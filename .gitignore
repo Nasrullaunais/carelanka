@@ -1,0 +1,20 @@
+## .NET
+api/bin/
+api/obj/
+*.user
+
+## Node / React
+web-ui/node_modules/
+web-ui/dist/
+web-ui/build/
+
+## Flutter
+mobile-ui/.dart_tool/
+mobile-ui/.flutter-plugin-registrant/
+mobile-ui/build/
+mobile-ui/**/*.g.dart
+
+## Editors / OS
+.vscode/
+.idea/
+.DS_Store

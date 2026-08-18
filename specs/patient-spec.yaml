@@ -1,0 +1,8 @@
+openapi: 3.0.3
+info:
+  title: CareLanka - Patient Management API
+  description: Owned by Member 4. Covers Patient, Admission, BedAssignment, Discharge.
+  version: 0.1.0
+paths: {}
+components:
+  schemas: {}

@@ -1,0 +1,8 @@
+openapi: 3.0.3
+info:
+  title: CareLanka - Staff Management API
+  description: Owned by Member 2. Covers StaffMember, Shift, Allocation, LeaveRequest.
+  version: 0.1.0
+paths: {}
+components:
+  schemas: {}

@@ -1,0 +1,8 @@
+openapi: 3.0.3
+info:
+  title: CareLanka - Emergency Service API
+  description: Owned by Member 1. Covers EmergencyCall, Ambulance, Dispatch, RouteLog.
+  version: 0.1.0
+paths: {}
+components:
+  schemas: {}

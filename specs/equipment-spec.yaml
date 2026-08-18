@@ -1,0 +1,8 @@
+openapi: 3.0.3
+info:
+  title: CareLanka - Health Equipment API
+  description: Owned by Member 3. Covers EquipmentItem, StockLevel, MaintenanceSchedule, Warning.
+  version: 0.1.0
+paths: {}
+components:
+  schemas: {}

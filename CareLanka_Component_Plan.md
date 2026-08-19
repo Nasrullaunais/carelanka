@@ -14,8 +14,11 @@ The system coordinates hospital operations across four areas: emergency response
 | **React (admin)** | Duty / Dispatch Manager | Oversees emergency dispatch and approves patient admission plans |
 | **React (admin)** | Hospital Administrator | Manages staff records and approves shift/roster plans |
 | **React (admin)** | Equipment & Inventory Manager | Monitors equipment stock and approves procurement/maintenance |
+| **Flutter (patient)** | Patient | Registers before a planned visit, views own admission status, bed/ward, and discharge details |
 
-*Flutter is for people doing the actual work (crews, nurses, staff). React is for people managing operations and approving what the AI recommends. Three roles on each side, and each role does a clearly different job.*
+*Flutter is for people doing the actual work (crews, nurses, staff) and for patients following their own stay. React is for people managing operations and approving what the AI recommends. Staff roles and the patient role see completely different screens: staff act on other people's records, a patient may only ever read their own.*
+
+**Patient accounts are optional and separate from patient records.** A `Patient` record is created by staff and exists whether or not that person ever logs in — an unconscious emergency arrival has a record and no account. An account, when one exists, is linked to the record afterwards. Patient Management owns the record; the account is only a read-only window onto it.
 
 ---
 
@@ -87,13 +90,17 @@ Manages the patient's stay from admission to discharge: what category of care th
 
 ### Main functions
 * Register a new patient and record admission details
-* Assign an administrative category (inpatient, outpatient, ICU, day-case)
-* Assign a bed/ward based on availability and category
+* Assign an administrative category (inpatient, outpatient, ICU, day-case) — set by clinical staff, never by the AI
+* Maintain the ward and bed register, and the live free/occupied state of every bed
+* Assign a bed/ward based on availability, category, and ward admission policy
 * Track patient status during their stay
 * Manage the discharge process
+* Give the patient a read-only view of their own stay (status, ward/bed, discharge details) in Flutter
 
 ### Main data it owns
-`Patient`, `Admission`, `BedAssignment`, `Discharge`
+`Patient`, `Admission`, `Ward`, `Bed`, `BedAssignment`, `Discharge`
+
+`Ward` and `Bed` sit here because occupancy only ever changes as a result of an admission or a discharge — the component that writes the data owns it. Equipment Management owns the movable medical equipment that is allocated *to* a ward (monitors, ventilators, consumables); Patient Management owns the ward itself and whether each bed is free.
 
 ### AI agent: Patient Admission & Bed Agent
 * **What it does:** Given a patient's admission category (set by clinical staff, not the AI) and the current bed availability, proposes which bed/ward to assign them to, and flags patients who meet the criteria for discharge.
@@ -148,7 +155,7 @@ Patient arrives, intake completed, outcome recorded
 | :--- | :--- |
 | **4 major business components, one per member** | Emergency, Staff, Equipment, Patient Management — one each |
 | **At least 4 distinct AI agents** | Dispatch & Routing, Staff Allocation, Equipment Monitoring, Patient Admission & Bed — each with its own data and job |
-| **At least 3 roles in Flutter, 3 in React, clearly different purposes** | 3 field roles (crew, nurse, staff) and 3 admin roles (dispatch, HR, equipment) — field work vs. oversight and approval |
+| **At least 3 roles in Flutter, 3 in React, clearly different purposes** | 4 Flutter roles (crew, nurse, staff, patient) and 3 admin roles (dispatch, HR, equipment) — field work and patient self-service vs. oversight and approval |
 | **Human approval before high-impact actions** | Reassigning committed resources, staff rosters, equipment spend above threshold, and bed/discharge decisions all need human sign-off |
 | **At least one external API** | Maps/navigation API for ambulance routing |
 | **Not a medical diagnosis system** | The Patient agent only works with administrative categories already set by staff — it never diagnoses |

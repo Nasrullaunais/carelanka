@@ -1,8 +1,1912 @@
 openapi: 3.0.3
+
 info:
   title: CareLanka - Patient Management API
-  description: Owned by Member 4. Covers Patient, Admission, BedAssignment, Discharge.
-  version: 0.1.0
-paths: {}
+  description: |
+    Owned by Member 4. Covers Patient, Admission, Ward, Bed, BedAssignment, Discharge.
+
+    Manages a patient's stay from arrival to discharge: who they are, whether they are
+    currently in the hospital, which bed they are in, and whether they can go home.
+
+    **The line this component does not cross.** `admission_category` (icu / hdu / inpatient /
+    day_case / outpatient) is a clinical decision, set by a human and recorded with
+    `category_set_by_staff_id`. It is an INPUT to the bed agent, never an output. No endpoint
+    here lets an AI set or change it.
+
+    **Design rationale** is in `patient-management-plan.md`.
+    **Cross-component boundaries** are in `integration_of_functions.md`.
+
+    Open item: bed ownership (see `integration_of_functions.md` section 5.1). This spec assumes
+    Patient Management owns bed occupancy, with an optional link to an Equipment-owned asset
+    record for the physical bed frame.
+  version: 0.2.0
+  contact:
+    name: Member 4 - Patient Management
+
+servers:
+  - url: /api
+    description: Shared CareLanka ASP.NET Core Web API
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Patients
+    description: Patient records. One row per human being, reused across visits.
+  - name: Admissions
+    description: One row per hospital visit, with its status workflow.
+  - name: Wards and Beds
+    description: The ward and bed register, and live occupancy.
+  - name: Bed Assignment
+    description: Agent proposals, human approval, and manual override.
+  - name: Discharge
+    description: Discharge checklist and confirmation.
+  - name: Patient Self-Service
+    description: What a logged-in patient may see about themselves. Deliberately narrow.
+  - name: Reports
+    description: Occupancy, length of stay, and agent performance.
+  - name: Integration
+    description: Read-only surfaces other components depend on.
+
+paths:
+
+  # ------------------------------------------------------------------
+  # Patients
+  # ------------------------------------------------------------------
+
+  /patients:
+    post:
+      tags: [Patients]
+      summary: Register a patient
+      description: |
+        Roles: WardNurse, AmbulanceCrew, DutyManager.
+
+        Creates a patient record. The record is created BY staff ABOUT a person - the patient
+        does not sign up for it and may never have an account.
+
+        Minimum viable identity: a name plus an NIC or phone. If neither identifier is available
+        (unconscious arrival, no documents), omit both and the server generates a
+        `temp_reference` such as `UNKNOWN-2026-0142`. Every patient must be identifiable somehow.
+
+        Call `/patients/lookup` first when an NIC is available, to avoid creating a duplicate.
+      operationId: createPatient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePatientRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Patient' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: A patient with this NIC already exists. The response carries the existing id.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+    get:
+      tags: [Patients]
+      summary: Search patients
+      description: |
+        Roles: WardNurse, DutyManager, HospitalAdministrator.
+
+        `search` matches full name, NIC, phone, or temp reference.
+      operationId: listPatients
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [full_name, created_at]
+            default: created_at
+        - $ref: '#/components/parameters/SortDir'
+      responses:
+        '200':
+          description: A page of patients
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/PatientSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /patients/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Patients]
+      summary: Get one patient with their visit history
+      description: 'Roles: WardNurse, DutyManager, HospitalAdministrator.'
+      operationId: getPatient
+      responses:
+        '200':
+          description: The patient, including every past and current admission
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatientDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Patients]
+      summary: Update a patient record
+      description: 'Roles: WardNurse, DutyManager.'
+      operationId: updatePatient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdatePatientRequest' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Patient' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /patients/lookup:
+    post:
+      tags: [Patients]
+      summary: Find an existing patient by NIC before registering a new one
+      description: |
+        Roles: WardNurse, AmbulanceCrew, DutyManager.
+
+        Business operation beyond CRUD. Duplicate patient records are the single most damaging
+        data problem in this component - a returning patient must keep one record with many
+        admissions, not gain a second identity. This endpoint is the guard, and both the staff
+        registration form and patient self-registration call it first.
+
+        Returns 200 with `found: false` when there is no match. A miss is a normal answer, not
+        an error.
+      operationId: lookupPatient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nic]
+              properties:
+                nic:
+                  type: string
+                  example: '199534501V'
+      responses:
+        '200':
+          description: Lookup result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [found]
+                properties:
+                  found: { type: boolean }
+                  patient:
+                    allOf:
+                      - $ref: '#/components/schemas/PatientSummary'
+                    nullable: true
+                  has_open_admission:
+                    type: boolean
+                    description: True when this patient is already in the hospital. Registering a second concurrent admission is almost always a mistake.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /patients/{id}/link-account:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Patients]
+      summary: Attach a patient login to an existing patient record
+      description: |
+        Roles: DutyManager.
+
+        A patient RECORD and a patient ACCOUNT are different things. The record is created by
+        staff and exists whether or not the person ever logs in. This endpoint links an optional
+        account to it afterwards. One account, one record.
+      operationId: linkPatientAccount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_account_id]
+              properties:
+                user_account_id: { type: string, format: uuid }
+      responses:
+        '204': { description: Linked }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This record or this account is already linked to another.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  # ------------------------------------------------------------------
+  # Admissions
+  # ------------------------------------------------------------------
+
+  /admissions:
+    post:
+      tags: [Admissions]
+      summary: Start an admission
+      description: |
+        Roles: WardNurse, AmbulanceCrew, DutyManager.
+
+        Creates a visit in status `awaiting_bed`.
+
+        `admission_category` and `category_set_by_staff_id` are both required. The second one is
+        deliberate: it is the recorded proof that a human clinician chose the care level. There
+        is no code path in this API that lets an agent supply it.
+      operationId: createAdmission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateAdmissionRequest' }
+      responses:
+        '201':
+          description: Created, status `awaiting_bed`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Admission' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: This patient already has an open admission.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+    get:
+      tags: [Admissions]
+      summary: List admissions
+      description: 'Roles: WardNurse, DutyManager. Nurses are scoped to their own ward.'
+      operationId: listAdmissions
+      parameters:
+        - name: status
+          in: query
+          description: Repeatable. Omit to get all non-terminal admissions.
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/AdmissionStatus' }
+          style: form
+          explode: true
+        - name: wardId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: category
+          in: query
+          schema: { $ref: '#/components/schemas/AdmissionCategory' }
+        - name: source
+          in: query
+          schema: { $ref: '#/components/schemas/AdmissionSource' }
+        - name: detailsComplete
+          in: query
+          description: Set false to build a nurse's "paperwork still missing" worklist.
+          schema: { type: boolean }
+        - name: search
+          in: query
+          description: Matches patient name or NIC.
+          schema: { type: string }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [created_at, expected_arrival, admitted_at, urgency]
+            default: created_at
+        - $ref: '#/components/parameters/SortDir'
+      responses:
+        '200':
+          description: A page of admissions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/AdmissionSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admissions/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Admissions]
+      summary: Get one admission with its full history
+      description: |
+        Roles: WardNurse, DutyManager.
+
+        Includes every bed assignment (accepted, rejected and expired), every agent run, and
+        every status change. Nothing is deleted or overwritten, so this is the audit trail.
+      operationId: getAdmission
+      responses:
+        '200':
+          description: The admission with assignment history and agent runs
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdmissionDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admissions/{id}/details:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    patch:
+      tags: [Admissions]
+      summary: Fill in details that were missing at registration
+      description: |
+        Roles: WardNurse, DutyManager.
+
+        Business operation beyond CRUD. Emergency arrivals are registered with the bare minimum
+        so care is not delayed; the rest is collected later, often from a relative.
+
+        Recalculates `details_complete` and `missing_fields` server-side. Data completeness is
+        deliberately NOT part of `status` - a patient can be `admitted` and still have paperwork
+        outstanding, and one field cannot express both without ambiguity.
+      operationId: completeAdmissionDetails
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompleteDetailsRequest' }
+      responses:
+        '200':
+          description: Updated, with recalculated completeness
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Admission' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admissions/{id}/arrive:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Admissions]
+      summary: Mark the patient as physically present in the bed
+      description: |
+        Roles: WardNurse.
+
+        Business operation beyond CRUD. Moves `bed_reserved` -> `admitted`, sets `admitted_at`,
+        and flips the bed assignment from `reserved` to `occupied` so the hold can no longer
+        expire.
+
+        Rejected with 409 from any other status - a patient cannot arrive into a bed that was
+        never approved.
+      operationId: markArrived
+      responses:
+        '200':
+          description: Now `admitted`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Admission' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
+  /admissions/{id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Admissions]
+      summary: Cancel an admission, with a reason
+      description: |
+        Roles: DutyManager.
+
+        Business operation beyond CRUD. Always a human act, never automatic. A computer cannot
+        know whether an ambulance was diverted, the patient died, or it is simply stuck in
+        traffic - only a person can make that claim, so a reason is mandatory.
+
+        Note the difference from a bed hold expiring: an expired hold frees the bed
+        automatically and needs nobody's approval, because it is cheap and reversible. Cancelling
+        declares that the patient is not coming, which is neither.
+
+        Releases any held bed. Not permitted once the patient is `admitted` - you cannot cancel
+        someone who is lying in your ward. Discharge them instead.
+      operationId: cancelAdmission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { $ref: '#/components/schemas/CancelReason' }
+                note: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Now `cancelled`, bed released
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Admission' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
+  /admissions/pre-admit:
+    post:
+      tags: [Admissions, Integration]
+      summary: Create a pre-admission from an ambulance dispatch
+      description: |
+        Roles: AmbulanceCrew, DutyManager, and the Emergency Service component.
+
+        Called by Emergency Service (Member 1) when an ambulance is dispatched to this hospital,
+        so a bed can be found BEFORE the patient arrives. That head start is the whole reason
+        the bed agent is worth having.
+
+        `patient_id` is supplied when the emergency call came from a logged-in patient, in which
+        case identity and history are already known. When it is null, an unidentified patient
+        record is created with a generated `temp_reference`.
+
+        `destination_ward_type_hint` is a routing hint only. It never becomes
+        `admission_category` on its own - a human still sets that.
+      operationId: preAdmitFromDispatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PreAdmitRequest' }
+      responses:
+        '201':
+          description: Pre-admission created in `awaiting_bed`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Admission' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: A pre-admission already exists for this `dispatch_id`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  # ------------------------------------------------------------------
+  # Wards and beds
+  # ------------------------------------------------------------------
+
+  /wards:
+    get:
+      tags: [Wards and Beds]
+      summary: List wards
+      description: 'Roles: any authenticated staff. Also read by Equipment Management for allocation.'
+      operationId: listWards
+      parameters:
+        - name: wardType
+          in: query
+          schema: { $ref: '#/components/schemas/WardType' }
+        - name: isActive
+          in: query
+          schema: { type: boolean, default: true }
+      responses:
+        '200':
+          description: Wards
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Ward' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Wards and Beds]
+      summary: Create a ward
+      description: |
+        Roles: HospitalAdministrator.
+
+        `gender_policy` is a property of the ward, not a rule the agent bends under pressure.
+        ICU and pediatric wards are `mixed` because real intensive care units are open bays;
+        general wards are usually `male` or `female`. Keeping this in data means the agent
+        applies one rule to every ward and never carries a special case for emergencies.
+      operationId: createWard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateWardRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ward' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: A ward with this name already exists.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /wards/{id}/occupancy:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Wards and Beds, Integration]
+      summary: Occupancy and care mix for one ward
+      description: |
+        Roles: any authenticated staff. Consumed by Staff Management (Member 2) to work out
+        staffing demand.
+
+        `patients_by_category` is the useful part: fifteen routine inpatients and two
+        high-dependency patients need very different staffing, even though both are
+        "seventeen patients".
+
+        `incoming_next_2h` lets the Staff Allocation Agent staff AHEAD of a rush instead of
+        reacting to one.
+
+        Counts only. No patient identities cross this boundary.
+      operationId: getWardOccupancy
+      responses:
+        '200':
+          description: Occupancy for the ward
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WardOccupancy' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /capacity/wards:
+    get:
+      tags: [Integration]
+      summary: Free bed counts across all wards
+      description: |
+        Roles: any authenticated staff. Consumed by the Emergency Service Dispatch and Routing
+        Agent (Member 1) to choose a destination hospital or ward.
+
+        `free_beds` counts beds that are usable, unoccupied, and not under a live reservation.
+        A reservation past its `reserved_until` counts as free. That expiry logic lives here, in
+        the owning service, so no other component re-implements it differently.
+
+        Counts only. No patient data.
+      operationId: getWardCapacity
+      responses:
+        '200':
+          description: Capacity summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WardCapacitySummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /beds:
+    get:
+      tags: [Wards and Beds]
+      summary: List beds
+      description: 'Roles: any authenticated staff.'
+      operationId: listBeds
+      parameters:
+        - name: wardId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: wardType
+          in: query
+          schema: { $ref: '#/components/schemas/WardType' }
+        - name: availability
+          in: query
+          description: '`free` applies hold expiry, so a bed with a lapsed reservation is reported free.'
+          schema:
+            type: string
+            enum: [free, reserved, occupied, out_of_service, all]
+            default: all
+        - name: needsIsolation
+          in: query
+          schema: { type: boolean }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of beds
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/Bed' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Wards and Beds]
+      summary: Add a bed to a ward
+      description: 'Roles: HospitalAdministrator. `bed_number` must be unique within its ward.'
+      operationId: createBed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateBedRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bed' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: That bed number already exists in this ward.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /beds/{id}/condition:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Wards and Beds, Integration]
+      summary: Take a bed out of service, or return it to service
+      description: |
+        Roles: HospitalAdministrator, and the Equipment Management component.
+
+        Business operation beyond CRUD. This is the write side of the Equipment integration:
+        when their Monitoring Agent finds a bed frame overdue for servicing, it calls this to
+        remove the bed from circulation. Our bed agent then has one fewer candidate, which can
+        push a ward to full and produce a downgrade proposal needing manager approval. One
+        equipment warning, one human decision about a patient.
+
+        Hard rule: a bed with a patient in it CANNOT be taken out of service. Returns 409 and
+        the caller retries after discharge. Maintenance never evicts a patient.
+      operationId: setBedCondition
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [condition, reason]
+              properties:
+                condition: { $ref: '#/components/schemas/BedCondition' }
+                reason: { type: string, maxLength: 300 }
+                equipment_asset_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Equipment Management's asset reference for the bed frame, when the split in integration_of_functions.md section 5.1 is agreed.
+      responses:
+        '200':
+          description: Condition updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bed' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The bed is occupied. Retry after discharge.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  # ------------------------------------------------------------------
+  # Bed assignment and the agent
+  # ------------------------------------------------------------------
+
+  /admissions/{id}/bed-suggestion:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Bed Assignment]
+      summary: Ask the Patient Admission and Bed Agent for a bed
+      description: |
+        Roles: WardNurse, DutyManager.
+
+        Agent entry point. Starts the workflow and returns immediately with a `workflow_id`;
+        poll `/workflows/{workflowId}` for progress.
+
+        What the agent does, in order: reads the admission's requirements, lists candidate beds,
+        discards every bed failing a hard rule, ranks the survivors on soft rules, and proposes
+        one - placing a 30 minute hold so nobody else takes it while a human decides.
+
+        Its proposal is then re-checked by a deterministic validator written in ordinary C#,
+        not by the model. A proposal that breaks a hard rule never reaches a human.
+
+        The agent has four tools: three read-only, and one that can only create a proposal
+        awaiting approval. There is no tool that admits a patient, confirms a discharge, changes
+        an admission category, or frees an occupied bed. Least privilege is enforced by the tool
+        list, not by prompt wording.
+
+        When no bed of the requested category is free, the agent tries one step down the ladder
+        (icu -> hdu -> inpatient) and returns `proposed_with_downgrade`, which always requires
+        DutyManager approval. When nothing on the ladder is free either, it returns
+        `no_bed_available` and the admission stays in `awaiting_bed` - a safe, recorded failure
+        rather than a guess.
+      operationId: requestBedSuggestion
+      responses:
+        '202':
+          description: Workflow started
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowAccepted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This admission is not in a status that can receive a bed proposal.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '503':
+          description: The agent service is unavailable. Use the manual assignment path instead.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /workflows/{workflowId}:
+    parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Bed Assignment]
+      summary: Agent execution summary
+      description: |
+        Roles: WardNurse, DutyManager.
+
+        Plan, completed steps, tool calls with timings, validation results, errors, retries,
+        approval status and final outcome.
+
+        `rationale` is a short human-readable summary shown in React. The model's raw internal
+        reasoning is NOT stored - the assignment requires persisting only the workflow state the
+        design needs, not hidden reasoning.
+      operationId: getWorkflow
+      responses:
+        '200':
+          description: Execution summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /bed-assignments/{id}/approve:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Bed Assignment]
+      summary: Approve a proposed bed - the high-impact human gate
+      description: |
+        Roles: WardNurse for a matching general, maternity or pediatric bed.
+        DutyManager only for ICU, HDU, or any downgrade.
+
+        ICU beds are the scarcest resource in a hospital, so neither the AI nor a ward nurse can
+        commit one alone. This is one of the two actions in this component that pause for
+        authorised human approval.
+
+        Before committing, the server re-checks that the bed is still free, inside a transaction
+        holding a row lock on the bed. This matters: the agent may propose bed 12 at 14:00 and
+        the nurse approve at 14:04, while someone else took it at 14:02. Without the lock, two
+        concurrent approvals both pass their check and both write. With it, the second waits,
+        re-reads, sees the bed taken, and fails cleanly with 409.
+
+        That re-check IS the deterministic validation the assignment requires before a
+        high-impact action. It is plain C# testing a fact against the database, with no model
+        involved. On 409, the client re-runs the agent and shows the nurse a fresh proposal.
+      operationId: approveBedAssignment
+      responses:
+        '200':
+          description: Approved. Admission moves to `bed_reserved`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BedAssignment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: This role may not approve this bed. ICU, HDU and downgrades need a DutyManager.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The bed is no longer available, or the hold expired. Re-run the agent.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /bed-assignments/{id}/reject:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Bed Assignment]
+      summary: Reject a proposed bed
+      description: |
+        Roles: WardNurse, DutyManager.
+
+        Releases the hold and returns the admission to `awaiting_bed` - the same place an expired
+        hold lands. One waiting state for every failure path, rather than a separate error state
+        for each thing that can go wrong.
+
+        The rejected assignment row is kept with `release_reason: rejected`. Nothing is deleted,
+        so the audit trail shows what was proposed and refused, not only what was accepted. The
+        reason also feeds the agent-performance report.
+      operationId: rejectBedAssignment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Rejected, hold released, admission back to `awaiting_bed`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Admission' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admissions/{id}/assign-bed:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Bed Assignment]
+      summary: Assign a bed manually, bypassing the agent
+      description: |
+        Roles: WardNurse for matching beds, DutyManager for ICU, HDU and downgrades.
+
+        The manual path must always work. If the only way to admit a patient were through the
+        AI, the hospital would stop the moment the AI stopped. It is also what makes the human
+        genuinely in control rather than merely able to say yes or no.
+
+        The same hard rules and the same row-locked re-check apply. A human may overrule the
+        agent's ranking; nobody may put an ICU patient in a general bed without it being recorded
+        as a downgrade.
+
+        Records `assigned_by: user` and an `override_reason` when this follows a rejected
+        proposal, which is what the agent-performance report measures.
+      operationId: assignBedManually
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bed_id]
+              properties:
+                bed_id: { type: string, format: uuid }
+                override_reason:
+                  type: string
+                  maxLength: 500
+                  description: Required when overriding a proposal the agent made.
+      responses:
+        '200':
+          description: Assigned. Admission moves to `bed_reserved`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BedAssignment' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The bed is taken, out of service, or breaks a hard rule.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  # ------------------------------------------------------------------
+  # Discharge
+  # ------------------------------------------------------------------
+
+  /discharges/candidates:
+    get:
+      tags: [Discharge]
+      summary: Patients whose checklist says they could go home
+      description: |
+        Roles: WardNurse, DutyManager.
+
+        Produced by a plain rule, not by the agent: every mandatory checklist item is ticked.
+        Checking whether five boxes are ticked is a WHERE clause, and putting a language model
+        in front of it would add cost, latency and a failure mode while buying nothing.
+
+        The list is advisory. Being on it changes nothing until a human confirms.
+      operationId: listDischargeCandidates
+      parameters:
+        - name: wardId
+          in: query
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of candidates
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/DischargeCandidate' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /discharges/{admissionId}/checklist:
+    parameters:
+      - name: admissionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [Discharge]
+      summary: Tick discharge checklist items
+      description: |
+        Each item is gated by role, not just by login:
+
+        - `clinical_clearance` - Doctor only. This is the wall. Without it nothing flags and
+          nothing discharges, and no automated process can ever set it. The `StaffMember` record
+          itself belongs to Staff Management; here we only check the role claim on the JWT.
+        - `medication_issued`, `follow_up_recorded`, `transport_arranged` - WardNurse
+        - `billing_settled` - HospitalAdministrator
+
+        Every tick records who did it and when.
+      operationId: updateDischargeChecklist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChecklistUpdateRequest' }
+      responses:
+        '200':
+          description: Checklist updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Discharge' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: This role may not tick this item.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /discharges/{admissionId}/confirm:
+    parameters:
+      - name: admissionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Discharge]
+      summary: Confirm discharge - the second high-impact human gate
+      description: |
+        Roles: WardNurse for outpatient, day_case and inpatient. DutyManager for ICU and HDU.
+
+        High impact: it ends the admission, frees the bed for the next patient, and sends someone
+        home. In one transaction it sets `discharged_at`, releases the bed assignment with
+        `release_reason: discharged`, and moves the admission to `discharged`.
+
+        Refused with 409 if any mandatory checklist item is unticked - `clinical_clearance` above
+        all.
+      operationId: confirmDischarge
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                summary_note:
+                  type: string
+                  maxLength: 2000
+                  description: Instructions the patient can read on their own phone afterwards.
+      responses:
+        '200':
+          description: Discharged, bed freed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Discharge' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Checklist incomplete, or the admission is not `ready_for_discharge`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  # ------------------------------------------------------------------
+  # Patient self-service
+  # ------------------------------------------------------------------
+
+  /me/pre-register:
+    post:
+      tags: [Patient Self-Service]
+      summary: Register your own details ahead of a planned visit
+      description: |
+        Roles: Patient.
+
+        Deliberately NOT an appointment booking. No doctor calendars, no time slots, no
+        rescheduling - that is a component-sized feature and this project does not have room for
+        it. This gets the useful part: the record is complete before the person walks in.
+
+        Matches on NIC first. An existing record is linked to the account rather than duplicated,
+        which is what stops the signup form creating the second identity that would otherwise
+        split a returning patient's history in two.
+      operationId: preRegisterSelf
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PreRegisterRequest' }
+      responses:
+        '201':
+          description: Pre-registered
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyAdmission' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: You already have an open admission.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /me/admission:
+    get:
+      tags: [Patient Self-Service]
+      summary: Your current stay
+      description: |
+        Roles: Patient. Resolved from the JWT - a patient cannot pass someone else's id.
+
+        Returns `MyAdmission`, a separate and deliberately small shape. This is NOT the staff
+        admission object with a filter applied. A filtered staff object leaks the first time
+        somebody adds a field and forgets the filter; a separate shape cannot leak what it does
+        not contain. There is no staff note, no agent reasoning, no rejection history, and
+        nothing about any other patient anywhere in it.
+      operationId: getMyAdmission
+      responses:
+        '200':
+          description: Your current stay, or 404 if you have none
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyAdmission' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /me/history:
+    get:
+      tags: [Patient Self-Service]
+      summary: Your past visits
+      description: 'Roles: Patient. Same narrow shape as /me/admission.'
+      operationId: getMyHistory
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Your past visits
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/MyAdmission' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ------------------------------------------------------------------
+  # Reports
+  # ------------------------------------------------------------------
+
+  /reports/occupancy:
+    get:
+      tags: [Reports]
+      summary: Bed occupancy over a date range
+      description: 'Roles: DutyManager, HospitalAdministrator.'
+      operationId: getOccupancyReport
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: wardId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Occupancy per ward per day
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/OccupancyReportRow' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/length-of-stay:
+    get:
+      tags: [Reports]
+      summary: Average length of stay by category and ward
+      description: 'Roles: DutyManager, HospitalAdministrator.'
+      operationId: getLengthOfStayReport
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Length of stay statistics
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/LengthOfStayRow' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/agent-performance:
+    get:
+      tags: [Reports]
+      summary: How well the bed agent is doing
+      description: |
+        Roles: DutyManager.
+
+        Proposals approved, rejected and overridden, average time to approval, downgrade rate,
+        and safe-failure count.
+
+        This is the agent's own observability, which the assignment asks for by name. It is also
+        the honest answer to "how do you know your agent is any good?" - a rejection rate is
+        evidence; a demo that went well is not.
+      operationId: getAgentPerformanceReport
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Agent performance
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AgentPerformanceReport' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+# ====================================================================
 components:
-  schemas: {}
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Shared JWT issued by the CareLanka API. Roles used by this component:
+        WardNurse, DutyManager, HospitalAdministrator, AmbulanceCrew, Doctor, Patient.
+
+  parameters:
+    PathId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    SortDir:
+      name: sortDir
+      in: query
+      schema: { type: string, enum: [asc, desc], default: desc }
+
+  responses:
+    BadRequest:
+      description: Validation failed
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ValidationProblemDetails' }
+    Unauthorized:
+      description: Missing or invalid token
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    Forbidden:
+      description: Authenticated, but this role may not do this
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    NotFound:
+      description: Not found
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    IllegalTransition:
+      description: |
+        Not a legal status change. The allowed moves are:
+        awaiting_bed -> awaiting_approval, cancelled;
+        awaiting_approval -> bed_reserved, awaiting_bed, cancelled;
+        bed_reserved -> admitted, awaiting_bed, cancelled;
+        admitted -> ready_for_discharge;
+        ready_for_discharge -> discharged, admitted.
+        Anything else is rejected here rather than silently allowed.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  schemas:
+
+    # ---------- enums ----------
+
+    Gender:
+      type: string
+      enum: [male, female, other]
+
+    AdmissionSource:
+      type: string
+      enum: [emergency, walk_in, pre_registered]
+
+    AdmissionCategory:
+      type: string
+      description: |
+        The care level. Set by clinical staff, never by an AI agent. Ordered most to least
+        intensive; the downgrade ladder walks icu -> hdu -> inpatient.
+      enum: [icu, hdu, inpatient, day_case, outpatient]
+
+    Urgency:
+      type: string
+      description: Used only to break ties when two admissions want the last bed.
+      enum: [routine, urgent, emergency]
+
+    AdmissionStatus:
+      type: string
+      description: |
+        Where the patient is in their journey. Never mixed with data completeness - see
+        `details_complete`.
+      enum:
+        - awaiting_bed
+        - awaiting_approval
+        - bed_reserved
+        - admitted
+        - ready_for_discharge
+        - discharged
+        - cancelled
+
+    CancelReason:
+      type: string
+      enum:
+        - diverted_to_other_hospital
+        - false_alarm
+        - died_en_route
+        - patient_refused
+        - no_show
+
+    WardType:
+      type: string
+      enum: [icu, hdu, general, maternity, pediatric, isolation]
+
+    GenderPolicy:
+      type: string
+      description: A property of the ward. ICU and pediatric are `mixed`; general wards usually are not.
+      enum: [male, female, mixed]
+
+    BedCondition:
+      type: string
+      enum: [usable, out_of_service]
+
+    AssignmentStatus:
+      type: string
+      enum: [reserved, occupied, released]
+
+    AssignedBy:
+      type: string
+      enum: [agent, user]
+
+    ReleaseReason:
+      type: string
+      enum: [discharged, hold_expired, cancelled, transferred, rejected]
+
+    AgentOutcome:
+      type: string
+      enum: [proposed, proposed_with_downgrade, no_bed_available, failed]
+
+    # ---------- common ----------
+
+    PagedResult:
+      type: object
+      required: [page, page_size, total_items, total_pages]
+      properties:
+        page: { type: integer }
+        page_size: { type: integer }
+        total_items: { type: integer }
+        total_pages: { type: integer }
+
+    ProblemDetails:
+      type: object
+      description: RFC 7807, as produced by ASP.NET Core.
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+
+    ValidationProblemDetails:
+      allOf:
+        - $ref: '#/components/schemas/ProblemDetails'
+        - type: object
+          properties:
+            errors:
+              type: object
+              additionalProperties:
+                type: array
+                items: { type: string }
+
+    AuditFields:
+      type: object
+      properties:
+        created_at: { type: string, format: date-time, readOnly: true }
+        updated_at: { type: string, format: date-time, readOnly: true }
+
+    # ---------- patient ----------
+
+    CreatePatientRequest:
+      type: object
+      required: [full_name, gender]
+      properties:
+        full_name: { type: string, minLength: 1, maxLength: 200 }
+        nic:
+          type: string
+          maxLength: 20
+          nullable: true
+          description: Omit for an unidentified arrival; the server then generates a temp_reference.
+        gender: { $ref: '#/components/schemas/Gender' }
+        date_of_birth: { type: string, format: date, nullable: true }
+        phone: { type: string, maxLength: 20, nullable: true }
+        address: { type: string, maxLength: 300, nullable: true }
+        emergency_contact_name: { type: string, maxLength: 200, nullable: true }
+        emergency_contact_phone: { type: string, maxLength: 20, nullable: true }
+
+    UpdatePatientRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreatePatientRequest'
+
+    PatientSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        full_name: { type: string }
+        nic: { type: string, nullable: true }
+        temp_reference:
+          type: string
+          nullable: true
+          description: Present only for patients registered without an identifier, e.g. UNKNOWN-2026-0142.
+        gender: { $ref: '#/components/schemas/Gender' }
+        date_of_birth: { type: string, format: date, nullable: true }
+
+    Patient:
+      allOf:
+        - $ref: '#/components/schemas/PatientSummary'
+        - $ref: '#/components/schemas/AuditFields'
+        - type: object
+          properties:
+            phone: { type: string, nullable: true }
+            address: { type: string, nullable: true }
+            emergency_contact_name: { type: string, nullable: true }
+            emergency_contact_phone: { type: string, nullable: true }
+            has_account:
+              type: boolean
+              description: Whether an optional patient login is linked. Most records never have one.
+
+    PatientDetail:
+      allOf:
+        - $ref: '#/components/schemas/Patient'
+        - type: object
+          properties:
+            admissions:
+              type: array
+              description: Every visit, newest first. One patient, many admissions.
+              items: { $ref: '#/components/schemas/AdmissionSummary' }
+
+    # ---------- admission ----------
+
+    CreateAdmissionRequest:
+      type: object
+      required: [patient_id, source, admission_category, category_set_by_staff_id, urgency]
+      properties:
+        patient_id: { type: string, format: uuid }
+        source: { $ref: '#/components/schemas/AdmissionSource' }
+        dispatch_id:
+          type: string
+          nullable: true
+          description: Emergency Service's reference. Required when source is `emergency`.
+        admission_category: { $ref: '#/components/schemas/AdmissionCategory' }
+        category_set_by_staff_id:
+          type: string
+          format: uuid
+          description: The clinician who chose the category. Recorded proof a human decided it.
+        urgency: { $ref: '#/components/schemas/Urgency' }
+        is_infectious:
+          type: boolean
+          default: false
+          description: Set by staff. Forces an isolation-capable bed.
+        expected_arrival: { type: string, format: date-time, nullable: true }
+
+    PreAdmitRequest:
+      type: object
+      required: [dispatch_id, expected_arrival, urgency]
+      properties:
+        dispatch_id: { type: string }
+        patient_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Set when the emergency call came from a logged-in patient. Null creates an unidentified record.
+        expected_arrival: { type: string, format: date-time }
+        urgency: { $ref: '#/components/schemas/Urgency' }
+        destination_ward_type_hint:
+          allOf:
+            - $ref: '#/components/schemas/WardType'
+          nullable: true
+          description: A routing hint from Emergency. Never becomes admission_category on its own.
+        provisional_name: { type: string, nullable: true }
+        provisional_gender:
+          allOf:
+            - $ref: '#/components/schemas/Gender'
+          nullable: true
+
+    CompleteDetailsRequest:
+      type: object
+      description: Any subset of the fields that were missing. Completeness is recalculated server-side.
+      properties:
+        nic: { type: string, nullable: true }
+        full_name: { type: string, nullable: true }
+        date_of_birth: { type: string, format: date, nullable: true }
+        phone: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        emergency_contact_name: { type: string, nullable: true }
+        emergency_contact_phone: { type: string, nullable: true }
+
+    AdmissionSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        patient: { $ref: '#/components/schemas/PatientSummary' }
+        source: { $ref: '#/components/schemas/AdmissionSource' }
+        admission_category: { $ref: '#/components/schemas/AdmissionCategory' }
+        urgency: { $ref: '#/components/schemas/Urgency' }
+        status: { $ref: '#/components/schemas/AdmissionStatus' }
+        details_complete: { type: boolean }
+        ward_name: { type: string, nullable: true }
+        bed_number: { type: string, nullable: true }
+        expected_arrival: { type: string, format: date-time, nullable: true }
+        admitted_at: { type: string, format: date-time, nullable: true }
+
+    Admission:
+      allOf:
+        - $ref: '#/components/schemas/AdmissionSummary'
+        - $ref: '#/components/schemas/AuditFields'
+        - type: object
+          properties:
+            dispatch_id: { type: string, nullable: true }
+            category_set_by_staff_id: { type: string, format: uuid }
+            category_set_at: { type: string, format: date-time }
+            is_infectious: { type: boolean }
+            missing_fields:
+              type: array
+              items: { type: string }
+              description: Empty when details_complete is true.
+            discharged_at: { type: string, format: date-time, nullable: true }
+            cancel_reason:
+              allOf:
+                - $ref: '#/components/schemas/CancelReason'
+              nullable: true
+
+    AdmissionDetail:
+      allOf:
+        - $ref: '#/components/schemas/Admission'
+        - type: object
+          properties:
+            bed_assignments:
+              type: array
+              description: Every assignment ever made for this admission, including rejected and expired ones.
+              items: { $ref: '#/components/schemas/BedAssignment' }
+            workflows:
+              type: array
+              description: Every agent run for this admission.
+              items: { $ref: '#/components/schemas/WorkflowSummary' }
+            discharge:
+              allOf:
+                - $ref: '#/components/schemas/Discharge'
+              nullable: true
+
+    # ---------- ward and bed ----------
+
+    CreateWardRequest:
+      type: object
+      required: [name, ward_type, gender_policy]
+      properties:
+        name: { type: string, maxLength: 100 }
+        ward_type: { $ref: '#/components/schemas/WardType' }
+        gender_policy: { $ref: '#/components/schemas/GenderPolicy' }
+        is_active: { type: boolean, default: true }
+
+    Ward:
+      allOf:
+        - $ref: '#/components/schemas/AuditFields'
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            ward_type: { $ref: '#/components/schemas/WardType' }
+            gender_policy: { $ref: '#/components/schemas/GenderPolicy' }
+            is_active: { type: boolean }
+            total_beds:
+              type: integer
+              description: Counted from beds, never stored. Two sources of truth would drift.
+
+    CreateBedRequest:
+      type: object
+      required: [ward_id, bed_number]
+      properties:
+        ward_id: { type: string, format: uuid }
+        bed_number: { type: string, maxLength: 20 }
+        has_isolation: { type: boolean, default: false }
+        nurse_station_distance:
+          type: integer
+          minimum: 1
+          default: 5
+          description: 1 is closest. Sicker patients are ranked toward lower values.
+        equipment_asset_id: { type: string, format: uuid, nullable: true }
+
+    Bed:
+      allOf:
+        - $ref: '#/components/schemas/AuditFields'
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            ward_id: { type: string, format: uuid }
+            ward_name: { type: string }
+            bed_number: { type: string }
+            has_isolation: { type: boolean }
+            nurse_station_distance: { type: integer }
+            condition: { $ref: '#/components/schemas/BedCondition' }
+            equipment_asset_id: { type: string, format: uuid, nullable: true }
+            availability:
+              type: string
+              enum: [free, reserved, occupied, out_of_service]
+              description: Computed. A reservation past its reserved_until reports as free.
+            occupied_by_admission_id: { type: string, format: uuid, nullable: true }
+
+    WardOccupancy:
+      type: object
+      properties:
+        ward_id: { type: string, format: uuid }
+        name: { type: string }
+        ward_type: { $ref: '#/components/schemas/WardType' }
+        total_beds: { type: integer }
+        occupied_beds: { type: integer }
+        reserved_beds: { type: integer }
+        out_of_service_beds: { type: integer }
+        patients_by_category:
+          type: object
+          description: Care mix. Fifteen inpatients and two HDU patients need different staffing.
+          additionalProperties: { type: integer }
+        incoming_next_2h:
+          type: integer
+          description: Admissions in bed_reserved arriving within two hours, so Staff can staff ahead of a rush.
+
+    WardCapacitySummary:
+      type: object
+      properties:
+        generated_at: { type: string, format: date-time }
+        wards:
+          type: array
+          items:
+            type: object
+            properties:
+              ward_id: { type: string, format: uuid }
+              name: { type: string }
+              ward_type: { $ref: '#/components/schemas/WardType' }
+              gender_policy: { $ref: '#/components/schemas/GenderPolicy' }
+              total_beds: { type: integer }
+              free_beds:
+                type: integer
+                description: Usable, unoccupied, and not under a live reservation.
+
+    # ---------- bed assignment and agent ----------
+
+    BedAssignment:
+      allOf:
+        - $ref: '#/components/schemas/AuditFields'
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            admission_id: { type: string, format: uuid }
+            bed_id: { type: string, format: uuid }
+            ward_name: { type: string }
+            bed_number: { type: string }
+            status: { $ref: '#/components/schemas/AssignmentStatus' }
+            reserved_until:
+              type: string
+              format: date-time
+              nullable: true
+              description: The expiring hold. Past this instant the bed is free again, with no human action.
+            assigned_by: { $ref: '#/components/schemas/AssignedBy' }
+            workflow_id: { type: string, format: uuid, nullable: true }
+            is_downgrade:
+              type: boolean
+              description: True when the bed is below the requested category. Always needs DutyManager approval.
+            approved_by_staff_id: { type: string, format: uuid, nullable: true }
+            approved_at: { type: string, format: date-time, nullable: true }
+            override_reason: { type: string, nullable: true }
+            released_at: { type: string, format: date-time, nullable: true }
+            release_reason:
+              allOf:
+                - $ref: '#/components/schemas/ReleaseReason'
+              nullable: true
+
+    WorkflowAccepted:
+      type: object
+      properties:
+        workflow_id: { type: string, format: uuid }
+        admission_id: { type: string, format: uuid }
+        status: { type: string, example: running }
+        poll_url: { type: string, example: /api/workflows/3fa85f64-5717-4562-b3fc-2c963f66afa6 }
+
+    WorkflowSummary:
+      type: object
+      description: |
+        Persisted agent execution state: id, objective, plan, completed steps, tool calls,
+        validation results, errors, approval status and outcome. Raw model reasoning is not
+        stored.
+      properties:
+        workflow_id: { type: string, format: uuid }
+        admission_id: { type: string, format: uuid }
+        objective: { type: string, example: assign_bed }
+        status:
+          type: string
+          enum: [running, awaiting_approval, completed, failed]
+        outcome:
+          allOf:
+            - $ref: '#/components/schemas/AgentOutcome'
+          nullable: true
+        plan:
+          type: array
+          items: { type: string }
+        steps:
+          type: array
+          items:
+            type: object
+            properties:
+              step: { type: string }
+              tool: { type: string, nullable: true }
+              started_at: { type: string, format: date-time }
+              duration_ms: { type: integer }
+              ok: { type: boolean }
+              error: { type: string, nullable: true }
+        proposed_bed_id: { type: string, format: uuid, nullable: true }
+        is_downgrade: { type: boolean }
+        rules_satisfied:
+          type: array
+          items: { type: string }
+          example: [category_match, gender_policy, isolation]
+        rationale:
+          type: string
+          nullable: true
+          description: Short human-readable summary shown to the approver. Not the model's raw reasoning.
+        alternatives:
+          type: array
+          items:
+            type: object
+            properties:
+              bed_id: { type: string, format: uuid }
+              reason_not_chosen: { type: string }
+        validation:
+          type: object
+          description: Result of the deterministic C# validator, run after the agent proposes and again at approval.
+          properties:
+            passed: { type: boolean }
+            failed_rules:
+              type: array
+              items: { type: string }
+        requires_approval_by:
+          type: string
+          enum: [ward_nurse, duty_manager]
+          nullable: true
+        retries: { type: integer }
+
+    # ---------- discharge ----------
+
+    ChecklistUpdateRequest:
+      type: object
+      description: Any subset. Each key is role-gated; clinical_clearance is Doctor-only.
+      properties:
+        clinical_clearance: { type: boolean }
+        medication_issued: { type: boolean }
+        billing_settled: { type: boolean }
+        follow_up_recorded: { type: boolean }
+        transport_arranged: { type: boolean }
+
+    ChecklistItem:
+      type: object
+      properties:
+        ticked: { type: boolean }
+        ticked_by_staff_id: { type: string, format: uuid, nullable: true }
+        ticked_at: { type: string, format: date-time, nullable: true }
+        mandatory: { type: boolean }
+
+    Discharge:
+      allOf:
+        - $ref: '#/components/schemas/AuditFields'
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            admission_id: { type: string, format: uuid }
+            flagged_by: { $ref: '#/components/schemas/AssignedBy' }
+            flagged_at: { type: string, format: date-time }
+            checklist:
+              type: object
+              additionalProperties: { $ref: '#/components/schemas/ChecklistItem' }
+            all_mandatory_ticked: { type: boolean }
+            confirmed_by_staff_id: { type: string, format: uuid, nullable: true }
+            confirmed_at: { type: string, format: date-time, nullable: true }
+            summary_note: { type: string, nullable: true }
+
+    DischargeCandidate:
+      type: object
+      properties:
+        admission_id: { type: string, format: uuid }
+        patient: { $ref: '#/components/schemas/PatientSummary' }
+        ward_name: { type: string }
+        bed_number: { type: string }
+        admission_category: { $ref: '#/components/schemas/AdmissionCategory' }
+        admitted_at: { type: string, format: date-time }
+        days_in_bed: { type: integer }
+        outstanding_items:
+          type: array
+          items: { type: string }
+          description: Empty for a true candidate. Populated rows are shown as "nearly ready".
+
+    # ---------- patient self-service ----------
+
+    PreRegisterRequest:
+      type: object
+      required: [nic, full_name, gender, expected_arrival]
+      properties:
+        nic: { type: string }
+        full_name: { type: string }
+        gender: { $ref: '#/components/schemas/Gender' }
+        date_of_birth: { type: string, format: date, nullable: true }
+        phone: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        emergency_contact_name: { type: string, nullable: true }
+        emergency_contact_phone: { type: string, nullable: true }
+        expected_arrival: { type: string, format: date-time }
+        reason_for_visit: { type: string, maxLength: 300, nullable: true }
+
+    MyAdmission:
+      type: object
+      description: |
+        What a patient may see about their own stay. A separate shape, not a filtered staff
+        object - it cannot leak staff notes, agent reasoning or other patients because it does
+        not contain them.
+      properties:
+        admission_id: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/AdmissionStatus' }
+        status_text:
+          type: string
+          description: Plain-language wording for the patient, e.g. "A bed is being arranged for you".
+        ward_name: { type: string, nullable: true }
+        bed_number: { type: string, nullable: true }
+        admitted_at: { type: string, format: date-time, nullable: true }
+        expected_arrival: { type: string, format: date-time, nullable: true }
+        discharged_at: { type: string, format: date-time, nullable: true }
+        discharge_instructions: { type: string, nullable: true }
+        details_complete: { type: boolean }
+        missing_fields:
+          type: array
+          items: { type: string }
+          description: So the patient can be asked to supply what is still outstanding.
+
+    # ---------- reports ----------
+
+    OccupancyReportRow:
+      type: object
+      properties:
+        date: { type: string, format: date }
+        ward_id: { type: string, format: uuid }
+        ward_name: { type: string }
+        total_beds: { type: integer }
+        occupied_beds: { type: integer }
+        occupancy_rate: { type: number, format: float }
+
+    LengthOfStayRow:
+      type: object
+      properties:
+        ward_name: { type: string }
+        admission_category: { $ref: '#/components/schemas/AdmissionCategory' }
+        admissions_count: { type: integer }
+        average_days: { type: number, format: float }
+        median_days: { type: number, format: float }
+
+    AgentPerformanceReport:
+      type: object
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        proposals_total: { type: integer }
+        approved: { type: integer }
+        rejected: { type: integer }
+        overridden_manually: { type: integer }
+        downgrades_proposed: { type: integer }
+        no_bed_available: { type: integer }
+        failed: { type: integer }
+        average_seconds_to_approval: { type: number, format: float }
+        average_agent_latency_ms: { type: number, format: float }

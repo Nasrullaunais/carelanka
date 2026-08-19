@@ -118,20 +118,44 @@ member's own job inside their feature folder.
 
 ## 5. Getting started
 
-The Flutter SDK was not available when this skeleton was created, so the
-platform folders (`android/`, `ios/`) are not generated yet. Whoever sets up
-first should run:
+> **⚠️ One-time setup — this must be done once, by one person, before anyone
+> can run the app.**
+>
+> The Flutter SDK was not installed on the machine where this skeleton was
+> created, so the platform folders (`android/` and `ios/`) **do not exist yet**.
+> Until someone generates them, `flutter run` will not work for anybody.
+
+**Whoever sets up first (only one person needs to do this):**
 
 ```bash
 cd mobile-ui
-flutter create .          # fills in android/ ios/ without touching lib/
+flutter create .          # adds android/ and ios/ — does NOT touch lib/
+flutter pub get
+flutter run               # check it launches
+```
+
+Then commit the generated folders so nobody else has to repeat it:
+
+```bash
+git add android ios
+git commit -m "Add Flutter platform folders (android/ios)"
+```
+
+`flutter create .` is safe to run here. Because `pubspec.yaml` already exists,
+Flutter fills in only what is missing — it leaves `lib/`, `pubspec.yaml`, this
+README and everyone's feature folders exactly as they are.
+
+**Everyone else, after that person has pushed:**
+
+```bash
+git pull
+cd mobile-ui
 flutter pub get
 flutter run
 ```
 
-`flutter create .` is safe here — it adds the missing platform folders and
-leaves existing `lib/`, `pubspec.yaml` and this README alone. Commit the
-generated folders once, so nobody else has to repeat it.
+If you pull and `android/` still isn't there, ask in the group chat who is doing
+the setup — don't run `flutter create .` a second time in parallel.
 
 ---
 

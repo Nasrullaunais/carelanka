@@ -17,7 +17,7 @@ It answers four questions:
 
 1. **Who is this person?** — the patient record, which survives across many visits
 2. **Are they in the hospital right now, and at what stage?** — the admission and its status
-3. **Which bed are they in?** — the ward and bed register, and who is in which bed
+3. **Which bed are they in?** — the ward register, and who is in which bed (the beds themselves belong to Equipment)
 4. **Are they ready to leave?** — the discharge checklist and confirmation
 
 ### What it deliberately does *not* do
@@ -29,6 +29,7 @@ It answers four questions:
 | Dispatching ambulances, routing | Emergency Service (Member 1) |
 | Nurse rosters, who is on shift | Staff Management (Member 2) |
 | Ventilators, monitors, consumables, stock | Equipment Management (Member 3) |
+| The bed register itself — adding beds, repairs, taking them out of service | Equipment Management (Member 3). We read it; see §3.1. |
 | Doctor appointment booking, time slots, calendars | Out of scope — see §11 |
 
 > **The line we do not cross:** the AI never decides *what care a patient needs*. It only decides *where to physically put them*, given a care level a human already chose. Everything in this document holds that line.
@@ -41,9 +42,9 @@ It answers four questions:
 | :--- | :--- | :--- |
 | **Ward Nurse** | Flutter | Register patients, admit, complete missing details, update status, approve normal-ward beds, tick discharge checklist items, request discharge |
 | **Duty / Dispatch Manager** | React | Everything a nurse can do, plus approve ICU/HDU beds, approve downgrades, confirm ICU discharges, cancel admissions, view all wards |
-| **Hospital Administrator** | React | Manage the ward and bed register (create wards, add beds, mark beds out of service). Read-only on patients. |
+| **Hospital Administrator** | React | Manage the ward register (create and deactivate wards). Beds belong to Equipment. Read-only on patients. |
 | **Ambulance Crew** | Flutter | Create a pre-admission for a patient they are bringing in. Read-only on everything else. |
-| **Patient** | Flutter | Read **their own** admission status, ward/bed, and discharge info. Pre-register before a planned visit. Raise an emergency call (the screen is ours, the call record is Emergency's — §15.3). Nothing else. |
+| **Patient** | Flutter | Read **their own** admission status, ward/bed, and discharge info. Pre-register before a planned visit. Raise an emergency call (the screen is ours, the call record is Emergency's — `integration_of_functions.md` §4.1). Nothing else. |
 
 ### Two rules about the patient role
 
@@ -108,7 +109,7 @@ Constraint: `nic IS NOT NULL OR temp_reference IS NOT NULL` — every patient mu
 | `cancel_reason` | enum, nullable | `diverted_to_other_hospital` `false_alarm` `died_en_route` `patient_refused` `no_show` |
 | `created_at` / `updated_at` | timestamptz | |
 
-**Ward** — a physical ward. Managed by the Hospital Administrator, changes rarely.
+**Ward** — a physical ward. Ours (pending §15.1), managed by the Hospital Administrator, changes rarely.
 
 | Field | Type | Notes |
 | :--- | :--- | :--- |
@@ -119,20 +120,35 @@ Constraint: `nic IS NOT NULL OR temp_reference IS NOT NULL` — every patient mu
 | `is_active` | boolean | |
 | `created_at` / `updated_at` | timestamptz | |
 
-Capacity is **not** stored — it is `COUNT(beds WHERE ward_id = x)`. Storing it means two sources of truth that will drift.
+Capacity is **not** stored — it is a count of Equipment's beds in this ward. Storing it means two sources of truth that will drift, and the number would be ours to keep in step with somebody else's table.
 
-**Bed** — a physical bed slot. Belongs to exactly one ward and never moves.
+`gender_policy` and `ward_type` are why the ward stays with us: they are admission-policy facts that drive the agent's hard rules. Equipment cares about frames and servicing, not about whether a ward is male or female.
 
-| Field | Type | Notes |
-| :--- | :--- | :--- |
-| `id` | uuid, PK | |
-| `ward_id` | uuid, FK → Ward | |
-| `bed_number` | text | Unique **within** a ward: `UNIQUE(ward_id, bed_number)` |
-| `has_isolation` | boolean | Side room / curtained isolation capability |
-| `nurse_station_distance` | smallint | 1 = closest. Used for a soft ranking rule. |
-| `condition` | enum | `usable` `out_of_service` |
-| `equipment_asset_id` | uuid, nullable | Optional link to Equipment Management's asset record for the physical bed frame. See §12. |
-| `created_at` / `updated_at` | timestamptz | |
+**Bed** — **owned by Equipment Management (Member 3). We read it, we never write it.**
+
+They create beds, retire them, and mark them out of service for repair. We need these fields from their register:
+
+| Field | Notes |
+| :--- | :--- |
+| `id` | |
+| `ward_id` | Which ward the bed sits in |
+| `bed_number` | Unique within a ward |
+| `has_isolation` | Side room / curtained isolation capability — drives hard rule H4 |
+| `nurse_station_distance` | 1 = closest. Drives soft rule S2. |
+| `condition` | `usable` / `out_of_service` — drives hard rule H1 |
+
+**Why occupancy is not a column here.** Whether a bed is free is not stored on the bed at all — it is the presence or absence of a live row in our `BedAssignment`. That is what lets Equipment own the bed without either of us writing to the other's table:
+
+```
+"Is bed 12 free?"
+    = it exists in Equipment's register        (their data, we read)
+    AND condition = 'usable'                   (their data, we read)
+    AND no live BedAssignment references it    (our data)
+```
+
+Two reads, zero shared writes. See `integration_of_functions.md` §6.1.
+
+> **This is our hardest external dependency.** Without a readable bed register the agent has no candidates. Agree the shape with Member 3 early, and seed a stub table locally so we can build and test before their component exists.
 
 **BedAssignment** — the link between an admission and a bed, plus the full story of how it got there.
 
@@ -176,8 +192,7 @@ Capacity is **not** stored — it is `COUNT(beds WHERE ward_id = x)`. Storing it
 | `patient(nic)` unique | Duplicate prevention + lookup on registration |
 | `admission(status)` | Every dashboard filters on status |
 | `admission(patient_id, created_at desc)` | "Show me this patient's visit history" |
-| `bed(ward_id, condition)` | The bed-availability query the agent runs constantly |
-| `bed_assignment(bed_id) WHERE status IN ('reserved','occupied')` partial | Finding the current occupant of a bed — the hot path |
+| `bed_assignment(bed_id) WHERE status IN ('reserved','occupied')` **UNIQUE** partial | Finding the current occupant — and making a second live assignment for one bed impossible at the database level |
 | `bed_assignment(admission_id)` | Assignment history for one admission |
 
 ### 3.3 Transactions and concurrency
@@ -188,14 +203,16 @@ Approving a bed does three things that must all succeed or all fail:
 2. Flip the `BedAssignment` to `occupied`
 3. Move the admission to `bed_reserved`
 
-This runs in **one transaction with a row lock on the bed** (`SELECT ... FOR UPDATE`). Without the lock, two nurses approving different patients into the same bed at the same moment both pass the check and both write. With it, the second one waits, re-reads, sees it taken, and fails cleanly with `409 Conflict`.
+This runs in **one transaction, taking a lock keyed on the bed** (`SELECT ... FOR UPDATE` over that bed's live `BedAssignment` rows, plus a `UNIQUE` partial index so the database refuses a second live assignment for one bed even if the lock is ever bypassed). Without it, two nurses approving different patients into the same bed at the same moment both pass the check and both write. With it, the second waits, re-reads, sees it taken, and fails cleanly with `409 Conflict`.
+
+The belt-and-braces detail matters here: the bed row itself belongs to Equipment, so we cannot rely on locking *their* row. The uniqueness guarantee has to live in our own table.
 
 This is the single most important piece of database work in the component, and it is a likely viva question.
 
 ### 3.4 Seed data
 
 - 5 wards: 1 ICU (mixed), 1 HDU (mixed), 2 general (one male, one female), 1 maternity (female)
-- ~40 beds spread across them, 3 with `has_isolation = true`, 2 `out_of_service`
+- ~40 beds, 3 with `has_isolation = true`, 2 `out_of_service` — **owned by Equipment.** Until their component exists, seed a local stub so we can build and test alone.
 - ~15 patients with a realistic mix: some discharged, some admitted, 1 unidentified, 1 with a linked account
 - At least one admission sitting in `awaiting_approval` so the demo has something to approve on day one
 
@@ -378,12 +395,13 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 
 | Method | Route | Role | Notes |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/api/wards` | All staff | |
-| `POST` | `/api/wards` | Admin | |
-| `GET` | `/api/wards/{id}/occupancy` | All staff | Free/occupied counts, category mix |
-| `GET` | `/api/beds` | All staff | `?wardId=`, `?status=free`, `?wardType=` |
-| `POST` | `/api/beds` | Admin | |
-| `POST` | `/api/beds/{id}/out-of-service` | Admin | **Business op.** Refuses if a patient is currently in it. |
+| `GET` | `/api/wards` | All staff | Also read by Equipment for allocation |
+| `POST` | `/api/wards` | Admin | Ward register — ours, pending §15.1 |
+| `GET` | `/api/wards/{id}/occupancy` | All staff | Free/occupied counts, care mix, incoming |
+| `GET` | `/api/beds` | All staff | **Availability view.** Joins Equipment's register with our assignments and applies hold expiry. |
+| `GET` | `/api/beds/{id}/occupancy` | All staff, Equipment | **Business op.** Is anyone in this bed? Equipment calls this **before** servicing it — maintenance never evicts a patient. |
+
+Creating, retiring and taking beds out of service are **Equipment's endpoints, not ours** (`integration_of_functions.md` §6.1).
 
 ### 7.4 Bed assignment and the agent
 
@@ -478,7 +496,7 @@ Deliberately *not* in the agent's remit: setting the admission category (clinica
 | Tool | Access | Purpose |
 | :--- | :--- | :--- |
 | `get_admission_requirements(admission_id)` | read | Category, gender, infectious flag, urgency |
-| `list_available_beds(ward_type, gender, needs_isolation)` | read | Only free, usable beds |
+| `list_available_beds(ward_type, gender, needs_isolation)` | read | Candidate beds: Equipment's register joined with our assignments, hold expiry applied. Only free, usable beds come back. |
 | `get_ward_occupancy()` | read | Load per ward, for the balancing rule |
 | `propose_bed(admission_id, bed_id, rationale)` | **write — proposal only** | Creates a `reserved` BedAssignment awaiting approval |
 
@@ -628,11 +646,12 @@ Full detail — including the code-level rules for who may write what — is in 
 | **We provide** | Ward occupancy and patient counts. Read-only. | Staff (Member 2), so the Allocation agent knows staffing demand |
 | **We provide** | Ward list | Equipment (Member 3), for allocating equipment to wards |
 | **We consume** | Dispatch notification: `dispatch_id`, ETA, patient basics | Emergency (Member 1) — triggers a pre-admission |
-| **We consume** | Bed-frame maintenance status → sets our `Bed.condition = out_of_service` | Equipment (Member 3), if the asset split in §15.1 is agreed |
-| **We send** | Patient-raised emergency call (screen only; the record is theirs) | Emergency (Member 1) — see §15.3 |
+| **We provide** | "Is this bed occupied?" — checked before servicing | Equipment (Member 3) |
+| **We consume** | **The bed register** — id, ward, number, condition, isolation | Equipment (Member 3). **Our hardest dependency**: no register, no candidates for the agent. |
+| **We send** | Patient-raised emergency call (screen only; the record is theirs) | Emergency (Member 1) |
 | **We consume** | Nothing else. No other component writes our tables directly. | |
 
-The Equipment link is worth having in both directions: their agent flags a bed frame as overdue for service, our `Bed.condition` flips to `out_of_service`, and our agent has one fewer bed to choose from. Two components, two agents, one visible consequence.
+The Equipment link runs both ways and neither side writes the other's table. Their agent flags a bed frame overdue for servicing → it asks us whether anyone is in it → if free, they set it `out_of_service` → our agent has one fewer candidate → if that tips the ward to full, it proposes a downgrade, which needs Duty Manager approval. One equipment warning, one human decision about a patient.
 
 This matches the group plan, which already states that Emergency and Staff read ward capacity **from Patient Management**.
 
@@ -672,7 +691,8 @@ Rule-based assertions, not an LLM judge. The assignment allows LLM-as-judge only
 
 | Decision | Reason | If you disagree |
 | :--- | :--- | :--- |
-| **Bed occupancy** is ours; the **bed frame as a maintainable asset** can be Equipment's, linked by `equipment_asset_id` | Occupancy changes only as a result of an admission or discharge — the component that writes the data owns it. Splitting it any other way puts two students' code in lockstep on every admission. The group plan already routes both other agents to us for capacity. | Still open — §15.1 |
+| **Equipment owns `Bed`; we own `BedAssignment`** | Agreed with the group. It works because occupancy is not a column on the bed — it is the presence of a live assignment row in our table. So neither side writes the other's table, and no admission depends on a cross-component write. | Settled |
+| `Ward` stays with us | `gender_policy` and `ward_type` are admission-policy facts driving the agent's hard rules, not maintenance facts | Open — §15.1 |
 | The agent does bed assignment **only** | One contract, one tool list, one failure mode. Discharge flagging is a `WHERE` clause and does not need a model. | — |
 | ICU full → propose a downgrade, don't refuse | Gives the demo its best moment: agent hits a wall, offers something imperfect, refuses to act alone, waits for a human. Refusing outright is safer but makes the agent look useless exactly when it matters. | Option A (refuse and escalate) is defensible and simpler |
 | Never suggest moving an existing ICU patient out | That's a clinical judgement about a second patient | — |
@@ -687,9 +707,11 @@ Rule-based assertions, not an LLM judge. The assignment allows LLM-as-judge only
 
 ## 15. Open questions for the group
 
-**1. Beds — still open, and everything else rests on it.**
-Proposed split: Equipment owns the bed *frame* as a maintainable asset (serial number, service history); we own the bed *slot* and its occupancy; linked by `Bed.equipment_asset_id`. The exact question for the leader and Member 3: *"Does Equipment want bed frames as maintainable assets? If yes, they own the asset record and we own the occupancy."*
-The reason occupancy cannot sit with Equipment: a bed's status changes only when we admit or discharge someone, so every admission would become a cross-service call between two students' code, on the critical path, for nine weeks.
+**1. Does `Ward` sit with us or with Equipment?**
+Beds are settled — Equipment owns the `Bed` register, we own `BedAssignment` (§3.1). Wards are not. Our argument: `gender_policy` and `ward_type` drive the agent's hard rules, and Equipment has no use for them. Written as ours; Member 3 and the leader to confirm.
+
+**1b. The bed register shape — agree it with Member 3 this week.**
+This is our hardest external dependency: no readable bed register, no candidates for the agent. We need `id`, `ward_id`, `bed_number`, `condition`, `has_isolation`, `nurse_station_distance`. Seed a local stub in the meantime so we can build and test before their component exists.
 
 **2. Who owns the shared agent-workflow tables?**
 All four agents must persist workflow state. §9.1 of the assignment requires it, and the rubric scores it under a **group** criterion — *"Integrated Architecture, Agent Orchestration and State Management (10)"* — not an individual one. §10 also requires one workflow that crosses all four agents. Four separately designed workflow schemas would make that trace a four-way join.

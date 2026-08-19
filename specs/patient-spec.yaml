@@ -16,9 +16,14 @@ info:
     **Design rationale** is in `patient-management-plan.md`.
     **Cross-component boundaries** are in `integration_of_functions.md`.
 
-    Open item: bed ownership (see `integration_of_functions.md` section 5.1). This spec assumes
-    Patient Management owns bed occupancy, with an optional link to an Equipment-owned asset
-    record for the physical bed frame.
+    **Bed ownership (settled).** Equipment Management owns the `Bed` register - creating beds,
+    retiring them, and taking them out of service for repair. Patient Management owns
+    `BedAssignment` - who is in a bed, the hold on a proposed bed, and approvals. This works
+    because occupancy is not a column on the bed: it is the presence or absence of a live
+    assignment row. Neither component writes the other's table. See
+    `integration_of_functions.md` section 6.1.
+
+    Open: whether `Ward` sits here or with Equipment. Written as ours.
   version: 0.2.0
   contact:
     name: Member 4 - Patient Management
@@ -36,7 +41,9 @@ tags:
   - name: Admissions
     description: One row per hospital visit, with its status workflow.
   - name: Wards and Beds
-    description: The ward and bed register, and live occupancy.
+    description: |
+      The ward register (ours) and bed availability. The beds themselves belong to Equipment
+      Management; endpoints here read their register and join it with our assignments.
   - name: Bed Assignment
     description: Agent proposals, human approval, and manual override.
   - name: Discharge
@@ -609,8 +616,12 @@ paths:
   /beds:
     get:
       tags: [Wards and Beds]
-      summary: List beds
-      description: 'Roles: any authenticated staff.'
+      summary: List beds with their availability
+      description: |
+        Roles: any authenticated staff.
+
+        Reads Equipment Management's bed register and joins it with our assignments, applying
+        hold expiry. This is the candidate list the bed agent works from.
       operationId: listBeds
       parameters:
         - name: wardId
@@ -645,79 +656,35 @@ paths:
                         type: array
                         items: { $ref: '#/components/schemas/Bed' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-    post:
-      tags: [Wards and Beds]
-      summary: Add a bed to a ward
-      description: 'Roles: HospitalAdministrator. `bed_number` must be unique within its ward.'
-      operationId: createBed
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/CreateBedRequest' }
-      responses:
-        '201':
-          description: Created
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Bed' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '409':
-          description: That bed number already exists in this ward.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ProblemDetails' }
 
-  /beds/{id}/condition:
+  /beds/{id}/occupancy:
     parameters:
       - $ref: '#/components/parameters/PathId'
-    post:
+    get:
       tags: [Wards and Beds, Integration]
-      summary: Take a bed out of service, or return it to service
+      summary: Is anyone in this bed?
       description: |
-        Roles: HospitalAdministrator, and the Equipment Management component.
+        Roles: any authenticated staff, and the Equipment Management component.
 
-        Business operation beyond CRUD. This is the write side of the Equipment integration:
-        when their Monitoring Agent finds a bed frame overdue for servicing, it calls this to
-        remove the bed from circulation. Our bed agent then has one fewer candidate, which can
-        push a ward to full and produce a downgrade proposal needing manager approval. One
-        equipment warning, one human decision about a patient.
+        Equipment calls this BEFORE taking a bed out of service for repair or maintenance.
+        Creating, retiring and servicing beds are their operations on their own table - but a
+        bed with a patient in it must not be withdrawn, and only Patient Management knows
+        whether it is occupied. This endpoint is that answer.
 
-        Hard rule: a bed with a patient in it CANNOT be taken out of service. Returns 409 and
-        the caller retries after discharge. Maintenance never evicts a patient.
-      operationId: setBedCondition
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [condition, reason]
-              properties:
-                condition: { $ref: '#/components/schemas/BedCondition' }
-                reason: { type: string, maxLength: 300 }
-                equipment_asset_id:
-                  type: string
-                  format: uuid
-                  nullable: true
-                  description: Equipment Management's asset reference for the bed frame, when the split in integration_of_functions.md section 5.1 is agreed.
+        `occupied` is true when a live assignment exists: status `occupied`, or `reserved` with
+        a `reserved_until` still in the future. A lapsed hold does not block servicing.
+
+        The hard rule this exists to enforce: maintenance never evicts a patient. If the answer
+        is occupied, Equipment waits for discharge.
+      operationId: getBedOccupancy
       responses:
         '200':
-          description: Condition updated
+          description: Occupancy status for one bed
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Bed' }
-        '400': { $ref: '#/components/responses/BadRequest' }
+              schema: { $ref: '#/components/schemas/BedOccupancyStatus' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409':
-          description: The bed is occupied. Retry after discharge.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   # ------------------------------------------------------------------
   # Bed assignment and the agent
@@ -1611,21 +1578,29 @@ components:
               type: integer
               description: Counted from beds, never stored. Two sources of truth would drift.
 
-    CreateBedRequest:
+    BedOccupancyStatus:
       type: object
-      required: [ward_id, bed_number]
+      description: Answer to "may this bed be taken out of service?" - consumed by Equipment Management.
       properties:
-        ward_id: { type: string, format: uuid }
-        bed_number: { type: string, maxLength: 20 }
-        has_isolation: { type: boolean, default: false }
-        nurse_station_distance:
-          type: integer
-          minimum: 1
-          default: 5
-          description: 1 is closest. Sicker patients are ranked toward lower values.
-        equipment_asset_id: { type: string, format: uuid, nullable: true }
+        bed_id: { type: string, format: uuid }
+        occupied:
+          type: boolean
+          description: True if a live assignment exists. An expired hold does not count.
+        assignment_status:
+          allOf:
+            - $ref: '#/components/schemas/AssignmentStatus'
+          nullable: true
+        reserved_until: { type: string, format: date-time, nullable: true }
+        may_take_out_of_service:
+          type: boolean
+          description: The direct answer for Equipment. False while a patient is in the bed or a live hold stands.
 
     Bed:
+      description: |
+        A bed as this component sees it. `id`, `ward_id`, `bed_number`, `has_isolation`,
+        `nurse_station_distance` and `condition` are read from Equipment Management's register
+        and are never written here. `availability` and `occupied_by_admission_id` are computed
+        from our own BedAssignment rows.
       allOf:
         - $ref: '#/components/schemas/AuditFields'
         - type: object
@@ -1637,7 +1612,6 @@ components:
             has_isolation: { type: boolean }
             nurse_station_distance: { type: integer }
             condition: { $ref: '#/components/schemas/BedCondition' }
-            equipment_asset_id: { type: string, format: uuid, nullable: true }
             availability:
               type: string
               enum: [free, reserved, occupied, out_of_service]

@@ -379,6 +379,11 @@ paths:
         Business operation beyond CRUD. Emergency arrivals are registered with the bare minimum
         so care is not delayed; the rest is collected later, often from a relative.
 
+        This is also the endpoint that finishes a bystander-reported patient. Somebody called an
+        ambulance for a stranger, so almost every field started empty; a relative arrives with
+        the NIC and the nurse photographs it and completes the record here. Same endpoint, same
+        screen - the bystander case is a user of this machinery, not a separate copy of it.
+
         Recalculates `details_complete` and `missing_fields` server-side. Data completeness is
         deliberately NOT part of `status` - a patient can be `admitted` and still have paperwork
         outstanding, and one field cannot express both without ambiguity.
@@ -479,9 +484,15 @@ paths:
         so a bed can be found BEFORE the patient arrives. That head start is the whole reason
         the bed agent is worth having.
 
-        `patient_id` is supplied when the emergency call came from a logged-in patient, in which
-        case identity and history are already known. When it is null, an unidentified patient
-        record is created with a generated `temp_reference`.
+        `patient_is_caller` decides whose medical record this becomes. When true, `patient_id` is
+        supplied and the admission links to that existing record - identity and history already
+        known. When false, the person who is hurt is someone else, so a NEW patient record is
+        created from the provisional details, and the caller is stored as the emergency contact
+        and as `reported_by_user_id`.
+
+        The question is asked once, on the call screen, by the caller - who is far better placed
+        to answer it than anyone reconstructing it afterwards. Filing one person's emergency
+        under another person's record is the failure this prevents.
 
         `destination_ward_type_hint` is a routing hint only. It never becomes
         `admission_category` on its own - a human still sets that.
@@ -1467,14 +1478,22 @@ components:
 
     PreAdmitRequest:
       type: object
-      required: [dispatch_id, expected_arrival, urgency]
+      required: [dispatch_id, expected_arrival, urgency, patient_is_caller]
       properties:
         dispatch_id: { type: string }
+        patient_is_caller:
+          type: boolean
+          description: Answered by the caller on the emergency screen. False means the person who is hurt is someone else.
+        caller_user_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: The app user who raised the call. Stored as the patient's emergency contact when they are not the patient.
         patient_id:
           type: string
           format: uuid
           nullable: true
-          description: Set when the emergency call came from a logged-in patient. Null creates an unidentified record.
+          description: Required when patient_is_caller is true. Ignored otherwise - a new record is created instead.
         expected_arrival: { type: string, format: date-time }
         urgency: { $ref: '#/components/schemas/Urgency' }
         destination_ward_type_hint:
@@ -1525,6 +1544,11 @@ components:
             category_set_by_staff_id: { type: string, format: uuid }
             category_set_at: { type: string, format: date-time }
             is_infectious: { type: boolean }
+            reported_by_user_id:
+              type: string
+              format: uuid
+              nullable: true
+              description: The app user who raised the emergency call, when they are not the patient.
             missing_fields:
               type: array
               items: { type: string }

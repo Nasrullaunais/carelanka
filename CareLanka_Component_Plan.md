@@ -91,21 +91,21 @@ Manages the patient's stay from admission to discharge: what category of care th
 ### Main functions
 * Register a new patient and record admission details
 * Assign an administrative category (inpatient, outpatient, ICU, day-case) — set by clinical staff, never by the AI
-* Maintain the ward and bed register, and the live free/occupied state of every bed
+* Maintain the ward register, and the live free/occupied state of every bed
 * Assign a bed/ward based on availability, category, and ward admission policy
 * Track patient status during their stay
 * Manage the discharge process
 * Give the patient a read-only view of their own stay (status, ward/bed, discharge details) in Flutter
 
 ### Main data it owns
-`Patient`, `Admission`, `Ward`, `Bed`, `BedAssignment`, `Discharge`
+`Patient`, `Admission`, `Ward`, `BedAssignment`, `Discharge`
 
-`Ward` and `Bed` sit here because occupancy only ever changes as a result of an admission or a discharge — the component that writes the data owns it. Equipment Management owns the movable medical equipment that is allocated *to* a ward (monitors, ventilators, consumables); Patient Management owns the ward itself and whether each bed is free.
+**Beds are split with Equipment Management.** Equipment owns the `Bed` register — creating beds, retiring them, and taking them out of service for repair. Patient Management owns `BedAssignment` — who is in a bed, the hold on a proposed bed, and approvals. This works cleanly because occupancy is not a column on the bed: it is the presence or absence of a live assignment row, so neither component ever writes the other's table. Equipment also owns the movable medical equipment allocated *to* a ward (monitors, ventilators, consumables). `Ward` sits with Patient Management because `ward_type` and `gender_policy` are admission-policy facts that drive the bed agent's rules.
 
 ### AI agent: Patient Admission & Bed Agent
-* **What it does:** Given a patient's admission category (set by clinical staff, not the AI) and the current bed availability, proposes which bed/ward to assign them to, and flags patients who meet the criteria for discharge.
-* **What it looks at:** Bed/ward availability, the admission category already set by clinical staff, and discharge checklist status
-* **What it produces:** A proposed bed/ward assignment, and a list of patients flagged as ready for discharge review
+* **What it does:** Given a patient's admission category (set by clinical staff, not the AI) and the current bed availability, proposes which specific ward and bed to assign them to. One job only — logistics, never clinical judgement.
+* **What it looks at:** Bed/ward availability (Equipment's bed register joined with our assignments) and the admission category already set by clinical staff
+* **What it produces:** A proposed bed/ward assignment, with a downgrade flagged when no bed of the requested category is free. Discharge candidates come from a plain checklist rule, not from the agent — checking whether every box is ticked does not need a language model.
 * **Who approves / uses it:** A nurse or Duty Manager confirms the bed assignment and confirms discharge. The AI never decides a patient's medical condition or diagnosis — it only works with the administrative category and checklist that clinical staff have already set.
 
 ---

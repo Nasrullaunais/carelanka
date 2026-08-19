@@ -95,6 +95,7 @@ Constraint: `nic IS NOT NULL OR temp_reference IS NOT NULL` — every patient mu
 | `patient_id` | uuid, FK → Patient | |
 | `source` | enum | `emergency` `walk_in` `pre_registered` |
 | `dispatch_id` | text, nullable | Emergency Service's reference. Filled only when `source = emergency`. |
+| `reported_by_user_id` | uuid, FK, nullable | The app user who raised the emergency call, **when they are not the patient**. See §5.6. |
 | `admission_category` | enum | `icu` `hdu` `inpatient` `day_case` `outpatient` |
 | `category_set_by_staff_id` | uuid, FK → Staff | **Proof a human chose it.** Not nullable. |
 | `category_set_at` | timestamptz | |
@@ -312,6 +313,25 @@ These are different events with different rules, and gluing them together causes
 | **Admission cancelled** → patient isn't coming | A human. Always. | Yes |
 
 A computer cannot know whether an ambulance was diverted, the patient died, or it's just stuck in traffic. Only a human can make that claim, so cancellation is always a human act with a recorded reason.
+
+### 5.6 When the caller is not the patient
+
+An app user calls an ambulance. Very often the person who is hurt is **someone else** — a father, a stranger at a roadside, a colleague. The caller's own record must never be silently used as the patient's.
+
+**Asked once, at call time, by the caller.** The emergency screen has a single question: *"Is this for you, or someone else?"* Two seconds to answer, and it removes all the guessing later. Nobody is better placed to answer it than the person making the call.
+
+| Answer | What we do |
+| :--- | :--- |
+| **For me** | Link the admission to the caller's existing `Patient` record. Name, NIC, age, history, allergies — all already there. `details_complete` is usually true immediately. |
+| **For someone else** | Create a **new** patient record from whatever the caller can say — "my father, about 60, male" — or a `temp_reference` if they can say nothing. `details_complete = false`, with almost everything in `missing_fields`. |
+
+**The caller becomes the emergency contact.** When the patient is someone else, we still know exactly who called and how to reach them, and they are standing next to the patient. That goes straight into `emergency_contact_name` / `emergency_contact_phone`, and the caller's user id is kept on the admission as `reported_by_user_id`.
+
+**Nothing new is needed to handle the gaps.** A bystander-reported patient lands with `details_complete = false` and shows on the nurse's worklist exactly like any other incomplete record. The nurse completes it later through `PATCH /admissions/{id}/details` — the same endpoint and the same screen used for any other patient whose paperwork was outstanding. This case is a *user* of the incomplete-details machinery, not a second copy of it.
+
+**Captured automatically, never typed:** call time, location, and the caller's identity from their JWT. In an accident nobody should be filling in fields the system already knows. Location capture and maps belong to Emergency Service — we consume what their call record gives us.
+
+---
 
 ### 5.5 The re-check at approval — this is the important one
 
@@ -602,7 +622,7 @@ Protected routes by role, loading / empty / success / error states throughout.
 | :--- | :--- |
 | My ward | Patients in my ward with status badges, and a warning badge on anyone with `details_complete = false` |
 | Register patient | Form with validation; NIC lookup first to avoid duplicates |
-| **Scan wristband** | **Device feature — QR scan** pulls up a patient instantly |
+| Complete details | Fill in `missing_fields` for an incomplete record |
 | Admit / arrive | Confirm the reserved bed, mark arrived |
 | Complete details | Fill in `missing_fields` |
 | Discharge request | Tick checklist items, request discharge |
@@ -616,7 +636,29 @@ Protected routes by role, loading / empty / success / error states throughout.
 | Discharge info | Summary note and instructions |
 | **Call an ambulance** | Minimum details + location, posted to Emergency's endpoint. Because the caller is logged in, we already know who they are — the pre-admission starts complete. |
 
-**Device feature:** QR wristband scanning is the primary one — it is genuinely how hospitals identify patients, and it demos in two seconds. Camera capture of an NIC document is a natural second.
+**Device features.** The assignment requires at least one meaningful one (§8). We do two, both on the patient side:
+
+**1. Local notifications — the one that earns the marks.** The patient's phone tells them when something has actually happened to their stay:
+
+| Trigger | Message |
+| :--- | :--- |
+| Bed approved | "A bed has been arranged for you: Ward 5B, Bed 12" |
+| Marked ready for discharge | "You are being reviewed for discharge" |
+| Discharge confirmed | "You have been discharged. Tap for your instructions." |
+
+This is worth more than a device feature bolted on to tick a box, because it closes the cross-platform loop the assignment asks for in §10 — a workflow that begins in one client, is approved in the other, and returns an updated status to the person who started it:
+
+```
+Duty Manager approves the bed in React
+        ↓
+Patient's phone buzzes: "Ward 5B, Bed 12"
+```
+
+Every trigger already exists as a status change, so nothing new is needed on the server beyond emitting the event.
+
+**2. Date and time picker** on the "Book a visit" screen, for `expected_arrival`. Built into Flutter, needed by that screen anyway, and explicitly listed in §8 as an acceptable device feature.
+
+> **Not ours:** GPS and maps on the emergency call screen belong to Emergency Service (Member 1). We use their service; we do not implement location handling. Photographing an NIC with the camera is a reasonable third option if there is time, but it needs file upload and storage on the backend, so it is not planned for the first build.
 
 **Secure token storage** via `flutter_secure_storage`.
 
@@ -666,7 +708,7 @@ This matches the group plan, which already states that Emergency and Staff read 
 | **Controller** | Auth on every endpoint; a nurse gets 403 approving an ICU bed; a patient gets 403 reading someone else's admission |
 | **Database** | Migrations run clean; `UNIQUE(ward_id, bed_number)` holds; **the concurrent-approval test** — two approvals for one bed, one wins, one gets 409 |
 | **React** | Approvals queue renders a proposal; approve calls the API; error state on 409; protected routes redirect |
-| **Flutter** | Registration form validation; QR scan flow; secure token storage; patient sees only their own data |
+| **Flutter** | Registration form validation; notification fires on bed approval and on discharge; date picker sets `expected_arrival`; secure token storage; patient sees only their own data |
 | **Agent** | Golden cases — see below |
 | **End to end** | Flutter registers → agent proposes → React approves → Flutter shows the bed |
 
@@ -720,7 +762,7 @@ Recommendation: **the group leader owns one shared design**, since he already ow
 **3. Emergency call raised from the patient app — confirm the split with Member 1.**
 The *screen* (patient taps "I need an ambulance", minimum details, location) is ours, in the patient's Flutter app. The `EmergencyCall` record and everything downstream stays Member 1's; our screen posts to his endpoint.
 Worth flagging as a benefit: a call from a **logged-in patient** means we already have their identity, history and contact details, so the pre-admission starts complete instead of guessing. That contrasts nicely against the unidentified-arrival path in the same demo.
-Still to decide: can a bystander raise a call *for someone else*? If yes, that path produces an unidentified patient. If no, say so and record it as a limitation.
+**Decided:** a bystander can raise a call for someone else. The call screen asks once, and Member 1 must pass `patient_is_caller` and `caller_user_id` through on the dispatch notification. See §5.6. **Confirm those two fields with Member 1.**
 
 **4. How does Emergency notify us of a dispatch?** Direct API call, or via the orchestrator? Affects both of our specs.
 
@@ -749,6 +791,6 @@ Still to decide: can a bystander raise a call *for someone else*? If yes, that p
 | Observability | §8.8, §7.7 agent-performance report |
 | Safe failure | §8.6 `no_bed_available` |
 | Prompt-injection resistance | §8.9, tested in §13 |
-| Flutter device feature | §10 — QR wristband scan |
+| Flutter device feature | §10 — local notifications on status change, plus date/time picker for booking |
 | Cross-platform workflow | §13 end-to-end row |
 | Tests across all layers | §13 |

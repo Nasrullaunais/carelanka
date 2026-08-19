@@ -125,13 +125,15 @@ M4 builds a form. M1 builds the data and the workflow. The form posts to M1's en
 
 **Minimum details only.** An emergency form must be fast — a few required fields, nothing optional. Everything else is filled in later once the patient is in a bed and someone has time.
 
-**Location** is handled by M1's maps integration. Until that exists, the form sends whatever the device reports, or free text. M4 does not build a map.
+**Location and maps belong to M1, entirely.** They own the location capture, the map and the routing. M4 builds a form that posts to their endpoint and consumes whatever their call record provides — we do not implement location handling of any kind.
 
 **Why it is worth doing at all:** because the caller is logged in, we already know exactly who they are — NIC, age, gender, contact, past visits. The emergency call carries a `patient_id`, so the pre-admission starts complete instead of guessing.
 
 That gives the demo a good contrast: the same system handling a known patient who called from their own phone, and an unidentified patient who arrives unconscious as `UNKNOWN-2026-0142`.
 
-**Open (§11.4):** can a bystander raise a call *for someone else*? If yes, that path produces an unidentified patient.
+**The caller is often not the patient.** The emergency screen asks one question — *"Is this for you, or someone else?"* — because the person calling is best placed to answer it, and guessing later is worse. If it is for them, the admission links to their existing record and starts complete. If it is for someone else, a new patient record is created from whatever the caller can say, and **the caller is recorded as the emergency contact** — they are standing next to the patient and know how to be reached.
+
+M1 needs to carry that answer through to us. See §4.2.
 
 ### 4.2 Dispatch happens → Patient Management pre-admits
 
@@ -142,14 +144,25 @@ When M1 dispatches an ambulance to this hospital, M4 needs to know so a bed can 
 ```json
 {
   "dispatch_id": "DSP-2026-0142",
-  "patient_id": "uuid-or-null",
+  "caller_user_id": "uuid",
+  "patient_is_caller": false,
+  "patient_id": null,
+  "provisional_name": "father of caller, approx 60",
+  "provisional_gender": "male",
   "expected_arrival": "2026-08-19T14:30:00Z",
   "urgency": "emergency",
   "destination_ward_type_hint": "icu"
 }
 ```
 
-`patient_id` is present when the caller was a logged-in patient (§4.1) and null otherwise. When null, Patient Management creates an unidentified record.
+**`patient_is_caller` is the field that matters**, and M1 must pass it through from the question asked on the call screen.
+
+| `patient_is_caller` | What Patient Management does |
+| :--- | :--- |
+| `true` | `patient_id` is set; link the admission to that existing record. Details usually complete already. |
+| `false` | Create a new patient from `provisional_name` / `provisional_gender`, or a `temp_reference` if nothing is known. Record `caller_user_id` as the emergency contact and as `reported_by_user_id`. |
+
+Getting this wrong means filing one person's emergency under another person's medical record, so it is asked explicitly rather than inferred.
 
 Patient Management then creates an `Admission` with `source = emergency` and `dispatch_id` set, in status `awaiting_bed`.
 
@@ -395,7 +408,8 @@ All JWT-protected and role-restricted. Aggregate endpoints return **counts, neve
 | :--- | :--- | :--- |
 | **M1** | Dispatch notification — `dispatch_id`, `patient_id` (nullable), `expected_arrival`, `urgency` | Triggers pre-admission so a bed is ready before arrival |
 | **M1** | An endpoint our patient-app screen can post an emergency call to | §4.1 |
-| **M1** | Maps/location handling on the emergency form | §4.1 — M4 does not build a map |
+| **M1** | Location capture and maps on the emergency form | §4.1 — entirely theirs; M4 builds only the form |
+| **M1** | `caller_user_id` and `patient_is_caller` on the dispatch notification | §4.2 — without these we cannot tell whose medical record this is |
 | **M2** | Look up a staff member's name and role by ID | Displaying "Approved by …" without copying their data |
 | **M2** | `Doctor` as a role on the JWT | Gating `clinical_clearance` |
 | **M3** | A readable bed register: bed id, ward, number, condition, isolation capability | Our agent's candidate list. **This is our hardest dependency** — without it the bed agent has nothing to reason over. |
@@ -416,7 +430,7 @@ All four agents must persist workflow id, objective, plan, steps, tool results, 
 
 **11.3 — Does M1 call M4 directly for pre-admission, or does the orchestrator drive both?** Affects §4.2 and both specs.
 
-**11.4 — Can a bystander raise an emergency call for someone else?** Affects §4.1 and whether the unidentified-patient path is reachable from the app.
+**11.4 (RESOLVED) — A bystander can raise a call for someone else.** The call screen asks once; M1 passes `patient_is_caller` and `caller_user_id` through on the dispatch notification (§4.2). The caller is stored as the patient's emergency contact. **M1 needs to add these two fields** — confirm with Member 1.
 
 **11.5 — Booking a visit.** A patient can register their details and an expected arrival ahead of a planned visit (`source = pre_registered`). This is deliberately **not** a full appointment system — no doctor calendars, no time slots, no rescheduling — because that is a component-sized feature on its own. If the group wants real appointments, it needs an owner and something else has to be dropped.
 

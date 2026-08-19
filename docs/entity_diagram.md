@@ -9,6 +9,18 @@ throughout.
 Management admission/discharge flow. Changes in this revision are marked *(Rev 2)*.
 Items still requiring a group decision are collected in [Open Decisions](#open-decisions).
 
+**Revision 2.1** — review feedback on PR #1, marked *(Rev 2.1)*:
+
+- **`AdmissionStatus` now carries all seven states** the admission flow uses, stored rather
+  than computed, and named identically to `patient-spec.yaml`. Reasoning and the legal
+  transition table are under [`AdmissionStatus`](#admissionstatus-rev-21--changed-again-review-item-2).
+- **`Patient.TempReference`** gives unidentified arrivals a handle (`UNKNOWN-2026-0142`),
+  with a CHECK guaranteeing every patient row carries at least one identifier.
+- **`Admission.MissingDetails` / `DetailsComplete`** record *which* details are still
+  outstanding, for the "relative brings the ID later" case.
+- Enum literals in SQL normalised to snake_case throughout, matching the wire values
+  already published in `patient-spec.yaml`.
+
 ## Architecture Overview
 
 ```
@@ -401,19 +413,35 @@ A background sweep moves `Held` rows past `ExpiresAt` to `Expired` and returns t
 + LastName: string (non-null)
 + DateOfBirth: DateOnly (nullable)
 + NationalId: string (nullable, unique when present)
++ TempReference: string (nullable, unique when present)  -- (Rev 2.1)
 + Gender: Gender (nullable)                             -- (Rev 2: was string)
 + PhoneNumber: string (nullable)
 + EmergencyContactName: string (nullable)
 + EmergencyContactPhone: string (nullable)
 ```
 **Table:** `patients`
-**Constraint:** `CREATE UNIQUE INDEX ON patients (national_id) WHERE national_id IS NOT NULL`
+**Constraints:**
+- `UNIQUE (national_id) WHERE national_id IS NOT NULL`
+- `UNIQUE (temp_reference) WHERE temp_reference IS NOT NULL` *(Rev 2.1)*
+- `CHECK (national_id IS NOT NULL OR phone_number IS NOT NULL OR temp_reference IS NOT NULL)` *(Rev 2.1)*
+
 **Note:** `NationalId` nullable — unconscious/unidentified emergency admissions may
 lack one at intake — but unique whenever present, to dedupe registered patients.
 *(Decision 35)*
 *(Rev 2)* `Gender` promoted from free text to an enum: the gender-ward filter is a
 deterministic rule run by C# validation code, and a deterministic filter cannot run
 reliably on free text.
+
+*(Rev 2.1 — review item 4)* **`TempReference` makes an unidentified patient identifiable.**
+Before this, a patient with no NIC had nothing distinguishing them at all: three unconscious
+arrivals in one evening were three rows differing only by `Id`, and staff had no handle to
+say *which* one they meant. `TempReference` is server-generated at intake when no NIC and no
+phone number is available — format `UNKNOWN-{yyyy}-{sequence}`, e.g. `UNKNOWN-2026-0142` —
+and matches the value `patient-spec.yaml` already returns.
+
+The CHECK is the real guarantee: **every patient row carries at least one identifier.**
+The reference is never cleared once a NIC arrives later, so the paper trail, wristband and
+verbal handover from the unidentified period still resolve to the right person.
 
 #### Appointment extends AuditedEntity *(Rev 2 — new)*
 ```
@@ -443,7 +471,10 @@ On check-in this becomes an `Admission` with `Source = Booked`.
 + RequiresIsolation: bool = false (non-null)            -- (Rev 2)
 + ExpectedArrivalAt: DateTimeOffset (nullable)          -- (Rev 2)
 + AdmittedAt: DateTimeOffset (nullable)                 -- (Rev 2: was non-null)
-+ Status: AdmissionStatus (non-null)
++ Status: AdmissionStatus (non-null)                    -- (Rev 2.1: now 7 states, stored)
++ MissingDetails: text[] (non-null, default '{}')       -- (Rev 2.1)
++ DetailsComplete: bool (GENERATED, stored)             -- (Rev 2.1)
++ DetailsCompletedAt: DateTimeOffset (nullable)         -- (Rev 2.1)
 ```
 **Table:** `admissions`
 **Note:** `EmergencyCallId` nullable — null for walk-in/referral admissions, set for
@@ -451,11 +482,54 @@ the emergency-originated path. *(Decision 25)*
 *(Rev 2)* The patient flow requires that for an emergency "the record is created
 **BEFORE** they arrive, so a bed is ready when they get here". That state was
 unrepresentable: `AdmittedAt` was non-null and `AdmissionStatus` was only
-`{Active, Discharged}`. Now a pre-arrival row is `Status = Expected` with
-`ExpectedArrivalAt` set and `AdmittedAt` null, flipping to `Active` on arrival.
+`{Active, Discharged}`.
 `AcuityLevel` and `RequiresIsolation` are the patient-side inputs to the bed agent's
 filter and ranking rules; both are set by clinical staff, never by the agent — the same
 wall that keeps `Category` a human decision.
+
+*(Rev 2.1 — review item 2)* **`Status` is stored and authoritative, not computed.**
+The four Rev 2 values did not cover `awaiting_bed`, `awaiting_approval`, `bed_reserved` or
+`ready_for_discharge`, so it now carries the same seven values `patient-spec.yaml` already
+returns. Deriving them from `BedReservation.Status` + `BedAssignment.EndAt` +
+`Discharge.ReadinessStatus` was the alternative; it was rejected for one decisive reason:
+
+> **A derived status cannot be guarded.** `patient-spec.yaml` already documents an
+> `IllegalTransition` 409 with an explicit transition table — `admitted -> ready_for_discharge`
+> is legal, `awaiting_bed -> admitted` is not. You can only reject an illegal move if there
+> is a stored *previous* value to compare against. A computed status has no previous value:
+> it would silently skip states whenever an underlying row changed, and the 409 could never
+> fire.
+
+The three-table join on every read was the secondary argument, but it is the weaker one —
+correctness settles this, not cost.
+
+**The drift risk is real and is handled by writing both in one transaction.** The
+reservation, assignment and discharge rows remain the *mechanism*; `Status` is the *fact*.
+Same treatment `Bed.Status` already gets. A reconciliation query belongs in the integration
+test suite so drift fails a build rather than surfacing in a demo:
+
+```sql
+-- must return zero rows
+SELECT a.id, a.status FROM admissions a
+LEFT JOIN bed_assignments ba ON ba.admission_id = a.id AND ba.end_at IS NULL
+WHERE (a.status = 'admitted'      AND ba.id IS NULL)
+   OR (a.status = 'awaiting_bed'  AND ba.id IS NOT NULL);
+```
+
+*(Rev 2.1 — review item 4)* **`MissingDetails` records what is still outstanding**, for the
+"emergency arrival, relative brings the ID later" case. A `text[]` of field names rather
+than a bare boolean, because "incomplete" alone does not tell a ward clerk *what to chase* —
+`{national_id, date_of_birth}` does. Values come from `PatientDetailField`; queryable with
+`WHERE 'national_id' = ANY(missing_details)`, which is the outstanding-paperwork worklist.
+
+`DetailsComplete` is a **stored generated column**, `cardinality(missing_details) = 0` — the
+one place in this schema where a computed value is right, because unlike `Status` it has no
+transition rules to enforce and cannot drift by construction. `DetailsCompletedAt` records
+when the gap closed, which answers "how long did we hold an unidentified patient".
+
+Deliberately **separate from `Status`**: how far through their stay a patient is and how
+complete their paperwork is are independent facts. A fully-admitted ICU patient can still be
+missing a NIC, and collapsing the two would make one unrepresentable.
 
 #### BedAssignment extends AuditedEntity
 ```
@@ -759,12 +833,50 @@ Available, Reserved, Occupied, Cleaning, Maintenance
 Held, Confirmed, Expired, Released
 ```
 
-### AdmissionStatus *(Rev 2 — changed)*
+### AdmissionStatus *(Rev 2.1 — changed again, review item 2)*
 ```
-Expected, Active, Discharged, Cancelled
+AwaitingBed, AwaitingApproval, BedReserved, Admitted,
+ReadyForDischarge, Discharged, Cancelled
 ```
-`Expected` = record created before arrival (the emergency fast path). `Cancelled` covers a
-booked or expected admission that never happened.
+Serialized and stored as `awaiting_bed`, `awaiting_approval`, `bed_reserved`, `admitted`,
+`ready_for_discharge`, `discharged`, `cancelled` — identical to the enum
+`patient-spec.yaml` already publishes, so the API needs no translation layer.
+
+Rev 2's four values (`Expected, Active, Discharged, Cancelled`) could not express the four
+middle states of the flow. `Expected` is now `AwaitingBed`; `Active` is now `Admitted`.
+
+| Status | Meaning | `AdmittedAt` |
+| :-- | :-- | :--: |
+| `AwaitingBed` | Record exists, no bed found yet. The emergency pre-arrival state. | null |
+| `AwaitingApproval` | The bed agent proposed a bed; a human has not approved it. | null |
+| `BedReserved` | Approved and held (`BedReservation.Status = Held`); patient not yet in it. | null |
+| `Admitted` | In the bed. Live `BedAssignment` with `EndAt IS NULL`. | set |
+| `ReadyForDischarge` | Every `DischargeChecklistItem` complete; awaiting confirmation. | set |
+| `Discharged` | Confirmed and gone; the bed is released. | set |
+| `Cancelled` | Never happened — diverted, false alarm, no-show, died en route. | null |
+
+Legal transitions — anything else is a 409, matching `patient-spec.yaml`'s
+`IllegalTransition` response:
+
+```
+AwaitingBed       ──► AwaitingApproval, Cancelled
+AwaitingApproval  ──► BedReserved, AwaitingBed, Cancelled
+BedReserved       ──► Admitted, AwaitingBed, Cancelled
+Admitted          ──► ReadyForDischarge
+ReadyForDischarge ──► Discharged, Admitted        (a patient can deteriorate)
+```
+
+`AwaitingApproval → AwaitingBed` and `BedReserved → AwaitingBed` are the rejection and
+hold-expiry paths: the proposal was refused or the 30 minutes ran out, and the search
+restarts.
+
+### PatientDetailField *(Rev 2.1 — new, review item 4)*
+```
+NationalId, DateOfBirth, Gender, PhoneNumber,
+EmergencyContactName, EmergencyContactPhone, Address
+```
+The allowed members of `Admission.MissingDetails`. A closed set rather than free text, so
+"what is still outstanding" can be counted and filtered instead of parsed.
 
 ### DischargeReadinessStatus
 ```
@@ -858,6 +970,7 @@ CREATE UNIQUE INDEX ux_equipment_types_name    ON equipment_types (name)        
 CREATE UNIQUE INDEX ux_equipment_items_serial  ON equipment_items (serial_number)
     WHERE is_active AND serial_number IS NOT NULL;
 CREATE UNIQUE INDEX ux_patients_national_id    ON patients (national_id)             WHERE national_id IS NOT NULL;
+CREATE UNIQUE INDEX ux_patients_temp_ref       ON patients (temp_reference)          WHERE temp_reference IS NOT NULL;
 CREATE UNIQUE INDEX ux_beds_ward_proximity     ON beds (ward_id, proximity_rank)     WHERE is_active;
 ```
 
@@ -869,22 +982,25 @@ CREATE UNIQUE INDEX ux_bed_assign_bed   ON bed_assignments (bed_id)       WHERE 
 CREATE UNIQUE INDEX ux_bed_assign_adm   ON bed_assignments (admission_id) WHERE end_at IS NULL;
 
 -- one live hold per bed  (the 30-minute reservation race)
-CREATE UNIQUE INDEX ux_bed_reservation  ON bed_reservations (bed_id)      WHERE status = 'Held';
+CREATE UNIQUE INDEX ux_bed_reservation  ON bed_reservations (bed_id)      WHERE status = 'held';
 
--- one active admission per patient
-CREATE UNIQUE INDEX ux_admissions_active ON admissions (patient_id)       WHERE status = 'Active';
+-- one OPEN admission per patient  (Rev 2.1: was status = 'Active', which no longer exists.
+-- "Open" now spans every state before the patient has left or the visit was called off,
+-- so a second admission cannot be opened while one is mid-flight.)
+CREATE UNIQUE INDEX ux_admissions_open ON admissions (patient_id)
+    WHERE status NOT IN ('discharged', 'cancelled');
 
 -- an ambulance cannot be on two runs
 CREATE UNIQUE INDEX ux_dispatch_ambulance ON dispatches (ambulance_id)
-    WHERE status IN ('Assigned', 'EnRoute');
+    WHERE status IN ('assigned', 'en_route');
 
 -- no duplicate open warning per target  (otherwise every threshold tick inserts one)
 CREATE UNIQUE INDEX ux_warnings_open ON warnings (entity_type, entity_id, type)
-    WHERE status = 'Open';
+    WHERE status = 'open';
 
 -- one confirmed allocation per (shift, staff); superseded rows may coexist
 CREATE UNIQUE INDEX ux_allocations_confirmed ON allocations (shift_id, staff_member_id)
-    WHERE status = 'Confirmed';
+    WHERE status = 'confirmed';
 
 CREATE UNIQUE INDEX ux_refresh_tokens_hash ON refresh_tokens (token_hash);
 CREATE UNIQUE INDEX ux_device_tokens_token ON device_tokens (token);
@@ -903,7 +1019,7 @@ ALTER TABLE stock_levels ADD CONSTRAINT ck_stock_nonneg
 
 ALTER TABLE leave_requests ADD CONSTRAINT ck_leave_dates CHECK (start_date <= end_date);
 ALTER TABLE leave_requests ADD CONSTRAINT ck_leave_swap_fields
-    CHECK (type = 'ShiftSwap' OR (swap_with_staff_member_id IS NULL AND swap_shift_id IS NULL));
+    CHECK (type = 'shift_swap' OR (swap_with_staff_member_id IS NULL AND swap_shift_id IS NULL));
 
 ALTER TABLE bed_assignments ADD CONSTRAINT ck_bed_assign_window
     CHECK (end_at IS NULL OR end_at > start_at);
@@ -912,13 +1028,23 @@ ALTER TABLE bed_assignments ADD CONSTRAINT ck_bed_assign_downgrade
 
 ALTER TABLE bed_reservations ADD CONSTRAINT ck_bed_res_expiry CHECK (expires_at > created_at);
 
--- a pre-arrival record has no admitted_at; anything else must have one
+-- admitted_at is set exactly when the patient has actually arrived in a bed  (Rev 2.1)
 ALTER TABLE admissions ADD CONSTRAINT ck_admissions_arrival
-    CHECK ((status = 'Expected' AND admitted_at IS NULL)
-        OR (status <> 'Expected' AND admitted_at IS NOT NULL));
+    CHECK ((status IN ('admitted', 'ready_for_discharge', 'discharged') AND admitted_at IS NOT NULL)
+        OR (status IN ('awaiting_bed', 'awaiting_approval', 'bed_reserved', 'cancelled')
+            AND admitted_at IS NULL));
+
+-- every patient is identifiable by something  (Rev 2.1, review item 4)
+ALTER TABLE patients ADD CONSTRAINT ck_patients_identifiable
+    CHECK (national_id IS NOT NULL OR phone_number IS NOT NULL OR temp_reference IS NOT NULL);
+
+-- missing_details may only name known fields  (Rev 2.1)
+ALTER TABLE admissions ADD CONSTRAINT ck_admissions_missing_details
+    CHECK (missing_details <@ ARRAY['national_id','date_of_birth','gender','phone_number',
+                                    'emergency_contact_name','emergency_contact_phone','address']::text[]);
 
 ALTER TABLE discharges ADD CONSTRAINT ck_discharge_ready
-    CHECK (discharged_at IS NULL OR readiness_status = 'Ready');
+    CHECK (discharged_at IS NULL OR readiness_status = 'ready');
 
 ALTER TABLE route_logs ADD CONSTRAINT ck_route_nonneg
     CHECK (planned_distance_km >= 0 AND planned_duration_minutes >= 0);
@@ -944,21 +1070,29 @@ CREATE INDEX ix_warnings_target        ON warnings (entity_type, entity_id);
 
 -- approval queues and dashboards
 CREATE INDEX ix_agent_workflows_queue  ON agent_workflows (required_approver_role, created_at DESC)
-    WHERE status = 'PendingApproval';
-CREATE INDEX ix_warnings_open          ON warnings (severity, created_at DESC) WHERE status = 'Open';
+    WHERE status = 'pending_approval';
+CREATE INDEX ix_warnings_open          ON warnings (severity, created_at DESC) WHERE status = 'open';
 CREATE INDEX ix_emergency_calls_open   ON emergency_calls (status, created_at DESC);
 CREATE INDEX ix_notifications_unread   ON notifications (recipient_staff_member_id, created_at DESC)
     WHERE read_at IS NULL;
 
 -- agent query paths
 CREATE INDEX ix_shifts_ward_date       ON shifts (ward_id, date);
-CREATE INDEX ix_allocations_staff      ON allocations (staff_member_id) WHERE status = 'Confirmed';
+CREATE INDEX ix_allocations_staff      ON allocations (staff_member_id) WHERE status = 'confirmed';
 CREATE INDEX ix_beds_ward_status       ON beds (ward_id, status) WHERE is_active;
 CREATE INDEX ix_discharges_ready       ON discharges (readiness_status)
     WHERE discharged_at IS NULL;
 
 -- expiry sweep for the 30-minute holds
-CREATE INDEX ix_bed_reservations_expiry ON bed_reservations (expires_at) WHERE status = 'Held';
+CREATE INDEX ix_bed_reservations_expiry ON bed_reservations (expires_at) WHERE status = 'held';
+
+-- admission status is queried on every read; the open states drive every worklist  (Rev 2.1)
+CREATE INDEX ix_admissions_status ON admissions (status, expected_arrival_at)
+    WHERE status NOT IN ('discharged', 'cancelled');
+
+-- outstanding-paperwork worklist: "which admissions are still missing a NIC?"  (Rev 2.1)
+CREATE INDEX ix_admissions_missing_details ON admissions USING gin (missing_details)
+    WHERE cardinality(missing_details) > 0;
 ```
 
 ### Types and mapping notes
@@ -975,7 +1109,24 @@ CREATE INDEX ix_bed_reservations_expiry ON bed_reservations (expires_at) WHERE s
   `ON DELETE CASCADE` for owned children — `staff_member_skills`, `dispatch_crew`,
   `agent_proposed_changes`, `discharge_checklist_items`, `device_tokens`,
   `refresh_tokens`, `notifications`.
-- **Enum storage** is an open decision — see below.
+- **`text[]` → `string[]`.** Npgsql maps this natively; no value converter needed.
+  `missing_details` uses a **GIN** index because the queries are containment
+  (`'national_id' = ANY(...)`), which b-tree cannot serve. *(Rev 2.1)*
+- **Generated column** *(Rev 2.1)* — `details_complete` is computed by the database, so it
+  can never disagree with `missing_details`:
+  ```sql
+  ALTER TABLE admissions ADD COLUMN details_complete boolean
+      GENERATED ALWAYS AS (cardinality(missing_details) = 0) STORED;
+  ```
+  In EF Core: `.HasComputedColumnSql("cardinality(missing_details) = 0", stored: true)`.
+  Mark it `ValueGeneratedOnAddOrUpdate()` so EF never tries to write it.
+- **Enum literals in this document are written snake_case** (`awaiting_bed`, `pending_approval`),
+  matching the wire values already published in `patient-spec.yaml` — one vocabulary from
+  database to API, no translation layer. C# members stay PascalCase; a single
+  `HasConversion` with a snake_case naming policy bridges them. *(Rev 2.1)*
+- **Enum storage** (native PG enum vs int vs string) is still an open decision — see below.
+  If the group picks `int`, every literal above becomes an ordinal and the CHECK constraints
+  need rewriting, which is one more argument for the string option.
 
 ---
 

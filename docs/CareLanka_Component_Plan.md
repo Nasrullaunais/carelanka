@@ -254,7 +254,7 @@ Group-level decisions that are not one member's call.
 
 | # | Decision | Why it matters |
 | :--- | :--- | :--- |
-| 1 | **Who owns the orchestration, and the shared agent-workflow tables** | `AgentWorkflow` and `AgentProposedChange` are used by all four agents, and the rubric scores orchestration and state as a *group* criterion. `specs/ai-orchestration-workflow.md` proposes a fifth group-owned Coordinator Agent above the four domain agents, plus one shared table design owned by the leader. Decide once the four agents exist |
+| 1 | **Who owns the orchestration, and the shared agent-workflow tables** | `AgentWorkflow` and `AgentProposedChange` are used by all four agents, and the rubric scores orchestration and state as a *group* criterion. `specs/ai-orchestration-workflow.md` proposes a fifth group-owned Coordinator Agent above the four domain agents, plus one shared table design, group-owned. Decide once the four agents exist |
 | 2 | **Enum storage strategy** | Native PostgreSQL enums vs `int` vs string conversion. Affects every migration and is worth an ADR entry |
 | 3 | **Flutter state management** | `provider`, Riverpod or Bloc. All four of us must use the same one, and switching after screens are built is painful — see `mobile-ui/README.md` |
 | 4 | **Notification delivery** | In-app only, device push, or SMS. Decides whether the backend needs a push integration |

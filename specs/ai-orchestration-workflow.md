@@ -69,7 +69,7 @@ distinct agents" — so five is allowed and everyone keeps their own domain agen
 
 | Agent | Owner | Responsibility |
 | :--- | :--- | :--- |
-| **Coordinator** | Group / leader | Receives the objective, produces a structured plan, delegates each step to a domain agent, collects results, assembles one approval package |
+| **Coordinator** | Group | Receives the objective, produces a structured plan, delegates each step to a domain agent, collects results, assembles one approval package |
 | Dispatch & Routing | M1 | Which ambulance, which route, which destination ward |
 | Patient Admission & Bed | M4 | Which ward and bed, or a flagged downgrade |
 | Staff Allocation | M2 | Whether the destination ward is staffed, and what to reallocate |
@@ -144,7 +144,7 @@ One `AgentWorkflow` row per agent run, all rows in one chain sharing a
 Both columns already exist in `entity_diagram.md`. Concrete proposed writes go in
 `AgentProposedChange`, also already designed.
 
-**Proposed owner: the leader**, since this document is already group-owned and
+**Proposed owner: the group**, since this document is already group-owned and
 four separately designed schemas would make the §10 trace a four-way join.
 Each component links to it by `workflow_id` and otherwise leaves it alone.
 
@@ -159,7 +159,7 @@ approval status, final outcome.
 | Member | Owns |
 | :--- | :--- |
 | **All four** | Their own domain agent: responsibility, structured I/O contract, allow-listed tools, error handling, its own deterministic validator, tests |
-| **Leader / group** | The Coordinator Agent, the shared workflow tables, this document |
+| **The group** | The Coordinator Agent, the shared workflow tables, this document |
 
 Each domain agent must publish, in its own `*-management-plan.md`: its objective,
 its input and output contract, its tool allow-list, its hard rules and who
@@ -170,7 +170,7 @@ enforces them, and what "safe failure" looks like for it.
 
 ## 7. Open decisions
 
-1. **Do we accept the fifth Coordinator Agent, and does the leader own it?**
+1. **Do we accept the fifth Coordinator Agent, and who builds it?**
    The alternative is a deterministic C# orchestrator with no LLM in the planning
    step. That is simpler and more reliable in a demo, but the §9.1 wording asks
    for a plan to be *created*, so it needs a deliberate justification in the ADR.

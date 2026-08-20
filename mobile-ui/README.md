@@ -163,7 +163,7 @@ the setup — don't run `flutter create .` a second time in parallel.
 
 These are shared decisions, not one member's call:
 
-- **Who owns `core/`?** Suggestion: the group leader, so the HTTP client, auth
+- **Who owns `core/`?** Suggestion: one person for the whole group, so the HTTP client, auth
   and router stay consistent. Others request changes rather than making them.
 - **State management choice.** `provider` is listed in `pubspec.yaml` as a
   starting point because it is the simplest option that satisfies the rubric.

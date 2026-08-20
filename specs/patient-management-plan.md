@@ -750,14 +750,14 @@ Rule-based assertions, not an LLM judge. The assignment allows LLM-as-judge only
 ## 15. Open questions for the group
 
 **1. Does `Ward` sit with us or with Equipment?**
-Beds are settled — Equipment owns the `Bed` register, we own `BedAssignment` (§3.1). Wards are not. Our argument: `gender_policy` and `ward_type` drive the agent's hard rules, and Equipment has no use for them. Written as ours; Member 3 and the leader to confirm.
+Beds are settled — Equipment owns the `Bed` register, we own `BedAssignment` (§3.1). Wards are not. Our argument: `gender_policy` and `ward_type` drive the agent's hard rules, and Equipment has no use for them. Written as ours; Member 3 and the group to confirm.
 
 **1b. The bed register shape — agree it with Member 3 this week.**
 This is our hardest external dependency: no readable bed register, no candidates for the agent. We need `id`, `ward_id`, `bed_number`, `condition`, `has_isolation`, `nurse_station_distance`. Seed a local stub in the meantime so we can build and test before their component exists.
 
 **2. Who owns the shared agent-workflow tables?**
 All four agents must persist workflow state. §9.1 of the assignment requires it, and the rubric scores it under a **group** criterion — *"Integrated Architecture, Agent Orchestration and State Management (10)"* — not an individual one. §10 also requires one workflow that crosses all four agents. Four separately designed workflow schemas would make that trace a four-way join.
-Recommendation: **the group leader owns one shared design**, since he already owns `ai-orchestration-workflow.md`. Our `BedAssignment.workflow_id` points into it.
+Recommendation: **one shared design, group-owned**, since `ai-orchestration-workflow.md` is already group-owned. Our `BedAssignment.workflow_id` points into it.
 
 **3. Emergency call raised from the patient app — confirm the split with Member 1.**
 The *screen* (patient taps "I need an ambulance", minimum details, location) is ours, in the patient's Flutter app. The `EmergencyCall` record and everything downstream stays Member 1's; our screen posts to his endpoint.

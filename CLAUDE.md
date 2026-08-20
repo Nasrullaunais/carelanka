@@ -213,7 +213,7 @@ Agents/                    the AI agents
 the four component folders. **There is no repository layer** — EF Core's `DbSet`
 is the repository.
 
-> **Open — the leader's call.** The facade layer has no folder in `api/` and
+> **Open — needs a group decision.** The facade layer has no folder in `api/` and
 > appears in no other document. Either add `Facades/{Component}/` here and in
 > `integration_of_functions.md` §1 in one commit, or drop the layer and move the
 > transaction boundary and the throwing into the service. A facade that exists in

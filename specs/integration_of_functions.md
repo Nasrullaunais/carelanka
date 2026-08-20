@@ -104,8 +104,15 @@ The second version keeps working when hold expiry, out-of-service beds or a new 
 | `Patient`, `Admission`, `Discharge` | **Patient (M4)** | Emergency, Staff (aggregates only) | Patient only |
 | **`BedAssignment`** — who is in a bed, holds, approvals | **Patient (M4)** | Equipment (before servicing a bed) | Patient only |
 | `Ward` — name, type, gender policy | **Patient (M4)** — *see §11.1* | All | Patient only |
-| Agent workflow state | **Group / leader** — *open, §11.2* | All four agents | All four agents |
-| `User`, roles, JWT | **Group / leader** | All | Leader |
+| Agent workflow state | **Group** — *open, §11.2* | All four agents | All four agents |
+| `StaffMember`, login, JWT issuing | **Group** — shared plumbing, built once | All | Whoever takes it on |
+
+**Roles are not owned by anyone.** The shared part is only the plumbing — one
+`StaffMember` table, one login endpoint, one JWT issuer — so all four components
+read the same token. **What each role is allowed to do is decided by the component
+that role acts in:** Ward Nurse permissions come from Patient Management,
+Equipment Technician from Equipment, and so on. Add a role to `StaffRole` when
+your component needs it; that is not a request to anyone.
 
 ---
 
@@ -414,21 +421,21 @@ All JWT-protected and role-restricted. Aggregate endpoints return **counts, neve
 | **M2** | `Doctor` as a role on the JWT | Gating `clinical_clearance` |
 | **M3** | A readable bed register: bed id, ward, number, condition, isolation capability | Our agent's candidate list. **This is our hardest dependency** — without it the bed agent has nothing to reason over. |
 | **M3** | Notification (or just a condition change we can read) when a bed goes in or out of service | §6.2 |
-| **Leader** | Shared agent-workflow tables | §11.2 |
+| **Group** | Shared agent-workflow tables | §11.2 |
 
 ---
 
 ## 11. Open items
 
 **11.1 — Does `Ward` sit with Patient Management or Equipment?**
-Beds are settled (§6.1). Wards are not. Argument for M4: a ward's `gender_policy` and `ward_type` are admission-policy facts that drive the bed agent's hard rules — Equipment does not care whether a ward is male or female, only about frames and servicing. Written as M4's for now; M3 and the leader to confirm.
+Beds are settled (§6.1). Wards are not. Argument for M4: a ward's `gender_policy` and `ward_type` are admission-policy facts that drive the bed agent's hard rules — Equipment does not care whether a ward is male or female, only about frames and servicing. Written as M4's for now; M3 and the group to confirm.
 
 **11.2 — Who owns the agent-workflow tables?**
 All four agents must persist workflow id, objective, plan, steps, tool results, validation results, errors, approval status and outcome (assignment §9.1). The rubric scores this under a **group** criterion — *"Integrated Architecture, Agent Orchestration and State Management (10)"* — not an individual one, and §10 requires one workflow crossing all four agents. Four separately designed schemas would make that trace a four-way join.
-**Recommendation:** the leader owns one shared design, since `ai-orchestration-workflow.md` is already group-owned. Each component links by `workflow_id`.
-**Flagged for the leader. Not decided.**
+**Recommendation:** one shared design, group-owned, since `ai-orchestration-workflow.md` is already group-owned. Each component links by `workflow_id`.
+**Needs a group decision. Not decided.**
 
-*Update:* `ai-orchestration-workflow.md` §5 now proposes exactly this — one `AgentWorkflow` row per agent run, chained by `correlation_id` and `parent_workflow_id`, owned by the leader. Settle it alongside the orchestration decision in that document, since the table design follows from it.
+*Update:* `ai-orchestration-workflow.md` §5 now proposes exactly this — one `AgentWorkflow` row per agent run, chained by `correlation_id` and `parent_workflow_id`, group-owned. Settle it alongside the orchestration decision in that document, since the table design follows from it.
 
 **11.3 — Does M1 call M4 directly for pre-admission, or does the orchestrator drive both?** Affects §4.2 and both specs. If the Coordinator Agent proposed in `ai-orchestration-workflow.md` §3 is adopted, the coordinator drives both and this closes.
 
@@ -528,4 +535,4 @@ Mirrors §10's format, from the Equipment side.
 | **M4 (Patient)** | Ward list — id, name, type | `ward_id` on every `EquipmentItem` and `Bed` |
 | **M4 (Patient)** | Admission summary by ID | Displaying who an assigned item belongs to, without copying patient data |
 | **M2 (Staff)** | Staff member's name and role by ID | Displaying "Approved by …" / "Serviced by …" without copying their data |
-| **Leader** | Shared agent-workflow tables | Same open item as §11.2 — `ActionRequest.workflow_id` and `Warning.workflow_id` point into whatever the group leader designs |
+| **Group** | Shared agent-workflow tables | Same open item as §11.2 — `ActionRequest.workflow_id` and `Warning.workflow_id` point into whatever the group agrees |

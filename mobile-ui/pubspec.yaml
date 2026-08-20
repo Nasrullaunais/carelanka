@@ -1,0 +1,34 @@
+name: carelanka_mobile
+description: CareLanka mobile app (Flutter) — ambulance crew, ward nurses, staff and patients.
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+# Packages are listed here as the agreed baseline for the whole team.
+# Add a package only if your feature needs it, and tell the group — this file
+# is shared, so two people editing it at once causes merge conflicts.
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # HTTP + API access (core/network)
+  http: ^1.2.0
+
+  # Routing (core/routing)
+  go_router: ^14.0.0
+
+  # State management — assignment rubric §8 requires state management
+  provider: ^6.1.2
+
+  # Secure token storage — rubric requires "secure API integration"
+  flutter_secure_storage: ^9.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

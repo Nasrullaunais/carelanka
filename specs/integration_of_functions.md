@@ -1,7 +1,7 @@
 # How the Four Components Connect
 
 **CareLanka Hospital Management System · SE3090 Assignment 1**
-**Status:** living document · Patient Management (Member 4) sections are filled in; other members should add their own
+**Status:** living document · Patient Management (Member 4) and Equipment Management (Member 3) sections are filled in; Emergency (Member 1) and Staff (Member 2) should add their own
 
 This file explains where one member's component ends and another's begins, and exactly what crosses the line.
 
@@ -99,7 +99,7 @@ The second version keeps working when hold expiry, out-of-service beds or a new 
 | :--- | :--- | :--- | :--- |
 | `EmergencyCall`, `Ambulance`, `Dispatch`, `RouteLog` | **Emergency (M1)** | Patient (dispatch ETA) | Emergency only |
 | `StaffMember`, `Shift`, `Allocation`, `LeaveRequest` | **Staff (M2)** | All — everyone stores staff IDs | Staff only |
-| `EquipmentItem`, `StockLevel`, `MaintenanceSchedule`, `Warning` | **Equipment (M3)** | — | Equipment only |
+| `EquipmentItem`, `EquipmentCategory`, `PharmacyItem`, `PharmacyCategory`, `PharmacyTransaction`, `MaintenanceSchedule`, `Warning`, `ActionRequest` | **Equipment (M3)** | Patient (ward equipment readiness); any staff (search/availability) | Equipment only |
 | **`Bed`** — exists, number, condition, repairs | **Equipment (M3)** | Patient (to find candidates) | Equipment only |
 | `Patient`, `Admission`, `Discharge` | **Patient (M4)** | Emergency, Staff (aggregates only) | Patient only |
 | **`BedAssignment`** — who is in a bed, holds, approvals | **Patient (M4)** | Equipment (before servicing a bed) | Patient only |
@@ -440,9 +440,69 @@ All four agents must persist workflow id, objective, plan, steps, tool results, 
 
 ## 12. For the other three members
 
-This file currently describes every boundary **from the Patient Management side**, because that is the component that has been designed so far. Add your own sections; if something here is wrong about your component, raise it in §11 rather than working around it.
+This file originally described every boundary **from the Patient Management side**, because that was the first component designed. Equipment Management (§13–§16 below) has since added its own sections, written against `equipment-management-plan.md` and `equipment-spec.yaml`. Emergency (M1) and Staff (M2) should do the same. If something here is wrong about your component, raise it in §11 rather than working around it.
 
 Two questions worth asking about anything you are unsure of:
 
 1. **Who writes this?** Whoever's business rules cause the value to change owns the table. Everyone else reads through their service.
 2. **Would this make my component depend on someone else's code being finished?** If yes, you cannot demo alone and you cannot test alone. Push the dependency to a read-only call and keep a working fallback.
+
+---
+
+## 13. Equipment Management ↔ Patient Management (Member 4) — confirmed from Equipment's side
+
+§6 above already documents this boundary from Patient Management's side. Equipment's own design (`equipment-management-plan.md` §3.3, §13.1–§13.2) agrees on every point, written here for the record so a reader doesn't have to cross-check two documents to be sure they match:
+
+- **The bed split holds.** Equipment owns `Bed` — frame, condition, repairs, adding/retiring beds. Patient owns `BedAssignment` — who is in it, holds, approvals. Neither writes the other's table.
+- **Equipment asks before touching a bed, every time, no exceptions.** Before `PATCH /api/beds/{id}` or `POST /api/beds/{id}/retire`, and before scheduling maintenance against a bed (`asset_type = bed`), Equipment calls Patient's `GetBedOccupancyAsync` **inside the same request, before committing anything**. Occupied or held → `409 Conflict`, nothing written. This is the one place Equipment's correctness depends on another component's live answer rather than its own row lock, because "is anyone in this bed" is not Equipment's data to lock (equipment-management-plan.md §3.3).
+- **Equipment reads the ward list, never duplicates it.** `ward_id` on every `EquipmentItem` and `Bed` is a read-only reference into Patient's `Ward` table (`GET /api/wards`). Equipment stores no copy of `ward_type` or `gender_policy` — it has no use for either.
+- **`EquipmentItem.assigned_to_admission_id` is ID-only.** Equipment never writes into `Admission`; it stores the ID and reads an admission summary from Patient's service at display time to show "assigned to: [patient], Ward 5B" without copying patient data.
+
+No open disagreement between the two write-ups. If one changes, check the other.
+
+---
+
+## 14. Equipment Management ↔ Staff Management (Member 2)
+
+### 14.1 We store staff IDs. We never store staff data.
+
+Same rule Patient Management states in §5.1, applied to Equipment's tables. Each of these is a foreign key into `StaffMember`, ID only:
+
+| Our field | What it records |
+| :--- | :--- |
+| `PharmacyTransaction.performed_by_staff_id` | Who recorded a stock movement — received, dispensed, adjusted, expired-removed |
+| `MaintenanceSchedule.performed_by_staff_id` | Who carried out a service, calibration or repair |
+| `ActionRequest.approved_by_staff_id` | Who approved (or rejected) a proposed action |
+| `Warning.acknowledged_by_staff_id` | Who acknowledged an open warning |
+
+Name, role and department stay in `StaffMember`, owned by M2. To show "Approved by …" or "Serviced by …" in React or Flutter, we ask M2's service for the name at read time rather than copying it in — the same staleness argument Patient gives in §5.1.
+
+### 14.2 No Equipment action is gated on a specific clinical role
+
+Unlike Patient Management's `clinical_clearance` checklist item (§5.2), nothing in Equipment Management requires a `Doctor` claim. Write actions gate on **Inventory Administrator** (add stock, approve/reject an `ActionRequest`, manage the bed register) or **Equipment Technician** (complete a service, report a fault, assign/release equipment); search and availability are open to any authenticated staff role (equipment-management-plan.md §2).
+
+---
+
+## 15. Contracts Equipment Management provides
+
+Mirrors §9's format, from the Equipment side. All JWT-protected; role restrictions per `equipment-management-plan.md` §7.
+
+| Endpoint | For | Returns |
+| :--- | :--- | :--- |
+| `GET /api/beds` | Patient Management's bed agent | The full bed register — id, ward, number, condition, isolation, distance. This is what §10 calls Patient's "hardest dependency." |
+| `GET /api/wards/{wardId}/equipment-readiness` | The group orchestrator, as a step in the shared admission workflow | `ready` / `not_ready` for a ward against a list of required equipment categories (§8.7 "readiness check") |
+| `GET /api/equipment-items?wardId=` | Any staff, including other components' agents | Equipment currently in a given ward |
+| `GET /api/pharmacy-items?search=&availableOnly=` | Any authenticated staff | Stock search and availability — the literal "search and check availability" requirement (equipment-management-plan.md §5.2) |
+| A readable condition change on `Bed` (or a notification) when a bed goes in or out of service | Patient Management | So Patient's bed agent's candidate pool stays current — the item Patient asks for in §10 |
+
+## 16. What Equipment Management needs from others
+
+Mirrors §10's format, from the Equipment side.
+
+| From | What | Why |
+| :--- | :--- | :--- |
+| **M4 (Patient)** | `GetBedOccupancyAsync(bedId)` | Blocks any bed-servicing or bed-retirement action against an occupied or held bed — §13, equipment-management-plan.md §3.3 |
+| **M4 (Patient)** | Ward list — id, name, type | `ward_id` on every `EquipmentItem` and `Bed` |
+| **M4 (Patient)** | Admission summary by ID | Displaying who an assigned item belongs to, without copying patient data |
+| **M2 (Staff)** | Staff member's name and role by ID | Displaying "Approved by …" / "Serviced by …" without copying their data |
+| **Leader** | Shared agent-workflow tables | Same open item as §11.2 — `ActionRequest.workflow_id` and `Warning.workflow_id` point into whatever the group leader designs |

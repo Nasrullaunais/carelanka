@@ -1,8 +1,1689 @@
 openapi: 3.0.3
+
 info:
   title: CareLanka - Health Equipment API
-  description: Owned by Member 3. Covers EquipmentItem, StockLevel, MaintenanceSchedule, Warning.
-  version: 0.1.0
-paths: {}
+  description: |
+    Owned by Member 3. Covers EquipmentCategory, EquipmentItem, Bed, PharmacyCategory,
+    PharmacyItem, PharmacyTransaction, MaintenanceSchedule, Warning, ActionRequest.
+
+    Manages two separate kinds of hospital inventory side by side: health equipment (durable,
+    reusable items - ventilators, monitors, wheelchairs, hospital furniture) and pharmacy items
+    (medicines and medical supplies, tracked by quantity). Also owns the physical bed register,
+    kept here specifically because Patient Management needs a readable bed register to work
+    from.
+
+    **The line this component does not cross.** The Equipment Monitoring Agent may only ever
+    PROPOSE an action (`ActionRequest`). It never spends money, assigns equipment to a patient,
+    dispenses medicine, or retires an asset by itself. Anything costly, urgent or irreversible
+    pauses for an Inventory Administrator to approve.
+
+    **Design rationale** is in `equipment-management-plan.md`.
+
+    **Bed ownership (settled).** Equipment Management owns the `Bed` register - creating beds,
+    retiring them, and taking them out of service for repair. Patient Management owns
+    `BedAssignment` - who is in a bed. Neither writes the other's table. Before ANY action
+    touches a bed, this component calls Patient Management's read-only
+    `GET /api/beds/{id}/occupancy` and refuses to proceed if the bed is occupied or held.
+
+    **Equipment assignment.** When an equipment item's status is set to `assigned`, the record
+    stores `assigned_to_admission_id` - a read-only reference into Patient Management's
+    `Admission` table, ID only, never a copy of patient data.
+  version: 0.2.0
+  contact:
+    name: Member 3 - Health Equipment Management
+
+servers:
+  - url: /api
+    description: Shared CareLanka ASP.NET Core Web API
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Equipment
+    description: The equipment catalog (EquipmentCategory) and physical units (EquipmentItem).
+  - name: Beds
+    description: |
+      The bed register - the physical frame, owned here. Occupancy (who is in it) belongs to
+      Patient Management and is never written from this component.
+  - name: Pharmacy
+    description: Medicines and medical supplies - catalog, quantity, and the transaction log that drives it.
+  - name: Maintenance
+    description: Scheduled and completed service, calibration and repair for equipment and beds.
+  - name: Monitoring
+    description: The Equipment Monitoring Agent - warnings, proposed actions, and human approval.
+  - name: Reports
+    description: Pharmacy consumption, maintenance compliance, utilization, agent performance.
+  - name: Integration
+    description: Read-only surfaces other components depend on.
+
+paths:
+
+  # ------------------------------------------------------------------
+  # Equipment
+  # ------------------------------------------------------------------
+
+  /equipment-categories:
+    get:
+      tags: [Equipment]
+      summary: List equipment categories
+      description: 'Roles: any authenticated staff.'
+      operationId: listEquipmentCategories
+      responses:
+        '200':
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/EquipmentCategory' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Equipment]
+      summary: Add a new equipment category
+      description: |
+        Roles: InventoryAdministrator.
+
+        Seeded with Diagnostic Tools, Life Support Systems, Surgical Gear, Monitoring Devices and
+        Hospital Furniture. Modelled as a table rather than a hard-coded enum so a sixth category
+        can be added without a migration.
+      operationId: createEquipmentCategory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateEquipmentCategoryRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EquipmentCategory' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: A category with this name already exists.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /equipment-items:
+    post:
+      tags: [Equipment]
+      summary: Register a new physical equipment item
+      description: |
+        Roles: InventoryAdministrator.
+
+        Adds an item under its category - a ventilator under Life Support Systems, for example.
+        `name`, `category_id`, `model`, `manufacturer` and `purchase_date` are the fields named
+        in the component plan; `asset_tag`, `ward_id` and `serial_number` are additions the plan
+        depends on for the QR-scan device feature and ward-location tracking.
+      operationId: createEquipmentItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateEquipmentItemRequest' }
+      responses:
+        '201':
+          description: Created, status `available`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EquipmentItem' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: This asset tag or serial number is already in use.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+    get:
+      tags: [Equipment]
+      summary: Search equipment items
+      description: 'Roles: any authenticated staff.'
+      operationId: listEquipmentItems
+      parameters:
+        - name: search
+          in: query
+          description: Matches name, model, manufacturer, asset tag or serial number.
+          schema: { type: string }
+        - name: categoryId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: wardId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/EquipmentStatus' }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [name, purchase_date, next_maintenance_due, created_at]
+            default: created_at
+        - $ref: '#/components/parameters/SortDir'
+      responses:
+        '200':
+          description: A page of equipment items
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/EquipmentItemSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /equipment-items/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Equipment]
+      summary: Get one equipment item with its maintenance history
+      description: 'Roles: any authenticated staff.'
+      operationId: getEquipmentItem
+      responses:
+        '200':
+          description: The item, including every maintenance schedule and open warning
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EquipmentItemDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Equipment]
+      summary: Update an equipment item
+      description: 'Roles: InventoryAdministrator.'
+      operationId: updateEquipmentItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateEquipmentItemRequest' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EquipmentItem' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /equipment-items/by-tag/{assetTag}:
+    parameters:
+      - name: assetTag
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Equipment]
+      summary: Resolve a scanned QR asset tag to its equipment record
+      description: |
+        Roles: EquipmentTechnician, InventoryAdministrator.
+
+        Business operation beyond CRUD. What the Flutter QR-scan screen calls the instant a
+        technician scans the tag printed on a physical item - the device feature described in
+        `equipment-management-plan.md` section 10.
+      operationId: getEquipmentItemByTag
+      responses:
+        '200':
+          description: The matching item
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EquipmentItemDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: No equipment item or bed carries this tag.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /equipment-items/{id}/assign:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Equipment]
+      summary: Assign an equipment item to a patient's admission
+      description: |
+        Roles: InventoryAdministrator, EquipmentTechnician.
+
+        Business operation beyond CRUD. `available -> assigned`. `admission_id` references
+        Patient Management's `Admission` table - stored as an ID only, never copied patient
+        data. Rejected with 409 if the item is not currently `available`.
+      operationId: assignEquipmentItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [admission_id]
+              properties:
+                admission_id: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Assigned
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EquipmentItem' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This item is not available (already assigned, in maintenance, or retired).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /equipment-items/{id}/release:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Equipment]
+      summary: Release an assigned equipment item back to available
+      description: |
+        Roles: InventoryAdministrator, EquipmentTechnician.
+
+        Business operation beyond CRUD. `assigned -> available`, clears
+        `assigned_to_admission_id`. No assignment history is retained beyond this point - see
+        `equipment-management-plan.md` section 4.1 and the open item in section 16.
+      operationId: releaseEquipmentItem
+      responses:
+        '200':
+          description: Released
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EquipmentItem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This item is not currently assigned.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /equipment-items/{id}/report-fault:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Equipment]
+      summary: Report a fault against an equipment item
+      description: |
+        Roles: EquipmentTechnician, any authenticated staff.
+
+        Business operation beyond CRUD. Sets `status = maintenance` immediately and raises a
+        `Warning` with `raised_by = user` - a broken defibrillator does not wait for the next
+        agent sweep.
+      operationId: reportEquipmentFault
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [description]
+              properties:
+                description: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Fault recorded, status set to maintenance, warning raised
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EquipmentItem' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ------------------------------------------------------------------
+  # Beds
+  # ------------------------------------------------------------------
+
+  /beds:
+    post:
+      tags: [Beds]
+      summary: Create a bed
+      description: |
+        Roles: InventoryAdministrator.
+
+        `ward_id` references Patient Management's `Ward` table. We store the reference and
+        never write to that table.
+      operationId: createBed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateBedRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bed' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: A bed with this number already exists in this ward, or this asset tag is in use.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+    get:
+      tags: [Beds, Integration]
+      summary: List beds
+      description: |
+        Roles: InventoryAdministrator. Also read by Patient Management, which joins this
+        register with its own `BedAssignment` rows to build its bed agent's candidate list.
+      operationId: listBeds
+      parameters:
+        - name: wardId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: condition
+          in: query
+          schema: { $ref: '#/components/schemas/BedCondition' }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of beds
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/Bed' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /beds/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    patch:
+      tags: [Beds]
+      summary: Update a bed's condition or details
+      description: |
+        Roles: InventoryAdministrator.
+
+        Setting `condition = out_of_service` is blocked with 409 if Patient Management reports
+        the bed occupied or held - checked synchronously, inside this request, every time.
+        Maintenance never evicts a patient.
+      operationId: updateBed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateBedRequest' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bed' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The bed is occupied or held - checked against Patient Management before this can proceed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /beds/{id}/retire:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Beds]
+      summary: Retire a bed permanently
+      description: |
+        Roles: InventoryAdministrator.
+
+        Same occupancy check as `PATCH /beds/{id}`, and additionally irreversible - there is no
+        un-retire. A dedicated endpoint rather than a condition value, so the one-way nature of
+        the action is visible in the API surface.
+      operationId: retireBed
+      responses:
+        '200':
+          description: Retired
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bed' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The bed is occupied or held.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  # ------------------------------------------------------------------
+  # Pharmacy
+  # ------------------------------------------------------------------
+
+  /pharmacy-categories:
+    get:
+      tags: [Pharmacy]
+      summary: List pharmacy categories
+      description: 'Roles: any authenticated staff.'
+      operationId: listPharmacyCategories
+      responses:
+        '200':
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PharmacyCategory' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Pharmacy]
+      summary: Add a new pharmacy category
+      description: |
+        Roles: InventoryAdministrator.
+
+        Seeded with Prescription Medicines, OTC Medicines, Behind-the-Counter Medicines, Chronic
+        Medicines and Medical Supplies.
+      operationId: createPharmacyCategory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePharmacyCategoryRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PharmacyCategory' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: A category with this name already exists.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /pharmacy-items:
+    post:
+      tags: [Pharmacy]
+      summary: Add a new pharmacy item to the catalog
+      description: |
+        Roles: InventoryAdministrator.
+
+        When a medicine or supply is purchased, it is added under its category here.
+      operationId: createPharmacyItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePharmacyItemRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PharmacyItem' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: A pharmacy item with this name already exists.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+    get:
+      tags: [Pharmacy]
+      summary: Search pharmacy items and check availability
+      description: |
+        Roles: any authenticated staff - the literal requirement of the component plan: "the
+        system allows staff to search for pharmacy items and check whether they are currently
+        available or not." Not gated to an Equipment-specific role.
+
+        `availableOnly=true` filters to `quantity_on_hand > 0`. Availability is computed at read
+        time, never stored as its own column, so it can never drift out of step with the
+        quantity.
+      operationId: listPharmacyItems
+      parameters:
+        - name: search
+          in: query
+          description: Matches name or manufacturer.
+          schema: { type: string }
+        - name: categoryId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: availableOnly
+          in: query
+          schema: { type: boolean, default: false }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [name, expiry_date, quantity_on_hand, created_at]
+            default: name
+        - $ref: '#/components/parameters/SortDir'
+      responses:
+        '200':
+          description: A page of pharmacy items
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/PharmacyItem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /pharmacy-items/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Pharmacy]
+      summary: Get one pharmacy item
+      description: 'Roles: any authenticated staff.'
+      operationId: getPharmacyItem
+      responses:
+        '200':
+          description: The item
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PharmacyItem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /pharmacy-items/{id}/transactions:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Pharmacy]
+      summary: Record a pharmacy stock movement
+      description: |
+        Roles: InventoryAdministrator for `received`/`adjusted`/`expired_removed`;
+        InventoryAdministrator or EquipmentTechnician for `dispensed`.
+
+        Business operation beyond CRUD. `quantity_on_hand` is never edited directly - every
+        change is a transaction, applied with an atomic conditional update
+        (`WHERE quantity_on_hand >= :qty`) so it can never go negative and two concurrent
+        `dispensed` calls can't both succeed past zero.
+      operationId: recordPharmacyTransaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePharmacyTransactionRequest' }
+      responses:
+        '201':
+          description: Recorded, quantity updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PharmacyItem' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Not enough stock on hand for a `dispensed` or `expired_removed` transaction of this quantity.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+    get:
+      tags: [Pharmacy]
+      summary: Transaction history for one pharmacy item
+      description: 'Roles: InventoryAdministrator.'
+      operationId: listPharmacyTransactions
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of transactions, newest first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/PharmacyTransaction' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ------------------------------------------------------------------
+  # Maintenance
+  # ------------------------------------------------------------------
+
+  /maintenance-schedules:
+    get:
+      tags: [Maintenance]
+      summary: List maintenance schedules
+      description: |
+        Roles: InventoryAdministrator, EquipmentTechnician.
+
+        `overdue=true` returns `status = scheduled AND scheduled_date < today`, computed at read
+        time - nothing cached, nothing to drift.
+      operationId: listMaintenanceSchedules
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/MaintenanceStatus' }
+        - name: assetType
+          in: query
+          schema: { $ref: '#/components/schemas/AssetType' }
+        - name: overdue
+          in: query
+          schema: { type: boolean }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of maintenance schedules
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/MaintenanceSchedule' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+    post:
+      tags: [Maintenance]
+      summary: Schedule maintenance manually, without the agent
+      description: |
+        Roles: InventoryAdministrator.
+
+        The manual path must always work: if the only way to schedule service were through the
+        agent, the hospital stops the moment the agent stops. When `asset_type = bed`, this still
+        calls Patient Management's occupancy check before creating the row.
+      operationId: createMaintenanceSchedule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateMaintenanceScheduleRequest' }
+      responses:
+        '201':
+          description: Scheduled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MaintenanceSchedule' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: The target bed is occupied or held.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /maintenance-schedules/{id}/complete:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Maintenance]
+      summary: Mark a maintenance task complete
+      description: |
+        Roles: EquipmentTechnician.
+
+        Business operation beyond CRUD. Sets `status = completed`, `completed_at`,
+        `performed_by_staff_id` from the caller's JWT, and recomputes `next_maintenance_due`.
+        For `asset_type = equipment_item`, sets `EquipmentItem.status` back to `available`. The
+        related `Warning`, if any, moves to `action_taken`.
+      operationId: completeMaintenanceSchedule
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes: { type: string, maxLength: 1000 }
+      responses:
+        '200':
+          description: Completed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MaintenanceSchedule' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This schedule is not in a status that can be completed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  # ------------------------------------------------------------------
+  # Monitoring - the agent, warnings, and approvals
+  # ------------------------------------------------------------------
+
+  /equipment/monitor:
+    post:
+      tags: [Monitoring]
+      summary: Run the Equipment Monitoring Agent's standing sweep
+      description: |
+        Roles: InventoryAdministrator, or the group orchestrator / scheduler.
+
+        Agent entry point. Starts the workflow and returns immediately with a `workflow_id`;
+        poll `/workflows/{workflowId}` for progress.
+
+        Reads pharmacy stock levels, medicine expiry dates, and equipment/bed maintenance due
+        dates, raises a `Warning` for anything that needs attention, and proposes an
+        `ActionRequest` for each one. A proposal touching a bed always calls Patient
+        Management's occupancy check first and is silently dropped (not merely queued) if the
+        bed is occupied.
+
+        The agent has four tools: three read-only, and one that can only create a proposal.
+        There is no tool that spends money, assigns equipment, dispenses medicine, or retires an
+        asset.
+      operationId: runEquipmentMonitorSweep
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ward_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Omit to sweep every ward plus the central pharmacy store.
+      responses:
+        '202':
+          description: Workflow started
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowAccepted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503':
+          description: The agent service is unavailable. Use manual scheduling and manual pharmacy transactions instead.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /workflows/{workflowId}:
+    parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Monitoring]
+      summary: Agent execution summary
+      description: |
+        Roles: InventoryAdministrator.
+
+        Plan, completed steps, tool calls with timings, validation results, errors, retries,
+        approval status and final outcome. The model's raw internal reasoning is NOT stored.
+      operationId: getEquipmentWorkflow
+      responses:
+        '200':
+          description: Execution summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /warnings:
+    get:
+      tags: [Monitoring]
+      summary: List warnings
+      description: 'Roles: InventoryAdministrator.'
+      operationId: listWarnings
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/WarningStatus' }
+        - name: severity
+          in: query
+          schema: { $ref: '#/components/schemas/WarningSeverity' }
+        - name: type
+          in: query
+          schema: { $ref: '#/components/schemas/WarningType' }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of warnings
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/Warning' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /warnings/{id}/acknowledge:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Monitoring]
+      summary: Acknowledge a warning
+      description: 'Roles: InventoryAdministrator. Records who has seen it, without closing it.'
+      operationId: acknowledgeWarning
+      responses:
+        '200':
+          description: Acknowledged
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Warning' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /action-requests:
+    get:
+      tags: [Monitoring]
+      summary: List proposed and decided actions - the approvals queue
+      description: 'Roles: InventoryAdministrator. This is the demo screen.'
+      operationId: listActionRequests
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/ActionRequestStatus' }
+        - name: actionType
+          in: query
+          schema: { $ref: '#/components/schemas/ActionType' }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of action requests
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/ActionRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /action-requests/{id}/approve:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Monitoring]
+      summary: Approve a proposed action - the high-impact human gate
+      description: |
+        Roles: InventoryAdministrator.
+
+        In one transaction: flips `status` to `approved`, then executes the action - writes the
+        `PharmacyTransaction`, creates the `MaintenanceSchedule` row, or updates
+        `EquipmentItem.ward_id` for a reallocation. If the action targets a bed, the occupancy
+        check against Patient Management runs again here, not just at proposal time.
+
+        Only reachable for requests where `requires_approval = true`; anything auto-approved
+        already executed at proposal time.
+      operationId: approveActionRequest
+      responses:
+        '200':
+          description: Approved and executed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActionRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This request is not pending approval, or (for a bed action) the bed is no longer free.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /action-requests/{id}/reject:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Monitoring]
+      summary: Reject a proposed action
+      description: |
+        Roles: InventoryAdministrator.
+
+        The rejected request is kept, `status = rejected`, with the reason - nothing is deleted.
+        The originating `Warning`, if any, stays open for a human or the next sweep to
+        reconsider.
+      operationId: rejectActionRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Rejected
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActionRequest' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /wards/{wardId}/equipment-readiness:
+    parameters:
+      - name: wardId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Monitoring, Integration]
+      summary: Does this ward have working equipment of the given categories?
+      description: |
+        Roles: InventoryAdministrator, and the group orchestrator.
+
+        Business operation beyond CRUD, and the integration surface named in the group plan's
+        cross-agent sequence (`CareLanka_Component_Plan.md` section 5): "Equipment Monitoring
+        Agent checks the destination ward has the equipment it needs." Runs the agent's
+        `check_ward_readiness` objective synchronously and returns the answer directly.
+      operationId: getWardEquipmentReadiness
+      parameters:
+        - name: requiredCategories
+          in: query
+          required: true
+          description: Equipment category IDs the caller needs present and `available` (or `assigned`, i.e. in use but working) in this ward.
+          schema:
+            type: array
+            items: { type: string, format: uuid }
+          style: form
+          explode: true
+      responses:
+        '200':
+          description: Readiness result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WardEquipmentReadiness' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ------------------------------------------------------------------
+  # Reports
+  # ------------------------------------------------------------------
+
+  /reports/pharmacy-consumption:
+    get:
+      tags: [Reports]
+      summary: Pharmacy usage over a date range
+      description: 'Roles: InventoryAdministrator.'
+      operationId: getPharmacyConsumptionReport
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: categoryId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Consumption per pharmacy item
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PharmacyConsumptionRow' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/maintenance-compliance:
+    get:
+      tags: [Reports]
+      summary: On-time vs overdue maintenance completion
+      description: 'Roles: InventoryAdministrator.'
+      operationId: getMaintenanceComplianceReport
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Compliance statistics
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MaintenanceComplianceReport' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/equipment-utilization:
+    get:
+      tags: [Reports]
+      summary: Equipment counts and time spent in maintenance, by category and ward
+      description: 'Roles: InventoryAdministrator.'
+      operationId: getEquipmentUtilizationReport
+      responses:
+        '200':
+          description: Utilization per category/ward
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/EquipmentUtilizationRow' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/agent-performance:
+    get:
+      tags: [Reports]
+      summary: How well the Equipment Monitoring Agent is doing
+      description: |
+        Roles: InventoryAdministrator.
+
+        Warnings raised, actions auto-approved vs manager-approved vs rejected, and average time
+        to approval. This is the agent's own observability, required by the assignment.
+      operationId: getEquipmentAgentPerformanceReport
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Agent performance
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AgentPerformanceReport' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+# ====================================================================
 components:
-  schemas: {}
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Shared JWT issued by the CareLanka API. Roles used by this component:
+        InventoryAdministrator, EquipmentTechnician. Read-only search endpoints (pharmacy and
+        equipment listing) accept any authenticated staff role from the shared identity system.
+
+  parameters:
+    PathId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    SortDir:
+      name: sortDir
+      in: query
+      schema: { type: string, enum: [asc, desc], default: desc }
+
+  responses:
+    BadRequest:
+      description: Validation failed
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ValidationProblemDetails' }
+    Unauthorized:
+      description: Missing or invalid token
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    Forbidden:
+      description: Authenticated, but this role may not do this
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    NotFound:
+      description: Not found
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  schemas:
+
+    # ---------- enums ----------
+
+    EquipmentStatus:
+      type: string
+      description: |
+        Available/Assigned/Maintenance are the states named in the component plan. Retired is an
+        addition for permanently decommissioned items - see equipment-management-plan.md
+        section 15.
+      enum: [available, assigned, maintenance, retired]
+
+    BedCondition:
+      type: string
+      enum: [usable, out_of_service]
+
+    AssetType:
+      type: string
+      enum: [equipment_item, bed]
+
+    MaintenanceType:
+      type: string
+      enum: [routine_service, calibration, repair]
+
+    MaintenanceStatus:
+      type: string
+      description: '`overdue` is computed at read time from `scheduled_date < today AND status = scheduled`, never stored.'
+      enum: [scheduled, in_progress, completed, overdue, cancelled]
+
+    WarningType:
+      type: string
+      enum: [low_stock, medicine_expiring, maintenance_overdue, equipment_faulty]
+
+    WarningSeverity:
+      type: string
+      enum: [low, medium, high, critical]
+
+    WarningStatus:
+      type: string
+      enum: [open, acknowledged, action_taken, dismissed]
+
+    RaisedBy:
+      type: string
+      enum: [agent, user]
+
+    ActionType:
+      type: string
+      enum: [reorder_pharmacy_stock, schedule_maintenance, reallocate_equipment, retire_equipment, dispose_expired_stock]
+
+    ActionRequestStatus:
+      type: string
+      enum: [pending_approval, approved, rejected, completed]
+
+    Urgency:
+      type: string
+      description: Feeds the deterministic approval threshold - urgent or critical always requires a human, whatever the cost.
+      enum: [routine, urgent, critical]
+
+    PharmacyTransactionType:
+      type: string
+      enum: [received, dispensed, adjusted, expired_removed]
+
+    # ---------- common ----------
+
+    PagedResult:
+      type: object
+      required: [page, page_size, total_items, total_pages]
+      properties:
+        page: { type: integer }
+        page_size: { type: integer }
+        total_items: { type: integer }
+        total_pages: { type: integer }
+
+    ProblemDetails:
+      type: object
+      description: RFC 7807, as produced by ASP.NET Core.
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+
+    ValidationProblemDetails:
+      allOf:
+        - $ref: '#/components/schemas/ProblemDetails'
+        - type: object
+          properties:
+            errors:
+              type: object
+              additionalProperties:
+                type: array
+                items: { type: string }
+
+    AuditFields:
+      type: object
+      properties:
+        created_at: { type: string, format: date-time, readOnly: true }
+        updated_at: { type: string, format: date-time, readOnly: true }
+
+    # ---------- equipment ----------
+
+    CreateEquipmentCategoryRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 150 }
+
+    EquipmentCategory:
+      allOf:
+        - $ref: '#/components/schemas/AuditFields'
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+
+    CreateEquipmentItemRequest:
+      type: object
+      required: [name, category_id, model, manufacturer, purchase_date, asset_tag]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 150, example: Ventilator }
+        category_id: { type: string, format: uuid }
+        model: { type: string, maxLength: 100 }
+        manufacturer: { type: string, maxLength: 150 }
+        purchase_date: { type: string, format: date }
+        asset_tag: { type: string, maxLength: 50, description: 'Printed as a QR code on the physical item.' }
+        serial_number: { type: string, maxLength: 100, nullable: true }
+        ward_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Null = central store / not yet allocated. References Patient Management's Ward table.
+        next_maintenance_due: { type: string, format: date, nullable: true }
+
+    UpdateEquipmentItemRequest:
+      type: object
+      properties:
+        name: { type: string, maxLength: 150 }
+        model: { type: string, maxLength: 100 }
+        manufacturer: { type: string, maxLength: 150 }
+        ward_id: { type: string, format: uuid, nullable: true }
+        status: { $ref: '#/components/schemas/EquipmentStatus' }
+        next_maintenance_due: { type: string, format: date, nullable: true }
+
+    EquipmentItemSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        category_id: { type: string, format: uuid }
+        category_name: { type: string }
+        model: { type: string }
+        manufacturer: { type: string }
+        asset_tag: { type: string }
+        ward_id: { type: string, format: uuid, nullable: true }
+        ward_name: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/EquipmentStatus' }
+        next_maintenance_due: { type: string, format: date, nullable: true }
+
+    EquipmentItem:
+      allOf:
+        - $ref: '#/components/schemas/EquipmentItemSummary'
+        - $ref: '#/components/schemas/AuditFields'
+        - type: object
+          properties:
+            purchase_date: { type: string, format: date }
+            serial_number: { type: string, nullable: true }
+            assigned_to_admission_id:
+              type: string
+              format: uuid
+              nullable: true
+              description: Set when status = assigned. References Patient Management's Admission table.
+
+    EquipmentItemDetail:
+      allOf:
+        - $ref: '#/components/schemas/EquipmentItem'
+        - type: object
+          properties:
+            maintenance_history:
+              type: array
+              items: { $ref: '#/components/schemas/MaintenanceSchedule' }
+            open_warnings:
+              type: array
+              items: { $ref: '#/components/schemas/Warning' }
+
+    # ---------- beds ----------
+
+    CreateBedRequest:
+      type: object
+      required: [ward_id, bed_number]
+      properties:
+        ward_id: { type: string, format: uuid, description: "References Patient Management's Ward table." }
+        bed_number: { type: string, maxLength: 20 }
+        has_isolation: { type: boolean, default: false }
+        nurse_station_distance: { type: integer, minimum: 1, default: 1, description: '1 = closest.' }
+        asset_tag: { type: string, maxLength: 50, nullable: true }
+
+    UpdateBedRequest:
+      type: object
+      properties:
+        has_isolation: { type: boolean }
+        nurse_station_distance: { type: integer, minimum: 1 }
+        condition: { $ref: '#/components/schemas/BedCondition' }
+        asset_tag: { type: string, maxLength: 50, nullable: true }
+
+    Bed:
+      description: |
+        The physical bed frame. This is the writable source of truth Patient Management's
+        `patient-spec.yaml` `Bed` schema reads and never writes to.
+      allOf:
+        - $ref: '#/components/schemas/AuditFields'
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            ward_id: { type: string, format: uuid }
+            ward_name: { type: string }
+            bed_number: { type: string }
+            has_isolation: { type: boolean }
+            nurse_station_distance: { type: integer }
+            condition: { $ref: '#/components/schemas/BedCondition' }
+            asset_tag: { type: string, nullable: true }
+
+    # ---------- pharmacy ----------
+
+    CreatePharmacyCategoryRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 150 }
+        requires_prescription: { type: boolean, default: false }
+
+    PharmacyCategory:
+      allOf:
+        - $ref: '#/components/schemas/AuditFields'
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            requires_prescription: { type: boolean }
+
+    CreatePharmacyItemRequest:
+      type: object
+      required: [name, category_id, unit]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200, example: Paracetamol 500mg }
+        category_id: { type: string, format: uuid }
+        manufacturer: { type: string, maxLength: 150, nullable: true }
+        batch_number: { type: string, maxLength: 50, nullable: true }
+        expiry_date: { type: string, format: date, nullable: true }
+        unit: { type: string, maxLength: 20, example: box }
+        quantity_on_hand: { type: integer, minimum: 0, default: 0 }
+        reorder_threshold: { type: integer, minimum: 0, default: 10 }
+        unit_price: { type: number, format: float, nullable: true }
+
+    PharmacyItem:
+      allOf:
+        - $ref: '#/components/schemas/AuditFields'
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            category_id: { type: string, format: uuid }
+            category_name: { type: string }
+            manufacturer: { type: string, nullable: true }
+            batch_number: { type: string, nullable: true }
+            expiry_date: { type: string, format: date, nullable: true }
+            unit: { type: string }
+            quantity_on_hand: { type: integer }
+            reorder_threshold: { type: integer }
+            unit_price: { type: number, format: float, nullable: true }
+            is_available:
+              type: boolean
+              description: Computed as quantity_on_hand > 0, never stored - the literal availability check from the component plan.
+            below_threshold: { type: boolean }
+
+    CreatePharmacyTransactionRequest:
+      type: object
+      required: [type, quantity]
+      properties:
+        type: { $ref: '#/components/schemas/PharmacyTransactionType' }
+        quantity: { type: integer, minimum: 1 }
+        note: { type: string, maxLength: 300, nullable: true }
+
+    PharmacyTransaction:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        pharmacy_item_id: { type: string, format: uuid }
+        type: { $ref: '#/components/schemas/PharmacyTransactionType' }
+        quantity: { type: integer }
+        performed_by_staff_id: { type: string, format: uuid }
+        note: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    # ---------- maintenance ----------
+
+    CreateMaintenanceScheduleRequest:
+      type: object
+      required: [asset_type, asset_id, schedule_type, scheduled_date]
+      properties:
+        asset_type: { $ref: '#/components/schemas/AssetType' }
+        asset_id: { type: string, format: uuid }
+        schedule_type: { $ref: '#/components/schemas/MaintenanceType' }
+        scheduled_date: { type: string, format: date }
+        notes: { type: string, maxLength: 1000, nullable: true }
+
+    MaintenanceSchedule:
+      allOf:
+        - $ref: '#/components/schemas/AuditFields'
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            asset_type: { $ref: '#/components/schemas/AssetType' }
+            asset_id: { type: string, format: uuid }
+            asset_label:
+              type: string
+              description: 'Human-readable, e.g. "Ventilator (asset tag EQ-0042)" or "Ward 5B, Bed 12".'
+            schedule_type: { $ref: '#/components/schemas/MaintenanceType' }
+            scheduled_date: { type: string, format: date }
+            status: { $ref: '#/components/schemas/MaintenanceStatus' }
+            performed_by_staff_id: { type: string, format: uuid, nullable: true }
+            completed_at: { type: string, format: date-time, nullable: true }
+            notes: { type: string, nullable: true }
+            created_by: { $ref: '#/components/schemas/RaisedBy' }
+
+    # ---------- monitoring: warnings, actions, workflow ----------
+
+    Warning:
+      allOf:
+        - $ref: '#/components/schemas/AuditFields'
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            type: { $ref: '#/components/schemas/WarningType' }
+            severity: { $ref: '#/components/schemas/WarningSeverity' }
+            related_entity_type:
+              type: string
+              enum: [pharmacy_item, equipment_item, bed]
+            related_entity_id: { type: string, format: uuid }
+            related_entity_label: { type: string }
+            ward_id: { type: string, format: uuid, nullable: true }
+            recommended_action:
+              type: string
+              description: Short human-readable summary. Not the model's raw reasoning.
+            status: { $ref: '#/components/schemas/WarningStatus' }
+            raised_by: { $ref: '#/components/schemas/RaisedBy' }
+            workflow_id: { type: string, format: uuid, nullable: true }
+            acknowledged_by_staff_id: { type: string, format: uuid, nullable: true }
+            acknowledged_at: { type: string, format: date-time, nullable: true }
+            resolved_at: { type: string, format: date-time, nullable: true }
+
+    ActionRequest:
+      allOf:
+        - $ref: '#/components/schemas/AuditFields'
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            warning_id: { type: string, format: uuid, nullable: true }
+            action_type: { $ref: '#/components/schemas/ActionType' }
+            details:
+              type: object
+              description: |
+                Shape depends on action_type. reorder_pharmacy_stock:
+                {pharmacy_item_id, quantity}. reallocate_equipment:
+                {equipment_item_id, from_ward_id, to_ward_id}. schedule_maintenance:
+                {asset_type, asset_id, schedule_type}. retire_equipment: {asset_type, asset_id}.
+                dispose_expired_stock: {pharmacy_item_id, quantity}.
+              additionalProperties: true
+            estimated_cost: { type: number, format: float, nullable: true }
+            urgency: { $ref: '#/components/schemas/Urgency' }
+            proposed_by: { $ref: '#/components/schemas/RaisedBy' }
+            workflow_id: { type: string, format: uuid, nullable: true }
+            requires_approval:
+              type: boolean
+              description: Computed once at creation by the deterministic threshold rule, never by the model.
+            auto_approved: { type: boolean }
+            status: { $ref: '#/components/schemas/ActionRequestStatus' }
+            approved_by_staff_id: { type: string, format: uuid, nullable: true }
+            approved_at: { type: string, format: date-time, nullable: true }
+            rejection_reason: { type: string, nullable: true }
+            executed_at: { type: string, format: date-time, nullable: true }
+
+    WorkflowAccepted:
+      type: object
+      properties:
+        workflow_id: { type: string, format: uuid }
+        status: { type: string, example: running }
+        poll_url: { type: string, example: /api/workflows/3fa85f64-5717-4562-b3fc-2c963f66afa6 }
+
+    WorkflowSummary:
+      type: object
+      description: |
+        Persisted agent execution state: id, objective, plan, completed steps, tool calls,
+        validation results, errors, approval status and outcome. Raw model reasoning is not
+        stored.
+      properties:
+        workflow_id: { type: string, format: uuid }
+        objective:
+          type: string
+          enum: [monitor_stock_and_maintenance, check_ward_readiness]
+        status:
+          type: string
+          enum: [running, completed, failed]
+        outcome:
+          type: string
+          enum: [completed, ready, not_ready, failed]
+          nullable: true
+        plan:
+          type: array
+          items: { type: string }
+        steps:
+          type: array
+          items:
+            type: object
+            properties:
+              step: { type: string }
+              tool: { type: string, nullable: true }
+              started_at: { type: string, format: date-time }
+              duration_ms: { type: integer }
+              ok: { type: boolean }
+              error: { type: string, nullable: true }
+        warnings_raised:
+          type: array
+          items: { type: string, format: uuid }
+        actions_proposed:
+          type: array
+          items: { type: string, format: uuid }
+        retries: { type: integer }
+
+    WardEquipmentReadiness:
+      type: object
+      properties:
+        workflow_id: { type: string, format: uuid }
+        ward_id: { type: string, format: uuid }
+        outcome:
+          type: string
+          enum: [ready, not_ready]
+        missing_categories:
+          type: array
+          items: { type: string, format: uuid }
+          description: Equipment category IDs requested but not found available/assigned in this ward.
+
+    # ---------- reports ----------
+
+    PharmacyConsumptionRow:
+      type: object
+      properties:
+        pharmacy_item_name: { type: string }
+        category_name: { type: string }
+        total_dispensed: { type: integer }
+        total_received: { type: integer }
+        ending_quantity: { type: integer }
+
+    MaintenanceComplianceReport:
+      type: object
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        total_scheduled: { type: integer }
+        completed_on_time: { type: integer }
+        completed_late: { type: integer }
+        still_overdue: { type: integer }
+        compliance_rate: { type: number, format: float }
+
+    EquipmentUtilizationRow:
+      type: object
+      properties:
+        category_name: { type: string }
+        ward_name: { type: string, nullable: true }
+        total_items: { type: integer }
+        available: { type: integer }
+        assigned: { type: integer }
+        maintenance_days_last_30: { type: number, format: float }
+
+    AgentPerformanceReport:
+      type: object
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        warnings_raised: { type: integer }
+        actions_proposed: { type: integer }
+        auto_approved: { type: integer }
+        manually_approved: { type: integer }
+        rejected: { type: integer }
+        average_seconds_to_approval: { type: number, format: float }
+        average_agent_latency_ms: { type: number, format: float }

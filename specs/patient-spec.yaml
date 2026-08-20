@@ -1306,9 +1306,13 @@ components:
         intensive; the downgrade ladder walks icu -> hdu -> inpatient.
       enum: [icu, hdu, inpatient, day_case, outpatient]
 
-    Urgency:
+    AdmissionUrgency:
       type: string
-      description: Used only to break ties when two admissions want the last bed.
+      description: |
+        Used only to break ties when two admissions want the last bed.
+        Called AdmissionUrgency rather than Urgency because equipment-spec.yaml has its
+        own Urgency, meaning how urgent a maintenance or restock job is. Different thing,
+        same word, one shared app - so the names have to differ.
       enum: [routine, urgent, emergency]
 
     AdmissionStatus:
@@ -1478,7 +1482,7 @@ components:
           type: string
           format: uuid
           description: The clinician who chose the category. Recorded proof a human decided it.
-        urgency: { $ref: '#/components/schemas/Urgency' }
+        urgency: { $ref: '#/components/schemas/AdmissionUrgency' }
         is_infectious:
           type: boolean
           default: false
@@ -1504,7 +1508,7 @@ components:
           nullable: true
           description: Required when patient_is_caller is true. Ignored otherwise - a new record is created instead.
         expected_arrival: { type: string, format: date-time }
-        urgency: { $ref: '#/components/schemas/Urgency' }
+        urgency: { $ref: '#/components/schemas/AdmissionUrgency' }
         destination_ward_type_hint:
           allOf:
             - $ref: '#/components/schemas/WardType'
@@ -1535,7 +1539,7 @@ components:
         patient: { $ref: '#/components/schemas/PatientSummary' }
         source: { $ref: '#/components/schemas/AdmissionSource' }
         admission_category: { $ref: '#/components/schemas/AdmissionCategory' }
-        urgency: { $ref: '#/components/schemas/Urgency' }
+        urgency: { $ref: '#/components/schemas/AdmissionUrgency' }
         status: { $ref: '#/components/schemas/AdmissionStatus' }
         details_complete: { type: boolean }
         ward_name: { type: string, nullable: true }

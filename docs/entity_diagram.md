@@ -522,7 +522,7 @@ On check-in this becomes an `Admission` with `Source = Booked`.
 + AppointmentId: Guid (nullable) FK → Appointment.Id    -- (Rev 2)
 + Source: AdmissionSource (non-null)                    -- (Rev 2)
 + Category: AdmissionCategory (non-null)
-+ Urgency: Urgency (non-null)                           -- (Rev 2.2: was AcuityLevel)
++ Urgency: AdmissionUrgency (non-null)                  -- (Rev 2.2: was AcuityLevel)
 + IsInfectious: bool = false (non-null)                 -- (Rev 2.2: was RequiresIsolation)
 + CategorySetByStaffMemberId: Guid (non-null) FK → StaffMember.Id  -- (Rev 2.2)
 + CategorySetAt: DateTimeOffset (non-null)              -- (Rev 2.2)
@@ -907,7 +907,7 @@ published in `patient-spec.yaml`. `Ward.Type` used to reuse `AdmissionCategory`,
 could not express a maternity, pediatric or isolation ward. Overlaps `AdmissionCategory`
 on `icu`/`hdu` only; the two lists are not interchangeable.
 
-### Urgency *(Rev 2.2 — replaces AcuityLevel)*
+### AdmissionUrgency *(Rev 2.2 — replaces AcuityLevel)*
 ```
 Routine, Urgent, Emergency
 ```
@@ -918,6 +918,11 @@ last bed.
 
 Rev 2 introduced this as `AcuityLevel {Critical, High, Medium, Low}`, which duplicated
 both the committed `urgency` field and the shape of `CallPriority`. One field, one name.
+
+Named `AdmissionUrgency`, not `Urgency`, because `equipment-spec.yaml` already has an
+`Urgency` of its own — how urgent a maintenance or restock job is. Two different facts
+that happened to pick the same word; in one shared project they need different names.
+The JSON field stays `urgency`, so nothing about the API changes.
 
 ### Gender *(Rev 2 — new)*
 ```

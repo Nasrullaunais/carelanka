@@ -108,7 +108,7 @@ Warning ──< ActionRequest (the proposal + approval record)
 | `manufacturer` | text | From your plan |
 | `purchase_date` | date | From your plan |
 | `status` | enum | `available` `assigned` `maintenance` `retired` — see §4.1. Your plan named the first three; `retired` is an addition, see §15. |
-| `ward_id` | uuid, nullable | *Addition beyond your plan* — which ward the item currently sits in, or `null` for central store. Needed so the agent can answer "does this ward have a working ventilator" (§9.7) and so the Administrator can filter by location. References Patient Management's `Ward` table, read-only. |
+| `ward_id` | uuid, nullable | *Addition beyond your plan* — which ward the item currently sits in, or `null` for central store. Needed so the agent can answer "does this ward have a working ventilator" (§8.7) and so the Administrator can filter by location. References Patient Management's `Ward` table, read-only. |
 | `assigned_to_admission_id` | uuid, nullable | *Addition beyond your plan* — set when `status = assigned`, cleared when released. References Patient Management's `Admission` table, ID only, per the Q&A decision to record *who* an assigned item belongs to. |
 | `asset_tag` | text, unique | *Addition beyond your plan* — printed as a QR code on the physical item, what the Technician scans (§10) |
 | `serial_number` | text, nullable | *Addition beyond your plan* — distinct from the manufacturer's model name, for items where more than one unit shares a model |
@@ -152,7 +152,7 @@ Constraint: `UNIQUE(ward_id, bed_number)`.
 | `unit` | text | `tablet` `bottle` `box` etc. |
 | `quantity_on_hand` | integer | Per the Q&A decision to track real quantities, not a plain flag |
 | `reorder_threshold` | integer | |
-| `unit_price` | numeric, nullable | Feeds the agent's cost-threshold decision (§9.6) |
+| `unit_price` | numeric, nullable | Feeds the agent's cost-threshold decision (§8.6) |
 | `created_at` / `updated_at` | timestamptz | |
 
 **Availability is not a stored column.** `is_available = quantity_on_hand > 0`, computed at read time — the same reasoning Patient Management uses for bed occupancy not being a column on `Bed`: one source of truth, nothing to let drift out of sync.
@@ -218,7 +218,7 @@ Constraint: `UNIQUE(ward_id, bed_number)`.
 | `urgency` | enum | `routine` `urgent` `critical` |
 | `proposed_by` | enum | `agent` `user` |
 | `workflow_id` | uuid, nullable | |
-| `requires_approval` | boolean | Computed once at creation by the deterministic threshold rule (§9.6) — never the model's call |
+| `requires_approval` | boolean | Computed once at creation by the deterministic threshold rule (§8.6) — never the model's call |
 | `auto_approved` | boolean | |
 | `status` | enum | `pending_approval` `approved` `rejected` `completed` |
 | `approved_by_staff_id` | uuid, FK, nullable | |
@@ -227,7 +227,7 @@ Constraint: `UNIQUE(ward_id, bed_number)`.
 | `executed_at` | timestamptz, nullable | |
 | `created_at` / `updated_at` | timestamptz | |
 
-Rows are never deleted — a rejected reorder stays as a `rejected` row, which is what the agent-performance report (§8.6) measures.
+Rows are never deleted — a rejected reorder stays as a `rejected` row, which is what the agent-performance report (§7.6) measures.
 
 ### 3.2 Indexes
 
@@ -330,7 +330,7 @@ Two independent triggers, both checked by the same sweep:
 2. WARNING      raised, type = maintenance_overdue / equipment_faulty
 3. PROPOSE      agent proposes an ActionRequest: schedule_maintenance
 4. GATE         if asset_type = bed: block if occupied (§3.3) - hard stop, not a queue item
-5. THRESHOLD    deterministic rule decides requires_approval (§9.6)
+5. THRESHOLD    deterministic rule decides requires_approval (§8.6)
 6. APPROVE      Administrator approves in React (or it auto-clears)
 7. SCHEDULE     MaintenanceSchedule row created, status = scheduled; EquipmentItem.status -> maintenance
 8. COMPLETE     Technician scans the asset tag, marks it done in Flutter
@@ -400,7 +400,7 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 | `GET` | `/api/action-requests` | Inventory Administrator | The approvals queue — **this is the demo screen** |
 | `POST` | `/api/action-requests/{id}/approve` | Inventory Administrator | **High-impact gate.** Executes the action per §3.3. |
 | `POST` | `/api/action-requests/{id}/reject` | Inventory Administrator | Requires a reason |
-| `GET` | `/api/wards/{wardId}/equipment-readiness` | Inventory Administrator, and the group orchestrator | **Integration surface.** §9.7 — does this ward have working equipment of the types a plan needs? |
+| `GET` | `/api/wards/{wardId}/equipment-readiness` | Inventory Administrator, and the group orchestrator | **Integration surface.** §8.7 — does this ward have working equipment of the types a plan needs? |
 
 ### 7.6 Reports
 
@@ -419,7 +419,7 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 
 > Given the current pharmacy stock, medicine expiry dates, and equipment/bed maintenance schedules, find what needs attention before it becomes a shortage, an expired medicine in circulation, or an equipment failure, and propose what to do about it.
 
-**One agent, two entry points, one job.** It either runs a standing sweep (§9.7 "monitor") or answers a single targeted question for another agent's workflow (§9.7 "readiness check"). Neither ever dispenses medicine, assigns equipment, or takes a bed out of service by itself.
+**One agent, two entry points, one job.** It either runs a standing sweep (§8.7 "monitor") or answers a single targeted question for another agent's workflow (§8.7 "readiness check"). Neither ever dispenses medicine, assigns equipment, or takes a bed out of service by itself.
 
 ### 8.2 Input contract
 

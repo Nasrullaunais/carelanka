@@ -27,7 +27,7 @@ here is the order of authority.
 | `specs/integration_of_functions.md` | Component boundaries: who owns which table, who calls whose service, open cross-component items. Read before touching anything you do not own. | Group |
 | `specs/*-spec.yaml` | The OpenAPI contract per component — actual request and response shapes. | That component's member |
 | `specs/{patient,equipment}-management-plan.md` | That component's design doc; its `*-spec.yaml` follows from it. Staff and Emergency have not written theirs. | That component's member |
-| `specs/ai-orchestration-workflow.md` | How the four agents chain. Currently a stub. | Group |
+| `specs/ai-orchestration-workflow.md` | How the agents chain into one workflow, and the shared workflow state. Proposal stage; does not block building an individual agent. | Group |
 | `mobile-ui/README.md` | Flutter layout, and that each member works only inside `lib/features/<component>/`. Read before writing Dart. | Group |
 
 Three rules that fall out of it:
@@ -227,6 +227,10 @@ is the repository.
 - **AI agents propose, never write.** Every agent output becomes an
   `AgentProposedChange` awaiting human approval, and no agent sets a patient's
   care category.
+- **Each component's agent plans and acts internally** — gather → filter → rank →
+  decide → propose → deterministic validation → pause for approval.
+  `patient-management-plan.md` §8.7 is the template. Chaining the four together
+  is `ai-orchestration-workflow.md`, and comes after.
 
 ## Data conventions
 

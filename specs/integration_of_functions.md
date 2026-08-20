@@ -428,7 +428,9 @@ All four agents must persist workflow id, objective, plan, steps, tool results, 
 **Recommendation:** the leader owns one shared design, since `ai-orchestration-workflow.md` is already group-owned. Each component links by `workflow_id`.
 **Flagged for the leader. Not decided.**
 
-**11.3 — Does M1 call M4 directly for pre-admission, or does the orchestrator drive both?** Affects §4.2 and both specs.
+*Update:* `ai-orchestration-workflow.md` §5 now proposes exactly this — one `AgentWorkflow` row per agent run, chained by `correlation_id` and `parent_workflow_id`, owned by the leader. Settle it alongside the orchestration decision in that document, since the table design follows from it.
+
+**11.3 — Does M1 call M4 directly for pre-admission, or does the orchestrator drive both?** Affects §4.2 and both specs. If the Coordinator Agent proposed in `ai-orchestration-workflow.md` §3 is adopted, the coordinator drives both and this closes.
 
 **11.4 (RESOLVED) — A bystander can raise a call for someone else.** The call screen asks once; M1 passes `patient_is_caller` and `caller_user_id` through on the dispatch notification (§4.2). The caller is stored as the patient's emergency contact. **M1 needs to add these two fields** — confirm with Member 1.
 

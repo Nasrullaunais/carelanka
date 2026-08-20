@@ -449,12 +449,6 @@ Re-verified against `main` on 2026-08-21:
 | `PagedResult` — staff says `total_count`, the others `total_items` | all three | `total_items`, on the 2-vs-1 count. Staff to confirm |
 | `Bed`, `WorkflowSummary`, `WorkflowAccepted`, `AgentPerformanceReport` — one name, different shapes | across specs | Either make them byte-identical or give them different names (`EquipmentBed` / `AdmissionBed`) |
 
-Already resolved — listed so nobody reopens them: `GET /beds` and
-`operationId: listBeds` are Equipment's alone (Patient publishes only
-`/beds/{id}/occupancy`); `Urgency` split into Patient's `AdmissionUrgency` and
-Equipment's `Urgency`; `AgentOutcome` split into Staff's `AgentOutcome` and
-Patient's `BedAgentOutcome`.
-
 **Also blocking:** `emergency-spec.yaml` is still a 212-byte stub with
 `paths: {}`. Everything §10 lists under M1 — the dispatch notification,
 `patient_is_caller`, `caller_user_id` — has nowhere to live until M1 writes it.

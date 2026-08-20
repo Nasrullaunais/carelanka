@@ -1,4 +1,4 @@
-# Patient Management — Component Design
+# Patient Management  - Component Design
 
 **CareLanka Hospital Management System · SE3090 Assignment 1**
 **Owner:** Member 4 · **Status:** draft for group review · **Version:** 0.1

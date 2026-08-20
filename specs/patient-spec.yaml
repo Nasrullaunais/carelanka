@@ -1363,8 +1363,12 @@ components:
       type: string
       enum: [discharged, hold_expired, cancelled, transferred, rejected]
 
-    AgentOutcome:
+    BedAgentOutcome:
       type: string
+      description: |
+        What the bed agent decided. Called BedAgentOutcome rather than AgentOutcome
+        because staff-spec.yaml has its own AgentOutcome for what the staffing agent
+        decided. Different thing, same word, one shared app - so the names have to differ.
       enum: [proposed, proposed_with_downgrade, no_bed_available, failed]
 
     # ---------- common ----------
@@ -1746,7 +1750,7 @@ components:
           enum: [running, awaiting_approval, completed, failed]
         outcome:
           allOf:
-            - $ref: '#/components/schemas/AgentOutcome'
+            - $ref: '#/components/schemas/BedAgentOutcome'
           nullable: true
         plan:
           type: array

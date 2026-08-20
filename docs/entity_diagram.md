@@ -16,10 +16,36 @@ Items still requiring a group decision are collected in [Open Decisions](#open-d
   transition table are under [`AdmissionStatus`](#admissionstatus-rev-21--changed-again-review-item-2).
 - **`Patient.TempReference`** gives unidentified arrivals a handle (`UNKNOWN-2026-0142`),
   with a CHECK guaranteeing every patient row carries at least one identifier.
-- **`Admission.MissingDetails` / `DetailsComplete`** record *which* details are still
+- **`Admission.MissingFields` / `DetailsComplete`** record *which* details are still
   outstanding, for the "relative brings the ID later" case.
 - Enum literals in SQL normalised to snake_case throughout, matching the wire values
   already published in `patient-spec.yaml`.
+
+**Revision 2.2** — schema reconciled against the three committed component specs
+(`patient-spec.yaml`, `equipment-spec.yaml`, `staff-spec.yaml`), marked *(Rev 2.2)*.
+Rev 2.1 closed review items 2 and 4; this revision closes **item 3**, which was not
+addressed, and fixes name and value mismatches found by comparing every entity, field and
+enum in this document against those specs.
+
+The rule applied throughout: **where this diagram and a component's own committed spec
+disagree, the spec wins — for whichever member owns that entity.** That cuts in every
+direction, including against Patient Management (see `Gender`).
+
+- **`Bed` moved to Health Equipment (Member 3)** — review item 3. Three other documents had
+  already settled this; Rev 2.1 was the only one placing it under Member 4.
+- **`Bed` field names and `BedCondition`** aligned to `equipment-spec.yaml`. Occupancy and
+  holds are no longer denormalized onto `Bed`, which had reintroduced a cross-write between
+  two components.
+- **`Ward.Type` is now `WardType`**, not `AdmissionCategory` — maternity, pediatric and
+  isolation wards were unrepresentable.
+- **`Admission.Urgency` / `IsInfectious` / `MissingFields`** — Rev 2 had invented second
+  names for fields the committed spec already published.
+- **`AdmissionCategory.HighDependency` serializes to `hdu`**, not `high_dependency`.
+- **`StaffRole` aligned to `staff-spec.yaml`**, adding `Doctor` — without it, a published
+  authorization rule in `patient-spec.yaml` could not be implemented.
+- **`Gender.Unknown` kept**, and `patient-spec.yaml` corrected to match it.
+- Three new items in [Open Decisions](#open-decisions) (9–11) for things that need an
+  owner's call rather than a unilateral edit.
 
 ## Architecture Overview
 
@@ -360,33 +386,62 @@ partial UNIQUE stops the threshold job inserting a duplicate open warning on eve
 #### Ward extends SoftDeletableEntity
 ```
 + Name: string (unique, non-null)
-+ Type: AdmissionCategory (non-null)
++ Type: WardType (non-null)                             -- (Rev 2.2: was AdmissionCategory)
 + GenderPolicy: WardGenderPolicy (non-null)             -- (Rev 2)
 ```
 **Table:** `wards`
-**Note:** `Type` mirrors `AdmissionCategory` so the Patient Admission & Bed Agent can
-filter candidate beds by matching ward type to the patient's category. *(Decision 31)*
+**Note:** `Type` lets the Patient Admission & Bed Agent filter candidate beds by matching
+ward type to the patient's category. *(Decision 31)*
+
+*(Rev 2.2)* **`Type` is its own enum, not `AdmissionCategory`.** Reusing `AdmissionCategory`
+made maternity, pediatric and isolation wards unrepresentable — a hospital has those wards,
+and `patient-management-plan.md` hard rules H3 (gender policy) and H4 (isolation) are
+written against them. `patient-spec.yaml` already publishes a separate `WardType`; this now
+matches it. The two enums overlap on `icu` and `hdu`, which is what the downgrade ladder
+walks; they are not the same list and should not share a type.
 *(Rev 2)* `GenderPolicy` implements the patient flow's "throws out every bed in the wrong
 gender ward" filter — before Rev 2 the schema had nothing on `Ward` to filter against.
 
-#### Bed extends SoftDeletableEntity
+#### Bed extends SoftDeletableEntity — **owned by Health Equipment (Member 3)** *(Rev 2.2)*
 ```
 + WardId: Guid (non-null) FK → Ward.Id
-+ Label: string (non-null)
-+ Status: BedStatus (non-null)
-+ IsIsolationCapable: bool = false (non-null)           -- (Rev 2)
-+ ProximityRank: int (non-null)                         -- (Rev 2)
++ BedNumber: string (non-null)                          -- (Rev 2.2: was Label)
++ Condition: BedCondition (non-null)                    -- (Rev 2.2: was Status: BedStatus)
++ HasIsolation: bool = false (non-null)                 -- (Rev 2.2: was IsIsolationCapable)
++ NurseStationDistance: int (non-null)                  -- (Rev 2.2: was ProximityRank)
++ AssetTag: string (nullable)                           -- (Rev 2.2)
 ```
 **Table:** `beds`
-**Constraint:** UNIQUE(WardId, Label) WHERE IsActive
-**Note:** *(Rev 2)* `IsIsolationCapable` is the bed side of the "no isolation for
-infectious patients" filter (the patient side is `Admission.RequiresIsolation`).
-`ProximityRank` is the bed side of "sicker patient goes closer to the nurses' station"
-(the patient side is `Admission.AcuityLevel`); lower rank = closer, unique within a ward
-so the agent's ranking is deterministic. Both filters were unimplementable before Rev 2.
-`Status = Occupied` is denormalized from the open `BedAssignment` row and must be written
-in the same transaction; `Cleaning`/`Maintenance`/`Reserved` are not derivable and are
-authoritative here.
+**Constraint:** UNIQUE(WardId, BedNumber) WHERE IsActive
+**Note:** *(Rev 2)* `HasIsolation` is the bed side of the "no isolation for
+infectious patients" filter (the patient side is `Admission.IsInfectious`).
+`NurseStationDistance` is the bed side of "sicker patient goes closer to the nurses'
+station" (the patient side is `Admission.Urgency`); 1 = closest, unique within a ward so
+the agent's ranking is deterministic. Both filters were unimplementable before Rev 2.
+
+*(Rev 2.2 — review item 3)* **Field names and `Condition` aligned to the owner's spec.**
+`equipment-spec.yaml` and `patient-spec.yaml` already publish this table with identical
+field names and an identical `BedCondition` enum; Rev 2.1 was the only document using
+`Label` / `IsIsolationCapable` / `ProximityRank` / `BedStatus`. Renamed to match, and
+`AssetTag` added because Equipment prints it as the QR code their technician scans
+(`equipment-management-plan.md` §3.1).
+
+**Occupancy is deliberately not a column here.** Rev 2.1's `BedStatus` carried `Occupied`
+and `Reserved`, denormalized from `BedAssignment`. That reintroduces exactly the cross-write
+`integration_of_functions.md` §6.1 was written to prevent: Equipment owns this row, but only
+Patient Management knows who is in the bed, so Patient would be writing Equipment's table.
+Occupancy is instead the presence of a live `BedAssignment` (`EndAt IS NULL`) and a hold is a
+`BedReservation` with `Status = Held`:
+
+```
+"Is bed 12 free?"
+    = it exists in Equipment's register        (M3's data, M4 reads)
+    AND condition = 'usable'                   (M3's data, M4 reads)
+    AND no live BedAssignment references it    (M4's data)
+```
+
+Two reads, zero shared writes. `Cleaning` had no home in either published spec and is
+carried to Open Decisions as item 9 rather than dropped silently.
 
 #### BedReservation extends AuditedEntity *(Rev 2 — new)*
 ```
@@ -467,14 +522,17 @@ On check-in this becomes an `Admission` with `Source = Booked`.
 + AppointmentId: Guid (nullable) FK → Appointment.Id    -- (Rev 2)
 + Source: AdmissionSource (non-null)                    -- (Rev 2)
 + Category: AdmissionCategory (non-null)
-+ AcuityLevel: AcuityLevel (non-null)                   -- (Rev 2)
-+ RequiresIsolation: bool = false (non-null)            -- (Rev 2)
++ Urgency: Urgency (non-null)                           -- (Rev 2.2: was AcuityLevel)
++ IsInfectious: bool = false (non-null)                 -- (Rev 2.2: was RequiresIsolation)
++ CategorySetByStaffMemberId: Guid (non-null) FK → StaffMember.Id  -- (Rev 2.2)
++ CategorySetAt: DateTimeOffset (non-null)              -- (Rev 2.2)
 + ExpectedArrivalAt: DateTimeOffset (nullable)          -- (Rev 2)
 + AdmittedAt: DateTimeOffset (nullable)                 -- (Rev 2: was non-null)
 + Status: AdmissionStatus (non-null)                    -- (Rev 2.1: now 7 states, stored)
-+ MissingDetails: text[] (non-null, default '{}')       -- (Rev 2.1)
++ MissingFields: text[] (non-null, default '{}')        -- (Rev 2.2: was MissingDetails)
 + DetailsComplete: bool (GENERATED, stored)             -- (Rev 2.1)
 + DetailsCompletedAt: DateTimeOffset (nullable)         -- (Rev 2.1)
++ CancelReason: CancelReason (nullable)                 -- (Rev 2.2)
 ```
 **Table:** `admissions`
 **Note:** `EmergencyCallId` nullable — null for walk-in/referral admissions, set for
@@ -483,9 +541,29 @@ the emergency-originated path. *(Decision 25)*
 **BEFORE** they arrive, so a bed is ready when they get here". That state was
 unrepresentable: `AdmittedAt` was non-null and `AdmissionStatus` was only
 `{Active, Discharged}`.
-`AcuityLevel` and `RequiresIsolation` are the patient-side inputs to the bed agent's
-filter and ranking rules; both are set by clinical staff, never by the agent — the same
-wall that keeps `Category` a human decision.
+`Urgency` and `IsInfectious` are the patient-side inputs to the bed agent's filter and
+ranking rules; both are set by clinical staff, never by the agent — the same wall that
+keeps `Category` a human decision.
+
+*(Rev 2.2)* **Renamed to the names `patient-spec.yaml` already publishes.** Rev 2 invented
+`AcuityLevel` and `RequiresIsolation` for fields the committed spec already had as
+`urgency` and `is_infectious`. These were never two pairs of fields, only two names for
+one pair, and keeping both would have meant either a translation layer or two columns
+recording the same clinical fact:
+
+| Rev 2.1 name | `patient-spec.yaml` | Drives |
+| :--- | :--- | :--- |
+| `AcuityLevel` (Critical/High/Medium/Low) | `urgency` (routine/urgent/emergency) | Soft rule S2 — higher urgency prefers a lower `NurseStationDistance` |
+| `RequiresIsolation` | `is_infectious` | Hard rule H4 — an infectious patient must get `HasIsolation = true` |
+| `MissingDetails` | `missing_fields` | The outstanding-paperwork worklist |
+
+`is_infectious` is the better of the two names because it records the *clinical fact*;
+"requires isolation" is the *consequence* the rule derives from it, and storing a
+consequence invites it disagreeing with its own cause.
+
+Also added, from the committed spec: `CategorySetByStaffMemberId` and `CategorySetAt`
+(recorded proof a human — not the agent — chose the care level, which is the audit the
+approval gate leans on), and `CancelReason`, whose closed enum was already published.
 
 *(Rev 2.1 — review item 2)* **`Status` is stored and authoritative, not computed.**
 The four Rev 2 values did not cover `awaiting_bed`, `awaiting_approval`, `bed_reserved` or
@@ -516,13 +594,13 @@ WHERE (a.status = 'admitted'      AND ba.id IS NULL)
    OR (a.status = 'awaiting_bed'  AND ba.id IS NOT NULL);
 ```
 
-*(Rev 2.1 — review item 4)* **`MissingDetails` records what is still outstanding**, for the
+*(Rev 2.1 — review item 4)* **`MissingFields` records what is still outstanding**, for the
 "emergency arrival, relative brings the ID later" case. A `text[]` of field names rather
 than a bare boolean, because "incomplete" alone does not tell a ward clerk *what to chase* —
 `{national_id, date_of_birth}` does. Values come from `PatientDetailField`; queryable with
-`WHERE 'national_id' = ANY(missing_details)`, which is the outstanding-paperwork worklist.
+`WHERE 'national_id' = ANY(missing_fields)`, which is the outstanding-paperwork worklist.
 
-`DetailsComplete` is a **stored generated column**, `cardinality(missing_details) = 0` — the
+`DetailsComplete` is a **stored generated column**, `cardinality(missing_fields) = 0` — the
 one place in this schema where a computed value is right, because unlike `Status` it has no
 transition rules to enforce and cannot drift by construction. `DetailsCompletedAt` records
 when the gap closed, which answers "how long did we hold an unidentified patient".
@@ -717,11 +795,28 @@ sees `IsActive` transition `true → false`.
 
 ## Enums
 
-### StaffRole
+### StaffRole *(Rev 2.2 — aligned to `staff-spec.yaml`)*
 ```
-AmbulanceCrew, WardNurse, GeneralStaff, DutyDispatchManager,
-HospitalAdministrator, EquipmentInventoryManager
+WardNurse, Doctor, AmbulanceCrew, GeneralStaff, DutyManager,
+HospitalAdministrator, EquipmentManager
 ```
+Serialized as `ward_nurse`, `doctor`, `ambulance_crew`, `general_staff`, `duty_manager`,
+`hospital_administrator`, `equipment_manager` — as published in `staff-spec.yaml`.
+
+*(Rev 2.2)* Three changes, all resolving disagreements `staff-spec.yaml` itself flagged as
+open:
+
+- **`Doctor` added.** `patient-spec.yaml` gates the `clinical_clearance` discharge
+  checklist item on a `Doctor` claim, and `staff-spec.yaml` already carries the role. The
+  diagram was the only document without it, which made a published authorization rule
+  unimplementable.
+- **`DutyDispatchManager` → `DutyManager`**, matching both committed specs. This is the
+  role the bed-downgrade approval gate names.
+- **`EquipmentInventoryManager` → `EquipmentManager`**, matching `staff-spec.yaml`.
+
+Note that `equipment-management-plan.md` §2 works in terms of two *capabilities* —
+Inventory Administrator and Equipment Technician — rather than this single role. Member 3
+and Member 2 should confirm whether that is one role or two; carried as Open Decision 11.
 
 ### CallPriority
 ```
@@ -787,46 +882,93 @@ Low, Medium, High, Critical
 Open, Resolved
 ```
 
-### AdmissionCategory *(Rev 2 — changed)*
+### AdmissionCategory *(Rev 2 — changed; Rev 2.2 — wire values pinned)*
 ```
 ICU, HighDependency, Inpatient, DayCase, Outpatient
 ```
-`HighDependency` added — the patient flow's care levels are "ICU / high-dependency /
-inpatient / day-case / outpatient". Ordered most to least acute so the bed agent's
-downgrade logic ("offers the next best thing") is a simple ordinal step.
+Serialized as `icu`, **`hdu`**, `inpatient`, `day_case`, `outpatient`.
 
-### AcuityLevel *(Rev 2 — new)*
+*(Rev 2.2)* `HighDependency` serializes to **`hdu`**, not `high_dependency`.
+`patient-spec.yaml` publishes `hdu` in both this enum and `WardType`, and its downgrade
+ladder is documented as `icu -> hdu -> inpatient`. Rev 2.1 said enum literals were
+"normalised to snake_case to match your wire values", which for this member produced
+`high_dependency` and silently broke the match. The C# member keeps the readable name and
+`HasConversion<string>()` maps it to `hdu`.
+
+Ordered most to least acute so the bed agent's downgrade logic ("offers the next best
+thing") is a simple ordinal step.
+
+### WardType *(Rev 2.2 — new)*
 ```
-Critical, High, Medium, Low
+ICU, HighDependency, General, Maternity, Pediatric, Isolation
 ```
-Patient-side input to "sicker patient goes closer to the nurses' station"; pairs with
-`Bed.ProximityRank`.
+Serialized as `icu`, `hdu`, `general`, `maternity`, `pediatric`, `isolation` — as
+published in `patient-spec.yaml`. `Ward.Type` used to reuse `AdmissionCategory`, which
+could not express a maternity, pediatric or isolation ward. Overlaps `AdmissionCategory`
+on `icu`/`hdu` only; the two lists are not interchangeable.
+
+### Urgency *(Rev 2.2 — replaces AcuityLevel)*
+```
+Routine, Urgent, Emergency
+```
+Serialized as `routine`, `urgent`, `emergency` — the enum `patient-spec.yaml` already
+publishes. Patient-side input to "sicker patient goes closer to the nurses' station";
+pairs with `Bed.NurseStationDistance`, and breaks the tie when two admissions want the
+last bed.
+
+Rev 2 introduced this as `AcuityLevel {Critical, High, Medium, Low}`, which duplicated
+both the committed `urgency` field and the shape of `CallPriority`. One field, one name.
 
 ### Gender *(Rev 2 — new)*
 ```
 Male, Female, Other, Unknown
 ```
+Serialized as `male`, `female`, `other`, `unknown`.
+
+*(Rev 2.2)* **`Unknown` is correct and `patient-spec.yaml` was the document at fault** —
+it published only three values while the same spec allows an unidentified arrival with no
+NIC, no phone and a generated `TempReference`. A patient nobody can identify has an unknown
+gender, and the gender-ward filter (hard rule H3) has to do something deterministic with
+that. `patient-spec.yaml` has been updated to match this enum, not the other way round.
 
 ### WardGenderPolicy *(Rev 2 — new)*
 ```
 Male, Female, Mixed
 ```
 
-### AdmissionSource *(Rev 2 — new)*
+### AdmissionSource *(Rev 2 — new; Rev 2.2 — aligned)*
 ```
-Emergency, WalkIn, Booked, Referral
+Emergency, WalkIn, PreRegistered
 ```
+Serialized as `emergency`, `walk_in`, `pre_registered` — as published in
+`patient-spec.yaml`.
+
+*(Rev 2.2)* `Booked` renamed `PreRegistered`: same concept, and the committed spec's name
+wins on an entity Member 4 owns. It is still the `Appointment` check-in path Rev 2 added,
+which was a real gap worth keeping.
+
+`Referral` is **not** dropped on the merits — it is a genuine fourth arrival path that
+`patient-spec.yaml` has no value for. Adding it means adding it to the published enum too,
+so it is carried to Open Decisions as item 10 rather than decided here by one member.
 
 ### AppointmentStatus *(Rev 2 — new)*
 ```
 Scheduled, CheckedIn, Completed, Cancelled, NoShow
 ```
 
-### BedStatus *(Rev 2 — changed)*
+### BedCondition *(Rev 2.2 — replaces BedStatus)*
 ```
-Available, Reserved, Occupied, Cleaning, Maintenance
+Usable, OutOfService
 ```
-`Reserved` added for the 30-minute hold; the authoritative hold record is `BedReservation`.
+Serialized as `usable`, `out_of_service` — identical in `equipment-spec.yaml` and
+`patient-spec.yaml`, which both already publish it.
+
+Rev 2's `BedStatus {Available, Reserved, Occupied, Cleaning, Maintenance}` mixed three
+different owners' facts into one column on a table Equipment owns: `Occupied` is Patient
+Management's (`BedAssignment`), `Reserved` is Patient Management's (`BedReservation`), and
+only `Maintenance` was ever Equipment's. `Condition` now carries the Equipment fact alone;
+the other two are read from their owners' rows. See the `Bed` note and
+`integration_of_functions.md` §6.1. `Cleaning` is Open Decision 7.
 
 ### BedReservationStatus *(Rev 2 — new)*
 ```
@@ -870,12 +1012,21 @@ ReadyForDischarge ──► Discharged, Admitted        (a patient can deteriora
 hold-expiry paths: the proposal was refused or the 30 minutes ran out, and the search
 restarts.
 
+### CancelReason *(Rev 2.2 — new)*
+```
+DivertedToOtherHospital, FalseAlarm, DiedEnRoute, PatientRefused, NoShow
+```
+Serialized as `diverted_to_other_hospital`, `false_alarm`, `died_en_route`,
+`patient_refused`, `no_show` — as published in `patient-spec.yaml`. `Admission.Cancelled`
+already existed as a state with nothing recording *why*; the closed enum was in the spec
+but had no home in this document.
+
 ### PatientDetailField *(Rev 2.1 — new, review item 4)*
 ```
 NationalId, DateOfBirth, Gender, PhoneNumber,
 EmergencyContactName, EmergencyContactPhone, Address
 ```
-The allowed members of `Admission.MissingDetails`. A closed set rather than free text, so
+The allowed members of `Admission.MissingFields`. A closed set rather than free text, so
 "what is still outstanding" can be counted and filtered instead of parsed.
 
 ### DischargeReadinessStatus
@@ -965,13 +1116,13 @@ never create another `ICU-1`. Worse under EF Core, where a global query filter o
 CREATE UNIQUE INDEX ux_staff_members_email     ON staff_members (email)              WHERE is_active;
 CREATE UNIQUE INDEX ux_ambulances_reg          ON ambulances (registration_number)   WHERE is_active;
 CREATE UNIQUE INDEX ux_wards_name              ON wards (name)                       WHERE is_active;
-CREATE UNIQUE INDEX ux_beds_ward_label         ON beds (ward_id, label)              WHERE is_active;
+CREATE UNIQUE INDEX ux_beds_ward_number        ON beds (ward_id, bed_number)         WHERE is_active;
 CREATE UNIQUE INDEX ux_equipment_types_name    ON equipment_types (name)             WHERE is_active;
 CREATE UNIQUE INDEX ux_equipment_items_serial  ON equipment_items (serial_number)
     WHERE is_active AND serial_number IS NOT NULL;
 CREATE UNIQUE INDEX ux_patients_national_id    ON patients (national_id)             WHERE national_id IS NOT NULL;
 CREATE UNIQUE INDEX ux_patients_temp_ref       ON patients (temp_reference)          WHERE temp_reference IS NOT NULL;
-CREATE UNIQUE INDEX ux_beds_ward_proximity     ON beds (ward_id, proximity_rank)     WHERE is_active;
+CREATE UNIQUE INDEX ux_beds_ward_distance      ON beds (ward_id, nurse_station_distance) WHERE is_active;
 ```
 
 ### Partial unique indexes — business invariants
@@ -1038,9 +1189,9 @@ ALTER TABLE admissions ADD CONSTRAINT ck_admissions_arrival
 ALTER TABLE patients ADD CONSTRAINT ck_patients_identifiable
     CHECK (national_id IS NOT NULL OR phone_number IS NOT NULL OR temp_reference IS NOT NULL);
 
--- missing_details may only name known fields  (Rev 2.1)
-ALTER TABLE admissions ADD CONSTRAINT ck_admissions_missing_details
-    CHECK (missing_details <@ ARRAY['national_id','date_of_birth','gender','phone_number',
+-- missing_fields may only name known fields  (Rev 2.1)
+ALTER TABLE admissions ADD CONSTRAINT ck_admissions_missing_fields
+    CHECK (missing_fields <@ ARRAY['national_id','date_of_birth','gender','phone_number',
                                     'emergency_contact_name','emergency_contact_phone','address']::text[]);
 
 ALTER TABLE discharges ADD CONSTRAINT ck_discharge_ready
@@ -1079,7 +1230,7 @@ CREATE INDEX ix_notifications_unread   ON notifications (recipient_staff_member_
 -- agent query paths
 CREATE INDEX ix_shifts_ward_date       ON shifts (ward_id, date);
 CREATE INDEX ix_allocations_staff      ON allocations (staff_member_id) WHERE status = 'confirmed';
-CREATE INDEX ix_beds_ward_status       ON beds (ward_id, status) WHERE is_active;
+CREATE INDEX ix_beds_ward_condition    ON beds (ward_id, condition) WHERE is_active;
 CREATE INDEX ix_discharges_ready       ON discharges (readiness_status)
     WHERE discharged_at IS NULL;
 
@@ -1091,8 +1242,8 @@ CREATE INDEX ix_admissions_status ON admissions (status, expected_arrival_at)
     WHERE status NOT IN ('discharged', 'cancelled');
 
 -- outstanding-paperwork worklist: "which admissions are still missing a NIC?"  (Rev 2.1)
-CREATE INDEX ix_admissions_missing_details ON admissions USING gin (missing_details)
-    WHERE cardinality(missing_details) > 0;
+CREATE INDEX ix_admissions_missing_fields ON admissions USING gin (missing_fields)
+    WHERE cardinality(missing_fields) > 0;
 ```
 
 ### Types and mapping notes
@@ -1110,15 +1261,15 @@ CREATE INDEX ix_admissions_missing_details ON admissions USING gin (missing_deta
   `agent_proposed_changes`, `discharge_checklist_items`, `device_tokens`,
   `refresh_tokens`, `notifications`.
 - **`text[]` → `string[]`.** Npgsql maps this natively; no value converter needed.
-  `missing_details` uses a **GIN** index because the queries are containment
+  `missing_fields` uses a **GIN** index because the queries are containment
   (`'national_id' = ANY(...)`), which b-tree cannot serve. *(Rev 2.1)*
 - **Generated column** *(Rev 2.1)* — `details_complete` is computed by the database, so it
-  can never disagree with `missing_details`:
+  can never disagree with `missing_fields`:
   ```sql
   ALTER TABLE admissions ADD COLUMN details_complete boolean
-      GENERATED ALWAYS AS (cardinality(missing_details) = 0) STORED;
+      GENERATED ALWAYS AS (cardinality(missing_fields) = 0) STORED;
   ```
-  In EF Core: `.HasComputedColumnSql("cardinality(missing_details) = 0", stored: true)`.
+  In EF Core: `.HasComputedColumnSql("cardinality(missing_fields) = 0", stored: true)`.
   Mark it `ValueGeneratedOnAddOrUpdate()` so EF never tries to write it.
 - **Enum literals in this document are written snake_case** (`awaiting_bed`, `pending_approval`),
   matching the wire values already published in `patient-spec.yaml` — one vocabulary from
@@ -1247,13 +1398,22 @@ rows are mutated after insert; pure join/append-only tables (`DispatchCrew`,
 |-----------|-------|----------|
 | Emergency / Ambulance | Member 1 | EmergencyCall, Ambulance, Dispatch, DispatchCrew, RouteLog |
 | Staff Management | Member 2 | Shift, Allocation, LeaveRequest, Skill, StaffMemberSkill, WardStaffingRule |
-| Health Equipment | Member 3 | EquipmentType, EquipmentItem, StockLevel, MaintenanceSchedule, Warning |
-| Patient Management | Member 4 | Patient, Admission, BedAssignment, BedReservation, Discharge, DischargeChecklistItem, Appointment, Ward, Bed |
+| Health Equipment | Member 3 | EquipmentType, EquipmentItem, StockLevel, MaintenanceSchedule, Warning, **Bed** |
+| Patient Management | Member 4 | Patient, Admission, BedAssignment, BedReservation, Discharge, DischargeChecklistItem, Appointment, Ward |
 | Shared / Group | All | StaffMember, RefreshToken, DeviceToken, Notification, AgentWorkflow, AgentProposedChange, AuditLog |
 
 **Note:** `Ward` sits under Patient Management but is referenced by all four components
 (`Shift.WardId`, `EquipmentItem.WardId`, `StockLevel.WardId`, `Dispatch.DestinationWardId`).
 Treat its schema as frozen once agreed — changes to it break three other members.
+
+**Note (Rev 2.2 — review item 3):** `Bed` moved from Patient Management to Health
+Equipment. Rev 2.1 listed it under Member 4, which contradicted three documents that had
+already settled it the other way: `integration_of_functions.md` §3 and §6.1 (marked
+**DECIDED**), `equipment-management-plan.md` §13.1, and `patient-management-plan.md`
+("owned by Equipment Management (Member 3). We read it, we never write it.").
+The split is: **Equipment owns the frame** — it exists, its number, its condition, repairs
+and retirement. **Patient Management owns the occupant** — `BedAssignment` and
+`BedReservation`. Neither writes the other's table.
 
 ---
 
@@ -1305,3 +1465,22 @@ authoritative and derive the rest, or write down the sync rule.
 **8. Decision log.** This document cites 37 numbered decisions but no log exists in the
 repo, and decisions 1, 3, 5, 28 and 37 are never cited. For a submission graded on
 traceable documentation, commit the log or inline the rationale.
+
+**9. Where does `Cleaning` live?** *(Rev 2.2)* Rev 2's `BedStatus` had a `Cleaning` value;
+`BedCondition` does not, and neither published spec has anywhere to record it. A bed being
+turned over between patients is a real state and somebody owns it. Options: a third
+`BedCondition` value (Equipment's, but Patient triggers it at discharge), or a short-lived
+`BedReservation`-style row. Member 3 decides, since it is their table.
+
+**10. Is `Referral` a fourth admission source?** *(Rev 2.2)* Rev 2 proposed
+`{Emergency, WalkIn, Booked, Referral}`; `patient-spec.yaml` publishes three and has no
+`referral`. A patient referred from another clinic is plausibly distinct from a walk-in.
+Member 4 decides — adding it means changing a committed enum, so it is not a diagram-only
+change.
+
+**11. Is Equipment one role or two?** *(Rev 2.2)* This diagram and `staff-spec.yaml` carry
+a single `EquipmentManager`. `equipment-management-plan.md` §2 is written around two
+distinct capabilities — **Inventory Administrator** (React: approves actions, manages
+stock and the bed register) and **Equipment Technician** (Flutter: scans tags, completes
+services, reports faults) — with different endpoint permissions for each. One role cannot
+express that split. Members 2 and 3 to settle.

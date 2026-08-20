@@ -1288,7 +1288,12 @@ components:
 
     Gender:
       type: string
-      enum: [male, female, other]
+      enum: [male, female, other, unknown]
+      description: |
+        `unknown` is required, not a filler value: this spec allows registering an
+        unidentified arrival with no NIC, no phone number and a generated `temp_reference`,
+        and hard rule H3 (the ward gender-policy filter) has to behave deterministically for
+        that patient. Added to match `docs/entity_diagram.md`, which had it first.
 
     AdmissionSource:
       type: string

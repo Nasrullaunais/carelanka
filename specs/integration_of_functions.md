@@ -441,6 +441,8 @@ All four agents must persist workflow id, objective, plan, steps, tool results, 
 
 **11.4 (RESOLVED) — A bystander can raise a call for someone else.** The call screen asks once; M1 passes `patient_is_caller` and `caller_user_id` through on the dispatch notification (§4.2). The caller is stored as the patient's emergency contact. **M1 needs to add these two fields** — confirm with Member 1.
 
+**11.5 — Booking a visit.** A patient can register their details and an expected arrival ahead of a planned visit (`source = pre_registered`). This is deliberately **not** a full appointment system — no doctor calendars, no time slots, no rescheduling — because that is a component-sized feature on its own. If the group wants real appointments, it needs an owner and something else has to be dropped.
+
 **11.6 — Name collisions across the four specs. Each row needs an owner.**
 The four `*-spec.yaml` files describe **one** ASP.NET application, so routes,
 `operationId`s and schema names are global, not per-component. A duplicate route
@@ -461,8 +463,6 @@ Re-verified against `main` on 2026-08-21:
 **Also blocking:** `emergency-spec.yaml` is still a 212-byte stub with
 `paths: {}`. Everything §10 lists under M1 — the dispatch notification,
 `patient_is_caller`, `caller_user_id` — has nowhere to live until M1 writes it.
-
-**11.5 — Booking a visit.** A patient can register their details and an expected arrival ahead of a planned visit (`source = pre_registered`). This is deliberately **not** a full appointment system — no doctor calendars, no time slots, no rescheduling — because that is a component-sized feature on its own. If the group wants real appointments, it needs an owner and something else has to be dropped.
 
 *Resolved:* `Doctor` is a Staff Management role — M4 only checks the JWT claim. Bed ownership split agreed (§6.1). No SMS integration; the group's Maps API covers the third-party requirement.
 

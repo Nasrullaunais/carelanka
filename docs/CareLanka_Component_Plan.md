@@ -178,7 +178,7 @@ referenced by Staff (`Shift.WardId`), Equipment (`EquipmentItem.WardId`,
 schema as frozen once agreed — changing it breaks three other people.
 
 Detailed boundaries, and what each member needs from the others, are in
-[`specs/integration_of_functions.md`](specs/integration_of_functions.md).
+[`integration_of_functions.md`](integration_of_functions.md).
 
 ---
 

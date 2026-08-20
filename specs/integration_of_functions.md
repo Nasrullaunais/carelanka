@@ -432,6 +432,33 @@ All four agents must persist workflow id, objective, plan, steps, tool results, 
 
 **11.4 (RESOLVED) — A bystander can raise a call for someone else.** The call screen asks once; M1 passes `patient_is_caller` and `caller_user_id` through on the dispatch notification (§4.2). The caller is stored as the patient's emergency contact. **M1 needs to add these two fields** — confirm with Member 1.
 
+**11.6 — Name collisions across the four specs. Each row needs an owner.**
+The four `*-spec.yaml` files describe **one** ASP.NET application, so routes,
+`operationId`s and schema names are global, not per-component. A duplicate route
+throws at startup; a duplicate `operationId` or schema name silently collides in
+the generated clients, and whichever one generates second wins. None of these is
+one member's call — the two or three members sharing the name have to agree.
+
+Re-verified against `main` on 2026-08-21:
+
+| Collision | Where | Suggested fix |
+| :--- | :--- | :--- |
+| `GET /reports/agent-performance` | staff, equipment, patient | Namespace by component: `/reports/staff/agent-performance` |
+| `GET /workflows/{workflowId}` | equipment, patient | Group-owned once §11.2 is settled — one workflow endpoint, not four |
+| `operationId: getAgentPerformanceReport` | staff, patient | Follows whatever the route above becomes |
+| `PagedResult` — staff says `total_count`, the others `total_items` | all three | `total_items`, on the 2-vs-1 count. Staff to confirm |
+| `Bed`, `WorkflowSummary`, `WorkflowAccepted`, `AgentPerformanceReport` — one name, different shapes | across specs | Either make them byte-identical or give them different names (`EquipmentBed` / `AdmissionBed`) |
+
+Already resolved — listed so nobody reopens them: `GET /beds` and
+`operationId: listBeds` are Equipment's alone (Patient publishes only
+`/beds/{id}/occupancy`); `Urgency` split into Patient's `AdmissionUrgency` and
+Equipment's `Urgency`; `AgentOutcome` split into Staff's `AgentOutcome` and
+Patient's `BedAgentOutcome`.
+
+**Also blocking:** `emergency-spec.yaml` is still a 212-byte stub with
+`paths: {}`. Everything §10 lists under M1 — the dispatch notification,
+`patient_is_caller`, `caller_user_id` — has nowhere to live until M1 writes it.
+
 **11.5 — Booking a visit.** A patient can register their details and an expected arrival ahead of a planned visit (`source = pre_registered`). This is deliberately **not** a full appointment system — no doctor calendars, no time slots, no rescheduling — because that is a component-sized feature on its own. If the group wants real appointments, it needs an owner and something else has to be dropped.
 
 *Resolved:* `Doctor` is a Staff Management role — M4 only checks the JWT claim. Bed ownership split agreed (§6.1). No SMS integration; the group's Maps API covers the third-party requirement.

@@ -1,37 +1,59 @@
 # CLAUDE.md
 
-Guidance for Claude Code (claude.ai/code) when working in this repository.
+Repo-wide conventions for Claude Code. Kept short on purpose — it loads on every
+turn of every session. Detail lives in the documents below; this file holds only
+what you would get wrong before thinking to go and look it up.
 
 ## Current state
 
-**Documentation only — no code yet.** `docs/` holds the design, `specs/` holds
-the OpenAPI contracts, `api/` `web-ui/` `mobile-ui/` are empty placeholders. So
-this file is prescriptive: conventions the code must follow when it lands. Where
-a committed contract in `specs/` already answers a question, that contract wins.
+**Design and scaffolding only — no features yet.** `api/` is an empty ASP.NET
+project with the component folder tree stubbed out (`.gitkeep` files, no classes,
+no `DbContext`). `mobile-ui/` is a Flutter skeleton with the same per-member tree
+and no `android/`/`ios/` yet. `web-ui/` is empty.
 
-`MY_NOTES.md` is gitignored and never pushed.
+So this file is prescriptive. **Where a committed contract in `specs/` already
+answers a question, that contract wins over anything written here.**
+
+## Which document answers what
+
+Read the one that owns the question before deciding. If two disagree, the order
+here is the order of authority.
+
+| Document | What it settles | Owner |
+| :--- | :--- | :--- |
+| `docs/2026-S1-SE3090-Assignment_1_Specification.md` | The assignment brief. Beats every other file, this one included. | Module |
+| `docs/CareLanka_Component_Plan.md` | The four components, who owns which, the seven roles, why React and Flutter differ. Read first. | Group |
+| `docs/entity_diagram.md` | Every table, field and enum, with the reasoning. | Group; each member edits only their own entities |
+| `specs/integration_of_functions.md` | Component boundaries: who owns which table, who calls whose service, open cross-component items. Read before touching anything you do not own. | Group |
+| `specs/*-spec.yaml` | The OpenAPI contract per component — actual request and response shapes. | That component's member |
+| `specs/{patient,equipment}-management-plan.md` | That component's design doc; its `*-spec.yaml` follows from it. Staff and Emergency have not written theirs. | That component's member |
+| `specs/ai-orchestration-workflow.md` | How the four agents chain. Currently a stub. | Group |
+| `mobile-ui/README.md` | Flutter layout, and that each member works only inside `lib/features/<component>/`. Read before writing Dart. | Group |
+
+Three rules that fall out of it:
+
+- **A design doc and its spec move together** — changing one means changing all
+  three (plan, spec, integration doc) in the same commit.
+- **Where `entity_diagram.md` and a member's own committed `*-spec.yaml`
+  disagree, the spec wins** — for whichever member owns that entity. A
+  disagreement about someone *else's* entity is an Open Decision, not an edit.
+- **Cross-document references are bare filenames in prose**, not relative links.
 
 ## Stack
 
-| Layer | Technology |
-| :--- | :--- |
-| API | ASP.NET Core Web API (.NET 8) |
-| Database | PostgreSQL via Entity Framework Core |
-| Web | React + Vite (plain React, not Next.js) |
-| Mobile | Flutter (Dart) |
-| Auth | Shared JWT, `bearerAuth`, roles in claims |
-| CI | GitHub Actions |
+ASP.NET Core Web API (.NET 8) · PostgreSQL via EF Core · React + Vite (plain
+React, not Next.js) · Flutter · shared JWT with roles in claims · GitHub Actions.
 
-**Package manager: `bun`.** Other members use `npm`, which is fine — keep
-`package.json` scripts runner-agnostic (no `bun` inside a script body).
+**Package manager: `bun`.** Others use `npm`, which is fine — keep `package.json`
+scripts runner-agnostic (no `bun` inside a script body).
 
 ---
 
 # API clients are generated, never hand-written
 
-The ASP.NET API is the source of truth. Both frontends generate typed clients
+The ASP.NET API is the source of truth; both frontends generate typed clients
 from its OpenAPI document. **Never write `fetch()`, `axios`, `http.get()` or a
-hand-rolled model for a CareLanka endpoint.**
+hand-rolled model for a CareLanka endpoint** — generate it, then import it.
 
 ```
 api/ → /swagger/v1/swagger.json
@@ -39,158 +61,87 @@ api/ → /swagger/v1/swagger.json
          └─ mobile-ui/ swagger_parser      → Dart client + models
 ```
 
-## Backend: publish a truthful spec
+## Publish a truthful spec
 
-- `<Nullable>enable</Nullable>`, or required vs. optional in the spec is meaningless.
-- `[ProducesResponseType]` for **every** outcome, error ones included. An endpoint
+- `<Nullable>enable</Nullable>`, or required vs. optional in the spec means nothing.
+- `[ProducesResponseType]` for **every** outcome, errors included. An endpoint
   declaring only its 200 generates a client that cannot type its failures.
 - Wire format is **`snake_case` bodies** (`full_name`) with **`camelCase` query
   params** (`sortDir`) — what `specs/*.yaml` already publish. Use
   `JsonNamingPolicy.SnakeCaseLower` for bodies.
+
 ## The hand-written specs are temporary
 
-`specs/*.yaml` were written by hand ahead of the code and are, right now, the
-only record of the API design — so **do not delete them yet**. They stop being
-the contract the moment the code that would generate them exists.
-
-Per component, when its controllers are implemented:
-
-1. Build the controllers to match the hand-written spec.
-2. Download the generated document over the top of it.
-3. Diff the two. Every difference is either a spec the code failed to honour or
-   a design decision made in the controller and never written down — resolve it
-   deliberately, do not accept the generated side by default.
-4. From then on that file is **generated output**: regenerate it, never edit it.
-
-Once all four are generated, the four files should collapse into one
-`carelanka.json` — one app publishes one document. Two hand-maintained
-contracts for one API is the desync this whole section exists to prevent.
-
-## web-ui
-
-```ts
-// openapi-ts.config.ts
-export default defineConfig({
-  input: "./src/services/openapi/carelanka.json",
-  output: { path: "./src/services/openapi/carelanka", clean: true },
-  plugins: [
-    { name: "@hey-api/client-fetch", baseUrl: false,
-      runtimeConfigPath: "./src/services/api/runtime" },
-    "@tanstack/react-query",
-  ],
-});
-```
-
-`baseUrl: false` drops the spec's `servers` entry, which names whichever host
-published it. The real base URL is the relative path `/api`, set in
-`src/services/api/runtime.ts`, with dev proxying `/api` to the backend —
-relative in dev and production alike. **No base-URL environment variable**: it
-buys a CORS surface and an environment contract for nothing.
-
-```
-src/services/openapi/carelanka.json   committed specification
-src/services/openapi/carelanka/       GENERATED — disposable, never edit
-src/services/api/                     the only hand-written seam
-  runtime.ts       base URL only, consumed by the generator
-  transport.ts     credential, interceptors, error handling — all HTTP
-  query-client.ts  TanStack Query defaults
-  session-bridge.tsx  the whole of the React coupling for auth
-```
-
-`transport.ts` imports the generated client, so `runtime.ts` must import nothing
-leading back to it — the client calls `createClientConfig` while still
-initialising, and a cycle there is a startup crash.
-
-Scripts: `download:spec` (curl the swagger.json), `generate:spec` (`openapi-ts`),
-`check:codegen`, `typecheck` (`tsc --noEmit`).
-
-## mobile-ui
-
-```yaml
-# swagger_parser.yaml
-swagger_parser:
-  schema_path: lib/services/openapi/carelanka.json
-  output_directory: lib/services/api_client
-  language: dart
-  json_serializer: json_serializable
-```
-
-`dart run swagger_parser`, then `dart run build_runner build
---delete-conflicting-outputs`. Config keys move between major versions — check
-the pinned package's README if an option is rejected.
-
-**Open decision:** is `lib/services/api_client/` committed or generated in CI?
-`**/*.g.dart` is already gitignored, so this is currently ambiguous.
+`specs/*.yaml` were written ahead of the code and are the only record of the API
+design, so **do not delete them yet**. Per component, once its controllers exist:
+build them to match the hand-written spec, download the generated document over
+the top, and diff. Every difference is either a spec the code failed to honour or
+a decision made in a controller and never written down — resolve each one
+deliberately rather than accepting the generated side by default. From then on
+that file is generated output. Once all four are generated they collapse into one
+`carelanka.json` — one app publishes one document.
 
 ## Rules
 
 1. **Generated directories are disposable.** Anything written inside one is lost
    on the next run. Fixes go in the ASP.NET code that publishes the spec.
 2. **Generated types are the single source of truth for domain shapes.** Import
-   `Admission` from the generated types, never a hand-written interface.
-   `src/types/*` holds UI-only concerns — permission unions, column definitions,
-   presentation maps. Key those off the generated enum so a contract change is a
-   compile error.
+   `Admission` from the generated types. `src/types/*` holds UI-only concerns —
+   permission unions, column definitions, presentation maps — keyed off the
+   generated enums so a contract change becomes a compile error.
 3. **Regenerate in the same commit as the backend change.**
-4. **A drift gate, not discipline.** `check:codegen` runs `generate:spec` and
-   fails on any `git status --porcelain` difference in the generated directory,
-   catching both a spec updated without regenerating and a hand-edited generated
-   file. CI runs it **before** `typecheck` — a stale client makes every
-   downstream type error a red herring.
+4. **A drift gate, not discipline.** `check:codegen` regenerates and fails on any
+   `git status --porcelain` difference in the generated directory. CI runs it
+   **before** `typecheck` — a stale client makes every type error a red herring.
+
+## Two things that are easy to get wrong
+
+- **web-ui generates with `baseUrl: false`**, dropping the spec's `servers`
+  entry, which names whichever host published it. The base URL is the relative
+  path `/api`, set in `src/services/api/runtime.ts`, with dev proxying `/api` to
+  the backend — relative in dev and production alike. **No base-URL environment
+  variable**: it buys a CORS surface and an environment contract for nothing.
+  `runtime.ts` must import nothing leading back to the generated client — the
+  client calls `createClientConfig` while still initialising, and a cycle there
+  is a startup crash. All other HTTP concerns live in `transport.ts`.
+- **mobile-ui contradicts `mobile-ui/README.md`**, which gives every feature a
+  `models/` and a `services/` for hand-written JSON classes and HTTP calls — the
+  thing this section forbids. Until the group settles it: domain shapes come from
+  the generated `api_client`, a feature's `services/` wraps that client instead of
+  calling `http`/`dio`, and `core/network/` owns the JWT header and error handling
+  once for everyone. **Open:** is `lib/services/api_client/` committed or built in CI?
 
 ---
 
 # One app, one API surface
 
-The four specs describe **one** ASP.NET application. Routes, `operationId`s and
-schema names are therefore global, not per-component. A duplicate route throws
-at startup; a duplicate `operationId` or schema name silently collides in the
+The four specs describe **one** ASP.NET application, so routes, `operationId`s
+and schema names are global, not per-component. A duplicate route throws at
+startup; a duplicate `operationId` or schema name silently collides in the
 generated clients.
 
 - **Namespace by component** where a resource is not genuinely shared:
   `/reports/staff/agent-performance`, not a third claim on
   `/reports/agent-performance`.
-- **`operationId` must be unique across all four specs** — it becomes the
-  generated function name.
-- **A schema name shared between specs must be byte-identical.** Where two
-  components genuinely need different views of the same thing, give them
-  different names (`EquipmentBed` / `AdmissionBed`), not one name and two shapes.
+- **`operationId` is unique across all four specs** — it becomes the generated
+  function name.
+- **A schema name shared between specs is byte-identical.** Where two components
+  need different views of one thing, give them different names (`EquipmentBed` /
+  `AdmissionBed`), not one name and two shapes. Same for enums: a
+  component-specific vocabulary gets a component-specific name.
 - **Genuinely shared types** (`ProblemDetails`, `PagedResult`, the workflow
-  types) have one definition. They are group-owned: change them in all four
-  specs in the same commit, or not at all.
-- **Same enum name, same values.** A component-specific vocabulary gets a
-  component-specific name.
+  types) have one definition, group-owned: changed in all four specs in the same
+  commit, or not at all.
 
-Outstanding, verified against the current branches — each needs an owner:
+The live collision list is `integration_of_functions.md` §11.6, kept there
+because each row needs two or three members to agree.
 
-| Collision | Where |
-| :--- | :--- |
-| `GET /reports/agent-performance` | staff, equipment, patient |
-| `GET /beds` | equipment, patient |
-| `GET /workflows/{workflowId}` | equipment, patient |
-| `operationId: getAgentPerformanceReport` | staff, patient |
-| `operationId: listBeds` | equipment, patient |
-| `PagedResult` — staff says `total_count`, the others `total_items` | all three |
-| `Urgency` — `[routine, urgent, emergency]` vs `[routine, urgent, critical]` | patient, equipment |
-| `Bed`, `WorkflowSummary`, `WorkflowAccepted`, `AgentOutcome`, `AgentPerformanceReport` — same name, different shapes | across specs |
-
-`emergency-spec.yaml` is still a 204-byte stub, which blocks anything that
-depends on dispatch notification.
-
-## Validate specs in CI
-
-`npx @apidevtools/swagger-parser validate specs/*.yaml`, alongside the route and
-`operationId` uniqueness check. `staff-spec.yaml` currently fails it:
-
-```yaml
-key: { type: string, description: Staff name, leave type, ward or month. }
-```
-
-Unquoted commas inside a YAML **flow mapping** split the description into
-phantom keys — this parses as `{type, description: "Staff name",
-"leave type": null, "ward or month.": null}`. Quote any inline description
-containing a comma. Nothing catches this by eye; the validator catches it every
-time.
+**Validate in CI:** `npx @apidevtools/swagger-parser validate specs/*.yaml`,
+alongside the route and `operationId` uniqueness check. **Quote any inline
+description containing a comma** — inside a YAML flow mapping an unquoted comma
+splits the description into phantom keys, which no one catches by eye and the
+validator catches every time. `staff-spec.yaml:2325` currently fails on exactly
+this.
 
 ---
 
@@ -200,60 +151,31 @@ time.
 `ValidationProblemDetails` — ASP.NET Core's native shape, and what the clients
 generate against. Do not wrap responses in a custom envelope.
 
-## Typed exceptions
-
-One base carrying status, machine-readable code and message parameters; one
-subclass per HTTP status:
-
-```csharp
-public abstract class ApiException : Exception
-{
-    public int Status { get; }
-    public MessageCode Code { get; }
-    public string[] Params { get; }
-}
-
-NotFoundException          // 404
-BadRequestException        // 400
-ForbiddenException         // 403
-ConflictException          // 409
-IllegalTransitionException : ConflictException
-```
-
-`IllegalTransitionException` is its own type because the specs define explicit
-state machines and document illegal moves as a distinct response.
+**Typed exceptions.** One `ApiException` base carrying status, a machine-readable
+`MessageCode` and message params; one subclass per status — `NotFoundException`
+(404), `BadRequestException` (400), `ForbiddenException` (403),
+`ConflictException` (409), and `IllegalTransitionException : ConflictException`.
+That last one is its own type because the specs define explicit state machines
+and document illegal moves as a distinct response.
 
 **Services return, facades throw.** `FindByIdAsync` returns `T?`; the facade
 turns `null` into `NotFoundException`. Otherwise "not found" means two different
 things at two layers.
 
-## One central handler
+**One central handler** — a single `IExceptionHandler` via `AddExceptionHandler`
++ `UseExceptionHandler`. `ApiException` → `ProblemDetails` at its status;
+validation failures → `ValidationProblemDetails`; everything else → 500 with a
+generic message and **no internal detail**. Code goes in `extensions["code"]`,
+trace id in `extensions["traceId"]` and a header. Log `Error` for 5xx,
+`Information` for 4xx — a 404 is not an incident. **No `try/catch` in
+controllers**: a controller that reshapes an error produces a response the client
+cannot classify.
 
-A single `IExceptionHandler` via `AddExceptionHandler` + `UseExceptionHandler`:
-
-- `ApiException` → `ProblemDetails` at the right status
-- validation / model-state failures → `ValidationProblemDetails`
-- everything else → 500, generic message, **no internal detail**
-- code into `extensions["code"]`, trace id into `extensions["traceId"]` and a header
-- log `Error` for 5xx, `Information` for 4xx — a 404 is not an incident
-
-**No `try/catch` in controllers.** A controller that reshapes an error produces
-a response the client cannot classify.
-
-## Message codes
-
-Stable enum codes, human text in a resource file keyed by code, parameterised
-with `{0}`:
-
-```
-cl_err_004   The requested resource was not found
-cl_pat_001   Could not find patient with id {0}
-cl_adm_003   Admission {0} cannot move from {1} to {2}
-```
-
-Prefixes: `cl_err_` shared, then `cl_emg_`, `cl_stf_`, `cl_equ_`, `cl_pat_`.
-Clients branch on the code; the text stays translatable, so Sinhala/Tamil is a
-resource-file change rather than a code change.
+**Message codes** are a stable enum, with human text in a resource file keyed by
+code and parameterised with `{0}` (`cl_adm_003  Admission {0} cannot move from
+{1} to {2}`). Prefixes: `cl_err_` shared, then `cl_emg_`, `cl_stf_`, `cl_equ_`,
+`cl_pat_`. Clients branch on the code, so text stays translatable and
+Sinhala/Tamil is a resource-file change rather than a code change.
 
 ## Client side
 
@@ -275,40 +197,52 @@ never handles an HTTP status code.**
 
 # Backend architecture
 
-**Controller → Facade → Service → Repository → Entity**, DTOs separate from EF
-entities.
+**Controller → Facade → Service → Entity**, DTOs separate from EF entities. The
+tree committed in `api/`, and the one `integration_of_functions.md` §1 publishes
+to the group:
 
 ```
 Controllers/{Component}/   thin — bind, delegate, return. No business logic.
-Facades/{Component}/       orchestration, mapping, transactions, throwing
 Services/{Component}/      business logic + data access, returns T?
-Data/Entities/             EF entities
-Models/{Component}/        DTOs — no `Dto` suffix: `Admission`, not `AdmissionDto`
-Agents/{Component}/        the AI agent for that component
+DTOs/{Component}/          no `Dto` suffix: `Admission`, not `AdmissionDto`
+Data/                      one DbContext, all entities
+Agents/                    the AI agents
 ```
 
+`Controllers/`, `Services/` and `DTOs/` each have a `Common/` folder alongside
+the four component folders. **There is no repository layer** — EF Core's `DbSet`
+is the repository.
+
+> **Open — the leader's call.** The facade layer has no folder in `api/` and
+> appears in no other document. Either add `Facades/{Component}/` here and in
+> `integration_of_functions.md` §1 in one commit, or drop the layer and move the
+> transaction boundary and the throwing into the service. A facade that exists in
+> three components and not the fourth is worse than neither.
+
 - The transaction boundary is the **facade**, not the service.
-- **A component never reaches into another component's tables.** Cross-component
-  reads go through the owning component's service interface;
-  `docs/integration_of_functions.md` names the exact methods.
+- **One writer per table; everyone else reads through the owner's service.**
+  Ownership is `integration_of_functions.md` §3 — it names the exact methods.
+  `Bed` is Equipment's, `BedAssignment` is Patient's, and neither writes the
+  other's. That split is decided, not open.
 - **AI agents propose, never write.** Every agent output becomes an
-  `AgentProposedChange` awaiting human approval.
+  `AgentProposedChange` awaiting human approval, and no agent sets a patient's
+  care category.
 
 ## Data conventions
 
-```
-Entity (Id, CreatedAt, CreatedBy)
-  └── AuditedEntity (+ UpdatedAt, UpdatedBy)
-        └── SoftDeletableEntity (+ IsActive, DeletedAt)
-```
+Base classes are `Entity` → `AuditedEntity` → `SoftDeletableEntity`, defined in
+`docs/entity_diagram.md`, which is the authority on every field. **There are no
+`CreatedBy` / `UpdatedBy` columns** — who did what lives in the separate
+`AuditLog` table.
 
 - **Soft delete via EF global query filters** — `HasQueryFilter(e => e.IsActive)`.
-- **Unique constraints on soft-deletable tables must be scoped `WHERE is_active`.**
+- **Unique constraints on soft-deletable tables are scoped `WHERE is_active`.**
   A plain `UNIQUE` is a live bug: deactivate ward `ICU-1` and you can never create
-  another, and since the global filter hides the conflicting row the service-layer
-  duplicate check passes and `SaveChanges` throws. Detail in `docs/entity_diagram.md`.
-- **Auditing is automatic** — an `ISaveChangesInterceptor` fills `CreatedBy` /
-  `UpdatedBy` from the JWT. Never set audit fields by hand.
+  another, and because the global filter hides the conflicting row the
+  service-layer duplicate check passes and `SaveChanges` throws.
+- **Auditing is automatic** — an `ISaveChangesInterceptor` writes the `AuditLog`
+  row, taking the staff id from the JWT. Never write one by hand. A soft delete
+  logs as `Operation = Delete`, not `Update`.
 - **`DateTimeOffset` in UTC** everywhere — Npgsql requires a UTC offset.
 - **Migrations are DDL only.** Seed data lives in `docs/*.sql` as parameterised,
   idempotent scripts, so environment-specific ids never reach production.
@@ -329,7 +263,9 @@ Entity (Id, CreatedAt, CreatedBy)
   permission, **hide** controls the user cannot use rather than disabling them,
   and show the state badge on the detail page.
 - **React decides, Flutter does.** Reviewing an AI recommendation belongs in
-  React. Work done walking a ward, in an ambulance, or in a bed belongs in Flutter.
+  React; work done walking a ward, in an ambulance or in a bed belongs in Flutter.
+- **In Flutter, work only inside your own `lib/features/<component>/`.** `core/`
+  and `pubspec.yaml` are shared — ask the group before changing either.
 - **Bulk writes are a loop over one endpoint.** Report *n* of *m* landed; never
   claim the batch succeeded because the first one did.
 - **Blocks with no backend**: keep the UI, disable the write path, mark it
@@ -339,15 +275,8 @@ Entity (Id, CreatedAt, CreatedBy)
 
 ---
 
-# CI and docs
+# CI
 
 On every PR into `main`: `dotnet build` + `dotnet test`; `bun install
 --frozen-lockfile` → `check:codegen` → `typecheck`; `flutter analyze` +
-`flutter test`.
-
-`docs/` is prose design, `specs/` is contracts. A design document and its spec
-move together — `patient-management-plan.md` states that `patient-spec.yaml` and
-`integration_of_functions.md` follow from its decisions, so changing one means
-changing all three. Cross-document references are bare filenames in prose, not
-relative links. When a component needs data it does not own, the boundary is
-negotiated in `docs/integration_of_functions.md` first.
+`flutter test`; spec validation and uniqueness checks.

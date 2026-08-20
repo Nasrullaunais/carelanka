@@ -19,5 +19,6 @@ mobile-ui/**/*.g.dart
 .idea/
 .DS_Store
 
-## Personal notes — never pushed
+## Personal notes and Claude rules — never pushed
 MY_NOTES.md
+IMPORTANT.md

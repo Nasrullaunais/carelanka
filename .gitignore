@@ -20,5 +20,5 @@ mobile-ui/**/*.g.dart
 .DS_Store
 
 ## Personal notes and Claude rules — never pushed
-MY_NOTES.md
+RESUME.md
 IMPORTANT.md

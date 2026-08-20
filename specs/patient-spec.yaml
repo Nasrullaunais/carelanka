@@ -624,7 +624,7 @@ paths:
               schema: { $ref: '#/components/schemas/WardCapacitySummary' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
-  /beds:
+  /bed-availability:
     get:
       tags: [Wards and Beds]
       summary: List beds with their availability
@@ -633,7 +633,11 @@ paths:
 
         Reads Equipment Management's bed register and joins it with our assignments, applying
         hold expiry. This is the candidate list the bed agent works from.
-      operationId: listBeds
+
+        Deliberately NOT `/api/beds` - that route belongs to Equipment Management, which owns
+        the bed register itself (`equipment-spec.yaml`). Theirs lists the beds that exist;
+        this one answers which of them are free. Same app, so the two cannot share a route.
+      operationId: listBedAvailability
       parameters:
         - name: wardId
           in: query

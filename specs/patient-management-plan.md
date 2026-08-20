@@ -418,7 +418,7 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 | `GET` | `/api/wards` | All staff | Also read by Equipment for allocation |
 | `POST` | `/api/wards` | Admin | Ward register — ours, pending §15.1 |
 | `GET` | `/api/wards/{id}/occupancy` | All staff | Free/occupied counts, care mix, incoming |
-| `GET` | `/api/beds` | All staff | **Availability view.** Joins Equipment's register with our assignments and applies hold expiry. |
+| `GET` | `/api/bed-availability` | All staff | **Availability view.** Joins Equipment's register with our assignments and applies hold expiry. Not `/api/beds` — that route is Equipment's bed register (`integration_of_functions.md` §6.1). |
 | `GET` | `/api/beds/{id}/occupancy` | All staff, Equipment | **Business op.** Is anyone in this bed? Equipment calls this **before** servicing it — maintenance never evicts a patient. |
 
 Creating, retiring and taking beds out of service are **Equipment's endpoints, not ours** (`integration_of_functions.md` §6.1).

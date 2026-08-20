@@ -1,8 +1,2396 @@
 openapi: 3.0.3
+
 info:
   title: CareLanka - Staff Management API
-  description: Owned by Member 2. Covers StaffMember, Shift, Allocation, LeaveRequest.
-  version: 0.1.0
-paths: {}
+  description: |
+    Owned by Member 2. Covers StaffMember, Skill, StaffMemberSkill, Shift, Allocation,
+    LeaveRequest and WardStaffingRule.
+
+    Answers three questions: who works here and what are they qualified to do, who is
+    covering which ward on which shift, and what happens when somebody cannot come in.
+
+    **The line this component does not cross.** Staff Management owns the staff record and
+    the roster. It does not own patients, beds or wards. Ward *occupancy* is read from
+    Patient Management to work out staffing demand (`integration_of_functions.md` §5.3);
+    ward *identity* is theirs too, pending §11.1. Every other component stores staff IDs
+    and reads names through this API rather than copying them (§5.1).
+
+    **The agentic workflow.** The Staff Allocation Agent proposes a *cascading swap*: when a
+    sick call drops a ward below its minimum, and no standby staff exist, it finds someone
+    qualified in a better-staffed ward and proposes moving them. The proposal is validated
+    by ordinary C# — not by the agent checking itself — and a Hospital Administrator
+    approves it before any allocation changes. See `Roster Agent` below.
+
+    **Schema** is in `docs/entity_diagram.md` (Rev 2).
+    **Cross-component boundaries** are in `integration_of_functions.md`.
+
+    **Open items carried by this spec**
+
+    - `Doctor` is not in the entity diagram's `StaffRole` enum, but Patient Management
+      already gates `clinical_clearance` on it (§5.2, §10). Added here as a role; the
+      leader owns the JWT role list (§3) and must confirm.
+    - The entity diagram calls the dispatch role `DutyDispatchManager`; `patient-spec.yaml`
+      calls it `DutyManager`. This spec uses `duty_manager` to match the spec already
+      committed. One of the two documents needs correcting.
+    - Clock-in / clock-out is in `CareLanka_Component_Plan.md` §Roles but has no schema
+      behind it. The `/me/allocations/{id}/clock-in|out` endpoints below need
+      `clocked_in_at` and `clocked_out_at` added to `Allocation`.
+    - Agent workflow tables are group-owned and undecided (`integration_of_functions.md`
+      §11.2). This spec defines only the roster-specific approval surface and links to the
+      shared workflow by `workflow_id`.
+  version: 0.2.0
+  contact:
+    name: Member 2 - Staff Management
+
+servers:
+  - url: /api
+    description: Shared CareLanka ASP.NET Core Web API
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Staff
+    description: The staff register. One row per employed person, reused across every roster.
+  - name: Skills
+    description: |
+      The qualification lookup and who holds what. Admin-editable, not a hardcoded enum,
+      because "who can work in ICU" changes as people train.
+  - name: Shifts
+    description: Shift slots — a ward needing N people of a role for a window of time.
+  - name: Allocations
+    description: Who is filling a shift slot, and the history of who filled it before.
+  - name: Leave
+    description: Leave and shift-swap requests, and the decisions on them.
+  - name: Roster Agent
+    description: Staff Allocation Agent proposals, deterministic validation, and human approval.
+  - name: My Roster
+    description: What a logged-in staff member may see and do about their own work. Flutter.
+  - name: Reports
+    description: Coverage, leave patterns, and agent performance.
+  - name: Integration
+    description: Read-only surfaces the other three components depend on.
+
+paths:
+
+  # ------------------------------------------------------------------
+  # Staff
+  # ------------------------------------------------------------------
+
+  /staff:
+    post:
+      tags: [Staff]
+      summary: Create a staff member
+      description: |
+        Roles: HospitalAdministrator.
+
+        Creates the employment record and the login identity in one step — they are the
+        same row (`docs/entity_diagram.md`, unified staff identity). The account is created
+        active; the caller supplies a temporary password the user must change on first login.
+
+        Email is unique among *active* staff. Re-employing someone whose record was
+        deactivated reuses the existing row via `POST /staff/{id}/reactivate` rather than
+        creating a second one.
+      operationId: createStaffMember
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateStaffMemberRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StaffMember' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: |
+            An active staff member already uses this email. The response carries the
+            existing id so the caller can reactivate instead.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+    get:
+      tags: [Staff]
+      summary: Search staff
+      description: |
+        Roles: HospitalAdministrator, DutyManager.
+
+        `search` matches full name, email or employee number. `skill` filters to people
+        holding a currently-valid skill — this is how an administrator answers "who can
+        cover ICU tonight?" without reading the roster.
+      operationId: listStaff
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: role
+          in: query
+          schema: { $ref: '#/components/schemas/StaffRole' }
+        - name: skill
+          in: query
+          description: Skill id. Only staff whose skill is valid today are returned.
+          schema: { type: string, format: uuid }
+        - name: department
+          in: query
+          schema: { type: string }
+        - name: includeInactive
+          in: query
+          description: Default false. Deactivated staff are hidden unless asked for.
+          schema: { type: boolean, default: false }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [full_name, role, department, created_at]
+            default: full_name
+        - $ref: '#/components/parameters/SortDir'
+      responses:
+        '200':
+          description: A page of staff
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/StaffSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /staff/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Staff]
+      summary: Get one staff member with skills and current allocations
+      description: 'Roles: HospitalAdministrator, DutyManager.'
+      operationId: getStaffMember
+      responses:
+        '200':
+          description: The staff member, their valid skills, and their upcoming shifts
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StaffMemberDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Staff]
+      summary: Update a staff member
+      description: |
+        Roles: HospitalAdministrator.
+
+        Role changes take effect immediately and can invalidate future allocations — the
+        response carries `affected_allocations` listing any upcoming shift the person is no
+        longer eligible for, so the administrator can re-roster rather than discover it on
+        the night.
+      operationId: updateStaffMember
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateStaffMemberRequest' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UpdateStaffMemberResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /staff/{id}/deactivate:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Staff]
+      summary: Deactivate a staff member
+      description: |
+        Roles: HospitalAdministrator.
+
+        A soft delete. The row stays because allocations, leave decisions and audit entries
+        across all four components reference it — hard deletion would either destroy that
+        history or be refused by the database.
+
+        Refuses while the person still holds confirmed allocations for future shifts. The
+        error lists them; end those allocations first, so nobody is quietly removed from a
+        roster that someone else is relying on.
+
+        Also revokes their refresh tokens, so an ex-employee's session dies immediately
+        rather than at token expiry.
+      operationId: deactivateStaffMember
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 500 }
+                effective_date: { type: string, format: date }
+      responses:
+        '204': { description: Deactivated }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Still allocated to future shifts. The response lists them.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /staff/{id}/reactivate:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Staff]
+      summary: Reactivate a previously deactivated staff member
+      description: |
+        Roles: HospitalAdministrator.
+
+        Re-employment reuses the original row so the person's history stays in one place.
+        Fails if another active staff member has since taken their email.
+      operationId: reactivateStaffMember
+      responses:
+        '200':
+          description: Reactivated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StaffMember' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The email is now in use by an active staff member.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  # ------------------------------------------------------------------
+  # Skills
+  # ------------------------------------------------------------------
+
+  /skills:
+    get:
+      tags: [Skills]
+      summary: List skills
+      description: 'Roles: any authenticated staff member.'
+      operationId: listSkills
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: All skills
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Skill' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Skills]
+      summary: Create a skill
+      description: |
+        Roles: HospitalAdministrator.
+
+        A lookup table rather than a hardcoded enum, so a new qualification can be added
+        without a deployment. Names are unique among active skills.
+      operationId: createSkill
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 100, example: ICU Certified }
+                description: { type: string, maxLength: 500 }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Skill' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: A skill with this name already exists.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /skills/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    put:
+      tags: [Skills]
+      summary: Rename a skill
+      description: 'Roles: HospitalAdministrator.'
+      operationId: updateSkill
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 100 }
+                description: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Skill' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Skills]
+      summary: Retire a skill
+      description: |
+        Roles: HospitalAdministrator.
+
+        Soft delete. Refuses while any shift still requires this skill, because retiring it
+        would leave those shifts with an unfillable requirement.
+      operationId: retireSkill
+      responses:
+        '204': { description: Retired }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Shifts still require this skill. The response lists them.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /staff/{id}/skills:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Skills]
+      summary: List a staff member's skills
+      description: |
+        Roles: HospitalAdministrator, DutyManager, or the staff member themselves.
+
+        Returns expired skills too, marked `is_valid: false`, so an administrator can see
+        that a certification lapsed rather than that it vanished.
+      operationId: listStaffSkills
+      responses:
+        '200':
+          description: Their skills
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/StaffSkill' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Skills]
+      summary: Grant a skill to a staff member
+      description: |
+        Roles: HospitalAdministrator.
+
+        `valid_from` and `expires_at` are both optional; omitting them means the skill is
+        held indefinitely. Clinical certifications lapse, and the roster agent's validator
+        checks validity on the date of the shift — not today — so a skill expiring next
+        week correctly disqualifies someone from a shift the week after.
+      operationId: grantStaffSkill
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [skill_id]
+              properties:
+                skill_id: { type: string, format: uuid }
+                valid_from: { type: string, format: date }
+                expires_at: { type: string, format: date }
+      responses:
+        '201':
+          description: Granted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StaffSkill' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This staff member already holds this skill.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /staff/{staffId}/skills/{skillId}:
+    parameters:
+      - name: staffId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: skillId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      tags: [Skills]
+      summary: Revoke a skill from a staff member
+      description: |
+        Roles: HospitalAdministrator.
+
+        Returns `affected_allocations` — future shifts requiring this skill that the person
+        is currently allocated to. Revoking does not cancel them automatically; that is the
+        administrator's decision.
+      operationId: revokeStaffSkill
+      responses:
+        '200':
+          description: Revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  affected_allocations:
+                    type: array
+                    items: { $ref: '#/components/schemas/AllocationSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ------------------------------------------------------------------
+  # Shifts
+  # ------------------------------------------------------------------
+
+  /shifts:
+    get:
+      tags: [Shifts]
+      summary: List shift slots
+      description: |
+        Roles: HospitalAdministrator, DutyManager.
+
+        The roster grid. Filter by ward and date range; `coverage_status` on each row is
+        computed from confirmed allocations against `minimum_headcount`, so an
+        understaffed slot is visible without a second call.
+      operationId: listShifts
+      parameters:
+        - name: wardId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: role
+          in: query
+          schema: { $ref: '#/components/schemas/StaffRole' }
+        - name: coverageStatus
+          in: query
+          description: Filter to slots in this state. `understaffed` is the administrator's daily view.
+          schema: { $ref: '#/components/schemas/CoverageStatus' }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [date, ward, coverage_status]
+            default: date
+        - $ref: '#/components/parameters/SortDir'
+      responses:
+        '200':
+          description: A page of shifts
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/ShiftSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Shifts]
+      summary: Create a shift slot
+      description: |
+        Roles: HospitalAdministrator.
+
+        A shift is the *slot*, not the assignment — it says "ICU needs 3 nurses with the ICU
+        skill from 22:00 to 06:00". `Allocation` fills it.
+
+        `minimum_headcount` is the safe floor the roster agent's validator refuses to breach;
+        `headcount_needed` is the target. They are different numbers and conflating them is
+        what lets a "fully staffed" ward quietly drop below its legal minimum. Defaults are
+        taken from the ward's staffing rule when omitted.
+
+        **Overnight shifts:** when `end_time` is earlier than `start_time` the shift ends on
+        the following day. Every overlap check applies this rule.
+      operationId: createShift
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateShiftRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Shift' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /shifts/bulk:
+    post:
+      tags: [Shifts]
+      summary: Generate a repeating pattern of shifts
+      description: |
+        Roles: HospitalAdministrator.
+
+        Creating a month of three-shift days one at a time is 90 calls. This generates them
+        from a weekday pattern in one transaction — either all are created or none are.
+
+        Slots that would duplicate an existing shift for the same ward, date, window and
+        role are skipped rather than duplicated, and reported in `skipped`.
+      operationId: createShiftsBulk
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BulkShiftRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  created: { type: integer }
+                  skipped: { type: integer }
+                  shifts:
+                    type: array
+                    items: { $ref: '#/components/schemas/ShiftSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /shifts/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Shifts]
+      summary: Get one shift with who is on it
+      description: 'Roles: HospitalAdministrator, DutyManager.'
+      operationId: getShift
+      responses:
+        '200':
+          description: The shift, its allocations, and its coverage
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShiftDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Shifts]
+      summary: Update a shift slot
+      description: |
+        Roles: HospitalAdministrator.
+
+        Reducing `minimum_headcount` below the confirmed allocation count is allowed;
+        raising it above may put the slot into `understaffed`, which the response reports
+        rather than hides.
+      operationId: updateShift
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateShiftRequest' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Shift' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Shifts]
+      summary: Cancel a shift slot
+      description: |
+        Roles: HospitalAdministrator.
+
+        Releases every confirmed allocation on it with reason `shift_cancelled` and
+        notifies the affected staff. Refuses for a shift that has already started.
+      operationId: cancelShift
+      responses:
+        '204': { description: Cancelled }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The shift has already started.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /wards/{wardId}/staffing-rules:
+    parameters:
+      - name: wardId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Shifts]
+      summary: Get a ward's minimum staffing rules
+      description: |
+        Roles: HospitalAdministrator, DutyManager.
+
+        The policy the roster agent's validator enforces: for this ward, this role, holding
+        this skill, never fewer than N people on shift. Ward identity belongs to Patient
+        Management; the staffing *rule* is ours.
+      operationId: getWardStaffingRules
+      responses:
+        '200':
+          description: The rules
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/WardStaffingRule' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Shifts]
+      summary: Replace a ward's minimum staffing rules
+      description: |
+        Roles: HospitalAdministrator.
+
+        Replaces the whole set for this ward. Existing shifts keep the
+        `minimum_headcount` they were created with; the response lists shifts whose stored
+        minimum now disagrees with the new rule, so they can be corrected deliberately
+        rather than drifting.
+      operationId: setWardStaffingRules
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items: { $ref: '#/components/schemas/WardStaffingRuleInput' }
+      responses:
+        '200':
+          description: Replaced
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rules:
+                    type: array
+                    items: { $ref: '#/components/schemas/WardStaffingRule' }
+                  shifts_now_disagreeing:
+                    type: array
+                    items: { $ref: '#/components/schemas/ShiftSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ------------------------------------------------------------------
+  # Allocations
+  # ------------------------------------------------------------------
+
+  /allocations:
+    get:
+      tags: [Allocations]
+      summary: List allocations
+      description: |
+        Roles: HospitalAdministrator, DutyManager.
+
+        Includes released and cancelled rows when asked for, because the swap history is the
+        point — "who was on this shift before the swap" is a question the audit trail has to
+        answer.
+      operationId: listAllocations
+      parameters:
+        - name: shiftId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: staffMemberId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: wardId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/AllocationStatus' }
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of allocations
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/Allocation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Allocations]
+      summary: Allocate a staff member to a shift manually
+      description: |
+        Roles: HospitalAdministrator, DutyManager.
+
+        The manual path. The same deterministic validation the roster agent's proposals go
+        through runs here too — a human assigning an unqualified nurse to ICU is refused for
+        the same reason the agent would be. Set `override: true` with a reason to proceed
+        anyway; the override is recorded and appears in the agent-performance report.
+
+        Checks: the person is active, holds the shift's required skill valid on the shift
+        date, is not on approved leave, and is not already allocated to an overlapping shift.
+      operationId: createAllocation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateAllocationRequest' }
+      responses:
+        '201':
+          description: Allocated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Allocation' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/AllocationRejected' }
+
+  /allocations/{id}/end:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Allocations]
+      summary: End an allocation
+      description: |
+        Roles: HospitalAdministrator, DutyManager.
+
+        Ends rather than deletes. The row moves to `released` with `ended_at` and a reason,
+        and stays queryable — deleting it would destroy the history the audit trail and the
+        swap chain depend on.
+
+        Ending an allocation can drop the shift below its minimum. The response reports the
+        resulting `coverage_status`, and if it is `understaffed` a roster proposal is raised
+        automatically unless `suppress_agent` is set.
+      operationId: endAllocation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { $ref: '#/components/schemas/AllocationEndReason' }
+                notes: { type: string, maxLength: 500 }
+                suppress_agent: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Ended
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  allocation: { $ref: '#/components/schemas/Allocation' }
+                  shift_coverage: { $ref: '#/components/schemas/ShiftCoverage' }
+                  roster_proposal_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+                    description: Set when ending this allocation triggered the agent.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Already ended.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  # ------------------------------------------------------------------
+  # Leave
+  # ------------------------------------------------------------------
+
+  /leave-requests:
+    get:
+      tags: [Leave]
+      summary: List leave requests
+      description: |
+        Roles: HospitalAdministrator, DutyManager.
+
+        The approval queue. Default sort puts pending requests affecting the soonest shifts
+        first, because a sick call for tonight matters more than annual leave in November.
+      operationId: listLeaveRequests
+      parameters:
+        - name: staffMemberId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/LeaveStatus' }
+        - name: type
+          in: query
+          schema: { $ref: '#/components/schemas/LeaveType' }
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of leave requests
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/LeaveRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /leave-requests/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Leave]
+      summary: Get one leave request
+      description: |
+        Roles: HospitalAdministrator, DutyManager, or the requester themselves.
+
+        `affected_shifts` shows which allocations this request would release if approved,
+        with the coverage each shift would be left at — the reviewer sees the consequence
+        before deciding, not after.
+      operationId: getLeaveRequest
+      responses:
+        '200':
+          description: The request with its consequences
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LeaveRequestDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /leave-requests/{id}/decision:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Leave]
+      summary: Approve or reject a leave request
+      description: |
+        Roles: HospitalAdministrator, DutyManager.
+
+        Approving releases the requester's allocations across the leave dates, then
+        re-checks each affected shift. Any shift left below its minimum raises a roster
+        proposal, and the response returns their ids so React can jump straight to the
+        approval screen.
+
+        A reviewer cannot decide their own request; that is refused with 403.
+      operationId: decideLeaveRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [approve, reject] }
+                notes: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Decided
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  leave_request: { $ref: '#/components/schemas/LeaveRequest' }
+                  released_allocations:
+                    type: array
+                    items: { $ref: '#/components/schemas/AllocationSummary' }
+                  roster_proposal_ids:
+                    type: array
+                    items: { type: string, format: uuid }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
+  # ------------------------------------------------------------------
+  # Roster Agent
+  # ------------------------------------------------------------------
+
+  /roster-proposals:
+    get:
+      tags: [Roster Agent]
+      summary: List roster proposals
+      description: |
+        Roles: HospitalAdministrator, DutyManager.
+
+        The React approval dashboard. `pending_approval` is what needs a human.
+      operationId: listRosterProposals
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/RosterProposalStatus' }
+        - name: wardId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: shiftId
+          in: query
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of proposals
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/RosterProposalSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Roster Agent]
+      summary: Ask the Staff Allocation Agent to fill a gap
+      description: |
+        Roles: HospitalAdministrator, DutyManager. Also raised automatically by the API when
+        approving leave or ending an allocation leaves a shift below its minimum.
+
+        **The objective.** "Bring shift X back to its minimum staffing level."
+
+        **What the agent plans.** A structured multi-step plan, delegated across steps:
+        read the shift's requirement, list staff who hold the required skill and are free,
+        prefer standby staff, and only if none exist look for a *cascading swap* — somebody
+        qualified who is currently allocated to a ward comfortably above its own minimum.
+
+        **Allow-listed tools only.** The agent may read shifts, allocations, staff skills,
+        leave and ward coverage, and may read Patient Management's ward occupancy. It has
+        no write access to any table. Every change it wants is returned as a proposed
+        change and applied by this API after approval — never by the agent.
+
+        **Then deterministic validation runs.** Ordinary C#, not the agent checking its own
+        work: does the proposed person actually hold the required skill valid on that date,
+        are they free, and does removing them leave their current ward at or above *its*
+        minimum. A proposal that fails any of these never reaches a human.
+
+        Returns `202` because planning and validation are asynchronous. Poll the proposal or
+        wait for the notification.
+      operationId: createRosterProposal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shift_id]
+              properties:
+                shift_id: { type: string, format: uuid }
+                objective:
+                  type: string
+                  maxLength: 500
+                  description: Optional override. Defaults to restoring minimum coverage.
+                allow_cascading_swap:
+                  type: boolean
+                  default: true
+                  description: |
+                    When false the agent may only propose genuinely free staff, never move
+                    somebody out of another ward. Useful when the hospital is busy everywhere.
+      responses:
+        '202':
+          description: Accepted. The proposal is planning.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RosterProposalSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This shift already has an open proposal.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /roster-proposals/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Roster Agent]
+      summary: Get a proposal with its plan, validation and proposed changes
+      description: |
+        Roles: HospitalAdministrator, DutyManager.
+
+        The observability surface. Carries the objective, the plan, the completed steps, the
+        tool calls with timings, the deterministic validation result per proposed change,
+        any errors, the retry count, and the approval decision.
+
+        `workflow_id` links to the shared agent-workflow record
+        (`GET /workflows/{workflowId}`), which is group-owned — see
+        `integration_of_functions.md` §11.2.
+      operationId: getRosterProposal
+      responses:
+        '200':
+          description: The proposal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RosterProposalDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /roster-proposals/{id}/approve:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Roster Agent]
+      summary: Approve a proposal and apply it
+      description: |
+        Roles: HospitalAdministrator.
+
+        **This is the high-impact action that pauses for human approval** (assignment §9.1).
+        Nothing in the roster changes until this call succeeds.
+
+        Applies every proposed change in one transaction: the outgoing allocation is ended
+        with reason `swapped_out` and linked to its replacement, the new allocation is
+        created as `confirmed`, and both affected staff are notified — the reassigned nurse
+        gets a push telling them which ward to report to.
+
+        Validation is re-run immediately before applying. A proposal that was valid ten
+        minutes ago but is not now — somebody else took the nurse — is refused with 409
+        rather than applied on stale facts.
+
+        Only a `pending_approval` proposal can be approved, and not by the person who
+        raised it.
+      operationId: approveRosterProposal
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Approved and applied
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RosterProposalDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: |
+            Either not in `pending_approval`, or re-validation failed. The response body
+            carries the failed checks so the reviewer can see what changed underneath them.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /roster-proposals/{id}/reject:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Roster Agent]
+      summary: Reject a proposal
+      description: |
+        Roles: HospitalAdministrator.
+
+        Nothing is applied. The shift stays understaffed and keeps appearing in the
+        understaffed report — rejecting a proposal does not make the gap go away, and the
+        reviewer is expected to fill it manually.
+
+        `reason` is required and feeds the agent-performance report: a proposal rejected as
+        `unsafe_suggestion` is evidence the validator missed something.
+      operationId: rejectRosterProposal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { $ref: '#/components/schemas/RejectionReason' }
+                notes: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Rejected
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RosterProposalDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
+  /roster-proposals/{id}/request-revision:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Roster Agent]
+      summary: Send a proposal back for revision
+      description: |
+        Roles: HospitalAdministrator.
+
+        The third option the assignment requires alongside approve and reject (§9.1). The
+        proposal returns to `pending` and the agent replans with the reviewer's constraint
+        applied — typically "not that person" or "don't take anyone out of ICU".
+
+        `AttemptCount` increments. After the configured retry limit the proposal moves to
+        `failed` with a recorded reason rather than looping.
+      operationId: reviseRosterProposal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [guidance]
+              properties:
+                guidance: { type: string, maxLength: 500 }
+                exclude_staff_ids:
+                  type: array
+                  items: { type: string, format: uuid }
+                exclude_ward_ids:
+                  type: array
+                  items: { type: string, format: uuid }
+      responses:
+        '202':
+          description: Replanning
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RosterProposalSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
+  # ------------------------------------------------------------------
+  # My Roster (Flutter self-service)
+  # ------------------------------------------------------------------
+
+  /me/shifts:
+    get:
+      tags: [My Roster]
+      summary: My upcoming shifts
+      description: |
+        Roles: any authenticated staff member.
+
+        Scoped to the caller by their JWT — there is no `staffMemberId` parameter, so one
+        nurse cannot read another's roster by changing a query string.
+      operationId: getMyShifts
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - name: includePast
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: My shifts
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MyShift' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /me/allocations/{id}/clock-in:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [My Roster]
+      summary: Clock in to a shift
+      description: |
+        Roles: the allocated staff member only.
+
+        > **Needs schema support.** `Allocation` has no `clocked_in_at` / `clocked_out_at`
+        > in `entity_diagram.md` Rev 2. Adding these two fields is a prerequisite for this
+        > endpoint. Raised as an open item in `info.description`.
+
+        Refuses outside a configurable window around the shift start, so a shift cannot be
+        clocked into from home the night before.
+      operationId: clockIn
+      responses:
+        '200':
+          description: Clocked in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Allocation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Already clocked in, or outside the permitted window.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /me/allocations/{id}/clock-out:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [My Roster]
+      summary: Clock out of a shift
+      description: 'Roles: the allocated staff member only. Same schema prerequisite as clock-in.'
+      operationId: clockOut
+      responses:
+        '200':
+          description: Clocked out
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Allocation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Not clocked in.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /me/leave-requests:
+    get:
+      tags: [My Roster]
+      summary: My leave requests
+      description: 'Roles: any authenticated staff member. Scoped to the caller.'
+      operationId: getMyLeaveRequests
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/LeaveStatus' }
+      responses:
+        '200':
+          description: My requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/LeaveRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [My Roster]
+      summary: Request leave or a shift swap
+      description: |
+        Roles: any authenticated staff member.
+
+        One endpoint, two shapes, discriminated by `type`:
+
+        - `annual`, `sick`, `emergency` — a date range. `sick` and `emergency` are treated as
+          urgent: they skip the queue and, once approved, trigger the roster agent
+          immediately rather than waiting for the nightly roster run.
+        - `shift_swap` — names the shift to give away and the colleague taking it. The
+          colleague must hold the shift's required skill and be free, checked here rather
+          than discovered at approval time.
+
+        This is the entry point for the cascading-swap demo: a sick call two hours before an
+        ICU shift.
+      operationId: createMyLeaveRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateLeaveRequest' }
+      responses:
+        '201':
+          description: Submitted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LeaveRequestDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: Overlaps an existing request, or the swap partner is not eligible.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /me/leave-requests/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    delete:
+      tags: [My Roster]
+      summary: Withdraw my own pending leave request
+      description: |
+        Roles: the requester only. Only while still `pending` — an approved request has
+        already released allocations, and withdrawing it would need them rebuilt.
+      operationId: withdrawMyLeaveRequest
+      responses:
+        '204': { description: Withdrawn }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
+  # ------------------------------------------------------------------
+  # Reports
+  # ------------------------------------------------------------------
+
+  /reports/coverage:
+    get:
+      tags: [Reports]
+      summary: Coverage across wards over a date range
+      description: |
+        Roles: HospitalAdministrator, DutyManager.
+
+        The dashboard chart: for each ward and day, target headcount, minimum, actual, and
+        how many hours the ward spent below its minimum. `hours_below_minimum` is the number
+        the administrator is actually judged on.
+      operationId: getCoverageReport
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: wardId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CoverageReport' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/leave:
+    get:
+      tags: [Reports]
+      summary: Leave taken and pending, by staff member and type
+      description: |
+        Roles: HospitalAdministrator.
+
+        Sick days clustered on the same weekday, or one ward carrying most of the leave, are
+        the patterns worth surfacing.
+      operationId: getLeaveReport
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: groupBy
+          in: query
+          schema: { type: string, enum: [staff, type, ward, month], default: type }
+      responses:
+        '200':
+          description: The report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LeaveReport' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/agent-performance:
+    get:
+      tags: [Reports]
+      summary: How well the Staff Allocation Agent is doing
+      description: |
+        Roles: HospitalAdministrator.
+
+        Evidence for the Agentic AI evaluation report (assignment §12): how many proposals
+        were raised, how many passed deterministic validation, how many a human approved,
+        how many were rejected and why, how many failed safely, and median time from gap
+        detected to gap filled.
+
+        `validation_failure_rate` is the honest one — proposals the agent produced that
+        ordinary C# had to catch.
+      operationId: getAgentPerformanceReport
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: The report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AgentPerformanceReport' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ------------------------------------------------------------------
+  # Integration — read-only surfaces the other components depend on
+  # ------------------------------------------------------------------
+
+  /staff/lookup:
+    post:
+      tags: [Integration]
+      summary: Resolve staff ids to names and roles
+      description: |
+        Roles: any authenticated staff member.
+
+        Requested by Patient Management (`integration_of_functions.md` §10) so React can
+        render "Approved by Dr. Perera" without any component copying staff data into its
+        own tables. Batch, because a list of twenty admissions would otherwise be twenty
+        calls.
+
+        Returns name, role and active flag only — never email, phone, department, skills or
+        anything else. Unknown or deactivated ids come back with `found: false` rather than
+        being silently dropped, so the caller can render "unknown staff member" instead of
+        a blank.
+      operationId: lookupStaff
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [staff_ids]
+              properties:
+                staff_ids:
+                  type: array
+                  maxItems: 100
+                  items: { type: string, format: uuid }
+      responses:
+        '200':
+          description: One entry per requested id, in the order asked
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/StaffLookupResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /coverage/wards:
+    get:
+      tags: [Integration]
+      summary: Current staffing coverage per ward
+      description: |
+        Roles: any authenticated staff member. Read by Patient Management's bed agent as a
+        soft ranking rule (`integration_of_functions.md` §5.4 — optional, not in the first
+        build) and by the Equipment agent when deciding where to move equipment.
+
+        Counts only. **No staff identities cross this boundary** — the mirror of the rule
+        Patient Management applies to us in §5.3.
+      operationId: getWardCoverage
+      parameters:
+        - name: at
+          in: query
+          description: Point in time. Defaults to now.
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Coverage for every ward
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  generated_at: { type: string, format: date-time }
+                  wards:
+                    type: array
+                    items: { $ref: '#/components/schemas/WardCoverage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
 components:
-  schemas: {}
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Shared JWT issued by the CareLanka API. Roles used by this component:
+        HospitalAdministrator, DutyManager, WardNurse, Doctor, AmbulanceCrew, GeneralStaff,
+        EquipmentManager.
+
+        Self-service endpoints under `/me` are scoped by the `sub` claim, never by a
+        parameter, so no role can read another person's roster by changing an id.
+
+  parameters:
+    PathId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    SortDir:
+      name: sortDir
+      in: query
+      schema: { type: string, enum: [asc, desc], default: desc }
+
+  responses:
+    BadRequest:
+      description: Validation failed
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ValidationProblemDetails' }
+    Unauthorized:
+      description: Missing or invalid token
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    Forbidden:
+      description: Authenticated, but this role may not do this
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    NotFound:
+      description: Not found
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    IllegalTransition:
+      description: |
+        Not a legal status change. The allowed moves are:
+
+        Leave request — pending -> approved, rejected, withdrawn. Nothing leaves a decided state.
+
+        Allocation — proposed -> confirmed, cancelled; confirmed -> released.
+        A released allocation is never revived; a replacement row is created instead.
+
+        Roster proposal — pending -> pending_approval, failed;
+        pending_approval -> approved, rejected, revision_requested, failed;
+        revision_requested -> pending; approved -> executed, failed.
+
+        Anything else is rejected here rather than silently allowed.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    AllocationRejected:
+      description: |
+        The allocation breaks a staffing rule. `failed_checks` names which ones, so the UI
+        can show "no valid ICU skill" rather than a generic conflict.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/AllocationRejectedProblem' }
+
+  schemas:
+
+    # ---------- enums ----------
+
+    StaffRole:
+      type: string
+      description: |
+        `doctor` is not in `entity_diagram.md` Rev 2 but Patient Management already gates
+        `clinical_clearance` on it. The leader owns the JWT role list — see the open items
+        in `info.description`.
+      enum:
+        - ward_nurse
+        - doctor
+        - ambulance_crew
+        - general_staff
+        - duty_manager
+        - hospital_administrator
+        - equipment_manager
+
+    AllocationStatus:
+      type: string
+      description: |
+        `released` is what a swapped-out allocation becomes. It is never deleted — the
+        history is the audit trail the cascading swap depends on.
+      enum: [proposed, confirmed, released, cancelled]
+
+    AllocationEndReason:
+      type: string
+      enum: [leave_approved, swapped_out, shift_cancelled, staff_deactivated, manual]
+
+    AllocationSource:
+      type: string
+      description: Whether a human or an approved agent proposal created this allocation.
+      enum: [manual, agent_proposal, swap_request]
+
+    LeaveType:
+      type: string
+      description: |
+        `sick` and `emergency` are urgent — approving them triggers the roster agent
+        immediately instead of waiting for the next roster run.
+      enum: [annual, sick, emergency, shift_swap]
+
+    LeaveStatus:
+      type: string
+      enum: [pending, approved, rejected, withdrawn]
+
+    CoverageStatus:
+      type: string
+      description: |
+        Derived from confirmed allocations against the shift's headcount numbers.
+        `at_minimum` is deliberately distinct from `adequate` — a ward sitting exactly on
+        its legal floor has no slack and one more sick call breaks it.
+      enum: [adequate, at_minimum, understaffed, critical]
+
+    RosterProposalStatus:
+      type: string
+      description: |
+        Mirrors `AgentWorkflowStatus` in `entity_diagram.md`. `pending` means planning or
+        validating; `pending_approval` means deterministic validation passed and a human is
+        needed; `executed` means the roster actually changed; `failed` is the safe-failure
+        state required by assignment §9.1.
+      enum:
+        - pending
+        - pending_approval
+        - approved
+        - executed
+        - rejected
+        - revision_requested
+        - failed
+
+    ProposedChangeType:
+      type: string
+      enum: [end_allocation, create_allocation]
+
+    ValidationStatus:
+      type: string
+      enum: [pending, passed, failed]
+
+    AgentOutcome:
+      type: string
+      description: |
+        What the agent concluded. `no_candidate_found` is a legitimate, recorded outcome —
+        an honest "nobody can cover this" is more useful than an unsafe suggestion.
+      enum: [swap_proposed, free_staff_proposed, no_candidate_found, failed]
+
+    RejectionReason:
+      type: string
+      enum:
+        - unsafe_suggestion
+        - source_ward_cannot_spare
+        - staff_unsuitable
+        - gap_filled_another_way
+        - no_longer_needed
+        - other
+
+    # ---------- staff ----------
+
+    StaffMember:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        employee_number: { type: string }
+        first_name: { type: string }
+        last_name: { type: string }
+        full_name: { type: string, description: Convenience for display. Server-computed. }
+        email: { type: string, format: email }
+        phone_number: { type: string, nullable: true }
+        role: { $ref: '#/components/schemas/StaffRole' }
+        department: { type: string, nullable: true }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    StaffSummary:
+      type: object
+      description: List projection. No contact details.
+      properties:
+        id: { type: string, format: uuid }
+        full_name: { type: string }
+        role: { $ref: '#/components/schemas/StaffRole' }
+        department: { type: string, nullable: true }
+        is_active: { type: boolean }
+        skill_count: { type: integer }
+
+    StaffMemberDetail:
+      allOf:
+        - $ref: '#/components/schemas/StaffMember'
+        - type: object
+          properties:
+            skills:
+              type: array
+              items: { $ref: '#/components/schemas/StaffSkill' }
+            upcoming_allocations:
+              type: array
+              items: { $ref: '#/components/schemas/AllocationSummary' }
+            leave_balance_days:
+              type: number
+              nullable: true
+              description: Null until leave entitlement is modelled. Not in scope for Rev 2.
+
+    CreateStaffMemberRequest:
+      type: object
+      required: [first_name, last_name, email, role, temporary_password]
+      properties:
+        first_name: { type: string, maxLength: 100 }
+        last_name: { type: string, maxLength: 100 }
+        email: { type: string, format: email }
+        temporary_password:
+          type: string
+          minLength: 12
+          description: Must be changed on first login. Never returned by any endpoint.
+        phone_number: { type: string, maxLength: 20 }
+        role: { $ref: '#/components/schemas/StaffRole' }
+        department: { type: string, maxLength: 100 }
+        skill_ids:
+          type: array
+          description: Optional. Grants these skills with no expiry.
+          items: { type: string, format: uuid }
+
+    UpdateStaffMemberRequest:
+      type: object
+      properties:
+        first_name: { type: string, maxLength: 100 }
+        last_name: { type: string, maxLength: 100 }
+        phone_number: { type: string, maxLength: 20 }
+        role: { $ref: '#/components/schemas/StaffRole' }
+        department: { type: string, maxLength: 100 }
+
+    UpdateStaffMemberResponse:
+      type: object
+      properties:
+        staff_member: { $ref: '#/components/schemas/StaffMember' }
+        affected_allocations:
+          type: array
+          description: Future shifts this person is no longer eligible for after a role change.
+          items: { $ref: '#/components/schemas/AllocationSummary' }
+
+    StaffLookupResult:
+      type: object
+      description: The only staff data other components receive. Deliberately narrow.
+      properties:
+        staff_id: { type: string, format: uuid }
+        found: { type: boolean }
+        full_name: { type: string, nullable: true }
+        role: { $ref: '#/components/schemas/StaffRole' }
+        is_active: { type: boolean, nullable: true }
+
+    # ---------- skills ----------
+
+    Skill:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, example: ICU Certified }
+        description: { type: string, nullable: true }
+        staff_count: { type: integer, description: How many active staff currently hold it. }
+
+    StaffSkill:
+      type: object
+      properties:
+        skill_id: { type: string, format: uuid }
+        skill_name: { type: string }
+        valid_from: { type: string, format: date, nullable: true }
+        expires_at: { type: string, format: date, nullable: true }
+        is_valid:
+          type: boolean
+          description: |
+            Valid as of today. The roster validator instead checks validity on the *shift
+            date*, so a skill expiring next week still disqualifies someone from a shift
+            the week after.
+        granted_at: { type: string, format: date-time }
+
+    # ---------- shifts ----------
+
+    Shift:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        ward_id: { type: string, format: uuid }
+        ward_name: { type: string, description: Resolved from Patient Management at read time. }
+        date: { type: string, format: date }
+        start_time: { type: string, example: '22:00' }
+        end_time: { type: string, example: '06:00' }
+        crosses_midnight:
+          type: boolean
+          description: Server-computed from the times, so clients never re-derive it.
+        required_role: { $ref: '#/components/schemas/StaffRole' }
+        required_skill_id: { type: string, format: uuid, nullable: true }
+        required_skill_name: { type: string, nullable: true }
+        headcount_needed: { type: integer, minimum: 1 }
+        minimum_headcount: { type: integer, minimum: 1 }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ShiftSummary:
+      allOf:
+        - $ref: '#/components/schemas/Shift'
+        - type: object
+          properties:
+            coverage: { $ref: '#/components/schemas/ShiftCoverage' }
+
+    ShiftDetail:
+      allOf:
+        - $ref: '#/components/schemas/Shift'
+        - type: object
+          properties:
+            coverage: { $ref: '#/components/schemas/ShiftCoverage' }
+            allocations:
+              type: array
+              items: { $ref: '#/components/schemas/Allocation' }
+            open_proposal_id:
+              type: string
+              format: uuid
+              nullable: true
+
+    ShiftCoverage:
+      type: object
+      properties:
+        confirmed_count: { type: integer }
+        headcount_needed: { type: integer }
+        minimum_headcount: { type: integer }
+        status: { $ref: '#/components/schemas/CoverageStatus' }
+        shortfall_to_minimum:
+          type: integer
+          description: Zero when at or above minimum. Never negative.
+
+    CreateShiftRequest:
+      type: object
+      required: [ward_id, date, start_time, end_time, required_role, headcount_needed]
+      properties:
+        ward_id: { type: string, format: uuid }
+        date: { type: string, format: date }
+        start_time: { type: string, example: '22:00' }
+        end_time: { type: string, example: '06:00' }
+        required_role: { $ref: '#/components/schemas/StaffRole' }
+        required_skill_id: { type: string, format: uuid, nullable: true }
+        headcount_needed: { type: integer, minimum: 1 }
+        minimum_headcount:
+          type: integer
+          minimum: 1
+          description: |
+            Must not exceed `headcount_needed`. Defaults to the ward's staffing rule for
+            this role, or to `headcount_needed` when no rule exists.
+
+    BulkShiftRequest:
+      type: object
+      required: [ward_id, from, to, patterns]
+      properties:
+        ward_id: { type: string, format: uuid }
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        weekdays:
+          type: array
+          description: Defaults to every day.
+          items: { type: string, enum: [mon, tue, wed, thu, fri, sat, sun] }
+        patterns:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [start_time, end_time, required_role, headcount_needed]
+            properties:
+              start_time: { type: string }
+              end_time: { type: string }
+              required_role: { $ref: '#/components/schemas/StaffRole' }
+              required_skill_id: { type: string, format: uuid, nullable: true }
+              headcount_needed: { type: integer, minimum: 1 }
+              minimum_headcount: { type: integer, minimum: 1 }
+
+    WardStaffingRule:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        ward_id: { type: string, format: uuid }
+        required_role: { $ref: '#/components/schemas/StaffRole' }
+        required_skill_id: { type: string, format: uuid, nullable: true }
+        required_skill_name: { type: string, nullable: true }
+        minimum_headcount: { type: integer, minimum: 1 }
+
+    WardStaffingRuleInput:
+      type: object
+      required: [required_role, minimum_headcount]
+      properties:
+        required_role: { $ref: '#/components/schemas/StaffRole' }
+        required_skill_id: { type: string, format: uuid, nullable: true }
+        minimum_headcount: { type: integer, minimum: 1 }
+
+    # ---------- allocations ----------
+
+    Allocation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        shift_id: { type: string, format: uuid }
+        staff_member_id: { type: string, format: uuid }
+        staff_name: { type: string }
+        status: { $ref: '#/components/schemas/AllocationStatus' }
+        source: { $ref: '#/components/schemas/AllocationSource' }
+        ended_at: { type: string, format: date-time, nullable: true }
+        ended_reason: { $ref: '#/components/schemas/AllocationEndReason' }
+        replaced_by_allocation_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: |
+            Set when this allocation was swapped out. Following this chain reconstructs the
+            full cascading swap for the audit trail.
+        clocked_in_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Needs the schema change noted against `/me/allocations/{id}/clock-in`.
+        clocked_out_at: { type: string, format: date-time, nullable: true }
+        created_by_staff_id: { type: string, format: uuid, nullable: true }
+        roster_proposal_id: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    AllocationSummary:
+      type: object
+      properties:
+        allocation_id: { type: string, format: uuid }
+        shift_id: { type: string, format: uuid }
+        ward_name: { type: string }
+        date: { type: string, format: date }
+        start_time: { type: string }
+        end_time: { type: string }
+        staff_member_id: { type: string, format: uuid }
+        staff_name: { type: string }
+        status: { $ref: '#/components/schemas/AllocationStatus' }
+
+    CreateAllocationRequest:
+      type: object
+      required: [shift_id, staff_member_id]
+      properties:
+        shift_id: { type: string, format: uuid }
+        staff_member_id: { type: string, format: uuid }
+        override:
+          type: boolean
+          default: false
+          description: Proceed despite failed checks. Requires `override_reason`.
+        override_reason: { type: string, maxLength: 500 }
+
+    # ---------- leave ----------
+
+    LeaveRequest:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        staff_member_id: { type: string, format: uuid }
+        staff_name: { type: string }
+        type: { $ref: '#/components/schemas/LeaveType' }
+        is_urgent:
+          type: boolean
+          description: True for `sick` and `emergency`, or when the range starts within 24 hours.
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        reason: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/LeaveStatus' }
+        reviewed_by_staff_id: { type: string, format: uuid, nullable: true }
+        reviewed_at: { type: string, format: date-time, nullable: true }
+        review_notes: { type: string, nullable: true }
+        swap_with_staff_member_id: { type: string, format: uuid, nullable: true }
+        swap_shift_id: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    LeaveRequestDetail:
+      allOf:
+        - $ref: '#/components/schemas/LeaveRequest'
+        - type: object
+          properties:
+            affected_shifts:
+              type: array
+              description: |
+                What approving this would cost. Each entry is a shift the requester is
+                allocated to within the dates, with the coverage it would be left at.
+              items:
+                type: object
+                properties:
+                  shift: { $ref: '#/components/schemas/ShiftSummary' }
+                  coverage_if_approved: { $ref: '#/components/schemas/ShiftCoverage' }
+
+    CreateLeaveRequest:
+      type: object
+      required: [type]
+      properties:
+        type: { $ref: '#/components/schemas/LeaveType' }
+        start_date:
+          type: string
+          format: date
+          description: Required for annual, sick and emergency. Must not be after `end_date`.
+        end_date: { type: string, format: date }
+        reason: { type: string, maxLength: 500 }
+        swap_shift_id:
+          type: string
+          format: uuid
+          description: Required when `type = shift_swap`. Must be a shift the caller is allocated to.
+        swap_with_staff_member_id:
+          type: string
+          format: uuid
+          description: |
+            Required when `type = shift_swap`. Checked here for the shift's required skill
+            and availability, rather than at approval time.
+
+    # ---------- roster agent ----------
+
+    RosterProposalSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        workflow_id:
+          type: string
+          format: uuid
+          description: The shared agent-workflow record. Group-owned, see integration §11.2.
+        shift_id: { type: string, format: uuid }
+        ward_name: { type: string }
+        shift_date: { type: string, format: date }
+        objective: { type: string }
+        status: { $ref: '#/components/schemas/RosterProposalStatus' }
+        outcome: { $ref: '#/components/schemas/AgentOutcome' }
+        is_cascading_swap:
+          type: boolean
+          description: |
+            True when filling this gap requires taking somebody out of another ward. These
+            are the proposals that need the closest human attention.
+        change_count: { type: integer }
+        created_at: { type: string, format: date-time }
+
+    RosterProposalDetail:
+      allOf:
+        - $ref: '#/components/schemas/RosterProposalSummary'
+        - type: object
+          properties:
+            plan:
+              type: array
+              description: The structured multi-step plan, in order.
+              items: { $ref: '#/components/schemas/PlanStep' }
+            proposed_changes:
+              type: array
+              items: { $ref: '#/components/schemas/ProposedChange' }
+            validation:
+              type: array
+              description: Deterministic checks. Ordinary C#, not the agent checking itself.
+              items: { $ref: '#/components/schemas/ValidationResult' }
+            tool_calls:
+              type: array
+              items: { $ref: '#/components/schemas/ToolCall' }
+            errors:
+              type: array
+              items:
+                type: object
+                properties:
+                  step: { type: string }
+                  message: { type: string }
+                  occurred_at: { type: string, format: date-time }
+            attempt_count: { type: integer }
+            started_at: { type: string, format: date-time, nullable: true }
+            completed_at: { type: string, format: date-time, nullable: true }
+            reviewed_by_staff_id: { type: string, format: uuid, nullable: true }
+            reviewed_at: { type: string, format: date-time, nullable: true }
+            review_notes: { type: string, nullable: true }
+            rejection_reason: { $ref: '#/components/schemas/RejectionReason' }
+            final_outcome: { type: string, nullable: true }
+
+    PlanStep:
+      type: object
+      properties:
+        sequence: { type: integer }
+        agent_role:
+          type: string
+          description: Which agent role this step was delegated to.
+          example: coverage_analysis
+        description: { type: string }
+        status: { type: string, enum: [pending, running, completed, failed, skipped] }
+        started_at: { type: string, format: date-time, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
+
+    ProposedChange:
+      type: object
+      description: |
+        One domain write the agent wants to make. Stored as a row rather than JSON so the
+        validator gets referential integrity and the approval query can filter by content.
+      properties:
+        id: { type: string, format: uuid }
+        sequence: { type: integer }
+        change_type: { $ref: '#/components/schemas/ProposedChangeType' }
+        target_allocation_id: { type: string, format: uuid, nullable: true }
+        proposed_staff_member_id: { type: string, format: uuid, nullable: true }
+        proposed_staff_name: { type: string, nullable: true }
+        proposed_shift_id: { type: string, format: uuid, nullable: true }
+        from_ward_name:
+          type: string
+          nullable: true
+          description: Set on a cascading swap — the ward the person is being taken out of.
+        to_ward_name: { type: string, nullable: true }
+        rationale:
+          type: string
+          description: Why the agent chose this person. Shown to the approver.
+        validation_status: { $ref: '#/components/schemas/ValidationStatus' }
+        validation_message: { type: string, nullable: true }
+        applied_at: { type: string, format: date-time, nullable: true }
+        applied_entity_id: { type: string, format: uuid, nullable: true }
+
+    ValidationResult:
+      type: object
+      properties:
+        check:
+          type: string
+          description: The rule that was tested.
+          enum:
+            - staff_is_active
+            - staff_holds_required_skill_on_shift_date
+            - staff_not_on_approved_leave
+            - staff_not_double_booked
+            - source_ward_stays_at_or_above_minimum
+            - target_shift_reaches_minimum
+        passed: { type: boolean }
+        detail: { type: string }
+        checked_at: { type: string, format: date-time }
+
+    ToolCall:
+      type: object
+      description: |
+        Allow-listed tools only, all read-only. The agent has no write access to any table —
+        every change it wants goes through `proposed_changes` and this API.
+      properties:
+        tool_name:
+          type: string
+          enum:
+            - list_shift_requirements
+            - list_candidate_staff
+            - list_staff_skills
+            - list_approved_leave
+            - get_ward_coverage
+            - get_ward_occupancy
+        arguments: { type: object, additionalProperties: true }
+        succeeded: { type: boolean }
+        duration_ms: { type: integer }
+        error: { type: string, nullable: true }
+        called_at: { type: string, format: date-time }
+
+    # ---------- self-service ----------
+
+    MyShift:
+      type: object
+      properties:
+        allocation_id: { type: string, format: uuid }
+        shift_id: { type: string, format: uuid }
+        ward_name: { type: string }
+        date: { type: string, format: date }
+        start_time: { type: string }
+        end_time: { type: string }
+        crosses_midnight: { type: boolean }
+        status: { $ref: '#/components/schemas/AllocationStatus' }
+        clocked_in_at: { type: string, format: date-time, nullable: true }
+        clocked_out_at: { type: string, format: date-time, nullable: true }
+        can_clock_in:
+          type: boolean
+          description: Server decides, so the app never has to know the window rule.
+        was_reassigned:
+          type: boolean
+          description: |
+            True when this allocation replaced another — the app shows "you were moved to
+            this ward" rather than presenting it as an ordinary shift.
+
+    # ---------- integration ----------
+
+    WardCoverage:
+      type: object
+      description: Counts only. No staff identities.
+      properties:
+        ward_id: { type: string, format: uuid }
+        ward_name: { type: string }
+        current_shift_id: { type: string, format: uuid, nullable: true }
+        on_duty_count: { type: integer }
+        minimum_headcount: { type: integer }
+        headcount_needed: { type: integer }
+        status: { $ref: '#/components/schemas/CoverageStatus' }
+        by_role:
+          type: object
+          additionalProperties: { type: integer }
+          description: Head count per role, keyed by StaffRole.
+
+    # ---------- reports ----------
+
+    CoverageReport:
+      type: object
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              ward_id: { type: string, format: uuid }
+              ward_name: { type: string }
+              date: { type: string, format: date }
+              shifts_total: { type: integer }
+              shifts_understaffed: { type: integer }
+              hours_below_minimum: { type: number }
+              fill_rate:
+                type: number
+                description: Confirmed allocations divided by headcount needed, 0 to 1.
+        totals:
+          type: object
+          properties:
+            shifts_total: { type: integer }
+            shifts_understaffed: { type: integer }
+            hours_below_minimum: { type: number }
+            fill_rate: { type: number }
+
+    LeaveReport:
+      type: object
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        group_by: { type: string }
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              key: { type: string, description: Staff name, leave type, ward or month. }
+              approved_days: { type: number }
+              pending_days: { type: number }
+              rejected_count: { type: integer }
+              sick_days: { type: number }
+
+    AgentPerformanceReport:
+      type: object
+      description: Evidence for the Agentic AI evaluation report (assignment §12).
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        proposals_raised: { type: integer }
+        proposals_auto_triggered:
+          type: integer
+          description: Raised by the API on a leave approval, rather than by a person.
+        validation_failure_rate:
+          type: number
+          description: |
+            Share of proposals the deterministic validator rejected before a human saw them.
+            The honest measure of how often the agent suggested something unsafe.
+        approved: { type: integer }
+        rejected: { type: integer }
+        revision_requested: { type: integer }
+        failed_safely: { type: integer }
+        cascading_swaps: { type: integer }
+        median_minutes_gap_to_fill:
+          type: number
+          description: From the gap appearing to an approved proposal being applied.
+        rejection_reasons:
+          type: object
+          additionalProperties: { type: integer }
+
+    # ---------- shared ----------
+
+    PagedResult:
+      type: object
+      properties:
+        page: { type: integer }
+        page_size: { type: integer }
+        total_count: { type: integer }
+        total_pages: { type: integer }
+
+    ProblemDetails:
+      type: object
+      description: RFC 7807. The shared error shape across all four components.
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+
+    ValidationProblemDetails:
+      allOf:
+        - $ref: '#/components/schemas/ProblemDetails'
+        - type: object
+          properties:
+            errors:
+              type: object
+              additionalProperties:
+                type: array
+                items: { type: string }
+
+    AllocationRejectedProblem:
+      allOf:
+        - $ref: '#/components/schemas/ProblemDetails'
+        - type: object
+          properties:
+            failed_checks:
+              type: array
+              items: { $ref: '#/components/schemas/ValidationResult' }

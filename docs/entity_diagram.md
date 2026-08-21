@@ -47,6 +47,13 @@ direction, including against Patient Management (see `Gender`).
 - Three new items in [Open Decisions](#open-decisions) (9–11) for things that need an
   owner's call rather than a unilateral edit.
 
+**Revision 2.3** — Open Decision 1 (patient identity) resolved: **patients keep an app
+login.** Rev 2.1 recorded the Component Plan as having no Patient role; v2 of that plan
+does list one, and both `patient-management-plan.md` and `patient-spec.yaml` are already
+built on it. The deciding requirement is assignment §4.1, "meaningful and different
+purposes for the React and Flutter applications". Knock-on work is listed under the
+decision.
+
 ## Architecture Overview
 
 ```
@@ -1426,17 +1433,63 @@ and retirement. **Patient Management owns the occupant** — `BedAssignment` and
 
 These need a group call before implementation. Each one changes work already scoped.
 
-**1. Patient identity — blocking.** `StaffMember` is the only auth identity
-(`Patient` "has no auth identity"), but the patient flow has patients booking visits
-"in the app" and receiving "Ward 5B, Bed 12" on their phone. The Component Plan's Flutter
-roles are crew / nurse / staff only — no patient. Three documents disagree.
-*Recommendation:* keep patients out of the app. Deliver the bed notification by SMS from
-the backend and let a receptionist or nurse create `Appointment` rows. Adding a patient
-identity means a second auth path, patient-scoped authorization on every endpoint, and PII
-exposure decisions — real work that earns nothing on the rubric, since the
-three-roles-per-client requirement is already met without it. `Notification` and
-`DeviceToken` are currently written staff-only on that assumption; if the group decides
-otherwise, both need a nullable `PatientId` and a polymorphic recipient.
+**1. Patient identity — RESOLVED (Rev 2.3): patients do get an app login.**
+
+*The premise was out of date.* Rev 2.1 recorded this as "the Component Plan's Flutter
+roles are crew / nurse / staff only — no patient". Component Plan v2 does list a Patient
+role: *"**Patient** | Flutter | Member 4 | Book a visit, view own admission status,
+ward/bed and discharge details. Read-only, own record only"*, and counts it as one of the
+four Flutter roles. `patient-management-plan.md` §10 lists the Patient screens, and
+`patient-spec.yaml` already publishes three Patient-role endpoints
+(`POST /me/pre-register`, `GET /me/admission`, `GET /me/history`). The documents agree;
+this entry did not.
+
+*Why it stays.* The course's own worked example — the *Assignment 1 sample project*
+handout (AutoCare AI), issued with the brief — splits the two clients exactly this way:
+
+> "The React application will be used mainly by **staff**"
+> "The Flutter application will support **customers** and technicians"
+
+"Customer" is role 1 of 5 in that sample — the end user of the service, our `Patient`
+equivalent — and the Flutter feature list it gives includes "registration, login and
+logout", "date and time selection" and "history and status tracking". Those are
+`/me/pre-register`, the booking date picker and `/me/admission` under different names. A
+staff-only mobile app is not the shape the example demonstrates.
+
+Assignment §4.1 points the same way: **"meaningful and different purposes for the React
+and Flutter applications."** With patients in Flutter that difference is self-evident —
+React is the hospital's internal system, Flutter is the app the public uses. Staff-only on
+both sides leaves it to be argued from posture alone, desk work versus walking around.
+
+*On the cost.* A second auth path and patient-scoped authorization on every `/me/*`
+endpoint is real work, and Rev 2.1 was right to raise it. Two things temper it. The sample
+notes that **"user management should be implemented as a shared mandatory feature"** and
+that "authentication and role-based authorization are already compulsory requirements" —
+so this sits inside a baseline the project owes anyway, rather than being net-new scope.
+And Rev 2.1's other point, that the three-roles minimum is already met without patients,
+is correct on its own terms; it just is not the requirement that decides this.
+
+There is also a demo cost to removing them. Our emergency path leans on the contrast
+between a **logged-in caller** whose identity, history and contact details we already hold,
+and an unidentified arrival registered as `UNKNOWN-2026-0142`. Without patient accounts
+the first half of that contrast disappears.
+
+**Knock-on changes this creates, still to do:**
+
+- `Notification` and `DeviceToken` are written staff-only. Both need a nullable `PatientId`
+  and a polymorphic recipient. *Owner: group / leader.*
+- `Appointment.BookedByStaffMemberId` stays nullable — it is null for a self-booking.
+  *Already modelled correctly (Rev 2).*
+- `patient-spec.yaml` now publishes the booking endpoints: `POST /me/appointments`,
+  `GET /me/appointments`, `POST /me/appointments/{id}/cancel`, and the staff side
+  `GET /appointments`, `POST /appointments`, `POST /appointments/{id}/check-in`.
+  Check-in creates an ordinary `Admission` with `source = pre_registered`, so the bed agent
+  path is unchanged. Doctor calendars, time slots and availability search remain out of
+  scope. *Done: Member 4.*
+
+Note for Member 4's own design: patient notifications are local (the app checks its own
+status), not push, so `DeviceToken` is not on the Patient Management critical path either
+way.
 
 **2. Single hospital vs. the "non-nearest hospital" approval trigger.** This document
 settles on one hospital with multiple wards, but the Component Plan says the Duty Manager

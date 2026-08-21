@@ -30,7 +30,7 @@ It answers four questions:
 | Nurse rosters, who is on shift | Staff Management (Member 2) |
 | Ventilators, monitors, consumables, stock | Equipment Management (Member 3) |
 | The bed register itself — adding beds, repairs, taking them out of service | Equipment Management (Member 3). We read it; see §3.1. |
-| Doctor appointment booking, time slots, calendars | Out of scope — see §11 |
+| Doctor calendars, time slots, availability search | Out of scope — see §11. Simple booking (patient picks a date) **is** in scope. |
 
 > **The line we do not cross:** the AI never decides *what care a patient needs*. It only decides *where to physically put them*, given a care level a human already chose. Everything in this document holds that line.
 
@@ -632,6 +632,8 @@ Protected routes by role, loading / empty / success / error states throughout.
 | Screen | Contents |
 | :--- | :--- |
 | My status | "You are in Ward 5B, Bed 12" — the narrow DTO from §7.6 |
+| Book a visit | Date/time picker, optional reason. `POST /me/appointments`. No calendars or slots — the patient says when they intend to come |
+| My visits | Upcoming and past bookings, cancel while still `scheduled` |
 | Pre-register | Details ahead of a planned visit |
 | Discharge info | Summary note and instructions |
 | **Call an ambulance** | Minimum details + location, posted to Emergency's endpoint. Because the caller is logged in, we already know who they are — the pre-admission starts complete. |
@@ -668,7 +670,7 @@ Every trigger already exists as a status change, so nothing new is needed on the
 
 | Not building | Why |
 | :--- | :--- |
-| Doctor appointment booking, time slots, calendars | A component-sized feature on its own. `pre_registered` with an `expected_arrival` gives us the useful 10% for almost no cost. |
+| Doctor calendars, time slots, availability search, rescheduling | The component-sized part, and still out. A patient booking a date is not: `POST /me/appointments` creates an `Appointment`, staff check them in, and it becomes an ordinary admission. Rescheduling is cancel and rebook. |
 | Merging duplicate patient records | Real hospitals do this; it's a whole workflow. Prevented up front by NIC lookup, and recorded here as a known limitation. |
 | Patient transfers between wards mid-stay | Nice to have. Only if time allows — the data model already supports it (a second `BedAssignment` with `release_reason = transferred`). |
 | Billing beyond a checklist tick | Not our component. |
@@ -740,7 +742,7 @@ Rule-based assertions, not an LLM judge. The assignment allows LLM-as-judge only
 | Never suggest moving an existing ICU patient out | That's a clinical judgement about a second patient | — |
 | Gender is a ward property, not an emergency exception | Special cases in code multiply. Push exceptions into data and the code stays one line. | — |
 | Hold expiry automatic, cancellation human-only | Only a human knows why an ambulance didn't arrive. A computer can safely free a bed; it cannot safely declare a patient isn't coming. | — |
-| Pre-registration instead of appointments | Gets the useful part of appointments for ~1% of the work | If the group wants real appointments, something else has to go |
+| Simple booking, not scheduling | A patient picking a date is cheap; doctor calendars and slot management are not. We do the first and skip the second. It also gives the mobile date/time picker something real to do — §16 claims it as our device feature | Drop `/me/appointments` and keep pre-registration only, if the group wants less |
 | Patient signup matches by NIC | Prevents the duplicate records that our own signup form would otherwise create | — |
 | Separate narrow DTO for patients | A filtered staff DTO leaks by accident the first time someone adds a field. A separate shape cannot. | — |
 | Added `hdu` to the category list | The downgrade ladder needs a rung between ICU and general | Drop it and downgrade ICU → inpatient directly |
@@ -765,6 +767,28 @@ Worth flagging as a benefit: a call from a **logged-in patient** means we alread
 **Decided:** a bystander can raise a call for someone else. The call screen asks once, and Member 1 must pass `patient_is_caller` and `caller_user_id` through on the dispatch notification. See §5.6. **Confirm those two fields with Member 1.**
 
 **4. How does Emergency notify us of a dispatch?** Direct API call, or via the orchestrator? Affects both of our specs.
+
+**5. Patient app login — settled, keeping it.**
+`docs/entity_diagram.md` Open Decision 1 recommended dropping the Patient role and sending bed details by SMS instead. That entry was written on an out-of-date reading: it said the Component Plan's Flutter roles were "crew / nurse / staff only", but v2 of that plan lists **Patient** as one of four Flutter roles, and §10 here has listed the Patient screens all along.
+
+The deciding evidence is the course's own worked example — the *Assignment 1 sample project* handout (AutoCare AI), issued with the brief — which splits the two clients exactly the way we have:
+
+> "The React application will be used mainly by **staff**"
+> "The Flutter application will support **customers** and technicians"
+
+"Customer" is role 1 of 5 in that sample — the end user of the service, our `Patient` equivalent. The Flutter feature list it gives includes "registration, login and logout", "date and time selection" and "history and status tracking", which are `/me/pre-register`, the booking date picker and `/me/admission` under different names. A staff-only mobile app is not the shape the example demonstrates.
+
+Assignment §4.1 points the same way — **"meaningful and different purposes for the React and Flutter applications."** With patients in Flutter that difference is obvious: React is the hospital's internal system, Flutter is the app the public uses. Staff-only on both sides makes it something we would have to argue rather than show.
+
+The cost the leader raised is real: a second auth path and patient-scoped authorization on every `/me/*` endpoint. Two things temper it. The sample notes that "user management should be implemented as a shared mandatory feature" and that authentication and role-based authorization "are already compulsory requirements", so this sits inside a baseline we owe anyway. And his other point — that the three-roles minimum is already met without patients — is correct; it is just not the requirement that decides this one.
+
+There is a demo cost to removing them too. Our emergency path leans on the contrast between a logged-in caller whose identity and history we already hold, and an unidentified arrival registered as `UNKNOWN-2026-0142` (§15.3). Drop patient accounts and the first half of that contrast goes with it.
+
+**Built:** `POST /me/appointments` (book), `GET /me/appointments` (my visits), `POST /me/appointments/{id}/cancel`, plus the staff side — `GET /appointments` (expected-visits worklist), `POST /appointments` (book on a patient's behalf) and `POST /appointments/{id}/check-in`, which turns the booking into an ordinary admission the bed agent then runs on.
+
+The care level is still set by staff at check-in, never by the patient at booking time — the same rule every other admission path follows.
+
+**Knock-on for the group:** `Notification` and `DeviceToken` are written staff-only in the entity diagram and need a nullable `PatientId` if patient notifications are wanted. Not on our critical path, since our patient notifications are local rather than push.
 
 *Resolved:* `Doctor` is a Staff Management role — we only check the JWT role claim on the `clinical_clearance` checklist item, no entity of our own. No SMS integration; the group's Maps API covers the third-party requirement.
 

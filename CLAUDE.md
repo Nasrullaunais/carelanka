@@ -167,15 +167,18 @@ generated clients.
   types) have one definition, group-owned: changed in all four specs in the same
   commit, or not at all.
 
-The live collision list is `integration_of_functions.md` §11.6, kept there
-because each row needs two or three members to agree.
+**All four specs currently validate and the collision count is zero** (cleared
+2026-08-21). `integration_of_functions.md` §11.6 records what was renamed and
+why, so the same names are not reintroduced. Check it before adding a route,
+`operationId` or schema name.
 
 **Validate in CI:** `npx @apidevtools/swagger-parser validate specs/*.yaml`,
-alongside the route and `operationId` uniqueness check. **Quote any inline
-description containing a comma** — inside a YAML flow mapping an unquoted comma
-splits the description into phantom keys, which no one catches by eye and the
-validator catches every time. `staff-spec.yaml:2325` currently fails on exactly
-this.
+alongside the route and `operationId` uniqueness check — that sweep is what stops
+zero silently becoming one again. **Quote any inline description containing a
+comma** — inside a YAML flow mapping an unquoted comma splits the description
+into phantom keys, which no one catches by eye and the validator catches every
+time. That exact mistake in `staff-spec.yaml` kept it invalid for weeks and
+blocked client generation for both frontends.
 
 ---
 

@@ -1495,6 +1495,7 @@ rows are mutated after insert; pure join/append-only tables (`DispatchCrew`,
 | Bed | beds | ✓ | changed |
 | BedReservation | bed_reservations | | **new** |
 | Patient | patients | ✓ | changed |
+| PatientAccount | patient_accounts | ✓ | **new (2.5)** |
 | Appointment | appointments | | **new** |
 | Admission | admissions | | changed |
 | BedAssignment | bed_assignments | | changed |
@@ -1505,7 +1506,7 @@ rows are mutated after insert; pure join/append-only tables (`DispatchCrew`,
 | Notification | notifications | | **new** |
 | AuditLog | audit_logs | | changed |
 
-**32 tables** (was 25).
+**33 tables** (was 25). *(Rev 2.5 added `PatientAccount`.)*
 
 ---
 
@@ -1516,7 +1517,7 @@ rows are mutated after insert; pure join/append-only tables (`DispatchCrew`,
 | Emergency / Ambulance | Member 1 | EmergencyCall, Ambulance, Dispatch, DispatchCrew, RouteLog |
 | Staff Management | Member 2 | Shift, Allocation, LeaveRequest, Skill, StaffMemberSkill, WardStaffingRule |
 | Health Equipment | Member 3 | EquipmentType, EquipmentItem, StockLevel, MaintenanceSchedule, Warning, **Bed** |
-| Patient Management | Member 4 | Patient, Admission, BedAssignment, BedReservation, Discharge, DischargeChecklistItem, Appointment, Ward |
+| Patient Management | Member 4 | Patient, **PatientAccount**, Admission, BedAssignment, BedReservation, Discharge, DischargeChecklistItem, Appointment, Ward |
 | Shared / Group | All | StaffMember, RefreshToken, DeviceToken, Notification, AgentWorkflow, AgentProposedChange, AuditLog |
 
 **Note:** `Ward` sits under Patient Management but is referenced by all four components

@@ -1819,10 +1819,13 @@ components:
           description: |
             Emergency ranks its calls critical/high/medium/low (`CallPriority`) - a different
             question from this one: how fast an ambulance is needed, not how fast a bed is. They
-            translate before calling us, by the fixed table in `emergency-spec.yaml`'s
-            `DispatchNotification` and `integration_of_functions.md` §22 - critical to emergency,
-            high to urgent, medium and low to routine. We accept only our own three values;
-            anything else is a 400.
+            translate before calling us, by a fixed table in C# on their side: critical to
+            emergency, high to urgent, medium and low to routine. We accept only our own three
+            values; anything else is a 400.
+
+            The same table is written in three other places and all four must stay in agreement:
+            `emergency-spec.yaml`'s `DispatchNotification`, `emergency-management-plan.md` §6,
+            and `integration_of_functions.md` §22.
         destination_ward_type_hint:
           allOf:
             - $ref: '#/components/schemas/WardType'

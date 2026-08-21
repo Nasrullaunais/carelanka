@@ -275,7 +275,7 @@ Follows the same gather → filter → rank → propose → validate → human g
 | `medium` | `routine` |
 | `low` | `routine` |
 
-Deliberately lossy in one direction — `medium` and `low` both mean "no rush" once the question is which bed. **The agent never chooses this value**; it is a lookup, the same as `destination_ward_type_hint` is a hint rather than a category. Also in `emergency-spec.yaml`'s `DispatchNotification` and `integration_of_functions.md` §22.
+Deliberately lossy in one direction — `medium` and `low` both mean "no rush" once the question is which bed. **The agent never chooses this value**; it is a lookup, the same as `destination_ward_type_hint` is a hint rather than a category. The same table is written in three other places and all four must stay in agreement: `emergency-spec.yaml`'s `DispatchNotification`, `integration_of_functions.md` §22, and `patient-spec.yaml`'s `PreAdmitRequest`.
 
 **Deterministic validation — ordinary C#, never the model checking itself.** Run before a proposal reaches a human, and **re-run immediately before applying**, because the road situation moves while a proposal sits on screen:
 

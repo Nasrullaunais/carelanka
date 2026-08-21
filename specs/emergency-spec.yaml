@@ -2291,9 +2291,11 @@ components:
             | `low` | `routine` |
 
             One-directional and deliberately lossy — `medium` and `low` both mean
-            "no rush" to a bed search. The mapping lives here and in
-            `integration_of_functions.md` §22; it is a fixed table in C#, never a
-            judgement the agent makes.
+            "no rush" to a bed search. It is a fixed table in C#, never a judgement
+            the agent makes. The same table is written in three other places and all
+            four must stay in agreement: `integration_of_functions.md` §22,
+            `emergency-management-plan.md` §6, and `patient-spec.yaml`'s
+            `PreAdmitRequest`.
         destination_ward_type_hint:
           allOf:
             - $ref: '#/components/schemas/WardTypeHint'

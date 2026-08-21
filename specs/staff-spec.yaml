@@ -1471,7 +1471,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
-  /reports/agent-performance:
+  /reports/staff/agent-performance:
     get:
       tags: [Reports]
       summary: How well the Staff Allocation Agent is doing
@@ -1485,7 +1485,7 @@ paths:
 
         `validation_failure_rate` is the honest one — proposals the agent produced that
         ordinary C# had to catch.
-      operationId: getAgentPerformanceReport
+      operationId: getStaffAgentPerformanceReport
       parameters:
         - name: from
           in: query
@@ -1500,7 +1500,7 @@ paths:
           description: The report
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/AgentPerformanceReport' }
+              schema: { $ref: '#/components/schemas/StaffAgentPerformanceReport' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -2322,13 +2322,13 @@ components:
           items:
             type: object
             properties:
-              key: { type: string, description: Staff name, leave type, ward or month. }
+              key: { type: string, description: 'Staff name, leave type, ward or month.' }
               approved_days: { type: number }
               pending_days: { type: number }
               rejected_count: { type: integer }
               sick_days: { type: number }
 
-    AgentPerformanceReport:
+    StaffAgentPerformanceReport:
       type: object
       description: Evidence for the Agentic AI evaluation report (assignment §12).
       properties:
@@ -2359,10 +2359,11 @@ components:
 
     PagedResult:
       type: object
+      required: [page, page_size, total_items, total_pages]
       properties:
         page: { type: integer }
         page_size: { type: integer }
-        total_count: { type: integer }
+        total_items: { type: integer }
         total_pages: { type: integer }
 
     ProblemDetails:

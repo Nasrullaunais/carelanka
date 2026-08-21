@@ -4,6 +4,35 @@ Repo-wide conventions for Claude Code. Kept short on purpose — it loads on eve
 turn of every session. Detail lives in the documents below; this file holds only
 what you would get wrong before thinking to go and look it up.
 
+## How to explain things to us
+
+**Write for a student who is good at this course but not fluent in the jargon.**
+We are all learning this stack while building on it. An explanation nobody
+understands is not an explanation, however correct it is.
+
+- **Lead with the problem in one plain sentence**, before any detail.
+- **Say what actually happens, not the name for it.**
+- **Show the actual thing.** Two clashing values side by side beats a paragraph
+  describing that they clash.
+- **Short lines, not paragraphs.** A block of prose gets skimmed and missed.
+- **An everyday comparison earns its place** when the idea is unfamiliar.
+- **End with what it means for the reader** — what changes, what is left to do.
+
+```
+Not:  "The route collides, throwing AmbiguousMatchException at startup."
+
+But:  "Two people gave their page the same web address.
+       One app can't have two pages at the same address — it won't start at all.
+       Like two shops on one street both numbered 12: the postman can't deliver.
+       You don't close a shop, you renumber one."
+```
+
+Use the exact term when it *is* the thing — a class name, an endpoint, a config
+key, something being looked up or searched for. Everywhere else, plain words.
+
+**If someone says they don't understand, that is not a request for more detail.**
+Say the same thing again with simpler words and fewer of them.
+
 ## Current state
 
 **Design and scaffolding only — no features yet.** `api/` is an empty ASP.NET

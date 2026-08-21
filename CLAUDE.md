@@ -23,10 +23,12 @@ here is the order of authority.
 | :--- | :--- | :--- |
 | `docs/2026-S1-SE3090-Assignment_1_Specification.md` | The assignment brief. Beats every other file, this one included. | Module |
 | `docs/CareLanka_Component_Plan.md` | The four components, who owns which, the seven roles, why React and Flutter differ. Read first. | Group |
+| `docs/BUILD_PLAN.md` | **What to build, in what order.** All four members in one file, so you see your neighbours' work. Read your member's section before writing code. | Group |
+| `STUBS.md` | **Every fake standing in for someone else's unbuilt work.** Read the rows where `Owner` is your member — somebody is already depending on those. | Everyone, constantly |
 | `docs/entity_diagram.md` | Every table, field and enum, with the reasoning. | Group; each member edits only their own entities |
 | `specs/integration_of_functions.md` | Component boundaries: who owns which table, who calls whose service, open cross-component items. Read before touching anything you do not own. | Group |
 | `specs/*-spec.yaml` | The OpenAPI contract per component — actual request and response shapes. | That component's member |
-| `specs/{patient,equipment}-management-plan.md` | That component's design doc; its `*-spec.yaml` follows from it. Staff and Emergency have not written theirs. | That component's member |
+| `specs/{patient,equipment,emergency}-management-plan.md` | That component's design doc; its `*-spec.yaml` follows from it. Staff has not written theirs. | That component's member |
 | `specs/ai-orchestration-workflow.md` | How the agents chain into one workflow, and the shared workflow state. Proposal stage; does not block building an individual agent. | Group |
 | `mobile-ui/README.md` | Flutter layout, and that each member works only inside `lib/features/<component>/`. Read before writing Dart. | Group |
 
@@ -35,7 +37,7 @@ their personal Claude sessions — nothing to read here, not part of this table.
 If you keep one, update `RESUME.md` as you go with what you discover, fix and
 build, so a fresh chat can pick up where you left off.)
 
-Three rules that fall out of it:
+Four rules that fall out of it:
 
 - **A design doc and its spec move together** — changing one means changing all
   three (plan, spec, integration doc) in the same commit.
@@ -43,6 +45,26 @@ Three rules that fall out of it:
   disagree, the spec wins** — for whichever member owns that entity. A
   disagreement about someone *else's* entity is an Open Decision, not an edit.
 - **Cross-document references are bare filenames in prose**, not relative links.
+- **Stub anything you don't own, and record it in `STUBS.md` in the same
+  commit.** Never wait for a teammate's code, and never write it for them — see
+  below.
+
+## Stubs
+
+Four people build four components that depend on each other, so you will
+regularly need something nobody has built yet. Fake it and keep moving. **A stub
+nobody wrote down is the problem** — it looks like working code, passes your
+tests, and quietly returns invented data.
+
+- **Stub at the service interface**, not in a controller, so swapping in the real
+  one is a DI registration change and nothing else moves.
+- **Mark it `// STUB`** with the `STUBS.md` row number.
+- **Match the owner's published contract exactly.** Invent a different shape and
+  the real service will break your code when it arrives.
+- **Read `STUBS.md` rows where `Owner` is your member** before you start work —
+  those are things other people are already depending on you for.
+- Stub notes go in `STUBS.md`, **never in this file.** This one loads every turn
+  and is for standing conventions; that one is current state and changes daily.
 
 ## Stack
 
@@ -255,6 +277,31 @@ Base classes are `Entity` → `AuditedEntity` → `SoftDeletableEntity`, defined
 - **`DateTimeOffset` in UTC** everywhere — Npgsql requires a UTC offset.
 - **Migrations are DDL only.** Seed data lives in `docs/*.sql` as parameterised,
   idempotent scripts, so environment-specific ids never reach production.
+
+## One DbContext, four people
+
+**Nobody edits `OnModelCreating`.** Four people adding entity configuration to
+one method means all four of us get a merge conflict on every migration.
+
+Each member writes their own configuration classes under
+`Data/Configurations/{Component}/`, and the context picks them all up in one
+line:
+
+```csharp
+protected override void OnModelCreating(ModelBuilder b)
+    => b.ApplyConfigurationsFromAssembly(typeof(CareLankaDbContext).Assembly);
+```
+
+You own your files; two people adding entities on the same day touch zero shared
+lines. `DbSet<T>` properties are the one shared surface — keep them grouped by
+component and add yours at the end of your group.
+
+**Migrations conflict badly**, because each one snapshots the whole model:
+
+- Name them `{Component}_{What}` — `Patient_AddAdmission`, `Equipment_AddBed`.
+- **Pull `main` immediately before generating one**, and push promptly after.
+- On a snapshot conflict: delete your migration, pull, regenerate. Never
+  hand-merge the snapshot file.
 
 ---
 

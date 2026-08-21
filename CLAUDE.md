@@ -30,6 +30,11 @@ here is the order of authority.
 | `specs/ai-orchestration-workflow.md` | How the agents chain into one workflow, and the shared workflow state. Proposal stage; does not block building an individual agent. | Group |
 | `mobile-ui/README.md` | Flutter layout, and that each member works only inside `lib/features/<component>/`. Read before writing Dart. | Group |
 
+(Each member may also keep their own gitignored `IMPORTANT.md`/`RESUME.md` for
+their personal Claude sessions — nothing to read here, not part of this table.
+If you keep one, update `RESUME.md` as you go with what you discover, fix and
+build, so a fresh chat can pick up where you left off.)
+
 Three rules that fall out of it:
 
 - **A design doc and its spec move together** — changing one means changing all

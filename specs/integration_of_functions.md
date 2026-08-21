@@ -450,17 +450,39 @@ throws at startup; a duplicate `operationId` or schema name silently collides in
 the generated clients, and whichever one generates second wins. None of these is
 one member's call — the two or three members sharing the name have to agree.
 
-Re-verified against `main` on 2026-08-21, after `emergency-spec.yaml` was written (§22–§26):
+**STATUS: CLEARED on 2026-08-21.** All four specs validate as OpenAPI 3.0.3 and the
+cross-spec sweep reports **zero** route, `operationId` or schema-shape collisions.
+Everything below is the record of what was fixed and why, kept so the same names are
+not reintroduced.
 
-| Collision | Where | Suggested fix |
+Each of the four agent-performance reports was a *different* report about a *different*
+agent — they were never a shared function, they had just independently picked the same
+name. So nothing was given up; each component kept its own report under its own name.
+
+| Was | Now | Whose |
 | :--- | :--- | :--- |
-| `GET /reports/agent-performance` | staff, equipment, patient | Namespace by component: `/reports/staff/agent-performance`. **Emergency does not collide** — `emergency-spec.yaml` was written after this was already flagged, so it namespaces itself from the start: `/reports/emergency/agent-performance` |
-| `GET /workflows/{workflowId}` | equipment, patient | Group-owned once §11.2 is settled — one workflow endpoint, not four. Emergency does not declare its own copy, for the same reason |
-| `operationId: getAgentPerformanceReport` | staff, patient | Follows whatever the route above becomes. Emergency's is `getEmergencyAgentPerformanceReport`, so it does not add a third name to this collision |
-| `PagedResult` — staff says `total_count`, the others `total_items` | staff vs. equipment/patient | Unresolved — still Staff's own file to fix, not something another member can edit for them. `emergency-spec.yaml` uses `total_items`, matching the majority rather than adding a third convention |
-| `Bed`, `WorkflowSummary`, `WorkflowAccepted`, `AgentPerformanceReport` — one name, different shapes | across specs | Either make them byte-identical or give them different names (`EquipmentBed` / `AdmissionBed`). Emergency defines none of these four names, so it does not add a fifth shape |
+| `GET /reports/agent-performance` ×4 | `/reports/{emergency,staff,equipment,patient}/agent-performance` | one each |
+| `AgentPerformanceReport` ×4 shapes | `{Emergency,Staff,Equipment,Patient}AgentPerformanceReport` | one each |
+| `operationId: getAgentPerformanceReport` | `get{Emergency,Staff,Equipment,Patient}AgentPerformanceReport` | one each |
+| `GET /workflows/{workflowId}` in equipment + patient | Patient's is now `/bed-workflows/{workflowId}`; Equipment keeps `/workflows/{workflowId}` | **interim — see below** |
+| `Bed` — two different shapes | Equipment keeps `Bed` (the physical frame); Patient's is `AdmissionBed` (adds `availability` and `occupied_by_admission_id` from `BedAssignment`) | M3 / M4 |
+| `WorkflowSummary`, `WorkflowAccepted` | Patient's are `BedWorkflowSummary` / `BedWorkflowAccepted` | M4 |
+| `PagedResult` — staff had `total_count` | `total_items` in all four, and `required` on all four | group-owned type |
+| `staff-spec.yaml` did not validate | Fixed — the `LeaveReport` description containing a comma is now quoted, exactly the trap `CLAUDE.md` warns about | M2 |
 
-*Resolved:* `Doctor` is a Staff Management role — M4 only checks the JWT claim. Bed ownership split agreed (§6.1). No SMS integration; the group's Maps API covers the third-party requirement. `emergency-spec.yaml` is no longer the 212-byte stub — see §22–§26 for what it now publishes, including the dispatch notification, `patient_is_caller` and `caller_user_id` that §10 was waiting on.
+**Still open, deliberately:** `/bed-workflows/{workflowId}` is an **interim name**, not a
+claim. §11.2 has not been settled, and once the group decides who owns the agent-workflow
+tables this should collapse into **one** shared workflow endpoint rather than one per
+component. Renaming was done only to stop the route clash from crashing startup.
+
+**The rule that keeps this cleared:** the four specs describe one ASP.NET application, so
+routes, `operationId`s and schema names are global. Before adding any of the three, check
+it does not already exist in another spec. A shared name is fine *only* if the definition
+is byte-identical — currently `PagedResult`, `ProblemDetails`, `ValidationProblemDetails`,
+`AuditFields` and `BedCondition`. CI should run the uniqueness sweep so this cannot
+silently regress.
+
+*Also resolved:* `Doctor` is a Staff Management role — M4 only checks the JWT claim. Bed ownership split agreed (§6.1). No SMS integration; the group's Maps API covers the third-party requirement. `emergency-spec.yaml` is no longer the 212-byte stub — see §22–§26 for what it now publishes, including the dispatch notification, `patient_is_caller` and `caller_user_id` that §10 was waiting on.
 
 ---
 

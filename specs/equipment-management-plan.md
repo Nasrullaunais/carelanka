@@ -409,7 +409,7 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 | `GET` | `/api/reports/pharmacy-consumption` | Inventory Administrator | Usage by item over a date range |
 | `GET` | `/api/reports/maintenance-compliance` | Inventory Administrator | On-time vs overdue completion rate |
 | `GET` | `/api/reports/equipment-utilization` | Inventory Administrator | Items per category/ward, time spent `maintenance` |
-| `GET` | `/api/reports/agent-performance` | Inventory Administrator | Warnings raised, auto-approved vs manager-approved vs rejected |
+| `GET` | `/api/reports/equipment/agent-performance` | Inventory Administrator | Warnings raised, auto-approved vs manager-approved vs rejected |
 
 ---
 

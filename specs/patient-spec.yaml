@@ -674,7 +674,7 @@ paths:
                     properties:
                       items:
                         type: array
-                        items: { $ref: '#/components/schemas/Bed' }
+                        items: { $ref: '#/components/schemas/AdmissionBed' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /beds/{id}/occupancy:
@@ -720,7 +720,7 @@ paths:
         Roles: WardNurse, DutyManager.
 
         Agent entry point. Starts the workflow and returns immediately with a `workflow_id`;
-        poll `/workflows/{workflowId}` for progress.
+        poll `/bed-workflows/{workflowId}` for progress.
 
         What the agent does, in order: reads the admission's requirements, lists candidate beds,
         discards every bed failing a hard rule, ranks the survivors on soft rules, and proposes
@@ -745,7 +745,7 @@ paths:
           description: Workflow started
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/WorkflowAccepted' }
+              schema: { $ref: '#/components/schemas/BedWorkflowAccepted' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -760,7 +760,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
-  /workflows/{workflowId}:
+  /bed-workflows/{workflowId}:
     parameters:
       - name: workflowId
         in: path
@@ -778,13 +778,13 @@ paths:
         `rationale` is a short human-readable summary shown in React. The model's raw internal
         reasoning is NOT stored - the assignment requires persisting only the workflow state the
         design needs, not hidden reasoning.
-      operationId: getWorkflow
+      operationId: getBedWorkflow
       responses:
         '200':
           description: Execution summary
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/WorkflowSummary' }
+              schema: { $ref: '#/components/schemas/BedWorkflowSummary' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -1398,7 +1398,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
-  /reports/agent-performance:
+  /reports/patient/agent-performance:
     get:
       tags: [Reports]
       summary: How well the bed agent is doing
@@ -1411,7 +1411,7 @@ paths:
         This is the agent's own observability, which the assignment asks for by name. It is also
         the honest answer to "how do you know your agent is any good?" - a rejection rate is
         evidence; a demo that went well is not.
-      operationId: getAgentPerformanceReport
+      operationId: getPatientAgentPerformanceReport
       parameters:
         - name: from
           in: query
@@ -1426,7 +1426,7 @@ paths:
           description: Agent performance
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/AgentPerformanceReport' }
+              schema: { $ref: '#/components/schemas/PatientAgentPerformanceReport' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -1905,7 +1905,7 @@ components:
             workflows:
               type: array
               description: Every agent run for this admission.
-              items: { $ref: '#/components/schemas/WorkflowSummary' }
+              items: { $ref: '#/components/schemas/BedWorkflowSummary' }
             discharge:
               allOf:
                 - $ref: '#/components/schemas/Discharge'
@@ -1953,7 +1953,7 @@ components:
           type: boolean
           description: The direct answer for Equipment. False while a patient is in the bed or a live hold stands.
 
-    Bed:
+    AdmissionBed:
       description: |
         A bed as this component sees it. `id`, `ward_id`, `bed_number`, `has_isolation`,
         `nurse_station_distance` and `condition` are read from Equipment Management's register
@@ -2044,15 +2044,15 @@ components:
                 - $ref: '#/components/schemas/ReleaseReason'
               nullable: true
 
-    WorkflowAccepted:
+    BedWorkflowAccepted:
       type: object
       properties:
         workflow_id: { type: string, format: uuid }
         admission_id: { type: string, format: uuid }
         status: { type: string, example: running }
-        poll_url: { type: string, example: /api/workflows/3fa85f64-5717-4562-b3fc-2c963f66afa6 }
+        poll_url: { type: string, example: /api/bed-workflows/3fa85f64-5717-4562-b3fc-2c963f66afa6 }
 
-    WorkflowSummary:
+    BedWorkflowSummary:
       type: object
       description: |
         Persisted agent execution state: id, objective, plan, completed steps, tool calls,
@@ -2228,7 +2228,7 @@ components:
         average_days: { type: number, format: float }
         median_days: { type: number, format: float }
 
-    AgentPerformanceReport:
+    PatientAgentPerformanceReport:
       type: object
       properties:
         from: { type: string, format: date }

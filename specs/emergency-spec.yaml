@@ -1545,9 +1545,9 @@ paths:
         the argument that the agent is genuinely useful; a low one says the
         dispatcher is doing the thinking anyway.
 
-        Namespaced as `/reports/emergency/...` deliberately — the other three specs
-        all declared a bare `/reports/agent-performance`, a collision already flagged
-        in `integration_of_functions.md` §11.6. This spec does not add a fourth.
+        Namespaced as `/reports/emergency/...`. All four components report on their
+        own agent, so all four namespace the route this way — see
+        `integration_of_functions.md` §11.6.
       operationId: getEmergencyAgentPerformanceReport
       parameters:
         - name: from
@@ -2305,10 +2305,7 @@ components:
 
     PagedResult:
       type: object
-      description: |
-        Uses `total_items`, matching Equipment's and Patient's specs rather than
-        Staff's `total_count` — see the open note in `integration_of_functions.md`
-        §11.6.
+      required: [page, page_size, total_items, total_pages]
       properties:
         page: { type: integer }
         page_size: { type: integer }

@@ -457,7 +457,7 @@ The patient response is a **different DTO**, not a filtered one. It cannot leak 
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/reports/occupancy` | Manager, Admin | Bed occupancy over a date range, by ward |
 | `GET` | `/api/reports/length-of-stay` | Manager, Admin | Average stay by category and ward |
-| `GET` | `/api/reports/agent-performance` | Manager | Approved vs rejected vs overridden agent proposals, and average time to approval |
+| `GET` | `/api/reports/patient/agent-performance` | Manager | Approved vs rejected vs overridden agent proposals, and average time to approval |
 
 That last one is the agent's own observability, which the assignment explicitly asks for.
 

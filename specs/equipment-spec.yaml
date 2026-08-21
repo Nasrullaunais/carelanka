@@ -1118,7 +1118,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
-  /reports/agent-performance:
+  /reports/equipment/agent-performance:
     get:
       tags: [Reports]
       summary: How well the Equipment Monitoring Agent is doing
@@ -1142,7 +1142,7 @@ paths:
           description: Agent performance
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/AgentPerformanceReport' }
+              schema: { $ref: '#/components/schemas/EquipmentAgentPerformanceReport' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -1675,7 +1675,7 @@ components:
         assigned: { type: integer }
         maintenance_days_last_30: { type: number, format: float }
 
-    AgentPerformanceReport:
+    EquipmentAgentPerformanceReport:
       type: object
       properties:
         from: { type: string, format: date }

@@ -1047,9 +1047,12 @@ paths:
       description: |
         Roles: Patient.
 
-        Deliberately NOT an appointment booking. No doctor calendars, no time slots, no
-        rescheduling - that is a component-sized feature and this project does not have room for
-        it. This gets the useful part: the record is complete before the person walks in.
+        Details only - this does not book a date. `POST /me/appointments` is the booking.
+        Use this when a patient wants their record complete ahead of an unscheduled visit,
+        or to fill in details after booking.
+
+        Neither endpoint brings in doctor calendars, time slots or availability search. That
+        is the component-sized part, and it stays out of scope.
 
         Matches on NIC first. An existing record is linked to the account rather than duplicated,
         which is what stops the signup form creating the second identity that would otherwise
@@ -1122,6 +1125,212 @@ paths:
                         items: { $ref: '#/components/schemas/MyAdmission' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+
+  /me/appointments:
+    post:
+      tags: [Patient Self-Service]
+      summary: Book a visit
+      description: |
+        Roles: Patient.
+
+        Creates an `Appointment` for a date and time the patient intends to come in. This is
+        the booking half that `/me/pre-register` deliberately left out, and it is what makes
+        the mobile app's date/time picker a real device feature rather than a decoration.
+
+        Still deliberately narrow: **no doctor calendars, no time slots, no availability
+        search, no rescheduling.** The patient states when they intend to arrive; the desk
+        sees them on a worklist. Everything that made full appointment scheduling a
+        component-sized feature stays out of scope. Rescheduling is cancel and rebook.
+
+        One open appointment at a time, which stops the app being used to hold several
+        speculative slots.
+      operationId: bookMyAppointment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookAppointmentRequest' }
+      responses:
+        '201':
+          description: Booked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyAppointment' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: You already have an open appointment, or an open admission.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+    get:
+      tags: [Patient Self-Service]
+      summary: Your visits
+      description: |
+        Roles: Patient. Resolved from the JWT - a patient cannot pass someone else's id.
+
+        Returns `MyAppointment`, a separate narrow shape for the same reason `MyAdmission`
+        is one: a filtered staff object leaks the first time somebody adds a field and
+        forgets the filter.
+      operationId: listMyAppointments
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Your visits, upcoming and past
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/MyAppointment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /me/appointments/{id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Patient Self-Service]
+      summary: Cancel your own visit
+      description: |
+        Roles: Patient, and only their own appointment - the id is checked against the JWT,
+        never trusted from the path.
+
+        Only a `scheduled` appointment can be cancelled. Once staff have checked the patient
+        in it is an admission, and cancelling an admission is a staff action with its own
+        rules.
+      operationId: cancelMyAppointment
+      responses:
+        '200':
+          description: Cancelled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyAppointment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Already checked in, completed or cancelled.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  # ------------------------------------------------------------------
+  # Appointments - staff side
+  # ------------------------------------------------------------------
+
+  /appointments:
+    get:
+      tags: [Admissions]
+      summary: Expected visits worklist
+      description: |
+        Roles: WardNurse, DutyManager.
+
+        Who is expected in, so the desk knows before they walk up. This is the React screen
+        a nurse works from; the patient's own view of the same booking is
+        `GET /me/appointments`, and the two are deliberately different shapes.
+      operationId: listAppointments
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: date
+          in: query
+          schema: { type: string, format: date }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/AppointmentStatus' }
+      responses:
+        '200':
+          description: Expected visits
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/Appointment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Admissions]
+      summary: Book a visit on a patient's behalf
+      description: |
+        Roles: WardNurse, DutyManager.
+
+        The desk equivalent of `POST /me/appointments`, for someone who phoned in or walked
+        up without the app. Records `booked_by_staff_id`; that field is null for a
+        self-booking, which is how the two paths stay tellable apart afterwards.
+      operationId: createAppointment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateAppointmentRequest' }
+      responses:
+        '201':
+          description: Booked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Appointment' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: That patient already has an open appointment or admission.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /appointments/{id}/check-in:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Admissions]
+      summary: Check in an expected patient
+      description: |
+        Roles: WardNurse for outpatient, day_case and inpatient. DutyManager for ICU and HDU.
+
+        **Business op.** Turns an `Appointment` into an `Admission` with
+        `source = pre_registered`, in one transaction: the appointment moves to `checked_in`
+        and the admission is created.
+
+        The care level is set here, by the staff member checking them in - not by the patient
+        at booking time and not by the agent. Same rule every other admission path follows,
+        and `category_set_by_staff_id` records who chose it.
+
+        From this point the admission behaves like any other: it needs a bed, so the bed
+        agent runs on it exactly as it would for a walk-in.
+      operationId: checkInAppointment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CheckInRequest' }
+      responses:
+        '201':
+          description: Admission created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Admission' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Already checked in, cancelled, or the patient has an open admission.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   # ------------------------------------------------------------------
   # Reports
@@ -1305,6 +1514,93 @@ components:
         The care level. Set by clinical staff, never by an AI agent. Ordered most to least
         intensive; the downgrade ladder walks icu -> hdu -> inpatient.
       enum: [icu, hdu, inpatient, day_case, outpatient]
+
+    AppointmentStatus:
+      type: string
+      description: |
+        `checked_in` is terminal for the appointment - from there the record of what happens
+        next is the `Admission`, not this row.
+      enum: [scheduled, checked_in, completed, cancelled, no_show]
+
+    Appointment:
+      description: A booked visit, as staff see it.
+      allOf:
+        - $ref: '#/components/schemas/AuditFields'
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            patient: { $ref: '#/components/schemas/PatientSummary' }
+            scheduled_at: { type: string, format: date-time }
+            status: { $ref: '#/components/schemas/AppointmentStatus' }
+            reason:
+              type: string
+              nullable: true
+              description: |
+                Free text, written by whoever booked. Displayed to staff and never read by
+                the bed agent - free text stays data, never instructions.
+            booked_by_staff_id:
+              type: string
+              format: uuid
+              nullable: true
+              description: Null for a self-booking from the patient app.
+            admission_id:
+              type: string
+              format: uuid
+              nullable: true
+              description: Set once checked in.
+
+    MyAppointment:
+      type: object
+      description: |
+        What a patient may see about their own booking. A separate shape, not a filtered
+        staff object - same reasoning as `MyAdmission`.
+      properties:
+        appointment_id: { type: string, format: uuid }
+        scheduled_at: { type: string, format: date-time }
+        status: { $ref: '#/components/schemas/AppointmentStatus' }
+        status_text:
+          type: string
+          description: Plain-language wording, e.g. "Booked for Tuesday 3 March, 10:00".
+        reason: { type: string, nullable: true }
+        can_cancel:
+          type: boolean
+          description: True only while `scheduled`. Saves the app re-implementing the rule.
+
+    BookAppointmentRequest:
+      type: object
+      required: [scheduled_at]
+      properties:
+        scheduled_at:
+          type: string
+          format: date-time
+          description: When the patient intends to come in. Must be in the future.
+        reason:
+          type: string
+          nullable: true
+          description: Optional free text, for the desk to read. Never read by the agent.
+
+    CreateAppointmentRequest:
+      type: object
+      required: [patient_id, scheduled_at]
+      properties:
+        patient_id: { type: string, format: uuid }
+        scheduled_at: { type: string, format: date-time }
+        reason: { type: string, nullable: true }
+
+    CheckInRequest:
+      type: object
+      required: [admission_category, category_set_by_staff_id, urgency]
+      properties:
+        admission_category: { $ref: '#/components/schemas/AdmissionCategory' }
+        category_set_by_staff_id:
+          type: string
+          format: uuid
+          description: The staff member who chose the care level at the desk. Recorded proof a human decided it.
+        urgency: { $ref: '#/components/schemas/AdmissionUrgency' }
+        is_infectious:
+          type: boolean
+          default: false
+          description: Set by staff. Forces an isolation-capable bed.
 
     AdmissionUrgency:
       type: string

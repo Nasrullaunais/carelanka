@@ -1,8 +1,2348 @@
 openapi: 3.0.3
+
 info:
   title: CareLanka - Emergency Service API
-  description: Owned by Member 1. Covers EmergencyCall, Ambulance, Dispatch, RouteLog.
-  version: 0.1.0
-paths: {}
+  description: |
+    Owned by Member 1. Covers EmergencyCall, Ambulance, Dispatch, DispatchCrew,
+    RouteLog.
+
+    Answers four questions: someone needs an ambulance, who is it for and where are
+    they; which ambulance goes; how does the crew get there and back; and what
+    happened once they arrived.
+
+    **The line this component does not cross.** Emergency owns the call, the
+    ambulance register and the dispatch. It does not decide a patient's care
+    category, find a bed, or admit anyone — Patient Management does, once this
+    component tells them a dispatch happened (`integration_of_functions.md` §22).
+    It does not own ward staffing (Staff Management, §23) or any tracked equipment
+    (ambulances carry none — `docs/entity_diagram.md` Decisions 9, 14 — so there is
+    no boundary with Equipment Management at all, §24).
+
+    **The agentic workflow.** The Dispatch & Routing Agent proposes an ambulance, a
+    route (via the maps API) and a destination ward. **Nothing it proposes is ever
+    applied without a human.** There are two gates, sized to the decision:
+
+    - **Confirm** (`POST /dispatch-proposals/{id}/confirm`) — the routine case. A
+      free ambulance is available, the agent has already ranked it, and the
+      dispatcher taps once. Seconds, not a review meeting.
+    - **Approve** (`POST /dispatch-proposals/{id}/approve`) — the diversion case.
+      Every ambulance is committed, and the only way to serve a critical call is to
+      turn one around that is still driving to a lower-priority call. The Duty
+      Manager sees exactly what it costs the other patient before deciding.
+
+    **A diversion can only touch an ambulance that has not yet reached its patient.**
+    Once a crew is `at_scene` or `transporting`, that ambulance is untouchable — no
+    proposal, no manual override, no exceptions. See `DiversionImpact` and the
+    `source_dispatch_still_pre_pickup` validation check.
+
+    **Third-party integration.** The maps/routing API is this component's, and it
+    covers the assignment's §11 requirement for the whole system — ETA ranking
+    (`get_route`), the stored `RouteLog`, and turn-by-turn navigation handed to the
+    crew's phone (`GET /me/dispatches/{id}/navigation`).
+
+    **Schema** is in `docs/entity_diagram.md` (Rev 2.4 for this component's fields).
+    **Cross-component boundaries** are in `integration_of_functions.md` §22–§26.
+    **Design rationale** is in `emergency-management-plan.md`.
+
+    **Open items carried by this spec**
+
+    - `CallStatus`, `DispatchStatus` and `AmbulanceStatus` all carry an
+      `en_route`-shaped state with nothing forcing the three to agree
+      (`docs/entity_diagram.md` Open Decision 7). Not resolved here.
+    - `Dispatch.destination_ward_id` is nullable — the dispatch is created the moment
+      the dispatcher confirms, but the destination ward is only settled once the
+      agent's ward step has read Patient Management's capacity.
+    - Agent workflow tables are group-owned and undecided
+      (`integration_of_functions.md` §11.2). This spec defines only the
+      dispatch-specific approval surface and links to the shared workflow by
+      `workflow_id`.
+    - `docs/CareLanka_Component_Plan.md` §4.1 previously described the routine
+      dispatch as happening with no human involved. This spec adds the one-tap
+      confirm gate instead. **Needs group confirmation** — see
+      `emergency-management-plan.md` §14.
+    - Report routes are namespaced (`/reports/emergency/...`) and `PagedResult` uses
+      `total_items`, both deliberately, to avoid the collisions already recorded in
+      `integration_of_functions.md` §11.6 rather than adding a fourth case to them.
+      `AgentPerformanceReport`, `ValidationResult` and `ToolCall` are named
+      `EmergencyAgentPerformanceReport`, `DispatchValidationResult` and
+      `DispatchToolCall` for the same reason.
+  version: 0.2.0
+  contact:
+    name: Member 1 - Emergency Service
+
+servers:
+  - url: /api
+    description: Shared CareLanka ASP.NET Core Web API
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Calls
+    description: The emergency call intake. One row per call, from ring to outcome.
+  - name: Ambulances
+    description: The vehicle register, live position and service history.
+  - name: Dispatch Agent
+    description: Dispatch & Routing Agent proposals, deterministic validation, and the two human gates.
+  - name: Dispatches
+    description: An ambulance assigned to a call — its crew, its route, and diversions.
+  - name: My Run
+    description: What a logged-in ambulance crew member sees and does about their own run. Flutter.
+  - name: My Calls
+    description: What a patient may see about an emergency call they raised. Flutter, read-only.
+  - name: Reports
+    description: Response times, fleet utilisation and agent performance. React dashboards.
+  - name: Integration
+    description: Read-only surfaces the other three components depend on.
+
+paths:
+
+  # ------------------------------------------------------------------
+  # Calls
+  # ------------------------------------------------------------------
+
+  /emergency-calls:
+    post:
+      tags: [Calls]
+      summary: Log an emergency call
+      description: |
+        Roles: any authenticated user, including the Patient role. Also used by staff
+        logging a call at the front desk for someone with no phone or app.
+
+        This is the endpoint Patient Management's "I need an ambulance" screen posts
+        to (`integration_of_functions.md` §4.1, §22) — the screen is theirs, the call
+        record and everything downstream is ours.
+
+        `patient_is_caller` is the field that matters most on this whole request. It
+        is asked once, by the caller, because they are best placed to answer it —
+        guessing later risks filing one person's emergency under another person's
+        medical record. When `true`, `patient_id` should be supplied if known. When
+        `false`, the caller becomes the new patient's emergency contact once Patient
+        Management creates that record.
+
+        Creating a call automatically raises a dispatch proposal, so the dispatcher
+        has something to confirm within seconds rather than having to ask for it.
+        The proposal id comes back on the response.
+      operationId: createEmergencyCall
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateEmergencyCallRequest' }
+      responses:
+        '201':
+          description: Created, status `received`, with a dispatch proposal already raised
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmergencyCallDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+    get:
+      tags: [Calls]
+      summary: Search emergency calls
+      description: |
+        Roles: DutyManager, AmbulanceCrew.
+
+        The live call board, and the historical search behind it. Default sort is
+        priority then age, so the most urgent open call is always first.
+      operationId: listEmergencyCalls
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/CallStatus' }
+        - name: priority
+          in: query
+          schema: { $ref: '#/components/schemas/CallPriority' }
+        - name: search
+          in: query
+          description: Matches caller name, caller phone or the free-text details.
+          schema: { type: string }
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - name: unassignedOnly
+          in: query
+          description: Only calls with no live dispatch. The dispatcher's "who still needs help" filter.
+          schema: { type: boolean, default: false }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [priority, created_at, status]
+            default: priority
+        - $ref: '#/components/parameters/SortDir'
+      responses:
+        '200':
+          description: A page of calls
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/EmergencyCallSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /emergency-calls/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Calls]
+      summary: Get one call with its dispatch history
+      description: |
+        Roles: DutyManager, AmbulanceCrew, or the caller themselves.
+
+        Carries **every** dispatch raised against this call, not just the live one —
+        a diverted-and-replaced call has two, and the point of keeping both is that
+        the audit trail shows what actually happened rather than only the outcome.
+      operationId: getEmergencyCall
+      responses:
+        '200':
+          description: The call with its dispatches
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmergencyCallDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Calls]
+      summary: Update a call's details or priority
+      description: |
+        Roles: DutyManager.
+
+        Callers under stress give partial information, and the picture changes as
+        the dispatcher keeps them talking. Raising `priority` re-runs the agent so
+        the ranking reflects what is now known — a call upgraded to `critical` should
+        not keep waiting behind the queue it was placed in when it looked routine.
+      operationId: updateEmergencyCall
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateEmergencyCallRequest' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmergencyCallDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
+  /emergency-calls/{id}/link-patient:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Calls]
+      summary: Link a call to a patient record identified later
+      description: |
+        Roles: DutyManager, AmbulanceCrew.
+
+        **A business operation, not CRUD.** Most emergency calls start with nobody
+        knowing who the patient is — `patient_id` is null and Patient Management is
+        holding them as `UNKNOWN-2026-0142`. When a relative turns up with an ID card
+        an hour later, this is what stitches the call to the real person, so the run
+        appears in that patient's history instead of floating unattached forever.
+
+        Refuses if the call already names a different patient — correcting a
+        mis-linked call is a deliberate act, not a silent overwrite.
+      operationId: linkCallToPatient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [patient_id]
+              properties:
+                patient_id: { type: string, format: uuid }
+                notes: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Linked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmergencyCall' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This call is already linked to a different patient.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /emergency-calls/{id}/outcome:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Calls]
+      summary: Record the call outcome
+      description: |
+        Roles: DutyManager, AmbulanceCrew.
+
+        Set once the crew has handed the patient over, or the call resolved without
+        transport. Moves the call to `completed` and closes the response-time clock
+        the reports measure.
+      operationId: recordEmergencyCallOutcome
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [outcome]
+              properties:
+                outcome: { type: string, maxLength: 1000 }
+                transported: { type: boolean, default: true }
+      responses:
+        '200':
+          description: Outcome recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmergencyCall' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
+  /emergency-calls/{id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Calls]
+      summary: Cancel a call
+      description: |
+        Roles: DutyManager.
+
+        A false alarm, a caller who hung up, or a patient taken by someone else. Any
+        live `Dispatch` against this call is cancelled in the same transaction and
+        the ambulance returns to `available` — which usually makes it the best
+        candidate for whatever is waiting, so the agent re-runs for open calls.
+      operationId: cancelEmergencyCall
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Cancelled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmergencyCall' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
+  # ------------------------------------------------------------------
+  # Ambulances
+  # ------------------------------------------------------------------
+
+  /ambulances:
+    get:
+      tags: [Ambulances]
+      summary: Search ambulances
+      description: |
+        Roles: DutyManager, AmbulanceCrew.
+
+        The fleet board. `nearTo` sorts by distance from a point using the maps API,
+        which is how the dispatcher answers "what is actually close to this street"
+        without reading coordinates off a screen.
+      operationId: listAmbulances
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/AmbulanceStatus' }
+        - name: search
+          in: query
+          description: Matches registration number.
+          schema: { type: string }
+        - name: nearToLatitude
+          in: query
+          schema: { type: number, format: double }
+        - name: nearToLongitude
+          in: query
+          schema: { type: number, format: double }
+        - name: includeRetired
+          in: query
+          schema: { type: boolean, default: false }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [registration_number, status, distance]
+            default: registration_number
+        - $ref: '#/components/parameters/SortDir'
+      responses:
+        '200':
+          description: A page of ambulances
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/AmbulanceSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Ambulances]
+      summary: Register an ambulance
+      description: |
+        Roles: DutyManager.
+
+        Registration number is unique among *active* vehicles. Re-commissioning a
+        retired ambulance reuses its row via `POST /ambulances/{id}/reinstate` rather
+        than creating a second one, so its dispatch history stays in one place.
+      operationId: createAmbulance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateAmbulanceRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ambulance' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: An active ambulance already uses this registration number.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /ambulances/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Ambulances]
+      summary: Get one ambulance with its current run
+      description: 'Roles: DutyManager, AmbulanceCrew.'
+      operationId: getAmbulance
+      responses:
+        '200':
+          description: The ambulance
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AmbulanceDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Ambulances]
+      summary: Update an ambulance's status or registration
+      description: |
+        Roles: DutyManager, or AmbulanceCrew for their own assigned vehicle.
+
+        Moving to `out_of_service` is refused while the ambulance is on a live
+        dispatch — a breakdown mid-run is handled by diverting the *call* to another
+        vehicle (`POST /dispatches/{id}/divert`), not by quietly marking the
+        ambulance unavailable and leaving the patient with nobody coming.
+      operationId: updateAmbulance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { $ref: '#/components/schemas/AmbulanceStatus' }
+                registration_number: { type: string, maxLength: 20 }
+                out_of_service_reason: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ambulance' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Still on a live dispatch. Divert the call first.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /ambulances/{id}/retire:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Ambulances]
+      summary: Retire an ambulance
+      description: |
+        Roles: DutyManager.
+
+        A soft delete. The row stays because dispatches, route logs and audit entries
+        reference it — hard deletion would either destroy that history or be refused
+        by the database (`docs/entity_diagram.md`, `Ambulance extends
+        SoftDeletableEntity`). Refuses while the vehicle is on a live dispatch.
+      operationId: retireAmbulance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 500 }
+      responses:
+        '204': { description: Retired }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Still on a live dispatch.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /ambulances/{id}/reinstate:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Ambulances]
+      summary: Bring a retired ambulance back into service
+      description: |
+        Roles: DutyManager.
+
+        Reuses the original row so the vehicle's history stays in one place. Fails if
+        another active ambulance has since taken its registration number.
+      operationId: reinstateAmbulance
+      responses:
+        '200':
+          description: Reinstated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ambulance' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The registration number is now in use by an active ambulance.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /ambulances/{id}/location:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Ambulances]
+      summary: Report the ambulance's current position
+      description: |
+        Roles: AmbulanceCrew, their assigned vehicle only.
+
+        Posted from the crew's phone GPS while a run is active. Current position
+        only, no history kept (`docs/entity_diagram.md`, Decision 9) — this
+        overwrites `current_latitude`/`current_longitude` rather than appending a row,
+        which is why the fleet map shows where everyone *is* and not where they have
+        been.
+      operationId: reportAmbulanceLocation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [latitude, longitude]
+              properties:
+                latitude: { type: number, format: double, minimum: -90, maximum: 90 }
+                longitude: { type: number, format: double, minimum: -180, maximum: 180 }
+      responses:
+        '204': { description: Recorded }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /ambulances/{id}/dispatch-history:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Ambulances]
+      summary: Every run this ambulance has been on
+      description: |
+        Roles: DutyManager.
+
+        Paged history, newest first — the evidence behind the fleet-utilisation
+        report, and what a manager reads when one vehicle seems to be doing all the
+        work.
+      operationId: getAmbulanceDispatchHistory
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of dispatches
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/DispatchSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ------------------------------------------------------------------
+  # Dispatch Agent
+  # ------------------------------------------------------------------
+
+  /dispatch-proposals:
+    get:
+      tags: [Dispatch Agent]
+      summary: List dispatch proposals
+      description: |
+        Roles: DutyManager, AmbulanceCrew.
+
+        The React dispatcher screen. `pending_confirmation` is the one-tap queue;
+        `pending_approval` is the diversion queue that needs reading properly. They
+        are deliberately the same list with a status filter, because a dispatcher
+        should see everything waiting on them in one place.
+      operationId: listDispatchProposals
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/DispatchProposalStatus' }
+        - name: emergencyCallId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: isDiversion
+          in: query
+          schema: { type: boolean }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of proposals
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/DispatchProposalSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Dispatch Agent]
+      summary: Ask the Dispatch & Routing Agent to plan a dispatch
+      description: |
+        Roles: DutyManager, AmbulanceCrew. Also raised automatically the moment a
+        call is created, so this endpoint is mainly for re-running the plan — after
+        a cancellation freed a vehicle, or after the call's priority was raised.
+
+        **The objective.** "Find the best ambulance and destination ward for this
+        call."
+
+        **What the agent plans** (`emergency-management-plan.md` §6): list available
+        ambulances, rank them by real ETA through the maps API rather than
+        straight-line distance, read Patient Management's ward capacity, and produce
+        one recommendation with its reasoning attached.
+
+        **Allow-listed tools only**, all read-only: `list_available_ambulances`
+        (ours), `get_route` (the maps API), `get_active_dispatches` (ours),
+        `get_ward_capacity` (Patient Management's `GET /capacity/wards`). The agent
+        has **no write access to any table** — it cannot dispatch anything itself.
+
+        **Then deterministic validation runs.** Ordinary C#, not the agent checking
+        its own work. Every proposal is checked; a diversion proposal is additionally
+        checked against the pre-pickup rule, and one that fails never reaches a human.
+
+        **Where it lands:**
+
+        - A free ambulance exists → `pending_confirmation`. One tap sends it.
+        - No free ambulance, but one is still driving to a lower-priority call →
+          `pending_approval` with a populated `diversion_impact`.
+        - Nothing at all → `failed`, outcome `no_ambulance_available`. Recorded
+          honestly rather than retried in a loop.
+      operationId: createDispatchProposal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [emergency_call_id]
+              properties:
+                emergency_call_id: { type: string, format: uuid }
+                allow_diversion:
+                  type: boolean
+                  default: true
+                  description: |
+                    When false the agent may only propose genuinely free ambulances,
+                    never turn one around. Useful when every crew is already stretched.
+                exclude_ambulance_ids:
+                  type: array
+                  items: { type: string, format: uuid }
+      responses:
+        '202':
+          description: Accepted. The proposal is planning; poll it or wait for the notification.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DispatchProposalSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This call already has an open proposal or a live dispatch.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /dispatch-proposals/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Dispatch Agent]
+      summary: Get a proposal with its plan, validation and reasoning
+      description: |
+        Roles: DutyManager, AmbulanceCrew.
+
+        The observability surface (assignment §9.1). Carries the objective, the
+        plan steps, the tool calls with timings, the deterministic validation result
+        per check, any errors, the retry count, and — on a diversion — the
+        `diversion_impact` block the approver actually reads.
+
+        `workflow_id` links to the shared agent-workflow record
+        (`GET /workflows/{workflowId}`), which is group-owned — see
+        `integration_of_functions.md` §11.2, §26.
+      operationId: getDispatchProposal
+      responses:
+        '200':
+          description: The proposal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DispatchProposalDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /dispatch-proposals/{id}/confirm:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Dispatch Agent]
+      summary: Confirm a routine dispatch and send the ambulance
+      description: |
+        Roles: DutyManager, AmbulanceCrew.
+
+        **The light human gate — one tap, and the ambulance goes.** This is the
+        common path: the agent found a free ambulance, deterministic validation
+        already passed, and the dispatcher is confirming rather than deliberating.
+
+        It exists because *no agent output in CareLanka is applied without a human*,
+        and a dispatch is not the exception — but the gate is sized to the decision.
+        A dispatcher looking at a ranked recommendation with an ETA on it does not
+        need an approval form; they need one button. The alternative designs are both
+        worse: no gate at all means an AI moves an emergency vehicle on its own, and
+        a full review form costs a minute nobody has.
+
+        Validation is **re-run immediately before applying**, because the ambulance
+        that was free when the proposal was raised may have been sent elsewhere in
+        the meantime. A stale proposal is refused with 409 rather than applied on
+        facts that have changed.
+
+        Only a `pending_confirmation` proposal can be confirmed. A diversion is not
+        confirmable here — it goes through `/approve`, which shows the cost first.
+      operationId: confirmDispatchProposal
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                crew_staff_ids:
+                  type: array
+                  description: Optional. Assigns the crew in the same call, saving a round trip.
+                  items: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Confirmed and dispatched
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DispatchProposalDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: |
+            Either not in `pending_confirmation`, or re-validation failed because the
+            ambulance is no longer free. The body names the failed checks so the
+            screen can say "that ambulance just got sent to another call" and offer
+            a re-plan.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/DispatchRejectedProblem' }
+
+  /dispatch-proposals/{id}/approve:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Dispatch Agent]
+      summary: Approve a diversion and apply it
+      description: |
+        Roles: DutyManager only.
+
+        **The heavy human gate** (assignment §9.1) — reached only when the agent
+        wants to turn an ambulance around that is already driving to another call.
+        One patient waits longer so a more critical one is reached sooner, and that
+        is a judgement no agent makes alone.
+
+        The approver has already seen `diversion_impact` on the proposal: which call
+        loses its ambulance, that call's priority, how many extra minutes it will now
+        wait, and which vehicle is proposed to take it instead. **The original call is
+        never abandoned** — approving this creates the new dispatch *and* re-queues
+        the old call, in one transaction.
+
+        **The rule the code enforces, not the model:** an ambulance may only be
+        diverted while it is still driving to its patient (`en_route`). Once the crew
+        is `at_scene` or `transporting`, that ambulance is untouchable, and a
+        proposal naming it is refused here even if a human tries to approve it.
+
+        Re-validated immediately before applying — a diversion approved on a run that
+        has since reached its scene is refused with 409, not applied.
+      operationId: approveDispatchProposal
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes: { type: string, maxLength: 500 }
+                crew_staff_ids:
+                  type: array
+                  items: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Approved — new dispatch created and the original call re-queued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DispatchProposalDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: |
+            Not in `pending_approval`, or re-validation failed — most often because
+            the crew reached their patient while the proposal sat waiting, which
+            makes the diversion permanently illegal rather than merely stale.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/DispatchRejectedProblem' }
+
+  /dispatch-proposals/{id}/reject:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Dispatch Agent]
+      summary: Reject a proposal
+      description: |
+        Roles: DutyManager.
+
+        Nothing is applied and the call stays unassigned, so it keeps appearing in
+        the `unassignedOnly` board — rejecting a proposal does not make the emergency
+        go away, and the dispatcher is expected to assign manually or re-plan.
+
+        `reason` is required and feeds the agent-performance report: a proposal
+        rejected as `unsafe_diversion` is evidence the validator missed something.
+      operationId: rejectDispatchProposal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { $ref: '#/components/schemas/DispatchRejectionReason' }
+                notes: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Rejected
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DispatchProposalDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
+  # ------------------------------------------------------------------
+  # Dispatches
+  # ------------------------------------------------------------------
+
+  /dispatches:
+    get:
+      tags: [Dispatches]
+      summary: Search dispatches
+      description: |
+        Roles: DutyManager.
+
+        The live fleet board and the historical search behind it — every run, with
+        filters for what is happening right now versus what already finished.
+      operationId: listDispatches
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/DispatchStatus' }
+        - name: ambulanceId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: emergencyCallId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: activeOnly
+          in: query
+          description: Only `assigned` and `en_route` runs. The live board's default.
+          schema: { type: boolean, default: false }
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [dispatched_at, status]
+            default: dispatched_at
+        - $ref: '#/components/parameters/SortDir'
+      responses:
+        '200':
+          description: A page of dispatches
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/DispatchSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /dispatches/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Dispatches]
+      summary: Get a dispatch with its route and crew
+      description: |
+        Roles: DutyManager, AmbulanceCrew, or read by Patient Management / a future
+        orchestrator to check status without waiting on the push notification
+        (`integration_of_functions.md` §25).
+      operationId: getDispatch
+      responses:
+        '200':
+          description: The dispatch
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DispatchDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /dispatches/{id}/divert:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Dispatches]
+      summary: Divert this run to a different call, or hand it to a different ambulance
+      description: |
+        Roles: DutyManager.
+
+        **A business operation, not CRUD**, and the manual twin of the agent's
+        diversion proposal. Two real situations use it: a crew breaks down and their
+        call needs another vehicle, and a critical call comes in that the dispatcher
+        wants handled without waiting for the agent.
+
+        **The hard rule, enforced here in C# and not left to anyone's judgement:**
+        this refuses unless the dispatch is still `assigned` or `en_route`. A crew
+        that has reached their patient — `at_scene` or `transporting` — is never
+        diverted. Someone is in the back of that ambulance, or standing next to it
+        waiting to be. The 409 body names `patient_already_reached` so the screen can
+        explain *why* rather than showing a generic conflict.
+
+        Ends this dispatch as `reassigned` and creates the replacement in one
+        transaction. The original call is re-queued, never dropped.
+      operationId: divertDispatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                to_emergency_call_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: |
+                    Send this ambulance to a different call. Omit to keep the same
+                    call and only change the vehicle.
+                replacement_ambulance_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: |
+                    Which ambulance takes over the original call. Omit to let the
+                    agent re-plan it.
+                reason: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Diverted — the new dispatch is returned
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DispatchDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: |
+            The crew has already reached their patient, or the replacement ambulance
+            is not available. `block_reason` says which.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/DispatchRejectedProblem' }
+
+  /dispatches/{id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Dispatches]
+      summary: Cancel a dispatch
+      description: |
+        Roles: DutyManager.
+
+        The run is called off but the emergency call stays open — used when the
+        patient was taken by someone else, or the address turned out to be wrong.
+        The ambulance returns to `available`. To close the call itself, use
+        `POST /emergency-calls/{id}/cancel`.
+      operationId: cancelDispatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Cancelled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Dispatch' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
+  /dispatches/{id}/route:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Dispatches]
+      summary: Get the planned route for this run
+      description: |
+        Roles: DutyManager, AmbulanceCrew.
+
+        The stored `RouteLog` — what the maps API returned when the run was planned,
+        plus the actual departure and arrival timestamps once they exist. Drawing the
+        line on the React map view reads from here, so the map shows the route that
+        was actually planned rather than re-querying and getting a different answer
+        later.
+      operationId: getDispatchRoute
+      responses:
+        '200':
+          description: The route
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RouteLog' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /dispatches/{id}/crew:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Dispatches]
+      summary: Who is on this run
+      description: |
+        Roles: DutyManager, AmbulanceCrew.
+
+        Names come from Staff Management's `POST /staff/lookup` at read time
+        (`integration_of_functions.md` §18.1, §23) — we store only the staff id, so a
+        crew member who changes name or role never shows stale details here.
+      operationId: getDispatchCrew
+      responses:
+        '200':
+          description: The crew
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DispatchCrewMember' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Dispatches]
+      summary: Assign a crew member to this run
+      description: |
+        Roles: DutyManager.
+
+        Checks the person holds the `ambulance_crew` role on their JWT before
+        accepting — Staff Management owns who they are, we own who is on this run
+        (`docs/entity_diagram.md`, Decision 30).
+      operationId: assignDispatchCrew
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [staff_member_id]
+              properties:
+                staff_member_id: { type: string, format: uuid }
+      responses:
+        '201':
+          description: Assigned
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DispatchCrewMember' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Already on this run, or not an ambulance crew member.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /dispatches/{dispatchId}/crew/{staffMemberId}:
+    parameters:
+      - name: dispatchId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: staffMemberId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      tags: [Dispatches]
+      summary: Remove a crew member from this run
+      description: |
+        Roles: DutyManager.
+
+        Refuses to leave a live run with nobody on it — an ambulance `en_route` with
+        an empty crew list is a data state that should not exist.
+      operationId: removeDispatchCrew
+      responses:
+        '204': { description: Removed }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This would leave a live dispatch with no crew.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  # ------------------------------------------------------------------
+  # My Run (Flutter — ambulance crew)
+  # ------------------------------------------------------------------
+
+  /me/dispatches/active:
+    get:
+      tags: [My Run]
+      summary: My current run, if any
+      description: |
+        Roles: AmbulanceCrew.
+
+        The crew app's home screen. Scoped to the caller by their JWT via
+        `DispatchCrew`, never by a parameter — one crew member cannot read another's
+        run by changing an id.
+      operationId: getMyActiveDispatch
+      responses:
+        '200':
+          description: My active run, or null when off a job
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/DispatchDetail'
+                nullable: true
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /me/dispatches/history:
+    get:
+      tags: [My Run]
+      summary: My past runs
+      description: 'Roles: AmbulanceCrew. Scoped to the caller. Newest first.'
+      operationId: getMyDispatchHistory
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of my runs
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/DispatchSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /me/dispatches/{id}/status:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [My Run]
+      summary: Update my run's status
+      description: |
+        Roles: AmbulanceCrew, assigned to this dispatch only.
+
+        The four buttons on the crew's screen: **on my way**, **at the scene**,
+        **transporting**, **arrived**. Each one moves `Dispatch.status` and the
+        vehicle's own `AmbulanceStatus` together, in one transaction, so the fleet
+        board and the run never disagree.
+
+        **`at_scene` is the point of no return for diversions.** From here on this
+        ambulance cannot be turned around by anyone — the crew has reached their
+        patient. Tapping it is what makes that rule true in the data.
+      operationId: updateMyDispatchStatus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [en_route, at_scene, transporting, completed] }
+                latitude: { type: number, format: double, nullable: true }
+                longitude: { type: number, format: double, nullable: true }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Dispatch' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
+  /me/dispatches/{id}/navigation:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [My Run]
+      summary: Turn-by-turn navigation for my run
+      description: |
+        Roles: AmbulanceCrew, assigned to this dispatch only.
+
+        **The third-party integration, on the device** (assignment §11 and §8's
+        GPS/map device feature). Returns a live route from the crew's current
+        position to their next waypoint — the scene while `en_route`, the destination
+        ward once `transporting` — so the driver gets directions that update as they
+        move, rather than the fixed route stored at planning time.
+
+        Distinct from `GET /dispatches/{id}/route`, which returns the *planned*
+        `RouteLog` for the record and the React map.
+      operationId: getMyDispatchNavigation
+      parameters:
+        - name: fromLatitude
+          in: query
+          required: true
+          schema: { type: number, format: double }
+        - name: fromLongitude
+          in: query
+          required: true
+          schema: { type: number, format: double }
+      responses:
+        '200':
+          description: The live route
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NavigationRoute' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502':
+          description: The maps provider is unreachable. The crew still has the stored route.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /me/dispatches/{id}/handover:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [My Run]
+      summary: Hand over patient information on arrival
+      description: |
+        Roles: AmbulanceCrew, assigned to this dispatch only.
+
+        What the crew tells the receiving ward: condition on arrival, anything that
+        happened on the way, and — often the most valuable part — the patient's name
+        and contact details if a relative gave them at the scene, which is what lets
+        Patient Management close out an `UNKNOWN-2026-0142` record.
+
+        Distinct from `POST /emergency-calls/{id}/outcome`, which closes the whole
+        call once everything is finished.
+      operationId: recordHandover
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [notes]
+              properties:
+                notes: { type: string, maxLength: 1000 }
+                patient_condition: { type: string, maxLength: 500 }
+                identified_patient_name: { type: string, maxLength: 200, nullable: true }
+                identified_patient_phone: { type: string, maxLength: 20, nullable: true }
+      responses:
+        '200':
+          description: Recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DispatchDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ------------------------------------------------------------------
+  # My Calls (Flutter — patient, read-only)
+  # ------------------------------------------------------------------
+
+  /me/emergency-calls:
+    get:
+      tags: [My Calls]
+      summary: Emergency calls I raised
+      description: |
+        Roles: Patient.
+
+        Scoped to the caller by `caller_user_id` from the JWT. A patient sees only
+        calls they personally raised — including ones they raised *for someone else*,
+        because they are entitled to know what happened to a call they made, without
+        that giving them access to the other person's medical record.
+      operationId: getMyEmergencyCalls
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/CallStatus' }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of my calls
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/EmergencyCallSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /me/emergency-calls/{id}/tracking:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [My Calls]
+      summary: Track the ambulance coming to my call
+      description: |
+        Roles: Patient, the caller of this call only.
+
+        **"Where is it, and how long?"** — the single question somebody waiting on a
+        pavement actually has. Returns the ambulance's current position and live ETA
+        while the run is active, and nothing else.
+
+        **A deliberately narrow shape, not a filtered staff response.** No crew
+        names, no call notes, no other patients, no dispatch reasoning — the same
+        rule Patient Management applies to its own patient-facing endpoints
+        (`patient-management-plan.md` §2). Returns `404` once the run is complete,
+        because there is nothing left to track.
+      operationId: trackMyEmergencyCall
+      responses:
+        '200':
+          description: Live tracking
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyCallTracking' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ------------------------------------------------------------------
+  # Reports
+  # ------------------------------------------------------------------
+
+  /reports/emergency/response-times:
+    get:
+      tags: [Reports]
+      summary: Response times over a date range
+      description: |
+        Roles: DutyManager.
+
+        Two clocks, broken down by priority: call received to ambulance dispatched
+        (how fast we decide) and dispatched to arrival at scene (how fast we drive).
+        Separating them matters — a slow overall number caused by dispatcher
+        hesitation needs a completely different fix from one caused by traffic.
+      operationId: getEmergencyResponseTimeReport
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: priority
+          in: query
+          schema: { $ref: '#/components/schemas/CallPriority' }
+      responses:
+        '200':
+          description: The report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResponseTimeReport' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/emergency/fleet-utilisation:
+    get:
+      tags: [Reports]
+      summary: How hard each ambulance is working
+      description: |
+        Roles: DutyManager.
+
+        Runs, hours committed and idle share per vehicle. The number worth acting on
+        is the spread — one ambulance doing three times the runs of another usually
+        means it is parked somewhere central and the others are not, which is a
+        positioning problem rather than a fleet-size problem.
+      operationId: getFleetUtilisationReport
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: The report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FleetUtilisationReport' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/emergency/agent-performance:
+    get:
+      tags: [Reports]
+      summary: How well the Dispatch & Routing Agent is doing
+      description: |
+        Roles: DutyManager.
+
+        Evidence for the Agentic AI evaluation report (assignment §12). The honest
+        measures are `validation_failure_rate` — proposals ordinary C# had to catch
+        before a human saw them — and `confirmed_without_change_rate`, which says how
+        often the dispatcher simply agreed with the agent. A high agreement rate is
+        the argument that the agent is genuinely useful; a low one says the
+        dispatcher is doing the thinking anyway.
+
+        Namespaced as `/reports/emergency/...` deliberately — the other three specs
+        all declared a bare `/reports/agent-performance`, a collision already flagged
+        in `integration_of_functions.md` §11.6. This spec does not add a fourth.
+      operationId: getEmergencyAgentPerformanceReport
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: The report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmergencyAgentPerformanceReport' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
 components:
-  schemas: {}
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Shared JWT issued by the CareLanka API. Roles used by this component:
+        DutyManager, AmbulanceCrew. The Patient role may raise a call
+        (`POST /emergency-calls`) and read or track their own (`/me/emergency-calls`).
+
+        Self-service endpoints under `/me/dispatches` are scoped by the `sub` claim
+        via `DispatchCrew`, and `/me/emergency-calls` by `caller_user_id` — never by
+        a parameter, so nobody can read another person's run or call by changing an
+        id.
+
+  parameters:
+    PathId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    SortDir:
+      name: sortDir
+      in: query
+      schema: { type: string, enum: [asc, desc], default: desc }
+
+  responses:
+    BadRequest:
+      description: Validation failed
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ValidationProblemDetails' }
+    Unauthorized:
+      description: Missing or invalid token
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    Forbidden:
+      description: Authenticated, but this role may not do this
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    NotFound:
+      description: Not found
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    IllegalTransition:
+      description: |
+        Not a legal status change. The allowed moves are:
+
+        Call — received -> dispatched -> en_route -> completed;
+        received, dispatched or en_route -> cancelled. Nothing leaves completed.
+
+        Dispatch — assigned -> en_route -> completed;
+        assigned or en_route -> cancelled, reassigned.
+        at_scene and transporting are crew-reported sub-states of en_route and are
+        never divertible.
+
+        Dispatch proposal — pending -> pending_confirmation, pending_approval, failed;
+        pending_confirmation -> executed, rejected;
+        pending_approval -> approved, rejected; approved -> executed, failed.
+
+        Anything else is rejected here rather than silently allowed.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  schemas:
+
+    # ---------- enums ----------
+
+    CallPriority:
+      type: string
+      description: |
+        Set by the dispatcher from what the caller says, never by the agent — how
+        sick somebody is, is a clinical judgement, and this project is explicitly not
+        a diagnosis system (`docs/CareLanka_Component_Plan.md` §7).
+      enum: [critical, high, medium, low]
+
+    CallStatus:
+      type: string
+      enum: [received, dispatched, en_route, completed, cancelled]
+
+    AmbulanceStatus:
+      type: string
+      description: |
+        `at_scene` and `transporting` are the two states in which the vehicle is
+        **not divertible** — the crew has reached their patient.
+      enum: [available, dispatched, en_route, at_scene, transporting, out_of_service]
+
+    DispatchStatus:
+      type: string
+      description: |
+        `reassigned` never reuses this row for the replacement ambulance — a new
+        `Dispatch` is created and linked back through `emergency_call_id`, so the
+        audit trail shows both attempts rather than overwriting the first.
+      enum: [assigned, en_route, completed, cancelled, reassigned]
+
+    DispatchProposalStatus:
+      type: string
+      description: |
+        Mirrors `AgentWorkflowStatus` in `docs/entity_diagram.md`. Two waiting states
+        rather than one, because the two human gates are genuinely different sizes:
+        `pending_confirmation` is a one-tap send, `pending_approval` is a diversion
+        that needs reading. **There is no auto-approved state** — nothing this agent
+        proposes reaches the road without a person.
+      enum:
+        - pending
+        - pending_confirmation
+        - pending_approval
+        - approved
+        - executed
+        - rejected
+        - failed
+
+    DispatchOutcome:
+      type: string
+      description: |
+        What the agent concluded. `no_ambulance_available` is a legitimate, recorded
+        outcome — an honest "there is nothing to send" is more useful than a
+        suggestion that cannot be acted on.
+      enum:
+        - free_ambulance_proposed
+        - diversion_proposed
+        - no_ambulance_available
+        - failed
+
+    DispatchRejectionReason:
+      type: string
+      enum:
+        - unsafe_diversion
+        - source_call_too_urgent_to_divert
+        - ambulance_unsuitable
+        - handled_another_way
+        - no_longer_needed
+        - other
+
+    DiversionBlockReason:
+      type: string
+      description: |
+        Why a diversion was refused. `patient_already_reached` is the important one —
+        it is permanent, not a retry-in-a-moment condition, and the UI should say so.
+      enum:
+        - patient_already_reached
+        - ambulance_not_available
+        - source_call_higher_priority
+        - no_replacement_for_source_call
+
+    WardTypeHint:
+      type: string
+      description: |
+        Mirrors `WardType` in `docs/entity_diagram.md` / `patient-spec.yaml`. A
+        routing hint only — it never becomes `admission_category`, which clinical
+        staff set (`integration_of_functions.md` §7, §22).
+      enum: [icu, hdu, general, maternity, pediatric, isolation]
+
+    # ---------- calls ----------
+
+    EmergencyCall:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        patient_id: { type: string, format: uuid, nullable: true }
+        caller_user_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: The logged-in app user who placed the call, if any.
+        patient_is_caller:
+          type: boolean
+          description: Answered once, on the call screen. See `docs/entity_diagram.md` Rev 2.4.
+        caller_name: { type: string, nullable: true }
+        caller_phone: { type: string, nullable: true }
+        latitude: { type: number, format: double }
+        longitude: { type: number, format: double }
+        address_label:
+          type: string
+          nullable: true
+          description: Human-readable address from the maps API's reverse geocode, for the crew.
+        details: { type: string, nullable: true }
+        priority: { $ref: '#/components/schemas/CallPriority' }
+        status: { $ref: '#/components/schemas/CallStatus' }
+        outcome: { type: string, nullable: true }
+        transported: { type: boolean, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    EmergencyCallSummary:
+      type: object
+      description: List projection for the live call board and the patient's own list.
+      properties:
+        id: { type: string, format: uuid }
+        priority: { $ref: '#/components/schemas/CallPriority' }
+        status: { $ref: '#/components/schemas/CallStatus' }
+        caller_name: { type: string, nullable: true }
+        address_label: { type: string, nullable: true }
+        latitude: { type: number, format: double }
+        longitude: { type: number, format: double }
+        active_dispatch_id: { type: string, format: uuid, nullable: true }
+        open_proposal_id: { type: string, format: uuid, nullable: true }
+        waiting_minutes:
+          type: integer
+          description: Minutes since the call came in, while still unassigned. The board sorts on this.
+        created_at: { type: string, format: date-time }
+
+    EmergencyCallDetail:
+      allOf:
+        - $ref: '#/components/schemas/EmergencyCall'
+        - type: object
+          properties:
+            dispatches:
+              type: array
+              description: Every dispatch raised against this call, including superseded ones.
+              items: { $ref: '#/components/schemas/DispatchSummary' }
+            open_proposal_id: { type: string, format: uuid, nullable: true }
+
+    CreateEmergencyCallRequest:
+      type: object
+      required: [latitude, longitude, patient_is_caller]
+      properties:
+        patient_is_caller:
+          type: boolean
+          description: |
+            Asked once, on the call screen. True links to the caller's own record;
+            false means the person who is hurt is somebody else.
+        patient_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Set when patient_is_caller is true and the caller is identified.
+        caller_name: { type: string, maxLength: 200, nullable: true }
+        caller_phone: { type: string, maxLength: 20, nullable: true }
+        latitude: { type: number, format: double, minimum: -90, maximum: 90 }
+        longitude: { type: number, format: double, minimum: -180, maximum: 180 }
+        details: { type: string, maxLength: 1000, nullable: true }
+        priority:
+          allOf:
+            - $ref: '#/components/schemas/CallPriority'
+          description: |
+            Defaults to `high` when omitted, which is what the patient app sends —
+            somebody tapping the emergency button is not asked to triage themselves.
+            A dispatcher adjusts it with PATCH once they have spoken to the caller.
+
+    UpdateEmergencyCallRequest:
+      type: object
+      properties:
+        priority: { $ref: '#/components/schemas/CallPriority' }
+        details: { type: string, maxLength: 1000 }
+        caller_name: { type: string, maxLength: 200 }
+        caller_phone: { type: string, maxLength: 20 }
+        latitude: { type: number, format: double, minimum: -90, maximum: 90 }
+        longitude: { type: number, format: double, minimum: -180, maximum: 180 }
+
+    # ---------- ambulances ----------
+
+    Ambulance:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        registration_number: { type: string }
+        current_latitude: { type: number, format: double, nullable: true }
+        current_longitude: { type: number, format: double, nullable: true }
+        status: { $ref: '#/components/schemas/AmbulanceStatus' }
+        out_of_service_reason: { type: string, nullable: true }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    AmbulanceSummary:
+      type: object
+      description: List projection for the fleet board.
+      properties:
+        id: { type: string, format: uuid }
+        registration_number: { type: string }
+        status: { $ref: '#/components/schemas/AmbulanceStatus' }
+        current_latitude: { type: number, format: double, nullable: true }
+        current_longitude: { type: number, format: double, nullable: true }
+        active_dispatch_id: { type: string, format: uuid, nullable: true }
+        is_divertible:
+          type: boolean
+          description: |
+            Server-computed, so no client re-derives the rule: true only when the
+            vehicle is free, or on a run that has not yet reached its patient.
+        distance_km:
+          type: number
+          nullable: true
+          description: Only present when the query supplied `nearToLatitude`/`nearToLongitude`.
+
+    AmbulanceDetail:
+      allOf:
+        - $ref: '#/components/schemas/Ambulance'
+        - type: object
+          properties:
+            active_dispatch: { $ref: '#/components/schemas/DispatchSummary' }
+            is_divertible: { type: boolean }
+            runs_today: { type: integer }
+
+    CreateAmbulanceRequest:
+      type: object
+      required: [registration_number]
+      properties:
+        registration_number: { type: string, maxLength: 20 }
+        current_latitude: { type: number, format: double, nullable: true }
+        current_longitude: { type: number, format: double, nullable: true }
+
+    # ---------- dispatch agent ----------
+
+    DispatchProposalSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        workflow_id:
+          type: string
+          format: uuid
+          description: The shared agent-workflow record. Group-owned, see integration §11.2.
+        emergency_call_id: { type: string, format: uuid }
+        call_priority: { $ref: '#/components/schemas/CallPriority' }
+        status: { $ref: '#/components/schemas/DispatchProposalStatus' }
+        outcome: { $ref: '#/components/schemas/DispatchOutcome' }
+        is_diversion:
+          type: boolean
+          description: |
+            True when serving this call means turning around an ambulance already
+            driving to another one. These are the proposals that need real attention.
+        proposed_ambulance_registration: { type: string, nullable: true }
+        estimated_minutes_to_scene: { type: number, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    DispatchProposalDetail:
+      allOf:
+        - $ref: '#/components/schemas/DispatchProposalSummary'
+        - type: object
+          properties:
+            objective: { type: string }
+            proposed_ambulance_id: { type: string, format: uuid, nullable: true }
+            destination_ward_type_hint:
+              allOf:
+                - $ref: '#/components/schemas/WardTypeHint'
+              nullable: true
+            rationale:
+              type: string
+              nullable: true
+              description: Why the agent picked this ambulance. Shown to the dispatcher.
+            diversion_impact:
+              allOf:
+                - $ref: '#/components/schemas/DiversionImpact'
+              nullable: true
+              description: Populated only when `is_diversion` is true. This is what the approver reads.
+            plan:
+              type: array
+              description: The structured multi-step plan, in order.
+              items: { $ref: '#/components/schemas/DispatchPlanStep' }
+            validation:
+              type: array
+              description: Deterministic checks. Ordinary C#, not the agent checking itself.
+              items: { $ref: '#/components/schemas/DispatchValidationResult' }
+            tool_calls:
+              type: array
+              items: { $ref: '#/components/schemas/DispatchToolCall' }
+            errors:
+              type: array
+              items:
+                type: object
+                properties:
+                  step: { type: string }
+                  message: { type: string }
+                  occurred_at: { type: string, format: date-time }
+            attempt_count: { type: integer }
+            started_at: { type: string, format: date-time, nullable: true }
+            completed_at: { type: string, format: date-time, nullable: true }
+            resulting_dispatch_id: { type: string, format: uuid, nullable: true }
+            pre_admission_sent:
+              allOf:
+                - $ref: '#/components/schemas/DispatchNotification'
+              nullable: true
+              description: |
+                What was sent to Patient Management's `POST /admissions/pre-admit`
+                once this proposal was confirmed or approved. Null until then.
+                Echoed back so a dispatcher can see the pre-admission actually fired
+                — a silent failure here means a bed search never started.
+            reviewed_by_staff_id: { type: string, format: uuid, nullable: true }
+            reviewed_at: { type: string, format: date-time, nullable: true }
+            review_notes: { type: string, nullable: true }
+            rejection_reason:
+              allOf:
+                - $ref: '#/components/schemas/DispatchRejectionReason'
+              nullable: true
+
+    DiversionImpact:
+      type: object
+      description: |
+        The cost of a diversion, stated plainly so the Duty Manager approves with
+        their eyes open. Every field here answers "what happens to the patient who
+        loses their ambulance" — without this block, approving a diversion would mean
+        trusting the agent's summary of a trade-off it does not have to live with.
+      properties:
+        source_dispatch_id: { type: string, format: uuid }
+        source_call_id: { type: string, format: uuid }
+        source_call_priority: { $ref: '#/components/schemas/CallPriority' }
+        source_call_address_label: { type: string, nullable: true }
+        source_dispatch_status:
+          allOf:
+            - $ref: '#/components/schemas/DispatchStatus'
+          description: Always `assigned` or `en_route`. Anything further along is not divertible.
+        source_call_waiting_minutes_so_far: { type: integer }
+        source_call_additional_wait_minutes:
+          type: integer
+          description: How much longer the other patient waits if this is approved. The number that decides it.
+        replacement_ambulance_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: |
+            What the agent proposes takes over the original call. Null means nothing
+            is free and the call returns to the queue — which the approver should
+            weigh heavily.
+        replacement_ambulance_registration: { type: string, nullable: true }
+        minutes_saved_for_this_call:
+          type: integer
+          description: The benefit side — how much sooner the critical call is reached.
+
+    DispatchPlanStep:
+      type: object
+      properties:
+        sequence: { type: integer }
+        description: { type: string }
+        status: { type: string, enum: [pending, running, completed, failed, skipped] }
+        started_at: { type: string, format: date-time, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
+
+    DispatchValidationResult:
+      type: object
+      description: |
+        Deterministic checks in ordinary C#. `source_dispatch_still_pre_pickup` is the
+        one that makes the diversion rule real — it is re-run at approval time, so a
+        crew that reached their patient while the proposal was waiting cannot be
+        diverted by an approval that was already on screen.
+      properties:
+        check:
+          type: string
+          enum:
+            - ambulance_still_available
+            - ambulance_is_active
+            - crew_assigned
+            - source_dispatch_still_pre_pickup
+            - source_call_has_replacement
+            - destination_ward_capacity_nonzero
+        passed: { type: boolean }
+        detail: { type: string }
+        checked_at: { type: string, format: date-time }
+
+    DispatchToolCall:
+      type: object
+      description: |
+        Allow-listed tools only, all read-only. The agent has **no write access to any
+        table** — a dispatch only exists after a human confirms or approves through
+        this API.
+      properties:
+        tool_name:
+          type: string
+          enum:
+            - list_available_ambulances
+            - get_active_dispatches
+            - get_route
+            - get_ward_capacity
+        arguments: { type: object, additionalProperties: true }
+        succeeded: { type: boolean }
+        duration_ms: { type: integer }
+        error: { type: string, nullable: true }
+        called_at: { type: string, format: date-time }
+
+    # ---------- dispatches ----------
+
+    Dispatch:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        emergency_call_id: { type: string, format: uuid }
+        ambulance_id: { type: string, format: uuid }
+        ambulance_registration: { type: string }
+        destination_ward_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: |
+            Set once the agent's ward step has read Patient Management's capacity.
+            Nullable because the dispatch is created the moment the dispatcher
+            confirms, which can be before that step finishes.
+        destination_ward_name: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/DispatchStatus' }
+        is_divertible:
+          type: boolean
+          description: Server-computed. False from the moment the crew taps `at_scene`.
+        dispatched_at: { type: string, format: date-time }
+        completed_at: { type: string, format: date-time, nullable: true }
+        dispatch_proposal_id: { type: string, format: uuid, nullable: true }
+        superseded_by_dispatch_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Set on a diverted run — points at the dispatch that replaced it.
+
+    DispatchSummary:
+      type: object
+      description: List projection for the fleet board and history views.
+      properties:
+        id: { type: string, format: uuid }
+        emergency_call_id: { type: string, format: uuid }
+        ambulance_registration: { type: string }
+        call_priority: { $ref: '#/components/schemas/CallPriority' }
+        status: { $ref: '#/components/schemas/DispatchStatus' }
+        destination_ward_name: { type: string, nullable: true }
+        crew_count: { type: integer }
+        dispatched_at: { type: string, format: date-time }
+        completed_at: { type: string, format: date-time, nullable: true }
+
+    DispatchDetail:
+      allOf:
+        - $ref: '#/components/schemas/Dispatch'
+        - type: object
+          properties:
+            route: { $ref: '#/components/schemas/RouteLog' }
+            crew:
+              type: array
+              items: { $ref: '#/components/schemas/DispatchCrewMember' }
+            call: { $ref: '#/components/schemas/EmergencyCallSummary' }
+            handover_notes: { type: string, nullable: true }
+            patient_condition: { type: string, nullable: true }
+
+    DispatchCrewMember:
+      type: object
+      description: |
+        Resolved through Staff Management's `POST /staff/lookup`
+        (`integration_of_functions.md` §18.1, §23) at read time — we store only
+        `staff_member_id`, never a copy of their name or role.
+      properties:
+        staff_member_id: { type: string, format: uuid }
+        full_name: { type: string, nullable: true }
+        role: { type: string, nullable: true }
+        assigned_at: { type: string, format: date-time }
+
+    RouteLog:
+      type: object
+      description: |
+        One summary row per dispatch — what the maps API returned at planning time,
+        not a GPS breadcrumb trail (`docs/entity_diagram.md`, Decision 23).
+      properties:
+        dispatch_id: { type: string, format: uuid }
+        origin_latitude: { type: number, format: double }
+        origin_longitude: { type: number, format: double }
+        destination_latitude: { type: number, format: double }
+        destination_longitude: { type: number, format: double }
+        planned_distance_km: { type: number, format: double }
+        planned_duration_minutes: { type: integer }
+        departed_at: { type: string, format: date-time, nullable: true }
+        arrived_at: { type: string, format: date-time, nullable: true }
+        maps_api_reference:
+          type: string
+          nullable: true
+          description: The maps provider's own request id, so a disputed ETA can be traced back.
+
+    NavigationRoute:
+      type: object
+      description: |
+        A live route for the crew's phone, fetched from the maps API on request. Not
+        persisted — `RouteLog` is the record; this is the driving.
+      properties:
+        dispatch_id: { type: string, format: uuid }
+        waypoint_type:
+          type: string
+          enum: [scene, destination_ward]
+          description: Where the crew is heading right now, derived from the run's status.
+        destination_latitude: { type: number, format: double }
+        destination_longitude: { type: number, format: double }
+        destination_label: { type: string, nullable: true }
+        distance_km: { type: number, format: double }
+        duration_minutes: { type: integer }
+        encoded_polyline:
+          type: string
+          nullable: true
+          description: For drawing the line on the in-app map.
+        steps:
+          type: array
+          items:
+            type: object
+            properties:
+              instruction: { type: string }
+              distance_metres: { type: integer }
+
+    # ---------- my calls (patient) ----------
+
+    MyCallTracking:
+      type: object
+      description: |
+        Deliberately tiny. A waiting patient gets position and time, nothing about
+        crew, notes or other calls.
+      properties:
+        emergency_call_id: { type: string, format: uuid }
+        call_status: { $ref: '#/components/schemas/CallStatus' }
+        ambulance_is_on_the_way: { type: boolean }
+        ambulance_latitude: { type: number, format: double, nullable: true }
+        ambulance_longitude: { type: number, format: double, nullable: true }
+        estimated_minutes_to_arrival: { type: integer, nullable: true }
+        updated_at: { type: string, format: date-time }
+
+    # ---------- reports ----------
+
+    ResponseTimeReport:
+      type: object
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              priority: { $ref: '#/components/schemas/CallPriority' }
+              call_count: { type: integer }
+              median_minutes_to_dispatch: { type: number }
+              median_minutes_to_arrival: { type: number }
+              slowest_minutes_to_arrival: { type: number }
+        totals:
+          type: object
+          properties:
+            call_count: { type: integer }
+            median_minutes_to_dispatch: { type: number }
+            median_minutes_to_arrival: { type: number }
+
+    FleetUtilisationReport:
+      type: object
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              ambulance_id: { type: string, format: uuid }
+              registration_number: { type: string }
+              run_count: { type: integer }
+              hours_committed: { type: number }
+              idle_share:
+                type: number
+                description: Share of the period the vehicle was `available`, 0 to 1.
+              out_of_service_hours: { type: number }
+
+    EmergencyAgentPerformanceReport:
+      type: object
+      description: Evidence for the Agentic AI evaluation report (assignment §12).
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        proposals_raised: { type: integer }
+        confirmed: { type: integer }
+        confirmed_without_change_rate:
+          type: number
+          description: |
+            Share of routine proposals the dispatcher confirmed with the ambulance
+            the agent picked. The measure of whether the agent is actually helping.
+        diversions_proposed: { type: integer }
+        diversions_approved: { type: integer }
+        diversions_rejected: { type: integer }
+        no_ambulance_available_count:
+          type: integer
+          description: The safe-failure outcome — recorded honestly, not hidden or retried in a loop.
+        validation_failure_rate:
+          type: number
+          description: Share of proposals the deterministic validator rejected before a human saw them.
+        median_seconds_proposal_to_confirm:
+          type: number
+          description: How long the one-tap gate actually costs. The number that justifies it.
+        median_minutes_call_to_dispatch: { type: number }
+        rejection_reasons:
+          type: object
+          additionalProperties: { type: integer }
+
+    # ---------- integration (payload shapes consumed by other components) ----------
+
+    DispatchNotification:
+      type: object
+      description: |
+        The shape Emergency sends when a dispatch is created — matches
+        `integration_of_functions.md` §4.2 field-for-field. Delivered as the request
+        body of Patient Management's `POST /admissions/pre-admit`
+        (`patient-spec.yaml`'s `PreAdmitRequest`); documented here so both sides can
+        be diffed against one place, not stored as a table of ours.
+      properties:
+        dispatch_id: { type: string, format: uuid }
+        caller_user_id: { type: string, format: uuid, nullable: true }
+        patient_is_caller: { type: boolean }
+        patient_id: { type: string, format: uuid, nullable: true }
+        provisional_name: { type: string, nullable: true }
+        provisional_gender: { type: string, nullable: true }
+        expected_arrival: { type: string, format: date-time }
+        urgency:
+          type: string
+          enum: [routine, urgent, emergency]
+          description: |
+            **Not our `CallPriority`.** This is Patient Management's `AdmissionUrgency`
+            vocabulary, because this payload is their request body, not ours. We
+            translate on the way out, so no other component has to guess:
+
+            | Our `CallPriority` | We send `urgency` |
+            | :--- | :--- |
+            | `critical` | `emergency` |
+            | `high` | `urgent` |
+            | `medium` | `routine` |
+            | `low` | `routine` |
+
+            One-directional and deliberately lossy — `medium` and `low` both mean
+            "no rush" to a bed search. The mapping lives here and in
+            `integration_of_functions.md` §22; it is a fixed table in C#, never a
+            judgement the agent makes.
+        destination_ward_type_hint:
+          allOf:
+            - $ref: '#/components/schemas/WardTypeHint'
+          nullable: true
+
+    # ---------- shared ----------
+
+    PagedResult:
+      type: object
+      description: |
+        Uses `total_items`, matching Equipment's and Patient's specs rather than
+        Staff's `total_count` — see the open note in `integration_of_functions.md`
+        §11.6.
+      properties:
+        page: { type: integer }
+        page_size: { type: integer }
+        total_items: { type: integer }
+        total_pages: { type: integer }
+
+    ProblemDetails:
+      type: object
+      description: RFC 7807. The shared error shape across all four components.
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+
+    ValidationProblemDetails:
+      allOf:
+        - $ref: '#/components/schemas/ProblemDetails'
+        - type: object
+          properties:
+            errors:
+              type: object
+              additionalProperties:
+                type: array
+                items: { type: string }
+
+    DispatchRejectedProblem:
+      allOf:
+        - $ref: '#/components/schemas/ProblemDetails'
+        - type: object
+          properties:
+            block_reason:
+              allOf:
+                - $ref: '#/components/schemas/DiversionBlockReason'
+              nullable: true
+            failed_checks:
+              type: array
+              items: { $ref: '#/components/schemas/DispatchValidationResult' }

@@ -637,6 +637,41 @@ Protected routes by role, loading / empty / success / error states throughout.
 | Pre-register | Details ahead of a planned visit |
 | Discharge info | Summary note and instructions |
 | **Call an ambulance** | Minimum details + location, posted to Emergency's endpoint. Because the caller is logged in, we already know who they are — the pre-admission starts complete. |
+| **Call the hotline** | A `tel:` link to the hospital's emergency number, on the same screen, under the button. No form, no endpoint, no code of ours. See §10.1. |
+
+### 10.1 Four ways a patient reaches us — and only three of them are forms
+
+Everything in this component eventually becomes an `Admission`, but the way it starts
+differs, and each path has a different `source` and a different person doing the typing:
+
+| How it starts | Who types | Where | `Admission.source` |
+| :--- | :--- | :--- | :--- |
+| **Emergency, from the app** | The patient, or a bystander with an account | Flutter, minimal form + location | `emergency` |
+| **Emergency, by phone** | A staff member at the desk, listening | React call desk | `emergency` |
+| **Walk-in** | A nurse or clerk at the counter | React | `walk_in` |
+| **Booked visit** | The patient, ahead of time | Flutter, date picker | `pre_registered` |
+
+**The phone path costs us nothing to support, so it is worth having.** Not everyone who
+needs an ambulance has our app, a charged phone, or the presence of mind to find a button
+— and the person who finds someone collapsed in the street is a stranger, not a
+registered patient. Leaving them with no route in would be a strange gap in a hospital
+system.
+
+But it needs **no new endpoint, no new table and no new field**. `emergency-spec.yaml`'s
+`POST /emergency-calls` already says it is *"also used by staff logging a call at the
+front desk for someone with no phone or app"*, and `caller_user_id` is already nullable
+for exactly that caller. A phone call is simply a staff member filling the same form the
+patient would have filled. All that is actually added is:
+
+- a `tel:` link on the Flutter emergency screen, under the main button, for the patient
+  who would rather speak to a person; and
+- the number itself in configuration — **not a database table**. One hospital, one
+  number, and a table with one row in it is a table nobody should have to migrate.
+
+**Deliberately not built: anything that treats the phone line as a system.** No call
+recording, no queue, no IVR, no telephony integration, no `PhoneCall` entity. That is a
+component-sized feature and we already have one. The line rings, a human answers, and the
+human uses the screen — the same as every hospital that has ever had a phone.
 
 **Device features.** The assignment requires at least one meaningful one (§8). We do two, both on the patient side:
 
@@ -764,7 +799,17 @@ Recommendation: **one shared design, group-owned**, since `ai-orchestration-work
 **3. Emergency call raised from the patient app — confirm the split with Member 1.**
 The *screen* (patient taps "I need an ambulance", minimum details, location) is ours, in the patient's Flutter app. The `EmergencyCall` record and everything downstream stays Member 1's; our screen posts to his endpoint.
 Worth flagging as a benefit: a call from a **logged-in patient** means we already have their identity, history and contact details, so the pre-admission starts complete instead of guessing. That contrasts nicely against the unidentified-arrival path in the same demo.
-**Decided:** a bystander can raise a call for someone else. The call screen asks once, and Member 1 must pass `patient_is_caller` and `caller_user_id` through on the dispatch notification. See §5.6. **Confirm those two fields with Member 1.**
+**Decided:** a bystander can raise a call for someone else. The call screen asks once, and Member 1 must pass `patient_is_caller` and `caller_user_id` through on the dispatch notification. See §5.6. **Done — both fields are on `emergency-spec.yaml`'s `DispatchNotification`**, and `caller_user_id` is read from the JWT rather than the request body, which is the right call: a client that could name its own caller id could file a call under someone else's account.
+
+**A caller id is an account id, not a patient id.** `docs/entity_diagram.md` Rev 2.5 adds
+the `PatientAccount` table this depended on and that nobody had written down — our own
+omission, not Member 1's, since the patient login was our decision in Rev 2.3. It matters
+most on precisely this path: when a bystander calls, `caller_user_id` is *their* login and
+`patient_id` is *someone else's* record, and if the two ids came from the same table we
+would be inventing a medical record for a healthy passer-by every time somebody helped a
+stranger. `Patient.user_account_id` is the one optional link, set by staff through
+`link-account` after checking identity — never inferred from a matching phone number,
+because two people share a phone far more often than is convenient.
 
 **4. How does Emergency notify us of a dispatch?** Direct API call, or via the orchestrator? Affects both of our specs.
 

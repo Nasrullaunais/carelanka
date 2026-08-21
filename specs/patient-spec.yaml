@@ -230,6 +230,11 @@ paths:
         A patient RECORD and a patient ACCOUNT are different things. The record is created by
         staff and exists whether or not the person ever logs in. This endpoint links an optional
         account to it afterwards. One account, one record.
+
+        `user_account_id` is a `PatientAccount.Id` (`docs/entity_diagram.md` Rev 2.5), stored as
+        `Patient.user_account_id`. Staff link it deliberately, after checking identity - it is
+        never inferred from a matching phone number, because two people share a phone far more
+        often than a hospital would like.
       operationId: linkPatientAccount
       requestBody:
         required: true
@@ -1808,7 +1813,16 @@ components:
           nullable: true
           description: Required when patient_is_caller is true. Ignored otherwise - a new record is created instead.
         expected_arrival: { type: string, format: date-time }
-        urgency: { $ref: '#/components/schemas/AdmissionUrgency' }
+        urgency:
+          allOf:
+            - $ref: '#/components/schemas/AdmissionUrgency'
+          description: |
+            Emergency ranks its calls critical/high/medium/low (`CallPriority`) - a different
+            question from this one: how fast an ambulance is needed, not how fast a bed is. They
+            translate before calling us, by the fixed table in `emergency-spec.yaml`'s
+            `DispatchNotification` and `integration_of_functions.md` §22 - critical to emergency,
+            high to urgent, medium and low to routine. We accept only our own three values;
+            anything else is a 400.
         destination_ward_type_hint:
           allOf:
             - $ref: '#/components/schemas/WardType'
@@ -1861,7 +1875,11 @@ components:
               type: string
               format: uuid
               nullable: true
-              description: The app user who raised the emergency call, when they are not the patient.
+              description: |
+                A `PatientAccount.Id` - the app user who raised the emergency call, when they are
+                not the patient. Not a `Patient.Id`: a bystander who calls for a stranger has a
+                login, not a medical record, and creating one for them would be wrong. Null for a
+                walk-in, a booking, or a call taken over the phone at the desk.
             missing_fields:
               type: array
               items: { type: string }

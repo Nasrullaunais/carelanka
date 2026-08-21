@@ -47,6 +47,42 @@ direction, including against Patient Management (see `Gender`).
 - Three new items in [Open Decisions](#open-decisions) (9–11) for things that need an
   owner's call rather than a unilateral edit.
 
+**Revision 2.5** — the patient login finally has a table, and the two columns
+`patient-spec.yaml` publishes but the diagram never had:
+
+- **`PatientAccount` (new)** — the app login for a patient, separate from the `Patient`
+  medical record. Rev 2.3 decided patients keep an app login and Rev 2.4 wired a caller id
+  to it, but no entity was ever added, so three committed specs referenced a table that did
+  not exist. See [`PatientAccount`](#patientaccount-extends-softdeletableentity-rev-25--new)
+  for why an account and a record must not be the same row.
+- **`EmergencyCall.CallerUserId` repointed** from `Patient.Id` to `PatientAccount.Id`.
+  Rev 2.4 had a bystander's login pointing at a medical record.
+- **`Patient.UserAccountId` (new)** — the one optional link between the two, nullable and
+  unique. Already listed in `patient-management-plan.md` §4; missing here.
+- **`Admission.DispatchId` / `ReportedByUserId` (new)** — both already published by
+  `patient-spec.yaml`'s `Admission` schema and required by the pre-admission flow.
+  Member 4's own omission, found while checking Rev 2.4.
+- **The `urgency` translation** between Emergency's `CallPriority` and Patient's
+  `AdmissionUrgency` is written down, in `integration_of_functions.md` §22 and both specs.
+  Nothing changes in this file — the two enums stay separate, as they should.
+
+**Revision 2.4** — the Emergency component's entities gain the fields its newly-written
+design needs (Member 1's own entities, added alongside `emergency-management-plan.md`
+and `emergency-spec.yaml`):
+
+- **`EmergencyCall.CallerUserId` / `PatientIsCaller`** — closes
+  `integration_of_functions.md` Open Item 11.4. See
+  [`EmergencyCall`](#emergencycall-extends-auditedentity).
+- **`EmergencyCall.AddressLabel` / `Transported`** — a reverse-geocoded street name for
+  the crew, and the fact that not every call ends in a hospital trip.
+- **`Ambulance.OutOfServiceReason`** — "broken down" and "scheduled service" are
+  different operational facts, and the fleet report separates them.
+- **`Dispatch.SupersededByDispatchId`** — a self-reference set when a run is diverted.
+  A diverted `Dispatch` keeps its own row and points at its replacement, so "who was
+  sent first and why did that change" stays answerable. Overwriting the row instead
+  would destroy the audit trail the diversion approval gate depends on
+  (`emergency-management-plan.md` §5.2).
+
 **Revision 2.3** — Open Decision 1 (patient identity) resolved: **patients keep an app
 login.** Rev 2.1 recorded the Component Plan as having no Patient role; v2 of that plan
 does list one, and both `patient-management-plan.md` and `patient-spec.yaml` are already
@@ -160,6 +196,46 @@ the reassigned nurse's Flutter app, and the patient flow pushes the bed assignme
 One staff member may have several devices. Scoped to `StaffMember` only; see
 [Open Decisions](#open-decisions) for the patient-device question.
 
+#### PatientAccount extends SoftDeletableEntity *(Rev 2.5 — new)*
+```
++ PhoneNumber: string (unique, non-null)               -- the login identifier
++ PasswordHash: string (non-null)
++ FullName: string (non-null)
++ LastLoginAt: DateTimeOffset (nullable)
+```
+**Table:** `patient_accounts`
+**Owner:** Patient Management (Member 4).
+**Constraints:**
+- `UNIQUE (phone_number) WHERE is_active`
+
+*(Rev 2.5)* **This table was missing, and three committed specs were already pointing at
+it.** Rev 2.3 resolved Open Decision 1 in favour of patients keeping an app login, but no
+entity was ever added for that login — so `patient-spec.yaml`'s
+`POST /patients/{id}/link-account` (`user_account_id`), its
+`Admission.reported_by_user_id`, and Rev 2.4's `EmergencyCall.CallerUserId` were each
+referencing a table that did not exist. Rev 2.4 filled the gap by pointing
+`CallerUserId` at `Patient.Id`, which is the one thing it must not be — see below.
+
+**An account is not a record, and conflating them breaks the emergency path.** A
+`Patient` row is a *medical record*, created by staff, and it exists whether or not that
+person ever installs the app — most do not, and an unconscious arrival certainly has not.
+A `PatientAccount` is a *login*, created by a person signing up, and it exists whether or
+not they have ever been treated here. `patient-spec.yaml` already says this in as many
+words: *"A patient RECORD and a patient ACCOUNT are different things."*
+
+The case that forces the split is the ordinary one for this system: **a bystander rings in
+for a stranger on the road.** That caller has an account and is not the patient
+(`PatientIsCaller = false`); the patient has a record and no account. If `CallerUserId`
+were an FK to `Patient.Id`, storing the caller would mean fabricating a medical record for
+a healthy passer-by, and it would then be indistinguishable from the record of the person
+actually bleeding. Two tables, one FK each, and that whole class of mix-up cannot occur.
+
+**Link, don't merge.** `Patient.UserAccountId` is the single optional join between them,
+nullable on the record side and unique — one account, one record, and neither requires the
+other. Staff make that link deliberately through `link-account` after checking identity;
+it is never inferred from a matching phone number, because two people share a phone far
+more often than a hospital would like.
+
 ---
 
 ### Emergency / Ambulance
@@ -167,18 +243,41 @@ One staff member may have several devices. Scoped to `StaffMember` only; see
 #### EmergencyCall extends AuditedEntity
 ```
 + PatientId: Guid (nullable) FK → Patient.Id
++ CallerUserId: Guid (nullable) FK → PatientAccount.Id      -- (Rev 2.5: was Patient.Id)
++ PatientIsCaller: bool (non-null)                          -- (Rev 2.4 — new)
 + CallerName: string (nullable)
 + CallerPhone: string (nullable)
 + Latitude: decimal(9,6) (non-null)
 + Longitude: decimal(9,6) (non-null)
++ AddressLabel: string (nullable)                           -- (Rev 2.4 — new)
 + Details: string (nullable)
 + Priority: CallPriority (non-null)
 + Status: CallStatus (non-null)
 + Outcome: string (nullable)
++ Transported: bool (nullable)                              -- (Rev 2.4 — new)
 ```
 **Table:** `emergency_calls`
 **Note:** `PatientId` nullable — identity is often unknown at the scene, settable
 later once intake matches the call to a registered `Patient`. *(Decision 25)*
+
+*(Rev 2.4)* **`CallerUserId` / `PatientIsCaller` close Open Item 11.4 in
+`integration_of_functions.md`.** The caller is often not the patient — someone rings
+in for a stranger on the road — and that is asked once, on the call screen, rather
+than guessed later. `CallerUserId` is the logged-in app user who placed the call
+(nullable — an anonymous caller, or one phoning the hotline, has none);
+`PatientIsCaller` is their answer.
+
+*(Rev 2.5 correction)* Rev 2.4 wrote this FK as `→ Patient.Id`. It is
+`→ PatientAccount.Id` — a caller is a **login**, not a medical record, and the whole
+point of `PatientIsCaller = false` is that the two are different people. See
+[`PatientAccount`](#patientaccount-extends-softdeletableentity-rev-25--new).
+`PatientId` is set when `PatientIsCaller = true`; when `false`, Patient Management
+creates a new record from `CallerName`/provisional details and records
+`CallerUserId` as that patient's emergency contact and `reported_by_user_id`,
+matching the field `patient-spec.yaml`'s `Admission.reported_by_user_id` already
+publishes. Both fields are carried unchanged onto the dispatch notification
+(`emergency-spec.yaml`'s `DispatchNotification`, `integration_of_functions.md` §4.2,
+§22) so Patient Management never has to re-derive them.
 
 #### Ambulance extends SoftDeletableEntity
 ```
@@ -186,6 +285,7 @@ later once intake matches the call to a registered `Patient`. *(Decision 25)*
 + CurrentLatitude: decimal(9,6) (nullable)
 + CurrentLongitude: decimal(9,6) (nullable)
 + Status: AmbulanceStatus (non-null)
++ OutOfServiceReason: string (nullable)                     -- (Rev 2.4 — new)
 ```
 **Table:** `ambulances`
 **Note:** Current-position fields only — no time-series location history.
@@ -198,6 +298,7 @@ Onboard equipment is explicitly not tracked (equipment stays ward-scoped only).
 + AmbulanceId: Guid (non-null) FK → Ambulance.Id
 + DestinationWardId: Guid (nullable) FK → Ward.Id       -- (Rev 2: was non-null)
 + Status: DispatchStatus (non-null)
++ SupersededByDispatchId: Guid (nullable) FK → Dispatch.Id  -- (Rev 2.4 — new)
 + DispatchedAt: DateTimeOffset (non-null)
 + CompletedAt: DateTimeOffset (nullable)
 ```
@@ -480,11 +581,13 @@ A background sweep moves `Held` rows past `ExpiresAt` to `Expired` and returns t
 + PhoneNumber: string (nullable)
 + EmergencyContactName: string (nullable)
 + EmergencyContactPhone: string (nullable)
++ UserAccountId: Guid (nullable, unique when present) FK → PatientAccount.Id  -- (Rev 2.5 — new)
 ```
 **Table:** `patients`
 **Constraints:**
 - `UNIQUE (national_id) WHERE national_id IS NOT NULL`
 - `UNIQUE (temp_reference) WHERE temp_reference IS NOT NULL` *(Rev 2.1)*
+- `UNIQUE (user_account_id) WHERE user_account_id IS NOT NULL` *(Rev 2.5)*
 - `CHECK (national_id IS NOT NULL OR phone_number IS NOT NULL OR temp_reference IS NOT NULL)` *(Rev 2.1)*
 
 **Note:** `NationalId` nullable — unconscious/unidentified emergency admissions may
@@ -540,6 +643,8 @@ On check-in this becomes an `Admission` with `Source = Booked`.
 + DetailsComplete: bool (GENERATED, stored)             -- (Rev 2.1)
 + DetailsCompletedAt: DateTimeOffset (nullable)         -- (Rev 2.1)
 + CancelReason: CancelReason (nullable)                 -- (Rev 2.2)
++ DispatchId: Guid (nullable) FK → Dispatch.Id           -- (Rev 2.5 — new)
++ ReportedByUserId: Guid (nullable) FK → PatientAccount.Id -- (Rev 2.5 — new)
 ```
 **Table:** `admissions`
 **Note:** `EmergencyCallId` nullable — null for walk-in/referral admissions, set for

@@ -34,7 +34,7 @@ responsibilities and permissions (§4.1). We have seven. Role names match the
 | Role | Uses | Owned by | What they can do |
 | :--- | :--- | :--- | :--- |
 | **Ambulance Crew** | Flutter | Member 1 | Receive dispatch, navigate to the scene, update run status, hand over patient info |
-| **Duty / Dispatch Manager** | React | Member 1 | Oversee emergency calls, approve dispatch reassignments, approve ICU and downgrade bed decisions |
+| **Duty / Dispatch Manager** | React | Member 1 | Oversee emergency calls, confirm routine dispatches, approve ambulance diversions, approve ICU and downgrade bed decisions |
 | **Hospital Administrator** | React | Member 2 | Manage staff records, approve rosters and reallocations, approve leave |
 | **General Staff** | Flutter | Member 2 | View own shifts, clock in/out, request leave or a shift swap |
 | **Equipment & Inventory Manager** | React | Member 3 | Monitor stock and maintenance, approve procurement and servicing |
@@ -100,9 +100,19 @@ the nearest ambulance, routing it, and deciding which ward the patient goes to.
   availability; dispatch the nearest ambulance; route it via a maps API; record
   the call outcome
 - **Agent:** given a call, proposes which ambulance, which route, which ward
-- **Approval:** sending the nearest ambulance happens immediately — speed
-  matters. The Duty Manager approves only when the plan pulls an ambulance off
-  another job
+- **Approval — two gates, sized to the decision.** A routine send is **one tap**:
+  the agent ranks the free ambulances by real driving ETA and the dispatcher
+  confirms. A **diversion** — turning around an ambulance already driving to
+  another call — goes to the Duty Manager with the full cost to that other
+  patient shown before they decide. An ambulance that has already reached its
+  patient is never diverted by anyone. See `specs/emergency-management-plan.md` §5
+
+> **Changed from v2, needs group confirmation.** This previously read *"sending
+> the nearest ambulance happens immediately"* with no human at all. Emergency's
+> own design doc argues the one-tap gate costs seconds and is far easier to
+> defend than an AI moving emergency vehicles unsupervised — so no agent output
+> anywhere in CareLanka is now applied without a person. Raised in
+> `emergency-management-plan.md` §14.
 
 ### 4.2 Staff Management — Member 2
 
@@ -242,7 +252,7 @@ whole chain can be replayed later.
 | At least one third-party integration (§4.1) | Maps API for ambulance routing |
 | One cross-platform workflow (§4.1) | §6 — starts in Flutter, approved in React, result returns to Flutter |
 | 4 distinct agents with allow-listed tools (§9) | One per member, each with its own data and job |
-| Human approval before high-impact actions (§9) | Dispatch reassignment, rosters, equipment spend, bed assignment, discharge |
+| Human approval before high-impact actions (§9) | Every dispatch (one-tap confirm) and every ambulance diversion, rosters, equipment spend, bed assignment, discharge. **No agent output anywhere in CareLanka reaches production data without a human** |
 | A meaningful device feature (§8) | Notifications, date/time picker, GPS, camera |
 | Not a medical diagnosis system | The patient agent only handles logistics using a category a human already set |
 

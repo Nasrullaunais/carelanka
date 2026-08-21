@@ -1,7 +1,7 @@
 # How the Four Components Connect
 
 **CareLanka Hospital Management System · SE3090 Assignment 1**
-**Status:** living document · Patient Management (Member 4) and Equipment Management (Member 3) sections are filled in; Emergency (Member 1) and Staff (Member 2) should add their own
+**Status:** living document · all four components' boundary sections are now filled in — Patient (§4–§11), Equipment (§13–§16), Staff (§17–§21), Emergency (§22–§26)
 
 This file explains where one member's component ends and another's begins, and exactly what crosses the line.
 
@@ -437,9 +437,9 @@ All four agents must persist workflow id, objective, plan, steps, tool results, 
 
 *Update:* `ai-orchestration-workflow.md` §5 now proposes exactly this — one `AgentWorkflow` row per agent run, chained by `correlation_id` and `parent_workflow_id`, group-owned. Settle it alongside the orchestration decision in that document, since the table design follows from it.
 
-**11.3 — Does M1 call M4 directly for pre-admission, or does the orchestrator drive both?** Affects §4.2 and both specs. If the Coordinator Agent proposed in `ai-orchestration-workflow.md` §3 is adopted, the coordinator drives both and this closes.
+**11.3 — Does M1 call M4 directly for pre-admission, or does the orchestrator drive both?** Affects §4.2 and both specs. **Partially settled by implementation:** `patient-spec.yaml`'s `POST /admissions/pre-admit` is already documented as "Called by Emergency Service (Member 1) when an ambulance is dispatched", and `emergency-spec.yaml` (§22–§26, §24.2) now calls it directly from the Dispatch & Routing Agent's plan. That is the current build path. If the Coordinator Agent proposed in `ai-orchestration-workflow.md` §3 is adopted later, the coordinator takes over driving both calls and this direct call is replaced — not a breaking change, since the coordinator would just call the same endpoint in Emergency's place.
 
-**11.4 (RESOLVED) — A bystander can raise a call for someone else.** The call screen asks once; M1 passes `patient_is_caller` and `caller_user_id` through on the dispatch notification (§4.2). The caller is stored as the patient's emergency contact. **M1 needs to add these two fields** — confirm with Member 1.
+**11.4 (RESOLVED) — A bystander can raise a call for someone else.** The call screen asks once; M1 passes `patient_is_caller` and `caller_user_id` through on the dispatch notification (§4.2). The caller is stored as the patient's emergency contact. **Done:** `docs/entity_diagram.md` Rev 2.4 adds `EmergencyCall.PatientIsCaller` / `CallerUserId`, and `emergency-spec.yaml` publishes both on `CreateEmergencyCallRequest` and `DispatchNotification` (§22).
 
 **11.5 — Booking a visit.** A patient can register their details and an expected arrival ahead of a planned visit (`source = pre_registered`). This is deliberately **not** a full appointment system — no doctor calendars, no time slots, no rescheduling — because that is a component-sized feature on its own. If the group wants real appointments, it needs an owner and something else has to be dropped.
 
@@ -450,27 +450,23 @@ throws at startup; a duplicate `operationId` or schema name silently collides in
 the generated clients, and whichever one generates second wins. None of these is
 one member's call — the two or three members sharing the name have to agree.
 
-Re-verified against `main` on 2026-08-21:
+Re-verified against `main` on 2026-08-21, after `emergency-spec.yaml` was written (§22–§26):
 
 | Collision | Where | Suggested fix |
 | :--- | :--- | :--- |
-| `GET /reports/agent-performance` | staff, equipment, patient | Namespace by component: `/reports/staff/agent-performance` |
-| `GET /workflows/{workflowId}` | equipment, patient | Group-owned once §11.2 is settled — one workflow endpoint, not four |
-| `operationId: getAgentPerformanceReport` | staff, patient | Follows whatever the route above becomes |
-| `PagedResult` — staff says `total_count`, the others `total_items` | all three | `total_items`, on the 2-vs-1 count. Staff to confirm |
-| `Bed`, `WorkflowSummary`, `WorkflowAccepted`, `AgentPerformanceReport` — one name, different shapes | across specs | Either make them byte-identical or give them different names (`EquipmentBed` / `AdmissionBed`) |
+| `GET /reports/agent-performance` | staff, equipment, patient | Namespace by component: `/reports/staff/agent-performance`. **Emergency does not collide** — `emergency-spec.yaml` was written after this was already flagged, so it namespaces itself from the start: `/reports/emergency/agent-performance` |
+| `GET /workflows/{workflowId}` | equipment, patient | Group-owned once §11.2 is settled — one workflow endpoint, not four. Emergency does not declare its own copy, for the same reason |
+| `operationId: getAgentPerformanceReport` | staff, patient | Follows whatever the route above becomes. Emergency's is `getEmergencyAgentPerformanceReport`, so it does not add a third name to this collision |
+| `PagedResult` — staff says `total_count`, the others `total_items` | staff vs. equipment/patient | Unresolved — still Staff's own file to fix, not something another member can edit for them. `emergency-spec.yaml` uses `total_items`, matching the majority rather than adding a third convention |
+| `Bed`, `WorkflowSummary`, `WorkflowAccepted`, `AgentPerformanceReport` — one name, different shapes | across specs | Either make them byte-identical or give them different names (`EquipmentBed` / `AdmissionBed`). Emergency defines none of these four names, so it does not add a fifth shape |
 
-**Also blocking:** `emergency-spec.yaml` is still a 212-byte stub with
-`paths: {}`. Everything §10 lists under M1 — the dispatch notification,
-`patient_is_caller`, `caller_user_id` — has nowhere to live until M1 writes it.
-
-*Resolved:* `Doctor` is a Staff Management role — M4 only checks the JWT claim. Bed ownership split agreed (§6.1). No SMS integration; the group's Maps API covers the third-party requirement.
+*Resolved:* `Doctor` is a Staff Management role — M4 only checks the JWT claim. Bed ownership split agreed (§6.1). No SMS integration; the group's Maps API covers the third-party requirement. `emergency-spec.yaml` is no longer the 212-byte stub — see §22–§26 for what it now publishes, including the dispatch notification, `patient_is_caller` and `caller_user_id` that §10 was waiting on.
 
 ---
 
 ## 12. For the other three members
 
-This file originally described every boundary **from the Patient Management side**, because that was the first component designed. Equipment Management (§13–§16 below) has since added its own sections, written against `equipment-management-plan.md` and `equipment-spec.yaml`. Emergency (M1) and Staff (M2) should do the same. If something here is wrong about your component, raise it in §11 rather than working around it.
+This file originally described every boundary **from the Patient Management side**, because that was the first component designed. Equipment Management (§13–§16) added its own sections, written against `equipment-management-plan.md` and `equipment-spec.yaml`. Staff Management (§17–§21) and Emergency (§22–§26) now have theirs too, written against `staff-spec.yaml` and `emergency-management-plan.md`/`emergency-spec.yaml` respectively. If something here is wrong about your component, raise it in §11 rather than working around it.
 
 Two questions worth asking about anything you are unsure of:
 
@@ -536,3 +532,125 @@ Mirrors §10's format, from the Equipment side.
 | **M4 (Patient)** | Admission summary by ID | Displaying who an assigned item belongs to, without copying patient data |
 | **M2 (Staff)** | Staff member's name and role by ID | Displaying "Approved by …" / "Serviced by …" without copying their data |
 | **Group** | Shared agent-workflow tables | Same open item as §11.2 — `ActionRequest.workflow_id` and `Warning.workflow_id` point into whatever the group agrees |
+
+---
+
+## 17. Staff Management ↔ Patient Management (Member 4) — confirmed from Staff's side
+
+Written from `staff-spec.yaml`, which Nasrullah (Member 2) committed but had not yet cross-referenced into this file (§0's rule 6 asks each member to add their own section; this one is written on his behalf from what his spec already publishes, not invented — nothing here goes beyond what `staff-spec.yaml`'s `info.description` and schemas already say).
+
+- **The boundary, in Staff's own words:** *"Staff Management owns the staff record and the roster. It does not own patients, beds or wards. Ward occupancy is read from Patient Management to work out staffing demand (`integration_of_functions.md` §5.3); ward identity is theirs too, pending §11.1."* This matches §5 and §11.1 exactly — no disagreement to raise.
+- **`Ward` stays Patient's.** `Shift.WardId` and `WardStaffingRule.WardId` are read-only references into Patient's `Ward` table. `GET /wards/{wardId}/staffing-rules` in `staff-spec.yaml` says it plainly: *"Ward identity belongs to Patient Management; the staffing rule is ours."*
+- **Staff reads Patient's ward occupancy for two things**, both already documented on Patient's side (§5.3): the roster grid's understanding of demand, and the Staff Allocation Agent's tool list — `staff-spec.yaml`'s `ToolCall.tool_name` enum includes `get_ward_occupancy` alongside its own `get_ward_coverage`, confirming the agent actually calls out to Patient rather than only reading its own tables.
+- **Staff stores no patient data at all.** Nothing in `staff-spec.yaml`'s schemas references `Patient`, `Admission` or any patient-identifying field — consistent with §5's "none of that makes patient data theirs."
+
+## 18. Staff Management ↔ Equipment Management (Member 3)
+
+- **§14 already documents this from Equipment's side** and Staff's spec agrees on every point found: `PharmacyTransaction.performed_by_staff_id`, `MaintenanceSchedule.performed_by_staff_id`, `ActionRequest.approved_by_staff_id` and `Warning.acknowledged_by_staff_id` are all ID-only FKs into `StaffMember`, resolved through Staff's lookup endpoint (§18.1) rather than copied.
+- **No Equipment action is gated on a Staff-defined role beyond the shared JWT.** `staff-spec.yaml`'s `bearerAuth` description lists `EquipmentManager` as one of the roles it issues claims for, but the gating logic itself (Inventory Administrator vs Equipment Technician, §14.2) is Equipment's to enforce — Staff only issues the token and the role claim.
+- **Open Decision 11 (`docs/entity_diagram.md`) is unresolved from Staff's side too.** `staff-spec.yaml`'s `StaffRole` enum still carries a single `equipment_manager`, not the two capabilities (`Inventory Administrator` / `Equipment Technician`) that `equipment-management-plan.md` §2 is written against. Staff has not proposed a fix; this stays open for Members 2 and 3 to settle, as already recorded in `docs/entity_diagram.md`.
+
+## 18.1 Staff's lookup contract, used by both
+
+`POST /staff/lookup` is the one endpoint both §5.1 (Patient) and §14.1 (Equipment) point at, so it is worth stating once, here, rather than twice: batch resolve of staff ids to `{ staff_id, found, full_name, role, is_active }`, name/role/active-flag only, "any authenticated staff member" may call it. Unknown or deactivated ids come back `found: false` rather than 404ing the whole batch, so a caller rendering twenty rows never gets a hard failure over one stale id.
+
+## 19. Staff Management ↔ Emergency (Member 1)
+
+`staff-spec.yaml` does not mention Emergency directly — no shared schema, no cross-reference in its `info.description`. The boundary here follows purely from the ownership map (§3) and the general-purpose contracts Staff already publishes to "any authenticated staff member," so nothing below is new plumbing Staff would need to build:
+
+- **`DispatchCrew` (Emergency's own table, §22–§26) stores `StaffMemberId`.** Same ID-only pattern as §5.1/§14.1/§18 — Emergency stores who crewed a dispatch, Staff owns the person. Emergency resolves names through `POST /staff/lookup`, the same endpoint Patient and Equipment already use; nothing Emergency-specific was needed on Staff's side.
+- **`ambulance_crew` and `general_staff` are already staff roles** in `staff-spec.yaml`'s `StaffRole` enum, so Emergency's Flutter screens authorize against the same JWT claim every other component reads — no separate role system for crew.
+- **Staff's roster does not currently model ambulance duty.** `Shift`/`Allocation` are ward-based (`Shift.WardId`); an ambulance run is not a ward shift. `docs/entity_diagram.md` keeps `DispatchCrew` as Emergency's own join table for exactly this reason (Decision 30: *"ambulance duty is real-time, not part of the ward-based shift roster"*) — so there is nothing to reconcile between the two schedules, they are deliberately separate concepts.
+
+## 20. Contracts Staff Management provides
+
+Mirrors §9's and §15's format, from Staff's side. All JWT-protected; role restrictions per `staff-spec.yaml`.
+
+| Endpoint | For | Returns |
+| :--- | :--- | :--- |
+| `POST /staff/lookup` | Patient, Equipment, Emergency — any component displaying "who did this" without copying staff data | Batch of `{ staff_id, found, full_name, role, is_active }`, in request order |
+| `GET /coverage/wards` | Patient's bed agent as an optional soft ranking rule (§5.4, not in the first build); the Equipment agent when deciding where to move equipment | Per-ward `{ on_duty_count, minimum_headcount, headcount_needed, status, by_role }` — counts only, no staff identities |
+| `GET /wards/{wardId}/staffing-rules` | Any component that needs to know a ward's staffing policy | The minimum-headcount rules for that ward, by role and skill |
+
+## 21. What Staff Management needs from others
+
+Mirrors §10's and §16's format, from Staff's side — read from `staff-spec.yaml`'s own stated dependencies, not invented.
+
+| From | What | Why |
+| :--- | :--- | :--- |
+| **M4 (Patient)** | Ward occupancy / ward capacity data | The roster agent's `get_ward_occupancy` tool and the coverage report both read Patient's ward numbers to judge staffing demand — §5.3 |
+| **M4 (Patient)** | Ward id and name | `Shift.WardId` and `WardStaffingRule.WardId` are read-only references; Staff keeps no copy of ward type or gender policy, having no use for either |
+| **Group** | Shared agent-workflow tables | Same open item as §11.2 and §16 — `staff-spec.yaml` already links its own `RosterProposalDetail.workflow_id` into whatever the group agrees, rather than inventing its own workflow schema |
+| **Group** | A decision on `Allocation.clocked_in_at` / `clocked_out_at` | `staff-spec.yaml` publishes `POST /me/allocations/{id}/clock-in` and `/clock-out`, and its own `info.description` and `Allocation` schema flag that these two fields do not yet exist on `docs/entity_diagram.md`'s `Allocation` entity (Rev 2). This is a genuine schema gap, not a boundary disagreement — raised here rather than silently assumed, since `entity_diagram.md` is group-owned and not Staff's alone to add fields to |
+
+---
+
+## 22. Emergency ↔ Patient Management (Member 4) — confirmed from Emergency's side
+
+§4 above already documents this boundary from Patient Management's side, written before `emergency-spec.yaml` existed. `emergency-spec.yaml` (Member 1, Kaveesha) now agrees with every point found there:
+
+- **The call screen split holds.** Patient Management builds the emergency-call form (a patient-role Flutter screen); Emergency owns `POST /emergency-calls`, the `EmergencyCall` record and everything downstream. Neither side writes the other's table.
+- **`patient_is_caller` and `caller_user_id` are now on the wire, as §4.2 and §10 asked for.** `emergency-spec.yaml`'s `CreateEmergencyCallRequest` carries `patient_is_caller` as a required field. **`caller_user_id` is not a request field** — it is read from the JWT of whoever posts the call, because a client that could name its own caller id could file a call under somebody else's account. It is null for a call logged at the front desk on behalf of a walk-in or phone caller. Both are carried forward unchanged onto the dispatch notification's `DispatchNotification` schema, matching the JSON shape §4.2 already specified field-for-field: `dispatch_id`, `caller_user_id`, `patient_is_caller`, `patient_id`, `provisional_name`, `provisional_gender`, `expected_arrival`, `urgency`, `destination_ward_type_hint`.
+- **`urgency` is translated by Emergency before the call, not by Patient afterwards.** The two components rank different things — `CallPriority` is how fast an *ambulance* is needed, `AdmissionUrgency` is how fast a *bed* is — so `DispatchNotification.urgency` carries Patient's vocabulary, not Emergency's. The table is fixed in C# on Emergency's side and is not something the agent decides: `critical` → `emergency`, `high` → `urgent`, `medium` and `low` → `routine`. Lossy on purpose, one-directional, and written in three places that must agree — here, `emergency-spec.yaml`'s `DispatchNotification`, and `patient-spec.yaml`'s `PreAdmitRequest`. `POST /admissions/pre-admit` rejects anything outside Patient's three values with a 400, so a drift here fails loudly rather than filing an emergency as routine.
+- **`caller_user_id` is a `PatientAccount.Id`, never a `Patient.Id`.** `docs/entity_diagram.md` Rev 2.5 adds the `PatientAccount` table and repoints `EmergencyCall.CallerUserId` at it. This is Patient Management's omission, not Emergency's — the patient login was resolved in Rev 2.3 and the table was never written down, so Rev 2.4 reasonably guessed `Patient.Id`. The bystander case is why it matters: `caller_user_id` is the helper's **login**, `patient_id` is the casualty's **medical record**, and one FK to one table would mean fabricating a record for the healthy person every time. `Patient.user_account_id` is the single optional link between them.
+- **A call can also arrive by phone, and that needs no new contract.** Patient Management's emergency screen carries a `tel:` link to the hospital number beside the button (`patient-management-plan.md` §10.1); a staff member takes the details and posts the same `POST /emergency-calls`, which `emergency-spec.yaml` already documents as *"also used by staff logging a call at the front desk for someone with no phone or app"*. `caller_user_id` is null on that path — which is exactly what it is nullable for. No endpoint, table or field is added by either component, and no telephony system is being built.
+- **Location and maps are entirely Emergency's**, per §4.1. `EmergencyCall.latitude` / `longitude` are required fields on Emergency's own create request; Patient's form only forwards whatever the caller enters, with no location logic of its own.
+- **`destination_ward_type_hint` stays a hint.** `emergency-spec.yaml`'s Dispatch & Routing Agent proposes it, but `admission_category` is set by clinical staff in Patient Management — the same wall §7 and §4.2 already draw, and Emergency's spec does not attempt to cross it.
+- **Open item 11.3 is now practically resolved** (see the updated §11.3 above): the agent's plan calls Patient's `POST /admissions/pre-admit` directly once a dispatch is created, matching what `patient-spec.yaml` already documented as the expected caller.
+- **Emergency reads Patient's ward capacity, read-only, counts only** — `GET /capacity/wards` — exactly as §4.3 specifies. No patient data crosses this boundary from either side.
+
+## 23. Emergency ↔ Staff Management (Member 2)
+
+- **`DispatchCrew` stores `StaffMemberId`, ID only.** Same pattern as every other cross-component staff reference in this document (§5.1, §14.1, §19) — Emergency never copies a crew member's name, role or department; it resolves them through Staff's `POST /staff/lookup` (§18.1) at read time, for the React dispatch board and the call-outcome report.
+- **`ambulance_crew` is a `StaffRole` Staff already issues.** Emergency's Flutter crew screens (§4.1 of `docs/CareLanka_Component_Plan.md`) authorize against that JWT claim; Emergency defines no role of its own.
+- **Ambulance duty stays outside the ward roster, on both sides' account.** §19 already records Staff's reasoning (`docs/entity_diagram.md` Decision 30); Emergency's `DispatchCrew` table is the other half of that same decision — crew assignment is real-time and per-dispatch, not a `Shift`/`Allocation` row.
+
+## 24. Emergency ↔ Equipment Management (Member 3)
+
+There is close to no boundary here, and that is a design decision recorded in `docs/entity_diagram.md`, not an oversight:
+
+- **Ambulances carry no tracked equipment.** `docs/entity_diagram.md`'s `Ambulance` note is explicit: *"Onboard equipment is explicitly not tracked (equipment stays ward-scoped only)"* (Decisions 9, 14). Equipment's `EquipmentItem.WardId` is non-nullable — every tracked item belongs to a ward, never to a vehicle — so there is no shared table, no read, no write between the two components.
+- **The only indirect link is the destination ward**, and that link already runs through Patient Management (§22, §6.3), not directly to Equipment. Emergency never calls Equipment's API.
+
+### 24.1 The Dispatch & Routing Agent's plan, for context on §22–§23
+
+`emergency-spec.yaml`'s Dispatch & Routing Agent (`AgentType.DispatchRouting` in `docs/entity_diagram.md`) plans in this order:
+
+1. Read the incoming `EmergencyCall` — location and priority. **The dispatcher sets the priority, not the agent**; triage is clinical judgement, the same wall §7 draws around `admission_category`.
+2. List available ambulances (own data) and rank by **real driving ETA** via the maps API — the assignment's one required third-party integration (§4.1), and the reason it earns its place rather than being decorative.
+3. Read Patient Management's `GET /capacity/wards` (§22) to attach a `destination_ward_type_hint` — a hint only, never `admission_category`.
+4. **Routine case:** a free ambulance exists → the proposal lands in `pending_confirmation` and the dispatcher sends it with **one tap**.
+5. **Diversion case:** nothing is free, but an ambulance is still *driving to* a lower-priority call → the proposal lands in `pending_approval` with a `DiversionImpact` block showing what it costs that other patient, and the Duty Manager decides in React (assignment §9.1).
+6. **Neither:** outcome `no_ambulance_available`, workflow `failed`, recorded honestly rather than retried in a loop.
+7. Once a human has confirmed or approved and a `Dispatch` exists, call Patient Management's `POST /admissions/pre-admit` (§22) so a bed search can start before the ambulance arrives.
+
+**Two things here matter to the other three members, because they change what the group can claim:**
+
+- **Nothing this agent proposes reaches the road without a person.** An earlier draft had the routine dispatch auto-approved with no human gate. That has been replaced by the one-tap confirm, which means **no agent in CareLanka — none of the four — now writes production data without human approval.** That is a cleaner story for the group's Agentic AI rubric line than "three of the four do." It does change `docs/CareLanka_Component_Plan.md` §4.1, which has been updated to match and is flagged there and in `emergency-management-plan.md` §14 as **needing group confirmation**.
+- **An ambulance that has reached its patient is never diverted.** Enforced in C# at proposal time, at approval time and on the manual path. Worth knowing outside Emergency because it is why a dispatch can still be reassigned while its ambulance is `en_route` but not once that ambulance is `at_scene` or `transporting`. Note which enum that is: `at_scene` is an **`AmbulanceStatus`**, not a `DispatchStatus` — the vehicle reports it, the dispatch does not have that state. Anyone reading dispatch status from outside this component and expecting to find `at_scene` there will not, and needs the ambulance's status instead.
+
+### 24.2 Note
+
+This section exists so a reader of `integration_of_functions.md` does not have to separately open `emergency-management-plan.md` to see why §22 and §23 read the way they do; the full design, including both approval gates, the divertibility rule and the React/Flutter screen split, is in `emergency-management-plan.md`.
+
+## 25. Contracts Emergency Service provides
+
+Mirrors §9's, §15's and §20's format, from Emergency's side. All JWT-protected; role restrictions per `emergency-management-plan.md` §7.
+
+| Endpoint | For | Returns |
+| :--- | :--- | :--- |
+| `POST /emergency-calls` | Patient Management's patient-facing "I need an ambulance" screen (§4.1, §22) | The created `EmergencyCall`, including `id` for the caller's app to track against, plus the dispatch proposal already raised |
+| `GET /dispatches/{id}` | Patient Management / a future orchestrator, to check dispatch status without waiting on the push notification | Dispatch status, ambulance, crew, destination ward (once set), route and ETA |
+| `GET /me/emergency-calls/{id}/tracking` | The patient's own Flutter screen | Ambulance position and ETA for a call **they** raised. Deliberately narrow — no crew names, no notes, no other calls. Emergency's own endpoint, not a filtered staff response |
+
+## 26. What Emergency needs from others
+
+Mirrors §10's, §16's and §21's format, from Emergency's side.
+
+| From | What | Why |
+| :--- | :--- | :--- |
+| **M4 (Patient)** | `GET /capacity/wards` | The Dispatch & Routing Agent's destination-ward choice (§24.1 step 3) |
+| **M4 (Patient)** | `POST /admissions/pre-admit` | Creates the pre-admission before the ambulance arrives (§24.1 step 6, §22) |
+| **M2 (Staff)** | `POST /staff/lookup` | Resolving crew member names for the React dispatch board and the call-outcome report, without copying staff data (§23) |
+| **M2 (Staff)** | `ambulance_crew` as a role on the JWT | Gating the Flutter crew screens (§23) |
+| **Group** | Shared agent-workflow tables | Same open item as §11.2, §16 and §21 — the Dispatch & Routing Agent links to whatever the group agrees rather than inventing its own workflow schema |

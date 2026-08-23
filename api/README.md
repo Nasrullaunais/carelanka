@@ -1,29 +1,37 @@
 # Running the API locally
 
-Everything below is a one-time setup, except step 3.
+Everything below is a one-time setup, except step 4.
 
-## 1. Start a database
+## 1. Install PostgreSQL
 
-The API needs PostgreSQL on **port 5433**. Not 5432 — several of us already have a
-Postgres installed on the normal port, and two servers cannot share one.
+Any recent version. If you already have one running (some of us do, from other
+projects), you don't need a second — just create a database and user for this
+project inside it.
 
-```bash
-docker compose up -d          # from the repo root
-```
+## 2. Create the database and user
 
-That gives you Postgres 16, database `carelanka`, user `carelanka`, password
-`carelanka`. `docker compose down` stops it and keeps your data;
-`docker compose down -v` throws the data away.
-
-**No Docker?** Create the same thing by hand in your own Postgres and point
-`api/appsettings.Development.json` at whatever port yours runs on:
+Open `psql` (or pgAdmin, or whatever you use) and run:
 
 ```sql
 CREATE USER carelanka WITH PASSWORD 'carelanka';
 CREATE DATABASE carelanka OWNER carelanka;
 ```
 
-## 2. Create the tables
+`api/appsettings.Development.json` assumes this user, this password, and the
+default port `5432`. **If your Postgres runs on a different port, or you'd
+rather not use these exact credentials, don't edit that file — it's shared and
+your change would show up in every diff.** Instead, override it locally:
+
+```bash
+cd api
+dotnet user-secrets init
+dotnet user-secrets set "ConnectionStrings:CareLanka" "Host=localhost;Port=5433;Database=carelanka;Username=carelanka;Password=carelanka"
+```
+
+User secrets live outside the repo (in a folder under your user profile), so this
+never gets committed and never conflicts with anyone else's setup.
+
+## 3. Create the tables
 
 ```bash
 dotnet tool install --global dotnet-ef --version 8.0.11    # once per machine
@@ -31,11 +39,13 @@ cd api
 dotnet ef database update
 ```
 
-## 3. Load the test accounts
+## 4. Load the test accounts
 
 ```bash
-psql -h localhost -p 5433 -U carelanka -d carelanka -f ../docs/seed_staff.sql
+psql -U carelanka -d carelanka -f ../docs/seed_staff.sql
 ```
+
+(Add `-h localhost -p <port>` if you're not on the default.)
 
 Seven accounts, one per role. All of them use the password **`CareLanka#2026`**.
 
@@ -49,7 +59,7 @@ Seven accounts, one per role. All of them use the password **`CareLanka#2026`**.
 | `equipment@carelanka.lk` | EquipmentManager |
 | `staff@carelanka.lk` | GeneralStaff |
 
-## 4. Run it
+## 5. Run it
 
 ```bash
 cd api

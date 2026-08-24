@@ -314,9 +314,10 @@ Everything below §5–§8 assumes steps 1–3 are done or stubbed.
 
 ## 8. Member 4 — Patient Management (Lochana)
 
-**Owns:** `Patient`, `PatientAccount`, `Admission`, **`Ward`**, `BedAssignment`, `BedReservation`, `Discharge`, `DischargeChecklistItem`, `Appointment`
-**Contract:** `specs/patient-spec.yaml` (33 paths) · **Design:** `specs/patient-management-plan.md`
+**Owns:** `Patient`, `PatientAccount`, `Admission`, **`Ward`**, `BedAssignment`, `BedReservation`, `Discharge`, `DischargeChecklistItem`, `Appointment`, **`CareRecommendation`**
+**Contract:** `specs/patient-spec.yaml` (40 paths) · **Design:** `specs/patient-management-plan.md`
 **Boundaries:** `integration_of_functions.md` §4–§11
+**Two agents, not one** — see step 13. Added on the lecturer's direction at topic finalization; §8.10 of the design doc has the full reasoning.
 
 | # | Step | Notes |
 | :-- | :--- | :--- |
@@ -330,12 +331,18 @@ Everything below §5–§8 assumes steps 1–3 are done or stubbed.
 | 8 | Codegen gate | |
 | 9 | React: admissions dashboard, bed board, occupancy report | |
 | 10 | Flutter: nurse screens, then patient's own-stay screens | Local notifications on status change — the device feature |
-| 11 | **The bed agent, last** | Hard rules H1–H5 in deterministic C#, soft rules rank. Re-check every hard rule under a row lock at approval time |
+| 11 | **The bed agent** | Hard rules H1–H5 in deterministic C#, soft rules rank. Re-check every hard rule under a row lock at approval time |
 | 12 | React: bed approval + downgrade approval | The two human gates |
+| 13 | `CareRecommendation` entity + configuration + migration | Independent of the bed workflow — no dependency on steps 1–12 beyond `Patient` and `Admission` existing |
+| 14 | **The care advisory agent, last** | Deterministic red-flag keyword screen (§8.13) runs *before* the model, not after. Rules CR1–CR4 (§8.15) validated the same way H1–H5 are |
+| 15 | React: Doctor's care recommendation queue, approve/reject | The third human gate in this component |
+| 16 | Flutter: "ask about a symptom" + "my care recommendations" | Patient-facing; never renders `agent_message` or `rejection_reason` |
 
 **You will need to stub:** Equipment's bed register (**your hardest dependency**); Staff's `POST /staff/lookup`; Emergency's dispatch notification.
 
 **Others are waiting on you for:** `Ward` (all three), `GET /capacity/wards` (M1), ward occupancy (M2), `GetBedOccupancyAsync` (M3), `POST /admissions/pre-admit` (M1).
+
+**Steps 13–16 are self-contained.** Nothing else in the group depends on the care advisory agent, and it depends on nothing outside this component beyond the `Doctor` role claim (already shared, via the bootstrap JWT). It can be built in parallel with the bed-agent track, or after — it does not gate anyone and nobody gates it.
 
 ---
 

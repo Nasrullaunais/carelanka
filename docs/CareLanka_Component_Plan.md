@@ -79,13 +79,21 @@ screens in both apps.**
 | :--- | :--- | :--- | :--- | :--- |
 | **Owns (data)** | EmergencyCall, Ambulance, Dispatch, DispatchCrew, RouteLog | Shift, Allocation, LeaveRequest, Skill, StaffMemberSkill, WardStaffingRule | EquipmentType, EquipmentItem, StockLevel, MaintenanceSchedule, Warning | Patient, Admission, Ward, Bed, BedAssignment, BedReservation, Discharge, DischargeChecklistItem, Appointment |
 | **React screens** | Live call board, dispatch approvals, route/map view, call outcome report | Staff records CRUD, roster approval, ward coverage dashboard, leave approval | Stock dashboard, warning queue, procurement/maintenance approval | Admissions dashboard, bed board, ICU/downgrade bed approval, discharge confirmation, occupancy report |
-| **Flutter screens** | Crew: receive dispatch, navigate, update status, handover. Patient: make emergency call | Staff: my shifts, clock in/out, request leave, request swap | Ward staff: report faulty equipment, view ward stock, take a bed out of service | Nurse: approve normal-ward bed, update status, complete details, request discharge. Patient: my stay, book a visit, discharge instructions |
-| **AI agent** | Dispatch & Routing | Staff Allocation | Equipment Monitoring | Patient Admission & Bed |
+| **Flutter screens** | Crew: receive dispatch, navigate, update status, handover. Patient: make emergency call | Staff: my shifts, clock in/out, request leave, request swap | Ward staff: report faulty equipment, view ward stock, take a bed out of service | Nurse: approve normal-ward bed, update status, complete details, request discharge. Patient: my stay, book a visit, discharge instructions, **ask about a symptom, see my doctor-approved recommendations** |
+| **AI agent** | Dispatch & Routing | Staff Allocation | Equipment Monitoring | Patient Admission & Bed, **+ Patient Care Advisory** |
 | **Device feature** | GPS + maps | Date/time picker for leave dates | Camera for fault photos | Local notifications on status change, date/time picker for booking |
 | **Third-party API** | Maps / navigation | — | — | — |
 
 > Only one third-party integration is required for the whole system (§4.1), and
 > Member 1's maps API covers it. Others are optional.
+
+> **Member 4 runs two agents, not one.** Added on the lecturer's direction at topic
+> finalization: a component this patient-facing needed an agent the patient actually
+> talks to, not only one that moves beds behind the scenes. **Patient Care Advisory**
+> reads a patient's own description of a symptom plus their stored history and drafts
+> a decision-support note — never a diagnosis — which a **Doctor** must approve before
+> the patient ever sees it. Same human-approval pattern as every other agent in this
+> table, one workflow later. Full design in `patient-management-plan.md` §8.10.
 
 ---
 

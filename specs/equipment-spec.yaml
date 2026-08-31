@@ -1019,7 +1019,7 @@ paths:
         Roles: InventoryAdministrator, and the group orchestrator.
 
         Business operation beyond CRUD, and the integration surface named in the group plan's
-        cross-agent sequence (`CareLanka_Component_Plan.md` section 5): "Equipment Monitoring
+        cross-agent sequence (`docs/CareLanka_Component_Plan.md` section 5): "Equipment Monitoring
         Agent checks the destination ward has the equipment it needs." Runs the agent's
         `check_ward_readiness` objective synchronously and returns the answer directly.
       operationId: getWardEquipmentReadiness

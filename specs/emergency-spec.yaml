@@ -2314,7 +2314,7 @@ components:
 
     ProblemDetails:
       type: object
-      description: RFC 7807. The shared error shape across all four components.
+      description: RFC 7807, as produced by ASP.NET Core.
       properties:
         type: { type: string }
         title: { type: string }

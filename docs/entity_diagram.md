@@ -449,6 +449,28 @@ shift starting in two hours, which the previous two-value enum could not express
 
 ### Health Equipment
 
+> **STALE — this section does not match `equipment-spec.yaml`. Member 3 owns the fix.**
+> *(flagged 2026-09-07)*
+>
+> `CLAUDE.md`'s rule is that where the diagram and a member's own committed spec disagree,
+> **the spec wins**. So the five entities below are wrong in two directions:
+>
+> | In the diagram, not in the spec | In the spec, not in the diagram |
+> | :--- | :--- |
+> | `EquipmentType` (spec calls it `EquipmentCategory`) | `PharmacyCategory` |
+> | `StockLevel` | `PharmacyItem` |
+> | | `PharmacyTransaction` |
+> | | `ActionRequest` |
+> | | `Bed` — defined under Patient Management below, but owned here |
+>
+> This matters beyond tidiness: **§6 and §15 require the ER diagram as a submitted,
+> graded artefact**, and right now it describes a database we are not going to build.
+>
+> Two questions only Member 3 can answer, which is why this is a flag and not an edit:
+> **(1)** Does `StockLevel` survive for equipment consumables, or did `PharmacyItem`
+> replace it entirely? **(2)** Is the pharmacy quantity central or per-ward
+> (`equipment-management-plan.md` §15 leaves this open)?
+
 #### EquipmentType extends SoftDeletableEntity
 ```
 + Name: string (unique, non-null)
@@ -1594,9 +1616,14 @@ rows are mutated after insert; pure join/append-only tables (`DispatchCrew`,
 |-----------|-------|----------|
 | Emergency / Ambulance | Member 1 | EmergencyCall, Ambulance, Dispatch, DispatchCrew, RouteLog |
 | Staff Management | Member 2 | Shift, Allocation, LeaveRequest, Skill, StaffMemberSkill, WardStaffingRule |
-| Health Equipment | Member 3 | EquipmentType, EquipmentItem, StockLevel, MaintenanceSchedule, Warning, **Bed** |
-| Patient Management | Member 4 | Patient, **PatientAccount**, Admission, BedAssignment, BedReservation, Discharge, DischargeChecklistItem, Appointment, Ward, **CareRecommendation** |
-| Shared / Group | All | StaffMember, RefreshToken, DeviceToken, Notification, AgentWorkflow, AgentProposedChange, AuditLog |
+| Health Equipment | Member 3 | EquipmentCategory, EquipmentItem, **Bed**, PharmacyCategory, PharmacyItem, PharmacyTransaction, MaintenanceSchedule, Warning, ActionRequest |
+| Patient Management | Member 4 | Patient, **PatientAccount**, Admission, BedAssignment, BedReservation, Discharge, DischargeChecklistItem, Appointment, Ward |
+| Common | Nasrullah | StaffMember, **PatientAccount**, RefreshToken, DeviceToken, Notification, AgentWorkflow, AgentProposedChange, AuditLog |
+
+**Common means built once, not four times.** *(2026-09-07)* Anything that is not a
+specific member's is common: auth and the JWT, the `DbContext` and base classes, the
+exception handler, the audit interceptor, the agent workflow tables and the Coordinator
+Agent. Contract: `specs/common-spec.yaml`. Reasoning: `docs/ADR.md` ADR 3.
 
 **Note:** `Ward` sits under Patient Management but is referenced by all four components
 (`Shift.WardId`, `EquipmentItem.WardId`, `StockLevel.WardId`, `Dispatch.DestinationWardId`).
@@ -1681,8 +1708,11 @@ approves when the plan "sends the patient to a hospital other than the nearest o
 unreachable branch. The reassignment trigger still works, so the approval demo survives.
 Fix the Component Plan wording, or introduce a `Hospital` entity.
 
-**3. Enum storage strategy.** Native PostgreSQL enum vs `int` vs
-`HasConversion<string>()`. Rev 2 adds nine enums and changes four existing ones — with
+**3. Enum storage strategy — RESOLVED (2026-09-07): `HasConversion<string>()` plus a
+CHECK constraint,** stored `snake_case` to match the wire values the specs publish. Full
+reasoning and consequences are **ADR 5** in `docs/ADR.md`. Original entry kept below.
+
+Native PostgreSQL enum vs `int` vs `HasConversion<string>()`. Rev 2 adds nine enums and changes four existing ones — with
 native PG enums each of those is an `ALTER TYPE` that EF Core migrations handle awkwardly.
 *Recommendation:* `HasConversion<string>()` plus a CHECK constraint. Readable in `psql`,
 trivial to extend, and the CHECK preserves integrity. This is ADR-worthy.
@@ -1719,6 +1749,13 @@ turned over between patients is a real state and somebody owns it. Options: a th
 `referral`. A patient referred from another clinic is plausibly distinct from a walk-in.
 Member 4 decides — adding it means changing a committed enum, so it is not a diagram-only
 change.
+
+**12. Health Equipment entities are stale in this diagram.** *(2026-09-07)* See the
+banner on the Health Equipment section above. `EquipmentType` and `StockLevel` are
+published nowhere; `PharmacyCategory`, `PharmacyItem`, `PharmacyTransaction` and
+`ActionRequest` are published in `equipment-spec.yaml` and modelled nowhere here. The spec
+wins, so the diagram needs updating to match. **Member 3 owns this**, and it is on the
+critical path for the submitted ER diagram, not just for tidiness.
 
 **11. Is Equipment one role or two?** *(Rev 2.2)* This diagram and `staff-spec.yaml` carry
 a single `EquipmentManager`. `equipment-management-plan.md` §2 is written around two

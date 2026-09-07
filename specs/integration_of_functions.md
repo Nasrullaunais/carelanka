@@ -104,8 +104,16 @@ The second version keeps working when hold expiry, out-of-service beds or a new 
 | `Patient`, `Admission`, `Discharge` | **Patient (M4)** | Emergency, Staff (aggregates only) | Patient only |
 | **`BedAssignment`** — who is in a bed, holds, approvals | **Patient (M4)** | Equipment (before servicing a bed) | Patient only |
 | `Ward` — name, type, gender policy | **Patient (M4)** — *see §11.1* | All | Patient only |
-| Agent workflow state | **Group** — *open, §11.2* | All four agents | All four agents |
-| `StaffMember`, login, JWT issuing | **Group** — shared plumbing, built once | All | Whoever takes it on |
+| `AgentWorkflow`, `AgentProposedChange` | **Common (Nasrullah)** — *DECIDED, §11.2* | All five agents | All five agents, by `workflow_id` |
+| `StaffMember`, `PatientAccount`, `RefreshToken`, login, JWT issuing | **Common (Nasrullah)** — `specs/common-spec.yaml` | All | Common only |
+| `AuditLog`, `Notification`, `DeviceToken` | **Common (Nasrullah)** | All | Written by the audit interceptor, never by hand |
+
+**The rule for everything else: if it does not belong to a specific member, it is
+common.** Common parts are owned by Nasrullah and built **once**, not four times.
+That covers auth, the JWT, the exception handler, the audit interceptor, the
+`DbContext`, the base entity classes, the agent workflow tables and the Coordinator
+Agent. If you are about to build something that is not in your component's row above,
+stop and check whether it is common.
 
 **Roles are not owned by anyone.** The shared part is only the plumbing — one
 `StaffMember` table, one login endpoint, one JWT issuer — so all four components
@@ -430,7 +438,17 @@ All JWT-protected and role-restricted. Aggregate endpoints return **counts, neve
 **11.1 — Does `Ward` sit with Patient Management or Equipment?**
 Beds are settled (§6.1). Wards are not. Argument for M4: a ward's `gender_policy` and `ward_type` are admission-policy facts that drive the bed agent's hard rules — Equipment does not care whether a ward is male or female, only about frames and servicing. Written as M4's for now; M3 and the group to confirm.
 
-**11.2 — Who owns the agent-workflow tables?**
+**11.2 (DECIDED 2026-09-07) — The agent-workflow tables are common.**
+`AgentWorkflow` and `AgentProposedChange` are one group-owned pair, built once as part of
+the common bootstrap. Every component links by `workflow_id` and otherwise leaves them
+alone. The HTTP surface is `specs/common-spec.yaml` — `GET /workflows`,
+`GET /workflows/{workflowId}`, and the single high-impact gate
+`POST /workflows/{workflowId}/{approve,reject,request-revision}`. Reasoning and
+consequences are **ADR 3** in `docs/ADR.md`.
+
+This also settles the general rule: **anything that is not a specific member's is common.**
+
+The original question, kept for the record:
 All four agents must persist workflow id, objective, plan, steps, tool results, validation results, errors, approval status and outcome (assignment §9.1). The rubric scores this under a **group** criterion — *"Integrated Architecture, Agent Orchestration and State Management (10)"* — not an individual one, and §10 requires one workflow crossing all four agents. Four separately designed schemas would make that trace a four-way join.
 **Recommendation:** one shared design, group-owned, since `ai-orchestration-workflow.md` is already group-owned. Each component links by `workflow_id`.
 **Needs a group decision. Not decided.**
@@ -470,10 +488,22 @@ name. So nothing was given up; each component kept its own report under its own 
 | `PagedResult` — staff had `total_count` | `total_items` in all four, and `required` on all four | group-owned type |
 | `staff-spec.yaml` did not validate | Fixed — the `LeaveReport` description containing a comma is now quoted, exactly the trap `CLAUDE.md` warns about | M2 |
 
-**Still open, deliberately:** `/bed-workflows/{workflowId}` is an **interim name**, not a
-claim. §11.2 has not been settled, and once the group decides who owns the agent-workflow
-tables this should collapse into **one** shared workflow endpoint rather than one per
-component. Renaming was done only to stop the route clash from crashing startup.
+**Second sweep, 2026-09-07** — after `specs/common-spec.yaml` was added. Five specs now,
+still zero route, `operationId` and schema-shape collisions.
+
+| Was | Now | Why |
+| :--- | :--- | :--- |
+| `GET /workflows/{workflowId}` in equipment | Common owns it; Equipment's richer view is `GET /equipment/workflows/{workflowId}` | §11.2 decided — the generic route is group-owned |
+| `WorkflowSummary` (equipment) | `EquipmentWorkflowSummary` | Generic name now belongs to the shared shape |
+| `ProposedChange`, `ProposedChangeType`, `ValidationResult` (staff) | `RosterProposedChange`, `RosterProposedChangeType`, `RosterValidationResult` | Same reason. Staff's are roster-shaped views with extra fields, so they get component names |
+| `ProblemDetails` — two different `description` strings | One text in all five | Shared types must be byte-identical, not merely same-shaped |
+| `StaffRole` (staff) | Byte-identical copy in common | It is the JWT role list, so it is group-owned |
+
+**No longer open:** `/bed-workflows/{workflowId}` was an interim name pending §11.2. §11.2
+is now decided and the name **stays** — deliberately, not by default. The shared trace
+lives at `/workflows/{workflowId}`; `/bed-workflows/{workflowId}` is Patient Management's
+own fuller view of its own runs, which is M4's individual work and worth keeping. Same
+shape of answer as Equipment's.
 
 **The rule that keeps this cleared:** the four specs describe one ASP.NET application, so
 routes, `operationId`s and schema names are global. Before adding any of the three, check

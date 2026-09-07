@@ -48,6 +48,11 @@ tags:
     description: Agent proposals, human approval, and manual override.
   - name: Discharge
     description: Discharge checklist and confirmation.
+  - name: Care Recommendations
+    description: |
+      The second agent. A patient describes a symptom or concern; the agent drafts a
+      decision-support note; a Doctor must approve, edit or reject it before the patient
+      ever sees it. Never a diagnosis - see patient-management-plan.md section 8.10.
   - name: Patient Self-Service
     description: What a logged-in patient may see about themselves. Deliberately narrow.
   - name: Reports
@@ -1431,6 +1436,223 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /me/care-queries:
+    post:
+      tags: [Patient Self-Service]
+      summary: Describe a new symptom or concern, in your own words
+      description: |
+        Roles: Patient.
+
+        Agent entry point for the Patient Care Advisory Agent. Starts the workflow and
+        returns immediately with a workflow_id; poll /care-workflows/{workflowId} for
+        progress, or wait for /me/care-recommendations to show it once a doctor has acted.
+
+        The agent reads your stored history (age, gender, past admissions, past reports -
+        never a diagnosis, this system does not store one) and drafts a note. That draft
+        is NOT returned here and is never shown to you directly. It is doctor-facing only,
+        held on the record until a Doctor approves, edits or rejects it. See
+        patient-management-plan.md section 8.10.
+
+        A fixed keyword screen runs before the agent does. If your text matches a
+        red-flag pattern (chest pain, can't breathe, severe bleeding, and similar), the
+        report is escalated to a doctor immediately rather than waiting in the ordinary
+        queue - but a human still decides what you are told.
+      operationId: submitCareQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CareQueryRequest' }
+      responses:
+        '202':
+          description: Workflow started
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CareWorkflowAccepted' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /care-workflows/{workflowId}:
+    parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Care Recommendations]
+      summary: Agent execution summary for a care recommendation
+      description: |
+        Roles: Doctor, DutyManager.
+
+        Same shape and purpose as /bed-workflows/{workflowId}: plan, completed steps,
+        tool calls, the red-flag screen result, validation, status and outcome. The
+        model's raw internal reasoning is not stored, only the summary.
+      operationId: getCareWorkflow
+      responses:
+        '200':
+          description: Execution summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CareWorkflowSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /care-recommendations:
+    get:
+      tags: [Care Recommendations]
+      summary: The doctor's review queue
+      description: 'Roles: Doctor, DutyManager. Filter by status. Paginated, sortable.'
+      operationId: listCareRecommendations
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/CareRecommendationStatus' }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/SortDir'
+      responses:
+        '200':
+          description: Care recommendations
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/CareRecommendationSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /care-recommendations/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Care Recommendations]
+      summary: Full detail for one care recommendation
+      description: |
+        Roles: Doctor, DutyManager.
+
+        The patient's own text, the agent's draft message, red_flag / urgency_flag, and
+        the patient history the agent read when drafting it.
+      operationId: getCareRecommendation
+      responses:
+        '200':
+          description: Care recommendation detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CareRecommendation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /care-recommendations/{id}/approve:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Care Recommendations]
+      summary: Approve a care recommendation - the high-impact human gate
+      description: |
+        Roles: Doctor only.
+
+        The one action in this component gated on the Doctor role alone, the same wall as
+        the clinical_clearance discharge checklist item. Optionally edit the message before
+        it becomes visible to the patient - doctor_message is either the doctor's own edit
+        or the agent's draft unchanged. Either way, nothing reaches the patient until this
+        call succeeds.
+      operationId: approveCareRecommendation
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApproveCareRecommendationRequest' }
+      responses:
+        '200':
+          description: Approved. Now visible to the patient.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CareRecommendation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Only a Doctor may approve a care recommendation.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This recommendation is not pending review.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /care-recommendations/{id}/reject:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Care Recommendations]
+      summary: Reject a care recommendation
+      description: |
+        Roles: Doctor only.
+
+        Requires a reason. The reason is staff-facing only and is never sent to the
+        patient - their own view shows a generic "reviewed, your doctor will follow up"
+        note instead. See patient-management-plan.md section 7.7.
+      operationId: rejectCareRecommendation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RejectCareRecommendationRequest' }
+      responses:
+        '200':
+          description: Rejected
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CareRecommendation' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Only a Doctor may reject a care recommendation.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /me/care-recommendations:
+    get:
+      tags: [Patient Self-Service]
+      summary: Your own past reports and their status
+      description: |
+        Roles: Patient. Resolved from the JWT.
+
+        Returns MyCareRecommendation, a separate and deliberately small shape - the same
+        pattern as MyAdmission (section 7.6). It never contains agent_message or
+        rejection_reason, because those fields do not exist on it. doctor_message is only
+        populated once status is approved.
+      operationId: getMyCareRecommendations
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Your care recommendations
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/MyCareRecommendation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
 # ====================================================================
 components:
 
@@ -2242,3 +2464,149 @@ components:
         failed: { type: integer }
         average_seconds_to_approval: { type: number, format: float }
         average_agent_latency_ms: { type: number, format: float }
+
+    # ---------- care recommendations (second agent) ----------
+
+    CareUrgency:
+      type: string
+      enum: [low, medium, high]
+
+    CareRecommendationStatus:
+      type: string
+      enum: [pending_review, approved, rejected]
+
+    CareQueryRequest:
+      type: object
+      required: [reported_text]
+      properties:
+        reported_text:
+          type: string
+          minLength: 5
+          maxLength: 2000
+          example: I've had a headache for two days and it's getting worse when I lie down.
+
+    CareWorkflowAccepted:
+      type: object
+      properties:
+        workflow_id: { type: string, format: uuid }
+        recommendation_id: { type: string, format: uuid }
+        status: { type: string, example: running }
+        poll_url: { type: string, example: /api/care-workflows/3fa85f64-5717-4562-b3fc-2c963f66afa6 }
+
+    CareWorkflowSummary:
+      type: object
+      description: |
+        Persisted agent execution state for the care advisory agent. Same shape and same
+        purpose as BedWorkflowSummary - see that schema's description.
+      properties:
+        workflow_id: { type: string, format: uuid }
+        recommendation_id: { type: string, format: uuid }
+        objective: { type: string, example: draft_care_recommendation }
+        status:
+          type: string
+          enum: [running, pending_review, completed, failed]
+        outcome:
+          type: string
+          enum: [drafted, escalated, failed]
+          nullable: true
+        plan:
+          type: array
+          items: { type: string }
+        steps:
+          type: array
+          items:
+            type: object
+            properties:
+              step: { type: string }
+              tool: { type: string, nullable: true }
+              started_at: { type: string, format: date-time }
+              duration_ms: { type: integer }
+              ok: { type: boolean }
+              error: { type: string, nullable: true }
+        red_flag:
+          type: boolean
+          description: Result of the deterministic keyword screen, run before the model.
+        validation:
+          type: object
+          description: Result of the deterministic C# validator (rules CR1-CR4), run after the agent drafts.
+          properties:
+            passed: { type: boolean }
+            failed_rules:
+              type: array
+              items: { type: string }
+        retries: { type: integer }
+
+    CareRecommendationSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        patient_id: { type: string, format: uuid }
+        reported_at: { type: string, format: date-time }
+        red_flag: { type: boolean }
+        urgency_flag:
+          allOf:
+            - $ref: '#/components/schemas/CareUrgency'
+          nullable: true
+        status: { $ref: '#/components/schemas/CareRecommendationStatus' }
+
+    CareRecommendation:
+      type: object
+      description: |
+        Full staff-facing detail. NEVER returned to a patient - see MyCareRecommendation
+        for the narrow shape a patient actually receives.
+      properties:
+        id: { type: string, format: uuid }
+        patient_id: { type: string, format: uuid }
+        admission_id: { type: string, format: uuid, nullable: true }
+        reported_text: { type: string }
+        reported_at: { type: string, format: date-time }
+        red_flag: { type: boolean }
+        urgency_flag:
+          allOf:
+            - $ref: '#/components/schemas/CareUrgency'
+          nullable: true
+        agent_message:
+          type: string
+          nullable: true
+          description: The agent's draft. Doctor-facing only.
+        status: { $ref: '#/components/schemas/CareRecommendationStatus' }
+        workflow_id: { type: string, format: uuid, nullable: true }
+        reviewed_by_staff_id: { type: string, format: uuid, nullable: true }
+        reviewed_at: { type: string, format: date-time, nullable: true }
+        doctor_message: { type: string, nullable: true }
+        rejection_reason: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ApproveCareRecommendationRequest:
+      type: object
+      properties:
+        doctor_message:
+          type: string
+          nullable: true
+          description: Leave unset to approve the agent's draft unchanged. Set to override it.
+
+    RejectCareRecommendationRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 3
+          description: Staff-facing only. Never sent to the patient.
+
+    MyCareRecommendation:
+      type: object
+      description: |
+        Narrow patient-facing shape, same pattern as MyAdmission. Does not contain
+        agent_message or rejection_reason - those fields do not exist on this schema,
+        so there is nothing to accidentally leak.
+      properties:
+        id: { type: string, format: uuid }
+        reported_text: { type: string }
+        reported_at: { type: string, format: date-time }
+        status: { $ref: '#/components/schemas/CareRecommendationStatus' }
+        doctor_message:
+          type: string
+          nullable: true
+          description: Set only once status is approved.

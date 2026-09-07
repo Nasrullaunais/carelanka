@@ -39,7 +39,7 @@ approval and one final transaction.
 
 ## 2. Where we already are
 
-Good news: `CareLanka_Component_Plan.md` §6 already describes the right chain —
+Good news: `docs/CareLanka_Component_Plan.md` §6 already describes the right chain —
 one emergency call fans out to all four agents, then the Duty Manager approves the
 whole plan. Structurally that is the sample's shape already.
 

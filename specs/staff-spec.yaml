@@ -32,7 +32,7 @@ info:
     - The entity diagram calls the dispatch role `DutyDispatchManager`; `patient-spec.yaml`
       calls it `DutyManager`. This spec uses `duty_manager` to match the spec already
       committed. One of the two documents needs correcting.
-    - Clock-in / clock-out is in `CareLanka_Component_Plan.md` §Roles but has no schema
+    - Clock-in / clock-out is in `docs/CareLanka_Component_Plan.md` §Roles but has no schema
       behind it. The `/me/allocations/{id}/clock-in|out` endpoints below need
       `clocked_in_at` and `clocked_out_at` added to `Allocation`.
     - Agent workflow tables are group-owned and undecided (`integration_of_functions.md`

@@ -189,7 +189,7 @@ Patient Management then creates an `Admission` with `source = emergency` and `di
 
 M1's Dispatch & Routing Agent needs to know which ward has room. The group plan already routes this through Patient Management:
 
-> "hospital ward capacity (**read-only, from Patient Management**)" — CareLanka_Component_Plan.md §1
+> "hospital ward capacity (**read-only, from Patient Management**)" — docs/CareLanka_Component_Plan.md §1
 
 ```json
 {
@@ -241,7 +241,7 @@ M2 owns the staff record. M4 owns the rule about who may tick which box.
 
 ### 5.3 Staff reads ward occupancy to work out staffing demand
 
-> "ward staffing demand (**read-only, from Patient Management** and Emergency)" — CareLanka_Component_Plan.md §2
+> "ward staffing demand (**read-only, from Patient Management** and Emergency)" — docs/CareLanka_Component_Plan.md §2
 
 ```json
 {
@@ -342,9 +342,9 @@ M3 allocates equipment *to* wards, so they read the ward list — id, name, type
 
 This is not caution — it is written into the group plan:
 
-> "The AI never decides a patient's medical condition or diagnosis — it only works with the administrative category and checklist that clinical staff have already set." — CareLanka_Component_Plan.md §4
+> "The AI never decides a patient's medical condition or diagnosis — it only works with the administrative category and checklist that clinical staff have already set." — docs/CareLanka_Component_Plan.md §4
 
-> "**Not a medical diagnosis system** — The Patient agent only works with administrative categories already set by staff — it never diagnoses" — CareLanka_Component_Plan.md §6
+> "**Not a medical diagnosis system** — The Patient agent only works with administrative categories already set by staff — it never diagnoses" — docs/CareLanka_Component_Plan.md §6
 
 Emergency may pass a `destination_ward_type_hint` for routing. It stays a hint.
 

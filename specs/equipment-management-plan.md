@@ -432,7 +432,7 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 }
 ```
 
-or, called as a step inside the shared cross-agent workflow (`CareLanka_Component_Plan.md` §5):
+or, called as a step inside the shared cross-agent workflow (`docs/CareLanka_Component_Plan.md` §5):
 
 ```json
 {
@@ -505,7 +505,7 @@ Anything else — a small, routine, non-urgent reorder — is `auto_approved = t
 
 **Standing sweep (`monitor_stock_and_maintenance`)** — the demo path, triggered by `POST /api/equipment/monitor` or a scheduled job.
 
-**Readiness check (`check_ward_readiness`)** — the orchestration path from the group plan's cross-agent sequence (*"Equipment Monitoring Agent checks the destination ward has the equipment it needs"* — `CareLanka_Component_Plan.md` §5). Answers `ready` / `not_ready` from `list_pharmacy_stock`/equipment lookups against `ward_id`, no warnings raised, no proposal made.
+**Readiness check (`check_ward_readiness`)** — the orchestration path from the group plan's cross-agent sequence (*"Equipment Monitoring Agent checks the destination ward has the equipment it needs"* — `docs/CareLanka_Component_Plan.md` §5). Answers `ready` / `not_ready` from `list_pharmacy_stock`/equipment lookups against `ward_id`, no warnings raised, no proposal made.
 
 ### 8.8 Persisted workflow state
 

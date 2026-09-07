@@ -5,6 +5,30 @@ single hospital / multiple wards, unified staff identity, generic agent-workflow
 audit-log schemas). PKs are `Guid` (PostgreSQL `uuid`, `default: gen_random_uuid()`)
 throughout.
 
+**Revision 2.6** — a second Patient Management agent, added on the lecturer's direction
+during the topic-finalization meeting. His feedback: a component called "Patient
+Management" whose only AI behaviour is picking a bed does not read as patient-facing.
+He asked for a second agent where the patient describes something in their own words and
+the agent reads their stored record and responds — with a doctor's approval sitting
+between the agent's draft and anything the patient sees, the same human-gate pattern
+already used everywhere else in this document.
+
+- **`CareRecommendation` (new)** — see
+  [`CareRecommendation`](#carerecommendation-extends-auditedentity-rev-26--new). Owned by
+  Patient Management, alongside the existing entities.
+- **`AgentType.PatientCareAdvisory` (new)** — the fifth agent value. The existing
+  `PatientAdmissionBed` is untouched; this project now has two agents in one component
+  rather than a replacement.
+- **`ProposedChangeType.CreateCareRecommendation` (new)** — the write this agent's
+  workflow proposes, following the same `AgentProposedChange` shape every other agent
+  already uses. No new column was needed on that shared table — see the entity note for
+  why.
+- **What this agent is not.** It does not diagnose, prescribe or set `admission_category`.
+  It drafts a decision-support note; a `Doctor`-role staff member approves, edits or
+  rejects it before the patient ever sees a word of it. That is the same wall §1 of
+  `patient-management-plan.md` already draws around the first agent, held in the same
+  place for the second.
+
 **Revision 2** — aligned with the Staff Management "cascading swap" flow and the Patient
 Management admission/discharge flow. Changes in this revision are marked *(Rev 2)*.
 Items still requiring a group decision are collected in [Open Decisions](#open-decisions).
@@ -797,6 +821,38 @@ clearance, medicine, bill settled) → all ticked → shows on a 'ready to go' l
 `ReadinessStatus` enum could not represent three independently tickable items or record
 who ticked each one. Rows are seeded alongside the `Discharge` row at admission time.
 
+#### CareRecommendation extends AuditedEntity *(Rev 2.6 — new)*
+```
++ PatientId: Guid (non-null) FK → Patient.Id
++ AdmissionId: Guid (nullable) FK → Admission.Id       -- set when raised during a stay
++ ReportedText: string (non-null)                      -- the patient's own words
++ ReportedAt: DateTimeOffset (non-null)
++ RedFlag: bool = false (non-null)                     -- matched the emergency-keyword screen
++ UrgencyFlag: CareUrgency (nullable)                   -- the agent's draft triage flag
++ AgentMessage: string (nullable)                       -- the agent's draft, doctor-facing only
++ Status: CareRecommendationStatus (non-null)
++ ReviewedByStaffMemberId: Guid (nullable) FK → StaffMember.Id  -- Doctor role, enforced in code
++ ReviewedAt: DateTimeOffset (nullable)
++ DoctorMessage: string (nullable)                     -- what the patient actually sees
++ RejectionReason: string (nullable)                   -- staff-facing only, never sent to the patient
+```
+**Table:** `care_recommendations`
+**Note:** *(Rev 2.6)* The second Patient Management agent's domain row, added on the
+lecturer's direction — see the Rev 2.6 note above. `AgentMessage` and `DoctorMessage` are
+deliberately two columns, not one edited in place: the model's draft must survive
+independently of what a doctor approved, for the same audit reason `AgentWorkflow`
+already keeps a `FinalOutcome` separate from its `Plan`. **The patient never reads
+`AgentMessage`** — only `DoctorMessage`, and only once `Status = Approved`. A `Doctor`
+role check gates every write to the review fields; `ReviewedByStaffMemberId` is how a
+`clinical_clearance`-style approval trail exists for this agent too.
+**Why no new column on `AgentProposedChange`.** That table's typed FKs
+(`ProposedStaffMemberId`, `ProposedShiftId`, `ProposedBedId`, `ProposedWardId`) exist
+because those four values need referential integrity and query-by-content. This agent's
+proposed write is a **new** `CareRecommendation` row — a create, exactly like `ReserveBed`
+already is — so it needs no target FK, only a `Payload` (`patient_id`, `admission_id`,
+`urgency_flag`, `agent_message`) and `AppliedEntityId` once the row exists. No group-owned
+shared table changes shape for this.
+
 ---
 
 ### Cross-Cutting: Agent Workflow & Audit
@@ -1160,6 +1216,22 @@ Serialized as `diverted_to_other_hospital`, `false_alarm`, `died_en_route`,
 already existed as a state with nothing recording *why*; the closed enum was in the spec
 but had no home in this document.
 
+### CareUrgency *(Rev 2.6 — new)*
+```
+Low, Medium, High
+```
+The Patient Care Advisory Agent's draft triage flag. `High` is forced by the deterministic
+keyword screen for red-flag symptoms (`patient-management-plan.md` §8.13), never left to
+model judgement alone.
+
+### CareRecommendationStatus *(Rev 2.6 — new)*
+```
+PendingReview, Approved, Rejected
+```
+A `CareRecommendation` is invisible to the patient until `Approved`. `Rejected` still
+records the doctor's reason, but the patient only ever sees a generic note that their
+doctor reviewed it — never `RejectionReason` itself.
+
 ### PatientDetailField *(Rev 2.1 — new, review item 4)*
 ```
 NationalId, DateOfBirth, Gender, PhoneNumber,
@@ -1180,8 +1252,11 @@ DoctorClearance, MedicationDispensed, BillSettled
 
 ### AgentType
 ```
-DispatchRouting, StaffAllocation, EquipmentMonitoring, PatientAdmissionBed
+DispatchRouting, StaffAllocation, EquipmentMonitoring, PatientAdmissionBed,
+PatientCareAdvisory
 ```
+*(Rev 2.6)* `PatientCareAdvisory` is the second Patient Management agent — see the Rev 2.6
+note near the top of this document. `PatientAdmissionBed` is unchanged.
 
 ### AgentWorkflowStatus *(Rev 2 — changed)*
 ```
@@ -1208,8 +1283,11 @@ Pending ──► PendingApproval ──► Approved ──────► Execu
 ### ProposedChangeType *(Rev 2 — new)*
 ```
 EndAllocation, CreateAllocation, ReserveBed, AssignBed, ReleaseBed,
-CreateDispatch, TransferEquipment, CreateMaintenanceSchedule
+CreateDispatch, TransferEquipment, CreateMaintenanceSchedule,
+CreateCareRecommendation
 ```
+*(Rev 2.6)* `CreateCareRecommendation` is the write the Patient Care Advisory Agent
+proposes — a new `CareRecommendation` row, same shape as `ReserveBed`.
 
 ### ProposedChangeValidationStatus *(Rev 2 — new)*
 ```
@@ -1528,7 +1606,7 @@ rows are mutated after insert; pure join/append-only tables (`DispatchCrew`,
 | Notification | notifications | | **new** |
 | AuditLog | audit_logs | | changed |
 
-**33 tables** (was 25). *(Rev 2.5 added `PatientAccount`.)*
+**34 tables** (was 25). *(Rev 2.5 added `PatientAccount`. Rev 2.6 added `CareRecommendation`.)*
 
 ---
 

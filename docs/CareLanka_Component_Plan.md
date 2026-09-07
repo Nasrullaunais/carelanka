@@ -77,7 +77,7 @@ screens in both apps.**
 
 | | **Member 1** Emergency | **Member 2** Staff | **Member 3** Equipment | **Member 4** Patient |
 | :--- | :--- | :--- | :--- | :--- |
-| **Owns (data)** | EmergencyCall, Ambulance, Dispatch, DispatchCrew, RouteLog | Shift, Allocation, LeaveRequest, Skill, StaffMemberSkill, WardStaffingRule | EquipmentType, EquipmentItem, StockLevel, MaintenanceSchedule, Warning | Patient, Admission, Ward, Bed, BedAssignment, BedReservation, Discharge, DischargeChecklistItem, Appointment |
+| **Owns (data)** | EmergencyCall, Ambulance, Dispatch, DispatchCrew, RouteLog | Shift, Allocation, LeaveRequest, Skill, StaffMemberSkill, WardStaffingRule | EquipmentCategory, EquipmentItem, **Bed**, PharmacyCategory, PharmacyItem, PharmacyTransaction, MaintenanceSchedule, Warning, ActionRequest | Patient, PatientAccount, Admission, Ward, BedAssignment, BedReservation, Discharge, DischargeChecklistItem, Appointment |
 | **React screens** | Live call board, dispatch approvals, route/map view, call outcome report | Staff records CRUD, roster approval, ward coverage dashboard, leave approval | Stock dashboard, warning queue, procurement/maintenance approval | Admissions dashboard, bed board, ICU/downgrade bed approval, discharge confirmation, occupancy report |
 | **Flutter screens** | Crew: receive dispatch, navigate, update status, handover. Patient: make emergency call | Staff: my shifts, clock in/out, request leave, request swap | Ward staff: report faulty equipment, view ward stock, take a bed out of service | Nurse: approve normal-ward bed, update status, complete details, request discharge. Patient: my stay, book a visit, discharge instructions |
 | **AI agent** | Dispatch & Routing | Staff Allocation | Equipment Monitoring | Patient Admission & Bed |
@@ -184,7 +184,7 @@ your component can only ever corrupt your own tables.
 
 **`Ward` is the exception to watch.** It belongs to Patient Management but is
 referenced by Staff (`Shift.WardId`), Equipment (`EquipmentItem.WardId`,
-`StockLevel.WardId`) and Emergency (`Dispatch.DestinationWardId`). Treat its
+`EquipmentItem.WardId`) and Emergency (`Dispatch.DestinationWardId`). Treat its
 schema as frozen once agreed — changing it breaks three other people.
 
 Detailed boundaries, and what each member needs from the others, are in
@@ -261,6 +261,22 @@ whole chain can be replayed later.
 ## 8. Still to be agreed
 
 Group-level decisions that are not one member's call.
+
+**Four of these are now settled — see `docs/ADR.md`.** *(2026-09-07)*
+
+| # | Decision | Settled as |
+| :-- | :--- | :--- |
+| 1 | Orchestration and the shared agent-workflow tables | **Common.** One group-owned `AgentWorkflow` / `AgentProposedChange` pair, plus a fifth Coordinator Agent. ADR 3 |
+| 2 | Enum storage | **`HasConversion<string>()` + CHECK**, `snake_case`. ADR 5 |
+| 3 | Flutter state management | **`provider`**, all four members. ADR 7 |
+| 5 | Deployment target | **Still open.** ADR 8 — the last unmade decision |
+| — | Agentic AI framework | **Custom C# orchestration, in-process**, Gemini free tier. ADR 1, ADR 2 |
+| — | Facade layer | **Dropped.** Controller → Service → Entity. ADR 4 |
+
+Decision 4 (notification delivery) is unchanged and still open, though it is low-risk:
+patient notifications are local to the device, so nothing on the critical path waits on it.
+
+Original entries, kept for the reasoning:
 
 | # | Decision | Why it matters |
 | :--- | :--- | :--- |

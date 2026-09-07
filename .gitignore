@@ -4,6 +4,7 @@ api/obj/
 *.user
 
 ## Node / React
+node_modules/
 web-ui/node_modules/
 web-ui/dist/
 web-ui/build/

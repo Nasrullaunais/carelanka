@@ -1,0 +1,944 @@
+openapi: 3.0.3
+
+info:
+  title: CareLanka - Common API
+  description: |
+    Group-owned. Everything that is not any one component's domain.
+
+    Two things live here, and they are here for the same reason: nobody owns them, so
+    without this file nobody builds them.
+
+    **1. Authentication.** The other four specs all declare `bearerAuth` and none of them
+    issues a token. This file does. Every `[Authorize]` endpoint in CareLanka depends on
+    it, so it is the first thing built.
+
+    There are **two identities, not one**, and they are deliberately separate
+    (`docs/entity_diagram.md` Rev 2.5):
+
+    - A `StaffMember` logs in with an **email**. Seven roles, all internal.
+    - A `PatientAccount` logs in with a **phone number**. One role, read-only, own record
+      only.
+
+    A patient *record* is a medical record created by staff; a patient *account* is a
+    login created by a person signing up. An unconscious arrival has a record and no
+    account, forever. `POST /patients/{id}/link-account` in `patient-spec.yaml` is the one
+    optional join between them, and it is made deliberately by staff after checking
+    identity - never inferred from a matching phone number.
+
+    **2. The shared agent workflow surface.** Settled 2026-09-07: the agent workflow
+    tables are group-owned, closing `integration_of_functions.md` §11.2. `staff-spec.yaml`
+    and `emergency-spec.yaml` were already written against `GET /workflows/{workflowId}`
+    on the assumption it would land here. It has.
+
+    `AgentWorkflow` and `AgentProposedChange` are one generic schema shared by all five
+    agents. The Coordinator Agent produces a plan, delegates each step to a domain agent,
+    and assembles one approval package - so there is **one** cross-component trace and
+    **one** high-impact approval gate, which is what assignment §9.1 and §10 ask for.
+
+    Each component keeps its own richer, domain-shaped view of its own runs
+    (`GET /equipment/workflows/{workflowId}`, `GET /bed-workflows/{workflowId}`) and its
+    own domain approval surface. Those are that member's individual work. This file owns
+    only what crosses all four.
+
+    **Decisions recorded in `docs/ADR.md`.**
+
+    **Wire format:** `snake_case` bodies, `camelCase` query parameters.
+  version: 0.1.0
+  contact:
+    name: Group (common) - Nasrullah
+
+servers:
+  - url: /api
+    description: Shared CareLanka ASP.NET Core Web API
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Health
+    description: Unauthenticated liveness probe. Assignment §14 requires a working health URL.
+  - name: Auth
+    description: |
+      Token issuing for both identities. Everything here is unauthenticated except
+      `/auth/logout` and `/auth/me`.
+  - name: Workflows
+    description: |
+      The group-owned agent workflow record. Read the trace, approve or reject the one
+      high-impact gate. Domain agents write here; nothing here writes domain data.
+
+paths:
+
+  # ============================================================
+  # Health
+  # ============================================================
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness and database connectivity
+      description: |
+        Unauthenticated. Reports whether the API is up and whether it can reach
+        PostgreSQL. Assignment §14 requires a working health URL for the deployed API.
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthStatus' }
+        '503':
+          description: Degraded - the API is up but a dependency is not
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthStatus' }
+
+  # ============================================================
+  # Auth - staff
+  # ============================================================
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Staff login
+      description: |
+        Unauthenticated. Email and password for a `StaffMember`.
+
+        Returns 401 for a wrong password, an unknown email **and** a deactivated account -
+        the same response for all three, so the endpoint cannot be used to discover which
+        emails exist.
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StaffLoginRequest' }
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthTokens' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/InvalidCredentials' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  # ============================================================
+  # Auth - patient
+  # ============================================================
+
+  /auth/patient/register:
+    post:
+      tags: [Auth]
+      summary: Patient self-registration
+      description: |
+        Unauthenticated. Creates a `PatientAccount` - a **login**, not a medical record.
+        No `Patient` row is created and none is linked. Staff link the two later through
+        `POST /patients/{id}/link-account` after checking identity.
+
+        Assignment §8 requires registration, login and logout in the Flutter app; this is
+        the registration half.
+
+        409 when the phone number already has an active account.
+      operationId: registerPatientAccount
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PatientRegisterRequest' }
+      responses:
+        '201':
+          description: Account created and signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthTokens' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409':
+          description: That phone number already has an active account
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/patient/login:
+    post:
+      tags: [Auth]
+      summary: Patient login
+      description: |
+        Unauthenticated. Phone number and password for a `PatientAccount`. Same
+        indistinguishable 401 as staff login, for the same reason.
+
+        Updates `PatientAccount.LastLoginAt` on success.
+      operationId: loginPatient
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PatientLoginRequest' }
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthTokens' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/InvalidCredentials' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  # ============================================================
+  # Auth - session
+  # ============================================================
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Exchange a refresh token for a new access token
+      description: |
+        Unauthenticated - the refresh token is the credential, so an expired access token
+        must not block this call.
+
+        **Rotating.** The presented token is revoked and a new one issued, so a refresh
+        token is single-use. Presenting an already-revoked token revokes the whole chain
+        for that principal and returns 401: it means two clients hold the same token, and
+        one of them is not the owner.
+
+        Works for both identities - `RefreshToken` rows carry the principal.
+      operationId: refreshToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshTokenRequest' }
+      responses:
+        '200':
+          description: New token pair
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthTokens' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401':
+          description: Unknown, expired, or already-used refresh token
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: End the session
+      description: |
+        Revokes the presented refresh token server-side, so a stolen token is dead even
+        though the access token is stateless and still inside its lifetime. This is why
+        `RefreshToken` is a table rather than a signed string.
+
+        Idempotent - logging out twice is a 204, not an error.
+      operationId: logout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshTokenRequest' }
+      responses:
+        '204': { description: Session ended }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Who is this token
+      description: |
+        Roles: any authenticated principal, staff or patient.
+
+        Resolved entirely from the `sub` claim - there is no id parameter, so no principal
+        can read another's identity by changing one. Both clients call this on startup to
+        decide which navigation to render.
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: The authenticated principal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CurrentPrincipal' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ============================================================
+  # Workflows - the group-owned agent surface
+  # ============================================================
+
+  /workflows:
+    get:
+      tags: [Workflows]
+      summary: List agent runs
+      description: |
+        Roles: DutyManager, HospitalAdministrator, EquipmentManager, WardNurse.
+
+        The monitoring list behind React's agent dashboard. Filter by agent, status or
+        correlation to pull one whole cross-component chain.
+      operationId: listWorkflows
+      parameters:
+        - { name: agentType, in: query, schema: { $ref: '#/components/schemas/AgentType' } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/AgentWorkflowStatus' } }
+        - name: correlationId
+          in: query
+          description: Every run in one chain shares this. Use it to fetch a whole coordinated plan.
+          schema: { type: string, format: uuid }
+        - { name: awaitingMyApproval, in: query, schema: { type: boolean, default: false } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+        - { $ref: '#/components/parameters/SortDir' }
+      responses:
+        '200':
+          description: A page of agent runs
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/WorkflowSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+    post:
+      tags: [Workflows]
+      summary: Start a coordinated workflow
+      description: |
+        Roles: DutyManager, HospitalAdministrator.
+
+        The Coordinator Agent's entry point, and the "receive a domain objective" step of
+        assignment §9.1. Persists the workflow row and its plan **before** running
+        anything, so a crash mid-run leaves an auditable record rather than nothing.
+
+        Returns 202 immediately with a `workflow_id`; poll
+        `GET /workflows/{workflowId}` for progress. The run itself is asynchronous
+        because it fans out to four domain agents.
+
+        Rejected with 400 if `objective` is not on the allow-list - free-text objectives
+        are not accepted, which is the first line of prompt-injection defence.
+      operationId: startWorkflow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StartWorkflowRequest' }
+      responses:
+        '202':
+          description: Accepted and running
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowAccepted' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /workflows/{workflowId}:
+    parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Workflows]
+      summary: Agent execution summary
+      description: |
+        Roles: DutyManager, HospitalAdministrator, EquipmentManager, WardNurse.
+
+        The full auditable trace assignment §9.1 Observability requires: objective, plan,
+        completed steps, tool calls with timings, validation results, errors, retries,
+        approval decision and final outcome.
+
+        **The model's raw internal reasoning is not stored and not returned** - §6 forbids
+        persisting hidden reasoning. `rationale` fields elsewhere are short human-readable
+        summaries written for the approver, not chain-of-thought.
+      operationId: getWorkflow
+      responses:
+        '200':
+          description: Execution summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /workflows/{workflowId}/approve:
+    parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Workflows]
+      summary: Approve the plan and apply it
+      description: |
+        **This is the high-impact gate assignment §9.1 requires.** Nothing an agent
+        proposes reaches domain data until this call succeeds.
+
+        Roles: whichever role the workflow itself recorded in `required_approver_role`.
+        Persisting the required role on the row - rather than hard-coding it in C# - is
+        what makes the authorization rule visible in the audit trail. A different role
+        gets 403 even if it is more senior.
+
+        On approval, every `AgentProposedChange` is **re-validated under a row lock and
+        applied in one transaction**, through the owning component's service. The world
+        moves while a proposal sits on screen: a bed that was free when the agent ranked
+        it may be taken by the time a human clicks approve. A hard rule that fails the
+        re-check produces 409 and **nothing is written** - not a partial apply.
+
+        Returns 409 when the workflow is not in `awaiting_approval`.
+      operationId: approveWorkflow
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WorkflowDecisionRequest' }
+      responses:
+        '200':
+          description: Approved and applied
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
+  /workflows/{workflowId}/reject:
+    parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Workflows]
+      summary: Reject the plan
+      description: |
+        Roles: the workflow's `required_approver_role`.
+
+        Terminal. Nothing is applied, `reviewed_by`, `reviewed_at` and `review_notes` are
+        stamped, and the workflow ends as a **recorded safe failure** rather than
+        disappearing - §9.1 asks for an auditable result *or* a safe, clearly recorded
+        failure, and this is the second one.
+
+        Any hold the agent placed (a 30-minute bed reservation, for instance) is released
+        by the owning component.
+      operationId: rejectWorkflow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WorkflowDecisionRequest' }
+      responses:
+        '200':
+          description: Rejected
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
+  /workflows/{workflowId}/request-revision:
+    parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Workflows]
+      summary: Send one step back for another attempt
+      description: |
+        Roles: the workflow's `required_approver_role`.
+
+        The third branch §9.1 names - "approves, rejects **or requests revision**". Sends
+        the named step back to its domain agent with the approver's note as extra context,
+        increments `attempt_count`, and returns the workflow to `running`.
+
+        `attempt_count` is capped. Past the cap the workflow fails safe and is recorded as
+        such rather than looping - an agent that cannot satisfy a human in three tries is
+        not going to on the fourth.
+      operationId: requestWorkflowRevision
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WorkflowRevisionRequest' }
+      responses:
+        '200':
+          description: Returned for revision
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Shared JWT issued by this component and consumed by all four others.
+
+        Claims: `sub` (StaffMember.Id or PatientAccount.Id), `role` (one
+        `PrincipalRole` value), `typ` (`staff` or `patient`), `jti`, `exp`.
+
+        `typ` exists because `sub` alone is ambiguous - staff ids and patient-account ids
+        both live in `sub` and come from different tables. An endpoint that trusted `sub`
+        without `typ` would look a patient id up in `staff_members` and find nothing, or
+        worse, find a collision.
+
+        Access tokens are short-lived; sessions are ended server-side by revoking the
+        `RefreshToken` row.
+
+  parameters:
+    PathId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    SortDir:
+      name: sortDir
+      in: query
+      schema: { type: string, enum: [asc, desc], default: desc }
+
+  responses:
+    BadRequest:
+      description: Validation failed
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ValidationProblemDetails' }
+    Unauthorized:
+      description: Missing or invalid token
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    Forbidden:
+      description: Authenticated, but this role may not do this
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    NotFound:
+      description: Not found
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    InvalidCredentials:
+      description: |
+        Wrong password, unknown account, or deactivated account - deliberately
+        indistinguishable. Always `cl_err_401`.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    TooManyRequests:
+      description: Rate limited. Login and registration are throttled per IP and per account.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    IllegalTransition:
+      description: |
+        Not a legal status change for this workflow. Approve, reject and request-revision
+        are only legal from `awaiting_approval`.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  schemas:
+
+    # ---------- shared, group-owned ----------
+    # Byte-identical in all five specs. Changed in all five in one commit, or not at all.
+
+    PagedResult:
+      type: object
+      required: [page, page_size, total_items, total_pages]
+      properties:
+        page: { type: integer }
+        page_size: { type: integer }
+        total_items: { type: integer }
+        total_pages: { type: integer }
+
+    ProblemDetails:
+      type: object
+      description: RFC 7807, as produced by ASP.NET Core.
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+
+    ValidationProblemDetails:
+      allOf:
+        - $ref: '#/components/schemas/ProblemDetails'
+        - type: object
+          properties:
+            errors:
+              type: object
+              additionalProperties:
+                type: array
+                items: { type: string }
+
+    AuditFields:
+      type: object
+      properties:
+        created_at: { type: string, format: date-time, readOnly: true }
+        updated_at: { type: string, format: date-time, readOnly: true }
+
+    StaffRole:
+      type: string
+      description: |
+        The seven internal roles. Group-owned: this is the JWT role list, so it is
+        byte-identical here and in `staff-spec.yaml` and changes in both at once.
+        `patient` is deliberately not here - a patient is not staff. See `PrincipalRole`.
+      enum:
+        - ward_nurse
+        - doctor
+        - ambulance_crew
+        - general_staff
+        - duty_manager
+        - hospital_administrator
+        - equipment_manager
+
+    # ---------- health ----------
+
+    HealthStatus:
+      type: object
+      properties:
+        status: { type: string, enum: [healthy, degraded] }
+        database: { type: string, enum: [up, down] }
+        version: { type: string }
+        checked_at: { type: string, format: date-time }
+
+    # ---------- auth ----------
+
+    PrincipalRole:
+      type: string
+      description: |
+        What goes in the JWT `role` claim: the seven `StaffRole` values plus `patient`.
+
+        A separate name rather than adding `patient` to `StaffRole`, because `StaffRole`
+        is a column on `staff_members` and a patient has no row there. One enum for two
+        different things would make an impossible value representable in the database.
+      enum:
+        - ward_nurse
+        - doctor
+        - ambulance_crew
+        - general_staff
+        - duty_manager
+        - hospital_administrator
+        - equipment_manager
+        - patient
+
+    StaffLoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, maxLength: 256 }
+        password: { type: string, format: password, minLength: 8, maxLength: 128 }
+
+    PatientLoginRequest:
+      type: object
+      required: [phone_number, password]
+      properties:
+        phone_number:
+          type: string
+          maxLength: 20
+          example: '+94771234567'
+          description: The login identifier for a patient account. Unique among active accounts.
+        password: { type: string, format: password, minLength: 8, maxLength: 128 }
+
+    PatientRegisterRequest:
+      type: object
+      required: [phone_number, password, full_name]
+      properties:
+        phone_number: { type: string, maxLength: 20, example: '+94771234567' }
+        password: { type: string, format: password, minLength: 8, maxLength: 128 }
+        full_name: { type: string, minLength: 1, maxLength: 200 }
+
+    RefreshTokenRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token: { type: string }
+
+    AuthTokens:
+      type: object
+      required: [access_token, token_type, expires_in, refresh_token, principal]
+      properties:
+        access_token: { type: string }
+        token_type: { type: string, example: Bearer }
+        expires_in:
+          type: integer
+          description: Access token lifetime in seconds.
+          example: 900
+        refresh_token:
+          type: string
+          description: |
+            Single-use. Store it in secure storage - `flutter_secure_storage` on mobile -
+            never in plain preferences or `localStorage`.
+        principal: { $ref: '#/components/schemas/CurrentPrincipal' }
+
+    CurrentPrincipal:
+      type: object
+      required: [id, principal_type, role, display_name]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: StaffMember.Id or PatientAccount.Id, depending on principal_type.
+        principal_type: { type: string, enum: [staff, patient] }
+        role: { $ref: '#/components/schemas/PrincipalRole' }
+        display_name: { type: string, example: Dr. Perera }
+        email:
+          type: string
+          format: email
+          nullable: true
+          description: Staff only. Null for a patient account.
+        phone_number:
+          type: string
+          nullable: true
+          description: Patient accounts only. Null for staff.
+        patient_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: |
+            The linked medical record, if staff have linked one. Null for staff, and null
+            for a patient who has an account but has never been treated here. A patient
+            client must handle null - it is the ordinary state for a new sign-up, not an
+            error.
+
+    # ---------- workflows ----------
+
+    AgentType:
+      type: string
+      description: |
+        Five agents. `coordinator` is group-owned and is the only one that plans and
+        delegates; the other four are one per member and each owns one domain.
+      enum:
+        - coordinator
+        - dispatch_routing
+        - patient_admission_bed
+        - staff_allocation
+        - equipment_monitoring
+
+    AgentWorkflowStatus:
+      type: string
+      enum:
+        - running
+        - awaiting_approval
+        - approved
+        - rejected
+        - revision_requested
+        - completed
+        - failed
+
+    WorkflowObjective:
+      type: string
+      description: |
+        The allow-list. Objectives are chosen from this enum, never free text - an
+        objective that reached the planner as an arbitrary string is a prompt-injection
+        surface, and §9.1 requires validated tool inputs.
+      enum:
+        - emergency_response
+        - assign_bed
+        - fill_roster_gap
+        - monitor_stock_and_maintenance
+        - check_ward_readiness
+
+    StartWorkflowRequest:
+      type: object
+      required: [objective, entity_type, entity_id]
+      properties:
+        objective: { $ref: '#/components/schemas/WorkflowObjective' }
+        entity_type:
+          type: string
+          enum: [EmergencyCall, Admission, Shift, Ward, Warning]
+          description: The domain row this run is about. Also allow-listed.
+        entity_id: { type: string, format: uuid }
+        correlation_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Omit to start a new chain. Supply to join an existing one.
+
+    WorkflowAccepted:
+      type: object
+      properties:
+        workflow_id: { type: string, format: uuid }
+        status: { type: string, example: running }
+        poll_url: { type: string, example: /api/workflows/3fa85f64-5717-4562-b3fc-2c963f66afa6 }
+
+    WorkflowStep:
+      type: object
+      properties:
+        step: { type: string }
+        agent:
+          allOf:
+            - $ref: '#/components/schemas/AgentType'
+          nullable: true
+        tool:
+          type: string
+          nullable: true
+          description: The allow-listed tool invoked, if any. Null for a planning step.
+        started_at: { type: string, format: date-time }
+        duration_ms: { type: integer }
+        ok: { type: boolean }
+        error: { type: string, nullable: true }
+
+    WorkflowSummary:
+      type: object
+      description: |
+        List-shaped view of one agent run. The detail view adds the steps, the proposed
+        changes and the validation verdicts.
+      required: [workflow_id, agent_type, objective, status]
+      properties:
+        workflow_id: { type: string, format: uuid }
+        agent_type: { $ref: '#/components/schemas/AgentType' }
+        objective: { $ref: '#/components/schemas/WorkflowObjective' }
+        entity_type: { type: string }
+        entity_id: { type: string, format: uuid }
+        correlation_id:
+          type: string
+          format: uuid
+          description: Shared by every run in one coordinated plan.
+        parent_workflow_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: The coordinator's run. Null on the coordinator's own row.
+        status: { $ref: '#/components/schemas/AgentWorkflowStatus' }
+        required_approver_role:
+          allOf:
+            - $ref: '#/components/schemas/StaffRole'
+          nullable: true
+        started_at: { type: string, format: date-time, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
+        attempt_count: { type: integer }
+        final_outcome: { type: string, nullable: true }
+
+    WorkflowDetail:
+      allOf:
+        - $ref: '#/components/schemas/WorkflowSummary'
+        - type: object
+          properties:
+            plan:
+              type: array
+              description: The ordered plan, persisted before the first step runs.
+              items: { type: string }
+            steps:
+              type: array
+              items: { $ref: '#/components/schemas/WorkflowStep' }
+            validation_results:
+              type: array
+              items: { $ref: '#/components/schemas/ValidationResult' }
+            errors:
+              type: array
+              items: { type: string }
+            proposed_changes:
+              type: array
+              description: |
+                Every domain write this run wants to make, in sequence. Applied only on
+                approval, and only through the owning component's service.
+              items: { $ref: '#/components/schemas/ProposedChange' }
+            children:
+              type: array
+              description: On a coordinator run, the four domain runs it delegated to.
+              items: { $ref: '#/components/schemas/WorkflowSummary' }
+            reviewed_by_staff_member_id: { type: string, format: uuid, nullable: true }
+            reviewed_at: { type: string, format: date-time, nullable: true }
+            review_notes: { type: string, nullable: true }
+
+    ValidationResult:
+      type: object
+      description: |
+        The verdict from a deterministic check - ordinary C# against the database, never
+        the model checking itself.
+      properties:
+        rule: { type: string, example: bed_gender_policy }
+        passed: { type: boolean }
+        message: { type: string, nullable: true }
+        checked_at: { type: string, format: date-time }
+
+    ProposedChangeType:
+      type: string
+      enum:
+        - reserve_bed
+        - end_allocation
+        - create_allocation
+        - assign_ambulance
+        - divert_dispatch
+        - raise_action_request
+
+    ProposedChangeValidationStatus:
+      type: string
+      enum: [pending, valid, invalid]
+
+    ProposedChange:
+      type: object
+      description: |
+        One concrete domain write, typed rather than buried in JSON, so the deterministic
+        validator gets referential integrity - a proposal cannot reference a soft-deleted
+        nurse or a retired bed.
+      properties:
+        id: { type: string, format: uuid }
+        sequence: { type: integer }
+        change_type: { $ref: '#/components/schemas/ProposedChangeType' }
+        target_entity_type: { type: string, nullable: true }
+        target_entity_id: { type: string, format: uuid, nullable: true }
+        proposed_staff_member_id: { type: string, format: uuid, nullable: true }
+        proposed_shift_id: { type: string, format: uuid, nullable: true }
+        proposed_bed_id: { type: string, format: uuid, nullable: true }
+        proposed_ward_id: { type: string, format: uuid, nullable: true }
+        validation_status: { $ref: '#/components/schemas/ProposedChangeValidationStatus' }
+        validation_message: { type: string, nullable: true }
+        rationale:
+          type: string
+          nullable: true
+          description: |
+            One or two plain sentences for the approver. Not the model's raw reasoning -
+            §6 forbids persisting that.
+        applied_at: { type: string, format: date-time, nullable: true }
+        applied_entity_id: { type: string, format: uuid, nullable: true }
+
+    WorkflowDecisionRequest:
+      type: object
+      properties:
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+          description: Stamped onto `review_notes`. Required when rejecting.
+
+    WorkflowRevisionRequest:
+      type: object
+      required: [step, notes]
+      properties:
+        step:
+          type: string
+          description: Which planned step to re-run. Must name a step in this workflow's plan.
+        notes:
+          type: string
+          maxLength: 1000
+          description: Passed to the domain agent as extra context on the retry.

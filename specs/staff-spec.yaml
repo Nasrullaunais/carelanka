@@ -1667,9 +1667,9 @@ components:
     StaffRole:
       type: string
       description: |
-        `doctor` is not in `entity_diagram.md` Rev 2 but Patient Management already gates
-        `clinical_clearance` on it. The leader owns the JWT role list — see the open items
-        in `info.description`.
+        The seven internal roles. Group-owned: this is the JWT role list, so it is
+        byte-identical here and in `staff-spec.yaml` and changes in both at once.
+        `patient` is deliberately not here - a patient is not staff. See `PrincipalRole`.
       enum:
         - ward_nurse
         - doctor
@@ -1730,7 +1730,7 @@ components:
         - revision_requested
         - failed
 
-    ProposedChangeType:
+    RosterProposedChangeType:
       type: string
       enum: [end_allocation, create_allocation]
 
@@ -2138,11 +2138,11 @@ components:
               items: { $ref: '#/components/schemas/PlanStep' }
             proposed_changes:
               type: array
-              items: { $ref: '#/components/schemas/ProposedChange' }
+              items: { $ref: '#/components/schemas/RosterProposedChange' }
             validation:
               type: array
               description: Deterministic checks. Ordinary C#, not the agent checking itself.
-              items: { $ref: '#/components/schemas/ValidationResult' }
+              items: { $ref: '#/components/schemas/RosterValidationResult' }
             tool_calls:
               type: array
               items: { $ref: '#/components/schemas/ToolCall' }
@@ -2176,7 +2176,7 @@ components:
         started_at: { type: string, format: date-time, nullable: true }
         completed_at: { type: string, format: date-time, nullable: true }
 
-    ProposedChange:
+    RosterProposedChange:
       type: object
       description: |
         One domain write the agent wants to make. Stored as a row rather than JSON so the
@@ -2184,7 +2184,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         sequence: { type: integer }
-        change_type: { $ref: '#/components/schemas/ProposedChangeType' }
+        change_type: { $ref: '#/components/schemas/RosterProposedChangeType' }
         target_allocation_id: { type: string, format: uuid, nullable: true }
         proposed_staff_member_id: { type: string, format: uuid, nullable: true }
         proposed_staff_name: { type: string, nullable: true }
@@ -2202,7 +2202,7 @@ components:
         applied_at: { type: string, format: date-time, nullable: true }
         applied_entity_id: { type: string, format: uuid, nullable: true }
 
-    ValidationResult:
+    RosterValidationResult:
       type: object
       properties:
         check:
@@ -2368,7 +2368,7 @@ components:
 
     ProblemDetails:
       type: object
-      description: RFC 7807. The shared error shape across all four components.
+      description: RFC 7807, as produced by ASP.NET Core.
       properties:
         type: { type: string }
         title: { type: string }
@@ -2394,4 +2394,4 @@ components:
           properties:
             failed_checks:
               type: array
-              items: { $ref: '#/components/schemas/ValidationResult' }
+              items: { $ref: '#/components/schemas/RosterValidationResult' }

@@ -1,6 +1,10 @@
 # AI Orchestration Workflow
 
-**Owned by the Group · Status: proposal for group review — not yet agreed**
+**Owned by the Group · Status: AGREED 2026-09-07.** The §7 open decisions are settled —
+see `docs/ADR.md` ADR 1 (custom C# orchestration, in-process, plus the fifth Coordinator
+Agent) and ADR 3 (one group-owned `AgentWorkflow` / `AgentProposedChange` pair, with the
+shared `/workflows` surface in `specs/common-spec.yaml`). §7 is kept below as the record of
+what was weighed.
 
 How the four component agents connect into **one** assessed workflow. Everything
 below needs a group decision; it is written as a concrete starting point so the
@@ -168,7 +172,16 @@ enforces them, and what "safe failure" looks like for it.
 
 ---
 
-## 7. Open decisions
+## 7. Open decisions — SETTLED
+
+| # | Was open | Settled as |
+| :-- | :--- | :--- |
+| 1 | Accept the fifth Coordinator Agent, and who builds it | **Yes.** Common — Nasrullah. ADR 1 |
+| 2 | Framework | **Custom C# orchestration in-process**, not LangGraph — §2's mandatory backend rule would have made a Python service a second deployable for no gain. Gemini free tier as the model. ADR 1, ADR 2 |
+| 3 | Does M1 call M4 directly, or does the coordinator drive both | **Coordinator drives both** for the assessed workflow; M1's direct call to `POST /admissions/pre-admit` stays for standalone dispatches. Closes `integration_of_functions.md` §11.3 |
+| 4 | `emergency-spec.yaml` is a stub | **No longer true** — 33 paths, valid, swept clean |
+
+Original entries, for the reasoning:
 
 1. **Do we accept the fifth Coordinator Agent, and who builds it?**
    The alternative is a deterministic C# orchestrator with no LLM in the planning

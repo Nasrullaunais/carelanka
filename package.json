@@ -1,0 +1,13 @@
+{
+  "name": "carelanka",
+  "private": true,
+  "description": "Repo-root tooling only. The React app has its own package.json in web-ui/.",
+  "type": "module",
+  "scripts": {
+    "check:specs": "node scripts/check-specs.mjs"
+  },
+  "devDependencies": {
+    "@apidevtools/swagger-parser": "^13.0.0",
+    "js-yaml": "^4.1.0"
+  }
+}

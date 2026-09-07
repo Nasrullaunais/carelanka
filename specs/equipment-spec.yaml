@@ -796,7 +796,8 @@ paths:
         Roles: InventoryAdministrator, or the group orchestrator / scheduler.
 
         Agent entry point. Starts the workflow and returns immediately with a `workflow_id`;
-        poll `/workflows/{workflowId}` for progress.
+        poll `/workflows/{workflowId}` for the shared trace, or
+        `/equipment/workflows/{workflowId}` for this component's fuller view.
 
         Reads pharmacy stock levels, medicine expiry dates, and equipment/bed maintenance due
         dates, raises a `Warning` for anything that needs attention, and proposes an
@@ -833,7 +834,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
-  /workflows/{workflowId}:
+  /equipment/workflows/{workflowId}:
     parameters:
       - name: workflowId
         in: path
@@ -853,7 +854,7 @@ paths:
           description: Execution summary
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/WorkflowSummary' }
+              schema: { $ref: '#/components/schemas/EquipmentWorkflowSummary' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -1590,7 +1591,7 @@ components:
         status: { type: string, example: running }
         poll_url: { type: string, example: /api/workflows/3fa85f64-5717-4562-b3fc-2c963f66afa6 }
 
-    WorkflowSummary:
+    EquipmentWorkflowSummary:
       type: object
       description: |
         Persisted agent execution state: id, objective, plan, completed steps, tool calls,

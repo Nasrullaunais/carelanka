@@ -1,6 +1,7 @@
 # CareLanka Build Plan
 
-**Status:** proposed — needs the group to agree before Phase 0 starts
+**Status:** Phase 0 decisions settled 2026-09-07 — see `docs/ADR.md`. Sections 2.1, 2.2
+and 2.3 below are **done**; read them as a record, not a task list.
 **Covers:** everything between "the design documents are finished" and "four people are building in parallel without breaking each other"
 
 ---
@@ -95,7 +96,23 @@ work under their own account.**
 These are cheap now and expensive later. Two of them will physically stop the
 application from starting once controllers exist.
 
-### 2.1 Route and name collisions — **these become startup crashes**
+> **§2 IS DONE. Do not work from the tables below.** *(2026-09-07)*
+>
+> Every collision in §2.1 was cleared on 2026-08-21, `staff-spec.yaml` in §2.2 was fixed
+> the same day, and all four decisions in §2.3 are now settled in `docs/ADR.md`. A second
+> sweep on 2026-09-07 — five specs including the new `common-spec.yaml` — reports:
+>
+> ```
+> OpenAPI validation      5/5 VALID
+> Duplicate routes            0
+> Duplicate operationIds      0
+> Conflicting schema names    0
+> ```
+>
+> The record of what was renamed and why is `integration_of_functions.md` §11.6. The
+> tables below are kept so the same names are not reintroduced.
+
+### 2.1 Route and name collisions — **CLEARED 2026-08-21**
 
 The four specs describe **one** ASP.NET application. Two controllers mapping the
 same route throw `AmbiguousMatchException` at startup, which means the app won't
@@ -110,7 +127,7 @@ boot for anybody, not just the person who caused it. Live list is
 | 4 | `GET /workflows/{workflowId}` in **equipment**, **patient** | group | Blocked on §2.3 — one workflow endpoint, not four |
 | 5 | `Bed`, `WorkflowSummary`, `WorkflowAccepted` — shared names | equipment + patient | Either make them byte-identical (allowed) or rename. `Bed` is reportedly already identical — **verify before renaming anything** |
 
-### 2.2 `staff-spec.yaml` is not valid OpenAPI
+### 2.2 `staff-spec.yaml` validation — **FIXED 2026-08-21**
 
 A stray `'leave type': None` in the `LeaveReport` schema. **This blocks client
 generation for both frontends**, not just Staff's — the generators read the whole
@@ -120,7 +137,21 @@ Also in the same file: `PagedResult` uses `total_count` where the other three us
 `total_items`. Two-vs-one, and the odd one out generates a differently-shaped
 type. **Owner: Member 2.**
 
-### 2.3 Group decisions that change code if settled late
+### 2.3 Group decisions — **ALL FOUR SETTLED 2026-09-07**
+
+| Decision | Settled as | Where |
+| :--- | :--- | :--- |
+| Enum storage | `HasConversion<string>()` + CHECK, `snake_case` | ADR 5 |
+| Facade layer | **Dropped.** Controller → Service → Entity; the service owns the transaction and throws | ADR 4 |
+| Agent-workflow tables | **Common**, group-owned pair, one shared `/workflows` surface | ADR 3 |
+| Flutter state management | **`provider`**, confirmed for all four | ADR 7 |
+
+Also settled, and not on the original list: the **agent framework** is custom C#
+orchestration running in-process (ADR 1) with **Gemini free tier** as the model (ADR 2),
+and **auth** now has a contract at `specs/common-spec.yaml` (it previously had none
+anywhere). **Still open: the deployment target** — ADR 8, the last unmade decision.
+
+Original table, kept for the reasoning:
 
 | Decision | Why it can't wait | Where it's written up |
 | :--- | :--- | :--- |
@@ -144,7 +175,9 @@ until it exists.
 individual marks — `integration_of_functions.md` §3 already lists this as
 "Group — shared plumbing, built once, whoever takes it on."
 
-**Owner: _to be agreed_ — this is the first thing the group needs to assign.**
+**Owner: Nasrullah.** *(assigned 2026-09-07)* This is the common track, and the rule it
+sets is general: **anything that is not a specific member's is common, and common is built
+once.** Its contract is `specs/common-spec.yaml`.
 
 What is in it:
 
@@ -153,7 +186,8 @@ What is in it:
 | `Program.cs` wiring | DI, EF Core + Npgsql, Swagger, auth, CORS |
 | `CareLankaDbContext` | Empty of entities — see §3.1 |
 | Base entity classes | `Entity` → `AuditedEntity` → `SoftDeletableEntity`, exactly as `entity_diagram.md` defines them |
-| `StaffMember` + `RefreshToken` + login + JWT issuing | Every other endpoint depends on the role claim |
+| `StaffMember` + `PatientAccount` + `RefreshToken` + login + JWT issuing | Every other endpoint depends on the role claim. **Two identities**, not one — staff by email, patients by phone. Contract: `specs/common-spec.yaml` |
+| `AgentWorkflow` + `AgentProposedChange` + the `/workflows` surface | Group-owned (ADR 3). All five agents write here |
 | Central exception handling | One `IExceptionHandler`, `ProblemDetails`, the `ApiException` hierarchy and `MessageCode` enum — all specified in `CLAUDE.md` |
 | Audit interceptor | `ISaveChangesInterceptor` writing `AuditLog`, staff id from the JWT |
 | `appsettings` + connection string | Plus a documented local Postgres setup so four machines can all run it |
@@ -357,6 +391,24 @@ deliberately, together, rather than discovering at the demo.
 
 None of these belong to a component, and all of them are graded. They will not
 happen by themselves.
+
+**Settled 2026-09-07: none of these are unowned any more.** By the rule in §3, anything
+that is not a specific member's is **common, and common is Nasrullah's**. Rows 1, 2, 3, 5
+and 6 below are therefore his; rows 4 and 7 still need a person because they need
+something he cannot supply alone — a machine with the Flutter SDK, and a group call on
+where we deploy.
+
+| # | Thing | Owner now | State |
+| :-- | :--- | :--- | :--- |
+| 1 | CI — `.github/` | Nasrullah (common) | Not built |
+| 2 | ADR | Nasrullah (common) | **Done** — `docs/ADR.md`, 7 of 8 decisions accepted |
+| 3 | `web-ui/` scaffold | Nasrullah (common) | Not built |
+| 4 | `flutter create .` | **whoever has the SDK** | Not run |
+| 5 | `swagger_parser` in `pubspec.yaml` | Nasrullah (common) | Not added |
+| 6 | `.gitignore` vs `*.g.dart` | Nasrullah (common) | Open — decide committed vs CI-built with row 4 |
+| 7 | Deployment target | **group** | Open — ADR 8 |
+
+Original table, with the reasoning:
 
 | # | Thing | Notes | Suggested owner |
 | :-- | :--- | :--- | :--- |

@@ -51,6 +51,8 @@ here is the order of authority.
 | Document | What it settles | Owner |
 | :--- | :--- | :--- |
 | `docs/2026-S1-SE3090-Assignment_1_Specification.md` | The assignment brief. Beats every other file, this one included. | Module |
+| `docs/ADR.md` | **The decisions that are settled and why.** Agent framework, model provider, agent workflow tables, no facade, enum storage, React and Flutter state. Required by assignment §14.2 and examinable at the viva. | Group |
+| `specs/common-spec.yaml` | **Auth and the shared agent workflow surface.** Everything that is not one member's component. Read before assuming something is unowned. | Common (Nasrullah) |
 | `docs/CareLanka_Component_Plan.md` | The four components, who owns which, the seven roles, why React and Flutter differ. Read first. | Group |
 | `docs/BUILD_PLAN.md` | **What to build, in what order.** All four members in one file, so you see your neighbours' work. Read your member's section before writing code. | Group |
 | `STUBS.md` | **Every fake standing in for someone else's unbuilt work.** Read the rows where `Owner` is your member — somebody is already depending on those. | Everyone, constantly |
@@ -58,7 +60,7 @@ here is the order of authority.
 | `specs/integration_of_functions.md` | Component boundaries: who owns which table, who calls whose service, open cross-component items. Read before touching anything you do not own. | Group |
 | `specs/*-spec.yaml` | The OpenAPI contract per component — actual request and response shapes. | That component's member |
 | `specs/{patient,equipment,emergency}-management-plan.md` | That component's design doc; its `*-spec.yaml` follows from it. Staff has not written theirs. | That component's member |
-| `specs/ai-orchestration-workflow.md` | How the agents chain into one workflow, and the shared workflow state. Proposal stage; does not block building an individual agent. | Group |
+| `specs/ai-orchestration-workflow.md` | How the agents chain into one workflow. Its two open questions — shared workflow state, and the fifth Coordinator Agent — are settled in ADR 3 and ADR 1. Does not block building an individual agent. | Group |
 | `mobile-ui/README.md` | Flutter layout, and that each member works only inside `lib/features/<component>/`. Read before writing Dart. | Group |
 
 (Each member may also keep their own gitignored `IMPORTANT.md`/`RESUME.md` for
@@ -77,6 +79,19 @@ Four rules that fall out of it:
 - **Stub anything you don't own, and record it in `STUBS.md` in the same
   commit.** Never wait for a teammate's code, and never write it for them — see
   below.
+
+## Common vs. yours
+
+**If it does not belong to a specific member, it is common — and common is built once,
+by Nasrullah, not four times.** *(settled 2026-09-07)*
+
+Common covers: auth and the JWT, the `DbContext` and base entity classes, the exception
+handler, the audit interceptor, `AgentWorkflow` / `AgentProposedChange`, the Coordinator
+Agent, and CI. The contract is `specs/common-spec.yaml`.
+
+Before building anything that is not in your component's row of
+`integration_of_functions.md` §3, check whether it is common. Building a common thing
+twice is worse than stubbing it, because both copies look right.
 
 ## Stubs
 
@@ -186,17 +201,21 @@ generated clients.
   `AdmissionBed`), not one name and two shapes. Same for enums: a
   component-specific vocabulary gets a component-specific name.
 - **Genuinely shared types** (`ProblemDetails`, `PagedResult`, the workflow
-  types) have one definition, group-owned: changed in all four specs in the same
+  types) have one definition, group-owned: changed in all five specs in the same
   commit, or not at all.
 
-**All four specs currently validate and the collision count is zero** (cleared
-2026-08-21). `integration_of_functions.md` §11.6 records what was renamed and
+**All five specs validate and the collision count is zero** (re-swept 2026-09-07, after
+`common-spec.yaml` was added: 5/5 valid, 0 duplicate routes, 0 duplicate `operationId`s,
+0 conflicting schema names). `integration_of_functions.md` §11.6 records what was renamed and
 why, so the same names are not reintroduced. Check it before adding a route,
 `operationId` or schema name.
 
-**Validate in CI:** `npx @apidevtools/swagger-parser validate specs/*.yaml`,
-alongside the route and `operationId` uniqueness check — that sweep is what stops
-zero silently becoming one again. **Quote any inline description containing a
+**Validate in CI:** `bun run check:specs`, which loads all five with
+`@apidevtools/swagger-parser` and then sweeps for duplicate routes, duplicate
+`operationId`s and same-name-different-shape schemas. Note that
+`npx @apidevtools/swagger-parser` does **not** work — the package ships a library, not a
+CLI — so this has to be a small script, not a one-liner. That sweep is what stops zero
+silently becoming one again. **Quote any inline description containing a
 comma** — inside a YAML flow mapping an unquoted comma splits the description
 into phantom keys, which no one catches by eye and the validator catches every
 time. That exact mistake in `staff-spec.yaml` kept it invalid for weeks and
@@ -217,9 +236,9 @@ generate against. Do not wrap responses in a custom envelope.
 That last one is its own type because the specs define explicit state machines
 and document illegal moves as a distinct response.
 
-**Services return, facades throw.** `FindByIdAsync` returns `T?`; the facade
-turns `null` into `NotFoundException`. Otherwise "not found" means two different
-things at two layers.
+**`Find*` returns, `Get*` throws.** `FindByIdAsync` returns `T?`; `GetByIdAsync` turns
+`null` into `NotFoundException`. Both live in the service (ADR 4). Otherwise "not found"
+means two different things at two layers.
 
 **One central handler** — a single `IExceptionHandler` via `AddExceptionHandler`
 + `UseExceptionHandler`. `ApiException` → `ProblemDetails` at its status;
@@ -256,7 +275,8 @@ never handles an HTTP status code.**
 
 # Backend architecture
 
-**Controller → Facade → Service → Entity**, DTOs separate from EF entities. The
+**Controller → Service → Entity**, DTOs separate from EF entities. *(ADR 4 — the facade
+layer was dropped on 2026-09-07.)* The
 tree committed in `api/`, and the one `integration_of_functions.md` §1 publishes
 to the group:
 
@@ -272,13 +292,11 @@ Agents/                    the AI agents
 the four component folders. **There is no repository layer** — EF Core's `DbSet`
 is the repository.
 
-> **Open — needs a group decision.** The facade layer has no folder in `api/` and
-> appears in no other document. Either add `Facades/{Component}/` here and in
-> `integration_of_functions.md` §1 in one commit, or drop the layer and move the
-> transaction boundary and the throwing into the service. A facade that exists in
-> three components and not the fourth is worse than neither.
+**No facade layer** *(ADR 4)*. The transaction boundary and the throwing both live in
+the **service**. `FindByIdAsync` returns `T?` for internal lookups; `GetByIdAsync` throws
+`NotFoundException`. The `Find*` / `Get*` naming is what tells you which you are calling —
+get it wrong and "not found" means two different things at two layers again.
 
-- The transaction boundary is the **facade**, not the service.
 - **One writer per table; everyone else reads through the owner's service.**
   Ownership is `integration_of_functions.md` §3 — it names the exact methods.
   `Bed` is Equipment's, `BedAssignment` is Patient's, and neither writes the

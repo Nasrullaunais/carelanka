@@ -17,7 +17,7 @@ files. What moved out is the detail, which nobody was reading in full anyway.
 
 | Track | File | Owner |
 | :--- | :--- | :--- |
-| **0 · Common** | `docs/build/common.md` | Nasrullah |
+| **0 · Common** | `docs/build/common.md` | Common (group-owned) |
 | 1 · Emergency / Ambulance | `docs/build/emergency.md` | Kaveesha |
 | 2 · Staff Management | `docs/build/staff.md` | Nasrullah |
 | 3 · Health Equipment | `docs/build/equipment.md` | Sethmin |
@@ -236,13 +236,14 @@ rather than discovering at the demo.
 
 | # | Thing | Owner | State |
 | :-- | :--- | :--- | :--- |
-| 1 | ADR | Nasrullah | **Done** — 7 of 8 accepted |
-| 2 | Auth + workflow contract | Nasrullah | **Done** — `specs/common-spec.yaml` |
-| 3 | Spec gate | Nasrullah | **Done** — `bun run check:specs` |
-| 4 | Backend bootstrap + auth | Nasrullah | **Not started — everything is behind this** |
-| 5 | CI — `.github/` | Nasrullah | Not built. §13 grades it |
-| 6 | Test project — the solution has none | Nasrullah | Not built. 8 individual marks |
-| 7 | `web-ui/` scaffold | Nasrullah | Not built. Blocks all React work |
+| 1 | ADR | Common | **Done** — 7 of 8 accepted |
+| 2 | Auth + workflow contract | Common | **Done** — `specs/common-spec.yaml` |
+| 3 | Spec gate | Common | **Done** — `bun run check:specs` |
+| 4 | Backend bootstrap + auth | Common | **Done, 2026-09-07** — EF Core + PostgreSQL, base entities, `Common_AddIdentity`, login/registration/refresh/logout/`/auth/me`, policies, exception handler, `/health`. Setup: `api/README.md` |
+| 4b | Audit interceptor + `AgentWorkflow` tables | Common | Not built. Nothing else is waiting on them — the three other tracks are unblocked by #4 |
+| 5 | CI — `.github/` | Common | Not built. §13 grades it |
+| 6 | Test project — the solution has none | Common | Not built. 8 individual marks |
+| 7 | `web-ui/` scaffold | Common | Not built. Blocks all React work |
 | 8 | `flutter create .` | **whoever has the SDK** | Not run. No `android/`, no APK without it |
 | 9 | `swagger_parser` in `pubspec.yaml` | with #8 | Not added |
 | 10 | `*.g.dart` — committed or CI-built? | with #8 | Open. `.gitignore` currently ignores it |

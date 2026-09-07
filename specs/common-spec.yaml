@@ -45,7 +45,7 @@ info:
     **Wire format:** `snake_case` bodies, `camelCase` query parameters.
   version: 0.1.0
   contact:
-    name: Group (common) - Nasrullah
+    name: Group (common)
 
 servers:
   - url: /api

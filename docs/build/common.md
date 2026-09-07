@@ -1,6 +1,6 @@
 # Build Track 0 — Common
 
-**Owner: Nasrullah** · **Contract:** `specs/common-spec.yaml` · **Decisions:** `docs/ADR.md`
+**Owner: Common (group-owned)** · **Contract:** `specs/common-spec.yaml` · **Decisions:** `docs/ADR.md`
 **Index:** `docs/BUILD_PLAN.md`
 
 Everything that is not a specific member's component. Built **once**, not four times.
@@ -12,6 +12,37 @@ person's.
 
 Read §7 if you are *not* the owner of this track — it is the short version of what auth
 means for your component.
+
+---
+
+## Built so far — 2026-09-07
+
+Steps 1 to 4 below are **done and on `main`**, plus the exception handler from §4.1 and
+`GET /health` from §6. Local setup — connection string, signing key, migrations, seed —
+is `api/README.md`.
+
+**The other three tracks are unblocked.** Endpoints can be written behind
+`[Authorize(Policy = Policies.DutyManager)]` now; §7 is the short version of what that
+means for you.
+
+| Section | State |
+| :--- | :--- |
+| §1 Foundations — base entities, `DbContext`, snake_case wire, enum storage, `Common_AddIdentity` | Done |
+| §2.1–2.2 Password hashing, `StaffMember`, seed (`docs/seed/001_identity.sql`) | Done |
+| §2.3–2.5 JWT issuing, `POST /auth/login`, policies | Done |
+| §2.6 Refresh rotation, reuse detection, logout | Done |
+| §2.7–2.8 `PatientAccount`, register, patient login, `GET /auth/me` | Done |
+| §4.1 Exception handler + `MessageCode` | Done |
+| §4.2 Audit interceptor | **Not built** |
+| §5 `AgentWorkflow` tables and the `/workflows` surface | **Not built** |
+| §6 CI, test project, `web-ui/` scaffold, Flutter auth plumbing | **Not built** |
+
+Two things worth knowing before you build on it:
+
+- **`RefreshToken` changed shape.** It could only hold staff sessions; it now carries a
+  `PrincipalType` and one nullable FK per identity. `entity_diagram.md` Rev 2.7 records why.
+- **The API will not start without `Jwt:SigningKey`.** That is deliberate. `api/README.md`
+  gives the one command.
 
 ---
 
@@ -340,12 +371,15 @@ The short version. Four things affect how you build your component:
 **1. Your endpoints are gated by policy, not by a role string.**
 
 ```csharp
-[Authorize(Policy = "DutyManager")]   // yes
-[Authorize(Roles = "duty_manager")]   // no — a typo here fails silently
+[Authorize(Policy = Policies.DutyManager)]   // yes — a typo will not compile
+[Authorize(Policy = "DutyManager")]          // works, but a typo fails at startup
+[Authorize(Roles = "duty_manager")]          // no — a typo here fails silently
 ```
 
-Policies are registered centrally (§2.5). If you need one that does not exist, ask — do not
-invent a role string.
+`CareLanka.Api.Common.Auth.Policies` holds every policy name as a constant, and they are
+registered centrally (§2.5). One per staff role, plus `AnyStaff`, `PatientOnly`,
+`WorkflowReader` and `WorkflowStarter`. If you need a combination that is not there, ask —
+do not invent a role string.
 
 **2. Anything under `/me/*` is scoped by the `sub` claim, never by a parameter.** Your spec
 already publishes it that way. A route that takes an id and checks it against the JWT is

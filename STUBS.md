@@ -106,7 +106,7 @@ needs from others" sections of `integration_of_functions.md` (§10, §16, §21,
 | M3 Equipment | Is this bed occupied or held? | **M4** | `GET /beds/{id}/occupancy` — **must** be real before Equipment can service any bed. Maintenance never evicts a patient, and a stub that always answers "free" would let it |
 | M3 Equipment | Admission summary by ID | **M4** | For displaying who an assigned item belongs to |
 | ~~all four~~ | ~~Agent workflow tables~~ | ~~group~~ | **Not a stub — DECIDED 2026-09-07.** Common, built once. Contract: `specs/common-spec.yaml` (`GET /workflows`, `GET /workflows/{workflowId}`, the approve/reject/revise gate). Reasoning: `docs/ADR.md` ADR 3 |
-| all four | Login + a JWT with your role claim | **Common (Nasrullah)** | `specs/common-spec.yaml` — `POST /auth/login`, `POST /auth/patient/login`, `POST /auth/refresh`, `GET /auth/me`. **Nobody can write an `[Authorize]` endpoint until this exists**, so it is being built first rather than stubbed |
+| ~~all four~~ | ~~Login + a JWT with your role claim~~ | ~~**Common (group-owned)**~~ | **BUILT 2026-09-07 — not a stub, and never was one.** `POST /auth/login`, `POST /auth/patient/register`, `POST /auth/patient/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me`. Write `[Authorize(Policy = Policies.X)]` against the real thing. Setup and test accounts: `api/README.md` |
 
 ### One of these should not be stubbed for long
 

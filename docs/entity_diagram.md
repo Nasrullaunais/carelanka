@@ -5,6 +5,21 @@ single hospital / multiple wards, unified staff identity, generic agent-workflow
 audit-log schemas). PKs are `Guid` (PostgreSQL `uuid`, `default: gen_random_uuid()`)
 throughout.
 
+**Revision 2.7** — the first Common code landed (auth: login, registration, refresh,
+logout, `/auth/me`), and building it surfaced one place where this document could not be
+implemented as written. Changes marked *(Rev 2.7)*.
+
+- **`RefreshToken` could only hold staff sessions.** Its `StaffMemberId` was non-null,
+  which predates `PatientAccount` (Rev 2.5) — so the patient login the specs require had
+  nowhere to store a session. It now carries a `PrincipalType` plus one nullable FK per
+  identity, with a CHECK making exactly one of them required. See
+  [`RefreshToken`](#refreshtoken-extends-entity-rev-27--changed).
+- **`PrincipalRole` and `PrincipalType` are written down.** Both were already in
+  `common-spec.yaml` and neither was in this document, so the JWT's `role` and `typ`
+  claims had no entry in the schema of record.
+- **`ux_patient_accounts_phone` added to the index list.** The `PatientAccount` entity
+  note already stated it; the Constraints section did not carry it.
+
 **Revision 2.6** — a second Patient Management agent, added on the lecturer's direction
 during the topic-finalization meeting. His feedback: a component called "Patient
 Management" whose only AI behaviour is picking a bed does not read as patient-facing.
@@ -193,18 +208,44 @@ validator confirm a nurse **actively** holds a skill — clinical certifications
 Both nullable means "held indefinitely"; a skill is active when
 `ValidFrom IS NULL OR ValidFrom <= today` and `ExpiresAt IS NULL OR ExpiresAt >= today`.
 
-#### RefreshToken extends Entity
+#### RefreshToken extends Entity *(Rev 2.7 — changed)*
 ```
-+ StaffMemberId: Guid (non-null) FK → StaffMember.Id
++ PrincipalType: PrincipalType (non-null)              -- (Rev 2.7) which table below is set
++ StaffMemberId: Guid (nullable) FK → StaffMember.Id           -- (Rev 2.7: was non-null)
++ PatientAccountId: Guid (nullable) FK → PatientAccount.Id     -- (Rev 2.7 — new)
 + TokenHash: string (unique, non-null)
 + ExpiresAt: DateTimeOffset (non-null)
 + RevokedAt: DateTimeOffset (nullable)
++ RevokedReason: string (nullable)                     -- (Rev 2.7 — new)
 ```
 **Table:** `refresh_tokens`
+**Owner:** Common.
+**Constraints:**
+- `UNIQUE (token_hash)`
+- `CHECK (principal_type IN ('staff', 'patient'))`
+- `CHECK ((principal_type = 'staff' AND staff_member_id IS NOT NULL AND patient_account_id IS NULL)
+   OR (principal_type = 'patient' AND patient_account_id IS NOT NULL AND staff_member_id IS NULL))`
+
 **Note:** Persisted so sessions can be revoked server-side (compromised device,
 terminated staff) rather than relying on stateless JWT expiry alone. *(Decision 36)*
 `RevokedAt` is the one post-insert mutation; the row is otherwise append-only, so it
 stays on `Entity` rather than gaining an `UpdatedAt` that would duplicate `RevokedAt`.
+
+*(Rev 2.7)* **This table could only hold staff sessions, and there are two identities.**
+The non-null `StaffMemberId` predates `PatientAccount` (Rev 2.5). `common-spec.yaml`
+already publishes `POST /auth/refresh` as working "for both identities — `RefreshToken`
+rows carry the principal", so the committed spec is what the code was built to.
+
+Two nullable foreign keys with a CHECK, rather than one bare `PrincipalId: Guid`, because
+a plain Guid pointing at "one of two tables" is a foreign key the database cannot enforce
+— nothing would stop a row naming an account that was hard-deleted, or an id from neither
+table. The CHECK is what makes the pair behave as one required field: exactly one is set,
+and it is the one `principal_type` names.
+
+`RevokedReason` (`rotated`, `logout`, `reuse_detected`) is not decoration. Refresh tokens
+are single-use and rotating, so rows are revoked constantly in normal operation; without
+a reason column there is no way to tell an ordinary rotation from the one revocation that
+means a token was stolen.
 
 #### DeviceToken extends AuditedEntity *(Rev 2 — new)*
 ```
@@ -1008,6 +1049,31 @@ Note that `equipment-management-plan.md` §2 works in terms of two *capabilities
 Inventory Administrator and Equipment Technician — rather than this single role. Member 3
 and Member 2 should confirm whether that is one role or two; carried as Open Decision 11.
 
+### PrincipalRole *(Rev 2.7 — new)*
+```
+WardNurse, Doctor, AmbulanceCrew, GeneralStaff, DutyManager,
+HospitalAdministrator, EquipmentManager, Patient
+```
+Serialized `ward_nurse` … `equipment_manager`, plus `patient`. **Never stored** — it
+exists only in the JWT `role` claim and in `CurrentPrincipal` on the wire.
+
+*(Rev 2.7)* A separate name rather than adding `Patient` to `StaffRole`, because
+`StaffRole` is a column on `staff_members` and a patient has no row there. One enum for
+two different things would make an impossible value representable in the database.
+
+### PrincipalType *(Rev 2.7 — new)*
+```
+Staff, Patient
+```
+Serialized `staff`, `patient`. Stored on `refresh_tokens.principal_type` and carried in
+the JWT as the `typ` claim.
+
+*(Rev 2.7)* **This is the claim that is easy to leave out and expensive to add back.**
+`sub` alone is ambiguous: a `StaffMember.Id` and a `PatientAccount.Id` are both GUIDs from
+different tables. An endpoint that trusts `sub` without checking `typ` looks a patient id
+up in `staff_members`, finds nothing, and either 500s or — worse — silently treats the
+request as unauthenticated staff.
+
 ### CallPriority
 ```
 Critical, High, Medium, Low
@@ -1331,6 +1397,7 @@ never create another `ICU-1`. Worse under EF Core, where a global query filter o
 
 ```sql
 CREATE UNIQUE INDEX ux_staff_members_email     ON staff_members (email)              WHERE is_active;
+CREATE UNIQUE INDEX ux_patient_accounts_phone ON patient_accounts (phone_number)     WHERE is_active;   -- (Rev 2.7)
 CREATE UNIQUE INDEX ux_ambulances_reg          ON ambulances (registration_number)   WHERE is_active;
 CREATE UNIQUE INDEX ux_wards_name              ON wards (name)                       WHERE is_active;
 CREATE UNIQUE INDEX ux_beds_ward_number        ON beds (ward_id, bed_number)         WHERE is_active;
@@ -1618,7 +1685,7 @@ rows are mutated after insert; pure join/append-only tables (`DispatchCrew`,
 | Staff Management | Member 2 | Shift, Allocation, LeaveRequest, Skill, StaffMemberSkill, WardStaffingRule |
 | Health Equipment | Member 3 | EquipmentCategory, EquipmentItem, **Bed**, PharmacyCategory, PharmacyItem, PharmacyTransaction, MaintenanceSchedule, Warning, ActionRequest |
 | Patient Management | Member 4 | Patient, **PatientAccount**, Admission, BedAssignment, BedReservation, Discharge, DischargeChecklistItem, Appointment, Ward |
-| Common | Nasrullah | StaffMember, **PatientAccount**, RefreshToken, DeviceToken, Notification, AgentWorkflow, AgentProposedChange, AuditLog |
+| Common | Group (common) | StaffMember, **PatientAccount**, RefreshToken, DeviceToken, Notification, AgentWorkflow, AgentProposedChange, AuditLog |
 
 **Common means built once, not four times.** *(2026-09-07)* Anything that is not a
 specific member's is common: auth and the JWT, the `DbContext` and base classes, the

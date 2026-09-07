@@ -54,7 +54,8 @@ here is the order of authority.
 | `docs/ADR.md` | **The decisions that are settled and why.** Agent framework, model provider, agent workflow tables, no facade, enum storage, React and Flutter state. Required by assignment §14.2 and examinable at the viva. | Group |
 | `specs/common-spec.yaml` | **Auth and the shared agent workflow surface.** Everything that is not one member's component. Read before assuming something is unowned. | Common (Nasrullah) |
 | `docs/CareLanka_Component_Plan.md` | The four components, who owns which, the seven roles, why React and Flutter differ. Read first. | Group |
-| `docs/BUILD_PLAN.md` | **What to build, in what order.** All four members in one file, so you see your neighbours' work. Read your member's section before writing code. | Group |
+| `docs/BUILD_PLAN.md` | **The build index.** Build order, the five tracks, who is waiting on whom, integration checkpoints. Read before writing code. | Group |
+| `docs/build/{common,emergency,staff,equipment,patient}.md` | **What your member builds, step by step.** Read your own in full; read `build/common.md` §7 whoever you are — four things about auth that change how you build. | That track's owner |
 | `STUBS.md` | **Every fake standing in for someone else's unbuilt work.** Read the rows where `Owner` is your member — somebody is already depending on those. | Everyone, constantly |
 | `docs/entity_diagram.md` | Every table, field and enum, with the reasoning. | Group; each member edits only their own entities |
 | `specs/integration_of_functions.md` | Component boundaries: who owns which table, who calls whose service, open cross-component items. Read before touching anything you do not own. | Group |
@@ -325,7 +326,7 @@ Base classes are `Entity` → `AuditedEntity` → `SoftDeletableEntity`, defined
   row, taking the staff id from the JWT. Never write one by hand. A soft delete
   logs as `Operation = Delete`, not `Update`.
 - **`DateTimeOffset` in UTC** everywhere — Npgsql requires a UTC offset.
-- **Migrations are DDL only.** Seed data lives in `docs/*.sql` as parameterised,
+- **Migrations are DDL only.** Seed data lives in `docs/seed/*.sql` as parameterised,
   idempotent scripts, so environment-specific ids never reach production.
 
 ## One DbContext, four people

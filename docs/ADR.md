@@ -253,7 +253,7 @@ controllers.
 
 The schema carries roughly thirty enums. How they are stored affects **every migration**,
 and deciding after the migrations exist means rewriting all of them —
-`docs/BUILD_PLAN.md` §2.3 listed this as a decision that could not wait.
+`docs/BUILD_PLAN.md` listed this as a decision that could not wait.
 
 ### Options considered
 

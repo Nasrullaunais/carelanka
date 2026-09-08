@@ -1,6 +1,6 @@
 # Build Track 0 — Common
 
-**Owner: Nasrullah** · **Contract:** `specs/common-spec.yaml` · **Decisions:** `docs/ADR.md`
+**Owner: Common (group-owned)** · **Contract:** `specs/common-spec.yaml` · **Decisions:** `docs/ADR.md`
 **Index:** `docs/BUILD_PLAN.md`
 
 Everything that is not a specific member's component. Built **once**, not four times.
@@ -12,6 +12,38 @@ person's.
 
 Read §7 if you are *not* the owner of this track — it is the short version of what auth
 means for your component.
+
+---
+
+## Built so far — 2026-09-08
+
+Steps 1 to 4 below are implemented in PR #11, plus the exception handler from §4.1,
+`GET /health` and the auth integration test foundation from §6. Local setup — connection
+string, signing key, migrations, seed — is `api/README.md`.
+
+Once PR #11 is merged, the other three tracks are unblocked. Endpoints can then be written
+behind `[Authorize(Policy = Policies.DutyManager)]`; §7 is the short version of what that
+means for you.
+
+| Section | State |
+| :--- | :--- |
+| §1 Foundations — base entities, `DbContext`, snake_case wire, enum storage, `Common_AddIdentity` | Done |
+| §2.1–2.2 Password hashing, `StaffMember`, seed (`docs/seed/001_identity.sql`) | Done |
+| §2.3–2.5 JWT issuing, `POST /auth/login`, policies | Done |
+| §2.6 Refresh rotation, reuse detection, logout | Done |
+| §2.7–2.8 `PatientAccount`, register, patient login, `GET /auth/me` | Done |
+| §4.1 Exception handler + `MessageCode` | Done |
+| §6 Auth integration and generated-contract tests | Done |
+| §4.2 Audit interceptor | **Not built** |
+| §5 `AgentWorkflow` tables and the `/workflows` surface | **Not built** |
+| §6 CI, `web-ui/` scaffold, Flutter auth plumbing | **Not built** |
+
+Two things worth knowing before you build on it:
+
+- **`RefreshToken` changed shape.** It could only hold staff sessions; it now carries a
+  `PrincipalType` and one nullable FK per identity. `entity_diagram.md` Rev 2.7 records why.
+- **The API will not start without `Jwt:SigningKey`.** That is deliberate. `api/README.md`
+  gives the one command.
 
 ---
 
@@ -219,15 +251,24 @@ Both clients call this on startup to decide which navigation to render.
 
 Do not move on until all of these pass:
 
-- [ ] Seeded staff member logs in, gets a token
-- [ ] Wrong password, unknown email and deactivated account all return the **same** 401
-- [ ] A protected endpoint returns 401 with no token, 403 with the wrong role, 200 with the right one
-- [ ] Refresh returns a new pair; the old refresh token is dead
-- [ ] Reusing a revoked refresh token 401s **and** kills the chain
-- [ ] Logout, then refresh → 401
-- [ ] Patient registers, logs in, and `/auth/me` returns `principal_type: patient`, `patient_id: null`
-- [ ] Swagger shows the Authorize button and a pasted token works from the UI
-- [ ] No password or signing key appears in any log line or any response body
+- [x] Seeded staff member logs in, gets a token
+- [x] Wrong password, unknown email and deactivated account all return the **same** 401
+- [x] A protected endpoint returns 401 with no token, 403 with the wrong role, 200 with the right one
+- [x] Refresh returns a new pair; the old refresh token is dead
+- [x] Reusing a revoked refresh token 401s **and** kills the chain
+- [x] Logout, then refresh → 401
+- [x] Patient registers, logs in, and `/auth/me` returns `principal_type: patient`, `patient_id: null`
+- [x] Swagger publishes bearer authorization and a token passes the protected policy endpoint
+- [x] No password or signing key appears in any captured log line or response body
+
+These gates run in `CareLanka.Api.Tests` against a disposable PostgreSQL database. The
+registration test sends two requests concurrently so the unique-index race is part of the
+acceptance suite, not only a sequential duplicate check.
+
+The generated document attaches bearer security to each `[Authorize]` operation rather
+than declaring it globally. Swashbuckle 6.6 omits an empty operation security array when
+serializing, so a global requirement would incorrectly make `[AllowAnonymous]` login,
+registration and refresh operations require the token they exist to issue.
 
 That last one is worth checking by actually reading the console output during a failed
 login, not by assuming.
@@ -340,12 +381,15 @@ The short version. Four things affect how you build your component:
 **1. Your endpoints are gated by policy, not by a role string.**
 
 ```csharp
-[Authorize(Policy = "DutyManager")]   // yes
-[Authorize(Roles = "duty_manager")]   // no — a typo here fails silently
+[Authorize(Policy = Policies.DutyManager)]   // yes — a typo will not compile
+[Authorize(Policy = "DutyManager")]          // works, but a typo fails at startup
+[Authorize(Roles = "duty_manager")]          // no — a typo here fails silently
 ```
 
-Policies are registered centrally (§2.5). If you need one that does not exist, ask — do not
-invent a role string.
+`CareLanka.Api.Common.Auth.Policies` holds every policy name as a constant, and they are
+registered centrally (§2.5). One per staff role, plus `AnyStaff`, `PatientOnly`,
+`WorkflowReader` and `WorkflowStarter`. If you need a combination that is not there, ask —
+do not invent a role string.
 
 **2. Anything under `/me/*` is scoped by the `sub` claim, never by a parameter.** Your spec
 already publishes it that way. A route that takes an id and checks it against the JWT is

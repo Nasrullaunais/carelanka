@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <data name="cl_err_400" xml:space="preserve">
+    <value>One or more fields are not valid.</value>
+  </data>
+  <data name="cl_err_401" xml:space="preserve">
+    <value>Those sign-in details are not correct.</value>
+    <comment>Deliberately identical for a wrong password, an unknown account and a deactivated account.</comment>
+  </data>
+  <data name="cl_err_401_missing" xml:space="preserve">
+    <value>You are not signed in.</value>
+  </data>
+  <data name="cl_err_403" xml:space="preserve">
+    <value>Your role does not allow this.</value>
+  </data>
+  <data name="cl_err_404" xml:space="preserve">
+    <value>{0} {1} was not found.</value>
+  </data>
+  <data name="cl_err_409" xml:space="preserve">
+    <value>That conflicts with something already recorded.</value>
+  </data>
+  <data name="cl_err_409_transition" xml:space="preserve">
+    <value>{0} cannot move from {1} to {2}.</value>
+  </data>
+  <data name="cl_err_429" xml:space="preserve">
+    <value>Too many attempts. Wait a moment and try again.</value>
+  </data>
+  <data name="cl_err_500" xml:space="preserve">
+    <value>Something went wrong at our end.</value>
+    <comment>Never carries internal detail. The trace id in the response is how a developer finds the real error in the logs.</comment>
+  </data>
+  <data name="cl_err_001" xml:space="preserve">
+    <value>Your session has ended. Please sign in again.</value>
+    <comment>Refresh token unknown, expired, or already used.</comment>
+  </data>
+  <data name="cl_err_002" xml:space="preserve">
+    <value>That phone number already has an account.</value>
+  </data>
+</root>

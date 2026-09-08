@@ -43,11 +43,26 @@ So "integration" here does **not** mean four separate services calling each othe
 
 ```
 api/
-  Controllers/  Emergency/  Staff/  Equipment/  Patient/
-  Services/     Emergency/  Staff/  Equipment/  Patient/
-  DTOs/         Emergency/  Staff/  Equipment/  Patient/
-  Data/         one DbContext, all entities
+  Controllers/  Common/  Emergency/  Staff/  Equipment/  Patient/   thin: bind, delegate, return
+  Services/     Common/  Emergency/  Staff/  Equipment/  Patient/   business logic + data access
+  DTOs/         Common/  Emergency/  Staff/  Equipment/  Patient/   no `Dto` suffix
+  Agents/                                                           the AI agents
+  Data/
+    CareLankaDbContext.cs      one context; OnModelCreating is one line and nobody edits it
+    Entities/{Component}/      base classes at the top level, your entities in your folder
+    Configurations/{Component}/  your IEntityTypeConfiguration classes — zero shared lines
+    Enums/                     one file per enum
+    Migrations/                generated; pull immediately before, push promptly after
+  Common/                      cross-cutting infrastructure, group-owned
+    Auth/                      policy names, claim names, JwtOptions, rate-limit policy names
+    Errors/                    MessageCode, ErrorMessages.resx, the one IExceptionHandler
+    Exceptions/                ApiException and its subclasses
+    Persistence/               enum wire format, value converters, SaveChanges interceptors
 ```
+
+`Common/` is infrastructure every component uses and nobody owns individually. Read it,
+import from it, do not fork it — a second copy of the exception handler or the enum
+converter looks right and behaves differently.
 
 That makes the ownership rules a **team convention**, not something the compiler enforces. Which is exactly why they need writing down.
 
@@ -104,12 +119,12 @@ The second version keeps working when hold expiry, out-of-service beds or a new 
 | `Patient`, `Admission`, `Discharge` | **Patient (M4)** | Emergency, Staff (aggregates only) | Patient only |
 | **`BedAssignment`** — who is in a bed, holds, approvals | **Patient (M4)** | Equipment (before servicing a bed) | Patient only |
 | `Ward` — name, type, gender policy | **Patient (M4)** — *see §11.1* | All | Patient only |
-| `AgentWorkflow`, `AgentProposedChange` | **Common (Nasrullah)** — *DECIDED, §11.2* | All five agents | All five agents, by `workflow_id` |
-| `StaffMember`, `PatientAccount`, `RefreshToken`, login, JWT issuing | **Common (Nasrullah)** — `specs/common-spec.yaml` | All | Common only |
-| `AuditLog`, `Notification`, `DeviceToken` | **Common (Nasrullah)** | All | Written by the audit interceptor, never by hand |
+| `AgentWorkflow`, `AgentProposedChange` | **Common (group-owned)** — *DECIDED, §11.2* | All five agents | All five agents, by `workflow_id` |
+| `StaffMember`, `PatientAccount`, `RefreshToken`, login, JWT issuing | **Common (group-owned)** — `specs/common-spec.yaml` | All | Common only |
+| `AuditLog`, `Notification`, `DeviceToken` | **Common (group-owned)** | All | Written by the audit interceptor, never by hand |
 
 **The rule for everything else: if it does not belong to a specific member, it is
-common.** Common parts are owned by Nasrullah and built **once**, not four times.
+common.** Common parts are group-owned and built **once**, not four times.
 That covers auth, the JWT, the exception handler, the audit interceptor, the
 `DbContext`, the base entity classes, the agent workflow tables and the Coordinator
 Agent. If you are about to build something that is not in your component's row above,

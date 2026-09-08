@@ -176,7 +176,7 @@ enforces them, and what "safe failure" looks like for it.
 
 | # | Was open | Settled as |
 | :-- | :--- | :--- |
-| 1 | Accept the fifth Coordinator Agent, and who builds it | **Yes.** Common — Nasrullah. ADR 1 |
+| 1 | Accept the fifth Coordinator Agent, and who builds it | **Yes.** Common — group-owned. ADR 1 |
 | 2 | Framework | **Custom C# orchestration in-process**, not LangGraph — §2's mandatory backend rule would have made a Python service a second deployable for no gain. Gemini free tier as the model. ADR 1, ADR 2 |
 | 3 | Does M1 call M4 directly, or does the coordinator drive both | **Coordinator drives both** for the assessed workflow; M1's direct call to `POST /admissions/pre-admit` stays for standalone dispatches. Closes `integration_of_functions.md` §11.3 |
 | 4 | `emergency-spec.yaml` is a stub | **No longer true** — 33 paths, valid, swept clean |

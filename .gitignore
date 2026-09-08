@@ -1,6 +1,6 @@
 ## .NET
-api/bin/
-api/obj/
+**/bin/
+**/obj/
 *.user
 
 ## Node / React

@@ -52,10 +52,11 @@ here is the order of authority.
 | :--- | :--- | :--- |
 | `docs/2026-S1-SE3090-Assignment_1_Specification.md` | The assignment brief. Beats every other file, this one included. | Module |
 | `docs/ADR.md` | **The decisions that are settled and why.** Agent framework, model provider, agent workflow tables, no facade, enum storage, React and Flutter state. Required by assignment §14.2 and examinable at the viva. | Group |
-| `specs/common-spec.yaml` | **Auth and the shared agent workflow surface.** Everything that is not one member's component. Read before assuming something is unowned. | Common (Nasrullah) |
+| `specs/common-spec.yaml` | **Auth and the shared agent workflow surface.** Everything that is not one member's component. Read before assuming something is unowned. | Common (group-owned) |
 | `docs/CareLanka_Component_Plan.md` | The four components, who owns which, the seven roles, why React and Flutter differ. Read first. | Group |
 | `docs/BUILD_PLAN.md` | **The build index.** Build order, the five tracks, who is waiting on whom, integration checkpoints. Read before writing code. | Group |
 | `docs/build/{common,emergency,staff,equipment,patient}.md` | **What your member builds, step by step.** Read your own in full; read `build/common.md` §7 whoever you are — four things about auth that change how you build. | That track's owner |
+| `TEST_ACCOUNTS.md` | **Who to log in as.** The seeded accounts, their roles and passwords, and how to use a token in Swagger or curl. Required by assignment §15. | Common (group-owned) |
 | `STUBS.md` | **Every fake standing in for someone else's unbuilt work.** Read the rows where `Owner` is your member — somebody is already depending on those. | Everyone, constantly |
 | `docs/entity_diagram.md` | Every table, field and enum, with the reasoning. | Group; each member edits only their own entities |
 | `specs/integration_of_functions.md` | Component boundaries: who owns which table, who calls whose service, open cross-component items. Read before touching anything you do not own. | Group |
@@ -84,7 +85,7 @@ Four rules that fall out of it:
 ## Common vs. yours
 
 **If it does not belong to a specific member, it is common — and common is built once,
-by Nasrullah, not four times.** *(settled 2026-09-07)*
+not four times.** *(settled 2026-09-07)*
 
 Common covers: auth and the JWT, the `DbContext` and base entity classes, the exception
 handler, the audit interceptor, `AgentWorkflow` / `AgentProposedChange`, the Coordinator

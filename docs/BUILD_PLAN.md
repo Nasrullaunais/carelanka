@@ -239,10 +239,10 @@ rather than discovering at the demo.
 | 1 | ADR | Common | **Done** — 7 of 8 accepted |
 | 2 | Auth + workflow contract | Common | **Done** — `specs/common-spec.yaml` |
 | 3 | Spec gate | Common | **Done** — `bun run check:specs` |
-| 4 | Backend bootstrap + auth | Common | **Done, 2026-09-07** — EF Core + PostgreSQL, base entities, `Common_AddIdentity`, login/registration/refresh/logout/`/auth/me`, policies, exception handler, `/health`. Setup: `api/README.md` |
+| 4 | Backend bootstrap + auth | Common | **Implemented in PR #11, verified 2026-09-08** — EF Core + PostgreSQL, base entities, `Common_AddIdentity`, login/registration/refresh/logout/`/auth/me`, policies, exception handler, `/health`. Setup: `api/README.md` |
 | 4b | Audit interceptor + `AgentWorkflow` tables | Common | Not built. Nothing else is waiting on them — the three other tracks are unblocked by #4 |
 | 5 | CI — `.github/` | Common | Not built. §13 grades it |
-| 6 | Test project — the solution has none | Common | Not built. 8 individual marks |
+| 6 | Auth integration + generated-contract test project | Common | **Done in PR #11** — `CareLanka.Api.Tests`, 15 tests against disposable PostgreSQL |
 | 7 | `web-ui/` scaffold | Common | Not built. Blocks all React work |
 | 8 | `flutter create .` | **whoever has the SDK** | Not run. No `android/`, no APK without it |
 | 9 | `swagger_parser` in `pubspec.yaml` | with #8 | Not added |

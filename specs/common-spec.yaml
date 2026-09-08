@@ -225,6 +225,7 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /auth/logout:
     post:

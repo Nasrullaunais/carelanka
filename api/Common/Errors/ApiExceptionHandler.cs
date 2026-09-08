@@ -39,9 +39,7 @@ public sealed class ApiExceptionHandler : IExceptionHandler
             }.WithCareLankaExtensions(context, MessageCode.Unexpected);
         }
 
-        context.Response.StatusCode = problem.Status!.Value;
-        context.Response.ContentType = "application/problem+json";
-        await context.Response.WriteAsJsonAsync(problem, cancellationToken);
+        await ProblemResponseWriter.WriteAsync(context, problem, cancellationToken);
 
         return true;
     }

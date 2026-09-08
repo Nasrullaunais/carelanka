@@ -65,6 +65,7 @@ public class AuthController : ControllerBase
     [ProducesResponseType(typeof(AuthTokens), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests, "application/problem+json")]
     public async Task<ActionResult<AuthTokens>> RefreshToken(
         [FromBody] RefreshTokenRequest request, CancellationToken ct)
         => Ok(await _auth.RefreshAsync(request.RefreshToken, ct));

@@ -6,6 +6,8 @@ namespace CareLanka.Api.Data.Configurations.Common;
 
 public class PatientAccountConfiguration : IEntityTypeConfiguration<PatientAccount>
 {
+    public const string PhoneNumberUniqueIndex = "ux_patient_accounts_phone";
+
     public void Configure(EntityTypeBuilder<PatientAccount> builder)
     {
         builder.ToTable("patient_accounts");
@@ -17,7 +19,7 @@ public class PatientAccountConfiguration : IEntityTypeConfiguration<PatientAccou
         builder.Property(p => p.FullName).HasMaxLength(200).IsRequired();
 
         builder.HasIndex(p => p.PhoneNumber)
-            .HasDatabaseName("ux_patient_accounts_phone")
+            .HasDatabaseName(PhoneNumberUniqueIndex)
             .IsUnique()
             .HasFilter("is_active");
 

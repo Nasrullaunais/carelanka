@@ -2,11 +2,13 @@ using CareLanka.Api.Common.Auth;
 using CareLanka.Api.Common.Errors;
 using CareLanka.Api.Common.Exceptions;
 using CareLanka.Api.Data;
+using CareLanka.Api.Data.Configurations.Common;
 using CareLanka.Api.Data.Entities.Common;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Npgsql;
 
 namespace CareLanka.Api.Services.Common;
 
@@ -68,13 +70,6 @@ public sealed class AuthService : IAuthService
     {
         var phone = request.PhoneNumber.Trim();
 
-        var taken = await _db.PatientAccounts.AnyAsync(p => p.PhoneNumber == phone, ct);
-
-        if (taken)
-        {
-            throw new ConflictException(MessageCode.PhoneNumberAlreadyRegistered);
-        }
-
         var account = new PatientAccount
         {
             Id = Guid.NewGuid(),
@@ -86,7 +81,14 @@ public sealed class AuthService : IAuthService
 
         _db.PatientAccounts.Add(account);
 
-        return await IssueAsync(ToPrincipal(account), account.Id, PrincipalType.Patient, ct);
+        try
+        {
+            return await IssueAsync(ToPrincipal(account), account.Id, PrincipalType.Patient, ct);
+        }
+        catch (DbUpdateException exception) when (IsDuplicatePhoneNumber(exception))
+        {
+            throw new ConflictException(MessageCode.PhoneNumberAlreadyRegistered);
+        }
     }
 
     public async Task<AuthTokens> LoginPatientAsync(PatientLoginRequest request, CancellationToken ct = default)
@@ -282,4 +284,11 @@ public sealed class AuthService : IAuthService
     // By name, not by position: reordering either enum must not promote a nurse to an administrator.
     private static PrincipalRole ToPrincipalRole(StaffRole role)
         => Enum.Parse<PrincipalRole>(role.ToString());
+
+    private static bool IsDuplicatePhoneNumber(DbUpdateException exception)
+        => exception.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: PatientAccountConfiguration.PhoneNumberUniqueIndex
+        };
 }

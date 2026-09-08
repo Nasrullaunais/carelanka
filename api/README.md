@@ -14,6 +14,10 @@ Four people need this to start on four machines. Three commands, then it runs.
   dotnet tool install --global dotnet-ef --version 8.*
   ```
 
+To run the integration tests, Docker must also be running. `dotnet test` starts a
+disposable PostgreSQL 16 container, applies the real migrations, and removes the
+container afterward; no test database password is stored in the repository.
+
 ---
 
 ## 1. Make the database
@@ -24,14 +28,19 @@ createdb -U postgres carelanka
 
 Or from `psql`: `CREATE DATABASE carelanka;`
 
-The connection string lives in `api/appsettings.Development.json` and assumes
-`postgres` / `postgres` on port 5432. **If your local Postgres password is
-different, do not edit that file** — override it, so nobody else's checkout
-breaks when you commit:
+The repository contains no database credential. Store your local connection
+string in .NET user-secrets so nobody else's checkout changes and a password
+cannot be committed accidentally:
+
+`api/appsettings.Development.example.json` shows the two required settings with
+placeholders only; the application does not load that example file.
 
 ```
 dotnet user-secrets set "ConnectionStrings:CareLanka" "Host=localhost;Port=5432;Database=carelanka;Username=postgres;Password=YOUR_PASSWORD" --project api
 ```
+
+For a deployed environment, use `ConnectionStrings__CareLanka` (two
+underscores) instead.
 
 ## 2. Set the JWT signing key
 

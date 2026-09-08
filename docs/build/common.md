@@ -15,14 +15,14 @@ means for your component.
 
 ---
 
-## Built so far — 2026-09-07
+## Built so far — 2026-09-08
 
-Steps 1 to 4 below are **done and on `main`**, plus the exception handler from §4.1 and
-`GET /health` from §6. Local setup — connection string, signing key, migrations, seed —
-is `api/README.md`.
+Steps 1 to 4 below are implemented in PR #11, plus the exception handler from §4.1,
+`GET /health` and the auth integration test foundation from §6. Local setup — connection
+string, signing key, migrations, seed — is `api/README.md`.
 
-**The other three tracks are unblocked.** Endpoints can be written behind
-`[Authorize(Policy = Policies.DutyManager)]` now; §7 is the short version of what that
+Once PR #11 is merged, the other three tracks are unblocked. Endpoints can then be written
+behind `[Authorize(Policy = Policies.DutyManager)]`; §7 is the short version of what that
 means for you.
 
 | Section | State |
@@ -33,9 +33,10 @@ means for you.
 | §2.6 Refresh rotation, reuse detection, logout | Done |
 | §2.7–2.8 `PatientAccount`, register, patient login, `GET /auth/me` | Done |
 | §4.1 Exception handler + `MessageCode` | Done |
+| §6 Auth integration and generated-contract tests | Done |
 | §4.2 Audit interceptor | **Not built** |
 | §5 `AgentWorkflow` tables and the `/workflows` surface | **Not built** |
-| §6 CI, test project, `web-ui/` scaffold, Flutter auth plumbing | **Not built** |
+| §6 CI, `web-ui/` scaffold, Flutter auth plumbing | **Not built** |
 
 Two things worth knowing before you build on it:
 
@@ -250,15 +251,24 @@ Both clients call this on startup to decide which navigation to render.
 
 Do not move on until all of these pass:
 
-- [ ] Seeded staff member logs in, gets a token
-- [ ] Wrong password, unknown email and deactivated account all return the **same** 401
-- [ ] A protected endpoint returns 401 with no token, 403 with the wrong role, 200 with the right one
-- [ ] Refresh returns a new pair; the old refresh token is dead
-- [ ] Reusing a revoked refresh token 401s **and** kills the chain
-- [ ] Logout, then refresh → 401
-- [ ] Patient registers, logs in, and `/auth/me` returns `principal_type: patient`, `patient_id: null`
-- [ ] Swagger shows the Authorize button and a pasted token works from the UI
-- [ ] No password or signing key appears in any log line or any response body
+- [x] Seeded staff member logs in, gets a token
+- [x] Wrong password, unknown email and deactivated account all return the **same** 401
+- [x] A protected endpoint returns 401 with no token, 403 with the wrong role, 200 with the right one
+- [x] Refresh returns a new pair; the old refresh token is dead
+- [x] Reusing a revoked refresh token 401s **and** kills the chain
+- [x] Logout, then refresh → 401
+- [x] Patient registers, logs in, and `/auth/me` returns `principal_type: patient`, `patient_id: null`
+- [x] Swagger publishes bearer authorization and a token passes the protected policy endpoint
+- [x] No password or signing key appears in any captured log line or response body
+
+These gates run in `CareLanka.Api.Tests` against a disposable PostgreSQL database. The
+registration test sends two requests concurrently so the unique-index race is part of the
+acceptance suite, not only a sequential duplicate check.
+
+The generated document attaches bearer security to each `[Authorize]` operation rather
+than declaring it globally. Swashbuckle 6.6 omits an empty operation security array when
+serializing, so a global requirement would incorrectly make `[AllowAnonymous]` login,
+registration and refresh operations require the token they exist to issue.
 
 That last one is worth checking by actually reading the console output during a failed
 login, not by assuming.

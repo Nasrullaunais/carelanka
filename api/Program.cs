@@ -129,11 +129,11 @@ builder.Services
             OnChallenge = async context =>
             {
                 context.HandleResponse();
-                await WriteProblemAsync(
+                await ProblemResponseWriter.WriteAsync(
                     context.HttpContext, StatusCodes.Status401Unauthorized,
                     "Unauthorized", MessageCode.NotAuthenticated);
             },
-            OnForbidden = context => WriteProblemAsync(
+            OnForbidden = context => ProblemResponseWriter.WriteAsync(
                 context.HttpContext, StatusCodes.Status403Forbidden,
                 "Forbidden", MessageCode.Forbidden)
         };
@@ -177,7 +177,7 @@ builder.Services.AddRateLimiter(options =>
 
     options.OnRejected = async (context, ct) =>
     {
-        await WriteProblemAsync(
+        await ProblemResponseWriter.WriteAsync(
             context.HttpContext, StatusCodes.Status429TooManyRequests,
             "Too Many Requests", MessageCode.TooManyRequests, ct);
     };
@@ -201,6 +201,7 @@ builder.Services.AddSingleton<ITokenService, TokenService>();
 builder.Services.AddSingleton<ILoginThrottle, LoginThrottle>();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IHealthService, HealthService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -226,19 +227,8 @@ builder.Services.AddSwaggerGen(options =>
         Description = "Paste the access_token from POST /api/auth/login. No \"Bearer \" prefix."
     });
 
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        [new OpenApiSecurityScheme
-        {
-            Reference = new OpenApiReference
-            {
-                Type = ReferenceType.SecurityScheme,
-                Id = JwtBearerDefaults.AuthenticationScheme
-            }
-        }] = Array.Empty<string>()
-    });
-
     options.DocumentFilter<ApiPrefixAsServerFilter>();
+    options.OperationFilter<AnonymousOperationFilter>();
 
     var xmlPath = Path.Combine(AppContext.BaseDirectory, "CareLanka.Api.xml");
 
@@ -271,27 +261,6 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
-
-static async Task WriteProblemAsync(
-    HttpContext context, int status, string title, MessageCode code, CancellationToken ct = default)
-{
-    if (context.Response.HasStarted)
-    {
-        return;
-    }
-
-    var problem = new ProblemDetails
-    {
-        Status = status,
-        Title = title,
-        Detail = code.ToText()
-    }.WithCareLankaExtensions(context, code);
-
-    context.Response.StatusCode = status;
-    context.Response.ContentType = "application/problem+json";
-
-    await context.Response.WriteAsJsonAsync(problem, ct);
-}
 
 // Exposed so an integration test project can spin the real application up.
 public partial class Program;

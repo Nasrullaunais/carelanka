@@ -16,9 +16,8 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
                 "ck_refresh_tokens_principal_type",
                 EnumWire.CheckConstraint<PrincipalType>("principal_type"));
 
-            // Exactly one owner, matching principal_type. Without this a row could name a
-            // staff member and claim to be a patient, and every /auth/me after it would be
-            // answering about the wrong person.
+            // Exactly one owner, matching principal_type. Without it a row could name a staff
+            // member and claim to be a patient, and /auth/me would answer about the wrong person.
             t.HasCheckConstraint(
                 "ck_refresh_tokens_one_principal",
                 "(principal_type = 'staff' AND staff_member_id IS NOT NULL AND patient_account_id IS NULL)"
@@ -41,7 +40,6 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
             .HasDatabaseName("ux_refresh_tokens_hash")
             .IsUnique();
 
-        // Refresh and reuse-detection both start from "every live row for this principal".
         builder.HasIndex(r => new { r.PrincipalType, r.StaffMemberId, r.PatientAccountId })
             .HasDatabaseName("ix_refresh_tokens_principal");
 

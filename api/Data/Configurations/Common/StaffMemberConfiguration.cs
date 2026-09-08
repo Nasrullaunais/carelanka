@@ -27,12 +27,10 @@ public class StaffMemberConfiguration : IEntityTypeConfiguration<StaffMember>
             .HasMaxLength(40)
             .IsRequired();
 
-        // FullName is computed in C#; there is no column behind it.
         builder.Ignore(s => s.FullName);
 
-        // Scoped WHERE is_active. A plain UNIQUE here means a deactivated staff member's
-        // email can never be reused, and the global query filter hides the row that is
-        // blocking it — so the duplicate check passes and SaveChanges throws instead.
+        // Scoped WHERE is_active. A plain UNIQUE means a deactivated member's email can never
+        // be reused, and the query filter hides the blocking row so SaveChanges throws instead.
         builder.HasIndex(s => s.Email)
             .HasDatabaseName("ux_staff_members_email")
             .IsUnique()

@@ -3,16 +3,10 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace CareLanka.Api.Common.Errors;
 
-/// <summary>
-/// The one place a <see cref="ProblemDetails"/> gets its CareLanka extensions, so every
-/// failure — thrown, validated, or refused by the auth middleware — carries the same two
-/// fields.
-/// </summary>
 public static class ProblemDetailsFactoryExtensions
 {
     public const string TraceIdHeader = "X-Trace-Id";
 
-    /// <summary><c>extensions["code"]</c> and <c>extensions["traceId"]</c>, plus the header.</summary>
     public static ProblemDetails WithCareLankaExtensions(
         this ProblemDetails problem, HttpContext context, MessageCode code)
     {

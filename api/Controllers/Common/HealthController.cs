@@ -7,10 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CareLanka.Api.Controllers.Common;
 
-/// <summary>
-/// Unauthenticated liveness probe. Assignment §14 requires a working health URL for the
-/// deployed API.
-/// </summary>
+/// <summary>Unauthenticated liveness probe.</summary>
 [ApiController]
 [Route("api/health")]
 [Tags("Health")]
@@ -25,12 +22,7 @@ public class HealthController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>Liveness and database connectivity.</summary>
-    /// <remarks>
-    /// Reports whether the API is up **and** whether it can reach PostgreSQL. An API that
-    /// answers "up" while the database is unreachable is worse than one that says nothing,
-    /// because it stops anyone from looking.
-    /// </remarks>
+    /// <summary>Liveness and database connectivity. An API that answers "up" while PostgreSQL is unreachable is worse than one that says nothing, because it stops anyone from looking.</summary>
     [AllowAnonymous]
     [HttpGet(Name = "getHealth")]
     [ProducesResponseType(typeof(HealthStatus), StatusCodes.Status200OK)]
@@ -45,8 +37,8 @@ public class HealthController : ControllerBase
         }
         catch (Exception ex)
         {
-            // The one justified catch in a controller: an unreachable database is the
-            // answer this endpoint exists to give, not an error to hand to the handler.
+            // The one justified catch in a controller: an unreachable database is the answer
+            // this endpoint exists to give, not an error to hand to the exception handler.
             _logger.LogError(ex, "Health check could not reach PostgreSQL");
             databaseUp = false;
         }

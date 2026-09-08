@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace CareLanka.Api.DTOs.Common;
 
-/// <summary>Body of <c>POST /api/auth/patient/login</c>.</summary>
+/// <summary>Body of POST /api/auth/patient/login.</summary>
 public class PatientLoginRequest
 {
     /// <summary>The login identifier for a patient account, e.g. <c>+94771234567</c>.</summary>

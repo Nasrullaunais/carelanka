@@ -2,14 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace CareLanka.Api.DTOs.Common;
 
-/// <summary>
-/// Body of <c>POST /api/auth/patient/register</c>.
-/// <para>
-/// This creates a <strong>login</strong>, not a medical record. There is deliberately no
-/// clinical field here — no date of birth, no national id, no next of kin. Staff create
-/// the <c>Patient</c> record and link it later after checking identity.
-/// </para>
-/// </summary>
+/// <summary>Body of POST /api/auth/patient/register. Creates a login, not a medical record — there is deliberately no clinical field here.</summary>
 public class PatientRegisterRequest
 {
     [Required]

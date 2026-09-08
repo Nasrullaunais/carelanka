@@ -1,10 +1,6 @@
 namespace CareLanka.Api.DTOs.Common;
 
-/// <summary>
-/// What <c>GET /api/health</c> reports. Deliberately includes database connectivity: an
-/// API that answers "up" while PostgreSQL is unreachable is worse than one that says
-/// nothing, because it stops anyone looking.
-/// </summary>
+/// <summary>What GET /api/health reports.</summary>
 public class HealthStatus
 {
     /// <summary><c>healthy</c> or <c>degraded</c>.</summary>

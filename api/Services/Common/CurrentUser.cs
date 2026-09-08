@@ -6,7 +6,6 @@ using CareLanka.Api.Data.Enums;
 
 namespace CareLanka.Api.Services.Common;
 
-/// <inheritdoc cref="ICurrentUser"/>
 public sealed class CurrentUser : ICurrentUser
 {
     private readonly IHttpContextAccessor _accessor;
@@ -28,8 +27,7 @@ public sealed class CurrentUser : ICurrentUser
     {
         var value = _accessor.HttpContext?.User.FindFirst(type)?.Value;
 
-        // A validated token that is missing one of its four claims is not a client error to
-        // explain — it is a token this API should not have issued. 401 and move on.
+        // A validated token missing one of its four claims is a token we should not have issued.
         return string.IsNullOrEmpty(value)
             ? throw new UnauthorizedException(MessageCode.NotAuthenticated)
             : value;

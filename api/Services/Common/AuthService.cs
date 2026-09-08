@@ -10,18 +10,10 @@ using Microsoft.Extensions.Options;
 
 namespace CareLanka.Api.Services.Common;
 
-/// <inheritdoc cref="IAuthService"/>
 public sealed class AuthService : IAuthService
 {
-    /// <summary>
-    /// A real hash of a throwaway password, verified against when the account does not
-    /// exist.
-    /// <para>
-    /// Without it, an unknown email comes back in microseconds while a known one takes the
-    /// ~100ms PBKDF2 costs — and that difference alone tells an attacker which addresses
-    /// are real, however identical the two responses look.
-    /// </para>
-    /// </summary>
+    // Verified against when the account does not exist, so an unknown email takes the same
+    // ~100ms as a known one. Without it the timing alone says which addresses are real.
     private static readonly Lazy<string> DecoyHash =
         new(() => new PasswordService().Hash("not-a-real-password-b2f1c9"));
 
@@ -48,18 +40,12 @@ public sealed class AuthService : IAuthService
         _options = options.Value;
     }
 
-    // ------------------------------------------------------------------
-    // Staff
-    // ------------------------------------------------------------------
-
     public async Task<AuthTokens> LoginStaffAsync(StaffLoginRequest request, CancellationToken ct = default)
     {
         var email = request.Email.Trim().ToLowerInvariant();
 
         _throttle.EnsureNotLockedOut(email);
 
-        // The global query filter already excludes deactivated staff, so from here down a
-        // deactivated account behaves exactly like an unknown one.
         var staff = await _db.StaffMembers.FirstOrDefaultAsync(s => s.Email == email, ct);
 
         if (!VerifyOrDecoy(staff?.PasswordHash, request.Password, out var needsRehash))
@@ -78,16 +64,10 @@ public sealed class AuthService : IAuthService
         return await IssueAsync(ToPrincipal(staff!), staff!.Id, PrincipalType.Staff, ct);
     }
 
-    // ------------------------------------------------------------------
-    // Patients
-    // ------------------------------------------------------------------
-
     public async Task<AuthTokens> RegisterPatientAsync(PatientRegisterRequest request, CancellationToken ct = default)
     {
         var phone = request.PhoneNumber.Trim();
 
-        // Checked here for a clean 409, and enforced by ux_patient_accounts_phone for the
-        // two-requests-at-once case this check cannot see.
         var taken = await _db.PatientAccounts.AnyAsync(p => p.PhoneNumber == phone, ct);
 
         if (taken)
@@ -95,8 +75,6 @@ public sealed class AuthService : IAuthService
             throw new ConflictException(MessageCode.PhoneNumberAlreadyRegistered);
         }
 
-        // Registration creates a login, not a medical record. No Patient row is created and
-        // none is linked — staff do that later, deliberately, after checking identity.
         var account = new PatientAccount
         {
             Id = Guid.NewGuid(),
@@ -136,10 +114,6 @@ public sealed class AuthService : IAuthService
         return await IssueAsync(ToPrincipal(account), account.Id, PrincipalType.Patient, ct);
     }
 
-    // ------------------------------------------------------------------
-    // Session
-    // ------------------------------------------------------------------
-
     public async Task<AuthTokens> RefreshAsync(string refreshToken, CancellationToken ct = default)
     {
         var hash = _tokens.HashRefreshToken(refreshToken);
@@ -152,9 +126,8 @@ public sealed class AuthService : IAuthService
             throw new UnauthorizedException(MessageCode.RefreshTokenInvalid);
         }
 
-        // Reuse. A single-use token presented twice means two clients hold it and one of
-        // them is not the owner — so every live session for this principal dies, not just
-        // this one. It costs the real owner a re-login; it costs the thief everything.
+        // A single-use token presented twice means two clients hold it and one is not the owner,
+        // so every live session for this principal dies — not just this one.
         if (stored.RevokedAt is not null)
         {
             await RevokeAllForPrincipalAsync(stored, "reuse_detected", now, ct);
@@ -166,9 +139,8 @@ public sealed class AuthService : IAuthService
             throw new UnauthorizedException(MessageCode.RefreshTokenInvalid);
         }
 
-        // Rotate with a conditional UPDATE rather than read-then-write, so two refreshes
-        // arriving together cannot both win. The loser sees zero rows changed and is
-        // treated as reuse, which is exactly what it looks like from here.
+        // Conditional UPDATE rather than read-then-write, so two refreshes arriving together
+        // cannot both win. The loser changes zero rows and is treated as reuse.
         var rotated = await _db.RefreshTokens
             .Where(r => r.Id == stored.Id && r.RevokedAt == null)
             .ExecuteUpdateAsync(
@@ -183,8 +155,7 @@ public sealed class AuthService : IAuthService
             throw new UnauthorizedException(MessageCode.RefreshTokenInvalid);
         }
 
-        // The account may have been deactivated while the session was alive. Both query
-        // filters exclude inactive rows, so this comes back null and the session ends.
+        // Comes back null if the account was deactivated mid-session: both query filters exclude it.
         var principal = stored.PrincipalType == PrincipalType.Staff
             ? ToPrincipalOrNull(await _db.StaffMembers.FirstOrDefaultAsync(s => s.Id == stored.StaffMemberId, ct))
             : ToPrincipalOrNull(await _db.PatientAccounts.FirstOrDefaultAsync(p => p.Id == stored.PatientAccountId, ct));
@@ -201,8 +172,6 @@ public sealed class AuthService : IAuthService
     {
         var hash = _tokens.HashRefreshToken(refreshToken);
 
-        // No row, or an already-revoked row, is still a successful logout: the caller asked
-        // for the session to be over, and it is over.
         await _db.RefreshTokens
             .Where(r => r.TokenHash == hash && r.RevokedAt == null)
             .ExecuteUpdateAsync(
@@ -220,19 +189,9 @@ public sealed class AuthService : IAuthService
             ? ToPrincipalOrNull(await _db.StaffMembers.FirstOrDefaultAsync(s => s.Id == id, ct))
             : ToPrincipalOrNull(await _db.PatientAccounts.FirstOrDefaultAsync(p => p.Id == id, ct));
 
-        // The token is valid but the account behind it is gone or deactivated. Not a 404 —
-        // as far as the caller is concerned, their session has ended.
         return principal ?? throw new UnauthorizedException(MessageCode.NotAuthenticated);
     }
 
-    // ------------------------------------------------------------------
-    // Internals
-    // ------------------------------------------------------------------
-
-    /// <summary>
-    /// Always does the PBKDF2 work, even when there is no account, so a wrong password and
-    /// an unknown account take the same time as well as returning the same response.
-    /// </summary>
     private bool VerifyOrDecoy(string? storedHash, string password, out bool needsRehash)
     {
         var matched = _passwords.Verify(storedHash ?? DecoyHash.Value, password, out needsRehash);
@@ -262,8 +221,6 @@ public sealed class AuthService : IAuthService
             ExpiresAt = DateTimeOffset.UtcNow.AddDays(_options.RefreshTokenDays)
         });
 
-        // One SaveChanges for the whole sign-in: the new session row, plus whatever the
-        // caller changed on the account (last login, a rehashed password).
         await _db.SaveChangesAsync(ct);
 
         return new AuthTokens
@@ -313,9 +270,6 @@ public sealed class AuthService : IAuthService
         Email = null,
         PhoneNumber = account.PhoneNumber,
 
-        // Null until Patient Management links a medical record through
-        // POST /patients/{id}/link-account. Null is the ordinary state for a new sign-up,
-        // not an error, and a client that assumes otherwise crashes on its first real user.
         PatientId = null
     };
 
@@ -325,11 +279,7 @@ public sealed class AuthService : IAuthService
     private static CurrentPrincipal? ToPrincipalOrNull(PatientAccount? account)
         => account is null ? null : ToPrincipal(account);
 
-    /// <summary>
-    /// The seven staff roles are also the first seven principal roles. Mapping by name
-    /// rather than by position means reordering either enum cannot silently promote a nurse
-    /// to an administrator.
-    /// </summary>
+    // By name, not by position: reordering either enum must not promote a nurse to an administrator.
     private static PrincipalRole ToPrincipalRole(StaffRole role)
         => Enum.Parse<PrincipalRole>(role.ToString());
 }

@@ -3,15 +3,8 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace CareLanka.Api.Services.Common;
 
-/// <summary>
-/// A fixed window of failed attempts per account, held in memory.
-/// <para>
-/// In memory means it resets when the API restarts and is not shared between instances.
-/// That is a deliberate trade for one deployment of one app: the per-IP middleware limit
-/// is the broad defence, and this is the narrow one. If CareLanka is ever run on more
-/// than one instance, this moves to the database or a cache both instances can see.
-/// </para>
-/// </summary>
+// In memory, so it resets on restart and is not shared between instances. Deliberate for one
+// deployment: the per-IP middleware limit is the broad defence and this is the narrow one.
 public sealed class LoginThrottle : ILoginThrottle
 {
     private const int MaxFailures = 5;
@@ -39,6 +32,5 @@ public sealed class LoginThrottle : ILoginThrottle
 
     public void RecordSuccess(string accountKey) => _cache.Remove(Key(accountKey));
 
-    // Lower-cased so "A@B.lk" and "a@b.lk" are not two separate allowances.
     private static string Key(string accountKey) => $"login-failures:{accountKey.ToLowerInvariant()}";
 }

@@ -4,18 +4,6 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace CareLanka.Api.Common.Persistence;
 
-/// <summary>
-/// Stamps <c>CreatedAt</c> and <c>UpdatedAt</c> so no service ever has to remember to.
-/// <para>
-/// This is not the audit interceptor — that one writes <c>audit_logs</c> rows and comes
-/// with the audit work. This one only fills in the two timestamp columns every entity
-/// inherits.
-/// </para>
-/// <para>
-/// Always <see cref="DateTimeOffset.UtcNow"/>: Npgsql rejects a local or unspecified
-/// offset, and it fails at write time rather than at compile time.
-/// </para>
-/// </summary>
 public sealed class TimestampInterceptor : SaveChangesInterceptor
 {
     public override InterceptionResult<int> SavingChanges(

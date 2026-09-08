@@ -6,10 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>carelanka-api</UserSecretsId>
 
-    <!-- Swagger reads these, so the /// comments on controllers and DTOs become the
-         descriptions in the OpenAPI document, and from there the doc comments on both
-         generated clients. CS1591 is "missing XML comment on a public member" - we do not
-         require one on every member. -->
+    <!-- Swagger turns the /// comments on controllers and DTOs into the OpenAPI descriptions.
+         CS1591 off: not every public member needs one. -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>

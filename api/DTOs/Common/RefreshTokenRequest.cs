@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace CareLanka.Api.DTOs.Common;
 
-/// <summary>Body of <c>POST /api/auth/refresh</c> and <c>POST /api/auth/logout</c>.</summary>
+/// <summary>Body of POST /api/auth/refresh and POST /api/auth/logout.</summary>
 public class RefreshTokenRequest
 {
     [Required]

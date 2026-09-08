@@ -1,35 +1,8 @@
--- ============================================================================
--- CareLanka seed 001 — identity
---
--- Seven staff accounts, one per role, plus one patient account. Assignment §15
--- requires test accounts in the submission, and the demo has to log in as four
--- different roles inside ten minutes.
---
--- Run AFTER the migrations:
---     dotnet ef database update --project api
---     psql -U postgres -d carelanka -f docs/seed/001_identity.sql
---
--- Two properties this script keeps, and why:
---
---   * Idempotent. ON CONFLICT DO NOTHING against the partial unique index, so
---     running it twice does not duplicate anybody and does not fail.
---   * No hard-coded ids. gen_random_uuid() means the same script is safe on
---     four laptops and on the deployed database, and no environment-specific id
---     ever ends up in a migration.
---
--- Seed data is NOT in a migration. Migrations are DDL only.
--- ============================================================================
+-- CareLanka seed 001 — identity. Run after the migrations; seed data is not in a
+-- migration, because migrations are DDL only.
 
--- ----------------------------------------------------------------------------
--- Staff — password for all seven: CareLanka#2026
---
--- The hashes below are real PBKDF2 output from ASP.NET Core's PasswordHasher,
--- one random salt each, so identical passwords produce different hashes. That is
--- correct, not a mistake in the file.
---
--- These are demo accounts on a demo database. Change every password before this
--- is ever pointed at something real.
--- ----------------------------------------------------------------------------
+-- Staff — password for all seven: CareLanka#2026. Identical passwords hash differently
+-- because each has its own salt; that is correct, not a mistake in the file.
 
 INSERT INTO staff_members
     (id, email, password_hash, first_name, last_name, phone_number, department, role,
@@ -72,24 +45,8 @@ VALUES
 
 ON CONFLICT (email) WHERE is_active DO NOTHING;
 
--- ----------------------------------------------------------------------------
--- One deactivated staff member.
---
--- Not padding. It is the only way to test the thing the spec is most explicit
--- about: signing in as a deactivated account must return the SAME 401 as a wrong
--- password, so login cannot be used to work out who used to work here.
---
--- It is also the row that proves ux_staff_members_email is scoped WHERE is_active
--- — this email is free to be reused by a new account, which a plain UNIQUE would
--- have blocked forever.
---
--- Password: CareLanka#2026 (the same hash as the ward nurse — it is a dead
--- account, and nothing should let anyone in with it regardless).
---
--- ON CONFLICT cannot help here: is_active is false, so the partial index does not
--- cover this row and there is no conflict for Postgres to detect. NOT EXISTS is
--- what keeps the second run from inserting a second copy.
--- ----------------------------------------------------------------------------
+-- One deactivated staff member, so the "same 401 as a wrong password" rule is testable.
+-- NOT EXISTS rather than ON CONFLICT: is_active is false, so the partial index misses this row.
 
 INSERT INTO staff_members
     (id, email, password_hash, first_name, last_name, phone_number, department, role,
@@ -103,14 +60,8 @@ WHERE NOT EXISTS (
     SELECT 1 FROM staff_members WHERE email = 'former.gunasekara@carelanka.lk'
 );
 
--- ----------------------------------------------------------------------------
--- Patient account — password: Patient#2026
---
--- A LOGIN, not a medical record. There is deliberately no patients row here and
--- nothing linked to one: GET /auth/me returns patient_id = null for this account
--- and that is the ordinary state, not an error. A Flutter screen that assumes
--- patient_id is non-null crashes on exactly this account.
--- ----------------------------------------------------------------------------
+-- Patient account — password: Patient#2026. A login with no patients row linked, so
+-- GET /auth/me returns patient_id = null for it. That is the ordinary state, not an error.
 
 INSERT INTO patient_accounts
     (id, phone_number, password_hash, full_name, last_login_at,

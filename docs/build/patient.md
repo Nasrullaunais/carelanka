@@ -3,9 +3,15 @@
 **Owner: Lochana (Member 4)** · **Index:** `docs/BUILD_PLAN.md`
 
 **Owns:** `Patient`, `PatientAccount`, `Admission`, **`Ward`**, `BedAssignment`,
-`BedReservation`, `Discharge`, `DischargeChecklistItem`, `Appointment`
-**Contract:** `specs/patient-spec.yaml` (33 paths) · **Design:** `specs/patient-management-plan.md`
+`BedReservation`, `Discharge`, `DischargeChecklistItem`, `Appointment`,
+**`CareRecommendation`**
+**Contract:** `specs/patient-spec.yaml` (40 paths) · **Design:** `specs/patient-management-plan.md`
 **Boundaries:** `specs/integration_of_functions.md` §4–§11
+
+> **Two agents, not one** — see steps 13–16. Added on the lecturer's direction at topic
+> finalization; §8.10 of the design doc has the full reasoning. The bed agent decides
+> *where to put someone*; the care advisory agent *drafts a note for a doctor to check*.
+> Neither decides what care a patient needs.
 
 > **`Ward` is the most-depended-on table in the system.** All four components reference it
 > (`Shift.WardId`, `EquipmentItem.WardId`, `Dispatch.DestinationWardId`). Build it first
@@ -31,8 +37,17 @@
 | 8 | Codegen gate | |
 | 9 | React: admissions dashboard, bed board, occupancy report | |
 | 10 | Flutter: nurse screens, then the patient's own-stay screens | Local notifications on status change is your device feature |
-| 11 | **The bed agent, last** | Hard rules H1–H5 in deterministic C#, soft rules rank. Re-check every hard rule under a row lock at approval time |
+| 11 | **The bed agent** | Hard rules H1–H5 in deterministic C#, soft rules rank. Re-check every hard rule under a row lock at approval time |
 | 12 | React: bed approval + downgrade approval | The two human gates |
+| 13 | `CareRecommendation` entity + configuration + migration | Independent of the bed workflow — no dependency on steps 1–12 beyond `Patient` and `Admission` existing |
+| 14 | **The care advisory agent, last** | Deterministic red-flag keyword screen (§8.13) runs *before* the model, not after. Rules CR1–CR4 (§8.15) validated the same way H1–H5 are |
+| 15 | React: Doctor's care recommendation queue, approve/reject | The third human gate in this component |
+| 16 | Flutter: "ask about a symptom" + "my care recommendations" | Patient-facing; never renders `agent_message` or `rejection_reason` |
+
+**Steps 13–16 are self-contained.** Nothing else in the group depends on the care advisory
+agent, and it depends on nothing outside this component beyond the `doctor` role claim,
+which auth already issues. Build it in parallel with the bed-agent track or after it — it
+does not gate anyone and nobody gates it.
 
 ---
 
@@ -80,8 +95,8 @@ Adding it means changing a committed enum, so it is not a diagram-only change. Y
 Your roles: `ward_nurse` and `patient` (Flutter), `duty_manager` and `doctor` (React).
 
 You have the largest `/me/*` surface in the project — `/me/admission`, `/me/history`,
-`/me/appointments`, `/me/pre-register`. **Every one is scoped by the `sub` claim, never by
-a parameter.** This is the component where an id-in-the-route bug means one patient reading
+`/me/appointments`, `/me/pre-register`, `/me/care-recommendations`. **Every one is scoped
+by the `sub` claim, never by a parameter.** This is the component where an id-in-the-route bug means one patient reading
 another patient's medical record, which is both a §16.1 security failure and the worst
 possible demo.
 

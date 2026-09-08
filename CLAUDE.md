@@ -35,13 +35,26 @@ Say the same thing again with simpler words and fewer of them.
 
 ## Current state
 
-**Design and scaffolding only — no features yet.** `api/` is an empty ASP.NET
-project with the component folder tree stubbed out (`.gitkeep` files, no classes,
-no `DbContext`). `mobile-ui/` is a Flutter skeleton with the same per-member tree
-and no `android/`/`ios/` yet. `web-ui/` is empty.
+**Common auth is built and on `main`; the four components have not started.**
+*(PR #11, merged 2026-09-08.)*
 
-So this file is prescriptive. **Where a committed contract in `specs/` already
-answers a question, that contract wins over anything written here.**
+`api/` now really runs: `CareLankaDbContext`, the three base entity classes,
+`StaffMember` / `PatientAccount` / `RefreshToken`, the `Common_AddIdentity`
+migration, the six `/api/auth` endpoints, `/api/health`, the policies, and the
+central exception handler. `tests/CareLanka.Api.Tests` covers it — 15 tests
+against a disposable PostgreSQL. Seeded logins are in `TEST_ACCOUNTS.md`.
+
+**So auth is no longer a thing to stub or wait for.** Write
+`[Authorize(Policy = Policies.X)]` against the real thing.
+
+Still not built: the audit interceptor, `AgentWorkflow` / `AgentProposedChange`,
+CI (there is no `.github/`), and every table the four components own. `web-ui/`
+is one `.gitkeep` — no Vite project yet. `mobile-ui/` has `lib/` and
+`pubspec.yaml` but no `android/` or `ios/`.
+
+So most of this file is still prescriptive. **Where a committed contract in
+`specs/` already answers a question, that contract wins over anything written
+here.**
 
 ## Which document answers what
 
@@ -153,6 +166,11 @@ a decision made in a controller and never written down — resolve each one
 deliberately rather than accepting the generated side by default. From then on
 that file is generated output. Once all four are generated they collapse into one
 `carelanka.json` — one app publishes one document.
+
+**Common is the first one at that point.** Its controllers exist, and
+`OpenApiContractTests` already asserts the generated document against the
+hand-written contract, so the two are known to agree today. The swap itself has
+not happened — `specs/common-spec.yaml` is still the hand-written file.
 
 ## Rules
 
@@ -385,6 +403,10 @@ component and add yours at the end of your group.
 
 # CI
 
-On every PR into `main`: `dotnet build` + `dotnet test`; `bun install
---frozen-lockfile` → `check:codegen` → `typecheck`; `flutter analyze` +
-`flutter test`; spec validation and uniqueness checks.
+**Not built yet — there is no `.github/`.** Until it exists, nothing checks a PR
+automatically and the gates below are things you run by hand. `BUILD_PLAN.md` §7
+row 5 tracks it; assignment §13 grades it.
+
+What it should run on every PR into `main`: `dotnet build` + `dotnet test`;
+`bun install --frozen-lockfile` → `check:codegen` → `typecheck`;
+`flutter analyze` + `flutter test`; spec validation and uniqueness checks.

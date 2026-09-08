@@ -66,7 +66,9 @@ actually published.
 
 ## Open stubs
 
-Nothing yet — coding hasn't started. Add rows as they appear.
+**None open.** Common auth is built and merged (PR #11, 2026-09-08) and was never
+stubbed. The four components have not started, so the first real rows will appear when
+they do.
 
 | # | What is faked | Where it lives | Standing in for | Owner of the real thing | Added |
 | :-- | :--- | :--- | :--- | :--- | :--- |

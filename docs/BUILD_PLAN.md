@@ -1,6 +1,7 @@
 # CareLanka Build Plan
 
-**Status:** Phase 0 settled 2026-09-07 — see `docs/ADR.md`. Five build tracks, ready to start.
+**Status:** Phase 0 settled 2026-09-07. **Track 0 (common auth) built and merged 2026-09-08 — PR #11.**
+The other four tracks are unblocked and have not started.
 **Covers:** everything between "the design documents are finished" and "five tracks running
 without breaking each other".
 
@@ -83,12 +84,14 @@ registration change and nothing else moves. A stub nobody wrote down is a lie in
 codebase that looks like working code, passes your tests, and quietly returns invented data
 until someone notices at the demo.
 
-**One exception: do not stub auth.** It is being built first specifically so nobody has to.
+**One exception: do not stub auth.** It is built and merged — write
+`[Authorize(Policy = Policies.X)]` against the real thing. Logins: `TEST_ACCOUNTS.md`.
 
 ### 1.5 Regenerate clients in the same commit as the backend change
 
 A stale generated client makes every downstream type error a red herring, so
-`check:codegen` runs **before** `typecheck` in CI.
+`check:codegen` must run **before** `typecheck`. That ordering is written down for the CI
+that does not exist yet (§7 row 5); until it does, it is a habit, not a gate.
 
 ### 1.6 Branch and PR, don't push to `main`
 
@@ -103,13 +106,14 @@ Route and name collisions, spec validity, and the four blocking group decisions 
 settled. Nothing here is a task.
 
 ```
-5 specs · 171 operations
+5 specs · 178 operations
 0 duplicate routes · 0 duplicate operationIds · 0 schema conflicts
 ```
 
 - **The decisions and their reasoning:** `docs/ADR.md` — 7 accepted, 1 open (deployment).
 - **What was renamed and why, so it is not reintroduced:** `integration_of_functions.md` §11.6.
-- **The gate that keeps it clean:** `bun run check:specs`, in CI.
+- **The gate that keeps it clean:** `bun run check:specs`. **Run it by hand — there is no
+  CI yet** (§7 row 5).
 
 ---
 
@@ -117,10 +121,10 @@ settled. Nothing here is a task.
 
 ```
    ┌──────────────────────────────────────────────────────────┐
-   │ TRACK 0 · COMMON — auth, JWT, [Authorize]                 │
-   │ docs/build/common.md §1–§2                                │
-   │ Nothing else can start. Every endpoint in every spec      │
-   │ sits behind [Authorize].                                  │
+   │ TRACK 0 · COMMON — auth, JWT, [Authorize]     ✅ DONE      │
+   │ docs/build/common.md §1–§2 · merged 2026-09-08, PR #11    │
+   │ This was the gate. It is open — the three below can       │
+   │ start now.                                                │
    └───────────────────────────┬──────────────────────────────┘
                                │
         ┌──────────────────────┼──────────────────────┐
@@ -151,11 +155,11 @@ its dependencies.
 
 | Track | Owns | Contract | Steps |
 | :--- | :--- | :--- | :--- |
-| **[Common](build/common.md)** | `StaffMember`, `PatientAccount`, `RefreshToken`, `AgentWorkflow`, `AgentProposedChange`, `AuditLog` | `common-spec.yaml` (12) | Bootstrap → **auth** → exceptions → audit → workflows → CI |
+| **[Common](build/common.md)** | `StaffMember`, `PatientAccount`, `RefreshToken`, `AgentWorkflow`, `AgentProposedChange`, `AuditLog` | `common-spec.yaml` (12) | ~~Bootstrap → auth → exceptions~~ **done** → audit → workflows → CI |
 | **[Emergency](build/emergency.md)** | `EmergencyCall`, `Ambulance`, `Dispatch`, `DispatchCrew`, `RouteLog` | `emergency-spec.yaml` (33) | 11 |
 | **[Staff](build/staff.md)** | `Skill`, `StaffMemberSkill`, `Shift`, `Allocation`, `LeaveRequest`, `WardStaffingRule` | `staff-spec.yaml` (32) | 12 |
 | **[Equipment](build/equipment.md)** | `EquipmentCategory`, `EquipmentItem`, `Bed`, `Pharmacy*`, `MaintenanceSchedule`, `Warning`, `ActionRequest` | `equipment-spec.yaml` (28) | 11 |
-| **[Patient](build/patient.md)** | `Patient`, `Admission`, `Ward`, `BedAssignment`, `BedReservation`, `Discharge`, `Appointment` | `patient-spec.yaml` (33) | 12 |
+| **[Patient](build/patient.md)** | `Patient`, `Admission`, `Ward`, `BedAssignment`, `BedReservation`, `Discharge`, `Appointment` | `patient-spec.yaml` (40) | 16 |
 
 ---
 
@@ -181,39 +185,6 @@ to reason over without it.
 than merely temporary. Equipment calls it before taking a bed out of service, and a fake
 that answers "free" would let maintenance be scheduled on an occupied bed. **Stub it
 answering "occupied"** so it fails safe, and replace it early.
----
-
-## 8. Member 4 — Patient Management (Lochana)
-
-**Owns:** `Patient`, `PatientAccount`, `Admission`, **`Ward`**, `BedAssignment`, `BedReservation`, `Discharge`, `DischargeChecklistItem`, `Appointment`, **`CareRecommendation`**
-**Contract:** `specs/patient-spec.yaml` (40 paths) · **Design:** `specs/patient-management-plan.md`
-**Boundaries:** `integration_of_functions.md` §4–§11
-**Two agents, not one** — see step 13. Added on the lecturer's direction at topic finalization; §8.10 of the design doc has the full reasoning.
-
-| # | Step | Notes |
-| :-- | :--- | :--- |
-| 1 | **`Ward` first** | Three other components reference it. Get it in early and then treat the schema as frozen |
-| 2 | Remaining entities + configurations + migration | Including `PatientAccount` (Rev 2.5) and its optional link `Patient.UserAccountId` |
-| 3 | Patient + Admission CRUD | Including `temp_reference` for unidentified arrivals |
-| 4 | **The 7-state admission status machine** | `awaiting_bed → awaiting_approval → bed_reserved → admitted → ready_for_discharge → discharged`, plus `cancelled`. Illegal transitions → 409. **This is the backbone — test it hardest** |
-| 5 | `GET /capacity/wards` + `GET /wards/{id}/occupancy` | M1 and M2 are both blocked on these — build them before the agent |
-| 6 | **Manual bed assignment, no AI** | Pick a bed by hand, with the 30-minute hold and the partial unique index. The concurrency guarantee lives in the index, not in code |
-| 7 | Discharge checklist + confirmation | `clinical_clearance` gated on the `Doctor` role claim |
-| 8 | Codegen gate | |
-| 9 | React: admissions dashboard, bed board, occupancy report | |
-| 10 | Flutter: nurse screens, then patient's own-stay screens | Local notifications on status change — the device feature |
-| 11 | **The bed agent** | Hard rules H1–H5 in deterministic C#, soft rules rank. Re-check every hard rule under a row lock at approval time |
-| 12 | React: bed approval + downgrade approval | The two human gates |
-| 13 | `CareRecommendation` entity + configuration + migration | Independent of the bed workflow — no dependency on steps 1–12 beyond `Patient` and `Admission` existing |
-| 14 | **The care advisory agent, last** | Deterministic red-flag keyword screen (§8.13) runs *before* the model, not after. Rules CR1–CR4 (§8.15) validated the same way H1–H5 are |
-| 15 | React: Doctor's care recommendation queue, approve/reject | The third human gate in this component |
-| 16 | Flutter: "ask about a symptom" + "my care recommendations" | Patient-facing; never renders `agent_message` or `rejection_reason` |
-
-**You will need to stub:** Equipment's bed register (**your hardest dependency**); Staff's `POST /staff/lookup`; Emergency's dispatch notification.
-
-**Others are waiting on you for:** `Ward` (all three), `GET /capacity/wards` (M1), ward occupancy (M2), `GetBedOccupancyAsync` (M3), `POST /admissions/pre-admit` (M1).
-
-**Steps 13–16 are self-contained.** Nothing else in the group depends on the care advisory agent, and it depends on nothing outside this component beyond the `Doctor` role claim (already shared, via the bootstrap JWT). It can be built in parallel with the bed-agent track, or after — it does not gate anyone and nobody gates it.
 
 ---
 
@@ -224,7 +195,7 @@ rather than discovering at the demo.
 
 | # | Checkpoint | Who | What proves it |
 | :-- | :--- | :--- | :--- |
-| 0 | **Auth works for everyone** | Common → all | Each member logs in as a seeded account of their own role and calls one of their own protected endpoints |
+| 0 | **Auth works for everyone** | Common → all | **Ready to do now.** Each member logs in as a seeded account of their own role (`TEST_ACCOUNTS.md`) and calls one of their own protected endpoints |
 | 1 | **First real cross-component read** | M3 → M4 | Equipment's bed register replaces M4's stub. Delete the `STUBS.md` row |
 | 2 | **Staff lookup replaces three stubs** | M2 → M1, M3, M4 | "Approved by Dr. Perera" renders from real data in all three |
 | 3 | **The pre-admission call** | M1 → M4 | A dispatch creates an `Admission` in `awaiting_bed`. Watch the urgency translation — `critical/high/medium/low` becomes `routine/urgent/emergency`, and a mismatch is a 400 |

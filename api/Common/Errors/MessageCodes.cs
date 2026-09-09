@@ -23,7 +23,10 @@ public static class MessageCodes
             [MessageCode.TooManyRequests] = "cl_err_429",
             [MessageCode.Unexpected] = "cl_err_500",
             [MessageCode.RefreshTokenInvalid] = "cl_err_001",
-            [MessageCode.PhoneNumberAlreadyRegistered] = "cl_err_002"
+            [MessageCode.PhoneNumberAlreadyRegistered] = "cl_err_002",
+            [MessageCode.BedNumberTaken] = "cl_equ_001",
+            [MessageCode.AssetTagTaken] = "cl_equ_002",
+            [MessageCode.BedOccupied] = "cl_equ_003"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

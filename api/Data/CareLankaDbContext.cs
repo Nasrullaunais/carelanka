@@ -1,4 +1,5 @@
 using CareLanka.Api.Data.Entities.Common;
+using CareLanka.Api.Data.Entities.Equipment;
 using Microsoft.EntityFrameworkCore;
 
 namespace CareLanka.Api.Data;
@@ -12,6 +13,8 @@ public class CareLankaDbContext : DbContext
     public DbSet<StaffMember> StaffMembers => Set<StaffMember>();
     public DbSet<PatientAccount> PatientAccounts => Set<PatientAccount>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
+    public DbSet<Bed> Beds => Set<Bed>();
 
     // Never add configuration here. Write Data/Configurations/{Component}/ instead,
     // or all four of us conflict on this method every migration.

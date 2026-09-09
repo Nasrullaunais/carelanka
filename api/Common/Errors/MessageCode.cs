@@ -24,5 +24,13 @@ public enum MessageCode
 
     RefreshTokenInvalid,
 
-    PhoneNumberAlreadyRegistered
+    PhoneNumberAlreadyRegistered,
+
+    // Equipment
+
+    BedNumberTaken,
+
+    AssetTagTaken,
+
+    BedOccupied
 }

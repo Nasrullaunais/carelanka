@@ -95,4 +95,14 @@
   <data name="cl_err_002" xml:space="preserve">
     <value>That phone number already has an account.</value>
   </data>
+  <data name="cl_equ_001" xml:space="preserve">
+    <value>Bed {0} already exists in that ward.</value>
+  </data>
+  <data name="cl_equ_002" xml:space="preserve">
+    <value>Asset tag {0} is already in use.</value>
+  </data>
+  <data name="cl_equ_003" xml:space="preserve">
+    <value>That bed has a patient in it, or is being held for one, so it cannot be taken out of service.</value>
+    <comment>Answered from Patient Management inside the same request. Maintenance never evicts a patient.</comment>
+  </data>
 </root>

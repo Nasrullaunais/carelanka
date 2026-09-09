@@ -66,15 +66,37 @@ actually published.
 
 ## Open stubs
 
-**None open.** Common auth is built and merged (PR #11, 2026-09-08) and was never
-stubbed. The four components have not started, so the first real rows will appear when
-they do.
+**Two open, both Equipment waiting on Patient Management.** Common auth was never
+stubbed: it was built and merged in PR #11. Numbering starts at 2 because row 1 is
+claimed by the open PR #12, which stubs our bed register from their side.
 
 | # | What is faked | Where it lives | Standing in for | Owner of the real thing | Added |
 | :-- | :--- | :--- | :--- | :--- | :--- |
-| _(example)_ | Bed register returns 6 fake beds in 2 wards | `api/Services/Patient/Stubs/StubBedRegistryService.cs` | `GET /beds` — `equipment-spec.yaml` | **M3 Sethmin** | 2026-08-21 |
+| 2 | Ward names on a bed — every ward is called `Stub ward <id fragment>` | `api/Services/Equipment/Stubs/StubWardDirectory.cs` | `GET /wards` — `patient-spec.yaml` | **M4 Lochana** | 2026-09-09 |
+| 3 | Is this bed occupied — always answers **yes** | `api/Services/Equipment/Stubs/StubBedOccupancyPort.cs` | `GET /beds/{id}/occupancy` — `patient-spec.yaml` | **M4 Lochana** | 2026-09-09 |
 
-> Delete the example row when the first real one is added.
+**Row 2 — why the name looks broken on purpose.** `Bed.ward_name` is Patient Management's
+to answer, and a plausible invented name like "Intensive Care" would be indistinguishable
+from a real one on screen and would still be there at the demo. `ward_id` is real
+throughout; only the display name is faked, so nothing downstream is reasoning over it.
+
+**Row 3 — this is the dangerous one, and it fails safe.** `PATCH /beds/{id}` moving a bed
+to `out_of_service`, and `POST /beds/{id}/retire`, both ask this before writing anything.
+The fake answers **occupied**, so both are refused with `cl_equ_003` until the real
+endpoint lands. That is deliberate: a stub answering "free" would let maintenance be
+scheduled on a bed with a patient in it and would pass every test we wrote. The cost is
+that withdrawing a bed cannot be exercised end to end yet, which is visible immediately
+rather than at the demo.
+
+**Replacing either is one line each** — the two `AddSingleton` registrations in
+`api/Program.cs`. Nothing else moves.
+
+**What this PR does to row 1.** `IBedService.CountBedsByWardAsync` has deliberately the
+same signature as Patient Management's `IBedRegistryService.CountBedsByWardAsync`, and
+returns the same "a ward with no beds is absent, not zero" shape. Once PR #12 merges,
+retiring their stub is a delegating adapter of about five lines plus their DI registration.
+It cannot be done from this branch because their interface does not exist on `main` yet.
+
 
 ---
 

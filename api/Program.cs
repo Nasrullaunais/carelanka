@@ -9,6 +9,8 @@ using CareLanka.Api.Common.Persistence;
 using CareLanka.Api.Data;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.Services.Common;
+using CareLanka.Api.Services.Equipment;
+using CareLanka.Api.Services.Equipment.Stubs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Formatters;
@@ -202,6 +204,13 @@ builder.Services.AddSingleton<ILoginThrottle, LoginThrottle>();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IHealthService, HealthService>();
+
+builder.Services.AddScoped<IBedService, BedService>();
+
+// STUB registrations - both stand in for Patient Management (M4). STUBS.md rows 2 and 3.
+// Replacing either is this one line and nothing else.
+builder.Services.AddSingleton<IWardDirectory, StubWardDirectory>();
+builder.Services.AddSingleton<IBedOccupancyPort, StubBedOccupancyPort>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>

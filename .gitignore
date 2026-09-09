@@ -8,6 +8,7 @@ node_modules/
 web-ui/node_modules/
 web-ui/dist/
 web-ui/build/
+web-ui/*.tsbuildinfo
 
 ## Flutter
 mobile-ui/.dart_tool/

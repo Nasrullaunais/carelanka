@@ -5,6 +5,40 @@ single hospital / multiple wards, unified staff identity, generic agent-workflow
 audit-log schemas). PKs are `Guid` (PostgreSQL `uuid`, `default: gen_random_uuid()`)
 throughout.
 
+**Revision 2.9** — the rest of the Patient Management tables landed (`Patient`,
+`Admission`, `Appointment`, `BedAssignment`, `Discharge`, `DischargeChecklistItem`, in the
+`Patient_AddAdmission` migration), and building them settled five places where this
+document and `patient-spec.yaml` disagreed. Changes marked *(Rev 2.9)*. In every case the
+spec won, per the rule in `CLAUDE.md`: on an entity Member 4 owns, the committed spec beats
+this document.
+
+- **`BedReservation` is gone; the hold lives on `BedAssignment`.** The spec publishes one
+  bed row with `status ∈ {reserved, occupied, released}` and a `reserved_until`, and has no
+  reservation schema and no reservation path at all. Two tables would have put the same
+  fact — *this bed is claimed* — in two places, which is the drift this document rejects
+  `Bed.Status` for. The concurrency guarantee is unchanged and still an index, now two
+  partial unique indexes on one table. See
+  [`BedAssignment`](#bedassignment-extends-auditedentity-rev-29--changed).
+- **`Patient` carries `FullName`, not `FirstName` + `LastName`**, and gains `Address`.
+  The spec publishes `full_name` and `address` everywhere, and `PatientDetailField` already
+  listed `Address` for a column this document never had. `NationalId` is `Nic`, the name the
+  spec uses.
+- **`Discharge` has no `ReadinessStatus`.** Readiness is a query over the checklist rows —
+  `all_mandatory_ticked` — so the enum and the rows could never disagree.
+  `DischargeChecklistItemType` has the spec's five values, not three, and each row carries
+  `IsMandatory`.
+- **`Admission` drops `EmergencyCallId` and `AppointmentId`.** The spec carries Emergency's
+  reference as `dispatch_id`, a string of theirs and not a foreign key, and the appointment
+  link lives on `Appointment.AdmissionId` — one link, one owner. `DischargedAt` added,
+  which the spec returns and this document had nowhere.
+- **Cross-component references are foreign keys with no navigation property.** Every
+  `*StaffMemberId` and the two `PatientAccount` links are configured with
+  `HasOne<StaffMember>()` and no navigation. That is `integration_of_functions.md` §5.1
+  enforced by the model rather than by discipline — there is no `Include()` to reach for.
+  It also removes a real bug: `StaffMember` is soft-deletable and
+  `Admission.CategorySetByStaffMemberId` is required, so a navigation would have dropped
+  every admission a retired clinician ever categorised out of every query.
+
 **Revision 2.8** — the first Patient Management code landed (`Ward`: the entity, its
 configuration, the `Patient_AddWard` migration and `GET`/`POST /wards`), and building it
 settled two names this document and `patient-spec.yaml` disagreed on. Changes marked
@@ -642,57 +676,47 @@ field names and an identical `BedCondition` enum; Rev 2.1 was the only document 
 and `Reserved`, denormalized from `BedAssignment`. That reintroduces exactly the cross-write
 `integration_of_functions.md` §6.1 was written to prevent: Equipment owns this row, but only
 Patient Management knows who is in the bed, so Patient would be writing Equipment's table.
-Occupancy is instead the presence of a live `BedAssignment` (`EndAt IS NULL`) and a hold is a
-`BedReservation` with `Status = Held`:
+Occupancy and holds are both `BedAssignment` rows: `Status = Occupied` is someone in the
+bed, `Status = Reserved` is the 30-minute hold *(Rev 2.9)*.
 
 ```
 "Is bed 12 free?"
     = it exists in Equipment's register        (M3's data, M4 reads)
     AND condition = 'usable'                   (M3's data, M4 reads)
-    AND no live BedAssignment references it    (M4's data)
+    AND no BedAssignment references it with
+        status IN ('reserved', 'occupied')      (M4's data)
 ```
 
 Two reads, zero shared writes. `Cleaning` had no home in either published spec and is
 carried to Open Decisions as item 9 rather than dropped silently.
 
-#### BedReservation extends AuditedEntity *(Rev 2 — new)*
-```
-+ BedId: Guid (non-null) FK → Bed.Id
-+ AdmissionId: Guid (nullable) FK → Admission.Id
-+ AgentWorkflowId: Guid (nullable) FK → AgentWorkflow.Id
-+ ExpiresAt: DateTimeOffset (non-null)
-+ Status: BedReservationStatus (non-null)
-+ ReleasedReason: string (nullable)
-```
-**Table:** `bed_reservations`
-**Constraint:** UNIQUE(BedId) **WHERE Status = 'Held'**
-**Note:** *(Rev 2)* Implements "picks one and **holds it for 30 minutes**". This is the
-concurrency-critical piece of the patient flow: without a real row and a partial unique
-index, two workflows can hold the same bed and the second approval silently overwrites
-the first. `AgentWorkflowId` is nullable because a hold is also created on the
-reject-and-override path, where a human picks the bed and no agent proposal exists.
-A background sweep moves `Held` rows past `ExpiresAt` to `Expired` and returns the bed to
-`Available`.
-
 #### Patient extends SoftDeletableEntity
 ```
-+ FirstName: string (non-null)
-+ LastName: string (non-null)
++ FullName: string (non-null)                           -- (Rev 2.9: was FirstName + LastName)
 + DateOfBirth: DateOnly (nullable)
-+ NationalId: string (nullable, unique when present)
++ Nic: string (nullable, unique when present)           -- (Rev 2.9: was NationalId)
 + TempReference: string (nullable, unique when present)  -- (Rev 2.1)
-+ Gender: Gender (nullable)                             -- (Rev 2: was string)
-+ PhoneNumber: string (nullable)
++ Gender: Gender (non-null)                             -- (Rev 2: was string; Rev 2.9: now required)
++ Phone: string (nullable)                              -- (Rev 2.9: was PhoneNumber)
++ Address: string (nullable)                            -- (Rev 2.9 — new)
 + EmergencyContactName: string (nullable)
 + EmergencyContactPhone: string (nullable)
 + UserAccountId: Guid (nullable, unique when present) FK → PatientAccount.Id  -- (Rev 2.5 — new)
 ```
-**Table:** `patients`
+**Table:** `patients` — **built.** `Patient_AddAdmission`, `api/Data/Entities/Patient/Patient.cs`.
 **Constraints:**
-- `UNIQUE (national_id) WHERE national_id IS NOT NULL`
-- `UNIQUE (temp_reference) WHERE temp_reference IS NOT NULL` *(Rev 2.1)*
-- `UNIQUE (user_account_id) WHERE user_account_id IS NOT NULL` *(Rev 2.5)*
-- `CHECK (national_id IS NOT NULL OR phone_number IS NOT NULL OR temp_reference IS NOT NULL)` *(Rev 2.1)*
+- `UNIQUE (nic) WHERE nic IS NOT NULL AND is_active`
+- `UNIQUE (temp_reference) WHERE temp_reference IS NOT NULL AND is_active` *(Rev 2.1)*
+- `UNIQUE (user_account_id) WHERE user_account_id IS NOT NULL AND is_active` *(Rev 2.5)*
+- `CHECK (nic IS NOT NULL OR phone IS NOT NULL OR temp_reference IS NOT NULL)` *(Rev 2.1)*
+
+*(Rev 2.9)* **One `FullName`, and the three unique indexes are scoped `AND is_active`.**
+The spec publishes `full_name` in every request and response, and splitting it in the
+database only to join it back on every read buys nothing — Sri Lankan names do not reliably
+divide into two parts anyway. `Address` was already in `PatientDetailField` as something a
+relative can bring later, with no column to put it in. Scoping the unique indexes to active
+rows is the same rule `Ward` follows: deactivate a duplicate record and its NIC has to
+become usable again, or the merge you just did can never be redone.
 
 **Note:** `NationalId` nullable — unconscious/unidentified emergency admissions may
 lack one at intake — but unique whenever present, to dedupe registered patients.
@@ -716,13 +740,18 @@ verbal handover from the unidentified period still resolve to the right person.
 ```
 + PatientId: Guid (non-null) FK → Patient.Id
 + ScheduledAt: DateTimeOffset (non-null)
-+ Category: AdmissionCategory (non-null)
-+ WardId: Guid (nullable) FK → Ward.Id
 + Status: AppointmentStatus (non-null)
++ Reason: string (nullable)                             -- (Rev 2.9: was Notes)
 + BookedByStaffMemberId: Guid (nullable) FK → StaffMember.Id
-+ Notes: string (nullable)
++ AdmissionId: Guid (nullable) FK → Admission.Id        -- (Rev 2.9 — new, set at check-in)
 ```
-**Table:** `appointments`
+**Table:** `appointments` — **built.** `Patient_AddAdmission`.
+
+*(Rev 2.9)* **`Category` and `WardId` dropped; `AdmissionId` added.** The care level is
+chosen by a clinician at the desk on check-in — `CheckInRequest` carries
+`admission_category` and `category_set_by_staff_id` — so storing a guess at booking time
+gave the same fact two homes and no rule about which one wins. `Reason` is free text shown
+to staff and never read by the bed agent: free text stays data, never instructions.
 **Note:** *(Rev 2)* Covers the patient flow's third arrival path — "they booked a visit
 beforehand". Previously an `Admission` could only be emergency-linked or unexplained.
 On check-in this becomes an `Admission` with `Source = Booked`.
@@ -732,27 +761,32 @@ On check-in this becomes an `Admission` with `Source = Booked`.
 #### Admission extends AuditedEntity
 ```
 + PatientId: Guid (non-null) FK → Patient.Id
-+ EmergencyCallId: Guid (nullable) FK → EmergencyCall.Id
-+ AppointmentId: Guid (nullable) FK → Appointment.Id    -- (Rev 2)
 + Source: AdmissionSource (non-null)                    -- (Rev 2)
 + Category: AdmissionCategory (non-null)
 + Urgency: AdmissionUrgency (non-null)                  -- (Rev 2.2: was AcuityLevel)
++ Status: AdmissionStatus (non-null)                    -- (Rev 2.1: now 7 states, stored)
 + IsInfectious: bool = false (non-null)                 -- (Rev 2.2: was RequiresIsolation)
 + CategorySetByStaffMemberId: Guid (non-null) FK → StaffMember.Id  -- (Rev 2.2)
 + CategorySetAt: DateTimeOffset (non-null)              -- (Rev 2.2)
++ DispatchId: string (nullable)                          -- (Rev 2.5; Rev 2.9: Emergency's own reference, not a FK)
++ ReportedByUserId: Guid (nullable) FK → PatientAccount.Id -- (Rev 2.5 — new)
 + ExpectedArrivalAt: DateTimeOffset (nullable)          -- (Rev 2)
 + AdmittedAt: DateTimeOffset (nullable)                 -- (Rev 2: was non-null)
-+ Status: AdmissionStatus (non-null)                    -- (Rev 2.1: now 7 states, stored)
++ DischargedAt: DateTimeOffset (nullable)               -- (Rev 2.9 — new)
 + MissingFields: text[] (non-null, default '{}')        -- (Rev 2.2: was MissingDetails)
 + DetailsComplete: bool (GENERATED, stored)             -- (Rev 2.1)
 + DetailsCompletedAt: DateTimeOffset (nullable)         -- (Rev 2.1)
 + CancelReason: CancelReason (nullable)                 -- (Rev 2.2)
-+ DispatchId: Guid (nullable) FK → Dispatch.Id           -- (Rev 2.5 — new)
-+ ReportedByUserId: Guid (nullable) FK → PatientAccount.Id -- (Rev 2.5 — new)
 ```
-**Table:** `admissions`
-**Note:** `EmergencyCallId` nullable — null for walk-in/referral admissions, set for
-the emergency-originated path. *(Decision 25)*
+**Table:** `admissions` — **built.** `Patient_AddAdmission`.
+
+*(Rev 2.9)* **`EmergencyCallId` and `AppointmentId` dropped, `DispatchId` is a string.**
+The spec's `Admission` returns exactly one Emergency reference, `dispatch_id`, and describes
+it as "Emergency Service's reference" — their identifier, carried as text. A real foreign
+key would mean Patient Management could not create an admission until Member 1's `dispatches`
+table existed, which is precisely the dependency `STUBS.md` exists to avoid. The appointment
+link moved to `Appointment.AdmissionId`: two nullable FKs pointing at each other is one link
+with two places to disagree. `DischargedAt` is returned by the spec and had no column.
 *(Rev 2)* The patient flow requires that for an emergency "the record is created
 **BEFORE** they arrive, so a bed is ready when they get here". That state was
 unrepresentable: `AdmittedAt` was non-null and `AdmissionStatus` was only
@@ -784,8 +818,8 @@ approval gate leans on), and `CancelReason`, whose closed enum was already publi
 *(Rev 2.1 — review item 2)* **`Status` is stored and authoritative, not computed.**
 The four Rev 2 values did not cover `awaiting_bed`, `awaiting_approval`, `bed_reserved` or
 `ready_for_discharge`, so it now carries the same seven values `patient-spec.yaml` already
-returns. Deriving them from `BedReservation.Status` + `BedAssignment.EndAt` +
-`Discharge.ReadinessStatus` was the alternative; it was rejected for one decisive reason:
+returns. Deriving them from `BedAssignment.Status` and the discharge checklist was the
+alternative; it was rejected for one decisive reason:
 
 > **A derived status cannot be guarded.** `patient-spec.yaml` already documents an
 > `IllegalTransition` 409 with an explicit transition table — `admitted -> ready_for_discharge`
@@ -813,8 +847,8 @@ WHERE (a.status = 'admitted'      AND ba.id IS NULL)
 *(Rev 2.1 — review item 4)* **`MissingFields` records what is still outstanding**, for the
 "emergency arrival, relative brings the ID later" case. A `text[]` of field names rather
 than a bare boolean, because "incomplete" alone does not tell a ward clerk *what to chase* —
-`{national_id, date_of_birth}` does. Values come from `PatientDetailField`; queryable with
-`WHERE 'national_id' = ANY(missing_fields)`, which is the outstanding-paperwork worklist.
+`{nic, date_of_birth}` does. Values come from `PatientDetailField`; queryable with
+`WHERE 'nic' = ANY(missing_fields)`, which is the outstanding-paperwork worklist.
 
 `DetailsComplete` is a **stored generated column**, `cardinality(missing_fields) = 0` — the
 one place in this schema where a computed value is right, because unlike `Status` it has no
@@ -825,58 +859,92 @@ Deliberately **separate from `Status`**: how far through their stay a patient is
 complete their paperwork is are independent facts. A fully-admitted ICU patient can still be
 missing a NIC, and collapsing the two would make one unrepresentable.
 
-#### BedAssignment extends AuditedEntity
+#### BedAssignment extends AuditedEntity *(Rev 2.9 — changed)*
 ```
 + AdmissionId: Guid (non-null) FK → Admission.Id
-+ BedId: Guid (non-null) FK → Bed.Id
-+ StartAt: DateTimeOffset (non-null)
-+ EndAt: DateTimeOffset (nullable)
++ BedId: Guid (non-null)                                -- no FK: beds is Equipment's table
++ Status: AssignmentStatus (non-null)                   -- (Rev 2.9 — new)
++ ReservedUntil: DateTimeOffset (nullable)              -- (Rev 2.9 — the 30-minute hold)
++ AssignedBy: AssignedBy (non-null)                     -- (Rev 2.9: agent or human)
++ WorkflowId: Guid (nullable) → AgentWorkflow.Id        -- (Rev 2: no FK until that table exists)
 + IsDowngrade: bool = false (non-null)                  -- (Rev 2)
-+ DowngradeReason: string (nullable)                    -- (Rev 2)
-+ AssignedByStaffMemberId: Guid (nullable) FK → StaffMember.Id  -- (Rev 2)
-+ AgentWorkflowId: Guid (nullable) FK → AgentWorkflow.Id -- (Rev 2)
++ ApprovedByStaffMemberId: Guid (nullable) FK → StaffMember.Id  -- (Rev 2)
++ ApprovedAt: DateTimeOffset (nullable)                 -- (Rev 2.9 — new)
++ OverrideReason: string (nullable)                     -- (Rev 2.9: was DowngradeReason)
++ ReleasedAt: DateTimeOffset (nullable)                 -- (Rev 2.9: was EndAt)
++ ReleaseReason: ReleaseReason (nullable)               -- (Rev 2.9 — new)
 ```
-**Table:** `bed_assignments`
-**Constraints:** UNIQUE(BedId) WHERE EndAt IS NULL; UNIQUE(AdmissionId) WHERE EndAt IS NULL *(Rev 2)*
-**Note:** Multiple rows per `Admission` (ward/bed transfers mid-stay); exactly one
-active row (`EndAt IS NULL`) at a time. *(Decision 19)*
-*(Rev 2)* That "exactly one" rule was prose only — two concurrent requests could both
-succeed. It is now enforced by two partial unique indexes. `IsDowngrade` records the
-flow's "if ICU is full it offers the next best thing, **flagged as a downgrade**"; it is a
-real column rather than a note in the workflow payload because it *routes the approval*
-(downgrades are Duty Manager only), so it must be queryable and auditable.
+**Table:** `bed_assignments` — **built.** `Patient_AddAdmission`.
+**Constraints:**
+- `UNIQUE (bed_id) WHERE status IN ('reserved', 'occupied')`
+- `UNIQUE (admission_id) WHERE status IN ('reserved', 'occupied')`
 
-#### Discharge extends AuditedEntity
+**Note:** Multiple rows per `Admission` (ward/bed transfers mid-stay); exactly one live row
+at a time. *(Decision 19)* That "exactly one" rule was prose only — two concurrent requests
+could both succeed. It is enforced by the two partial unique indexes above, not by any check
+in a service: two nurses assigning bed 12 at the same instant both pass an application-level
+"is it free?" test, and the second `INSERT` is what actually fails.
+
+`IsDowngrade` records the flow's "if ICU is full it offers the next best thing, **flagged as
+a downgrade**". It is a real column rather than a note in the workflow payload because it
+*routes the approval* — downgrades are Duty Manager only — so it has to be queryable and
+auditable.
+
+*(Rev 2.9)* **This row is the hold as well as the occupancy.** `BedReservation` was a
+separate table until the spec was implemented; it publishes one bed row whose `status` walks
+`reserved → occupied → released`, and no reservation schema at all. One row per claim means
+"this bed is taken" has exactly one home, which is the same argument this document makes for
+keeping occupancy off `Bed`. A background sweep moves `reserved` rows past `ReservedUntil` to
+`released` with `ReleaseReason = HoldExpired`.
+
+**`BedId` is a plain column, not a foreign key.** `beds` belongs to Health Equipment
+(Member 3) and does not exist yet. The constraint goes in when their table lands; until then
+`STUBS.md` row 109 stands.
+
+#### Discharge extends AuditedEntity *(Rev 2.9 — changed)*
 ```
 + AdmissionId: Guid (unique, non-null) FK → Admission.Id
-+ ReadinessStatus: DischargeReadinessStatus (non-null)
-+ DischargedAt: DateTimeOffset (nullable)
-+ DischargeSummary: string (nullable)
-+ DischargedByStaffMemberId: Guid (nullable) FK → StaffMember.Id
++ FlaggedBy: AssignedBy (non-null)                      -- (Rev 2.9: agent or human)
++ FlaggedAt: DateTimeOffset (non-null)                  -- (Rev 2.9 — new)
++ ConfirmedByStaffMemberId: Guid (nullable) FK → StaffMember.Id  -- (Rev 2.9: was DischargedByStaffMemberId)
++ ConfirmedAt: DateTimeOffset (nullable)                -- (Rev 2.9: was DischargedAt)
++ SummaryNote: string (nullable)                        -- (Rev 2.9: was DischargeSummary)
 ```
-**Table:** `discharges`
-**Note:** 1:1 companion row created **at admission time** (`ReadinessStatus = NotReady`),
+**Table:** `discharges` — **built.** `Patient_AddAdmission`.
+**Note:** 1:1 companion row created **at admission time**, with its checklist rows unticked,
 not only once discharge actually happens — this gives clinical staff somewhere to
 update readiness during the stay, and gives the Patient Admission & Bed Agent a
 persistent target to monitor. `DischargedAt`/`DischargeSummary` stay null until
 confirmed. *(Decisions 10, 32)*
-*(Rev 2)* `ReadinessStatus` is now **derived**, not directly edited: it becomes `Ready`
-once every `DischargeChecklistItem` for this discharge is complete. The "ready to go"
-list is a query over this field.
+*(Rev 2.9)* **`ReadinessStatus` is gone entirely.** Rev 2 already made it derived — `Ready`
+once every checklist item was complete — and a derived value still stored is a value that can
+drift. The spec publishes `all_mandatory_ticked` instead, computed from the rows on read, so
+the flag and the boxes cannot disagree. How far through their stay the patient is stays on
+`Admission.Status`, where the transition guard can see it. `DischargedAt` moved to
+`Admission`, which is where the spec returns it.
 
-#### DischargeChecklistItem extends AuditedEntity *(Rev 2 — new)*
+#### DischargeChecklistItem extends AuditedEntity *(Rev 2 — new; Rev 2.9 — changed)*
 ```
 + DischargeId: Guid (non-null) FK → Discharge.Id
 + ItemType: DischargeChecklistItemType (non-null)
-+ CompletedAt: DateTimeOffset (nullable)
-+ CompletedByStaffMemberId: Guid (nullable) FK → StaffMember.Id
++ IsMandatory: bool = true (non-null)                   -- (Rev 2.9 — new)
++ TickedAt: DateTimeOffset (nullable)                   -- (Rev 2.9: was CompletedAt)
++ TickedByStaffMemberId: Guid (nullable) FK → StaffMember.Id  -- (Rev 2.9: was CompletedByStaffMemberId)
 + Notes: string (nullable)
 ```
-**Table:** `discharge_checklist_items`
+**Table:** `discharge_checklist_items` — **built.** `Patient_AddAdmission`.
 **Constraint:** UNIQUE(DischargeId, ItemType)
+
+*(Rev 2.9)* **Five item types, and each row says whether it blocks.** The spec's
+`ChecklistUpdateRequest` publishes `clinical_clearance`, `medication_issued`,
+`billing_settled`, `follow_up_recorded` and `transport_arranged`, and its `ChecklistItem`
+carries a `mandatory` flag — a follow-up appointment that has not been booked should not
+hold a well patient in a bed, but an unpaid bill might. `ticked` is not a column:
+`TickedAt IS NOT NULL` is the answer, so a boolean and a timestamp can never contradict
+each other.
 **Note:** *(Rev 2)* The patient flow's step 7 is "staff tick a checklist (doctor's
 clearance, medicine, bill settled) → all ticked → shows on a 'ready to go' list". A single
-`ReadinessStatus` enum could not represent three independently tickable items or record
+A single readiness enum could not represent independently tickable items or record
 who ticked each one. Rows are seeded alongside the `Discharge` row at admission time.
 
 #### CareRecommendation extends AuditedEntity *(Rev 2.6 — new)*
@@ -1029,7 +1097,7 @@ aggregate-root entities plus the two allocation/assignment tables that agent wor
 mutate — `EmergencyCall`, `Dispatch`, `Ambulance`, `StaffMember`, `Shift`,
 **`Allocation`** *(Rev 2)*, `LeaveRequest`, `EquipmentItem`, `StockLevel`,
 `MaintenanceSchedule`, `Patient`, `Admission`, **`BedAssignment`** *(Rev 2)*,
-**`BedReservation`** *(Rev 2)*, `Discharge`, `Ward`, `Bed`, `AgentWorkflow`.
+`Discharge`, `Ward`, `Bed`, `AgentWorkflow`.
 `PerformedByStaffMemberId` nullable for system-initiated changes (e.g. deterministic
 `Warning` generation). *(Decisions 7, 11, 12, 13)*
 *(Rev 2)* `Allocation` and `BedAssignment` were previously excluded as "join tables", but
@@ -1245,15 +1313,40 @@ Serialized as `usable`, `out_of_service` — identical in `equipment-spec.yaml` 
 
 Rev 2's `BedStatus {Available, Reserved, Occupied, Cleaning, Maintenance}` mixed three
 different owners' facts into one column on a table Equipment owns: `Occupied` is Patient
-Management's (`BedAssignment`), `Reserved` is Patient Management's (`BedReservation`), and
+Management's (`BedAssignment`), `Reserved` is Patient Management's (`BedAssignment` again,
+under `Status = Reserved` — *Rev 2.9*), and
 only `Maintenance` was ever Equipment's. `Condition` now carries the Equipment fact alone;
 the other two are read from their owners' rows. See the `Bed` note and
 `integration_of_functions.md` §6.1. `Cleaning` is Open Decision 7.
 
-### BedReservationStatus *(Rev 2 — new)*
+### AssignmentStatus *(Rev 2.9 — replaces BedReservationStatus)*
 ```
-Held, Confirmed, Expired, Released
+Reserved, Occupied, Released
 ```
+Serialized as `reserved`, `occupied`, `released` — as published in `patient-spec.yaml`.
+One `BedAssignment` row walks the three in order. `Reserved` is the 30-minute hold, and the
+partial unique indexes treat `reserved` and `occupied` alike: both claim the bed.
+
+Rev 2's `BedReservationStatus {Held, Confirmed, Expired, Released}` belonged to a separate
+`bed_reservations` table that the committed spec does not have. `Confirmed` became
+`Occupied`, and `Expired` became `Released` with `ReleaseReason = HoldExpired` — the reason
+a hold ended is a different fact from the state it ended in, and keeping them apart means
+"why is this bed free again?" has one answer instead of two half-answers.
+
+### AssignedBy *(Rev 2.9 — new)*
+```
+Agent, User
+```
+Serialized as `agent`, `user`. Whether the bed agent proposed this or a human picked it.
+Used on `BedAssignment.AssignedBy` and `Discharge.FlaggedBy`, and it is what the approval
+gate and the agent-performance report both read.
+
+### ReleaseReason *(Rev 2.9 — new)*
+```
+Discharged, HoldExpired, Cancelled, Transferred, Rejected
+```
+Serialized as `discharged`, `hold_expired`, `cancelled`, `transferred`, `rejected` — as
+published in `patient-spec.yaml`.
 
 ### AdmissionStatus *(Rev 2.1 — changed again, review item 2)*
 ```
@@ -1271,7 +1364,7 @@ middle states of the flow. `Expected` is now `AwaitingBed`; `Active` is now `Adm
 | :-- | :-- | :--: |
 | `AwaitingBed` | Record exists, no bed found yet. The emergency pre-arrival state. | null |
 | `AwaitingApproval` | The bed agent proposed a bed; a human has not approved it. | null |
-| `BedReserved` | Approved and held (`BedReservation.Status = Held`); patient not yet in it. | null |
+| `BedReserved` | Approved and held (`BedAssignment.Status = Reserved`); patient not yet in it. | null |
 | `Admitted` | In the bed. Live `BedAssignment` with `EndAt IS NULL`. | set |
 | `ReadyForDischarge` | Every `DischargeChecklistItem` complete; awaiting confirmation. | set |
 | `Discharged` | Confirmed and gone; the bed is released. | set |
@@ -1317,23 +1410,34 @@ A `CareRecommendation` is invisible to the patient until `Approved`. `Rejected` 
 records the doctor's reason, but the patient only ever sees a generic note that their
 doctor reviewed it — never `RejectionReason` itself.
 
-### PatientDetailField *(Rev 2.1 — new, review item 4)*
+### PatientDetailField *(Rev 2.1 — new; Rev 2.9 — aligned to the spec)*
 ```
-NationalId, DateOfBirth, Gender, PhoneNumber,
-EmergencyContactName, EmergencyContactPhone, Address
+Nic, FullName, DateOfBirth, Phone, Address,
+EmergencyContactName, EmergencyContactPhone
 ```
 The allowed members of `Admission.MissingFields`. A closed set rather than free text, so
 "what is still outstanding" can be counted and filtered instead of parsed.
 
-### DischargeReadinessStatus
-```
-NotReady, PendingReview, Ready
-```
+*(Rev 2.9)* Renamed to `Nic` and `Phone`, and `Gender` dropped, so the list is exactly the
+keys `CompleteDetailsRequest` accepts — these are the fields a relative can bring in later.
+`Gender` is required at intake (`Unknown` is a legitimate answer for an unidentified
+arrival), so it can never be outstanding. `FullName` added for the provisional-name case,
+where Emergency sends what the caller shouted down the phone.
 
-### DischargeChecklistItemType *(Rev 2 — new)*
+### DischargeReadinessStatus — **removed** *(Rev 2.9)*
+Readiness is `all_mandatory_ticked`, computed from the `DischargeChecklistItem` rows on
+read. A stored copy of a value derived from other rows is a value that can drift, and this
+one had no transition rules to justify storing it — unlike `AdmissionStatus`, which does.
+
+### DischargeChecklistItemType *(Rev 2 — new; Rev 2.9 — aligned to the spec)*
 ```
-DoctorClearance, MedicationDispensed, BillSettled
+ClinicalClearance, MedicationIssued, BillingSettled, FollowUpRecorded, TransportArranged
 ```
+Serialized as `clinical_clearance`, `medication_issued`, `billing_settled`,
+`follow_up_recorded`, `transport_arranged` — the five keys `ChecklistUpdateRequest`
+publishes. Rev 2's three were a shorter list under different names for the same boxes;
+the committed spec wins. `ClinicalClearance` is the Doctor-only one, enforced in the
+service against the role claim, not in the schema.
 
 ### AgentType
 ```
@@ -1423,20 +1527,21 @@ CREATE UNIQUE INDEX ux_beds_ward_number        ON beds (ward_id, bed_number)    
 CREATE UNIQUE INDEX ux_equipment_types_name    ON equipment_types (name)             WHERE is_active;
 CREATE UNIQUE INDEX ux_equipment_items_serial  ON equipment_items (serial_number)
     WHERE is_active AND serial_number IS NOT NULL;
-CREATE UNIQUE INDEX ux_patients_national_id    ON patients (national_id)             WHERE national_id IS NOT NULL;
-CREATE UNIQUE INDEX ux_patients_temp_ref       ON patients (temp_reference)          WHERE temp_reference IS NOT NULL;
+CREATE UNIQUE INDEX ux_patients_nic            ON patients (nic)            WHERE nic IS NOT NULL AND is_active;
+CREATE UNIQUE INDEX ux_patients_temp_reference  ON patients (temp_reference) WHERE temp_reference IS NOT NULL AND is_active;
+CREATE UNIQUE INDEX ux_patients_user_account_id ON patients (user_account_id) WHERE user_account_id IS NOT NULL AND is_active;
 CREATE UNIQUE INDEX ux_beds_ward_distance      ON beds (ward_id, nurse_station_distance) WHERE is_active;
 ```
 
 ### Partial unique indexes — business invariants
 
 ```sql
--- one occupant per bed, one bed per admission
-CREATE UNIQUE INDEX ux_bed_assign_bed   ON bed_assignments (bed_id)       WHERE end_at IS NULL;
-CREATE UNIQUE INDEX ux_bed_assign_adm   ON bed_assignments (admission_id) WHERE end_at IS NULL;
-
--- one live hold per bed  (the 30-minute reservation race)
-CREATE UNIQUE INDEX ux_bed_reservation  ON bed_reservations (bed_id)      WHERE status = 'held';
+-- one live claim per bed, one per admission. A hold and an occupancy both claim the bed,
+-- so one pair of indexes covers the 30-minute reservation race too.  (Rev 2.9)
+CREATE UNIQUE INDEX ux_bed_assignments_live_bed ON bed_assignments (bed_id)
+    WHERE status IN ('reserved', 'occupied');
+CREATE UNIQUE INDEX ux_bed_assignments_live_admission ON bed_assignments (admission_id)
+    WHERE status IN ('reserved', 'occupied');
 
 -- one OPEN admission per patient  (Rev 2.1: was status = 'Active', which no longer exists.
 -- "Open" now spans every state before the patient has left or the visit was called off,
@@ -1480,8 +1585,6 @@ ALTER TABLE bed_assignments ADD CONSTRAINT ck_bed_assign_window
 ALTER TABLE bed_assignments ADD CONSTRAINT ck_bed_assign_downgrade
     CHECK (NOT is_downgrade OR downgrade_reason IS NOT NULL);
 
-ALTER TABLE bed_reservations ADD CONSTRAINT ck_bed_res_expiry CHECK (expires_at > created_at);
-
 -- admitted_at is set exactly when the patient has actually arrived in a bed  (Rev 2.1)
 ALTER TABLE admissions ADD CONSTRAINT ck_admissions_arrival
     CHECK ((status IN ('admitted', 'ready_for_discharge', 'discharged') AND admitted_at IS NOT NULL)
@@ -1490,15 +1593,15 @@ ALTER TABLE admissions ADD CONSTRAINT ck_admissions_arrival
 
 -- every patient is identifiable by something  (Rev 2.1, review item 4)
 ALTER TABLE patients ADD CONSTRAINT ck_patients_identifiable
-    CHECK (national_id IS NOT NULL OR phone_number IS NOT NULL OR temp_reference IS NOT NULL);
+    CHECK (nic IS NOT NULL OR phone IS NOT NULL OR temp_reference IS NOT NULL);
 
 -- missing_fields may only name known fields  (Rev 2.1)
 ALTER TABLE admissions ADD CONSTRAINT ck_admissions_missing_fields
-    CHECK (missing_fields <@ ARRAY['national_id','date_of_birth','gender','phone_number',
-                                    'emergency_contact_name','emergency_contact_phone','address']::text[]);
+    CHECK (missing_fields <@ ARRAY['nic','full_name','date_of_birth','phone','address',
+                                    'emergency_contact_name','emergency_contact_phone']::text[]);
 
-ALTER TABLE discharges ADD CONSTRAINT ck_discharge_ready
-    CHECK (discharged_at IS NULL OR readiness_status = 'ready');
+-- (Rev 2.9) readiness_status is gone; a discharge is confirmed only once every mandatory
+-- checklist row is ticked, which is a rule in the service, not a column comparison.
 
 ALTER TABLE route_logs ADD CONSTRAINT ck_route_nonneg
     CHECK (planned_distance_km >= 0 AND planned_duration_minutes >= 0);
@@ -1534,11 +1637,12 @@ CREATE INDEX ix_notifications_unread   ON notifications (recipient_staff_member_
 CREATE INDEX ix_shifts_ward_date       ON shifts (ward_id, date);
 CREATE INDEX ix_allocations_staff      ON allocations (staff_member_id) WHERE status = 'confirmed';
 CREATE INDEX ix_beds_ward_condition    ON beds (ward_id, condition) WHERE is_active;
-CREATE INDEX ix_discharges_ready       ON discharges (readiness_status)
-    WHERE discharged_at IS NULL;
+CREATE INDEX ix_discharge_items_unticked ON discharge_checklist_items (discharge_id)
+    WHERE ticked_at IS NULL;
 
--- expiry sweep for the 30-minute holds
-CREATE INDEX ix_bed_reservations_expiry ON bed_reservations (expires_at) WHERE status = 'held';
+-- expiry sweep for the 30-minute holds  (Rev 2.9)
+CREATE INDEX ix_bed_assignments_reserved_until ON bed_assignments (reserved_until)
+    WHERE status = 'reserved';
 
 -- admission status is queried on every read; the open states drive every worklist  (Rev 2.1)
 CREATE INDEX ix_admissions_status ON admissions (status, expected_arrival_at)
@@ -1565,7 +1669,7 @@ CREATE INDEX ix_admissions_missing_fields ON admissions USING gin (missing_field
   `refresh_tokens`, `notifications`.
 - **`text[]` → `string[]`.** Npgsql maps this natively; no value converter needed.
   `missing_fields` uses a **GIN** index because the queries are containment
-  (`'national_id' = ANY(...)`), which b-tree cannot serve. *(Rev 2.1)*
+  (`'nic' = ANY(...)`), which b-tree cannot serve. *(Rev 2.1)*
 - **Generated column** *(Rev 2.1)* — `details_complete` is computed by the database, so it
   can never disagree with `missing_fields`:
   ```sql
@@ -1614,16 +1718,15 @@ CREATE INDEX ix_admissions_missing_fields ON admissions USING gin (missing_field
 | EquipmentType | StockLevel | 1:N | StockLevel.EquipmentTypeId |
 | EquipmentItem | MaintenanceSchedule | 1:N | MaintenanceSchedule.EquipmentItemId |
 | Admission | BedAssignment | 1:N | BedAssignment.AdmissionId |
-| Admission | BedReservation | 1:N (nullable) | BedReservation.AdmissionId |
 | Admission | Discharge | 1:1 | Discharge.AdmissionId |
 | Bed | BedAssignment | 1:N | BedAssignment.BedId |
-| Bed | BedReservation | 1:N | BedReservation.BedId |
 | Discharge | DischargeChecklistItem | 1:N | DischargeChecklistItem.DischargeId |
 | Shift | Allocation | 1:N | Allocation.ShiftId |
 | Allocation | Allocation | 1:1 (nullable, self) | Allocation.ReplacedByAllocationId |
 | AgentWorkflow | AgentProposedChange | 1:N | AgentProposedChange.AgentWorkflowId |
 | AgentWorkflow | AgentWorkflow | 1:N (nullable, self) | AgentWorkflow.ParentWorkflowId |
-| AgentWorkflow | BedAssignment | 1:N (nullable) | BedAssignment.AgentWorkflowId |
+| AgentWorkflow | BedAssignment | 1:N (nullable) | BedAssignment.WorkflowId |
+| Appointment | Admission | 1:1 (nullable) | Appointment.AdmissionId *(Rev 2.9)* |
 | LeaveRequest | StaffMember | N:1 (nullable) ×2 | ReviewedBy…, SwapWith… |
 | LeaveRequest | Shift | N:1 (nullable) | LeaveRequest.SwapShiftId |
 | Warning | EquipmentItem \| StockLevel | N:1 (polymorphic) | (EntityType, EntityId) |
@@ -1679,7 +1782,6 @@ rows are mutated after insert; pure join/append-only tables (`DispatchCrew`,
 | Warning | warnings | | changed |
 | Ward | wards | ✓ | changed |
 | Bed | beds | ✓ | changed |
-| BedReservation | bed_reservations | | **new** |
 | Patient | patients | ✓ | changed |
 | PatientAccount | patient_accounts | ✓ | **new (2.5)** |
 | Appointment | appointments | | **new** |
@@ -1703,7 +1805,7 @@ rows are mutated after insert; pure join/append-only tables (`DispatchCrew`,
 | Emergency / Ambulance | Member 1 | EmergencyCall, Ambulance, Dispatch, DispatchCrew, RouteLog |
 | Staff Management | Member 2 | Shift, Allocation, LeaveRequest, Skill, StaffMemberSkill, WardStaffingRule |
 | Health Equipment | Member 3 | EquipmentCategory, EquipmentItem, **Bed**, PharmacyCategory, PharmacyItem, PharmacyTransaction, MaintenanceSchedule, Warning, ActionRequest |
-| Patient Management | Member 4 | Patient, **PatientAccount**, Admission, BedAssignment, BedReservation, Discharge, DischargeChecklistItem, Appointment, Ward |
+| Patient Management | Member 4 | Patient, **PatientAccount**, Admission, BedAssignment, Discharge, DischargeChecklistItem, Appointment, Ward |
 | Common | Group (common) | StaffMember, **PatientAccount**, RefreshToken, DeviceToken, Notification, AgentWorkflow, AgentProposedChange, AuditLog |
 
 **Common means built once, not four times.** *(2026-09-07)* Anything that is not a
@@ -1722,7 +1824,8 @@ already settled it the other way: `integration_of_functions.md` §3 and §6.1 (m
 ("owned by Equipment Management (Member 3). We read it, we never write it.").
 The split is: **Equipment owns the frame** — it exists, its number, its condition, repairs
 and retirement. **Patient Management owns the occupant** — `BedAssignment` and
-`BedReservation`. Neither writes the other's table.
+`BedAssignment`, which carries both the hold and the occupancy *(Rev 2.9)*. Neither writes
+the other's table.
 
 ---
 
@@ -1828,7 +1931,7 @@ traceable documentation, commit the log or inline the rationale.
 `BedCondition` does not, and neither published spec has anywhere to record it. A bed being
 turned over between patients is a real state and somebody owns it. Options: a third
 `BedCondition` value (Equipment's, but Patient triggers it at discharge), or a short-lived
-`BedReservation`-style row. Member 3 decides, since it is their table.
+`BedAssignment` row held by nobody *(Rev 2.9)*. Member 3 decides, since it is their table.
 
 **10. Is `Referral` a fourth admission source?** *(Rev 2.2)* Rev 2 proposed
 `{Emergency, WalkIn, Booked, Referral}`; `patient-spec.yaml` publishes three and has no

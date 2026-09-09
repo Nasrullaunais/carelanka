@@ -1,230 +1,158 @@
-# Commit + PR draft — `feat/patient-ward-register`
+# Commit + PR draft — `feat/patient-admission-entities`
 
-Scratch file for me to copy from. **Delete it before committing** (it is not in
-`.gitignore`, so it will show up in `git status`).
+Scratch file to copy from. **Delete it before committing** — it is tracked, so it
+will show up in `git status`.
 
-Branch is already created and checked out. Nothing is staged.
+Branch is created and checked out. Nothing is staged.
 
 ---
 
-## Three commits
+## Two commits
 
-Split this way because the repo's own rules force it: a schema change and its
-document move together, and a stub and its `STUBS.md` row move together. So the
-docs are not their own commit — they belong with the code that changed them.
+Split this way because the repo's own rule forces it: a schema change and the
+document that describes it move together. So `entity_diagram.md` is not its own
+commit — it belongs with the code that changed it.
 
-### 1 — the Ward register
-
-```
-git add api/Data/Enums/WardType.cs api/Data/Enums/GenderPolicy.cs \
-        api/Data/Entities/Patient api/Data/Configurations/Patient \
-        api/Data/CareLankaDbContext.cs api/Data/Migrations \
-        api/DTOs/Patient api/Services/Patient api/Controllers/Patient \
-        api/Program.cs api/Common/Errors \
-        docs/entity_diagram.md specs/patient-spec.yaml STUBS.md
-```
+### 1 — the entities, the migration, and the diagram
 
 ```
-feat(patient): add the Ward register
+git add api/Data/Enums api/Data/Entities/Patient api/Data/Configurations/Patient \
+        api/Data/Migrations api/Data/CareLankaDbContext.cs \
+        docs/entity_diagram.md
 
-Ward is the most-depended-on table in the system - Shift.WardId,
-EquipmentItem.WardId and Dispatch.DestinationWardId all point at it - so it is
-step 1 of docs/build/patient.md and its schema is frozen from here.
-
-Entity, configuration, the Patient_AddWard migration, DTOs, service and
-GET/POST /api/wards. Listing is any staff role; creating is HospitalAdministrator.
-
-Three naming decisions, all recorded as Rev 2.8 in docs/entity_diagram.md:
-
-- WardGenderPolicy is named GenderPolicy, and Ward.Type is named Ward.WardType.
-  Both were cases where the entity diagram and the committed patient-spec.yaml
-  disagreed, and the spec wins on an entity this component owns.
-- HighDependency is spelled Hdu in C#. Under this codebase's snake-case converter
-  the C# member name IS the wire value, so a "readable" HighDependency serializes
-  to high_dependency and silently breaks the hdu the spec publishes. That applies
-  to the stored column and the JSON alike, so a value converter cannot fix it.
-
-The duplicate-name 409 is raised from the partial unique index, not from a read
-beforehand: two administrators creating "ICU-1" at the same moment both pass any
-check made in advance. New message code cl_pat_001, the first cl_pat_ code.
-
-Ward.total_beds is counted from Equipment Management's bed register, which does
-not exist yet, so it reads through a stub - STUBS.md row 1. Swapping in the real
-service is the one DI registration in Program.cs and nothing else.
-
-patient-spec.yaml gains a required list on Ward so the generated clients type
-those members as present rather than optional. created_at/updated_at are left
-out deliberately: they come from the group-owned AuditFields schema, which lists
-no required members in any of the five specs, and changing that alone would make
-this component's client disagree with the other three.
+git commit -m "feat(patient): add admission, appointment, bed and discharge tables"
 ```
 
-### 2 — the tests
+Message body if you want one:
 
 ```
-git add tests/
+Adds the six remaining Patient Management entities in one migration:
+Patient, Appointment, Admission, BedAssignment, Discharge and
+DischargeChecklistItem, plus twelve enums.
+
+One migration rather than six, because every EF migration snapshots the
+whole model and six would be six chances to collide with the other tracks.
+
+Where entity_diagram.md and patient-spec.yaml disagreed, the spec won, per
+CLAUDE.md. The diagram is updated to match as Revision 2.9.
 ```
 
-```
-test(patient): cover the ward endpoints and pin the published contract
-
-11 endpoint tests and 6 contract tests; the suite goes from 15 to 35.
-
-The contract tests are the drift gate for this component. patient-spec.yaml is
-still hand-written, so nothing else stops the code and the published contract
-disagreeing. They assert the generated document against it: enum values in order,
-required members, operationIds, and that every operation declares its failures
-rather than only its 200.
-
-Every ward type is tested on its wire value, because hdu is the one value that is
-not just the C# member name lowercased and would go unnoticed if the enum were
-ever renamed for readability.
-
-Adds a seeded HospitalAdministrator to the shared fixture - POST /wards needs one
-and the three existing accounts could not exercise it.
-
-WardEndpointTests caches one token per account rather than signing in per test.
-/api/auth/login is rate limited to 20 a minute per IP and the whole collection
-shares that budget; spending it made every test here fail on a missing
-access_token, which looks nothing like the 429 actually causing it.
-```
-
-### 3 — the React app
+### 2 — the plan documents that named a table that no longer exists
 
 ```
-git add web-ui/
-```
+git add docs/build/patient.md docs/BUILD_PLAN.md \
+        docs/CareLanka_Component_Plan.md docs/build/equipment.md
 
-```
-feat(web-ui): scaffold the React app with a generated API client
-
-web-ui/ was one .gitkeep. This is the Vite + React + TanStack Query scaffold,
-built to the conventions already fixed in CLAUDE.md.
-
-NOTE FOR THE GROUP: the scaffold itself is Common-track work (BUILD_PLAN.md
-section 7 row 7, "Not built. Blocks all React work"). I built it because it
-blocked Patient Management's screens, not to claim it. That row is now stale.
-Nobody should scaffold this a second time.
-
-The API client is generated by @hey-api/openapi-ts from the running API's
-OpenAPI document; there is no hand-written fetch or model anywhere. The
-generated directory is committed on purpose - check:codegen regenerates it and
-fails on any git difference, and that gate needs the files tracked.
-
-Staff sign-in only, and there should never be a patient sign-in here.
-CareLanka_Component_Plan.md section 2.1 is the rule - React decides, Flutter
-does - and section 3 puts both Patient and Ward Nurse on Flutter. The screens
-are a wards list for any staff role and a create form shown only to a
-HospitalAdministrator; a control a role cannot use is hidden, not disabled.
-
-Two things the conventions call out and this honours: runtime.ts imports nothing
-that leads back to the generated client, because the client calls
-createClientConfig while still initialising and a cycle there is a startup
-crash; and the base URL is the relative path /api in dev and production alike,
-with no environment variable, so there is no CORS surface to configure.
-
-transport.ts owns the one response interceptor that toasts every failure with
-the server's own message - no page handles a status code. It ignores aborted
-requests: TanStack Query cancels in-flight queries on unmount, which StrictMode
-triggers on every mount, and that rejection carries no Response, so it was being
-reported as "cannot reach the server" while the data loaded fine.
-
-Known caveat, written down in session.ts rather than hidden: tokens live in
-sessionStorage. A browser has no secure storage, so the real choice was that or
-memory-only, which signs you out on every refresh and cannot be demonstrated.
+git commit -m "docs: drop BedReservation from the plan documents"
 ```
 
 ---
 
-## PR
-
-**Title**
+## Push and open the PR
 
 ```
-Patient Management step 1: the Ward register, with tests and a React screen
+git push -u origin feat/patient-admission-entities
+gh pr create --base main --title "feat(patient): admission, bed and discharge tables"
 ```
 
-**Body**
+---
 
-```markdown
-Step 1 of `docs/build/patient.md`. **`Ward` is built and its schema is frozen** —
-`Shift.WardId`, `EquipmentItem.WardId` and `Dispatch.DestinationWardId` all point
-at it, so changing it later breaks three of us.
+## PR description
 
-## What this unblocks
+### What this adds
 
-`GET /api/wards` is live, which is what M2 and M3 were waiting on for the ward
-list (`BUILD_PLAN.md` §5).
+The six remaining Patient Management tables, in one migration
+(`Patient_AddAdmission`). No endpoints, no DTOs, no services — CRUD is the next
+PR. This one is schema only, so it stays reviewable.
 
-**It does not unblock everything.** M1 needs `GET /capacity/wards` and M2 needs
-`GET /wards/{id}/occupancy` — those are step 5, and they need the bed register
-first.
-
-## Endpoints
-
-| Route | Roles |
+| Table | What it holds |
 | :--- | :--- |
-| `GET /api/wards` | any staff |
-| `POST /api/wards` | `HospitalAdministrator` |
+| `patients` | One row per human being, reused across visits |
+| `appointments` | A booked visit, before it becomes an admission |
+| `admissions` | One row per hospital visit, with the 7-state status |
+| `bed_assignments` | Who is in which bed, and the 30-minute hold on one |
+| `discharges` | The 1:1 companion row, created at admission time |
+| `discharge_checklist_items` | The five tickable boxes |
 
-## Decisions worth a reviewer's eye
+Twelve enums, all stored as their snake_case wire values with a `CHECK`
+constraint per column, matching how `Ward` already does it.
 
-**`HighDependency` is spelled `Hdu` in C#.** Under this codebase's snake-case
-converter the C# member name *is* the wire value, so `HighDependency` serializes
-to `high_dependency` and breaks the `hdu` the spec publishes — for the stored
-column and the JSON alike. A value converter cannot fix the JSON side. There is a
-test pinning all six ward-type wire values.
+### The concurrency guarantee
 
-**Two names now follow the spec, not the diagram** — `GenderPolicy` (was
-`WardGenderPolicy`) and `Ward.WardType` (was `Ward.Type`). Both are cases where
-`entity_diagram.md` and my own committed `patient-spec.yaml` disagreed, and the
-rule is that the spec wins for the member who owns the entity. Recorded as
-**Rev 2.8**.
+Two nurses assigning the same bed at the same instant both pass an
+application-level "is it free?" check. These are what actually stop it:
 
-**The 409 comes from the index, not from a prior read.** Two administrators
-creating `ICU-1` at the same moment both pass any application-level check. The
-unique index is scoped `WHERE is_active`, so retiring a ward frees its name.
-
-## Stub
-
-`Ward.total_beds` reads Equipment Management's bed register, which does not exist
-yet. **`STUBS.md` row 1** — every ward reports exactly six beds, which is visibly
-fake. Zero would have been mistaken for the real "no beds recorded yet" state.
-Replacing it is one DI line.
-
-## For the group — `web-ui/` now exists
-
-The React scaffold is **Common-track work**, not Patient Management's
-(`BUILD_PLAN.md` §7 row 7, *"Not built. Blocks all React work"*). I built it
-because it blocked my screens. **That row is now stale — please don't scaffold it
-a second time.** Happy to split it into its own PR if the group would rather.
-
-It is **staff-only, deliberately**: §2.1's *"React decides, Flutter does"* and §3
-put both Patient and Ward Nurse on Flutter.
-
-## Also raising
-
-`AuditFields` lists no required members in any of the five specs, so `created_at`
-and `updated_at` generate as optional in every component's client. It is
-group-owned, so I did not change it alone.
-
-## Testing
-
-35 tests pass (was 15). `bun run check:specs` clean — 5/5 valid, 0 duplicate
-routes, 0 duplicate operationIds, 0 schema conflicts. `web-ui` typechecks and
-builds. Verified by hand in the browser as administrator, duty manager and nurse.
-
-**There is still no CI**, so all of the above was run locally (`BUILD_PLAN.md` §7
-row 5).
+```sql
+CREATE UNIQUE INDEX ux_bed_assignments_live_bed ON bed_assignments (bed_id)
+    WHERE status IN ('reserved', 'occupied');
+CREATE UNIQUE INDEX ux_bed_assignments_live_admission ON bed_assignments (admission_id)
+    WHERE status IN ('reserved', 'occupied');
 ```
 
----
+A hold and an occupancy both claim the bed, so one pair of indexes covers both.
 
-## Before you commit
+### Five places the diagram and the spec disagreed
 
-```
-rm PR_DRAFT.md
-```
+`CLAUDE.md`: on an entity Member 4 owns, the committed spec beats
+`entity_diagram.md`. All five went the spec's way, and the diagram is updated in
+the same commit as **Revision 2.9**.
 
-The migration is already applied to your local database, so there is nothing to
-run after merging beyond `dotnet ef database update` on anyone else's machine.
+1. **`BedReservation` is dropped.** The hold is a `bed_assignments` row with
+   `status = 'reserved'` and a `reserved_until`. The spec publishes one bed row
+   and has no reservation schema and no reservation path. Two tables would have
+   put "this bed is claimed" in two places — the same drift the diagram rejects
+   `Bed.Status` for.
+2. **`Patient` has one `full_name`**, plus `nic`, `phone` and a new `address`
+   column. `address` was already in `PatientDetailField` with nothing behind it.
+3. **`Discharge` has no `readiness_status`.** Readiness is counted from the
+   checklist rows, so the flag and the boxes cannot disagree. Five item types
+   rather than three, each with an `is_mandatory` flag.
+4. **`Admission` drops `emergency_call_id` and `appointment_id`.** `dispatch_id`
+   is a string, Emergency's own reference rather than a foreign key — so this
+   table does not wait on Member 1's `dispatches` existing. The appointment link
+   is `appointments.admission_id`: one link, one owner.
+5. **`DischargedAt` added** to `admissions`, which the spec returns and the
+   diagram had nowhere for.
+
+### Cross-component references are FKs with no navigation property
+
+Every `*_staff_member_id` and both `patient_account` links are configured with
+`HasOne<StaffMember>()` and no navigation. That is
+`integration_of_functions.md` §5.1 — *we store the id and nothing else* — enforced
+by the model rather than by discipline, because there is no `Include()` to reach
+for.
+
+It also removes a real bug. `StaffMember` is soft-deletable and
+`Admission.CategorySetByStaffMemberId` is required, so a navigation would have
+dropped every admission a retired clinician ever categorised out of every query.
+EF Core warned about exactly this; it is fixed rather than suppressed.
+
+### What is deliberately not a foreign key
+
+- **`bed_assignments.bed_id`** — `beds` is Health Equipment's table (M3) and does
+  not exist yet. `STUBS.md` row 109 still stands. The constraint goes in when
+  their table lands.
+- **`bed_assignments.workflow_id`** — `AgentWorkflow` is common and unbuilt.
+- **`admissions.dispatch_id`** — Emergency's reference, carried as their string.
+
+### Not in this PR
+
+Endpoints, DTOs and services (step 3), the state-machine transition guard
+(step 4), and `CareRecommendation` (step 13, self-contained and gating nobody).
+
+### Documents changed
+
+`entity_diagram.md` (Rev 2.9), `docs/build/patient.md`, `docs/BUILD_PLAN.md`,
+`docs/CareLanka_Component_Plan.md`, and one line of `docs/build/equipment.md` —
+that file named `BedReservation`, and leaving it would have had Equipment build
+against a table that no longer exists.
+
+### Checks
+
+- `dotnet build` — clean, 0 warnings
+- `dotnet test` — 35/35 pass, against a real PostgreSQL. The suite runs
+  `Database.MigrateAsync()`, so the new migration is applied and verified on every
+  run: the generated column, both partial unique indexes, the `text[]` default and
+  all fifteen check constraints.
+- `npm run check:specs` — 5 specs, 0 duplicate routes, 0 duplicate operationIds,
+  0 schema conflicts. No spec file changed in this PR.

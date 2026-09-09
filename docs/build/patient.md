@@ -3,8 +3,7 @@
 **Owner: Lochana (Member 4)** · **Index:** `docs/BUILD_PLAN.md`
 
 **Owns:** `Patient`, `PatientAccount`, `Admission`, **`Ward`**, `BedAssignment`,
-`BedReservation`, `Discharge`, `DischargeChecklistItem`, `Appointment`,
-**`CareRecommendation`**
+`Discharge`, `DischargeChecklistItem`, `Appointment`, **`CareRecommendation`**
 **Contract:** `specs/patient-spec.yaml` (40 paths) · **Design:** `specs/patient-management-plan.md`
 **Boundaries:** `specs/integration_of_functions.md` §4–§11
 
@@ -44,6 +43,15 @@
 | 15 | React: Doctor's care recommendation queue, approve/reject | The third human gate in this component |
 | 16 | Flutter: "ask about a symptom" + "my care recommendations" | Patient-facing; never renders `agent_message` or `rejection_reason` |
 
+**Steps 1 and 2 are done.** `Ward` landed in `Patient_AddWard` (PR #12). `Patient`,
+`Admission`, `Appointment`, `BedAssignment`, `Discharge` and `DischargeChecklistItem`
+landed in `Patient_AddAdmission`, with their configurations and the partial unique indexes.
+Building them settled five disagreements between `entity_diagram.md` and
+`patient-spec.yaml`, all resolved in the spec's favour and written up as Revision 2.9 of the
+diagram. The one worth knowing before step 6: **`BedReservation` no longer exists.** The
+30-minute hold is a `BedAssignment` row with `status = 'reserved'` and a `reserved_until`,
+which is what the spec has always published.
+
 **Steps 13–16 are self-contained.** Nothing else in the group depends on the care advisory
 agent, and it depends on nothing outside this component beyond the `doctor` role claim,
 which auth already issues. Build it in parallel with the bed-agent track or after it — it
@@ -57,10 +65,13 @@ does not gate anyone and nobody gates it.
 bed at the same moment both pass an application-level "is it free" check. The partial
 unique index is what actually stops it:
 
+```sql
+CREATE UNIQUE INDEX ux_bed_assignments_live_bed ON bed_assignments (bed_id)
+    WHERE status IN ('reserved', 'occupied');
 ```
-CREATE UNIQUE INDEX ix_bed_assignments_active
-    ON bed_assignments (bed_id) WHERE is_active;
-```
+
+A hold and an occupancy both claim the bed, so one index covers both races. There is no
+separate `bed_reservations` table — see the step 2 note below.
 
 Catch the constraint violation and return 409. Do not try to prevent it with a prior read.
 

@@ -66,15 +66,23 @@ actually published.
 
 ## Open stubs
 
-**None open.** Common auth is built and merged (PR #11, 2026-09-08) and was never
-stubbed. The four components have not started, so the first real rows will appear when
-they do.
+**One open.** Common auth is built and merged (PR #11, 2026-09-08) and was never stubbed.
 
 | # | What is faked | Where it lives | Standing in for | Owner of the real thing | Added |
 | :-- | :--- | :--- | :--- | :--- | :--- |
-| _(example)_ | Bed register returns 6 fake beds in 2 wards | `api/Services/Patient/Stubs/StubBedRegistryService.cs` | `GET /beds` — `equipment-spec.yaml` | **M3 Sethmin** | 2026-08-21 |
+| 1 | Bed counts per ward — every ward reports exactly 6 beds | `api/Services/Patient/Stubs/StubBedRegistryService.cs` | `GET /beds` — `equipment-spec.yaml` | **M3 Sethmin** | 2026-09-08 |
 
-> Delete the example row when the first real one is added.
+**Row 1 — what it feeds and how far it goes.** Only `Ward.total_beds` on `GET /wards` and
+`POST /wards` reads it today. `IBedRegistryService` is deliberately one method wide
+(`CountBedsByWardAsync`) because counting is all the ward endpoints need; the bed agent's
+candidate list widens the interface later, and that is when the fake starts mattering.
+
+**Why a constant and not zero.** Six beds in every ward is visibly not a real hospital.
+Zero would have been indistinguishable from the genuine "no beds recorded in this ward yet"
+state, which is exactly the kind of fake that survives to a demo.
+
+**Replacing it is one line** — the `AddSingleton<IBedRegistryService, StubBedRegistryService>`
+registration in `api/Program.cs`. Nothing else moves.
 
 ---
 

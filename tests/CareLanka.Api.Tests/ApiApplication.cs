@@ -18,6 +18,7 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
     public const string Password = "CareLanka#Test2026";
     public const string NurseEmail = "nurse.tests@carelanka.invalid";
     public const string ManagerEmail = "manager.tests@carelanka.invalid";
+    public const string AdministratorEmail = "administrator.tests@carelanka.invalid";
     public const string InactiveEmail = "inactive.tests@carelanka.invalid";
     public const string SigningKey = "test-signing-key-that-is-at-least-32-characters";
 
@@ -63,6 +64,7 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
         db.StaffMembers.AddRange(
             Staff(NurseEmail, StaffRole.WardNurse, true, passwords),
             Staff(ManagerEmail, StaffRole.DutyManager, true, passwords),
+            Staff(AdministratorEmail, StaffRole.HospitalAdministrator, true, passwords),
             Staff(InactiveEmail, StaffRole.Doctor, false, passwords));
         await db.SaveChangesAsync();
     }

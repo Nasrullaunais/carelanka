@@ -9,6 +9,8 @@ using CareLanka.Api.Common.Persistence;
 using CareLanka.Api.Data;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.Services.Common;
+using CareLanka.Api.Services.Patient;
+using CareLanka.Api.Services.Patient.Stubs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Formatters;
@@ -202,6 +204,12 @@ builder.Services.AddSingleton<ILoginThrottle, LoginThrottle>();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IHealthService, HealthService>();
+
+builder.Services.AddScoped<IWardService, WardService>();
+
+// STUB — Equipment Management's bed register does not exist yet. See STUBS.md row 1.
+// Swapping in the real one is this line and nothing else.
+builder.Services.AddSingleton<IBedRegistryService, StubBedRegistryService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>

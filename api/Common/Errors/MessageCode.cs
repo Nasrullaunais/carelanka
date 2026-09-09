@@ -24,5 +24,8 @@ public enum MessageCode
 
     RefreshTokenInvalid,
 
-    PhoneNumberAlreadyRegistered
+    PhoneNumberAlreadyRegistered,
+
+    // Patient Management — cl_pat_*
+    WardNameTaken
 }

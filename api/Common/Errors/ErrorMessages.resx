@@ -95,4 +95,8 @@
   <data name="cl_err_002" xml:space="preserve">
     <value>That phone number already has an account.</value>
   </data>
+  <data name="cl_pat_001" xml:space="preserve">
+    <value>A ward named {0} already exists.</value>
+    <comment>Only active wards are checked. A retired ward's name can be reused.</comment>
+  </data>
 </root>

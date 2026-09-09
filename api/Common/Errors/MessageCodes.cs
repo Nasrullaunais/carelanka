@@ -26,7 +26,11 @@ public static class MessageCodes
             [MessageCode.PhoneNumberAlreadyRegistered] = "cl_err_002",
             [MessageCode.BedNumberTaken] = "cl_equ_001",
             [MessageCode.AssetTagTaken] = "cl_equ_002",
-            [MessageCode.BedOccupied] = "cl_equ_003"
+            [MessageCode.BedOccupied] = "cl_equ_003",
+            [MessageCode.CategoryNameTaken] = "cl_equ_004",
+            [MessageCode.SerialNumberTaken] = "cl_equ_005",
+            [MessageCode.EquipmentNotAvailable] = "cl_equ_006",
+            [MessageCode.EquipmentNotAssigned] = "cl_equ_007"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

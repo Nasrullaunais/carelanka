@@ -32,5 +32,13 @@ public enum MessageCode
 
     AssetTagTaken,
 
-    BedOccupied
+    BedOccupied,
+
+    CategoryNameTaken,
+
+    SerialNumberTaken,
+
+    EquipmentNotAvailable,
+
+    EquipmentNotAssigned
 }

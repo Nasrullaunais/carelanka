@@ -12,6 +12,16 @@ namespace CareLanka.Api.Tests;
 public sealed class EquipmentOpenApiContractTests
 {
     [Theory]
+    [InlineData("/equipment-categories", "get", "listEquipmentCategories")]
+    [InlineData("/equipment-categories", "post", "createEquipmentCategory")]
+    [InlineData("/equipment-items", "get", "listEquipmentItems")]
+    [InlineData("/equipment-items", "post", "createEquipmentItem")]
+    [InlineData("/equipment-items/{id}", "get", "getEquipmentItem")]
+    [InlineData("/equipment-items/{id}", "put", "updateEquipmentItem")]
+    [InlineData("/equipment-items/by-tag/{assetTag}", "get", "getEquipmentItemByTag")]
+    [InlineData("/equipment-items/{id}/assign", "post", "assignEquipmentItem")]
+    [InlineData("/equipment-items/{id}/release", "post", "releaseEquipmentItem")]
+    [InlineData("/equipment-items/{id}/report-fault", "post", "reportEquipmentFault")]
     [InlineData("/beds", "get", "listBeds")]
     [InlineData("/beds", "post", "createBed")]
     [InlineData("/beds/{id}", "patch", "updateBed")]
@@ -28,6 +38,16 @@ public sealed class EquipmentOpenApiContractTests
     }
 
     [Theory]
+    [InlineData("/equipment-categories", "get")]
+    [InlineData("/equipment-categories", "post")]
+    [InlineData("/equipment-items", "get")]
+    [InlineData("/equipment-items", "post")]
+    [InlineData("/equipment-items/{id}", "get")]
+    [InlineData("/equipment-items/{id}", "put")]
+    [InlineData("/equipment-items/by-tag/{assetTag}", "get")]
+    [InlineData("/equipment-items/{id}/assign", "post")]
+    [InlineData("/equipment-items/{id}/release", "post")]
+    [InlineData("/equipment-items/{id}/report-fault", "post")]
     [InlineData("/beds", "get")]
     [InlineData("/beds", "post")]
     [InlineData("/beds/{id}", "patch")]

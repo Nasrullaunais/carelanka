@@ -131,6 +131,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/EquipmentItem' }
+        '404':
+          description: No such equipment category.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -181,6 +186,7 @@ paths:
                       items:
                         type: array
                         items: { $ref: '#/components/schemas/EquipmentItemSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /equipment-items/{id}:
@@ -219,6 +225,11 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: That status change is not a legal move in the equipment lifecycle.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /equipment-items/by-tag/{assetTag}:
     parameters:
@@ -346,6 +357,11 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This item is retired, so a fault cannot be reported against it.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   # ------------------------------------------------------------------
   # Beds

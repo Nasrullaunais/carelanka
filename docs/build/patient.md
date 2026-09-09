@@ -43,7 +43,7 @@
 | 15 | React: Doctor's care recommendation queue, approve/reject | The third human gate in this component |
 | 16 | Flutter: "ask about a symptom" + "my care recommendations" | Patient-facing; never renders `agent_message` or `rejection_reason` |
 
-**Steps 1 and 2 are done.** `Ward` landed in `Patient_AddWard` (PR #12). `Patient`,
+**Steps 1 and 2 are done, and step 3 is half done.** `Ward` landed in `Patient_AddWard` (PR #12). `Patient`,
 `Admission`, `Appointment`, `BedAssignment`, `Discharge` and `DischargeChecklistItem`
 landed in `Patient_AddAdmission`, with their configurations and the partial unique indexes.
 Building them settled five disagreements between `entity_diagram.md` and
@@ -51,6 +51,22 @@ Building them settled five disagreements between `entity_diagram.md` and
 diagram. The one worth knowing before step 6: **`BedReservation` no longer exists.** The
 30-minute hold is a `BedAssignment` row with `status = 'reserved'` and a `reserved_until`,
 which is what the spec has always published.
+
+**Step 3, patients half.** `POST /patients`, `GET /patients`, `GET /patients/{id}`,
+`PUT /patients/{id}`, `POST /patients/lookup` and `POST /patients/{id}/link-account` are
+built and tested. The admissions half — `createAdmission`, `listAdmissions`,
+`getAdmission`, `completeAdmissionDetails` — is the next branch. Three things settled while
+building the first half:
+
+- **`temp_reference` is generated, not requested.** Register with no NIC and no phone and
+  the server allocates `UNKNOWN-2026-0001`, numbered per year. Supplying a NIC later never
+  clears it.
+- **Three new policies.** `PatientRegistrar`, `PatientReader` and `PatientEditor` in
+  `Common/Auth/Policies.cs`, because the role combinations this spec publishes did not
+  exist. Additive, flagged for the group.
+- **A query-string enum needs a type converter.** `?sortBy=full_name` does not bind to
+  `FullName` without one; the JSON converter only covers request and response bodies. See
+  `SnakeCaseEnumTypeConverter`.
 
 **Steps 13–16 are self-contained.** Nothing else in the group depends on the care advisory
 agent, and it depends on nothing outside this component beyond the `doctor` role claim,

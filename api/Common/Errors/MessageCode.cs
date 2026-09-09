@@ -27,5 +27,13 @@ public enum MessageCode
     PhoneNumberAlreadyRegistered,
 
     // Patient Management — cl_pat_*
-    WardNameTaken
+    WardNameTaken,
+
+    PatientNicTaken,
+
+    PatientAlreadyHasAccount,
+
+    AccountAlreadyLinked,
+
+    TempReferenceExhausted
 }

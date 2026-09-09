@@ -24,7 +24,11 @@ public static class MessageCodes
             [MessageCode.Unexpected] = "cl_err_500",
             [MessageCode.RefreshTokenInvalid] = "cl_err_001",
             [MessageCode.PhoneNumberAlreadyRegistered] = "cl_err_002",
-            [MessageCode.WardNameTaken] = "cl_pat_001"
+            [MessageCode.WardNameTaken] = "cl_pat_001",
+            [MessageCode.PatientNicTaken] = "cl_pat_002",
+            [MessageCode.PatientAlreadyHasAccount] = "cl_pat_003",
+            [MessageCode.AccountAlreadyLinked] = "cl_pat_004",
+            [MessageCode.TempReferenceExhausted] = "cl_pat_005"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

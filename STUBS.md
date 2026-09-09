@@ -81,6 +81,12 @@ candidate list widens the interface later, and that is when the fake starts matt
 Zero would have been indistinguishable from the genuine "no beds recorded in this ward yet"
 state, which is exactly the kind of fake that survives to a demo.
 
+**Row 1 also covers ward and bed names on an admission.** `AdmissionSummary.ward_name` and
+`bed_number` are published by the spec and returned as `null` today. That is not a fake:
+nothing can hold a bed until step 6, so there is no case yet where `null` is the wrong
+answer. It becomes one the moment `BedAssignment` rows exist, and filling them needs
+Equipment's register — the same dependency as the count above.
+
 **Replacing it is one line** — the `AddSingleton<IBedRegistryService, StubBedRegistryService>`
 registration in `api/Program.cs`. Nothing else moves.
 

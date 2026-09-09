@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateWardData, CreateWardErrors, CreateWardResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetHealthData, GetHealthErrors, GetHealthResponses, ListWardsData, ListWardsErrors, ListWardsResponses, LoginData, LoginErrors, LoginPatientData, LoginPatientErrors, LoginPatientResponses, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RegisterPatientAccountData, RegisterPatientAccountErrors, RegisterPatientAccountResponses } from './types.gen';
+import type { CreatePatientData, CreatePatientErrors, CreatePatientResponses, CreateWardData, CreateWardErrors, CreateWardResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetPatientData, GetPatientErrors, GetPatientResponses, LinkPatientAccountData, LinkPatientAccountErrors, LinkPatientAccountResponses, ListPatientsData, ListPatientsErrors, ListPatientsResponses, ListWardsData, ListWardsErrors, ListWardsResponses, LoginData, LoginErrors, LoginPatientData, LoginPatientErrors, LoginPatientResponses, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, LookupPatientData, LookupPatientErrors, LookupPatientResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RegisterPatientAccountData, RegisterPatientAccountErrors, RegisterPatientAccountResponses, UpdatePatientData, UpdatePatientErrors, UpdatePatientResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -92,6 +92,79 @@ export const getCurrentUser = <ThrowOnError extends boolean = false>(options?: O
  * Liveness and database connectivity. An API that answers "up" while PostgreSQL is unreachable is worse than one that says nothing, because it stops anyone from looking.
  */
 export const getHealth = <ThrowOnError extends boolean = false>(options?: Options<GetHealthData, ThrowOnError>): RequestResult<GetHealthResponses, GetHealthErrors, ThrowOnError> => (options?.client ?? client).get<GetHealthResponses, GetHealthErrors, ThrowOnError>({ url: '/health', ...options });
+
+/**
+ * Search patients. `search` matches full name, NIC, phone or temporary reference.
+ */
+export const listPatients = <ThrowOnError extends boolean = false>(options?: Options<ListPatientsData, ThrowOnError>): RequestResult<ListPatientsResponses, ListPatientsErrors, ThrowOnError> => (options?.client ?? client).get<ListPatientsResponses, ListPatientsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/patients',
+    ...options
+});
+
+/**
+ * Register a patient. Call lookup first when an NIC is available — a returning patient must
+ * keep one record with many admissions, not gain a second identity.
+ */
+export const createPatient = <ThrowOnError extends boolean = false>(options?: Options<CreatePatientData, ThrowOnError>): RequestResult<CreatePatientResponses, CreatePatientErrors, ThrowOnError> => (options?.client ?? client).post<CreatePatientResponses, CreatePatientErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/patients',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
+
+/**
+ * Get one patient with their visit history. One patient, many admissions.
+ */
+export const getPatient = <ThrowOnError extends boolean = false>(options: Options<GetPatientData, ThrowOnError>): RequestResult<GetPatientResponses, GetPatientErrors, ThrowOnError> => (options.client ?? client).get<GetPatientResponses, GetPatientErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/patients/{id}',
+    ...options
+});
+
+/**
+ * Update a patient record. A full replace — a field left out is cleared.
+ */
+export const updatePatient = <ThrowOnError extends boolean = false>(options: Options<UpdatePatientData, ThrowOnError>): RequestResult<UpdatePatientResponses, UpdatePatientErrors, ThrowOnError> => (options.client ?? client).put<UpdatePatientResponses, UpdatePatientErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/patients/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Find an existing patient by NIC before registering a new one. A miss is a 200 with
+ * found = false; not knowing someone is the normal answer at a registration desk.
+ */
+export const lookupPatient = <ThrowOnError extends boolean = false>(options?: Options<LookupPatientData, ThrowOnError>): RequestResult<LookupPatientResponses, LookupPatientErrors, ThrowOnError> => (options?.client ?? client).post<LookupPatientResponses, LookupPatientErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/patients/lookup',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
+
+/**
+ * Attach a patient login to an existing record. A record and an account are different
+ * things — staff link them deliberately, after checking identity.
+ */
+export const linkPatientAccount = <ThrowOnError extends boolean = false>(options: Options<LinkPatientAccountData, ThrowOnError>): RequestResult<LinkPatientAccountResponses, LinkPatientAccountErrors, ThrowOnError> => (options.client ?? client).post<LinkPatientAccountResponses, LinkPatientAccountErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/patients/{id}/link-account',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * List wards. Also read by Equipment Management for allocation and by Staff Management for staffing demand.

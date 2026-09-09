@@ -4,6 +4,34 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}/api` | (string & {});
 };
 
+export type AdmissionCategory = 'icu' | 'hdu' | 'inpatient' | 'day_case' | 'outpatient';
+
+export type AdmissionSource = 'emergency' | 'walk_in' | 'pre_registered';
+
+export type AdmissionStatus = 'awaiting_bed' | 'awaiting_approval' | 'bed_reserved' | 'admitted' | 'ready_for_discharge' | 'discharged' | 'cancelled';
+
+/**
+ * One visit, in list form. Appears on a patient's history and, later, on the admissions list.
+ */
+export type AdmissionSummary = {
+    id: string;
+    patient?: PatientSummary;
+    source: AdmissionSource;
+    admission_category: AdmissionCategory;
+    urgency: AdmissionUrgency;
+    status: AdmissionStatus;
+    details_complete: boolean;
+    /**
+     * From the live bed assignment, if there is one. Null before a bed is held and after discharge.
+     */
+    ward_name?: string | null;
+    bed_number?: string | null;
+    expected_arrival?: string | null;
+    admitted_at?: string | null;
+};
+
+export type AdmissionUrgency = 'routine' | 'urgent' | 'emergency';
+
 /**
  * What every successful sign-in returns.
  */
@@ -19,6 +47,24 @@ export type AuthTokens = {
      */
     refresh_token: string;
     principal: CurrentPrincipal;
+};
+
+/**
+ * Body of POST /api/patients. Registration is done BY staff ABOUT a person — the patient does
+ * not sign up for it and may never have an account.
+ */
+export type CreatePatientRequest = {
+    full_name: string;
+    /**
+     * Omit for an unidentified arrival; the server then generates a temp_reference.
+     */
+    nic?: string | null;
+    gender: Gender;
+    date_of_birth?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    emergency_contact_name?: string | null;
+    emergency_contact_phone?: string | null;
 };
 
 /**
@@ -56,6 +102,8 @@ export type CurrentPrincipal = {
     patient_id?: string | null;
 };
 
+export type Gender = 'male' | 'female' | 'other' | 'unknown';
+
 export type GenderPolicy = 'male' | 'female' | 'mixed';
 
 /**
@@ -75,6 +123,83 @@ export type HealthStatus = {
 };
 
 /**
+ * Body of POST /api/patients/{id}/link-account. A patient RECORD and a patient ACCOUNT are
+ * different things; this attaches an optional login to a record staff already created.
+ */
+export type LinkPatientAccountRequest = {
+    /**
+     * A PatientAccount.Id. Staff link it deliberately, after checking identity — never inferred
+     * from a matching phone number, because two people share a phone far more often than a
+     * hospital would like.
+     */
+    user_account_id: string;
+};
+
+/**
+ * A patient record as the API publishes it. The spec builds this from PatientSummary + AuditFields, so this inherits rather than repeating the identity fields.
+ */
+export type Patient = {
+    id: string;
+    full_name: string;
+    /**
+     * Null for an unidentified arrival; that row carries a TempReference instead.
+     */
+    nic?: string | null;
+    /**
+     * Present only for a patient registered with no NIC and no phone, e.g. UNKNOWN-2026-0142.
+     */
+    temp_reference?: string | null;
+    gender: Gender;
+    date_of_birth?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    emergency_contact_name?: string | null;
+    emergency_contact_phone?: string | null;
+    /**
+     * Whether an optional patient login is linked. Most records never have one — a walk-in is
+     * a medical record, not a user. The account id itself is not published: it belongs to
+     * common auth, and no screen in this component has a use for it.
+     */
+    has_account: boolean;
+    created_at?: string;
+    updated_at?: string;
+};
+
+/**
+ * One patient with every visit they have ever had. One patient, many admissions — never a second row for a returning person.
+ */
+export type PatientDetail = {
+    id: string;
+    full_name: string;
+    /**
+     * Null for an unidentified arrival; that row carries a TempReference instead.
+     */
+    nic?: string | null;
+    /**
+     * Present only for a patient registered with no NIC and no phone, e.g. UNKNOWN-2026-0142.
+     */
+    temp_reference?: string | null;
+    gender: Gender;
+    date_of_birth?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    emergency_contact_name?: string | null;
+    emergency_contact_phone?: string | null;
+    /**
+     * Whether an optional patient login is linked. Most records never have one — a walk-in is
+     * a medical record, not a user. The account id itself is not published: it belongs to
+     * common auth, and no screen in this component has a use for it.
+     */
+    has_account: boolean;
+    created_at?: string;
+    updated_at?: string;
+    /**
+     * Every visit, newest first. Empty for someone registered but not yet admitted — an empty list, never absent.
+     */
+    admissions: Array<AdmissionSummary>;
+};
+
+/**
  * Body of POST /api/auth/patient/login.
  */
 export type PatientLoginRequest = {
@@ -86,12 +211,73 @@ export type PatientLoginRequest = {
 };
 
 /**
+ * Body of POST /api/patients/lookup.
+ */
+export type PatientLookupRequest = {
+    nic: string;
+};
+
+/**
+ * The answer to "have we seen this NIC before?". A miss is a 200 with found = false, not a
+ * 404 — not finding someone is the normal outcome at a registration desk, not an error.
+ */
+export type PatientLookupResult = {
+    found: boolean;
+    patient?: PatientSummary;
+    /**
+     * True when this patient is already in the hospital. Registering a second concurrent
+     * admission is almost always a mistake, so the desk is told before it happens rather than
+     * blocked afterwards.
+     */
+    has_open_admission: boolean;
+};
+
+/**
  * Body of POST /api/auth/patient/register. Creates a login, not a medical record — there is deliberately no clinical field here.
  */
 export type PatientRegisterRequest = {
     phone_number: string;
     password: string;
     full_name: string;
+};
+
+/**
+ * What GET /api/patients sorts on. Two fields, because those are the two the spec publishes.
+ */
+export type PatientSortField = 'full_name' | 'created_at';
+
+/**
+ * The short view of a patient — enough to identify one row in a list or a lookup result,
+ * and nothing more. Contact details and the account link are on CareLanka.Api.DTOs.Patient.Patient.
+ */
+export type PatientSummary = {
+    id: string;
+    full_name: string;
+    /**
+     * Null for an unidentified arrival; that row carries a TempReference instead.
+     */
+    nic?: string | null;
+    /**
+     * Present only for a patient registered with no NIC and no phone, e.g. UNKNOWN-2026-0142.
+     */
+    temp_reference?: string | null;
+    gender: Gender;
+    date_of_birth?: string | null;
+};
+
+/**
+ * One page of a list. The shape is the group-owned `PagedResult` schema, published
+ * byte-identically by all five specs, so nothing here is this component's to change.
+ */
+export type PatientSummaryPagedResult = {
+    items: Array<PatientSummary>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    /**
+     * Zero items is zero pages, not one. An empty list has no page to ask for.
+     */
+    total_pages: number;
 };
 
 export type PrincipalRole = 'ward_nurse' | 'doctor' | 'ambulance_crew' | 'general_staff' | 'duty_manager' | 'hospital_administrator' | 'equipment_manager' | 'patient';
@@ -115,11 +301,35 @@ export type RefreshTokenRequest = {
 };
 
 /**
+ * Ascending or descending. The group-owned SortDir parameter in all five specs, so the name is
+ * not this component's to change — it moves to DTOs/Common the moment a second component pages.
+ */
+export type SortDirection = 'asc' | 'desc';
+
+/**
  * Body of POST /api/auth/login.
  */
 export type StaffLoginRequest = {
     email: string;
     password: string;
+};
+
+/**
+ * Body of PUT /api/patients/{id}. The spec defines this as CreatePatientRequest with nothing
+ * added, so it inherits rather than repeating eight properties that would then drift apart.
+ */
+export type UpdatePatientRequest = {
+    full_name: string;
+    /**
+     * Omit for an unidentified arrival; the server then generates a temp_reference.
+     */
+    nic?: string | null;
+    gender: Gender;
+    date_of_birth?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    emergency_contact_name?: string | null;
+    emergency_contact_phone?: string | null;
 };
 
 export type ValidationProblemDetails = {
@@ -363,6 +573,236 @@ export type GetHealthResponses = {
 };
 
 export type GetHealthResponse = GetHealthResponses[keyof GetHealthResponses];
+
+export type ListPatientsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        search?: string;
+        page?: number;
+        pageSize?: number;
+        sortBy?: PatientSortField;
+        sortDir?: SortDirection;
+    };
+    url: '/patients';
+};
+
+export type ListPatientsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListPatientsError = ListPatientsErrors[keyof ListPatientsErrors];
+
+export type ListPatientsResponses = {
+    /**
+     * OK
+     */
+    200: PatientSummaryPagedResult;
+};
+
+export type ListPatientsResponse = ListPatientsResponses[keyof ListPatientsResponses];
+
+export type CreatePatientData = {
+    body?: CreatePatientRequest;
+    path?: never;
+    query?: never;
+    url: '/patients';
+};
+
+export type CreatePatientErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CreatePatientError = CreatePatientErrors[keyof CreatePatientErrors];
+
+export type CreatePatientResponses = {
+    /**
+     * Created
+     */
+    201: Patient;
+};
+
+export type CreatePatientResponse = CreatePatientResponses[keyof CreatePatientResponses];
+
+export type GetPatientData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/patients/{id}';
+};
+
+export type GetPatientErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetPatientError = GetPatientErrors[keyof GetPatientErrors];
+
+export type GetPatientResponses = {
+    /**
+     * OK
+     */
+    200: PatientDetail;
+};
+
+export type GetPatientResponse = GetPatientResponses[keyof GetPatientResponses];
+
+export type UpdatePatientData = {
+    body?: UpdatePatientRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/patients/{id}';
+};
+
+export type UpdatePatientErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type UpdatePatientError = UpdatePatientErrors[keyof UpdatePatientErrors];
+
+export type UpdatePatientResponses = {
+    /**
+     * OK
+     */
+    200: Patient;
+};
+
+export type UpdatePatientResponse = UpdatePatientResponses[keyof UpdatePatientResponses];
+
+export type LookupPatientData = {
+    body?: PatientLookupRequest;
+    path?: never;
+    query?: never;
+    url: '/patients/lookup';
+};
+
+export type LookupPatientErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type LookupPatientError = LookupPatientErrors[keyof LookupPatientErrors];
+
+export type LookupPatientResponses = {
+    /**
+     * OK
+     */
+    200: PatientLookupResult;
+};
+
+export type LookupPatientResponse = LookupPatientResponses[keyof LookupPatientResponses];
+
+export type LinkPatientAccountData = {
+    body?: LinkPatientAccountRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/patients/{id}/link-account';
+};
+
+export type LinkPatientAccountErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type LinkPatientAccountError = LinkPatientAccountErrors[keyof LinkPatientAccountErrors];
+
+export type LinkPatientAccountResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type LinkPatientAccountResponse = LinkPatientAccountResponses[keyof LinkPatientAccountResponses];
 
 export type ListWardsData = {
     body?: never;

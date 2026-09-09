@@ -14,6 +14,7 @@ public sealed class PatientOpenApiContractTests
     [Theory]
     [InlineData("WardType")]
     [InlineData("GenderPolicy")]
+    [InlineData("Gender")]
     public async Task Published_enum_values_match_the_contract_in_order(string enumName)
     {
         var generated = await GenerateAsync();
@@ -32,6 +33,10 @@ public sealed class PatientOpenApiContractTests
     [Theory]
     [InlineData("CreateWardRequest")]
     [InlineData("Ward")]
+    [InlineData("CreatePatientRequest")]
+    [InlineData("PatientSummary")]
+    [InlineData("Patient")]
+    [InlineData("PatientDetail")]
     public async Task Published_schema_required_members_match_the_contract(string schemaName)
     {
         var generated = await GenerateAsync();
@@ -71,6 +76,47 @@ public sealed class PatientOpenApiContractTests
             Responses(wards.GetProperty("post")));
     }
 
+    [Fact]
+    public async Task Patient_routes_publish_the_operationIds_both_frontends_generate_against()
+    {
+        var generated = await GenerateAsync();
+        var paths = generated.RootElement.GetProperty("paths");
+        var patients = paths.GetProperty("/patients");
+        var one = paths.GetProperty("/patients/{id}");
+
+        Assert.Equal("listPatients", patients.GetProperty("get").GetProperty("operationId").GetString());
+        Assert.Equal("createPatient", patients.GetProperty("post").GetProperty("operationId").GetString());
+        Assert.Equal("getPatient", one.GetProperty("get").GetProperty("operationId").GetString());
+        Assert.Equal("updatePatient", one.GetProperty("put").GetProperty("operationId").GetString());
+        Assert.Equal(
+            "lookupPatient",
+            paths.GetProperty("/patients/lookup").GetProperty("post").GetProperty("operationId").GetString());
+        Assert.Equal(
+            "linkPatientAccount",
+            paths.GetProperty("/patients/{id}/link-account").GetProperty("post").GetProperty("operationId").GetString());
+    }
+
+    [Fact]
+    public async Task Every_patient_operation_declares_its_failures_and_not_only_its_success()
+    {
+        var generated = await GenerateAsync();
+        var paths = generated.RootElement.GetProperty("paths");
+        var patients = paths.GetProperty("/patients");
+        var one = paths.GetProperty("/patients/{id}");
+
+        // An endpoint declaring only its 200 generates a client that cannot type its failures.
+        Assert.Equal(new[] { "200", "400", "401", "403" }, Responses(patients.GetProperty("get")));
+        Assert.Equal(new[] { "201", "400", "401", "403", "409" }, Responses(patients.GetProperty("post")));
+        Assert.Equal(new[] { "200", "401", "403", "404" }, Responses(one.GetProperty("get")));
+        Assert.Equal(new[] { "200", "400", "401", "403", "404", "409" }, Responses(one.GetProperty("put")));
+        Assert.Equal(
+            new[] { "200", "400", "401", "403" },
+            Responses(paths.GetProperty("/patients/lookup").GetProperty("post")));
+        Assert.Equal(
+            new[] { "204", "400", "401", "403", "404", "409" },
+            Responses(paths.GetProperty("/patients/{id}/link-account").GetProperty("post")));
+    }
+
     private static string[] Responses(JsonElement operation)
         => operation.GetProperty("responses").EnumerateObject()
             .Select(response => response.Name).Order().ToArray();
@@ -86,27 +132,44 @@ public sealed class PatientOpenApiContractTests
 
     // The contract nests a response schema's members under allOf, next to the shared
     // AuditFields reference, so the required list is not always at the top level.
+    //
+    // Every branch counts, not just the first one with a list. Swashbuckle flattens C#
+    // inheritance into one schema, so the generated Patient carries PatientSummary's required
+    // members as well as its own — reading only one branch compared four members against one
+    // and failed for a document that was actually correct.
     private static HashSet<string> RequiredFromContract(YamlMappingNode contract, string schemaName)
     {
         var schema = Map(contract, "components", "schemas", schemaName);
+        var required = new HashSet<string>();
 
         if (schema.Children.TryGetValue(new YamlScalarNode("required"), out var direct))
         {
-            return Values((YamlSequenceNode)direct);
+            required.UnionWith(Values((YamlSequenceNode)direct));
         }
 
-        var branches = (YamlSequenceNode)schema.Children[new YamlScalarNode("allOf")];
-
-        foreach (var branch in branches.Children.Cast<YamlMappingNode>())
+        if (!schema.Children.TryGetValue(new YamlScalarNode("allOf"), out var allOf))
         {
+            return required;
+        }
+
+        foreach (var branch in ((YamlSequenceNode)allOf).Children.Cast<YamlMappingNode>())
+        {
+            if (branch.Children.TryGetValue(new YamlScalarNode("$ref"), out var reference))
+            {
+                required.UnionWith(RequiredFromContract(contract, LastSegment(reference)));
+            }
+
             if (branch.Children.TryGetValue(new YamlScalarNode("required"), out var nested))
             {
-                return Values((YamlSequenceNode)nested);
+                required.UnionWith(Values((YamlSequenceNode)nested));
             }
         }
 
-        return [];
+        return required;
     }
+
+    private static string LastSegment(YamlNode reference)
+        => ((YamlScalarNode)reference).Value!.Split('/')[^1];
 
     private static HashSet<string> Values(YamlSequenceNode node)
         => node.Children.Cast<YamlScalarNode>().Select(item => item.Value!).ToHashSet();

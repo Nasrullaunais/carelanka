@@ -164,7 +164,27 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.WorkflowStarter, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.DutyManager),
         EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
+    options.AddPolicy(Policies.PatientRegistrar, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.AmbulanceCrew),
+        EnumWire.ToWire(StaffRole.DutyManager)));
+
+    options.AddPolicy(Policies.PatientReader, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
+    options.AddPolicy(Policies.PatientEditor, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager)));
 });
+
+// 20 a minute per IP in production. Configurable only so the integration tests can raise it:
+// every test class shares one IP, so the whole suite spends one budget, and at 20 the next
+// test anybody adds fails on a 429 that reads like a broken login. Nothing sets this outside
+// the test fixture, and the default is what ships.
+var authRequestsPerMinute = builder.Configuration.GetValue("RateLimits:AuthPerMinute", 20);
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -172,7 +192,7 @@ builder.Services.AddRateLimiter(options =>
         partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         factory: _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 20,
+            PermitLimit = authRequestsPerMinute,
             Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0
         }));
@@ -206,6 +226,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IHealthService, HealthService>();
 
 builder.Services.AddScoped<IWardService, WardService>();
+builder.Services.AddScoped<IPatientService, PatientService>();
 
 // STUB — Equipment Management's bed register does not exist yet. See STUBS.md row 1.
 // Swapping in the real one is this line and nothing else.

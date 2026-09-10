@@ -31,7 +31,11 @@ public static class MessageCodes
             [MessageCode.SerialNumberTaken] = "cl_equ_005",
             [MessageCode.EquipmentNotAvailable] = "cl_equ_006",
             [MessageCode.EquipmentNotAssigned] = "cl_equ_007",
-            [MessageCode.WardNameTaken] = "cl_pat_001"
+            [MessageCode.WardNameTaken] = "cl_pat_001",
+            [MessageCode.PatientNicTaken] = "cl_pat_002",
+            [MessageCode.PatientAlreadyHasAccount] = "cl_pat_003",
+            [MessageCode.AccountAlreadyLinked] = "cl_pat_004",
+            [MessageCode.TempReferenceExhausted] = "cl_pat_005"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

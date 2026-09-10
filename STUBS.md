@@ -98,6 +98,12 @@ of a live `BedAssignment` row, and nothing writes those until step 6 of
 `docs/build/patient.md`. Until then the fake keeps answering **occupied**, which is the
 safe direction.
 
+**Not a stub, but the same dependency — `AdmissionSummary.ward_name` and `bed_number`
+are `null` today.** Both are published by `patient-spec.yaml`. Nothing can hold a bed until
+step 6, so there is no case yet where `null` is the wrong answer; it becomes one the moment
+`BedAssignment` rows exist. No row above, because nothing invented is being returned —
+the field is honestly empty rather than plausibly wrong.
+
 ---
 
 ## Replaced

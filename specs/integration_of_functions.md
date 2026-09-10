@@ -529,6 +529,22 @@ silently regress.
 
 *Also resolved:* `Doctor` is a Staff Management role — M4 only checks the JWT claim. Bed ownership split agreed (§6.1). No SMS integration; the group's Maps API covers the third-party requirement. `emergency-spec.yaml` is no longer the 212-byte stub — see §22–§26 for what it now publishes, including the dispatch notification, `patient_is_caller` and `caller_user_id` that §10 was waiting on.
 
+**11.7 — `GET /auth/me` always answers `patient_id: null`, and now it should not.**
+*(Raised by M4 on 2026-09-09, found while building `POST /patients/{id}/link-account`.)*
+
+`CurrentPrincipal.PatientId` is documented as "the linked medical record, if staff have
+linked one". `AuthService.ToPrincipal(PatientAccount)` hard-codes it to `null`, which was
+correct while nothing could create the link. That endpoint now exists: a Duty Manager links
+an account to a record and `Patient.UserAccountId` is set.
+
+So today a patient signs in through the Flutter app and the API tells them they have no
+medical record even when staff have linked one. Every `/me/*` screen in Patient Management
+is scoped by that value.
+
+The read is one line — `Patients.Where(p => p.UserAccountId == account.Id)` — but
+`AuthService` is **common**, not M4's, so M4 has not written it. Whoever owns common picks
+it up, or the group agrees M4 may. Until then the link is written and never read.
+
 ---
 
 ## 12. For the other three members

@@ -1957,6 +1957,7 @@ components:
 
     PatientSummary:
       type: object
+      required: [id, full_name, gender]
       properties:
         id: { type: string, format: uuid }
         full_name: { type: string }
@@ -1973,6 +1974,7 @@ components:
         - $ref: '#/components/schemas/PatientSummary'
         - $ref: '#/components/schemas/AuditFields'
         - type: object
+          required: [has_account]
           properties:
             phone: { type: string, nullable: true }
             address: { type: string, nullable: true }
@@ -1986,6 +1988,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/Patient'
         - type: object
+          required: [admissions]
           properties:
             admissions:
               type: array
@@ -2073,6 +2076,7 @@ components:
 
     AdmissionSummary:
       type: object
+      required: [id, source, admission_category, urgency, status, details_complete]
       properties:
         id: { type: string, format: uuid }
         patient: { $ref: '#/components/schemas/PatientSummary' }

@@ -66,27 +66,44 @@ actually published.
 
 ## Open stubs
 
-**One open.** Common auth is built and merged (PR #11, 2026-09-08) and was never stubbed.
+**Two open, both in the same direction.** Common auth was never stubbed: it was built
+and merged in PR #11. Rows 2 and 3 are Equipment waiting on Patient Management. **Row 1
+is gone** — Patient Management now reads Equipment's real bed register; see Replaced below.
 
 | # | What is faked | Where it lives | Standing in for | Owner of the real thing | Added |
 | :-- | :--- | :--- | :--- | :--- | :--- |
-| 1 | Bed counts per ward — every ward reports exactly 6 beds | `api/Services/Patient/Stubs/StubBedRegistryService.cs` | `GET /beds` — `equipment-spec.yaml` | **M3 Sethmin** | 2026-09-08 |
+| 2 | Ward names on a bed — every ward is called `Stub ward <id fragment>` | `api/Services/Equipment/Stubs/StubWardDirectory.cs` | `GET /wards` — `patient-spec.yaml` | **M4 Lochana** | 2026-09-09 |
+| 3 | Is this bed occupied — always answers **yes** | `api/Services/Equipment/Stubs/StubBedOccupancyPort.cs` | `GET /beds/{id}/occupancy` — `patient-spec.yaml` | **M4 Lochana** | 2026-09-09 |
 
-**Row 1 — what it feeds and how far it goes.** Only `Ward.total_beds` on `GET /wards` and
-`POST /wards` reads it today. `IBedRegistryService` is deliberately one method wide
-(`CountBedsByWardAsync`) because counting is all the ward endpoints need; the bed agent's
-candidate list widens the interface later, and that is when the fake starts mattering.
+**Row 2 — why the name looks broken on purpose.** `Bed.ward_name` is Patient Management's
+to answer, and a plausible invented name like "Intensive Care" would be indistinguishable
+from a real one on screen and would still be there at the demo. `ward_id` is real
+throughout; only the display name is faked, so nothing downstream is reasoning over it.
 
-**Why a constant and not zero.** Six beds in every ward is visibly not a real hospital.
-Zero would have been indistinguishable from the genuine "no beds recorded in this ward yet"
-state, which is exactly the kind of fake that survives to a demo.
+**Row 3 — this is the dangerous one, and it fails safe.** `PATCH /beds/{id}` moving a bed
+to `out_of_service`, and `POST /beds/{id}/retire`, both ask this before writing anything.
+The fake answers **occupied**, so both are refused with `cl_equ_003` until the real
+endpoint lands. That is deliberate: a stub answering "free" would let maintenance be
+scheduled on a bed with a patient in it and would pass every test we wrote. The cost is
+that withdrawing a bed cannot be exercised end to end yet, which is visible immediately
+rather than at the demo.
 
-**Row 1 also covers ward and bed names on an admission.** `AdmissionSummary.ward_name` and
-`bed_number` are published by the spec and returned as `null` today, and
-`BedAssignment.ward_name` / `bed_number` as empty strings. That is not a fake: nothing can
-hold a bed until step 6, so there is no case yet where those are the wrong answer, and the
-mapper that would fill them never runs. It becomes a fake the moment `BedAssignment` rows
-exist, and filling them needs Equipment's register — the same dependency as the count above.
+**Replacing either is one line each** — the two `AddSingleton` registrations in
+`api/Program.cs`. Nothing else moves.
+
+**Row 2 is retirable today; row 3 is not.** `IWardService` is real and merged, so
+`StubWardDirectory` can become a delegating adapter whenever M3 wants it — exactly what
+row 1 just did in the other direction. Row 3 cannot follow yet: occupancy is the presence
+of a live `BedAssignment` row, and nothing writes those until step 6 of
+`docs/build/patient.md`. Until then the fake keeps answering **occupied**, which is the
+safe direction.
+
+**Not a stub, but the same dependency — `AdmissionSummary.ward_name` and `bed_number`
+are `null` today**, and `BedAssignment.ward_name` / `bed_number` are empty strings. All four
+are published by `patient-spec.yaml`. Nothing can hold a bed until step 6, so there is no case
+yet where those are the wrong answer and the mapper that would fill them never runs; they
+become wrong the moment `BedAssignment` rows exist. No row above, because nothing invented is
+being returned — the fields are honestly empty rather than plausibly wrong.
 
 **Not stubs, but the same shape of gap, recorded here so nobody hunts for them.** Three
 things `patient-spec.yaml` publishes are deliberately **not served** by the API today, and
@@ -110,9 +127,6 @@ assignment grades access control. It is written here rather than left silently m
 is not discovered at the demo. Both halves have to exist first: **M2** has to publish which
 ward a nurse works in, and a live `BedAssignment` has to say which ward an admission is in.
 
-**Replacing it is one line** — the `AddSingleton<IBedRegistryService, StubBedRegistryService>`
-registration in `api/Program.cs`. Nothing else moves.
-
 ---
 
 ## Replaced
@@ -123,7 +137,19 @@ against" is answerable later.
 
 | # | What it was | Replaced by | Commit | Date |
 | :-- | :--- | :--- | :--- | :--- |
-| — | — | — | — | — |
+| 1 | Bed counts per ward — every ward reported exactly 6 beds | `api/Services/Patient/BedRegistryService.cs`, a delegating adapter over `IBedService.CountBedsByWardAsync` | `feat/patient-real-bed-counts` | 2026-09-10 |
+
+**What ran on the fake, and what changed when it went.** Row 1 was live from 2026-09-08 to
+2026-09-10 and fed exactly one field: `Ward.total_beds` on `GET /wards` and `POST /wards`.
+Nothing reasoned over it — no rule, no agent, no screen branched on the number — so the
+only visible change is that the number is now true. A ward with no beds reports **0** where
+it used to report 6, which is why the ward test asserting the constant was replaced by two:
+one for the empty ward, one that registers three real beds through `POST /api/beds` and
+reads the count back.
+
+Sethmin made this a small change on purpose: `IBedService.CountBedsByWardAsync` was given
+the same signature and the same "a ward with no beds is absent from the result, not zero"
+contract as the port it was replacing, so the swap is an adapter and a DI line.
 
 ---
 

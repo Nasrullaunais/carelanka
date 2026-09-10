@@ -227,6 +227,414 @@ namespace CareLanka.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Equipment.Bed", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AssetTag")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("asset_tag");
+
+                    b.Property<string>("BedNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("bed_number");
+
+                    b.Property<string>("Condition")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("condition");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("HasIsolation")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_isolation");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<int>("NurseStationDistance")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("nurse_station_distance");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("WardId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ward_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_beds");
+
+                    b.HasIndex("AssetTag")
+                        .IsUnique()
+                        .HasDatabaseName("ux_beds_asset_tag")
+                        .HasFilter("is_active AND asset_tag IS NOT NULL");
+
+                    b.HasIndex("WardId")
+                        .HasDatabaseName("ix_beds_ward_id");
+
+                    b.HasIndex("WardId", "BedNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ux_beds_ward_number")
+                        .HasFilter("is_active");
+
+                    b.ToTable("beds", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_beds_condition", "condition IN ('usable', 'out_of_service')");
+
+                            t.HasCheckConstraint("ck_beds_nurse_station_distance", "nurse_station_distance >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Equipment.EquipmentCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_equipment_categories");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("ux_equipment_categories_name")
+                        .HasFilter("is_active");
+
+                    b.ToTable("equipment_categories", (string)null);
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Equipment.EquipmentItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AssetTag")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("asset_tag");
+
+                    b.Property<Guid?>("AssignedToAdmissionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assigned_to_admission_id");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("category_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Manufacturer")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("manufacturer");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("model");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("name");
+
+                    b.Property<DateOnly?>("NextMaintenanceDue")
+                        .HasColumnType("date")
+                        .HasColumnName("next_maintenance_due");
+
+                    b.Property<DateOnly>("PurchaseDate")
+                        .HasColumnType("date")
+                        .HasColumnName("purchase_date");
+
+                    b.Property<string>("SerialNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("serial_number");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("WardId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ward_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_equipment_items");
+
+                    b.HasIndex("AssetTag")
+                        .IsUnique()
+                        .HasDatabaseName("ux_equipment_items_asset_tag")
+                        .HasFilter("is_active");
+
+                    b.HasIndex("CategoryId")
+                        .HasDatabaseName("ix_equipment_items_category_id");
+
+                    b.HasIndex("NextMaintenanceDue")
+                        .HasDatabaseName("ix_equipment_items_next_maintenance_due")
+                        .HasFilter("status <> 'retired'");
+
+                    b.HasIndex("SerialNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ux_equipment_items_serial_number")
+                        .HasFilter("is_active AND serial_number IS NOT NULL");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_equipment_items_status");
+
+                    b.HasIndex("WardId")
+                        .HasDatabaseName("ix_equipment_items_ward_id");
+
+                    b.ToTable("equipment_items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_equipment_items_status", "status IN ('available', 'assigned', 'maintenance', 'retired')");
+                        });
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Equipment.MaintenanceSchedule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("asset_id");
+
+                    b.Property<string>("AssetType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("asset_type");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("notes");
+
+                    b.Property<Guid?>("PerformedByStaffId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("performed_by_staff_id");
+
+                    b.Property<string>("ScheduleType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("schedule_type");
+
+                    b.Property<DateOnly>("ScheduledDate")
+                        .HasColumnType("date")
+                        .HasColumnName("scheduled_date");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_maintenance_schedules");
+
+                    b.HasIndex("ScheduledDate")
+                        .HasDatabaseName("ix_maintenance_schedules_scheduled_date")
+                        .HasFilter("status IN ('scheduled', 'in_progress')");
+
+                    b.HasIndex("AssetType", "AssetId")
+                        .HasDatabaseName("ix_maintenance_schedules_asset_type_asset_id");
+
+                    b.ToTable("maintenance_schedules", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_maintenance_schedules_asset_type", "asset_type IN ('equipment_item', 'bed')");
+
+                            t.HasCheckConstraint("ck_maintenance_schedules_created_by", "created_by IN ('agent', 'user')");
+
+                            t.HasCheckConstraint("ck_maintenance_schedules_schedule_type", "schedule_type IN ('routine_service', 'calibration', 'repair')");
+
+                            t.HasCheckConstraint("ck_maintenance_schedules_status", "status IN ('scheduled', 'in_progress', 'completed', 'overdue', 'cancelled')");
+                        });
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Equipment.Warning", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("AcknowledgedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("acknowledged_at");
+
+                    b.Property<Guid?>("AcknowledgedByStaffId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("acknowledged_by_staff_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("RaisedBy")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("raised_by");
+
+                    b.Property<string>("RecommendedAction")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("recommended_action");
+
+                    b.Property<Guid>("RelatedEntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("related_entity_id");
+
+                    b.Property<string>("RelatedEntityType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("related_entity_type");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resolved_at");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("severity");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("type");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("WardId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ward_id");
+
+                    b.Property<Guid?>("WorkflowId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workflow_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_warnings");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_warnings_status");
+
+                    b.HasIndex("RelatedEntityType", "RelatedEntityId")
+                        .HasDatabaseName("ix_warnings_related_entity_type_related_entity_id");
+
+                    b.ToTable("warnings", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_warnings_raised_by", "raised_by IN ('agent', 'user')");
+
+                            t.HasCheckConstraint("ck_warnings_related_entity_type", "related_entity_type IN ('pharmacy_item', 'equipment_item', 'bed')");
+
+                            t.HasCheckConstraint("ck_warnings_severity", "severity IN ('low', 'medium', 'high', 'critical')");
+
+                            t.HasCheckConstraint("ck_warnings_status", "status IN ('open', 'acknowledged', 'action_taken', 'dismissed')");
+
+                            t.HasCheckConstraint("ck_warnings_type", "type IN ('low_stock', 'medicine_expiring', 'maintenance_overdue', 'equipment_faulty')");
+                        });
+                });
+
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.Admission", b =>
                 {
                     b.Property<Guid>("Id")
@@ -817,6 +1225,18 @@ namespace CareLanka.Api.Data.Migrations
                     b.Navigation("StaffMember");
                 });
 
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Equipment.EquipmentItem", b =>
+                {
+                    b.HasOne("CareLanka.Api.Data.Entities.Equipment.EquipmentCategory", "Category")
+                        .WithMany("Items")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_equipment_items_equipment_categories_category_id");
+
+                    b.Navigation("Category");
+                });
+
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.Admission", b =>
                 {
                     b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", null)
@@ -939,6 +1359,11 @@ namespace CareLanka.Api.Data.Migrations
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Common.StaffMember", b =>
                 {
                     b.Navigation("RefreshTokens");
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Equipment.EquipmentCategory", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.Admission", b =>

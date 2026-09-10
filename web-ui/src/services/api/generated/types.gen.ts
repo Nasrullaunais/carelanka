@@ -162,6 +162,60 @@ export type AdmissionSummaryPagedResult = {
 
 export type AdmissionUrgency = 'routine' | 'urgent' | 'emergency';
 
+/**
+ * A booked visit, as staff see it. The patient's own view of the same booking is MyAppointment.
+ */
+export type Appointment = {
+    id: string;
+    patient: PatientSummary;
+    scheduled_at: string;
+    status: AppointmentStatus;
+    /**
+     * Free text, written by whoever booked. Displayed to staff and never read by the bed
+     * agent — free text stays data, never instructions.
+     */
+    reason?: string | null;
+    /**
+     * Who took the booking. Null for a self-booking from the patient app, which is how the
+     * two paths stay tellable apart afterwards.
+     */
+    booked_by_staff_id?: string | null;
+    /**
+     * Set once checked in. Until then there is no admission to point at.
+     */
+    admission_id?: string | null;
+    created_at?: string;
+    updated_at?: string;
+};
+
+/**
+ * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
+ */
+export type AppointmentPagedResult = {
+    items: Array<Appointment>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    /**
+     * Always at least 1, so an empty list does not render as "page 1 of 0".
+     */
+    total_pages: number;
+};
+
+export type AppointmentStatus = 'scheduled' | 'checked_in' | 'completed' | 'cancelled' | 'no_show';
+
+export type AssetType = 'equipment_item' | 'bed';
+
+/**
+ * Body of POST /api/equipment-items/{id}/assign.
+ */
+export type AssignEquipmentItemRequest = {
+    /**
+     * Patient Management's admission. Stored as an id; no patient data is copied here.
+     */
+    admission_id: string;
+};
+
 export type AssignedBy = 'agent' | 'user';
 
 export type AssignmentStatus = 'reserved' | 'occupied' | 'released';
@@ -181,6 +235,31 @@ export type AuthTokens = {
      */
     refresh_token: string;
     principal: CurrentPrincipal;
+};
+
+/**
+ * A bed frame as Equipment Management publishes it. The writable source of truth Patient Management reads and never writes.
+ */
+export type Bed = {
+    id: string;
+    /**
+     * Patient Management's Ward.
+     */
+    ward_id: string;
+    /**
+     * Read from Patient Management, not stored here. Stubbed until GET /wards exists — see STUBS.md row 2.
+     */
+    ward_name: string;
+    bed_number: string;
+    has_isolation: boolean;
+    /**
+     * 1 is closest to the nurse station.
+     */
+    nurse_station_distance: number;
+    condition: BedCondition;
+    asset_tag?: string | null;
+    created_at: string;
+    updated_at: string;
 };
 
 /**
@@ -216,6 +295,22 @@ export type BedAssignment = {
     updated_at?: string;
 };
 
+export type BedCondition = 'usable' | 'out_of_service';
+
+/**
+ * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
+ */
+export type BedPagedResult = {
+    items: Array<Bed>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    /**
+     * Always at least 1, so an empty list does not render as "page 1 of 0".
+     */
+    total_pages: number;
+};
+
 /**
  * Why a visit was called off. Always a human's claim, which is why the reason is mandatory:
  * a computer cannot know whether the ambulance was diverted, the patient died, or it is
@@ -231,6 +326,22 @@ export type CancelAdmissionRequest = {
 };
 
 export type CancelReason = 'diverted_to_other_hospital' | 'false_alarm' | 'died_en_route' | 'patient_refused' | 'no_show';
+
+/**
+ * Body of POST /api/appointments/{id}/check-in.
+ */
+export type CheckInRequest = {
+    admission_category: AdmissionCategory;
+    /**
+     * The staff member who chose the care level at the desk. Recorded proof a human decided it.
+     */
+    category_set_by_staff_id: string;
+    urgency: AdmissionUrgency;
+    /**
+     * Set by staff. Forces an isolation-capable bed once the bed agent runs.
+     */
+    is_infectious?: boolean;
+};
 
 /**
  * Body of PATCH /api/admissions/{id}/details. Any subset of the fields that were missing —
@@ -269,6 +380,69 @@ export type CreateAdmissionRequest = {
      */
     is_infectious?: boolean;
     expected_arrival?: string | null;
+};
+
+/**
+ * Body of POST /api/appointments — the desk booking a visit for someone who phoned in or
+ * walked up without the app.
+ */
+export type CreateAppointmentRequest = {
+    patient_id: string;
+    /**
+     * When the patient intends to come in. Must be in the future — booking a visit for a
+     * time that has passed is always a typo, and somebody already here is admitted, not
+     * booked.
+     */
+    scheduled_at: string;
+    /**
+     * Optional free text, for the desk to read. Never read by the agent.
+     */
+    reason?: string | null;
+};
+
+/**
+ * Body of POST /api/beds.
+ */
+export type CreateBedRequest = {
+    /**
+     * References Patient Management's Ward table. We store the reference and never write that table.
+     */
+    ward_id: string;
+    bed_number: string;
+    has_isolation?: boolean;
+    /**
+     * 1 is closest to the nurse station.
+     */
+    nurse_station_distance?: number;
+    asset_tag?: string | null;
+};
+
+/**
+ * Body of POST /api/equipment-categories.
+ */
+export type CreateEquipmentCategoryRequest = {
+    name: string;
+};
+
+/**
+ * Body of POST /api/equipment-items. The item starts available.
+ */
+export type CreateEquipmentItemRequest = {
+    name: string;
+    category_id: string;
+    model: string;
+    manufacturer: string;
+    purchase_date: string;
+    /**
+     * Printed as a QR code on the physical item.
+     */
+    asset_tag: string;
+    serial_number?: string | null;
+    /**
+     * Null means the central store. References Patient Management's ward.
+     */
+    ward_id?: string | null;
+    next_maintenance_due?: string | null;
 };
 
 /**
@@ -324,6 +498,122 @@ export type CurrentPrincipal = {
     patient_id?: string | null;
 };
 
+/**
+ * One of the equipment categories. A table, not an enum, so a sixth can be added without a migration.
+ */
+export type EquipmentCategory = {
+    id: string;
+    name: string;
+    created_at: string;
+    updated_at: string;
+};
+
+/**
+ * A full equipment item. Extends the list row with the fields a detail view needs.
+ */
+export type EquipmentItem = {
+    id: string;
+    name: string;
+    category_id: string;
+    category_name: string;
+    model: string;
+    manufacturer: string;
+    asset_tag: string;
+    /**
+     * Null means the central store rather than a ward.
+     */
+    ward_id?: string | null;
+    /**
+     * Read from Patient Management. Null when the item is in the central store.
+     */
+    ward_name?: string | null;
+    status: EquipmentStatus;
+    next_maintenance_due?: string | null;
+    purchase_date: string;
+    serial_number?: string | null;
+    /**
+     * Set while the status is assigned. Patient Management's admission, id only.
+     */
+    assigned_to_admission_id?: string | null;
+    created_at: string;
+    updated_at: string;
+};
+
+/**
+ * An equipment item with everything servicing and monitoring know about it.
+ */
+export type EquipmentItemDetail = {
+    id: string;
+    name: string;
+    category_id: string;
+    category_name: string;
+    model: string;
+    manufacturer: string;
+    asset_tag: string;
+    /**
+     * Null means the central store rather than a ward.
+     */
+    ward_id?: string | null;
+    /**
+     * Read from Patient Management. Null when the item is in the central store.
+     */
+    ward_name?: string | null;
+    status: EquipmentStatus;
+    next_maintenance_due?: string | null;
+    purchase_date: string;
+    serial_number?: string | null;
+    /**
+     * Set while the status is assigned. Patient Management's admission, id only.
+     */
+    assigned_to_admission_id?: string | null;
+    created_at: string;
+    updated_at: string;
+    maintenance_history: Array<MaintenanceSchedule>;
+    /**
+     * Only warnings still open. Acknowledged and dismissed ones are history, not a to-do list.
+     */
+    open_warnings: Array<Warning>;
+};
+
+/**
+ * An equipment item as a list row.
+ */
+export type EquipmentItemSummary = {
+    id: string;
+    name: string;
+    category_id: string;
+    category_name: string;
+    model: string;
+    manufacturer: string;
+    asset_tag: string;
+    /**
+     * Null means the central store rather than a ward.
+     */
+    ward_id?: string | null;
+    /**
+     * Read from Patient Management. Null when the item is in the central store.
+     */
+    ward_name?: string | null;
+    status: EquipmentStatus;
+    next_maintenance_due?: string | null;
+};
+
+/**
+ * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
+ */
+export type EquipmentItemSummaryPagedResult = {
+    items: Array<EquipmentItemSummary>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    /**
+     * Always at least 1, so an empty list does not render as "page 1 of 0".
+     */
+    total_pages: number;
+};
+
+export type EquipmentStatus = 'available' | 'assigned' | 'maintenance' | 'retired';
+
 export type Gender = 'male' | 'female' | 'other' | 'unknown';
 
 export type GenderPolicy = 'male' | 'female' | 'mixed';
@@ -356,6 +646,28 @@ export type LinkPatientAccountRequest = {
      */
     user_account_id: string;
 };
+
+/**
+ * One servicing event against an equipment item or a bed.
+ */
+export type MaintenanceSchedule = {
+    id: string;
+    asset_type: AssetType;
+    asset_id: string;
+    schedule_type: MaintenanceType;
+    scheduled_date: string;
+    status: MaintenanceStatus;
+    performed_by_staff_id?: string | null;
+    completed_at?: string | null;
+    notes?: string | null;
+    created_by: RaisedBy;
+    created_at: string;
+    updated_at: string;
+};
+
+export type MaintenanceStatus = 'scheduled' | 'in_progress' | 'completed' | 'overdue' | 'cancelled';
+
+export type MaintenanceType = 'routine_service' | 'calibration' | 'repair';
 
 /**
  * A patient record as the API publishes it. The spec builds this from PatientSummary + AuditFields, so this inherits rather than repeating the identity fields.
@@ -514,6 +826,8 @@ export type ProblemDetails = {
     [key: string]: unknown;
 };
 
+export type RaisedBy = 'agent' | 'user';
+
 /**
  * Body of POST /api/auth/refresh and POST /api/auth/logout.
  */
@@ -521,7 +835,16 @@ export type RefreshTokenRequest = {
     refresh_token: string;
 };
 
+export type RelatedEntityType = 'pharmacy_item' | 'equipment_item' | 'bed';
+
 export type ReleaseReason = 'discharged' | 'hold_expired' | 'cancelled' | 'transferred' | 'rejected';
+
+/**
+ * Body of POST /api/equipment-items/{id}/report-fault.
+ */
+export type ReportFaultRequest = {
+    description: string;
+};
 
 /**
  * Ascending or descending. The group-owned SortDir parameter in all five specs, so the name is
@@ -535,6 +858,31 @@ export type SortDirection = 'asc' | 'desc';
 export type StaffLoginRequest = {
     email: string;
     password: string;
+};
+
+/**
+ * Body of PATCH /api/beds/{id}. Every field is optional; an absent field is left alone.
+ */
+export type UpdateBedRequest = {
+    has_isolation?: boolean | null;
+    /**
+     * 1 is closest to the nurse station.
+     */
+    nurse_station_distance?: number | null;
+    condition?: BedCondition;
+    asset_tag?: string | null;
+};
+
+/**
+ * Body of PUT /api/equipment-items/{id}. Every field is optional; an absent field is left alone.
+ */
+export type UpdateEquipmentItemRequest = {
+    name?: string | null;
+    model?: string | null;
+    manufacturer?: string | null;
+    status?: EquipmentStatus;
+    ward_id?: string | null;
+    next_maintenance_due?: string | null;
 };
 
 /**
@@ -584,7 +932,104 @@ export type Ward = {
     updated_at?: string;
 };
 
+/**
+ * One ward's line in the capacity summary. Gender policy is on it because a male-only ward
+ * with two free beds is no use to a female patient, and the caller has to be able to see that.
+ */
+export type WardCapacity = {
+    ward_id: string;
+    name: string;
+    ward_type: WardType;
+    gender_policy: GenderPolicy;
+    total_beds: number;
+    /**
+     * Usable, unoccupied, and not under a live hold. A hold past its expiry counts as free.
+     * That expiry rule lives here, in the owning service, so no other component
+     * re-implements it differently.
+     */
+    free_beds: number;
+};
+
+/**
+ * Free bed counts across every ward. Read by Emergency Service (Member 1) to choose a
+ * destination — counts only, no patient data.
+ */
+export type WardCapacitySummary = {
+    /**
+     * When this was counted. On the wire because free beds go stale in seconds: a dispatcher
+     * acting on a number needs to know how old it is.
+     */
+    generated_at: string;
+    wards: Array<WardCapacity>;
+};
+
+/**
+ * How full one ward is and what kind of care the people in it need. Read by Staff
+ * Management (Member 2) to work out staffing demand — counts only, no patient identities.
+ */
+export type WardOccupancy = {
+    ward_id: string;
+    name: string;
+    ward_type: WardType;
+    /**
+     * Every bed standing in the ward today, counted from Equipment's register.
+     */
+    total_beds: number;
+    /**
+     * Beds with a patient actually in them.
+     */
+    occupied_beds: number;
+    /**
+     * Beds under a hold that has not lapsed. A hold past its expiry is not counted here.
+     */
+    reserved_beds: number;
+    /**
+     * Beds Equipment has withdrawn for repair or servicing.
+     */
+    out_of_service_beds: number;
+    /**
+     * The care mix, keyed by the wire value of AdmissionCategory. Fifteen routine inpatients
+     * and two high-dependency patients need very different staffing, even though both are
+     * "seventeen patients".
+     */
+    patients_by_category: {
+        [key: string]: number;
+    };
+    /**
+     * People holding a bed here who have not walked in yet, so Staff can staff ahead of a
+     * rush instead of reacting to one.
+     */
+    incoming_next_2h: number;
+};
+
 export type WardType = 'icu' | 'hdu' | 'general' | 'maternity' | 'pediatric' | 'isolation';
+
+/**
+ * A problem the threshold sweep found, or a fault a person reported.
+ */
+export type Warning = {
+    id: string;
+    type: WarningType;
+    severity: WarningSeverity;
+    related_entity_type: RelatedEntityType;
+    related_entity_id: string;
+    ward_id?: string | null;
+    recommended_action: string;
+    status: WarningStatus;
+    raised_by: RaisedBy;
+    workflow_id?: string | null;
+    acknowledged_by_staff_id?: string | null;
+    acknowledged_at?: string | null;
+    resolved_at?: string | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type WarningSeverity = 'low' | 'medium' | 'high' | 'critical';
+
+export type WarningStatus = 'open' | 'acknowledged' | 'action_taken' | 'dismissed';
+
+export type WarningType = 'low_stock' | 'medicine_expiring' | 'maintenance_overdue' | 'equipment_faulty';
 
 export type ListAdmissionsData = {
     body?: never;
@@ -830,6 +1275,128 @@ export type CancelAdmissionResponses = {
 
 export type CancelAdmissionResponse = CancelAdmissionResponses[keyof CancelAdmissionResponses];
 
+export type ListAppointmentsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        date?: string;
+        status?: AppointmentStatus;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/appointments';
+};
+
+export type ListAppointmentsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListAppointmentsError = ListAppointmentsErrors[keyof ListAppointmentsErrors];
+
+export type ListAppointmentsResponses = {
+    /**
+     * OK
+     */
+    200: AppointmentPagedResult;
+};
+
+export type ListAppointmentsResponse = ListAppointmentsResponses[keyof ListAppointmentsResponses];
+
+export type CreateAppointmentData = {
+    body?: CreateAppointmentRequest;
+    path?: never;
+    query?: never;
+    url: '/appointments';
+};
+
+export type CreateAppointmentErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CreateAppointmentError = CreateAppointmentErrors[keyof CreateAppointmentErrors];
+
+export type CreateAppointmentResponses = {
+    /**
+     * Created
+     */
+    201: Appointment;
+};
+
+export type CreateAppointmentResponse = CreateAppointmentResponses[keyof CreateAppointmentResponses];
+
+export type CheckInAppointmentData = {
+    body?: CheckInRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/appointments/{id}/check-in';
+};
+
+export type CheckInAppointmentErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CheckInAppointmentError = CheckInAppointmentErrors[keyof CheckInAppointmentErrors];
+
+export type CheckInAppointmentResponses = {
+    /**
+     * Created
+     */
+    201: Admission;
+};
+
+export type CheckInAppointmentResponse = CheckInAppointmentResponses[keyof CheckInAppointmentResponses];
+
 export type LoginData = {
     body?: StaffLoginRequest;
     path?: never;
@@ -1016,6 +1583,526 @@ export type GetCurrentUserResponses = {
 
 export type GetCurrentUserResponse = GetCurrentUserResponses[keyof GetCurrentUserResponses];
 
+export type ListBedsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        wardId?: string;
+        condition?: BedCondition;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/beds';
+};
+
+export type ListBedsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+};
+
+export type ListBedsError = ListBedsErrors[keyof ListBedsErrors];
+
+export type ListBedsResponses = {
+    /**
+     * OK
+     */
+    200: BedPagedResult;
+};
+
+export type ListBedsResponse = ListBedsResponses[keyof ListBedsResponses];
+
+export type CreateBedData = {
+    body?: CreateBedRequest;
+    path?: never;
+    query?: never;
+    url: '/beds';
+};
+
+export type CreateBedErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CreateBedError = CreateBedErrors[keyof CreateBedErrors];
+
+export type CreateBedResponses = {
+    /**
+     * Created
+     */
+    201: Bed;
+};
+
+export type CreateBedResponse = CreateBedResponses[keyof CreateBedResponses];
+
+export type UpdateBedData = {
+    body?: UpdateBedRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/beds/{id}';
+};
+
+export type UpdateBedErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type UpdateBedError = UpdateBedErrors[keyof UpdateBedErrors];
+
+export type UpdateBedResponses = {
+    /**
+     * OK
+     */
+    200: Bed;
+};
+
+export type UpdateBedResponse = UpdateBedResponses[keyof UpdateBedResponses];
+
+export type RetireBedData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/beds/{id}/retire';
+};
+
+export type RetireBedErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RetireBedError = RetireBedErrors[keyof RetireBedErrors];
+
+export type RetireBedResponses = {
+    /**
+     * OK
+     */
+    200: Bed;
+};
+
+export type RetireBedResponse = RetireBedResponses[keyof RetireBedResponses];
+
+export type ListEquipmentCategoriesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/equipment-categories';
+};
+
+export type ListEquipmentCategoriesErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+};
+
+export type ListEquipmentCategoriesError = ListEquipmentCategoriesErrors[keyof ListEquipmentCategoriesErrors];
+
+export type ListEquipmentCategoriesResponses = {
+    /**
+     * OK
+     */
+    200: Array<EquipmentCategory>;
+};
+
+export type ListEquipmentCategoriesResponse = ListEquipmentCategoriesResponses[keyof ListEquipmentCategoriesResponses];
+
+export type CreateEquipmentCategoryData = {
+    body?: CreateEquipmentCategoryRequest;
+    path?: never;
+    query?: never;
+    url: '/equipment-categories';
+};
+
+export type CreateEquipmentCategoryErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CreateEquipmentCategoryError = CreateEquipmentCategoryErrors[keyof CreateEquipmentCategoryErrors];
+
+export type CreateEquipmentCategoryResponses = {
+    /**
+     * Created
+     */
+    201: EquipmentCategory;
+};
+
+export type CreateEquipmentCategoryResponse = CreateEquipmentCategoryResponses[keyof CreateEquipmentCategoryResponses];
+
+export type ListEquipmentItemsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        search?: string;
+        categoryId?: string;
+        wardId?: string;
+        status?: EquipmentStatus;
+        page?: number;
+        pageSize?: number;
+        sortBy?: string;
+        sortDir?: string;
+    };
+    url: '/equipment-items';
+};
+
+export type ListEquipmentItemsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+};
+
+export type ListEquipmentItemsError = ListEquipmentItemsErrors[keyof ListEquipmentItemsErrors];
+
+export type ListEquipmentItemsResponses = {
+    /**
+     * OK
+     */
+    200: EquipmentItemSummaryPagedResult;
+};
+
+export type ListEquipmentItemsResponse = ListEquipmentItemsResponses[keyof ListEquipmentItemsResponses];
+
+export type CreateEquipmentItemData = {
+    body?: CreateEquipmentItemRequest;
+    path?: never;
+    query?: never;
+    url: '/equipment-items';
+};
+
+export type CreateEquipmentItemErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CreateEquipmentItemError = CreateEquipmentItemErrors[keyof CreateEquipmentItemErrors];
+
+export type CreateEquipmentItemResponses = {
+    /**
+     * Created
+     */
+    201: EquipmentItem;
+};
+
+export type CreateEquipmentItemResponse = CreateEquipmentItemResponses[keyof CreateEquipmentItemResponses];
+
+export type GetEquipmentItemData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/equipment-items/{id}';
+};
+
+export type GetEquipmentItemErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetEquipmentItemError = GetEquipmentItemErrors[keyof GetEquipmentItemErrors];
+
+export type GetEquipmentItemResponses = {
+    /**
+     * OK
+     */
+    200: EquipmentItemDetail;
+};
+
+export type GetEquipmentItemResponse = GetEquipmentItemResponses[keyof GetEquipmentItemResponses];
+
+export type UpdateEquipmentItemData = {
+    body?: UpdateEquipmentItemRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/equipment-items/{id}';
+};
+
+export type UpdateEquipmentItemErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type UpdateEquipmentItemError = UpdateEquipmentItemErrors[keyof UpdateEquipmentItemErrors];
+
+export type UpdateEquipmentItemResponses = {
+    /**
+     * OK
+     */
+    200: EquipmentItem;
+};
+
+export type UpdateEquipmentItemResponse = UpdateEquipmentItemResponses[keyof UpdateEquipmentItemResponses];
+
+export type GetEquipmentItemByTagData = {
+    body?: never;
+    path: {
+        assetTag: string;
+    };
+    query?: never;
+    url: '/equipment-items/by-tag/{assetTag}';
+};
+
+export type GetEquipmentItemByTagErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetEquipmentItemByTagError = GetEquipmentItemByTagErrors[keyof GetEquipmentItemByTagErrors];
+
+export type GetEquipmentItemByTagResponses = {
+    /**
+     * OK
+     */
+    200: EquipmentItemDetail;
+};
+
+export type GetEquipmentItemByTagResponse = GetEquipmentItemByTagResponses[keyof GetEquipmentItemByTagResponses];
+
+export type AssignEquipmentItemData = {
+    body?: AssignEquipmentItemRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/equipment-items/{id}/assign';
+};
+
+export type AssignEquipmentItemErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type AssignEquipmentItemError = AssignEquipmentItemErrors[keyof AssignEquipmentItemErrors];
+
+export type AssignEquipmentItemResponses = {
+    /**
+     * OK
+     */
+    200: EquipmentItem;
+};
+
+export type AssignEquipmentItemResponse = AssignEquipmentItemResponses[keyof AssignEquipmentItemResponses];
+
+export type ReleaseEquipmentItemData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/equipment-items/{id}/release';
+};
+
+export type ReleaseEquipmentItemErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ReleaseEquipmentItemError = ReleaseEquipmentItemErrors[keyof ReleaseEquipmentItemErrors];
+
+export type ReleaseEquipmentItemResponses = {
+    /**
+     * OK
+     */
+    200: EquipmentItem;
+};
+
+export type ReleaseEquipmentItemResponse = ReleaseEquipmentItemResponses[keyof ReleaseEquipmentItemResponses];
+
+export type ReportEquipmentFaultData = {
+    body?: ReportFaultRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/equipment-items/{id}/report-fault';
+};
+
+export type ReportEquipmentFaultErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ReportEquipmentFaultError = ReportEquipmentFaultErrors[keyof ReportEquipmentFaultErrors];
+
+export type ReportEquipmentFaultResponses = {
+    /**
+     * OK
+     */
+    200: EquipmentItem;
+};
+
+export type ReportEquipmentFaultResponse = ReportEquipmentFaultResponses[keyof ReportEquipmentFaultResponses];
+
 export type GetHealthData = {
     body?: never;
     path?: never;
@@ -1040,6 +2127,31 @@ export type GetHealthResponses = {
 };
 
 export type GetHealthResponse = GetHealthResponses[keyof GetHealthResponses];
+
+export type GetWardCapacityData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/capacity/wards';
+};
+
+export type GetWardCapacityErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+};
+
+export type GetWardCapacityError = GetWardCapacityErrors[keyof GetWardCapacityErrors];
+
+export type GetWardCapacityResponses = {
+    /**
+     * OK
+     */
+    200: WardCapacitySummary;
+};
+
+export type GetWardCapacityResponse = GetWardCapacityResponses[keyof GetWardCapacityResponses];
 
 export type ListPatientsData = {
     body?: never;
@@ -1343,3 +2455,34 @@ export type CreateWardResponses = {
 };
 
 export type CreateWardResponse = CreateWardResponses[keyof CreateWardResponses];
+
+export type GetWardOccupancyData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/wards/{id}/occupancy';
+};
+
+export type GetWardOccupancyErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetWardOccupancyError = GetWardOccupancyErrors[keyof GetWardOccupancyErrors];
+
+export type GetWardOccupancyResponses = {
+    /**
+     * OK
+     */
+    200: WardOccupancy;
+};
+
+export type GetWardOccupancyResponse = GetWardOccupancyResponses[keyof GetWardOccupancyResponses];

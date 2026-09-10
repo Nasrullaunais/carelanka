@@ -57,5 +57,11 @@ public enum MessageCode
 
     DispatchIdRequired,
 
-    CategoryStaffNotFound
+    CategoryStaffNotFound,
+
+    PatientHasOpenAppointment,
+
+    AppointmentInThePast,
+
+    CareLevelNeedsDutyManager
 }

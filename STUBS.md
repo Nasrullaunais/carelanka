@@ -91,6 +91,10 @@ rather than at the demo.
 **Replacing either is one line each** — the two `AddSingleton` registrations in
 `api/Program.cs`. Nothing else moves.
 
+**Neither new endpoint carries patient data**, and `CapacityEndpointTests` asserts that a patient's
+name does not appear in either response body. Counts only, as `integration_of_functions.md` §9 promises
+on our behalf.
+
 **Row 2 is retirable today; row 3 is not.** `IWardService` is real and merged, so
 `StubWardDirectory` can become a delegating adapter whenever M3 wants it — exactly what
 row 1 just did in the other direction. Row 3 cannot follow yet: occupancy is the presence
@@ -163,10 +167,10 @@ needs from others" sections of `integration_of_functions.md` (§10, §16, §21,
 | :--- | :--- | :--- | :--- |
 | M4 Patient | Bed register — id, ward, number, condition, isolation, distance | **M3** | `GET /beds`. Patient's **hardest dependency** — the bed agent has nothing to reason over without it |
 | M1, M3, M4 | Staff name and role by ID | **M2** | `POST /staff/lookup`. Needed by three people to render "Approved by …" — small, high value, worth building early |
-| M1 Emergency | Free bed counts per ward | **M4** | `GET /capacity/wards` |
+| ~~M1 Emergency~~ | ~~Free bed counts per ward~~ | ~~**M4**~~ | **BUILT 2026-09-11 — not a stub any more.** `GET /api/capacity/wards` is live and every staff role may read it. Shape: `WardCapacitySummary` in `specs/patient-spec.yaml`. `free_beds` is usable, unoccupied and not under a live hold; **a hold past its `reserved_until` counts as free**, and that expiry rule lives in `CapacityService` so nobody re-implements it |
 | M1 Emergency | Create a pre-admission from a dispatch | **M4** | `POST /admissions/pre-admit` |
 | M1 Emergency | Maps / routing | *third party* | Not a teammate, but stub it anyway so you can develop offline and test the provider-down path |
-| M2 Staff | Ward occupancy and care mix | **M4** | `GET /wards/{id}/occupancy` |
+| ~~M2 Staff~~ | ~~Ward occupancy and care mix~~ | ~~**M4**~~ | **BUILT 2026-09-11 — not a stub any more.** `GET /api/wards/{id}/occupancy` is live for every staff role. `patients_by_category` is keyed by `AdmissionCategory` wire value with **every category present at zero**, and counts only people actually in a bed — somebody merely holding one is in `incoming_next_2h` instead. 404 for an unknown or retired ward |
 | ~~M2, M3~~ | ~~Ward list — id, name, type~~ | ~~**M4**~~ | **BUILT 2026-09-09 — not a stub any more.** `GET /api/wards` is live and every staff role may read it; `POST /api/wards` is admin-only. Shape: `specs/patient-spec.yaml`. Filters: `?wardType=` and `?isActive=` (defaults true) |
 | M3 Equipment | Is this bed occupied or held? | **M4** | `GET /beds/{id}/occupancy` — **must** be real before Equipment can service any bed. Maintenance never evicts a patient, and a stub that always answers "free" would let it |
 | M3 Equipment | Admission summary by ID | **M4** | For displaying who an assigned item belongs to |

@@ -293,6 +293,7 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '409':
           description: This patient already has an open admission.
           content:
@@ -1297,6 +1298,7 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '409':
           description: That patient already has an open appointment or admission.
           content:
@@ -1319,6 +1321,13 @@ paths:
         The care level is set here, by the staff member checking them in - not by the patient
         at booking time and not by the agent. Same rule every other admission path follows,
         and `category_set_by_staff_id` records who chose it.
+
+        **The role split depends on the body, not the route.** A WardNurse may check somebody
+        in as `outpatient`, `day_case` or `inpatient`; `icu` and `hdu` are the DutyManager's
+        alone, and a nurse asking for either is a 403 carrying `cl_pat_011`.
+
+        Returns the **admission**, not the appointment - the admission is what the desk works
+        from next, and the booking is finished with.
 
         From this point the admission behaves like any other: it needs a bed, so the bed
         agent runs on it exactly as it would for a walk-in.
@@ -1756,6 +1765,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/AuditFields'
         - type: object
+          required: [id, patient, scheduled_at, status]
           properties:
             id: { type: string, format: uuid }
             patient: { $ref: '#/components/schemas/PatientSummary' }
@@ -1813,11 +1823,31 @@ components:
       required: [patient_id, scheduled_at]
       properties:
         patient_id: { type: string, format: uuid }
-        scheduled_at: { type: string, format: date-time }
-        reason: { type: string, nullable: true }
+        scheduled_at:
+          type: string
+          format: date-time
+          description: |
+            When the patient intends to come in. **Must be in the future** - a visit booked
+            for a time that has passed is always a typo, and somebody already in the building
+            is admitted rather than booked. Rejected with a 400.
+        reason:
+          type: string
+          nullable: true
+          maxLength: 300
+          description: |
+            Optional free text, for the desk to read. Never read by the agent.
+
+            There is no `booked_by_staff_id` on this body on purpose: who took the booking
+            comes off the token. A field a client fills in is a field a client can fill in
+            with somebody else's name, and it is the only thing separating a desk booking
+            from a self-booking afterwards.
 
     CheckInRequest:
       type: object
+      description: |
+        `admission_category` and `urgency` are required and have no default. An omitted
+        `admission_category` would check the patient in at `icu`, the most expensive care
+        level in the hospital, because it is declared first.
       required: [admission_category, category_set_by_staff_id, urgency]
       properties:
         admission_category: { $ref: '#/components/schemas/AdmissionCategory' }
@@ -2235,39 +2265,78 @@ components:
 
     WardOccupancy:
       type: object
+      required:
+        - ward_id
+        - name
+        - ward_type
+        - total_beds
+        - occupied_beds
+        - reserved_beds
+        - out_of_service_beds
+        - patients_by_category
+        - incoming_next_2h
       properties:
         ward_id: { type: string, format: uuid }
         name: { type: string }
         ward_type: { $ref: '#/components/schemas/WardType' }
         total_beds: { type: integer }
-        occupied_beds: { type: integer }
-        reserved_beds: { type: integer }
+        occupied_beds:
+          type: integer
+          description: Beds with a patient actually in them.
+        reserved_beds:
+          type: integer
+          description: Beds under a hold that has not lapsed. A hold past its expiry is not counted.
         out_of_service_beds: { type: integer }
         patients_by_category:
           type: object
-          description: Care mix. Fifteen inpatients and two HDU patients need different staffing.
+          description: |
+            Care mix. Fifteen inpatients and two HDU patients need different staffing.
+
+            Keyed by `AdmissionCategory` wire value. **Every category is present, zeros
+            included** - a category that vanished when it dropped to zero would disappear
+            from a chart rather than fall to the floor of it.
+
+            Counts only people who are in a bed. Somebody merely holding one has not arrived,
+            and is reported by `incoming_next_2h` instead.
           additionalProperties: { type: integer }
         incoming_next_2h:
           type: integer
-          description: Admissions in bed_reserved arriving within two hours, so Staff can staff ahead of a rush.
+          description: |
+            Admissions in `bed_reserved` holding a bed here and due within two hours, so Staff
+            can staff ahead of a rush.
+
+            An admission with no `expected_arrival` counts: its hold lapses in thirty minutes,
+            so it is arriving sooner than two hours or losing the bed. An overdue one counts
+            too - somebody late is still expected.
 
     WardCapacitySummary:
       type: object
+      required: [generated_at, wards]
       properties:
-        generated_at: { type: string, format: date-time }
+        generated_at:
+          type: string
+          format: date-time
+          description: When this was counted. Free beds go stale in seconds, so the caller needs the age of the number.
         wards:
           type: array
-          items:
-            type: object
-            properties:
-              ward_id: { type: string, format: uuid }
-              name: { type: string }
-              ward_type: { $ref: '#/components/schemas/WardType' }
-              gender_policy: { $ref: '#/components/schemas/GenderPolicy' }
-              total_beds: { type: integer }
-              free_beds:
-                type: integer
-                description: Usable, unoccupied, and not under a live reservation.
+          items: { $ref: '#/components/schemas/WardCapacity' }
+
+    WardCapacity:
+      type: object
+      description: |
+        One ward's line in the capacity summary. `gender_policy` is on it because a male-only
+        ward with two free beds is no use to a female patient, and the caller has to see that
+        without a second request.
+      required: [ward_id, name, ward_type, gender_policy, total_beds, free_beds]
+      properties:
+        ward_id: { type: string, format: uuid }
+        name: { type: string }
+        ward_type: { $ref: '#/components/schemas/WardType' }
+        gender_policy: { $ref: '#/components/schemas/GenderPolicy' }
+        total_beds: { type: integer }
+        free_beds:
+          type: integer
+          description: Usable, unoccupied, and not under a live reservation.
 
     # ---------- bed assignment and agent ----------
 

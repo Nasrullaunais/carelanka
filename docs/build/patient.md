@@ -30,7 +30,7 @@
 | 2 | Remaining entities + configurations + migration | Including `PatientAccount` (Rev 2.5) and the optional link `Patient.UserAccountId` |
 | 3 | Patient + Admission CRUD | Including `temp_reference` for unidentified arrivals |
 | 4 | **The 7-state admission status machine** | **Done.** `awaiting_bed → awaiting_approval → bed_reserved → admitted → ready_for_discharge → discharged`, plus `cancelled`. Illegal transitions → 409 |
-| 5 | `GET /capacity/wards` + `GET /wards/{id}/occupancy` | M1 and M2 are both blocked on these. Before the agent |
+| 5 | `GET /capacity/wards` + `GET /wards/{id}/occupancy` | **Done.** M1 and M2 are unblocked. Hold expiry lives in `CapacityService` and nowhere else |
 | 6 | **Manual bed assignment, no AI** | Pick a bed by hand, with the 30-minute hold. The concurrency guarantee lives in the partial unique index, not in code |
 | 7 | Discharge checklist + confirmation | `clinical_clearance` gated on the `doctor` role claim |
 | 8 | Codegen gate | |
@@ -51,6 +51,29 @@ Building them settled five disagreements between `entity_diagram.md` and
 diagram. The one worth knowing before step 6: **`BedReservation` no longer exists.** The
 30-minute hold is a `BedAssignment` row with `status = 'reserved'` and a `reserved_until`,
 which is what the spec has always published.
+
+**Step 5 is complete, and appointments with it.** `GET /api/capacity/wards` and
+`GET /api/wards/{id}/occupancy` are live for every staff role, so Kaveesha and Nasrullah are
+no longer waiting. Channeling followed: `GET /api/appointments`, `POST /api/appointments` and
+`POST /api/appointments/{id}/check-in`. **No migration** — every table and column those five
+endpoints read was already on `main`. Four things settled while building them:
+
+- **Nothing in this project has a timezone.** `?date=` on the appointments worklist filters
+  whole **UTC** days, which is what the column stores — so "today" starts at half past five in
+  the morning in Colombo. Inventing a timezone inside one filter would make that list disagree
+  with every report, so it is an open decision rather than a local fix.
+- **`incoming_next_2h` needed a hand-written wire name.** The snake_case policy does not break
+  before a digit, so `IncomingNext2h` serialised as `incoming_next2h` and the contract says
+  `incoming_next_2h`. The only property in this component with a number in it, and
+  `PatientOpenApiContractTests` is what found it.
+- **The check-in role split reads the body, not the route.** A ward nurse may check somebody in
+  as `outpatient`, `day_case` or `inpatient`; `icu` and `hdu` are the duty manager's. That
+  cannot be a policy on the action, so it is a check in `AppointmentService` returning
+  `cl_pat_011`.
+- **"One open booking at a time" is a read with no index behind it**, unlike the open-admission
+  rule. Closing it properly is a partial unique index and therefore a migration. Left open on
+  purpose: the damage is two rows on a worklist, and the second check-in is still refused by
+  the admission index that does exist.
 
 **Steps 3 and 4 are complete.** Patients half: `POST /patients`, `GET /patients`,
 `GET /patients/{id}`, `PUT /patients/{id}`, `POST /patients/lookup`,
@@ -224,6 +247,8 @@ Two things your Flutter screens must handle:
 | `POST /staff/lookup` | M2 | Rendering "Approved by …" |
 | Dispatch notification | M1 | Triggers your pre-admission |
 
-**Others are waiting on you for:** `Ward` (all three), `GET /capacity/wards` (M1),
-`GET /wards/{id}/occupancy` (M2), `GET /beds/{id}/occupancy` (M3 — they cannot service any
-bed safely until this is real), `POST /admissions/pre-admit` (M1).
+**Others are waiting on you for:** ~~`Ward` (all three)~~ **built**,
+~~`GET /capacity/wards` (M1)~~ **built 2026-09-11**,
+~~`GET /wards/{id}/occupancy` (M2)~~ **built 2026-09-11**,
+`GET /beds/{id}/occupancy` (M3 — they cannot service any bed safely until this is real, and
+it is now the only one of the four still outstanding), `POST /admissions/pre-admit` (M1).

@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
@@ -189,6 +189,13 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.AdmissionEditor, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
+
+    // The same two roles as AdmissionEditor, under a name that says which job it is. Checking
+    // somebody in at icu or hdu narrows further to the duty manager alone, and that rule reads
+    // the request body, so it lives in AppointmentService rather than here.
+    options.AddPolicy(Policies.AppointmentDesk, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager)));
 });
 
 // 20 a minute per IP in production. Configurable only so the integration tests can raise it:
@@ -242,6 +249,8 @@ builder.Services.AddScoped<IEquipmentItemService, EquipmentItemService>();
 builder.Services.AddScoped<IWardService, WardService>();
 builder.Services.AddScoped<IPatientService, PatientService>();
 builder.Services.AddScoped<IAdmissionService, AdmissionService>();
+builder.Services.AddScoped<ICapacityService, CapacityService>();
+builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 
 // Real: ward bed counts now come from Equipment's register instead of a constant.
 // Scoped, not Singleton — it delegates to IBedService, which is scoped because it holds a

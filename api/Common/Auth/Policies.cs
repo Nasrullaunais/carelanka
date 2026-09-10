@@ -46,4 +46,20 @@ public static class Policies
     /// policy over both would have handed every doctor the second along with the first.
     /// </summary>
     public const string AdmissionEditor = nameof(AdmissionEditor);
+
+    /// <summary>
+    /// Works the expected-visits desk — reads the worklist, books a visit on a patient's
+    /// behalf, and checks them in: ward nurse, duty manager.
+    /// </summary>
+    /// <remarks>
+    /// The same two roles as <see cref="AdmissionEditor"/> today, and deliberately a separate
+    /// name. Taking a booking and filling in a patient's missing paperwork are different jobs,
+    /// and one policy over both is how doctors nearly ended up with the paperwork when they
+    /// were given read access to admissions.
+    ///
+    /// It does not cover the whole of check-in. `icu` and `hdu` are the duty manager's alone,
+    /// and that rule depends on the request body rather than the route, so it lives in
+    /// <c>AppointmentService</c> where the body is.
+    /// </remarks>
+    public const string AppointmentDesk = nameof(AppointmentDesk);
 }

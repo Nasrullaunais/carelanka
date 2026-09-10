@@ -22,6 +22,7 @@ public sealed class PatientOpenApiContractTests
     [InlineData("AdmissionCategory")]
     [InlineData("AdmissionUrgency")]
     [InlineData("AdmissionStatus")]
+    [InlineData("AppointmentStatus")]
     public async Task Published_enum_values_match_the_contract_in_order(string enumName)
     {
         var generated = await GenerateAsync();
@@ -48,6 +49,12 @@ public sealed class PatientOpenApiContractTests
     [InlineData("Admission")]
     [InlineData("AdmissionDetail")]
     [InlineData("CancelAdmissionRequest")]
+    [InlineData("WardOccupancy")]
+    [InlineData("WardCapacitySummary")]
+    [InlineData("WardCapacity")]
+    [InlineData("Appointment")]
+    [InlineData("CreateAppointmentRequest")]
+    [InlineData("CheckInRequest")]
     public async Task Published_schema_required_members_match_the_contract(string schemaName)
     {
         var generated = await GenerateAsync();
@@ -85,6 +92,50 @@ public sealed class PatientOpenApiContractTests
         Assert.Equal(
             new[] { "201", "400", "401", "403", "409" },
             Responses(wards.GetProperty("post")));
+    }
+
+    [Fact]
+    public async Task Capacity_routes_publish_the_operationIds_the_other_components_generate_against()
+    {
+        var generated = await GenerateAsync();
+        var paths = generated.RootElement.GetProperty("paths");
+
+        // Two components have been blocked on exactly these two names. Emergency generates
+        // getWardCapacity, Staff Management generates getWardOccupancy.
+        Assert.Equal(
+            "getWardCapacity",
+            paths.GetProperty("/capacity/wards").GetProperty("get").GetProperty("operationId").GetString());
+        Assert.Equal(
+            "getWardOccupancy",
+            paths.GetProperty("/wards/{id}/occupancy").GetProperty("get").GetProperty("operationId").GetString());
+    }
+
+    [Fact]
+    public async Task Every_capacity_operation_declares_its_failures_and_not_only_its_success()
+    {
+        var generated = await GenerateAsync();
+        var paths = generated.RootElement.GetProperty("paths");
+
+        // No 403 on either: both are AnyStaff, so an authenticated caller is never refused and
+        // publishing a 403 would have every client branch on a status that cannot arrive.
+        Assert.Equal(
+            new[] { "200", "401" },
+            Responses(paths.GetProperty("/capacity/wards").GetProperty("get")));
+        Assert.Equal(
+            new[] { "200", "401", "404" },
+            Responses(paths.GetProperty("/wards/{id}/occupancy").GetProperty("get")));
+    }
+
+    // patients_by_category is an open map on the wire, so nothing in the schema pins its keys.
+    // This is what stops a rename of the C# enum silently changing them, which for a map is a
+    // key that reads as "no patients of that kind" rather than as a break.
+    [Fact]
+    public void The_care_mix_is_keyed_by_the_published_admission_category_values()
+    {
+        var published = Sequence(LoadContract(), "components", "schemas", "AdmissionCategory", "enum")
+            .Children.Cast<YamlScalarNode>().Select(value => value.Value!).ToArray();
+
+        Assert.Equal(published, Enum.GetValues<AdmissionCategory>().Select(EnumWire.ToWire).ToArray());
     }
 
     [Fact]
@@ -180,6 +231,51 @@ public sealed class PatientOpenApiContractTests
         Assert.Equal(
             new[] { "200", "400", "401", "403", "404", "409" },
             Responses(paths.GetProperty("/admissions/{id}/cancel").GetProperty("post")));
+    }
+
+    [Fact]
+    public async Task Appointment_routes_publish_the_operationIds_both_frontends_generate_against()
+    {
+        var generated = await GenerateAsync();
+        var paths = generated.RootElement.GetProperty("paths");
+        var appointments = paths.GetProperty("/appointments");
+
+        Assert.Equal("listAppointments", appointments.GetProperty("get").GetProperty("operationId").GetString());
+        Assert.Equal("createAppointment", appointments.GetProperty("post").GetProperty("operationId").GetString());
+        Assert.Equal(
+            "checkInAppointment",
+            paths.GetProperty("/appointments/{id}/check-in").GetProperty("post").GetProperty("operationId").GetString());
+    }
+
+    [Fact]
+    public async Task Every_appointment_operation_declares_its_failures_and_not_only_its_success()
+    {
+        var generated = await GenerateAsync();
+        var paths = generated.RootElement.GetProperty("paths");
+        var appointments = paths.GetProperty("/appointments");
+
+        Assert.Equal(new[] { "200", "400", "401", "403" }, Responses(appointments.GetProperty("get")));
+        Assert.Equal(
+            new[] { "201", "400", "401", "403", "404", "409" },
+            Responses(appointments.GetProperty("post")));
+        Assert.Equal(
+            new[] { "201", "400", "401", "403", "404", "409" },
+            Responses(paths.GetProperty("/appointments/{id}/check-in").GetProperty("post")));
+    }
+
+    // Check-in answers with an Admission, not with the booking it consumed. Easy to get wrong
+    // in a generated client and invisible until a screen renders the wrong shape.
+    [Fact]
+    public async Task Checking_in_publishes_an_admission_because_that_is_what_the_desk_works_from_next()
+    {
+        var generated = await GenerateAsync();
+
+        var schema = generated.RootElement
+            .GetProperty("paths").GetProperty("/appointments/{id}/check-in")
+            .GetProperty("post").GetProperty("responses").GetProperty("201")
+            .GetProperty("content").GetProperty("application/json").GetProperty("schema");
+
+        Assert.EndsWith("/Admission", schema.GetProperty("$ref").GetString());
     }
 
     // The drift gate on the backbone. patient-spec.yaml prints the whole workflow in the

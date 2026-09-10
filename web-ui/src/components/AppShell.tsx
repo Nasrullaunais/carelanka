@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { logoutMutation } from '../services/api/generated/@tanstack/react-query.gen';
 import { clearSession, getSession } from '../services/auth/session';
 import { useSession } from '../services/auth/useSession';
-import { canReadWards, roleLabels } from '../types/permissions';
+import { canReadEquipment, canReadWards, roleLabels } from '../types/permissions';
 
 export function AppShell() {
   const session = useSession();
@@ -30,6 +30,7 @@ export function AppShell() {
 
         <nav className="shell-nav">
           {canReadWards(role) && <NavLink to="/wards">Wards</NavLink>}
+          {canReadEquipment(role) && <NavLink to="/equipment">Equipment</NavLink>}
         </nav>
 
         {session && (

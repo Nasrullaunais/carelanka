@@ -64,8 +64,9 @@ will pass all your tests. `STUBS.md` calls this out as the one genuinely dangero
 the project.
 
 **`Bed` is yours; the occupant is not.** You own the frame — it exists, its number, its
-condition, repairs, retirement. M4 owns `BedAssignment` and `BedReservation`. Neither
-writes the other's table. This is settled (`integration_of_functions.md` §6.1), not open.
+condition, repairs, retirement. M4 owns `BedAssignment`, which carries both the 30-minute
+hold and the occupancy in one row *(the separate `BedReservation` table was dropped on
+2026-09-09 — `patient-spec.yaml` never had one)*. Neither writes the other's table. This is settled (`integration_of_functions.md` §6.1), not open.
 
 **Where does `Cleaning` live?** (Open Decision 9.) A bed being turned over between patients
 is a real state, `BedCondition` has no value for it, and neither spec can record it.

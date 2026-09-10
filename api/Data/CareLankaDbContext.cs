@@ -2,6 +2,7 @@ using CareLanka.Api.Data.Entities.Common;
 using CareLanka.Api.Data.Entities.Equipment;
 using CareLanka.Api.Data.Entities.Patient;
 using Microsoft.EntityFrameworkCore;
+using PatientEntity = CareLanka.Api.Data.Entities.Patient.Patient;
 
 namespace CareLanka.Api.Data;
 
@@ -24,6 +25,12 @@ public class CareLankaDbContext : DbContext
 
     // Patient Management
     public DbSet<Ward> Wards => Set<Ward>();
+    public DbSet<PatientEntity> Patients => Set<PatientEntity>();
+    public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<Admission> Admissions => Set<Admission>();
+    public DbSet<BedAssignment> BedAssignments => Set<BedAssignment>();
+    public DbSet<Discharge> Discharges => Set<Discharge>();
+    public DbSet<DischargeChecklistItem> DischargeChecklistItems => Set<DischargeChecklistItem>();
 
     // Never add configuration here. Write Data/Configurations/{Component}/ instead,
     // or all four of us conflict on this method every migration.

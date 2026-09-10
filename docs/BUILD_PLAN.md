@@ -159,7 +159,7 @@ its dependencies.
 | **[Emergency](build/emergency.md)** | `EmergencyCall`, `Ambulance`, `Dispatch`, `DispatchCrew`, `RouteLog` | `emergency-spec.yaml` (33) | 11 |
 | **[Staff](build/staff.md)** | `Skill`, `StaffMemberSkill`, `Shift`, `Allocation`, `LeaveRequest`, `WardStaffingRule` | `staff-spec.yaml` (32) | 12 |
 | **[Equipment](build/equipment.md)** | `EquipmentCategory`, `EquipmentItem`, `Bed`, `Pharmacy*`, `MaintenanceSchedule`, `Warning`, `ActionRequest` | `equipment-spec.yaml` (28) | 11 |
-| **[Patient](build/patient.md)** | `Patient`, `Admission`, `Ward`, `BedAssignment`, `BedReservation`, `Discharge`, `Appointment` | `patient-spec.yaml` (40) | 16 |
+| **[Patient](build/patient.md)** | `Patient`, `Admission`, `Ward`, `BedAssignment`, `Discharge`, `DischargeChecklistItem`, `Appointment` | `patient-spec.yaml` (40) | 16 |
 
 ---
 

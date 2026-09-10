@@ -138,7 +138,7 @@ needs from others" sections of `integration_of_functions.md` (§10, §16, §21,
 | M1 Emergency | Create a pre-admission from a dispatch | **M4** | `POST /admissions/pre-admit` |
 | M1 Emergency | Maps / routing | *third party* | Not a teammate, but stub it anyway so you can develop offline and test the provider-down path |
 | M2 Staff | Ward occupancy and care mix | **M4** | `GET /wards/{id}/occupancy` |
-| M2, M3 | Ward list — id, name, type | **M4** | `GET /wards`. Build early; three components reference `Ward` |
+| ~~M2, M3~~ | ~~Ward list — id, name, type~~ | ~~**M4**~~ | **BUILT 2026-09-09 — not a stub any more.** `GET /api/wards` is live and every staff role may read it; `POST /api/wards` is admin-only. Shape: `specs/patient-spec.yaml`. Filters: `?wardType=` and `?isActive=` (defaults true) |
 | M3 Equipment | Is this bed occupied or held? | **M4** | `GET /beds/{id}/occupancy` — **must** be real before Equipment can service any bed. Maintenance never evicts a patient, and a stub that always answers "free" would let it |
 | M3 Equipment | Admission summary by ID | **M4** | For displaying who an assigned item belongs to |
 | ~~all four~~ | ~~Agent workflow tables~~ | ~~group~~ | **Not a stub — DECIDED 2026-09-07.** Common, built once. Contract: `specs/common-spec.yaml` (`GET /workflows`, `GET /workflows/{workflowId}`, the approve/reject/revise gate). Reasoning: `docs/ADR.md` ADR 3 |

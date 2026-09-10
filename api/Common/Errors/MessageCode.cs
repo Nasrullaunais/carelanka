@@ -26,6 +26,22 @@ public enum MessageCode
 
     PhoneNumberAlreadyRegistered,
 
+    // Equipment
+
+    BedNumberTaken,
+
+    AssetTagTaken,
+
+    BedOccupied,
+
+    CategoryNameTaken,
+
+    SerialNumberTaken,
+
+    EquipmentNotAvailable,
+
+    EquipmentNotAssigned,
+
     // Patient Management — cl_pat_*
     WardNameTaken,
 

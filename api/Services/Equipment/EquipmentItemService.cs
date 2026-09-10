@@ -138,7 +138,14 @@ public sealed class EquipmentItemService : IEquipmentItemService
 
         if (request.Status is { } status && status != item.Status)
         {
-            EnsureTransitionAllowed(item, status);
+            // Assignment needs an admission id and this request has no field for one. Allowing
+            // it here would leave an item reading as assigned to nobody.
+            if (status == EquipmentStatus.Assigned)
+            {
+                throw new BadRequestException(MessageCode.ValidationFailed);
+            }
+
+            EnsureTransitionAllowed(item, status, TransitionReason.Update);
 
             // Releasing through a status change has to clear the admission too, or the item
             // reads as available while still pointing at a patient.
@@ -185,11 +192,7 @@ public sealed class EquipmentItemService : IEquipmentItemService
     {
         var item = await GetByIdAsync(id, cancellationToken);
 
-        if (item.Status != EquipmentStatus.Available)
-        {
-            throw new ConflictException(
-                MessageCode.EquipmentNotAvailable, item.Name, EnumWire.ToWire(item.Status));
-        }
+        EnsureTransitionAllowed(item, EquipmentStatus.Assigned, TransitionReason.Assign);
 
         item.Status = EquipmentStatus.Assigned;
         item.AssignedToAdmissionId = admissionId;
@@ -203,10 +206,7 @@ public sealed class EquipmentItemService : IEquipmentItemService
     {
         var item = await GetByIdAsync(id, cancellationToken);
 
-        if (item.Status != EquipmentStatus.Assigned)
-        {
-            throw new ConflictException(MessageCode.EquipmentNotAssigned, item.Name);
-        }
+        EnsureTransitionAllowed(item, EquipmentStatus.Available, TransitionReason.Release);
 
         item.Status = EquipmentStatus.Available;
 
@@ -224,15 +224,16 @@ public sealed class EquipmentItemService : IEquipmentItemService
     {
         var item = await GetByIdAsync(id, cancellationToken);
 
-        if (item.Status == EquipmentStatus.Retired)
-        {
-            throw new ConflictException(
-                MessageCode.EquipmentNotAvailable, item.Name, EnumWire.ToWire(item.Status));
-        }
+        // Assigned -> maintenance is not in the transition table. A fault report is the one
+        // caller exempt from it; see the note on TransitionReason.Fault in the guard.
+        EnsureTransitionAllowed(item, EquipmentStatus.Maintenance, TransitionReason.Fault);
 
         // A broken defibrillator changes status the moment it is reported, not on the next
         // agent sweep. Status and warning are one SaveChanges, so a failure leaves neither.
         item.Status = EquipmentStatus.Maintenance;
+
+        // Dropping the patient link is the documented consequence of that exemption rather
+        // than a side effect. A faulty item must not keep reading as in use by anyone.
         item.AssignedToAdmissionId = null;
 
         _db.Warnings.Add(new WarningEntity
@@ -262,24 +263,60 @@ public sealed class EquipmentItemService : IEquipmentItemService
     public async Task<ItemEntity> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         => await FindByIdAsync(id, cancellationToken) ?? throw new NotFoundException("Equipment item", id);
 
+    // Which caller is asking. It selects the 409 the caller reads back, and Fault carries the
+    // single documented exemption from the table below.
+    private enum TransitionReason
+    {
+        Update,
+        Assign,
+        Release,
+        Fault
+    }
+
     // available -> assigned -> available, available -> maintenance -> available or retired,
     // available -> retired. Retired is terminal: a replacement is a new row.
-    private static void EnsureTransitionAllowed(ItemEntity item, EquipmentStatus to)
+    //
+    // Every status change in this service comes through here, assign, release and report-fault
+    // included. Each of those used to carry its own smaller check, which is how assigned ->
+    // maintenance slipped past on the fault path.
+    private static void EnsureTransitionAllowed(
+        ItemEntity item, EquipmentStatus to, TransitionReason reason)
     {
+        // The documented exemption. A reported fault outranks the table: a person has said the
+        // machine is broken, and refusing that until the item is released would leave a
+        // known-faulty item reading as usable with a patient on it. Assigned -> maintenance is
+        // legal here and nowhere else, and it drops the assignment on purpose. Retired stays
+        // terminal even for a fault, because a scrapped item has nothing left to report.
+        if (reason == TransitionReason.Fault && item.Status != EquipmentStatus.Retired)
+        {
+            return;
+        }
+
         var allowed = item.Status switch
         {
-            EquipmentStatus.Available => to is EquipmentStatus.Maintenance or EquipmentStatus.Retired,
+            EquipmentStatus.Available =>
+                to is EquipmentStatus.Assigned or EquipmentStatus.Maintenance or EquipmentStatus.Retired,
             EquipmentStatus.Assigned => to is EquipmentStatus.Available,
             EquipmentStatus.Maintenance => to is EquipmentStatus.Available or EquipmentStatus.Retired,
             EquipmentStatus.Retired => false,
             _ => false
         };
 
-        if (!allowed)
+        if (allowed)
         {
-            throw new IllegalTransitionException(
-                "Equipment item", EnumWire.ToWire(item.Status), EnumWire.ToWire(to));
+            return;
         }
+
+        // One rule, different wording. "Not available" tells a technician more than "illegal
+        // transition available -> assigned" does, so the lifecycle endpoints keep their codes.
+        throw reason switch
+        {
+            TransitionReason.Release => new ConflictException(MessageCode.EquipmentNotAssigned, item.Name),
+            TransitionReason.Assign or TransitionReason.Fault => new ConflictException(
+                MessageCode.EquipmentNotAvailable, item.Name, EnumWire.ToWire(item.Status)),
+            _ => new IllegalTransitionException(
+                "Equipment item", EnumWire.ToWire(item.Status), EnumWire.ToWire(to))
+        };
     }
 
     private async Task EnsureAssetTagFreeAsync(
@@ -290,6 +327,11 @@ public sealed class EquipmentItemService : IEquipmentItemService
 
         // Beds carry tags from the same scheme, and the by-tag lookup has to resolve to one
         // thing. A tag unique only within its own table would break that.
+        //
+        // Known gap: this is the only uniqueness rule in the codebase not backed by a database
+        // constraint, because Postgres cannot index across two tables. A bed and an item
+        // claiming the same tag in overlapping transactions can both pass this check. Issue
+        // #17 carries the fix: a shared asset-tag table that both rows point at.
         var takenByBed = await _db.Beds.AnyAsync(b => b.AssetTag == assetTag, cancellationToken);
 
         if (takenByItem || takenByBed)

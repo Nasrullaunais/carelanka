@@ -85,7 +85,7 @@ public class AdmissionsController : ControllerBase
     /// Completeness is deliberately not part of `status`: a patient can be admitted and still
     /// have paperwork outstanding, and one field cannot express both without ambiguity.
     /// </remarks>
-    [Authorize(Policy = Policies.AdmissionReader)]
+    [Authorize(Policy = Policies.AdmissionEditor)]
     [HttpPatch("{id:guid}/details", Name = "completeAdmissionDetails")]
     [ProducesResponseType(typeof(AdmissionResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]

@@ -26,12 +26,24 @@ public static class Policies
     /// <summary>Registers patients at intake: ward nurse, ambulance crew, duty manager.</summary>
     public const string PatientRegistrar = nameof(PatientRegistrar);
 
-    /// <summary>Reads patient records: ward nurse, duty manager, hospital administrator.</summary>
+    /// <summary>
+    /// Reads patient records: ward nurse, duty manager, hospital administrator, doctor.
+    /// A doctor reads and never edits - the record is kept by the people at the desk.
+    /// </summary>
     public const string PatientReader = nameof(PatientReader);
 
     /// <summary>Edits a patient record: ward nurse, duty manager. Deliberately not the administrator.</summary>
     public const string PatientEditor = nameof(PatientEditor);
 
-    /// <summary>Reads and completes admissions: ward nurse, duty manager. Clinical work, so no administrator.</summary>
+    /// <summary>Reads admissions: ward nurse, duty manager, doctor. Clinical work, so no administrator.</summary>
     public const string AdmissionReader = nameof(AdmissionReader);
+
+    /// <summary>
+    /// Completes the paperwork on an admission: ward nurse, duty manager.
+    ///
+    /// Split from <see cref="AdmissionReader"/> when doctors were given read access. Reading
+    /// the worklist and filling in a patient's missing details are different jobs, and one
+    /// policy over both would have handed every doctor the second along with the first.
+    /// </summary>
+    public const string AdmissionEditor = nameof(AdmissionEditor);
 }

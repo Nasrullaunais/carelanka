@@ -739,6 +739,27 @@ public sealed class AdmissionEndpointTests
     }
 
     [Fact]
+    public async Task A_doctor_may_read_the_worklist_but_may_not_complete_the_paperwork()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var patientId = await NewPatientAsync(nurse, "Doctor Reads");
+        var id = await CreateIdAsync(nurse, patientId, await NurseIdAsync());
+
+        // This is why AdmissionReader and AdmissionEditor are two policies and not one. A
+        // doctor has to see who is in and open a visit; chasing a patient's missing address
+        // is desk work, and one policy over both would have handed them the second for free.
+        using var doctor = await ClientAsync(ApiApplication.DoctorEmail);
+        var list = await doctor.GetAsync("/api/admissions");
+        var read = await doctor.GetAsync($"/api/admissions/{id}");
+        var completed = await doctor.PatchAsJsonAsync(
+            $"/api/admissions/{id}/details", new { address = "82 Galle Road, Colombo 03" });
+
+        Assert.Equal(HttpStatusCode.OK, list.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, completed.StatusCode);
+    }
+
+    [Fact]
     public async Task A_duty_manager_may_read_and_complete_an_admission()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);

@@ -28,11 +28,25 @@ client.interceptors.error.use((error, response, request) => {
   // is not running. Handled explicitly, because a page that swallows this leaves the user
   // believing a write succeeded.
   if (!response) {
-    toast.error('Could not reach the server. Is the API running on port 5231?');
+    // Two different things produce this, and in development the dev proxy is the likelier of
+    // the two - the API can be perfectly healthy while nothing is forwarding /api to it. The
+    // old wording named only the API and sent people to check the half that was working.
+    toast.error(
+      import.meta.env.DEV
+        ? 'Could not reach the server. Check that the API is running on port 5231 and that the Vite dev server is up - it is what proxies /api.'
+        : 'Could not reach the server. Check your connection and try again.',
+    );
     return error;
   }
 
-  if (response.status === 401) {
+  // A 401 answering a sign-in attempt is not an expired session - it is the wrong email or
+  // password, and the server already says so in ProblemDetails.detail. Telling someone at the
+  // login screen that their session has ended sends them to do the thing they are already
+  // doing, and hides the only sentence that would have helped. /auth/refresh is deliberately
+  // not in this list: a 401 there really is a dead session.
+  const isSignIn = signInPaths.some((path) => pathOf(request).endsWith(path));
+
+  if (response.status === 401 && !isSignIn) {
     // Session gone. Not a toast the user can act on beyond signing in again.
     clearSession();
     toast.error('Your session has ended. Please sign in again.');
@@ -45,6 +59,21 @@ client.interceptors.error.use((error, response, request) => {
 
   return error;
 });
+
+const signInPaths = ['/auth/login', '/auth/patient/login', '/auth/patient/register'];
+
+function pathOf(request: Request | undefined): string {
+  if (!request) {
+    return '';
+  }
+
+  try {
+    return new URL(request.url).pathname;
+  } catch {
+    // A relative or malformed URL should never cost us the error toast entirely.
+    return request.url;
+  }
+}
 
 // ProblemDetails puts the human text in `detail`; a validation failure also carries a field
 // map in `errors`, and naming the fields is more use than "one or more fields are not valid".

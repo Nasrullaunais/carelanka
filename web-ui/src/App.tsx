@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
+import { IntakePage } from './pages/IntakePage';
 import { LoginPage } from './pages/LoginPage';
 import { WardsPage } from './pages/WardsPage';
 import { clearSession } from './services/auth/session';
@@ -40,6 +41,7 @@ export function App() {
   return (
     <Routes>
       <Route element={<AppShell />}>
+        <Route path="/intake" element={<IntakePage />} />
         <Route path="/wards" element={<WardsPage />} />
         <Route path="*" element={<Navigate to="/wards" replace />} />
       </Route>

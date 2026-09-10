@@ -31,6 +31,45 @@ export function canReadWards(role: PrincipalRole | undefined): boolean {
   return isStaff(role);
 }
 
+/**
+ * Policies.PatientRegistrar on POST /api/patients, POST /api/patients/lookup and
+ * POST /api/admissions. Registering someone and admitting them are the same permission:
+ * both are intake, and splitting them would let a role start a job it cannot finish.
+ */
+export function canRegisterPatient(role: PrincipalRole | undefined): boolean {
+  return role === 'ward_nurse' || role === 'ambulance_crew' || role === 'duty_manager';
+}
+
+/**
+ * Policies.PatientReader on GET /api/patients and GET /api/patients/{id}.
+ *
+ * Deliberately not the same set as canRegisterPatient. Ambulance crew may register and look
+ * up by NIC but may not browse the register, so intake must not offer them a name search.
+ */
+export function canReadPatients(role: PrincipalRole | undefined): boolean {
+  return (
+    role === 'ward_nurse' ||
+    role === 'duty_manager' ||
+    role === 'hospital_administrator' ||
+    role === 'doctor'
+  );
+}
+
+/** Policies.AdmissionReader on GET /api/admissions. Clinical work, so no administrator. */
+export function canReadAdmissions(role: PrincipalRole | undefined): boolean {
+  return role === 'ward_nurse' || role === 'duty_manager' || role === 'doctor';
+}
+
+/**
+ * Policies.AdmissionEditor on PATCH /api/admissions/{id}/details.
+ *
+ * Narrower than canReadAdmissions on purpose: a doctor reads the worklist but does not chase
+ * a patient's missing paperwork, which is desk work.
+ */
+export function canEditAdmissions(role: PrincipalRole | undefined): boolean {
+  return role === 'ward_nurse' || role === 'duty_manager';
+}
+
 export const roleLabels: Record<PrincipalRole, string> = {
   ward_nurse: 'Ward nurse',
   doctor: 'Doctor',

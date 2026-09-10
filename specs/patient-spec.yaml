@@ -106,7 +106,7 @@ paths:
       tags: [Patients]
       summary: Search patients
       description: |
-        Roles: WardNurse, DutyManager, HospitalAdministrator.
+        Roles: WardNurse, DutyManager, HospitalAdministrator, Doctor.
 
         `search` matches full name, NIC, phone, or temp reference.
       operationId: listPatients
@@ -145,7 +145,7 @@ paths:
     get:
       tags: [Patients]
       summary: Get one patient with their visit history
-      description: 'Roles: WardNurse, DutyManager, HospitalAdministrator.'
+      description: 'Roles: WardNurse, DutyManager, HospitalAdministrator, Doctor.'
       operationId: getPatient
       responses:
         '200':
@@ -303,7 +303,7 @@ paths:
       tags: [Admissions]
       summary: List admissions
       description: >-
-        Roles: WardNurse, DutyManager. Nurses are scoped to their own ward - NOT ENFORCED YET,
+        Roles: WardNurse, DutyManager, Doctor. Nurses are scoped to their own ward - NOT ENFORCED YET,
         see STUBS.md. It needs both which ward a nurse works in (Staff Management, unbuilt)
         and which ward an admission is in (a live BedAssignment, step 6).
       operationId: listAdmissions
@@ -369,7 +369,7 @@ paths:
       tags: [Admissions]
       summary: Get one admission with its full history
       description: |
-        Roles: WardNurse, DutyManager.
+        Roles: WardNurse, DutyManager, Doctor.
 
         Includes every bed assignment (accepted, rejected and expired), every agent run, and
         every status change. Nothing is deleted or overwritten, so this is the audit trail.

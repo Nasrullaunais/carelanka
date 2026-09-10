@@ -302,7 +302,10 @@ paths:
     get:
       tags: [Admissions]
       summary: List admissions
-      description: 'Roles: WardNurse, DutyManager. Nurses are scoped to their own ward.'
+      description: >-
+        Roles: WardNurse, DutyManager. Nurses are scoped to their own ward - NOT ENFORCED YET,
+        see STUBS.md. It needs both which ward a nurse works in (Staff Management, unbuilt)
+        and which ward an admission is in (a live BedAssignment, step 6).
       operationId: listAdmissions
       parameters:
         - name: status

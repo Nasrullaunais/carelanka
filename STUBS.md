@@ -97,10 +97,18 @@ each says so in the spec:
 | `AdmissionDetail.workflows` | `AgentWorkflow` is common and unbuilt (ADR 3) | Step 11 |
 | `AdmissionDetail.discharge` | No discharge row is written yet | Step 7 |
 | `wardId` filter on `GET /admissions` | A ward is reached through a live `BedAssignment` | Step 6 |
+| **Nurses scoped to their own ward** on `GET /admissions` and `GET /admissions/{id}` | Blocked twice: a nurse's ward is Staff Management's data (**M2**, unbuilt) and an admission's ward needs a live `BedAssignment` | Step 6, and M2 |
 
 The key is **omitted, not returned empty, and the parameter is unpublished rather than
 accepted and ignored.** A missing key is visible to whoever generates a client; a key that
 is always `[]` and a filter that silently does nothing are not.
+
+**The last row is the one that matters, because it is a permission and not a convenience.**
+`patient-spec.yaml` says "Nurses are scoped to their own ward"; today every ward nurse sees
+every admission in the hospital. That is wider than the contract promises, and §16.1 of the
+assignment grades access control. It is written here rather than left silently missing so it
+is not discovered at the demo. Both halves have to exist first: **M2** has to publish which
+ward a nurse works in, and a live `BedAssignment` has to say which ward an admission is in.
 
 **Replacing it is one line** — the `AddSingleton<IBedRegistryService, StubBedRegistryService>`
 registration in `api/Program.cs`. Nothing else moves.

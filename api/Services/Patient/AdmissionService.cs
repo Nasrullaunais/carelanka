@@ -127,17 +127,15 @@ public sealed class AdmissionService : IAdmissionService
         var patient = await _db.Patients.FirstOrDefaultAsync(p => p.Id == request.PatientId, ct)
             ?? throw new NotFoundException("Patient", request.PatientId);
 
-        var openAdmissionId = await _db.Admissions
-            .Where(a => a.PatientId == patient.Id && !ClosedStatuses.Contains(a.Status))
-            .Select(a => (Guid?)a.Id)
-            .FirstOrDefaultAsync(ct);
+        var alreadyAdmitted = await _db.Admissions
+            .AnyAsync(a => a.PatientId == patient.Id && !ClosedStatuses.Contains(a.Status), ct);
 
-        if (openAdmissionId is not null)
+        if (alreadyAdmitted)
         {
-            // One person, one stay at a time. A second concurrent admission is almost always
-            // the desk not realising this patient is already in the building.
-            throw new ConflictException(
-                MessageCode.PatientHasOpenAdmission, patient.FullName, openAdmissionId);
+            // The ordinary case, answered without waiting for the database to refuse. A second
+            // concurrent admission is almost always the desk not realising this patient is
+            // already in the building. The index below is what makes it a guarantee.
+            throw new ConflictException(MessageCode.PatientHasOpenAdmission, patient.FullName);
         }
 
         var staffExists = await _db.StaffMembers
@@ -170,9 +168,19 @@ public sealed class AdmissionService : IAdmissionService
 
         _db.Admissions.Add(admission);
 
-        // DetailsComplete is deliberately not set: it is a stored generated column over
-        // missing_fields, and EF reads it back after the insert.
-        await _db.SaveChangesAsync(ct);
+        try
+        {
+            // DetailsComplete is deliberately not set: it is a stored generated column over
+            // missing_fields, and EF reads it back after the insert.
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException exception)
+            when (IsUniqueViolation(exception, AdmissionConfiguration.OpenAdmissionUniqueIndex))
+        {
+            // Two desks admitting the same person in the same instant both passed the read
+            // above. The partial unique index is what actually stops the second one.
+            throw new ConflictException(MessageCode.PatientHasOpenAdmission, patient.FullName);
+        }
 
         admission.Patient = patient;
 

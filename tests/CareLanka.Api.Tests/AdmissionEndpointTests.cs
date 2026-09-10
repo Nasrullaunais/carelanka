@@ -102,6 +102,42 @@ public sealed class AdmissionEndpointTests
     }
 
     [Fact]
+    public async Task Two_admissions_started_at_the_same_instant_still_leave_the_patient_with_one()
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+        var nurseId = await NurseIdAsync();
+        var patientId = await NewPatientAsync(client, "Two Desks At Once");
+
+        // Both requests read "no open admission" before either inserts, so the service-layer
+        // check passes twice. ux_admissions_open_patient is what actually stops the second.
+        var responses = await Task.WhenAll(
+            CreateAsync(client, patientId, nurseId),
+            CreateAsync(client, patientId, nurseId));
+
+        var codes = responses.Select(r => r.StatusCode).ToArray();
+
+        Assert.Single(codes, HttpStatusCode.Created);
+        Assert.Single(codes, HttpStatusCode.Conflict);
+
+        using var conflict = await ReadJsonAsync(
+            responses.Single(r => r.StatusCode == HttpStatusCode.Conflict));
+
+        // Same code either way. A caller cannot tell which path refused it, and should not
+        // have to.
+        Assert.Equal("cl_pat_006", conflict.RootElement.GetProperty("code").GetString());
+
+        // The assertion that does not depend on which path won the race: the patient's own
+        // history has one visit on it, not two.
+        using var history = await ReadJsonAsync(await client.GetAsync($"/api/patients/{patientId}"));
+        Assert.Single(history.RootElement.GetProperty("admissions").EnumerateArray());
+
+        foreach (var response in responses)
+        {
+            response.Dispose();
+        }
+    }
+
+    [Fact]
     public async Task An_emergency_admission_without_the_dispatch_reference_is_a_400()
     {
         using var client = await ClientAsync(ApiApplication.NurseEmail);

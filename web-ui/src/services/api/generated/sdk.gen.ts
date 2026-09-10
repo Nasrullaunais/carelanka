@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreatePatientData, CreatePatientErrors, CreatePatientResponses, CreateWardData, CreateWardErrors, CreateWardResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetPatientData, GetPatientErrors, GetPatientResponses, LinkPatientAccountData, LinkPatientAccountErrors, LinkPatientAccountResponses, ListPatientsData, ListPatientsErrors, ListPatientsResponses, ListWardsData, ListWardsErrors, ListWardsResponses, LoginData, LoginErrors, LoginPatientData, LoginPatientErrors, LoginPatientResponses, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, LookupPatientData, LookupPatientErrors, LookupPatientResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RegisterPatientAccountData, RegisterPatientAccountErrors, RegisterPatientAccountResponses, UpdatePatientData, UpdatePatientErrors, UpdatePatientResponses } from './types.gen';
+import type { CompleteAdmissionDetailsData, CompleteAdmissionDetailsErrors, CompleteAdmissionDetailsResponses, CreateAdmissionData, CreateAdmissionErrors, CreateAdmissionResponses, CreatePatientData, CreatePatientErrors, CreatePatientResponses, CreateWardData, CreateWardErrors, CreateWardResponses, GetAdmissionData, GetAdmissionErrors, GetAdmissionResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetPatientData, GetPatientErrors, GetPatientResponses, LinkPatientAccountData, LinkPatientAccountErrors, LinkPatientAccountResponses, ListAdmissionsData, ListAdmissionsErrors, ListAdmissionsResponses, ListPatientsData, ListPatientsErrors, ListPatientsResponses, ListWardsData, ListWardsErrors, ListWardsResponses, LoginData, LoginErrors, LoginPatientData, LoginPatientErrors, LoginPatientResponses, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, LookupPatientData, LookupPatientErrors, LookupPatientResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RegisterPatientAccountData, RegisterPatientAccountErrors, RegisterPatientAccountResponses, UpdatePatientData, UpdatePatientErrors, UpdatePatientResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -17,6 +17,57 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
      */
     meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
+
+/**
+ * List admissions. With no `status` the answer is the live worklist, not the archive.
+ * `search` matches the patient's name or NIC.
+ */
+export const listAdmissions = <ThrowOnError extends boolean = false>(options?: Options<ListAdmissionsData, ThrowOnError>): RequestResult<ListAdmissionsResponses, ListAdmissionsErrors, ThrowOnError> => (options?.client ?? client).get<ListAdmissionsResponses, ListAdmissionsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admissions',
+    ...options
+});
+
+/**
+ * Start an admission. Creates a visit in status `awaiting_bed`. The care level and the
+ * clinician who chose it are both required — that pair is the proof a human decided it.
+ */
+export const createAdmission = <ThrowOnError extends boolean = false>(options?: Options<CreateAdmissionData, ThrowOnError>): RequestResult<CreateAdmissionResponses, CreateAdmissionErrors, ThrowOnError> => (options?.client ?? client).post<CreateAdmissionResponses, CreateAdmissionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admissions',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
+
+/**
+ * Get one admission with its bed history. Nothing is deleted or overwritten, so rejected
+ * and expired assignments stay on the list — this is the audit trail.
+ */
+export const getAdmission = <ThrowOnError extends boolean = false>(options: Options<GetAdmissionData, ThrowOnError>): RequestResult<GetAdmissionResponses, GetAdmissionErrors, ThrowOnError> => (options.client ?? client).get<GetAdmissionResponses, GetAdmissionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admissions/{id}',
+    ...options
+});
+
+/**
+ * Fill in details that were missing at registration. A field left out is left alone, and
+ * completeness is recalculated here rather than trusted from the caller.
+ *
+ * Completeness is deliberately not part of `status`: a patient can be admitted and still
+ * have paperwork outstanding, and one field cannot express both without ambiguity.
+ */
+export const completeAdmissionDetails = <ThrowOnError extends boolean = false>(options: Options<CompleteAdmissionDetailsData, ThrowOnError>): RequestResult<CompleteAdmissionDetailsResponses, CompleteAdmissionDetailsErrors, ThrowOnError> => (options.client ?? client).patch<CompleteAdmissionDetailsResponses, CompleteAdmissionDetailsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admissions/{id}/details',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Staff login. The same 401 for a wrong password, an unknown email and a deactivated account, so the endpoint cannot be used to discover which emails exist.

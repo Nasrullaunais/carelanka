@@ -99,10 +99,33 @@ of a live `BedAssignment` row, and nothing writes those until step 6 of
 safe direction.
 
 **Not a stub, but the same dependency — `AdmissionSummary.ward_name` and `bed_number`
-are `null` today.** Both are published by `patient-spec.yaml`. Nothing can hold a bed until
-step 6, so there is no case yet where `null` is the wrong answer; it becomes one the moment
-`BedAssignment` rows exist. No row above, because nothing invented is being returned —
-the field is honestly empty rather than plausibly wrong.
+are `null` today**, and `BedAssignment.ward_name` / `bed_number` are empty strings. All four
+are published by `patient-spec.yaml`. Nothing can hold a bed until step 6, so there is no case
+yet where those are the wrong answer and the mapper that would fill them never runs; they
+become wrong the moment `BedAssignment` rows exist. No row above, because nothing invented is
+being returned — the fields are honestly empty rather than plausibly wrong.
+
+**Not stubs, but the same shape of gap, recorded here so nobody hunts for them.** Three
+things `patient-spec.yaml` publishes are deliberately **not served** by the API today, and
+each says so in the spec:
+
+| What | Why | Arrives with |
+| :--- | :--- | :--- |
+| `AdmissionDetail.workflows` | `AgentWorkflow` is common and unbuilt (ADR 3) | Step 11 |
+| `AdmissionDetail.discharge` | No discharge row is written yet | Step 7 |
+| `wardId` filter on `GET /admissions` | A ward is reached through a live `BedAssignment` | Step 6 |
+| **Nurses scoped to their own ward** on `GET /admissions` and `GET /admissions/{id}` | Blocked twice: a nurse's ward is Staff Management's data (**M2**, unbuilt) and an admission's ward needs a live `BedAssignment` | Step 6, and M2 |
+
+The key is **omitted, not returned empty, and the parameter is unpublished rather than
+accepted and ignored.** A missing key is visible to whoever generates a client; a key that
+is always `[]` and a filter that silently does nothing are not.
+
+**The last row is the one that matters, because it is a permission and not a convenience.**
+`patient-spec.yaml` says "Nurses are scoped to their own ward"; today every ward nurse sees
+every admission in the hospital. That is wider than the contract promises, and §16.1 of the
+assignment grades access control. It is written here rather than left silently missing so it
+is not discovered at the demo. Both halves have to exist first: **M2** has to publish which
+ward a nurse works in, and a live `BedAssignment` has to say which ward an admission is in.
 
 ---
 

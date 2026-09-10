@@ -137,4 +137,15 @@
     <value>Could not allocate a temporary reference. Try again.</value>
     <comment>Only reachable if several unidentified arrivals are registered in the same instant and every retry collided.</comment>
   </data>
+  <data name="cl_pat_006" xml:space="preserve">
+    <value>{0} is already admitted. Continue their open visit rather than starting a second.</value>
+    <comment>One person, one stay at a time. Enforced by ux_admissions_open_patient, not only by the read that precedes it.</comment>
+  </data>
+  <data name="cl_pat_007" xml:space="preserve">
+    <value>An emergency admission needs the dispatch reference from Emergency Service.</value>
+    <comment>Without it there is no link back to their record of the same journey.</comment>
+  </data>
+  <data name="cl_pat_008" xml:space="preserve">
+    <value>No staff member {0} was found to record as having chosen the care level.</value>
+  </data>
 </root>

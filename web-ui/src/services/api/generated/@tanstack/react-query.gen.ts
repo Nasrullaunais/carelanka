@@ -3,8 +3,178 @@
 import { type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { createPatient, createWard, getCurrentUser, getHealth, getPatient, linkPatientAccount, listPatients, listWards, login, loginPatient, logout, lookupPatient, type Options, refreshToken, registerPatientAccount, updatePatient } from '../sdk.gen';
-import type { CreatePatientData, CreatePatientError, CreatePatientResponse, CreateWardData, CreateWardError, CreateWardResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetHealthData, GetHealthError, GetHealthResponse, GetPatientData, GetPatientError, GetPatientResponse, LinkPatientAccountData, LinkPatientAccountError, LinkPatientAccountResponse, ListPatientsData, ListPatientsError, ListPatientsResponse, ListWardsData, ListWardsError, ListWardsResponse, LoginData, LoginError, LoginPatientData, LoginPatientError, LoginPatientResponse, LoginResponse, LogoutData, LogoutError, LogoutResponse, LookupPatientData, LookupPatientError, LookupPatientResponse, RefreshTokenData, RefreshTokenError, RefreshTokenResponse, RegisterPatientAccountData, RegisterPatientAccountError, RegisterPatientAccountResponse, UpdatePatientData, UpdatePatientError, UpdatePatientResponse } from '../types.gen';
+import { completeAdmissionDetails, createAdmission, createPatient, createWard, getAdmission, getCurrentUser, getHealth, getPatient, linkPatientAccount, listAdmissions, listPatients, listWards, login, loginPatient, logout, lookupPatient, type Options, refreshToken, registerPatientAccount, updatePatient } from '../sdk.gen';
+import type { CompleteAdmissionDetailsData, CompleteAdmissionDetailsError, CompleteAdmissionDetailsResponse, CreateAdmissionData, CreateAdmissionError, CreateAdmissionResponse, CreatePatientData, CreatePatientError, CreatePatientResponse, CreateWardData, CreateWardError, CreateWardResponse, GetAdmissionData, GetAdmissionError, GetAdmissionResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetHealthData, GetHealthError, GetHealthResponse, GetPatientData, GetPatientError, GetPatientResponse, LinkPatientAccountData, LinkPatientAccountError, LinkPatientAccountResponse, ListAdmissionsData, ListAdmissionsError, ListAdmissionsResponse, ListPatientsData, ListPatientsError, ListPatientsResponse, ListWardsData, ListWardsError, ListWardsResponse, LoginData, LoginError, LoginPatientData, LoginPatientError, LoginPatientResponse, LoginResponse, LogoutData, LogoutError, LogoutResponse, LookupPatientData, LookupPatientError, LookupPatientResponse, RefreshTokenData, RefreshTokenError, RefreshTokenResponse, RegisterPatientAccountData, RegisterPatientAccountError, RegisterPatientAccountResponse, UpdatePatientData, UpdatePatientError, UpdatePatientResponse } from '../types.gen';
+
+export type QueryKey<TOptions extends Options> = [
+    Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
+        _id: string;
+        _infinite?: boolean;
+        tags?: ReadonlyArray<string>;
+    }
+];
+
+const createQueryKey = <TOptions extends Options>(id: string, options?: TOptions, infinite?: boolean, tags?: ReadonlyArray<string>): [
+    QueryKey<TOptions>[0]
+] => {
+    const params: QueryKey<TOptions>[0] = { _id: id, baseUrl: options?.baseUrl || (options?.client ?? client).getConfig().baseUrl } as QueryKey<TOptions>[0];
+    if (infinite) {
+        params._infinite = infinite;
+    }
+    if (tags) {
+        params.tags = tags;
+    }
+    if (options?.body) {
+        params.body = options.body;
+    }
+    if (options?.headers) {
+        params.headers = options.headers;
+    }
+    if (options?.path) {
+        params.path = options.path;
+    }
+    if (options?.query) {
+        params.query = options.query;
+    }
+    return [params];
+};
+
+export const listAdmissionsQueryKey = (options?: Options<ListAdmissionsData>) => createQueryKey('listAdmissions', options);
+
+/**
+ * List admissions. With no `status` the answer is the live worklist, not the archive.
+ * `search` matches the patient's name or NIC.
+ */
+export const listAdmissionsOptions = (options?: Options<ListAdmissionsData>) => queryOptions<ListAdmissionsResponse, ListAdmissionsError, ListAdmissionsResponse, ReturnType<typeof listAdmissionsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listAdmissions({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listAdmissionsQueryKey(options)
+});
+
+const createInfiniteParams = <K extends Pick<QueryKey<Options>[0], 'body' | 'headers' | 'path' | 'query'>>(queryKey: QueryKey<Options>, page: K) => {
+    const params = { ...queryKey[0] };
+    if (page.body) {
+        params.body = {
+            ...queryKey[0].body as any,
+            ...page.body as any
+        };
+    }
+    if (page.headers) {
+        params.headers = {
+            ...queryKey[0].headers,
+            ...page.headers
+        };
+    }
+    if (page.path) {
+        params.path = {
+            ...queryKey[0].path as any,
+            ...page.path as any
+        };
+    }
+    if (page.query) {
+        params.query = {
+            ...queryKey[0].query as any,
+            ...page.query as any
+        };
+    }
+    return params as unknown as typeof page;
+};
+
+export const listAdmissionsInfiniteQueryKey = (options?: Options<ListAdmissionsData>): QueryKey<Options<ListAdmissionsData>> => createQueryKey('listAdmissions', options, true);
+
+/**
+ * List admissions. With no `status` the answer is the live worklist, not the archive.
+ * `search` matches the patient's name or NIC.
+ */
+export const listAdmissionsInfiniteOptions = (options?: Options<ListAdmissionsData>) => {
+    const opts = infiniteQueryOptions<ListAdmissionsResponse, ListAdmissionsError, InfiniteData<ListAdmissionsResponse>, QueryKey<Options<ListAdmissionsData>>, number | Pick<QueryKey<Options<ListAdmissionsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListAdmissionsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listAdmissions({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listAdmissionsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+/**
+ * Start an admission. Creates a visit in status `awaiting_bed`. The care level and the
+ * clinician who chose it are both required — that pair is the proof a human decided it.
+ */
+export const createAdmissionMutation = (options?: Partial<Options<CreateAdmissionData>>): UseMutationOptions<CreateAdmissionResponse, CreateAdmissionError, Options<CreateAdmissionData>> => {
+    const mutationOptions: UseMutationOptions<CreateAdmissionResponse, CreateAdmissionError, Options<CreateAdmissionData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createAdmission({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getAdmissionQueryKey = (options: Options<GetAdmissionData>) => createQueryKey('getAdmission', options);
+
+/**
+ * Get one admission with its bed history. Nothing is deleted or overwritten, so rejected
+ * and expired assignments stay on the list — this is the audit trail.
+ */
+export const getAdmissionOptions = (options: Options<GetAdmissionData>) => queryOptions<GetAdmissionResponse, GetAdmissionError, GetAdmissionResponse, ReturnType<typeof getAdmissionQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getAdmission({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getAdmissionQueryKey(options)
+});
+
+/**
+ * Fill in details that were missing at registration. A field left out is left alone, and
+ * completeness is recalculated here rather than trusted from the caller.
+ *
+ * Completeness is deliberately not part of `status`: a patient can be admitted and still
+ * have paperwork outstanding, and one field cannot express both without ambiguity.
+ */
+export const completeAdmissionDetailsMutation = (options?: Partial<Options<CompleteAdmissionDetailsData>>): UseMutationOptions<CompleteAdmissionDetailsResponse, CompleteAdmissionDetailsError, Options<CompleteAdmissionDetailsData>> => {
+    const mutationOptions: UseMutationOptions<CompleteAdmissionDetailsResponse, CompleteAdmissionDetailsError, Options<CompleteAdmissionDetailsData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await completeAdmissionDetails({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
 
 /**
  * Staff login. The same 401 for a wrong password, an unknown email and a deactivated account, so the endpoint cannot be used to discover which emails exist.
@@ -91,39 +261,6 @@ export const logoutMutation = (options?: Partial<Options<LogoutData>>): UseMutat
     return mutationOptions;
 };
 
-export type QueryKey<TOptions extends Options> = [
-    Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
-        _id: string;
-        _infinite?: boolean;
-        tags?: ReadonlyArray<string>;
-    }
-];
-
-const createQueryKey = <TOptions extends Options>(id: string, options?: TOptions, infinite?: boolean, tags?: ReadonlyArray<string>): [
-    QueryKey<TOptions>[0]
-] => {
-    const params: QueryKey<TOptions>[0] = { _id: id, baseUrl: options?.baseUrl || (options?.client ?? client).getConfig().baseUrl } as QueryKey<TOptions>[0];
-    if (infinite) {
-        params._infinite = infinite;
-    }
-    if (tags) {
-        params.tags = tags;
-    }
-    if (options?.body) {
-        params.body = options.body;
-    }
-    if (options?.headers) {
-        params.headers = options.headers;
-    }
-    if (options?.path) {
-        params.path = options.path;
-    }
-    if (options?.query) {
-        params.query = options.query;
-    }
-    return [params];
-};
-
 export const getCurrentUserQueryKey = (options?: Options<GetCurrentUserData>) => createQueryKey('getCurrentUser', options);
 
 /**
@@ -177,35 +314,6 @@ export const listPatientsOptions = (options?: Options<ListPatientsData>) => quer
     },
     queryKey: listPatientsQueryKey(options)
 });
-
-const createInfiniteParams = <K extends Pick<QueryKey<Options>[0], 'body' | 'headers' | 'path' | 'query'>>(queryKey: QueryKey<Options>, page: K) => {
-    const params = { ...queryKey[0] };
-    if (page.body) {
-        params.body = {
-            ...queryKey[0].body as any,
-            ...page.body as any
-        };
-    }
-    if (page.headers) {
-        params.headers = {
-            ...queryKey[0].headers,
-            ...page.headers
-        };
-    }
-    if (page.path) {
-        params.path = {
-            ...queryKey[0].path as any,
-            ...page.path as any
-        };
-    }
-    if (page.query) {
-        params.query = {
-            ...queryKey[0].query as any,
-            ...page.query as any
-        };
-    }
-    return params as unknown as typeof page;
-};
 
 export const listPatientsInfiniteQueryKey = (options?: Options<ListPatientsData>): QueryKey<Options<ListPatientsData>> => createQueryKey('listPatients', options, true);
 

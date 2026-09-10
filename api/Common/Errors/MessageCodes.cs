@@ -35,7 +35,10 @@ public static class MessageCodes
             [MessageCode.PatientNicTaken] = "cl_pat_002",
             [MessageCode.PatientAlreadyHasAccount] = "cl_pat_003",
             [MessageCode.AccountAlreadyLinked] = "cl_pat_004",
-            [MessageCode.TempReferenceExhausted] = "cl_pat_005"
+            [MessageCode.TempReferenceExhausted] = "cl_pat_005",
+            [MessageCode.PatientHasOpenAdmission] = "cl_pat_006",
+            [MessageCode.DispatchIdRequired] = "cl_pat_007",
+            [MessageCode.CategoryStaffNotFound] = "cl_pat_008"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

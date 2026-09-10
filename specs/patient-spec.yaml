@@ -302,7 +302,10 @@ paths:
     get:
       tags: [Admissions]
       summary: List admissions
-      description: 'Roles: WardNurse, DutyManager. Nurses are scoped to their own ward.'
+      description: >-
+        Roles: WardNurse, DutyManager. Nurses are scoped to their own ward - NOT ENFORCED YET,
+        see STUBS.md. It needs both which ward a nurse works in (Staff Management, unbuilt)
+        and which ward an admission is in (a live BedAssignment, step 6).
       operationId: listAdmissions
       parameters:
         - name: status
@@ -315,6 +318,10 @@ paths:
           explode: true
         - name: wardId
           in: query
+          description: >-
+            NOT SERVED YET - the API does not publish this parameter. A ward is reached through
+            the live BedAssignment and Equipment's bed register, and nothing holds a bed until
+            step 6 of docs/build/patient.md. Left unpublished rather than accepted and ignored.
           schema: { type: string, format: uuid }
         - name: category
           in: query
@@ -2095,6 +2102,7 @@ components:
         - $ref: '#/components/schemas/AdmissionSummary'
         - $ref: '#/components/schemas/AuditFields'
         - type: object
+          required: [category_set_by_staff_id, category_set_at, is_infectious, missing_fields]
           properties:
             dispatch_id: { type: string, nullable: true }
             category_set_by_staff_id: { type: string, format: uuid }
@@ -2123,6 +2131,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/Admission'
         - type: object
+          required: [bed_assignments]
           properties:
             bed_assignments:
               type: array
@@ -2130,12 +2139,18 @@ components:
               items: { $ref: '#/components/schemas/BedAssignment' }
             workflows:
               type: array
-              description: Every agent run for this admission.
+              description: >-
+                Every agent run for this admission. NOT SERVED YET - the API omits this key
+                rather than returning an empty array, because AgentWorkflow is common and
+                unbuilt (ADR 3). Arrives with step 11 of docs/build/patient.md.
               items: { $ref: '#/components/schemas/BedWorkflowSummary' }
             discharge:
               allOf:
                 - $ref: '#/components/schemas/Discharge'
               nullable: true
+              description: >-
+                NOT SERVED YET - the API omits this key. The discharge checklist is step 7 of
+                docs/build/patient.md and no row is written before then.
 
     # ---------- ward and bed ----------
 

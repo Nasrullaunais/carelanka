@@ -15,6 +15,10 @@ public sealed class PatientOpenApiContractTests
     [InlineData("WardType")]
     [InlineData("GenderPolicy")]
     [InlineData("Gender")]
+    [InlineData("AdmissionSource")]
+    [InlineData("AdmissionCategory")]
+    [InlineData("AdmissionUrgency")]
+    [InlineData("AdmissionStatus")]
     public async Task Published_enum_values_match_the_contract_in_order(string enumName)
     {
         var generated = await GenerateAsync();
@@ -37,6 +41,9 @@ public sealed class PatientOpenApiContractTests
     [InlineData("PatientSummary")]
     [InlineData("Patient")]
     [InlineData("PatientDetail")]
+    [InlineData("CreateAdmissionRequest")]
+    [InlineData("Admission")]
+    [InlineData("AdmissionDetail")]
     public async Task Published_schema_required_members_match_the_contract(string schemaName)
     {
         var generated = await GenerateAsync();
@@ -115,6 +122,62 @@ public sealed class PatientOpenApiContractTests
         Assert.Equal(
             new[] { "204", "400", "401", "403", "404", "409" },
             Responses(paths.GetProperty("/patients/{id}/link-account").GetProperty("post")));
+    }
+
+    [Fact]
+    public async Task Admission_routes_publish_the_operationIds_both_frontends_generate_against()
+    {
+        var generated = await GenerateAsync();
+        var paths = generated.RootElement.GetProperty("paths");
+        var admissions = paths.GetProperty("/admissions");
+
+        Assert.Equal("listAdmissions", admissions.GetProperty("get").GetProperty("operationId").GetString());
+        Assert.Equal("createAdmission", admissions.GetProperty("post").GetProperty("operationId").GetString());
+        Assert.Equal(
+            "getAdmission",
+            paths.GetProperty("/admissions/{id}").GetProperty("get").GetProperty("operationId").GetString());
+        Assert.Equal(
+            "completeAdmissionDetails",
+            paths.GetProperty("/admissions/{id}/details").GetProperty("patch").GetProperty("operationId").GetString());
+    }
+
+    [Fact]
+    public async Task Every_admission_operation_declares_its_failures_and_not_only_its_success()
+    {
+        var generated = await GenerateAsync();
+        var paths = generated.RootElement.GetProperty("paths");
+        var admissions = paths.GetProperty("/admissions");
+
+        Assert.Equal(new[] { "200", "400", "401", "403" }, Responses(admissions.GetProperty("get")));
+
+        // 404 as well as the contract's list: the patient or the categorising clinician can be
+        // absent, and a client that cannot tell that from a validation failure retries forever.
+        Assert.Equal(
+            new[] { "201", "400", "401", "403", "404", "409" },
+            Responses(admissions.GetProperty("post")));
+        Assert.Equal(
+            new[] { "200", "401", "403", "404" },
+            Responses(paths.GetProperty("/admissions/{id}").GetProperty("get")));
+        Assert.Equal(
+            new[] { "200", "400", "401", "403", "404", "409" },
+            Responses(paths.GetProperty("/admissions/{id}/details").GetProperty("patch")));
+    }
+
+    // AdmissionDetail deliberately publishes fewer keys than patient-spec.yaml describes:
+    // workflows needs the common AgentWorkflow tables (ADR 3) and discharge needs step 7, so
+    // both are omitted rather than returned empty. This pins that, so re-adding them is a
+    // decision rather than an accident.
+    [Fact]
+    public async Task AdmissionDetail_omits_the_two_blocks_that_have_no_table_behind_them_yet()
+    {
+        var generated = await GenerateAsync();
+        var properties = generated.RootElement
+            .GetProperty("components").GetProperty("schemas").GetProperty("AdmissionDetail")
+            .GetProperty("properties");
+
+        Assert.True(properties.TryGetProperty("bed_assignments", out _));
+        Assert.False(properties.TryGetProperty("workflows", out _));
+        Assert.False(properties.TryGetProperty("discharge", out _));
     }
 
     private static string[] Responses(JsonElement operation)

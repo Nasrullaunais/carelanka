@@ -8,6 +8,8 @@ namespace CareLanka.Api.Data.Configurations.Patient;
 
 public class AdmissionConfiguration : IEntityTypeConfiguration<Admission>
 {
+    public const string OpenAdmissionUniqueIndex = "ux_admissions_open_patient";
+
     public void Configure(EntityTypeBuilder<Admission> builder)
     {
         builder.ToTable("admissions", t =>
@@ -84,7 +86,14 @@ public class AdmissionConfiguration : IEntityTypeConfiguration<Admission>
             .HasForeignKey(a => a.ReportedByUserId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(a => a.PatientId).HasDatabaseName("ix_admissions_patient_id");
+        // Named overload plus HasDatabaseName on both, and both are needed. EF keys an index
+        // by its property set, so two plain HasIndex(a => a.PatientId) calls are one index and
+        // the second silently replaces the first - which quietly dropped this one, the one
+        // that serves a patient's visit history across every status. The name in the overload
+        // is the model name; without HasDatabaseName as well the second index reaches the
+        // database as ix_admissions_patient_id1.
+        builder.HasIndex(a => a.PatientId, "ix_admissions_patient_id")
+            .HasDatabaseName("ix_admissions_patient_id");
 
         // Drives the admissions worklist and incoming_next_2h, which Staff reads to staff
         // ahead of a rush rather than react to one.
@@ -94,6 +103,17 @@ public class AdmissionConfiguration : IEntityTypeConfiguration<Admission>
         builder.HasIndex(a => a.DispatchId)
             .HasDatabaseName("ix_admissions_dispatch_id")
             .HasFilter("dispatch_id IS NOT NULL");
+
+        // One person, one open stay. Scoped to the statuses that are still running, so a
+        // patient can be admitted again after they are discharged or the visit is cancelled.
+        //
+        // This is the guarantee, not the service-layer read that precedes it: two desks
+        // admitting the same person in the same instant both see "no open admission" and both
+        // insert. Same reasoning as ux_patients_nic and ux_wards_name.
+        builder.HasIndex(a => a.PatientId, OpenAdmissionUniqueIndex)
+            .HasDatabaseName(OpenAdmissionUniqueIndex)
+            .IsUnique()
+            .HasFilter("status NOT IN ('discharged', 'cancelled')");
 
         builder.HasQueryFilter(a => a.Patient.IsActive);
     }

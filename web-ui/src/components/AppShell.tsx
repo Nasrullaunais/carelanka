@@ -1,16 +1,9 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { logoutMutation } from '../services/api/generated/@tanstack/react-query.gen';
 import { clearSession, getSession } from '../services/auth/session';
 import { useSession } from '../services/auth/useSession';
-import {
-  canReadAdmissions,
-  canReadCapacity,
-  canReadWards,
-  canRegisterPatient,
-  canWorkAppointmentDesk,
-  roleLabels,
-} from '../types/permissions';
+import { roleLabels } from '../types/permissions';
 
 export function AppShell() {
   const session = useSession();
@@ -28,21 +21,20 @@ export function AppShell() {
     },
   });
 
-  const role = session?.principal.role;
-
   return (
     <>
       <header className="shell-header">
-        <span className="brand">CareLanka</span>
+        <Link to="/" className="brand">
+          CareLanka
+        </Link>
 
+        {/* One link, not one per screen. Seven roles reach different sets of pages, and a bar
+            carrying all of them is mostly other people's work. The dashboard is where a role
+            sees its own. */}
         <nav className="shell-nav">
-          {canRegisterPatient(role) && <NavLink to="/intake">Intake</NavLink>}
-          {canReadAdmissions(role) && <NavLink to="/patients">Patients</NavLink>}
-          {canWorkAppointmentDesk(role) && (
-            <NavLink to="/appointments">Expected visits</NavLink>
-          )}
-          {canReadCapacity(role) && <NavLink to="/capacity">Bed capacity</NavLink>}
-          {canReadWards(role) && <NavLink to="/wards">Wards</NavLink>}
+          <NavLink to="/" end>
+            Dashboard
+          </NavLink>
         </nav>
 
         {session && (

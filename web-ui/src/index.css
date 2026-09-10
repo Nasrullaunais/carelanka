@@ -61,6 +61,8 @@ h3 {
 .brand {
   font-weight: 700;
   letter-spacing: -0.01em;
+  color: var(--ink);
+  text-decoration: none;
 }
 
 .shell-nav {
@@ -333,4 +335,40 @@ tr:last-child td {
 
 .meter.full > span {
   background: var(--danger);
+}
+
+/* ---------- dashboard tiles ---------- */
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.85rem;
+  margin-top: 1.25rem;
+}
+
+.tile {
+  display: block;
+  padding: 1.1rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.tile:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.tile strong {
+  display: block;
+  margin-bottom: 0.3rem;
+}
+
+.tile span {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  line-height: 1.45;
 }

@@ -206,6 +206,8 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IHealthService, HealthService>();
 
 builder.Services.AddScoped<IBedService, BedService>();
+builder.Services.AddScoped<IEquipmentCategoryService, EquipmentCategoryService>();
+builder.Services.AddScoped<IEquipmentItemService, EquipmentItemService>();
 
 // STUB registrations - both stand in for Patient Management (M4). STUBS.md rows 2 and 3.
 // Replacing either is this one line and nothing else.

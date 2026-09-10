@@ -34,6 +34,20 @@ public interface IAdmissionService
     Task<AdmissionResponse> CompleteDetailsAsync(
         Guid id, CompleteDetailsRequest request, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// The patient is physically in the bed. Moves <c>bed_reserved</c> to <c>admitted</c> and
+    /// turns the hold on the bed into an occupancy, so it can no longer expire underneath them.
+    /// Throws IllegalTransitionException from any other status.
+    /// </summary>
+    Task<AdmissionResponse> MarkArrivedAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The visit is called off and any held bed goes back to the pool. Not permitted once the
+    /// patient is <c>admitted</c> — they are discharged instead, not cancelled.
+    /// </summary>
+    Task<AdmissionResponse> CancelAsync(
+        Guid id, CancelAdmissionRequest request, CancellationToken cancellationToken = default);
+
     /// <summary>Null when there is no such admission. For internal lookups — use GetByIdAsync to answer a request.</summary>
     Task<AdmissionEntity?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default);
 

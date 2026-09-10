@@ -1,4 +1,4 @@
-using CareLanka.Api.Common.Errors;
+﻿using CareLanka.Api.Common.Errors;
 using CareLanka.Api.Common.Exceptions;
 using CareLanka.Api.Data;
 using CareLanka.Api.Data.Configurations.Patient;
@@ -120,7 +120,11 @@ public sealed class PatientService : IPatientService
             Id = Guid.NewGuid(),
             FullName = request.FullName.Trim(),
             Nic = nic,
-            Gender = request.Gender,
+
+            // Not null: [ApiController] has already returned a 400 for a body with no gender.
+            // It is nullable on the request so that omission is an error rather than a silent
+            // `male` — see CreatePatientRequest.
+            Gender = request.Gender!.Value,
             DateOfBirth = request.DateOfBirth,
             Phone = phone,
             Address = Clean(request.Address),
@@ -158,7 +162,7 @@ public sealed class PatientService : IPatientService
 
         patient.FullName = request.FullName.Trim();
         patient.Nic = nic;
-        patient.Gender = request.Gender;
+        patient.Gender = request.Gender!.Value;
         patient.DateOfBirth = request.DateOfBirth;
         patient.Phone = phone;
         patient.Address = Clean(request.Address);

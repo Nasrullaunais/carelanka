@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using CareLanka.Api.Data.Enums;
 
 namespace CareLanka.Api.DTOs.Patient;
 
@@ -31,6 +32,18 @@ public class Admission : AdmissionSummary
     /// </summary>
     [Required]
     public IReadOnlyList<string> MissingFields { get; set; } = Array.Empty<string>();
+
+    /// <summary>When the patient left. Null while the visit is still running.</summary>
+    public DateTimeOffset? DischargedAt { get; set; }
+
+    /// <summary>Why the visit was called off. Null unless the status is `cancelled`.</summary>
+    public CancelReason? CancelReason { get; set; }
+
+    /// <summary>
+    /// The free-text half of a cancellation, which the enum cannot carry. Null unless the
+    /// status is `cancelled`, and often null even then.
+    /// </summary>
+    public string? CancelNote { get; set; }
 
     // Not [Required]: created_at and updated_at come from the group-owned AuditFields schema,
     // which lists no required members in any of the five specs.

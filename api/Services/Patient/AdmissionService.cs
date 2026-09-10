@@ -1,4 +1,4 @@
-using CareLanka.Api.Common.Errors;
+﻿using CareLanka.Api.Common.Errors;
 using CareLanka.Api.Common.Exceptions;
 using CareLanka.Api.Common.Persistence;
 using CareLanka.Api.Data;
@@ -151,9 +151,12 @@ public sealed class AdmissionService : IAdmissionService
         {
             Id = Guid.NewGuid(),
             PatientId = patient.Id,
-            Source = request.Source,
-            Category = request.AdmissionCategory,
-            Urgency = request.Urgency,
+            // Not null: [ApiController] has already returned a 400 for a body that left any of
+            // these out. They are nullable on the request so that omission is an error rather
+            // than a silent default — see CreateAdmissionRequest.
+            Source = request.Source!.Value,
+            Category = request.AdmissionCategory!.Value,
+            Urgency = request.Urgency!.Value,
 
             // Every admission starts here. Getting a bed is a separate, approved step.
             Status = AdmissionStatus.AwaitingBed,
@@ -240,11 +243,107 @@ public sealed class AdmissionService : IAdmissionService
         return Fill(new AdmissionResponse(), admission);
     }
 
+    public Task<AdmissionResponse> MarkArrivedAsync(Guid id, CancellationToken ct = default)
+        => InTransitionAsync(id, admission =>
+        {
+            // Only from bed_reserved, and nowhere else. The workflow also allows
+            // ready_for_discharge -> admitted, but that is a nurse un-flagging a discharge and
+            // it must not stamp an arrival time, so it is a different endpoint at step 7.
+            AdmissionStatusMachine.EnsureMove(
+                admission.Status, AdmissionStatus.Admitted, AdmissionStatus.BedReserved);
+
+            admission.Status = AdmissionStatus.Admitted;
+            admission.AdmittedAt = DateTimeOffset.UtcNow;
+
+            // The hold becomes an occupancy. Until this happens the 30-minute expiry can still
+            // take the bed back, which would free a bed with a patient already in it.
+            var hold = admission.BedAssignments
+                .FirstOrDefault(b => b.Status == AssignmentStatus.Reserved);
+
+            if (hold is not null)
+            {
+                hold.Status = AssignmentStatus.Occupied;
+                hold.ReservedUntil = null;
+            }
+        }, ct);
+
+    public Task<AdmissionResponse> CancelAsync(
+        Guid id, CancelAdmissionRequest request, CancellationToken ct = default)
+        => InTransitionAsync(id, admission =>
+        {
+            // Everything before the patient is physically here. An admitted patient is
+            // discharged, not cancelled — you cannot call off somebody lying in your ward.
+            AdmissionStatusMachine.EnsureMove(
+                admission.Status,
+                AdmissionStatus.Cancelled,
+                AdmissionStatus.AwaitingBed,
+                AdmissionStatus.AwaitingApproval,
+                AdmissionStatus.BedReserved);
+
+            admission.Status = AdmissionStatus.Cancelled;
+            admission.CancelReason = request.Reason!.Value;
+            admission.CancelNote = Clean(request.Note);
+
+            // Any bed this visit was holding goes back to the pool in the same transaction.
+            // Leave it behind and the bed is out of service for nobody, and
+            // ux_bed_assignments_live_bed then refuses the next patient who needs it.
+            foreach (var live in admission.BedAssignments
+                .Where(b => b.Status != AssignmentStatus.Released))
+            {
+                live.Status = AssignmentStatus.Released;
+                live.ReservedUntil = null;
+                live.ReleasedAt = DateTimeOffset.UtcNow;
+                live.ReleaseReason = ReleaseReason.Cancelled;
+            }
+        }, ct);
+
     public Task<AdmissionEntity?> FindByIdAsync(Guid id, CancellationToken ct = default)
         => _db.Admissions.FirstOrDefaultAsync(a => a.Id == id, ct);
 
     public async Task<AdmissionEntity> GetByIdAsync(Guid id, CancellationToken ct = default)
         => await FindByIdAsync(id, ct) ?? throw new NotFoundException("Admission", id);
+
+    /// <summary>
+    /// Runs one status change against a locked row, so two people acting on the same visit are
+    /// serialised rather than each overwriting the other.
+    /// </summary>
+    /// <remarks>
+    /// The problem this solves: a transition check reads the status, and the save writes it. A
+    /// manager cancelling and a nurse marking arrival both read <c>bed_reserved</c> in the gap
+    /// between, both pass the check, and the later write wins — so a cancelled patient ends up
+    /// admitted. No index can catch that, because each row is legal on its own.
+    ///
+    /// <c>SELECT ... FOR UPDATE</c> holds the admission row until this transaction commits, so
+    /// the second request waits, then reads the status the first one left behind and is refused
+    /// with the honest 409: cannot move from <c>cancelled</c> to <c>admitted</c>. The same
+    /// approach the bed approval takes at step 11, for the same reason.
+    /// </remarks>
+    private async Task<AdmissionResponse> InTransitionAsync(
+        Guid id, Action<AdmissionEntity> change, CancellationToken ct)
+    {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+
+        // Takes the lock and nothing else. Locking and loading in one composed query puts
+        // FOR UPDATE inside a join against patients and bed_assignments, which locks rows
+        // nobody asked about. A missing row locks nothing and falls through to the 404 below.
+        await _db.Database.ExecuteSqlAsync(
+            $"SELECT id FROM admissions WHERE id = {id} FOR UPDATE", ct);
+
+        // Read committed gives every statement its own snapshot, so this sees whatever the
+        // request we just waited for committed — not the stale row we queued behind.
+        var admission = await _db.Admissions
+            .Include(a => a.Patient)
+            .Include(a => a.BedAssignments)
+            .FirstOrDefaultAsync(a => a.Id == id, ct)
+            ?? throw new NotFoundException("Admission", id);
+
+        change(admission);
+
+        await _db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+
+        return Fill(new AdmissionResponse(), admission);
+    }
 
     private static IOrderedQueryable<AdmissionEntity> Sort(
         IQueryable<AdmissionEntity> query, AdmissionSortField sortBy, SortDirection sortDir)
@@ -391,6 +490,9 @@ public sealed class AdmissionService : IAdmissionService
         response.IsInfectious = admission.IsInfectious;
         response.ReportedByUserId = admission.ReportedByUserId;
         response.MissingFields = admission.MissingFields.ToList();
+        response.DischargedAt = admission.DischargedAt;
+        response.CancelReason = admission.CancelReason;
+        response.CancelNote = admission.CancelNote;
         response.CreatedAt = admission.CreatedAt;
         response.UpdatedAt = admission.UpdatedAt;
 

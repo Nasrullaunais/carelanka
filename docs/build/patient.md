@@ -29,7 +29,7 @@
 | 1 | **`Ward` first** | Three other components are blocked behind it. Then freeze the schema |
 | 2 | Remaining entities + configurations + migration | Including `PatientAccount` (Rev 2.5) and the optional link `Patient.UserAccountId` |
 | 3 | Patient + Admission CRUD | Including `temp_reference` for unidentified arrivals |
-| 4 | **The 7-state admission status machine** | `awaiting_bed → awaiting_approval → bed_reserved → admitted → ready_for_discharge → discharged`, plus `cancelled`. Illegal transitions → 409. **This is the backbone — test it hardest** |
+| 4 | **The 7-state admission status machine** | **Done.** `awaiting_bed → awaiting_approval → bed_reserved → admitted → ready_for_discharge → discharged`, plus `cancelled`. Illegal transitions → 409 |
 | 5 | `GET /capacity/wards` + `GET /wards/{id}/occupancy` | M1 and M2 are both blocked on these. Before the agent |
 | 6 | **Manual bed assignment, no AI** | Pick a bed by hand, with the 30-minute hold. The concurrency guarantee lives in the partial unique index, not in code |
 | 7 | Discharge checklist + confirmation | `clinical_clearance` gated on the `doctor` role claim |
@@ -52,11 +52,13 @@ diagram. The one worth knowing before step 6: **`BedReservation` no longer exist
 30-minute hold is a `BedAssignment` row with `status = 'reserved'` and a `reserved_until`,
 which is what the spec has always published.
 
-**Step 3 is complete.** Patients half: `POST /patients`, `GET /patients`,
+**Steps 3 and 4 are complete.** Patients half: `POST /patients`, `GET /patients`,
 `GET /patients/{id}`, `PUT /patients/{id}`, `POST /patients/lookup`,
 `POST /patients/{id}/link-account`. Admissions half: `POST /admissions`, `GET /admissions`,
-`GET /admissions/{id}`, `PATCH /admissions/{id}/details`. **Step 4, the status machine, is
-next.** Things settled while building it:
+`GET /admissions/{id}`, `PATCH /admissions/{id}/details`, and from step 4
+`POST /admissions/{id}/arrive` and `POST /admissions/{id}/cancel`. **Step 5, the capacity
+endpoints Kaveesha and Nasrullah are both blocked on, is next.** Things settled while building
+step 3:
 
 - **`temp_reference` is generated, not requested.** Register with no NIC and no phone and
   the server allocates `UNKNOWN-2026-0001`, numbered per year. Supplying a NIC later never
@@ -64,6 +66,8 @@ next.** Things settled while building it:
 - **Three new policies.** `PatientRegistrar`, `PatientReader` and `PatientEditor` in
   `Common/Auth/Policies.cs`, because the role combinations this spec publishes did not
   exist. Additive, flagged for the group.
+- **A required enum in a request body has to be nullable to actually be required** — see the
+  step 4 notes below, where this was found and swept across all four request bodies.
 - **A query-string enum needs a type converter.** `?sortBy=full_name` does not bind to
   `FullName` without one; the JSON converter only covers request and response bodies. See
   `SnakeCaseEnumTypeConverter`. `AdmissionStatus`, `AdmissionSource` and `AdmissionCategory`
@@ -83,6 +87,59 @@ next.** Things settled while building it:
   snake_case string, so ordering it alphabetically gives emergency, routine, urgent — which
   reads like a sort and is not one. Write the rank inline: a helper method inside the lambda
   is not something EF can turn into SQL, and it fails at run time.
+
+**Step 4 is complete.** The workflow lives in `Services/Patient/AdmissionStatusMachine.cs` and
+nowhere else, and two endpoints go through it: `POST /admissions/{id}/arrive` and
+`POST /admissions/{id}/cancel`. 29 new tests — 13 unit tests on the table itself, 16
+integration tests through HTTP. Things settled while building it:
+
+- **The table is one question and an endpoint is a narrower one, and both get asked.**
+  `ready_for_discharge -> admitted` is a legal move, but `/arrive` is not what makes it —
+  arriving stamps `admitted_at` and a nurse un-flagging a discharge must not. So every
+  endpoint names the states *it* starts from as well as going through the table. Checking only
+  the table lets one endpoint do another's job; checking only the endpoint's own list lets a
+  typo invent a move the workflow does not have.
+- **The 49 from/to pairs are tested with no database at all.** `AdmissionStatusMachineTests`
+  sweeps every pair, including the ones no endpoint can reach until steps 6 and 7 — which is
+  exactly where a mistake would sit unnoticed until something was built on top of it. The
+  expectation is written as the plain text of `patient-management-plan.md` §4.2, not as a copy
+  of the machine's own C# dictionary: a test that asks the code what it does agrees with every
+  bug it has.
+- **A second drift gate holds the machine against the published contract.**
+  `patient-spec.yaml` prints the whole workflow in the description of its `IllegalTransition`
+  response, so `PatientOpenApiContractTests` parses that text and compares it with the table,
+  both directions. A move added to one and not the other fails there rather than at the viva.
+- **The race is real and an index cannot catch it.** A manager cancelling and a nurse marking
+  arrival both read `bed_reserved`, both pass the check, and the later write wins — a cancelled
+  patient ending up admitted. Both rows are legal on their own, so there is no unique index to
+  lean on. `SELECT ... FOR UPDATE` on the admission row makes the second request wait, re-read
+  and get the honest 409. Same row lock step 11 already plans to use at approval time.
+- **`cancel_note` needed a column.** The spec's cancel body has always published an optional
+  `note` and nothing stored it. Accepting and dropping it would have been a field that looks
+  saved and is not, so: `Patient_AddCancelNote`, published back on the `Admission` response,
+  entity diagram Rev 2.10.
+- **Every required enum on a request body is nullable, on purpose.** `[Required]` on a plain
+  enum always passes: the binder has already turned an absent key into the first declared
+  member, so there is nothing left for validation to object to. Making the property nullable is
+  what turns a missing key into a 400. Found on `CancelAdmissionRequest` and then swept: all
+  seven properties across four request bodies are fixed, with a test each that omits the key.
+  **Two of them were not cosmetic.** `admission_category` defaulted to `icu`, which is the top
+  of the downgrade ladder and the input to hard rule H2 — a body missing the key filed the
+  patient at the most acute care level in the hospital with no error. `gender` defaulted to
+  `male`, which defeats something deliberate: `Gender.Unknown` exists precisely so hard rule H3
+  behaves deterministically for an unidentified arrival, and omitting the key recorded that
+  patient as male — exactly the case `Unknown` was added to handle. **None of it changed the
+  published contract**: Swashbuckle emits a `$ref` with the property still in `required`, so the
+  generated client is byte-identical and this is a server-side validation fix only.
+  Equipment's request DTOs were checked and do not have the hole — its only two enum properties
+  are already nullable, on PATCH-style updates where nullable means "not supplied".
+- **`/arrive` is `WardNurse` and `/cancel` is `DutyManager`**, both single-role, taken straight
+  from the `Roles:` line on each operation. No new entry in the group-owned `Policies.cs`: a
+  policy per staff role already exists, and only a *combination* needs naming.
+- **Tests reach `bed_reserved` by writing the rows directly.** Nothing can reserve a bed until
+  step 6, and waiting would have left the only happy path through the backbone untested.
+  `AdmissionEndpointTests.ReserveABedAsync` writes exactly what step 6 will write, so the tests
+  should keep passing when it lands and the helper can then be deleted.
 
 **Steps 13–16 are self-contained.** Nothing else in the group depends on the care advisory
 agent, and it depends on nothing outside this component beyond the `doctor` role claim,
@@ -115,8 +172,10 @@ arrival has a record and no account, forever. A `PatientAccount` is a login. The
 because two people share a phone far more often than a hospital would like.
 
 **The state machine is the thing a marker will poke at.** Seven states, and §17.2 says you
-may be asked to modify a business rule live. Mirror the transition matrix in React and
-offer only legal moves — a transition with side effects has its own endpoint, and PATCHing
+may be asked to modify a business rule live — which is one edit to the `Moves` table in
+`AdmissionStatusMachine`, plus the same edit to `patient-management-plan.md` §4.2 and the
+`IllegalTransition` description in `patient-spec.yaml`, because two tests hold the three
+against each other. Mirror the transition matrix in React and offer only legal moves — a transition with side effects has its own endpoint, and PATCHing
 straight to `admitted` skips the approval and the approver stamp.
 
 **Urgency translation at the M1 → M4 boundary.** Emergency's `critical/high/medium/low`

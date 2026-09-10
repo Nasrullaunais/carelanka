@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CompleteAdmissionDetailsData, CompleteAdmissionDetailsErrors, CompleteAdmissionDetailsResponses, CreateAdmissionData, CreateAdmissionErrors, CreateAdmissionResponses, CreatePatientData, CreatePatientErrors, CreatePatientResponses, CreateWardData, CreateWardErrors, CreateWardResponses, GetAdmissionData, GetAdmissionErrors, GetAdmissionResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetPatientData, GetPatientErrors, GetPatientResponses, LinkPatientAccountData, LinkPatientAccountErrors, LinkPatientAccountResponses, ListAdmissionsData, ListAdmissionsErrors, ListAdmissionsResponses, ListPatientsData, ListPatientsErrors, ListPatientsResponses, ListWardsData, ListWardsErrors, ListWardsResponses, LoginData, LoginErrors, LoginPatientData, LoginPatientErrors, LoginPatientResponses, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, LookupPatientData, LookupPatientErrors, LookupPatientResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RegisterPatientAccountData, RegisterPatientAccountErrors, RegisterPatientAccountResponses, UpdatePatientData, UpdatePatientErrors, UpdatePatientResponses } from './types.gen';
+import type { CancelAdmissionData, CancelAdmissionErrors, CancelAdmissionResponses, CompleteAdmissionDetailsData, CompleteAdmissionDetailsErrors, CompleteAdmissionDetailsResponses, CreateAdmissionData, CreateAdmissionErrors, CreateAdmissionResponses, CreatePatientData, CreatePatientErrors, CreatePatientResponses, CreateWardData, CreateWardErrors, CreateWardResponses, GetAdmissionData, GetAdmissionErrors, GetAdmissionResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetPatientData, GetPatientErrors, GetPatientResponses, LinkPatientAccountData, LinkPatientAccountErrors, LinkPatientAccountResponses, ListAdmissionsData, ListAdmissionsErrors, ListAdmissionsResponses, ListPatientsData, ListPatientsErrors, ListPatientsResponses, ListWardsData, ListWardsErrors, ListWardsResponses, LoginData, LoginErrors, LoginPatientData, LoginPatientErrors, LoginPatientResponses, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, LookupPatientData, LookupPatientErrors, LookupPatientResponses, MarkArrivedData, MarkArrivedErrors, MarkArrivedResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RegisterPatientAccountData, RegisterPatientAccountErrors, RegisterPatientAccountResponses, UpdatePatientData, UpdatePatientErrors, UpdatePatientResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -62,6 +62,39 @@ export const getAdmission = <ThrowOnError extends boolean = false>(options: Opti
 export const completeAdmissionDetails = <ThrowOnError extends boolean = false>(options: Options<CompleteAdmissionDetailsData, ThrowOnError>): RequestResult<CompleteAdmissionDetailsResponses, CompleteAdmissionDetailsErrors, ThrowOnError> => (options.client ?? client).patch<CompleteAdmissionDetailsResponses, CompleteAdmissionDetailsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admissions/{id}/details',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Mark the patient as physically present in the bed. Moves `bed_reserved` to `admitted`,
+ * sets `admitted_at`, and turns the hold on the bed into an occupancy so it can no longer
+ * expire.
+ *
+ * Rejected with 409 from any other status: a patient cannot arrive into a bed that was
+ * never approved. The ward nurse is at the bedside, which is why this is theirs and not
+ * the duty manager's.
+ */
+export const markArrived = <ThrowOnError extends boolean = false>(options: Options<MarkArrivedData, ThrowOnError>): RequestResult<MarkArrivedResponses, MarkArrivedErrors, ThrowOnError> => (options.client ?? client).post<MarkArrivedResponses, MarkArrivedErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admissions/{id}/arrive',
+    ...options
+});
+
+/**
+ * Cancel an admission, with a reason, and release any bed it was holding.
+ *
+ * Always a human act, never automatic, which is why the reason is mandatory and why this
+ * is the duty manager's. A hold expiring frees a bed by itself because that is cheap and
+ * reversible; declaring that a patient is not coming is neither. Refused with 409 once
+ * they are `admitted` - discharge them instead.
+ */
+export const cancelAdmission = <ThrowOnError extends boolean = false>(options: Options<CancelAdmissionData, ThrowOnError>): RequestResult<CancelAdmissionResponses, CancelAdmissionErrors, ThrowOnError> => (options.client ?? client).post<CancelAdmissionResponses, CancelAdmissionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admissions/{id}/cancel',
     ...options,
     headers: {
         'Content-Type': 'application/json',

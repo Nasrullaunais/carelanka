@@ -1,4 +1,7 @@
 using System.Text.Json;
+using CareLanka.Api.Common.Persistence;
+using CareLanka.Api.Data.Enums;
+using CareLanka.Api.Services.Patient;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using YamlDotNet.RepresentationModel;
@@ -44,6 +47,7 @@ public sealed class PatientOpenApiContractTests
     [InlineData("CreateAdmissionRequest")]
     [InlineData("Admission")]
     [InlineData("AdmissionDetail")]
+    [InlineData("CancelAdmissionRequest")]
     public async Task Published_schema_required_members_match_the_contract(string schemaName)
     {
         var generated = await GenerateAsync();
@@ -139,6 +143,12 @@ public sealed class PatientOpenApiContractTests
         Assert.Equal(
             "completeAdmissionDetails",
             paths.GetProperty("/admissions/{id}/details").GetProperty("patch").GetProperty("operationId").GetString());
+        Assert.Equal(
+            "markArrived",
+            paths.GetProperty("/admissions/{id}/arrive").GetProperty("post").GetProperty("operationId").GetString());
+        Assert.Equal(
+            "cancelAdmission",
+            paths.GetProperty("/admissions/{id}/cancel").GetProperty("post").GetProperty("operationId").GetString());
     }
 
     [Fact]
@@ -161,6 +171,62 @@ public sealed class PatientOpenApiContractTests
         Assert.Equal(
             new[] { "200", "400", "401", "403", "404", "409" },
             Responses(paths.GetProperty("/admissions/{id}/details").GetProperty("patch")));
+
+        // No 400 on arrive: it takes no body, so there is nothing to fail validation. Cancel
+        // has one, because the reason is mandatory and a client can leave it out.
+        Assert.Equal(
+            new[] { "200", "401", "403", "404", "409" },
+            Responses(paths.GetProperty("/admissions/{id}/arrive").GetProperty("post")));
+        Assert.Equal(
+            new[] { "200", "400", "401", "403", "404", "409" },
+            Responses(paths.GetProperty("/admissions/{id}/cancel").GetProperty("post")));
+    }
+
+    // The drift gate on the backbone. patient-spec.yaml prints the whole workflow in the
+    // description of its IllegalTransition response, so that text is a contract the group and
+    // both frontends read. This parses it and holds the service's transition table against it,
+    // in both directions - a move added to one and not the other fails here rather than at a
+    // viva.
+    [Fact]
+    public void The_workflow_the_contract_prints_is_the_workflow_the_service_enforces()
+    {
+        var published = PublishedTransitions();
+        var enforced = Enum.GetValues<AdmissionStatus>()
+            .SelectMany(from => AdmissionStatusMachine.MovesFrom(from)
+                .Select(to => $"{EnumWire.ToWire(from)} -> {EnumWire.ToWire(to)}"))
+            .ToHashSet();
+
+        Assert.Equal(published.Order(), enforced.Order());
+    }
+
+    /// <summary>
+    /// The moves listed in the IllegalTransition response description, as "from -> to" strings.
+    /// The lines look like <c>bed_reserved -> admitted, awaiting_bed, cancelled;</c>.
+    /// </summary>
+    private static HashSet<string> PublishedTransitions()
+    {
+        var description = ((YamlScalarNode)Map(LoadContract(), "components", "responses", "IllegalTransition")
+            .Children[new YamlScalarNode("description")]).Value!;
+
+        var moves = new HashSet<string>();
+
+        foreach (var line in description.Split('\n'))
+        {
+            if (!line.Contains("->"))
+            {
+                continue;
+            }
+
+            var halves = line.Split("->");
+            var from = halves[0].Trim();
+
+            foreach (var to in halves[1].Split(',', StringSplitOptions.TrimEntries))
+            {
+                moves.Add($"{from} -> {to.TrimEnd(';', '.')}");
+            }
+        }
+
+        return moves;
     }
 
     // AdmissionDetail deliberately publishes fewer keys than patient-spec.yaml describes:

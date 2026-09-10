@@ -122,6 +122,15 @@ select {
   color: var(--ink);
 }
 
+/* A checkbox is not a text field. The width:100% above stretches it the width of the card,
+   which centres the little box in the middle of nowhere and pushes its own words onto the
+   next line. Affects every checkbox in the app, so it is fixed here rather than per page. */
+input[type='checkbox'] {
+  width: auto;
+  margin: 0 0.35rem 0 0;
+  vertical-align: -0.1em;
+}
+
 input:focus,
 select:focus {
   outline: 2px solid var(--accent);
@@ -255,4 +264,66 @@ tr:last-child td {
   background: var(--canvas);
   padding: 0.05rem 0.3rem;
   border-radius: 4px;
+}
+
+/* ---------- stat tiles and the fullness bar ---------- */
+
+.stats {
+  display: flex;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.stat {
+  flex: 1 1 7rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.7rem 0.85rem;
+}
+
+.stat .value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.stat .caption {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+
+.stat.free {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.stat.free .value {
+  color: var(--accent);
+}
+
+/* No beds free is the one number worth colouring, because it is the one that changes what
+   somebody does next. */
+.stat.none .value {
+  color: var(--danger);
+}
+
+.meter {
+  display: block;
+  height: 8px;
+  min-width: 4rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  overflow: hidden;
+}
+
+.meter > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.meter.full > span {
+  background: var(--danger);
 }

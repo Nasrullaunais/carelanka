@@ -70,6 +70,38 @@ export function canEditAdmissions(role: PrincipalRole | undefined): boolean {
   return role === 'ward_nurse' || role === 'duty_manager';
 }
 
+/**
+ * Policies.AppointmentDesk on GET /api/appointments, POST /api/appointments and
+ * POST /api/appointments/{id}/check-in.
+ *
+ * The same two roles as canEditAdmissions today, kept as its own helper for the same reason
+ * the server keeps it as its own policy: taking a booking and chasing paperwork are different
+ * jobs, and one name over both is how a role quietly gains the other.
+ */
+export function canWorkAppointmentDesk(role: PrincipalRole | undefined): boolean {
+  return role === 'ward_nurse' || role === 'duty_manager';
+}
+
+/**
+ * The half of check-in that is NOT a policy. AppointmentService refuses `icu` and `hdu` from
+ * anyone but the duty manager, and it has to be checked there rather than on the route because
+ * the rule reads the request body. Here it decides which care levels the picker offers, so a
+ * nurse never chooses one and finds out from a 403.
+ */
+export function canSetHighCareLevel(role: PrincipalRole | undefined): boolean {
+  return role === 'duty_manager';
+}
+
+/**
+ * Policies.AnyStaff on GET /api/capacity/wards and GET /api/wards/{id}/occupancy.
+ *
+ * Counts only, no patient identities, which is why it is open to every staff role — a porter
+ * moving a bed and a dispatcher choosing a hospital both need the same number.
+ */
+export function canReadCapacity(role: PrincipalRole | undefined): boolean {
+  return isStaff(role);
+}
+
 export const roleLabels: Record<PrincipalRole, string> = {
   ward_nurse: 'Ward nurse',
   doctor: 'Doctor',

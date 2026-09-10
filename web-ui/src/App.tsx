@@ -1,5 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
+import { AppointmentsPage } from './pages/AppointmentsPage';
+import { CapacityPage } from './pages/CapacityPage';
 import { IntakePage } from './pages/IntakePage';
 import { LoginPage } from './pages/LoginPage';
 import { WardsPage } from './pages/WardsPage';
@@ -42,6 +44,8 @@ export function App() {
     <Routes>
       <Route element={<AppShell />}>
         <Route path="/intake" element={<IntakePage />} />
+        <Route path="/appointments" element={<AppointmentsPage />} />
+        <Route path="/capacity" element={<CapacityPage />} />
         <Route path="/wards" element={<WardsPage />} />
         <Route path="*" element={<Navigate to="/wards" replace />} />
       </Route>

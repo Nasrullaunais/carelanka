@@ -30,7 +30,8 @@ public static class MessageCodes
             [MessageCode.CategoryNameTaken] = "cl_equ_004",
             [MessageCode.SerialNumberTaken] = "cl_equ_005",
             [MessageCode.EquipmentNotAvailable] = "cl_equ_006",
-            [MessageCode.EquipmentNotAssigned] = "cl_equ_007"
+            [MessageCode.EquipmentNotAssigned] = "cl_equ_007",
+            [MessageCode.WardNameTaken] = "cl_pat_001"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

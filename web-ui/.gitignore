@@ -1,0 +1,8 @@
+node_modules
+dist
+*.local
+.vite
+*.tsbuildinfo
+
+# src/services/api/generated/ is NOT ignored on purpose. check:codegen regenerates it and
+# fails on any git difference — that gate needs the generated files to be tracked.

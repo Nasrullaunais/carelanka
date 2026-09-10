@@ -5,6 +5,23 @@ single hospital / multiple wards, unified staff identity, generic agent-workflow
 audit-log schemas). PKs are `Guid` (PostgreSQL `uuid`, `default: gen_random_uuid()`)
 throughout.
 
+**Revision 2.8** — the first Patient Management code landed (`Ward`: the entity, its
+configuration, the `Patient_AddWard` migration and `GET`/`POST /wards`), and building it
+settled two names this document and `patient-spec.yaml` disagreed on. Changes marked
+*(Rev 2.8)*. **`Ward`'s schema is now frozen** — `Shift.WardId`, `EquipmentItem.WardId` and
+`Dispatch.DestinationWardId` all point at it.
+
+- **`WardGenderPolicy` is named `GenderPolicy`.** The committed spec publishes it as
+  `GenderPolicy`, and on an entity Member 4 owns the spec wins. Same values, same wire
+  values, one name in three places instead of two.
+- **`Ward.Type` is named `Ward.WardType`.** The JSON field was already `ward_type`; calling
+  the property `Type` meant the column, the property and the wire name were three different
+  words for one thing.
+- **`HighDependency` is spelled `Hdu` in C#.** Not a schema change — the wire value was
+  always `hdu`. The C# member name *is* the wire value under this codebase's snake-case
+  converter, so a "readable" `HighDependency` silently serialized to `high_dependency` and
+  broke the match the Rev 2.2 note was written to protect.
+
 **Revision 2.7** — the first Common code landed (auth: login, registration, refresh,
 logout, `/auth/me`), and building it surfaced one place where this document could not be
 implemented as written. Changes marked *(Rev 2.7)*.
@@ -581,10 +598,10 @@ partial UNIQUE stops the threshold job inserting a duplicate open warning on eve
 #### Ward extends SoftDeletableEntity
 ```
 + Name: string (unique, non-null)
-+ Type: WardType (non-null)                             -- (Rev 2.2: was AdmissionCategory)
-+ GenderPolicy: WardGenderPolicy (non-null)             -- (Rev 2)
++ WardType: WardType (non-null)                         -- (Rev 2.2: was AdmissionCategory; Rev 2.8: was Type)
++ GenderPolicy: GenderPolicy (non-null)                 -- (Rev 2; Rev 2.8: enum was WardGenderPolicy)
 ```
-**Table:** `wards`
+**Table:** `wards` — **built.** `Patient_AddWard`, `api/Data/Entities/Patient/Ward.cs`.
 **Note:** `Type` lets the Patient Admission & Bed Agent filter candidate beds by matching
 ward type to the patient's category. *(Decision 31)*
 
@@ -1192,10 +1209,12 @@ NIC, no phone and a generated `TempReference`. A patient nobody can identify has
 gender, and the gender-ward filter (hard rule H3) has to do something deterministic with
 that. `patient-spec.yaml` has been updated to match this enum, not the other way round.
 
-### WardGenderPolicy *(Rev 2 — new)*
+### GenderPolicy *(Rev 2 — new; Rev 2.8 — renamed)*
 ```
 Male, Female, Mixed
 ```
+Serialized as `male`, `female`, `mixed`. *(Rev 2.8)* Was `WardGenderPolicy` here and
+`GenderPolicy` in `patient-spec.yaml`; the spec wins on an entity Member 4 owns.
 
 ### AdmissionSource *(Rev 2 — new; Rev 2.2 — aligned)*
 ```

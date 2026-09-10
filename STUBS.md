@@ -66,14 +66,24 @@ actually published.
 
 ## Open stubs
 
-**Two open, both Equipment waiting on Patient Management.** Common auth was never
-stubbed: it was built and merged in PR #11. Numbering starts at 2 because row 1 is
-claimed by the open PR #12, which stubs our bed register from their side.
+**Three open, one in each direction.** Common auth was never stubbed: it was built
+and merged in PR #11. Rows 2 and 3 are Equipment waiting on Patient Management; row 1
+is Patient Management waiting on Equipment.
 
 | # | What is faked | Where it lives | Standing in for | Owner of the real thing | Added |
 | :-- | :--- | :--- | :--- | :--- | :--- |
+| 1 | Bed counts per ward — every ward reports exactly 6 beds | `api/Services/Patient/Stubs/StubBedRegistryService.cs` | `GET /beds` — `equipment-spec.yaml` | **M3 Sethmin** | 2026-09-08 |
 | 2 | Ward names on a bed — every ward is called `Stub ward <id fragment>` | `api/Services/Equipment/Stubs/StubWardDirectory.cs` | `GET /wards` — `patient-spec.yaml` | **M4 Lochana** | 2026-09-09 |
 | 3 | Is this bed occupied — always answers **yes** | `api/Services/Equipment/Stubs/StubBedOccupancyPort.cs` | `GET /beds/{id}/occupancy` — `patient-spec.yaml` | **M4 Lochana** | 2026-09-09 |
+
+**Row 1 — what it feeds and how far it goes.** Only `Ward.total_beds` on `GET /wards` and
+`POST /wards` reads it today. `IBedRegistryService` is deliberately one method wide
+(`CountBedsByWardAsync`) because counting is all the ward endpoints need; the bed agent's
+candidate list widens the interface later, and that is when the fake starts mattering.
+
+**Why a constant and not zero.** Six beds in every ward is visibly not a real hospital.
+Zero would have been indistinguishable from the genuine "no beds recorded in this ward yet"
+state, which is exactly the kind of fake that survives to a demo.
 
 **Row 2 — why the name looks broken on purpose.** `Bed.ward_name` is Patient Management's
 to answer, and a plausible invented name like "Intensive Care" would be indistinguishable
@@ -88,15 +98,16 @@ scheduled on a bed with a patient in it and would pass every test we wrote. The 
 that withdrawing a bed cannot be exercised end to end yet, which is visible immediately
 rather than at the demo.
 
-**Replacing either is one line each** — the two `AddSingleton` registrations in
+**Replacing any of them is one line each** — the three `AddSingleton` registrations in
 `api/Program.cs`. Nothing else moves.
 
-**What this PR does to row 1.** `IBedService.CountBedsByWardAsync` has deliberately the
-same signature as Patient Management's `IBedRegistryService.CountBedsByWardAsync`, and
-returns the same "a ward with no beds is absent, not zero" shape. Once PR #12 merges,
-retiring their stub is a delegating adapter of about five lines plus their DI registration.
-It cannot be done from this branch because their interface does not exist on `main` yet.
-
+**All three are now retirable, and none has been retired yet.** Before this merge each
+side was blocked on code that did not exist on `main`. Both sides are now on this branch,
+so row 1 can become a delegating adapter over `IBedService.CountBedsByWardAsync`, which
+was given deliberately the same signature and the same "a ward with no beds is absent,
+not zero" shape as `IBedRegistryService.CountBedsByWardAsync`. Rows 2 and 3 can point at
+the real ward and occupancy work in the same way. Swapping any of them changes behaviour,
+so each belongs in its own commit with its own tests rather than in a merge.
 
 ---
 

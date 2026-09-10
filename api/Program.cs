@@ -11,6 +11,8 @@ using CareLanka.Api.Data.Enums;
 using CareLanka.Api.Services.Common;
 using CareLanka.Api.Services.Equipment;
 using CareLanka.Api.Services.Equipment.Stubs;
+using CareLanka.Api.Services.Patient;
+using CareLanka.Api.Services.Patient.Stubs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Formatters;
@@ -208,11 +210,15 @@ builder.Services.AddScoped<IHealthService, HealthService>();
 builder.Services.AddScoped<IBedService, BedService>();
 builder.Services.AddScoped<IEquipmentCategoryService, EquipmentCategoryService>();
 builder.Services.AddScoped<IEquipmentItemService, EquipmentItemService>();
+builder.Services.AddScoped<IWardService, WardService>();
 
-// STUB registrations - both stand in for Patient Management (M4). STUBS.md rows 2 and 3.
-// Replacing either is this one line and nothing else.
+// STUB registrations - each module still stands in for the other. STUBS.md rows 1, 2
+// and 3. Both real implementations now live on this branch, so these three lines are
+// the whole of what is left to swap, but doing so is a behaviour change rather than a
+// merge resolution and belongs in its own commit.
 builder.Services.AddSingleton<IWardDirectory, StubWardDirectory>();
 builder.Services.AddSingleton<IBedOccupancyPort, StubBedOccupancyPort>();
+builder.Services.AddSingleton<IBedRegistryService, StubBedRegistryService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>

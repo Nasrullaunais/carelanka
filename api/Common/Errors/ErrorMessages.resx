@@ -118,4 +118,8 @@
   <data name="cl_equ_007" xml:space="preserve">
     <value>{0} is not currently assigned to anyone.</value>
   </data>
+  <data name="cl_pat_001" xml:space="preserve">
+    <value>A ward named {0} already exists.</value>
+    <comment>Only active wards are checked. A retired ward's name can be reused.</comment>
+  </data>
 </root>

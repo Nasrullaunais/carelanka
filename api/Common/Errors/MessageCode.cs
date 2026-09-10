@@ -40,5 +40,9 @@ public enum MessageCode
 
     EquipmentNotAvailable,
 
-    EquipmentNotAssigned
+    EquipmentNotAssigned,
+
+    // Patient Management — cl_pat_*
+
+    WardNameTaken
 }

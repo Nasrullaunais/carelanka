@@ -2148,6 +2148,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/AuditFields'
         - type: object
+          required: [id, name, ward_type, gender_policy, is_active, total_beds]
           properties:
             id: { type: string, format: uuid }
             name: { type: string }

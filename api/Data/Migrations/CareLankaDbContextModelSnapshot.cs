@@ -631,6 +631,63 @@ namespace CareLanka.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.Ward", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("GenderPolicy")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("gender_policy");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("WardType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("ward_type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_wards");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("ux_wards_name")
+                        .HasFilter("is_active");
+
+                    b.ToTable("wards", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_wards_gender_policy", "gender_policy IN ('male', 'female', 'mixed')");
+
+                            t.HasCheckConstraint("ck_wards_type", "ward_type IN ('icu', 'hdu', 'general', 'maternity', 'pediatric', 'isolation')");
+                        });
+                });
+
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Common.RefreshToken", b =>
                 {
                     b.HasOne("CareLanka.Api.Data.Entities.Common.PatientAccount", "PatientAccount")

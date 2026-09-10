@@ -183,6 +183,22 @@ public sealed class PatientEndpointTests
     }
 
     [Fact]
+    public async Task A_search_that_matches_nobody_is_page_one_of_one_and_not_page_one_of_zero()
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+
+        using var body = await ReadJsonAsync(
+            await client.GetAsync($"/api/patients?search=NoSuchPatient{Guid.NewGuid():N}"));
+
+        // Equipment Management shipped `PagedResult` to `main` first and rounds an empty list up
+        // to one page, so a UI renders "page 1 of 1" over an empty table rather than "of 0".
+        // Patient Management adopted that rather than shipping a second, differing copy.
+        Assert.Equal(0, body.RootElement.GetProperty("total_items").GetInt32());
+        Assert.Equal(1, body.RootElement.GetProperty("total_pages").GetInt32());
+        Assert.Empty(body.RootElement.GetProperty("items").EnumerateArray());
+    }
+
+    [Fact]
     public async Task Sorting_by_full_name_binds_the_snake_case_value_the_spec_publishes()
     {
         using var client = await ClientAsync(ApiApplication.NurseEmail);

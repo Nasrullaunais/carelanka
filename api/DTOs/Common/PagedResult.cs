@@ -2,16 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace CareLanka.Api.DTOs.Common;
 
-/// <summary>
-/// One page of a list. The shape is the group-owned <c>PagedResult</c> schema, published
-/// byte-identically by all five specs, so nothing here is this component's to change.
-/// </summary>
-/// <remarks>
-/// Built by Patient Management (M4) because <c>GET /api/patients</c> is the first paged
-/// endpoint in the API. It lives in DTOs/Common rather than DTOs/Patient precisely because it
-/// is not ours — the next component that pages a list imports this one instead of writing a
-/// second.
-/// </remarks>
+/// <summary>One page of a list endpoint. Group-owned: the shape is the same in all five specs.</summary>
 public class PagedResult<T>
 {
     [Required]
@@ -26,7 +17,7 @@ public class PagedResult<T>
     [Required]
     public int TotalItems { get; set; }
 
-    /// <summary>Zero items is zero pages, not one. An empty list has no page to ask for.</summary>
+    /// <summary>Always at least 1, so an empty list does not render as "page 1 of 0".</summary>
     [Required]
     public int TotalPages { get; set; }
 
@@ -37,6 +28,6 @@ public class PagedResult<T>
             Page = page,
             PageSize = pageSize,
             TotalItems = totalItems,
-            TotalPages = (int)Math.Ceiling(totalItems / (double)pageSize)
+            TotalPages = totalItems == 0 ? 1 : (int)Math.Ceiling(totalItems / (double)pageSize)
         };
 }

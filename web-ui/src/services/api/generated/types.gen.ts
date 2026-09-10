@@ -4,7 +4,103 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}/api` | (string & {});
 };
 
+/**
+ * One hospital visit, in full. The spec builds this from AdmissionSummary + AuditFields, so this inherits rather than repeating the summary fields.
+ */
+export type Admission = {
+    id: string;
+    patient?: PatientSummary;
+    source: AdmissionSource;
+    admission_category: AdmissionCategory;
+    urgency: AdmissionUrgency;
+    status: AdmissionStatus;
+    details_complete: boolean;
+    /**
+     * From the live bed assignment, if there is one. Null before a bed is held and after discharge.
+     */
+    ward_name?: string | null;
+    bed_number?: string | null;
+    expected_arrival?: string | null;
+    admitted_at?: string | null;
+    /**
+     * Emergency Service's own reference, carried as their string. Not a foreign key — dispatches are their table.
+     */
+    dispatch_id?: string | null;
+    /**
+     * The clinician who chose the care level. Recorded proof a human decided it, never an agent.
+     */
+    category_set_by_staff_id: string;
+    category_set_at: string;
+    is_infectious: boolean;
+    /**
+     * A PatientAccount id — the app user who raised the emergency call when they are not the
+     * patient. Never a Patient id: a bystander who calls for a stranger has a login, not a
+     * medical record. Null for a walk-in or a booking.
+     */
+    reported_by_user_id?: string | null;
+    /**
+     * What paperwork is still outstanding, named rather than counted. "Incomplete" does not
+     * tell a ward clerk what to chase; "nic, date_of_birth" does.
+     */
+    missing_fields: Array<string>;
+    created_at?: string;
+    updated_at?: string;
+};
+
 export type AdmissionCategory = 'icu' | 'hdu' | 'inpatient' | 'day_case' | 'outpatient';
+
+/**
+ * One admission with its bed history. Nothing is deleted or overwritten, so a rejected or
+ * expired assignment stays on the list — this is the audit trail, not the current state.
+ */
+export type AdmissionDetail = {
+    id: string;
+    patient?: PatientSummary;
+    source: AdmissionSource;
+    admission_category: AdmissionCategory;
+    urgency: AdmissionUrgency;
+    status: AdmissionStatus;
+    details_complete: boolean;
+    /**
+     * From the live bed assignment, if there is one. Null before a bed is held and after discharge.
+     */
+    ward_name?: string | null;
+    bed_number?: string | null;
+    expected_arrival?: string | null;
+    admitted_at?: string | null;
+    /**
+     * Emergency Service's own reference, carried as their string. Not a foreign key — dispatches are their table.
+     */
+    dispatch_id?: string | null;
+    /**
+     * The clinician who chose the care level. Recorded proof a human decided it, never an agent.
+     */
+    category_set_by_staff_id: string;
+    category_set_at: string;
+    is_infectious: boolean;
+    /**
+     * A PatientAccount id — the app user who raised the emergency call when they are not the
+     * patient. Never a Patient id: a bystander who calls for a stranger has a login, not a
+     * medical record. Null for a walk-in or a booking.
+     */
+    reported_by_user_id?: string | null;
+    /**
+     * What paperwork is still outstanding, named rather than counted. "Incomplete" does not
+     * tell a ward clerk what to chase; "nic, date_of_birth" does.
+     */
+    missing_fields: Array<string>;
+    created_at?: string;
+    updated_at?: string;
+    /**
+     * Every assignment ever made, including rejected and expired ones. Empty until step 6 puts beds behind it.
+     */
+    bed_assignments: Array<BedAssignment>;
+};
+
+/**
+ * What GET /api/admissions sorts on. Four fields, because those are the four the spec publishes.
+ */
+export type AdmissionSortField = 'created_at' | 'expected_arrival' | 'admitted_at' | 'urgency';
 
 export type AdmissionSource = 'emergency' | 'walk_in' | 'pre_registered';
 
@@ -30,7 +126,25 @@ export type AdmissionSummary = {
     admitted_at?: string | null;
 };
 
+/**
+ * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
+ */
+export type AdmissionSummaryPagedResult = {
+    items: Array<AdmissionSummary>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    /**
+     * Always at least 1, so an empty list does not render as "page 1 of 0".
+     */
+    total_pages: number;
+};
+
 export type AdmissionUrgency = 'routine' | 'urgent' | 'emergency';
+
+export type AssignedBy = 'agent' | 'user';
+
+export type AssignmentStatus = 'reserved' | 'occupied' | 'released';
 
 /**
  * What every successful sign-in returns.
@@ -47,6 +161,78 @@ export type AuthTokens = {
      */
     refresh_token: string;
     principal: CurrentPrincipal;
+};
+
+/**
+ * One bed held or occupied for an admission. A row walks reserved → occupied → released, and
+ * several rows per admission cover mid-stay transfers.
+ */
+export type BedAssignment = {
+    id: string;
+    admission_id: string;
+    bed_id: string;
+    /**
+     * From Equipment Management's register. Empty while their bed lookup is stubbed — see STUBS.md row 1.
+     */
+    ward_name: string;
+    bed_number: string;
+    status: AssignmentStatus;
+    /**
+     * The expiring hold. Past this instant the bed is free again, with no human action.
+     */
+    reserved_until?: string | null;
+    assigned_by: AssignedBy;
+    workflow_id?: string | null;
+    /**
+     * True when the bed is below the requested category. Always needs Duty Manager approval.
+     */
+    is_downgrade: boolean;
+    approved_by_staff_id?: string | null;
+    approved_at?: string | null;
+    override_reason?: string | null;
+    released_at?: string | null;
+    release_reason?: ReleaseReason;
+    created_at?: string;
+    updated_at?: string;
+};
+
+/**
+ * Body of PATCH /api/admissions/{id}/details. Any subset of the fields that were missing —
+ * a key left out is left alone, which is what makes this different from the PUT on a patient.
+ */
+export type CompleteDetailsRequest = {
+    nic?: string | null;
+    full_name?: string | null;
+    date_of_birth?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    emergency_contact_name?: string | null;
+    emergency_contact_phone?: string | null;
+};
+
+/**
+ * Body of POST /api/admissions. Creates a visit in status `awaiting_bed`.
+ */
+export type CreateAdmissionRequest = {
+    patient_id: string;
+    source: AdmissionSource;
+    /**
+     * Emergency Service's reference. Required when source is `emergency`.
+     */
+    dispatch_id?: string | null;
+    admission_category: AdmissionCategory;
+    /**
+     * The clinician who chose the category. Required on purpose: it is the recorded proof that
+     * a human chose the care level, and there is no code path in this API that lets an agent
+     * supply it.
+     */
+    category_set_by_staff_id: string;
+    urgency: AdmissionUrgency;
+    /**
+     * Set by staff. Forces an isolation-capable bed when the bed agent runs.
+     */
+    is_infectious?: boolean;
+    expected_arrival?: string | null;
 };
 
 /**
@@ -266,8 +452,7 @@ export type PatientSummary = {
 };
 
 /**
- * One page of a list. The shape is the group-owned `PagedResult` schema, published
- * byte-identically by all five specs, so nothing here is this component's to change.
+ * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
  */
 export type PatientSummaryPagedResult = {
     items: Array<PatientSummary>;
@@ -275,7 +460,7 @@ export type PatientSummaryPagedResult = {
     page_size: number;
     total_items: number;
     /**
-     * Zero items is zero pages, not one. An empty list has no page to ask for.
+     * Always at least 1, so an empty list does not render as "page 1 of 0".
      */
     total_pages: number;
 };
@@ -299,6 +484,8 @@ export type ProblemDetails = {
 export type RefreshTokenRequest = {
     refresh_token: string;
 };
+
+export type ReleaseReason = 'discharged' | 'hold_expired' | 'cancelled' | 'transferred' | 'rejected';
 
 /**
  * Ascending or descending. The group-owned SortDir parameter in all five specs, so the name is
@@ -362,6 +549,168 @@ export type Ward = {
 };
 
 export type WardType = 'icu' | 'hdu' | 'general' | 'maternity' | 'pediatric' | 'isolation';
+
+export type ListAdmissionsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: Array<AdmissionStatus>;
+        category?: AdmissionCategory;
+        source?: AdmissionSource;
+        detailsComplete?: boolean;
+        search?: string;
+        page?: number;
+        pageSize?: number;
+        sortBy?: AdmissionSortField;
+        sortDir?: SortDirection;
+    };
+    url: '/admissions';
+};
+
+export type ListAdmissionsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListAdmissionsError = ListAdmissionsErrors[keyof ListAdmissionsErrors];
+
+export type ListAdmissionsResponses = {
+    /**
+     * OK
+     */
+    200: AdmissionSummaryPagedResult;
+};
+
+export type ListAdmissionsResponse = ListAdmissionsResponses[keyof ListAdmissionsResponses];
+
+export type CreateAdmissionData = {
+    body?: CreateAdmissionRequest;
+    path?: never;
+    query?: never;
+    url: '/admissions';
+};
+
+export type CreateAdmissionErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CreateAdmissionError = CreateAdmissionErrors[keyof CreateAdmissionErrors];
+
+export type CreateAdmissionResponses = {
+    /**
+     * Created
+     */
+    201: Admission;
+};
+
+export type CreateAdmissionResponse = CreateAdmissionResponses[keyof CreateAdmissionResponses];
+
+export type GetAdmissionData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/admissions/{id}';
+};
+
+export type GetAdmissionErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetAdmissionError = GetAdmissionErrors[keyof GetAdmissionErrors];
+
+export type GetAdmissionResponses = {
+    /**
+     * OK
+     */
+    200: AdmissionDetail;
+};
+
+export type GetAdmissionResponse = GetAdmissionResponses[keyof GetAdmissionResponses];
+
+export type CompleteAdmissionDetailsData = {
+    body?: CompleteDetailsRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/admissions/{id}/details';
+};
+
+export type CompleteAdmissionDetailsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CompleteAdmissionDetailsError = CompleteAdmissionDetailsErrors[keyof CompleteAdmissionDetailsErrors];
+
+export type CompleteAdmissionDetailsResponses = {
+    /**
+     * OK
+     */
+    200: Admission;
+};
+
+export type CompleteAdmissionDetailsResponse = CompleteAdmissionDetailsResponses[keyof CompleteAdmissionDetailsResponses];
 
 export type LoginData = {
     body?: StaffLoginRequest;

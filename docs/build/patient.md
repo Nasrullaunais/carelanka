@@ -43,7 +43,7 @@
 | 15 | React: Doctor's care recommendation queue, approve/reject | The third human gate in this component |
 | 16 | Flutter: "ask about a symptom" + "my care recommendations" | Patient-facing; never renders `agent_message` or `rejection_reason` |
 
-**Steps 1 and 2 are done, and step 3 is half done.** `Ward` landed in `Patient_AddWard` (PR #12). `Patient`,
+**Steps 1, 2 and 3 are done.** `Ward` landed in `Patient_AddWard` (PR #12). `Patient`,
 `Admission`, `Appointment`, `BedAssignment`, `Discharge` and `DischargeChecklistItem`
 landed in `Patient_AddAdmission`, with their configurations and the partial unique indexes.
 Building them settled five disagreements between `entity_diagram.md` and
@@ -52,11 +52,11 @@ diagram. The one worth knowing before step 6: **`BedReservation` no longer exist
 30-minute hold is a `BedAssignment` row with `status = 'reserved'` and a `reserved_until`,
 which is what the spec has always published.
 
-**Step 3, patients half.** `POST /patients`, `GET /patients`, `GET /patients/{id}`,
-`PUT /patients/{id}`, `POST /patients/lookup` and `POST /patients/{id}/link-account` are
-built and tested. The admissions half — `createAdmission`, `listAdmissions`,
-`getAdmission`, `completeAdmissionDetails` — is the next branch. Three things settled while
-building the first half:
+**Step 3 is complete.** Patients half: `POST /patients`, `GET /patients`,
+`GET /patients/{id}`, `PUT /patients/{id}`, `POST /patients/lookup`,
+`POST /patients/{id}/link-account`. Admissions half: `POST /admissions`, `GET /admissions`,
+`GET /admissions/{id}`, `PATCH /admissions/{id}/details`. **Step 4, the status machine, is
+next.** Things settled while building it:
 
 - **`temp_reference` is generated, not requested.** Register with no NIC and no phone and
   the server allocates `UNKNOWN-2026-0001`, numbered per year. Supplying a NIC later never
@@ -66,7 +66,23 @@ building the first half:
   exist. Additive, flagged for the group.
 - **A query-string enum needs a type converter.** `?sortBy=full_name` does not bind to
   `FullName` without one; the JSON converter only covers request and response bodies. See
-  `SnakeCaseEnumTypeConverter`.
+  `SnakeCaseEnumTypeConverter`. `AdmissionStatus`, `AdmissionSource` and `AdmissionCategory`
+  carry the attribute for the same reason — all three appear in a query string.
+- **`missing_fields` is computed at admission, not asked for.** It is the closed
+  `PatientDetailField` vocabulary, read off the patient row. `details_complete` is a stored
+  generated column over it (`cardinality(missing_fields) = 0`), so the two cannot disagree
+  and neither is ever set by hand.
+- **Completeness is not part of `status`.** A patient can be `admitted` with paperwork
+  still outstanding. One field cannot express both without ambiguity.
+- **`AdmissionDetail` publishes less than the spec describes.** `workflows` needs the common
+  `AgentWorkflow` tables (ADR 3) and `discharge` needs step 7, so both keys are omitted
+  rather than returned empty, and `patient-spec.yaml` says NOT SERVED YET on each. The
+  `wardId` filter on `GET /admissions` is unpublished for the same reason — a ward is
+  reached through a live `BedAssignment`, which arrives at step 6.
+- **Sorting by urgency is a ranked CASE, not the column.** The stored value is a
+  snake_case string, so ordering it alphabetically gives emergency, routine, urgent — which
+  reads like a sort and is not one. Write the rank inline: a helper method inside the lambda
+  is not something EF can turn into SQL, and it fails at run time.
 
 **Steps 13–16 are self-contained.** Nothing else in the group depends on the care advisory
 agent, and it depends on nothing outside this component beyond the `doctor` role claim,

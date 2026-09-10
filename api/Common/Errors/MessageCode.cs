@@ -35,5 +35,11 @@ public enum MessageCode
 
     AccountAlreadyLinked,
 
-    TempReferenceExhausted
+    TempReferenceExhausted,
+
+    PatientHasOpenAdmission,
+
+    DispatchIdRequired,
+
+    CategoryStaffNotFound
 }

@@ -31,4 +31,7 @@ public static class Policies
 
     /// <summary>Edits a patient record: ward nurse, duty manager. Deliberately not the administrator.</summary>
     public const string PatientEditor = nameof(PatientEditor);
+
+    /// <summary>Reads and completes admissions: ward nurse, duty manager. Clinical work, so no administrator.</summary>
+    public const string AdmissionReader = nameof(AdmissionReader);
 }

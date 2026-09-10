@@ -178,6 +178,10 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.PatientEditor, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
+
+    options.AddPolicy(Policies.AdmissionReader, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager)));
 });
 
 // 20 a minute per IP in production. Configurable only so the integration tests can raise it:
@@ -227,6 +231,7 @@ builder.Services.AddScoped<IHealthService, HealthService>();
 
 builder.Services.AddScoped<IWardService, WardService>();
 builder.Services.AddScoped<IPatientService, PatientService>();
+builder.Services.AddScoped<IAdmissionService, AdmissionService>();
 
 // STUB — Equipment Management's bed register does not exist yet. See STUBS.md row 1.
 // Swapping in the real one is this line and nothing else.

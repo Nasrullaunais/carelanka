@@ -82,10 +82,25 @@ Zero would have been indistinguishable from the genuine "no beds recorded in thi
 state, which is exactly the kind of fake that survives to a demo.
 
 **Row 1 also covers ward and bed names on an admission.** `AdmissionSummary.ward_name` and
-`bed_number` are published by the spec and returned as `null` today. That is not a fake:
-nothing can hold a bed until step 6, so there is no case yet where `null` is the wrong
-answer. It becomes one the moment `BedAssignment` rows exist, and filling them needs
-Equipment's register — the same dependency as the count above.
+`bed_number` are published by the spec and returned as `null` today, and
+`BedAssignment.ward_name` / `bed_number` as empty strings. That is not a fake: nothing can
+hold a bed until step 6, so there is no case yet where those are the wrong answer, and the
+mapper that would fill them never runs. It becomes a fake the moment `BedAssignment` rows
+exist, and filling them needs Equipment's register — the same dependency as the count above.
+
+**Not stubs, but the same shape of gap, recorded here so nobody hunts for them.** Three
+things `patient-spec.yaml` publishes are deliberately **not served** by the API today, and
+each says so in the spec:
+
+| What | Why | Arrives with |
+| :--- | :--- | :--- |
+| `AdmissionDetail.workflows` | `AgentWorkflow` is common and unbuilt (ADR 3) | Step 11 |
+| `AdmissionDetail.discharge` | No discharge row is written yet | Step 7 |
+| `wardId` filter on `GET /admissions` | A ward is reached through a live `BedAssignment` | Step 6 |
+
+The key is **omitted, not returned empty, and the parameter is unpublished rather than
+accepted and ignored.** A missing key is visible to whoever generates a client; a key that
+is always `[]` and a filter that silently does nothing are not.
 
 **Replacing it is one line** — the `AddSingleton<IBedRegistryService, StubBedRegistryService>`
 registration in `api/Program.cs`. Nothing else moves.

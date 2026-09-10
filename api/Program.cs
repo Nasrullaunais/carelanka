@@ -210,6 +210,8 @@ builder.Services.AddScoped<IHealthService, HealthService>();
 builder.Services.AddScoped<IBedService, BedService>();
 builder.Services.AddScoped<IEquipmentCategoryService, EquipmentCategoryService>();
 builder.Services.AddScoped<IEquipmentItemService, EquipmentItemService>();
+builder.Services.AddScoped<IPharmacyCategoryService, PharmacyCategoryService>();
+builder.Services.AddScoped<IPharmacyItemService, PharmacyItemService>();
 builder.Services.AddScoped<IWardService, WardService>();
 
 // STUB registrations - each module still stands in for the other. STUBS.md rows 1, 2

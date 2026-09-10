@@ -118,6 +118,20 @@
   <data name="cl_equ_007" xml:space="preserve">
     <value>{0} is not currently assigned to anyone.</value>
   </data>
+  <data name="cl_equ_008" xml:space="preserve">
+    <value>A pharmacy category named {0} already exists.</value>
+  </data>
+  <data name="cl_equ_009" xml:space="preserve">
+    <value>A pharmacy item named {0} already exists.</value>
+  </data>
+  <data name="cl_equ_010" xml:space="preserve">
+    <value>Only {1} {2} of {0} on hand, so {3} cannot be taken.</value>
+    <comment>Raised by the conditional update, not by a prior read, so it is also what a losing race reports.</comment>
+  </data>
+  <data name="cl_equ_011" xml:space="preserve">
+    <value>A stock adjustment needs a note saying why.</value>
+    <comment>Plan section 5.1: adjustments are stocktake corrections, and an unexplained one is unauditable.</comment>
+  </data>
   <data name="cl_pat_001" xml:space="preserve">
     <value>A ward named {0} already exists.</value>
     <comment>Only active wards are checked. A retired ward's name can be reused.</comment>

@@ -42,6 +42,14 @@ public enum MessageCode
 
     EquipmentNotAssigned,
 
+    PharmacyCategoryNameTaken,
+
+    PharmacyItemNameTaken,
+
+    InsufficientStock,
+
+    AdjustmentNeedsNote,
+
     // Patient Management — cl_pat_*
 
     WardNameTaken

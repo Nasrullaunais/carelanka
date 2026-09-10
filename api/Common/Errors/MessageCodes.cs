@@ -31,6 +31,10 @@ public static class MessageCodes
             [MessageCode.SerialNumberTaken] = "cl_equ_005",
             [MessageCode.EquipmentNotAvailable] = "cl_equ_006",
             [MessageCode.EquipmentNotAssigned] = "cl_equ_007",
+            [MessageCode.PharmacyCategoryNameTaken] = "cl_equ_008",
+            [MessageCode.PharmacyItemNameTaken] = "cl_equ_009",
+            [MessageCode.InsufficientStock] = "cl_equ_010",
+            [MessageCode.AdjustmentNeedsNote] = "cl_equ_011",
             [MessageCode.WardNameTaken] = "cl_pat_001"
         };
 

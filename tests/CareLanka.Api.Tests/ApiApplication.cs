@@ -20,6 +20,7 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
     public const string ManagerEmail = "manager.tests@carelanka.invalid";
     public const string AdministratorEmail = "administrator.tests@carelanka.invalid";
     public const string InactiveEmail = "inactive.tests@carelanka.invalid";
+    public const string EquipmentEmail = "equipment.tests@carelanka.invalid";
     public const string SigningKey = "test-signing-key-that-is-at-least-32-characters";
 
     private readonly string _databasePassword = Guid.NewGuid().ToString("N");
@@ -41,6 +42,13 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+
+        // Every test class in this collection shares one host and therefore one rate-limit
+        // budget, keyed on an IP that is always "unknown". At the production limit of 20 a
+        // minute the suite ran out partway through and the failures looked like broken logins.
+        // ProblemResponseTests still asserts the 429 against its own host at the default.
+        builder.UseSetting("RateLimits:AuthPerMinute", "1000");
+
         builder.ConfigureLogging(logging => logging.AddProvider(new CapturingLoggerProvider(Logs)));
         builder.ConfigureServices(services =>
             services.AddControllers().AddApplicationPart(typeof(TestPolicyController).Assembly));
@@ -64,8 +72,9 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
         db.StaffMembers.AddRange(
             Staff(NurseEmail, StaffRole.WardNurse, true, passwords),
             Staff(ManagerEmail, StaffRole.DutyManager, true, passwords),
+            Staff(InactiveEmail, StaffRole.Doctor, false, passwords),
             Staff(AdministratorEmail, StaffRole.HospitalAdministrator, true, passwords),
-            Staff(InactiveEmail, StaffRole.Doctor, false, passwords));
+            Staff(EquipmentEmail, StaffRole.EquipmentManager, true, passwords));
         await db.SaveChangesAsync();
     }
 

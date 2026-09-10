@@ -3,6 +3,7 @@ using System;
 using CareLanka.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CareLanka.Api.Data.Migrations
 {
     [DbContext(typeof(CareLankaDbContext))]
-    partial class CareLankaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260909034637_Equipment_AddItems")]
+    partial class Equipment_AddItems
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -628,63 +631,6 @@ namespace CareLanka.Api.Data.Migrations
                             t.HasCheckConstraint("ck_warnings_status", "status IN ('open', 'acknowledged', 'action_taken', 'dismissed')");
 
                             t.HasCheckConstraint("ck_warnings_type", "type IN ('low_stock', 'medicine_expiring', 'maintenance_overdue', 'equipment_faulty')");
-                        });
-                });
-
-            modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.Ward", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTimeOffset?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<string>("GenderPolicy")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("gender_policy");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_active");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("name");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<string>("WardType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("ward_type");
-
-                    b.HasKey("Id")
-                        .HasName("pk_wards");
-
-                    b.HasIndex("Name")
-                        .IsUnique()
-                        .HasDatabaseName("ux_wards_name")
-                        .HasFilter("is_active");
-
-                    b.ToTable("wards", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_wards_gender_policy", "gender_policy IN ('male', 'female', 'mixed')");
-
-                            t.HasCheckConstraint("ck_wards_type", "ward_type IN ('icu', 'hdu', 'general', 'maternity', 'pediatric', 'isolation')");
                         });
                 });
 

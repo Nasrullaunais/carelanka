@@ -9,6 +9,8 @@ using CareLanka.Api.Common.Persistence;
 using CareLanka.Api.Data;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.Services.Common;
+using CareLanka.Api.Services.Equipment;
+using CareLanka.Api.Services.Equipment.Stubs;
 using CareLanka.Api.Services.Patient;
 using CareLanka.Api.Services.Patient.Stubs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -205,10 +207,17 @@ builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IHealthService, HealthService>();
 
+builder.Services.AddScoped<IBedService, BedService>();
+builder.Services.AddScoped<IEquipmentCategoryService, EquipmentCategoryService>();
+builder.Services.AddScoped<IEquipmentItemService, EquipmentItemService>();
 builder.Services.AddScoped<IWardService, WardService>();
 
-// STUB — Equipment Management's bed register does not exist yet. See STUBS.md row 1.
-// Swapping in the real one is this line and nothing else.
+// STUB registrations - each module still stands in for the other. STUBS.md rows 1, 2
+// and 3. Both real implementations now live on this branch, so these three lines are
+// the whole of what is left to swap, but doing so is a behaviour change rather than a
+// merge resolution and belongs in its own commit.
+builder.Services.AddSingleton<IWardDirectory, StubWardDirectory>();
+builder.Services.AddSingleton<IBedOccupancyPort, StubBedOccupancyPort>();
 builder.Services.AddSingleton<IBedRegistryService, StubBedRegistryService>();
 
 builder.Services.AddEndpointsApiExplorer();

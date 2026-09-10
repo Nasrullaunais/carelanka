@@ -1,6 +1,136 @@
-@CareLanka.Api_HostAddress = http://localhost:5231
+@host = http://localhost:5231
 
-GET {{CareLanka.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+# Any GUID works today. ward_id references Patient Management's ward table, which is not on
+# main yet, so nothing enforces it. See STUBS.md row 2.
+@ward = 11111111-1111-1111-1111-111111111111
+
+### Sign in as the equipment manager. Seeded by docs/seed/001_identity.sql.
+# @name login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "equip.bandara@carelanka.lk",
+  "password": "CareLanka#2026"
+}
+
+@token = {{login.response.body.access_token}}
+
+### Create a bed. Comes back usable: there is no way to create one already out of service.
+# @name created
+POST {{host}}/api/beds
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "ward_id": "{{ward}}",
+  "bed_number": "1",
+  "has_isolation": true,
+  "nurse_station_distance": 2,
+  "asset_tag": "BED-0001"
+}
+
+@bed = {{created.response.body.id}}
+
+### Create a second bed in the same ward.
+POST {{host}}/api/beds
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "ward_id": "{{ward}}",
+  "bed_number": "2"
+}
+
+### The same number twice in one ward is a conflict. Expect 409 and cl_equ_001.
+POST {{host}}/api/beds
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "ward_id": "{{ward}}",
+  "bed_number": "1"
+}
+
+### An asset tag cannot be reused either. Expect 409 and cl_equ_002.
+POST {{host}}/api/beds
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "ward_id": "{{ward}}",
+  "bed_number": "99",
+  "asset_tag": "BED-0001"
+}
+
+### List every bed. This is the call Patient Management makes to build its candidate list.
+GET {{host}}/api/beds
+Authorization: Bearer {{token}}
+
+### List one ward only. ward_name is the stub talking, on purpose.
+GET {{host}}/api/beds?wardId={{ward}}
+Authorization: Bearer {{token}}
+
+### Only the usable ones.
+GET {{host}}/api/beds?condition=usable
+Authorization: Bearer {{token}}
+
+### An edit that does not withdraw the bed never asks about occupancy. Expect 200.
+PATCH {{host}}/api/beds/{{bed}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "has_isolation": false,
+  "nurse_station_distance": 5
+}
+
+### Clear the asset tag. An explicit null clears; leaving the field out changes nothing.
+PATCH {{host}}/api/beds/{{bed}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "asset_tag": null
+}
+
+### Take it out of service. Expect 409 and cl_equ_003 while the occupancy stub says occupied.
+### This is the safety rule working, not a bug. STUBS.md row 3.
+PATCH {{host}}/api/beds/{{bed}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "condition": "out_of_service"
+}
+
+### Retire it. Same refusal, same reason.
+POST {{host}}/api/beds/{{bed}}/retire
+Authorization: Bearer {{token}}
+
+### A ward nurse may read the register but not write to it. Expect 200 then 403.
+# @name nurse
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "nurse.perera@carelanka.lk",
+  "password": "CareLanka#2026"
+}
 
 ###
+GET {{host}}/api/beds
+Authorization: Bearer {{nurse.response.body.access_token}}
+
+###
+POST {{host}}/api/beds
+Authorization: Bearer {{nurse.response.body.access_token}}
+Content-Type: application/json
+
+{
+  "ward_id": "{{ward}}",
+  "bed_number": "3"
+}
+
+### No token at all. Expect 401.
+GET {{host}}/api/beds

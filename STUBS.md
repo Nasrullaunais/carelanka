@@ -66,11 +66,15 @@ actually published.
 
 ## Open stubs
 
-**One open.** Common auth is built and merged (PR #11, 2026-09-08) and was never stubbed.
+**Three open, one in each direction.** Common auth was never stubbed: it was built
+and merged in PR #11. Rows 2 and 3 are Equipment waiting on Patient Management; row 1
+is Patient Management waiting on Equipment.
 
 | # | What is faked | Where it lives | Standing in for | Owner of the real thing | Added |
 | :-- | :--- | :--- | :--- | :--- | :--- |
 | 1 | Bed counts per ward — every ward reports exactly 6 beds | `api/Services/Patient/Stubs/StubBedRegistryService.cs` | `GET /beds` — `equipment-spec.yaml` | **M3 Sethmin** | 2026-09-08 |
+| 2 | Ward names on a bed — every ward is called `Stub ward <id fragment>` | `api/Services/Equipment/Stubs/StubWardDirectory.cs` | `GET /wards` — `patient-spec.yaml` | **M4 Lochana** | 2026-09-09 |
+| 3 | Is this bed occupied — always answers **yes** | `api/Services/Equipment/Stubs/StubBedOccupancyPort.cs` | `GET /beds/{id}/occupancy` — `patient-spec.yaml` | **M4 Lochana** | 2026-09-09 |
 
 **Row 1 — what it feeds and how far it goes.** Only `Ward.total_beds` on `GET /wards` and
 `POST /wards` reads it today. `IBedRegistryService` is deliberately one method wide
@@ -81,8 +85,29 @@ candidate list widens the interface later, and that is when the fake starts matt
 Zero would have been indistinguishable from the genuine "no beds recorded in this ward yet"
 state, which is exactly the kind of fake that survives to a demo.
 
-**Replacing it is one line** — the `AddSingleton<IBedRegistryService, StubBedRegistryService>`
-registration in `api/Program.cs`. Nothing else moves.
+**Row 2 — why the name looks broken on purpose.** `Bed.ward_name` is Patient Management's
+to answer, and a plausible invented name like "Intensive Care" would be indistinguishable
+from a real one on screen and would still be there at the demo. `ward_id` is real
+throughout; only the display name is faked, so nothing downstream is reasoning over it.
+
+**Row 3 — this is the dangerous one, and it fails safe.** `PATCH /beds/{id}` moving a bed
+to `out_of_service`, and `POST /beds/{id}/retire`, both ask this before writing anything.
+The fake answers **occupied**, so both are refused with `cl_equ_003` until the real
+endpoint lands. That is deliberate: a stub answering "free" would let maintenance be
+scheduled on a bed with a patient in it and would pass every test we wrote. The cost is
+that withdrawing a bed cannot be exercised end to end yet, which is visible immediately
+rather than at the demo.
+
+**Replacing any of them is one line each** — the three `AddSingleton` registrations in
+`api/Program.cs`. Nothing else moves.
+
+**All three are now retirable, and none has been retired yet.** Before this merge each
+side was blocked on code that did not exist on `main`. Both sides are now on this branch,
+so row 1 can become a delegating adapter over `IBedService.CountBedsByWardAsync`, which
+was given deliberately the same signature and the same "a ward with no beds is absent,
+not zero" shape as `IBedRegistryService.CountBedsByWardAsync`. Rows 2 and 3 can point at
+the real ward and occupancy work in the same way. Swapping any of them changes behaviour,
+so each belongs in its own commit with its own tests rather than in a merge.
 
 ---
 

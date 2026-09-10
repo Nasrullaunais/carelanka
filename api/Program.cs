@@ -174,13 +174,19 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.PatientReader, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager),
-        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+        EnumWire.ToWire(StaffRole.HospitalAdministrator),
+        EnumWire.ToWire(StaffRole.Doctor)));
 
     options.AddPolicy(Policies.PatientEditor, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
 
     options.AddPolicy(Policies.AdmissionReader, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager),
+        EnumWire.ToWire(StaffRole.Doctor)));
+
+    options.AddPolicy(Policies.AdmissionEditor, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
 });

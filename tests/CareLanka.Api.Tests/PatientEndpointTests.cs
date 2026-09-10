@@ -437,6 +437,27 @@ public sealed class PatientEndpointTests
     }
 
     [Fact]
+    public async Task A_doctor_may_read_a_patient_record_but_may_not_register_or_edit_one()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var id = await CreateIdAsync(nurse, "Read Only To Doctor", NewNic());
+
+        // A doctor treats the patient, so they must be able to open the record. They are not
+        // at the intake desk and they do not keep the demographics, so both writes are 403.
+        using var doctor = await ClientAsync(ApiApplication.DoctorEmail);
+        var read = await doctor.GetAsync($"/api/patients/{id}");
+        var list = await doctor.GetAsync("/api/patients");
+        var register = await CreateAsync(doctor, "Doctor Registered", nic: NewNic());
+        var edit = await doctor.PutAsJsonAsync(
+            $"/api/patients/{id}", new { full_name = "Renamed", gender = "male", nic = NewNic() });
+
+        Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, list.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, register.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, edit.StatusCode);
+    }
+
+    [Fact]
     public async Task An_administrator_may_read_the_register_but_may_not_edit_a_record()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);

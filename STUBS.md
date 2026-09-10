@@ -66,24 +66,14 @@ actually published.
 
 ## Open stubs
 
-**Three open, one in each direction.** Common auth was never stubbed: it was built
-and merged in PR #11. Rows 2 and 3 are Equipment waiting on Patient Management; row 1
-is Patient Management waiting on Equipment.
+**Two open, both in the same direction.** Common auth was never stubbed: it was built
+and merged in PR #11. Rows 2 and 3 are Equipment waiting on Patient Management. **Row 1
+is gone** — Patient Management now reads Equipment's real bed register; see Replaced below.
 
 | # | What is faked | Where it lives | Standing in for | Owner of the real thing | Added |
 | :-- | :--- | :--- | :--- | :--- | :--- |
-| 1 | Bed counts per ward — every ward reports exactly 6 beds | `api/Services/Patient/Stubs/StubBedRegistryService.cs` | `GET /beds` — `equipment-spec.yaml` | **M3 Sethmin** | 2026-09-08 |
 | 2 | Ward names on a bed — every ward is called `Stub ward <id fragment>` | `api/Services/Equipment/Stubs/StubWardDirectory.cs` | `GET /wards` — `patient-spec.yaml` | **M4 Lochana** | 2026-09-09 |
 | 3 | Is this bed occupied — always answers **yes** | `api/Services/Equipment/Stubs/StubBedOccupancyPort.cs` | `GET /beds/{id}/occupancy` — `patient-spec.yaml` | **M4 Lochana** | 2026-09-09 |
-
-**Row 1 — what it feeds and how far it goes.** Only `Ward.total_beds` on `GET /wards` and
-`POST /wards` reads it today. `IBedRegistryService` is deliberately one method wide
-(`CountBedsByWardAsync`) because counting is all the ward endpoints need; the bed agent's
-candidate list widens the interface later, and that is when the fake starts mattering.
-
-**Why a constant and not zero.** Six beds in every ward is visibly not a real hospital.
-Zero would have been indistinguishable from the genuine "no beds recorded in this ward yet"
-state, which is exactly the kind of fake that survives to a demo.
 
 **Row 2 — why the name looks broken on purpose.** `Bed.ward_name` is Patient Management's
 to answer, and a plausible invented name like "Intensive Care" would be indistinguishable
@@ -98,16 +88,15 @@ scheduled on a bed with a patient in it and would pass every test we wrote. The 
 that withdrawing a bed cannot be exercised end to end yet, which is visible immediately
 rather than at the demo.
 
-**Replacing any of them is one line each** — the three `AddSingleton` registrations in
+**Replacing either is one line each** — the two `AddSingleton` registrations in
 `api/Program.cs`. Nothing else moves.
 
-**All three are now retirable, and none has been retired yet.** Before this merge each
-side was blocked on code that did not exist on `main`. Both sides are now on this branch,
-so row 1 can become a delegating adapter over `IBedService.CountBedsByWardAsync`, which
-was given deliberately the same signature and the same "a ward with no beds is absent,
-not zero" shape as `IBedRegistryService.CountBedsByWardAsync`. Rows 2 and 3 can point at
-the real ward and occupancy work in the same way. Swapping any of them changes behaviour,
-so each belongs in its own commit with its own tests rather than in a merge.
+**Row 2 is retirable today; row 3 is not.** `IWardService` is real and merged, so
+`StubWardDirectory` can become a delegating adapter whenever M3 wants it — exactly what
+row 1 just did in the other direction. Row 3 cannot follow yet: occupancy is the presence
+of a live `BedAssignment` row, and nothing writes those until step 6 of
+`docs/build/patient.md`. Until then the fake keeps answering **occupied**, which is the
+safe direction.
 
 ---
 
@@ -119,7 +108,19 @@ against" is answerable later.
 
 | # | What it was | Replaced by | Commit | Date |
 | :-- | :--- | :--- | :--- | :--- |
-| — | — | — | — | — |
+| 1 | Bed counts per ward — every ward reported exactly 6 beds | `api/Services/Patient/BedRegistryService.cs`, a delegating adapter over `IBedService.CountBedsByWardAsync` | `feat/patient-real-bed-counts` | 2026-09-10 |
+
+**What ran on the fake, and what changed when it went.** Row 1 was live from 2026-09-08 to
+2026-09-10 and fed exactly one field: `Ward.total_beds` on `GET /wards` and `POST /wards`.
+Nothing reasoned over it — no rule, no agent, no screen branched on the number — so the
+only visible change is that the number is now true. A ward with no beds reports **0** where
+it used to report 6, which is why the ward test asserting the constant was replaced by two:
+one for the empty ward, one that registers three real beds through `POST /api/beds` and
+reads the count back.
+
+Sethmin made this a small change on purpose: `IBedService.CountBedsByWardAsync` was given
+the same signature and the same "a ward with no beds is absent from the result, not zero"
+contract as the port it was replacing, so the swap is an adapter and a DI line.
 
 ---
 

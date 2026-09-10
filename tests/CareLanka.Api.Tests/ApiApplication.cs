@@ -42,6 +42,13 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+
+        // Every test class in this collection shares one host and therefore one rate-limit
+        // budget, keyed on an IP that is always "unknown". At the production limit of 20 a
+        // minute the suite ran out partway through and the failures looked like broken logins.
+        // ProblemResponseTests still asserts the 429 against its own host at the default.
+        builder.UseSetting("RateLimits:AuthPerMinute", "1000");
+
         builder.ConfigureLogging(logging => logging.AddProvider(new CapturingLoggerProvider(Logs)));
         builder.ConfigureServices(services =>
             services.AddControllers().AddApplicationPart(typeof(TestPolicyController).Assembly));

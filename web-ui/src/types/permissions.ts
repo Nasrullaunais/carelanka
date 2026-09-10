@@ -31,6 +31,25 @@ export function canReadWards(role: PrincipalRole | undefined): boolean {
   return isStaff(role);
 }
 
+/** Policies.AnyStaff on GET /api/equipment-items and /api/equipment-categories. */
+export function canReadEquipment(role: PrincipalRole | undefined): boolean {
+  return isStaff(role);
+}
+
+/** Policies.EquipmentManager on create, edit, assign and release. */
+export function canManageEquipment(role: PrincipalRole | undefined): boolean {
+  return role === 'equipment_manager';
+}
+
+/**
+ * Policies.AnyStaff on POST /api/equipment-items/{id}/report-fault. Deliberately wider
+ * than canManageEquipment: the nurse at the bedside is who finds the fault, and making
+ * them chase an equipment manager first is how a broken machine stays in service.
+ */
+export function canReportFault(role: PrincipalRole | undefined): boolean {
+  return isStaff(role);
+}
+
 export const roleLabels: Record<PrincipalRole, string> = {
   ward_nurse: 'Ward nurse',
   doctor: 'Doctor',

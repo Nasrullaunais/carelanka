@@ -188,6 +188,38 @@ public sealed class WardEndpointTests
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 
+    // A missing enum is an error, not a default. [Required] on a plain C# enum always passes,
+    // because the model binder has already turned an absent key into the first declared member.
+    // Every other test in this class sends a full body, which is why neither of these was caught.
+
+    [Fact]
+    public async Task A_ward_with_no_type_is_refused_rather_than_created_as_an_icu()
+    {
+        using var client = await ClientAsync(ApiApplication.AdministratorEmail);
+
+        var created = await client.PostAsJsonAsync(
+            "/api/wards", new { name = NewWardName(), gender_policy = "mixed" });
+
+        // icu is declared first, so the old default built the most expensive kind of ward in the
+        // hospital out of a typo - and Ward's schema is frozen and depended on by three other
+        // components, so a wrong ward_type is not a local mistake.
+        Assert.Equal(HttpStatusCode.BadRequest, created.StatusCode);
+        Assert.Equal("application/problem+json", created.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task A_ward_with_no_gender_policy_is_refused_rather_than_created_male_only()
+    {
+        using var client = await ClientAsync(ApiApplication.AdministratorEmail);
+
+        var created = await client.PostAsJsonAsync(
+            "/api/wards", new { name = NewWardName(), ward_type = "general" });
+
+        // male is declared first, so the old default quietly halved the ward's usable beds: the
+        // policy is an input to hard rule H3, and a male-only ward takes no female patients.
+        Assert.Equal(HttpStatusCode.BadRequest, created.StatusCode);
+    }
+
     // /api/auth/login is rate limited to 20 requests a minute per IP, and this class shares
     // that budget with AuthFlowTests. Logging in once per test spent it and every test here
     // failed on a 429 that looked like a missing access_token. One token per account, reused.

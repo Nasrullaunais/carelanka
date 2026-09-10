@@ -53,6 +53,11 @@ public class Admission : AuditedEntity
 
     public CancelReason? CancelReason { get; set; }
 
+    // The half of a cancellation an enum cannot carry: "diverted to Kandy, family informed".
+    // Stored next to the reason rather than left in a log, because the reason on its own is
+    // rarely enough to answer "why is this bed free again?" a week later.
+    public string? CancelNote { get; set; }
+
     public ICollection<BedAssignment> BedAssignments { get; set; } = new List<BedAssignment>();
 
     public Discharge? Discharge { get; set; }

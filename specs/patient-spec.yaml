@@ -472,12 +472,7 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [reason]
-              properties:
-                reason: { $ref: '#/components/schemas/CancelReason' }
-                note: { type: string, maxLength: 500 }
+            schema: { $ref: '#/components/schemas/CancelAdmissionRequest' }
       responses:
         '200':
           description: Now `cancelled`, bed released
@@ -2081,6 +2076,20 @@ components:
         emergency_contact_name: { type: string, nullable: true }
         emergency_contact_phone: { type: string, nullable: true }
 
+    CancelAdmissionRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { $ref: '#/components/schemas/CancelReason' }
+        note:
+          type: string
+          maxLength: 500
+          nullable: true
+          description: >-
+            The part no enum can carry - "diverted to Kandy, family informed". Optional,
+            because forcing a sentence out of a nurse in a hurry produces "n/a" and nothing
+            else. Stored on the admission and published back as `cancel_note`.
+
     AdmissionSummary:
       type: object
       required: [id, source, admission_category, urgency, status, details_complete]
@@ -2126,6 +2135,12 @@ components:
               allOf:
                 - $ref: '#/components/schemas/CancelReason'
               nullable: true
+            cancel_note:
+              type: string
+              nullable: true
+              description: >-
+                The free-text half of a cancellation. Null unless the status is `cancelled`,
+                and often null even then - the reason is mandatory, this is not.
 
     AdmissionDetail:
       allOf:

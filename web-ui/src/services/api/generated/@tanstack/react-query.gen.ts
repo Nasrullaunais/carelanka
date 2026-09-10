@@ -3,8 +3,8 @@
 import { type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { completeAdmissionDetails, createAdmission, createPatient, createWard, getAdmission, getCurrentUser, getHealth, getPatient, linkPatientAccount, listAdmissions, listPatients, listWards, login, loginPatient, logout, lookupPatient, type Options, refreshToken, registerPatientAccount, updatePatient } from '../sdk.gen';
-import type { CompleteAdmissionDetailsData, CompleteAdmissionDetailsError, CompleteAdmissionDetailsResponse, CreateAdmissionData, CreateAdmissionError, CreateAdmissionResponse, CreatePatientData, CreatePatientError, CreatePatientResponse, CreateWardData, CreateWardError, CreateWardResponse, GetAdmissionData, GetAdmissionError, GetAdmissionResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetHealthData, GetHealthError, GetHealthResponse, GetPatientData, GetPatientError, GetPatientResponse, LinkPatientAccountData, LinkPatientAccountError, LinkPatientAccountResponse, ListAdmissionsData, ListAdmissionsError, ListAdmissionsResponse, ListPatientsData, ListPatientsError, ListPatientsResponse, ListWardsData, ListWardsError, ListWardsResponse, LoginData, LoginError, LoginPatientData, LoginPatientError, LoginPatientResponse, LoginResponse, LogoutData, LogoutError, LogoutResponse, LookupPatientData, LookupPatientError, LookupPatientResponse, RefreshTokenData, RefreshTokenError, RefreshTokenResponse, RegisterPatientAccountData, RegisterPatientAccountError, RegisterPatientAccountResponse, UpdatePatientData, UpdatePatientError, UpdatePatientResponse } from '../types.gen';
+import { cancelAdmission, completeAdmissionDetails, createAdmission, createPatient, createWard, getAdmission, getCurrentUser, getHealth, getPatient, linkPatientAccount, listAdmissions, listPatients, listWards, login, loginPatient, logout, lookupPatient, markArrived, type Options, refreshToken, registerPatientAccount, updatePatient } from '../sdk.gen';
+import type { CancelAdmissionData, CancelAdmissionError, CancelAdmissionResponse, CompleteAdmissionDetailsData, CompleteAdmissionDetailsError, CompleteAdmissionDetailsResponse, CreateAdmissionData, CreateAdmissionError, CreateAdmissionResponse, CreatePatientData, CreatePatientError, CreatePatientResponse, CreateWardData, CreateWardError, CreateWardResponse, GetAdmissionData, GetAdmissionError, GetAdmissionResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetHealthData, GetHealthError, GetHealthResponse, GetPatientData, GetPatientError, GetPatientResponse, LinkPatientAccountData, LinkPatientAccountError, LinkPatientAccountResponse, ListAdmissionsData, ListAdmissionsError, ListAdmissionsResponse, ListPatientsData, ListPatientsError, ListPatientsResponse, ListWardsData, ListWardsError, ListWardsResponse, LoginData, LoginError, LoginPatientData, LoginPatientError, LoginPatientResponse, LoginResponse, LogoutData, LogoutError, LogoutResponse, LookupPatientData, LookupPatientError, LookupPatientResponse, MarkArrivedData, MarkArrivedError, MarkArrivedResponse, RefreshTokenData, RefreshTokenError, RefreshTokenResponse, RegisterPatientAccountData, RegisterPatientAccountError, RegisterPatientAccountResponse, UpdatePatientData, UpdatePatientError, UpdatePatientResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -166,6 +166,51 @@ export const completeAdmissionDetailsMutation = (options?: Partial<Options<Compl
     const mutationOptions: UseMutationOptions<CompleteAdmissionDetailsResponse, CompleteAdmissionDetailsError, Options<CompleteAdmissionDetailsData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await completeAdmissionDetails({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Mark the patient as physically present in the bed. Moves `bed_reserved` to `admitted`,
+ * sets `admitted_at`, and turns the hold on the bed into an occupancy so it can no longer
+ * expire.
+ *
+ * Rejected with 409 from any other status: a patient cannot arrive into a bed that was
+ * never approved. The ward nurse is at the bedside, which is why this is theirs and not
+ * the duty manager's.
+ */
+export const markArrivedMutation = (options?: Partial<Options<MarkArrivedData>>): UseMutationOptions<MarkArrivedResponse, MarkArrivedError, Options<MarkArrivedData>> => {
+    const mutationOptions: UseMutationOptions<MarkArrivedResponse, MarkArrivedError, Options<MarkArrivedData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await markArrived({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Cancel an admission, with a reason, and release any bed it was holding.
+ *
+ * Always a human act, never automatic, which is why the reason is mandatory and why this
+ * is the duty manager's. A hold expiring frees a bed by itself because that is cheap and
+ * reversible; declaring that a patient is not coming is neither. Refused with 409 once
+ * they are `admitted` - discharge them instead.
+ */
+export const cancelAdmissionMutation = (options?: Partial<Options<CancelAdmissionData>>): UseMutationOptions<CancelAdmissionResponse, CancelAdmissionError, Options<CancelAdmissionData>> => {
+    const mutationOptions: UseMutationOptions<CancelAdmissionResponse, CancelAdmissionError, Options<CancelAdmissionData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await cancelAdmission({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

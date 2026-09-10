@@ -462,6 +462,47 @@ public sealed class PatientEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    [Fact]
+    public async Task A_patient_with_no_gender_is_refused_rather_than_recorded_as_male()
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+
+        var created = await client.PostAsJsonAsync("/api/patients", new
+        {
+            full_name = "Gender Omitted",
+            nic = NewNic()
+        });
+
+        // This one defeats something deliberate. Gender.Unknown exists precisely so hard rule H3,
+        // the ward gender-policy filter, behaves deterministically for an unidentified arrival -
+        // its own comment in the enum says so. male is declared first, so the old default
+        // recorded that patient as male: exactly the case Unknown was added to handle.
+        //
+        // Status code first. Reading the body first turns a 400 into a KeyNotFoundException and
+        // hides which of the two went wrong.
+        Assert.Equal(HttpStatusCode.BadRequest, created.StatusCode);
+
+        using var body = await ReadJsonAsync(created);
+        Assert.Equal("cl_err_400", body.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Updating_a_patient_with_no_gender_is_refused_for_the_same_reason()
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+        var id = await CreateIdAsync(client, "Gender Omitted On Update", NewNic());
+
+        // UpdatePatientRequest inherits CreatePatientRequest, so the PUT has the same hole and
+        // the same fix. It is a PUT, so an omitted key means "clear it" - which for gender would
+        // have meant "silently make them male".
+        var updated = await client.PutAsJsonAsync($"/api/patients/{id}", new
+        {
+            full_name = "Gender Omitted On Update"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, updated.StatusCode);
+    }
+
     // ---------- helpers ----------
 
     private static Task<HttpResponseMessage> CreateAsync(

@@ -43,6 +43,16 @@ export type Admission = {
      * tell a ward clerk what to chase; "nic, date_of_birth" does.
      */
     missing_fields: Array<string>;
+    /**
+     * When the patient left. Null while the visit is still running.
+     */
+    discharged_at?: string | null;
+    cancel_reason?: CancelReason;
+    /**
+     * The free-text half of a cancellation, which the enum cannot carry. Null unless the
+     * status is `cancelled`, and often null even then.
+     */
+    cancel_note?: string | null;
     created_at?: string;
     updated_at?: string;
 };
@@ -89,6 +99,16 @@ export type AdmissionDetail = {
      * tell a ward clerk what to chase; "nic, date_of_birth" does.
      */
     missing_fields: Array<string>;
+    /**
+     * When the patient left. Null while the visit is still running.
+     */
+    discharged_at?: string | null;
+    cancel_reason?: CancelReason;
+    /**
+     * The free-text half of a cancellation, which the enum cannot carry. Null unless the
+     * status is `cancelled`, and often null even then.
+     */
+    cancel_note?: string | null;
     created_at?: string;
     updated_at?: string;
     /**
@@ -195,6 +215,22 @@ export type BedAssignment = {
     created_at?: string;
     updated_at?: string;
 };
+
+/**
+ * Why a visit was called off. Always a human's claim, which is why the reason is mandatory:
+ * a computer cannot know whether the ambulance was diverted, the patient died, or it is
+ * simply stuck in traffic.
+ */
+export type CancelAdmissionRequest = {
+    reason: CancelReason;
+    /**
+     * The part no enum can carry - "diverted to Kandy, family informed". Optional, because
+     * forcing a sentence out of a nurse in a hurry produces "n/a" and nothing else.
+     */
+    note?: string | null;
+};
+
+export type CancelReason = 'diverted_to_other_hospital' | 'false_alarm' | 'died_en_route' | 'patient_refused' | 'no_show';
 
 /**
  * Body of PATCH /api/admissions/{id}/details. Any subset of the fields that were missing —
@@ -711,6 +747,88 @@ export type CompleteAdmissionDetailsResponses = {
 };
 
 export type CompleteAdmissionDetailsResponse = CompleteAdmissionDetailsResponses[keyof CompleteAdmissionDetailsResponses];
+
+export type MarkArrivedData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/admissions/{id}/arrive';
+};
+
+export type MarkArrivedErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type MarkArrivedError = MarkArrivedErrors[keyof MarkArrivedErrors];
+
+export type MarkArrivedResponses = {
+    /**
+     * OK
+     */
+    200: Admission;
+};
+
+export type MarkArrivedResponse = MarkArrivedResponses[keyof MarkArrivedResponses];
+
+export type CancelAdmissionData = {
+    body?: CancelAdmissionRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/admissions/{id}/cancel';
+};
+
+export type CancelAdmissionErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CancelAdmissionError = CancelAdmissionErrors[keyof CancelAdmissionErrors];
+
+export type CancelAdmissionResponses = {
+    /**
+     * OK
+     */
+    200: Admission;
+};
+
+export type CancelAdmissionResponse = CancelAdmissionResponses[keyof CancelAdmissionResponses];
 
 export type LoginData = {
     body?: StaffLoginRequest;

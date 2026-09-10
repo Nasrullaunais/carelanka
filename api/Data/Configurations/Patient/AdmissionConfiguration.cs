@@ -53,6 +53,8 @@ public class AdmissionConfiguration : IEntityTypeConfiguration<Admission>
             .HasConversion(new SnakeCaseEnumConverter<CancelReason>())
             .HasMaxLength(30);
 
+        builder.Property(a => a.CancelNote).HasMaxLength(500);
+
         builder.Property(a => a.IsInfectious).HasDefaultValue(false);
 
         builder.Property(a => a.DispatchId).HasMaxLength(64);

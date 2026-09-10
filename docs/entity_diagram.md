@@ -5,6 +5,25 @@ single hospital / multiple wards, unified staff identity, generic agent-workflow
 audit-log schemas). PKs are `Guid` (PostgreSQL `uuid`, `default: gen_random_uuid()`)
 throughout.
 
+**Revision 2.10** — the seven-state admission status machine landed (step 4 of
+`docs/build/patient.md`: `POST /admissions/{id}/arrive`, `POST /admissions/{id}/cancel`, and
+the transition table both of them go through). One new column, in the
+`Patient_AddCancelNote` migration. Changes marked *(Rev 2.10)*.
+
+- **`Admission.CancelNote`** — the free-text half of a cancellation, next to the enum.
+  `patient-spec.yaml` has always published a `note` on the cancel request body, and there was
+  no column to put it in; accepting it and dropping it would have been a field that looks
+  stored and is not. Now stored and published back as `cancel_note` on the `Admission`
+  response, because "why is this bed free again?" a week later is rarely answered by
+  `diverted_to_other_hospital` on its own.
+- **No column for the transition table, and none for concurrency.** The seven states and the
+  legal moves between them live in `AdmissionStatusMachine`, in code — they are rules, not
+  data. Two people acting on one visit in the same instant are serialised with
+  `SELECT ... FOR UPDATE` on the admission row, which is the same row lock
+  `patient-spec.yaml` already describes for the bed approval. No row-version column: Postgres'
+  `xmin` is not mappable without EF trying to add it as a real column, and a hand-rolled
+  version column would need a trigger to maintain.
+
 **Revision 2.9** — the rest of the Patient Management tables landed (`Patient`,
 `Admission`, `Appointment`, `BedAssignment`, `Discharge`, `DischargeChecklistItem`, in the
 `Patient_AddAdmission` migration), and building them settled five places where this
@@ -777,8 +796,15 @@ On check-in this becomes an `Admission` with `Source = Booked`.
 + DetailsComplete: bool (GENERATED, stored)             -- (Rev 2.1)
 + DetailsCompletedAt: DateTimeOffset (nullable)         -- (Rev 2.1)
 + CancelReason: CancelReason (nullable)                 -- (Rev 2.2)
++ CancelNote: string(500) (nullable)                    -- (Rev 2.10 — new)
 ```
-**Table:** `admissions` — **built.** `Patient_AddAdmission`.
+**Table:** `admissions` — **built.** `Patient_AddAdmission`, then
+`Patient_AddOpenAdmissionIndex` and `Patient_AddCancelNote`.
+
+*(Rev 2.10)* **`CancelNote` added; `Status`'s transitions are code, not schema.** The spec's
+cancel body has always carried an optional `note` and there was no column for it. The seven
+states and the moves between them stay in `AdmissionStatusMachine` — a transition table is a
+rule, and putting rules in columns is how two copies of a workflow get started.
 
 *(Rev 2.9)* **`EmergencyCallId` and `AppointmentId` dropped, `DispatchId` is a string.**
 The spec's `Admission` returns exactly one Emergency reference, `dispatch_id`, and describes

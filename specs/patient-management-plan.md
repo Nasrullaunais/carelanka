@@ -109,6 +109,7 @@ Constraint: `nic IS NOT NULL OR temp_reference IS NOT NULL` — every patient mu
 | `admitted_at` | timestamptz, nullable | When they physically arrived in the bed |
 | `discharged_at` | timestamptz, nullable | |
 | `cancel_reason` | enum, nullable | `diverted_to_other_hospital` `false_alarm` `died_en_route` `patient_refused` `no_show` |
+| `cancel_note` | string(500), nullable | The free-text half — "ambulance rerouted to Kandy, family informed". The reason is mandatory; this is not |
 | `created_at` / `updated_at` | timestamptz | |
 
 **Ward** — a physical ward. Ours (pending §15.1), managed by the Hospital Administrator, changes rarely.
@@ -269,7 +270,12 @@ discharged           -> (terminal)
 cancelled            -> (terminal)
 ```
 
-Anything not on this list returns **409 Conflict**. The table lives in one place in the service layer, not scattered through controllers.
+Anything not on this list returns **409 Conflict**. The table lives in one place in the service layer, not scattered through controllers — `AdmissionStatusMachine`, which every endpoint that moves a status calls.
+
+**Built** (step 4 of `docs/build/patient.md`). Two things about how it is enforced:
+
+- **The table is the wide question, an endpoint is the narrow one, and both are checked.** `ready_for_discharge -> admitted` is a legal move, but `POST /admissions/{id}/arrive` is not the endpoint that makes it — arriving stamps `admitted_at` and a nurse un-flagging a discharge must not. So each endpoint names the states *it* starts from as well as going through the table. Checking only the table would let one endpoint quietly do another's job.
+- **Two people acting on one visit are serialised, not merged.** A manager cancelling and a nurse marking arrival both read `bed_reserved`, both pass the check, and the later write would simply overwrite the earlier one — a cancelled patient ending up admitted. `SELECT ... FOR UPDATE` on the admission row makes the second request wait, re-read, and get the honest 409. Same row lock §5 already relies on for the bed approval.
 
 Three things worth noticing:
 

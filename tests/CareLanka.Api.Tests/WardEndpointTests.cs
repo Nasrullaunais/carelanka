@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using CareLanka.Api.Services.Patient.Stubs;
 using Xunit;
 
 namespace CareLanka.Api.Tests;
@@ -109,17 +108,50 @@ public sealed class WardEndpointTests
     }
 
     [Fact]
-    public async Task Total_beds_comes_from_the_bed_register_and_is_never_stored()
+    public async Task A_ward_with_no_beds_reports_zero_rather_than_a_made_up_number()
     {
         using var client = await ClientAsync(ApiApplication.AdministratorEmail);
 
         var created = await CreateWardAsync(client, NewWardName(), "general", "male");
         using var body = await ReadJsonAsync(created);
 
-        // STUB — while Equipment's register is faked this is a constant. See STUBS.md row 1.
-        Assert.Equal(
-            StubBedRegistryService.BedsPerWard,
-            body.RootElement.GetProperty("total_beds").GetInt32());
+        // Equipment's register leaves a ward with no beds out of its result entirely, so this
+        // is the case where "absent" has to become 0 rather than a missing property.
+        Assert.Equal(0, body.RootElement.GetProperty("total_beds").GetInt32());
+    }
+
+    [Fact]
+    public async Task Total_beds_counts_what_equipment_actually_registered_and_is_never_stored()
+    {
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
+        using var equipment = await ClientAsync(ApiApplication.EquipmentEmail);
+
+        var name = NewWardName();
+        using var ward = await ReadJsonAsync(await CreateWardAsync(administrator, name, "icu", "mixed"));
+        var wardId = ward.RootElement.GetProperty("id").GetString()!;
+
+        // Beds are Equipment Management's table. We only ever read the count back.
+        for (var number = 1; number <= 3; number++)
+        {
+            var bed = await equipment.PostAsJsonAsync("/api/beds", new
+            {
+                ward_id = wardId,
+                bed_number = $"B{number}",
+                has_isolation = false,
+                nurse_station_distance = number
+            });
+
+            Assert.Equal(HttpStatusCode.Created, bed.StatusCode);
+        }
+
+        using var listed = await ReadJsonAsync(await administrator.GetAsync("/api/wards"));
+        var counted = listed.RootElement.EnumerateArray()
+            .Single(w => w.GetProperty("name").GetString() == name)
+            .GetProperty("total_beds").GetInt32();
+
+        // Counted on every read, never stored on the ward row: two sources of truth would drift
+        // the moment Equipment retires a bed.
+        Assert.Equal(3, counted);
     }
 
     [Fact]

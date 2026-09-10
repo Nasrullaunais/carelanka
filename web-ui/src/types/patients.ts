@@ -64,6 +64,19 @@ export const admissionSourceLabels: Record<AdmissionSource, string> = {
   pre_registered: 'Booked visit',
 };
 
+// Every status, in the order a visit moves through them. Passing the whole list to
+// GET /admissions is what asks for the archive: with no status the endpoint answers the live
+// worklist only, which is the right default but hides anyone discharged or cancelled.
+export const admissionStatuses: AdmissionStatus[] = [
+  'awaiting_bed',
+  'awaiting_approval',
+  'bed_reserved',
+  'admitted',
+  'ready_for_discharge',
+  'discharged',
+  'cancelled',
+];
+
 export const admissionStatusLabels: Record<AdmissionStatus, string> = {
   awaiting_bed: 'Awaiting bed',
   awaiting_approval: 'Awaiting approval',

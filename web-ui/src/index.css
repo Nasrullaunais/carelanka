@@ -34,6 +34,13 @@ h2 {
   margin: 0 0 0.75rem;
 }
 
+/* Without this h3 renders bigger than h2, because the browser default is 1.17em and h2 here
+   is deliberately small. A sub-heading that shouts louder than its heading reads as broken. */
+h3 {
+  font-size: 0.95rem;
+  margin: 0 0 0.5rem;
+}
+
 .muted {
   color: var(--ink-soft);
   font-size: 0.875rem;

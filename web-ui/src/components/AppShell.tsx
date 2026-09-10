@@ -4,6 +4,7 @@ import { logoutMutation } from '../services/api/generated/@tanstack/react-query.
 import { clearSession, getSession } from '../services/auth/session';
 import { useSession } from '../services/auth/useSession';
 import {
+  canReadAdmissions,
   canReadCapacity,
   canReadWards,
   canRegisterPatient,
@@ -36,6 +37,7 @@ export function AppShell() {
 
         <nav className="shell-nav">
           {canRegisterPatient(role) && <NavLink to="/intake">Intake</NavLink>}
+          {canReadAdmissions(role) && <NavLink to="/patients">Patients</NavLink>}
           {canWorkAppointmentDesk(role) && (
             <NavLink to="/appointments">Expected visits</NavLink>
           )}

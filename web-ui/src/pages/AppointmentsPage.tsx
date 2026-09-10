@@ -23,11 +23,8 @@ import {
   appointmentStatuses,
   deskCareLevels,
   dutyManagerCareLevels,
-  localDateTime,
-  localInputValue,
-  localTime,
-  utcDay,
 } from '../types/appointments';
+import { localDateTime, localInputValue, localTime, utcDay } from '../types/datetime';
 import {
   admissionCategoryHints,
   admissionCategoryLabels,

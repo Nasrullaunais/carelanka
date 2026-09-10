@@ -74,8 +74,8 @@ export function CapacityPage() {
 
             <p className="hint">
               &ldquo;Not free&rdquo; is everything else at once: someone in the bed, someone
-              holding it on their way in, or Equipment has it out for repair. Open a ward below
-              to see which is which.
+              holding it on their way in, or Equipment has it out for repair. Open a ward's
+              details below to see which is which.
               {capacity.data && (
                 <>
                   {' '}
@@ -153,7 +153,7 @@ export function CapacityPage() {
                             )
                           }
                         >
-                          {selected?.ward_id === ward.ward_id ? 'Close' : 'Open'}
+                          {selected?.ward_id === ward.ward_id ? 'Hide' : 'Details'}
                         </button>
                       </td>
                     </tr>

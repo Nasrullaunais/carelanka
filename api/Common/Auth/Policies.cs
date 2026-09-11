@@ -57,7 +57,15 @@ public static class Policies
     /// </remarks>
     public const string PatientDetails = nameof(PatientDetails);
 
-    /// <summary>Edits a patient record: ward nurse, duty manager. Deliberately not the administrator.</summary>
+    /// <summary>
+    /// Edits a patient record: general staff, ward nurse, duty manager. Deliberately not the
+    /// administrator, and deliberately the same three roles as <see cref="PatientRegistrar"/>.
+    /// </summary>
+    /// <remarks>
+    /// Whoever may create a record may correct it. Splitting the two left reception able to
+    /// register a patient and unable to fix the name thirty seconds later, which is not a
+    /// safeguard — it is a typo that has to be chased through somebody else.
+    /// </remarks>
     public const string PatientEditor = nameof(PatientEditor);
 
     /// <summary>
@@ -82,6 +90,23 @@ public static class Policies
     /// rung narrower, with ICU and HDU narrowing again to the duty manager inside the service.
     /// </remarks>
     public const string DischargeChecklist = nameof(DischargeChecklist);
+
+    /// <summary>
+    /// Reads the discharge board: ward nurse, doctor, duty manager, general staff, hospital
+    /// administrator. Everyone who does <i>any</i> part of sending a patient home.
+    /// </summary>
+    /// <remarks>
+    /// Wider than <see cref="DischargeChecklist"/> because the discharge screen is now the
+    /// whole of a discharge - the bill is raised and settled on it, and reception is general
+    /// staff. Without this, the one screen that does the job would be closed to the person who
+    /// takes the money.
+    ///
+    /// <b>Reading only.</b> Every write on that screen keeps its own narrower policy:
+    /// <c>clinical_clearance</c> is the doctor's, the bill is <see cref="BillingDesk"/>, and
+    /// confirming is <see cref="AdmissionEditor"/>. A wider door onto the room does not widen
+    /// what anybody may do in it.
+    /// </remarks>
+    public const string DischargeBoard = nameof(DischargeBoard);
 
     /// <summary>
     /// Takes money: general staff, hospital administrator, duty manager.

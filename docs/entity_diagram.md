@@ -1526,14 +1526,23 @@ ladder is documented as `icu -> hdu -> inpatient`. Rev 2.1 said enum literals we
 Ordered most to least acute so the bed agent's downgrade logic ("offers the next best
 thing") is a simple ordinal step.
 
-### WardType *(Rev 2.2 — new)*
+### WardType *(Rev 2.2 — new; three members added 2026-09-11)*
 ```
-ICU, HighDependency, General, Maternity, Pediatric, Isolation
+Icu, Hdu, General, Maternity, Pediatric, Isolation, Surgical, Emergency, MentalHealth
 ```
-Serialized as `icu`, `hdu`, `general`, `maternity`, `pediatric`, `isolation` — as
-published in `patient-spec.yaml`. `Ward.Type` used to reuse `AdmissionCategory`, which
-could not express a maternity, pediatric or isolation ward. Overlaps `AdmissionCategory`
-on `icu`/`hdu` only; the two lists are not interchangeable.
+Serialized as `icu`, `hdu`, `general`, `maternity`, `pediatric`, `isolation`, `surgical`,
+`emergency`, `mental_health` — as published in `patient-spec.yaml`. `Ward.Type` used to reuse
+`AdmissionCategory`, which could not express a maternity, pediatric or isolation ward. Overlaps
+`AdmissionCategory` on `icu`/`hdu` only; the two lists are not interchangeable.
+
+**Why `surgical`, `emergency` and `mental_health` are types rather than ward names.** The
+bed-day rate is read off the ward type. A surgical ward called a `general` one prices a
+surgical bed and an ordinary bed identically, with no way to tell them apart on a bill. All
+three sit on the same rung as `general` in `BedPlacementRules.Rung`, so no placement rule
+changed — what they buy is a price and a name, not a new level of care.
+
+`emergency-spec.yaml` publishes a separate `WardTypeHint` that still lists six. That is
+Kaveesha's file and an open item, not an edit — see `integration_of_functions.md` §11.11.
 
 ### AdmissionUrgency *(Rev 2.2 — replaces AcuityLevel)*
 ```

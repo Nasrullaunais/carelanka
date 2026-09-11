@@ -53,6 +53,13 @@ client.interceptors.error.use((error, response, request) => {
     return error;
   }
 
+  // A handful of 404s are ordinary answers rather than failures, and the screen that asked
+  // already says so in its own words. Toasting them puts a red box over a page that is
+  // working correctly - see expected404s below.
+  if (response.status === 404 && isExpected404(request)) {
+    return error;
+  }
+
   // Everything else: show the server's own message, word for word. Re-wording it in the UI
   // is how two people end up describing the same failure differently.
   toast.error(messageOf(error) ?? `Request failed (${response.status}).`);
@@ -61,6 +68,26 @@ client.interceptors.error.use((error, response, request) => {
 });
 
 const signInPaths = ['/auth/login', '/auth/patient/login', '/auth/patient/register'];
+
+/**
+ * Reads that answer 404 to mean "not yet", not "something went wrong".
+ *
+ * `GET /admissions/{id}/bill` is the one that matters: no bill exists until reception opens
+ * one, BillPanel renders "No bill has been opened for this visit yet", and the red toast on
+ * top of that sentence contradicted it. Kept as an explicit list, and matched on GET only, so
+ * a failing write is never swallowed by accident.
+ */
+const expected404s = [/\/admissions\/[^/]+\/bill$/];
+
+function isExpected404(request: Request | undefined): boolean {
+  if (request?.method !== 'GET') {
+    return false;
+  }
+
+  const path = pathOf(request);
+
+  return expected404s.some((pattern) => pattern.test(path));
+}
 
 function pathOf(request: Request | undefined): string {
   if (!request) {

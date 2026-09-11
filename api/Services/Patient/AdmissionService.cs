@@ -641,8 +641,33 @@ public sealed class AdmissionService : IAdmissionService
     {
         var now = DateTimeOffset.UtcNow;
 
-        return admission.BedAssignments.FirstOrDefault(
+        var live = admission.BedAssignments.FirstOrDefault(
             assignment => BedHold.IsLive(assignment, now));
+
+        if (live is not null)
+        {
+            return live;
+        }
+
+        // Nothing live. For a visit that is over, that is not "no bed" - a discharge releases
+        // the assignment, and answering "No bed" about somebody who spent three days in GEN-02
+        // is the wrong answer to the question a finished record is asking. Fall back to the bed
+        // they were last in.
+        //
+        // Only once the visit has ended. While it is running, "no live assignment" genuinely
+        // means they are waiting for a bed, and showing a released one would put a patient in a
+        // bed somebody else may now be in.
+        if (admission.Status is not (AdmissionStatus.Discharged or AdmissionStatus.Cancelled))
+        {
+            return null;
+        }
+
+        // A corrected bed leaves a released row behind that the patient was never really in,
+        // so the most recently released row is the one that counts.
+        return admission.BedAssignments
+            .OrderByDescending(assignment => assignment.ReleasedAt ?? DateTimeOffset.MinValue)
+            .ThenByDescending(assignment => assignment.OccupiedAt ?? assignment.CreatedAt)
+            .FirstOrDefault();
     }
 
     /// <summary>

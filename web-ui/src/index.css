@@ -358,9 +358,18 @@ tr.selected {
 
 .detail-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-  gap: 0.8rem;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.9rem 1.6rem;
   margin: 0;
+}
+
+/* Each label and its value are wrapped in a div, and that div is the grid item.
+   Without the wrapper, dt and dd are separate items flowing into the same track
+   list - so a three-column grid puts "Where / No bed / Status" on one row and
+   "discharged / Admitted by / Ishara" on the next, and every label sits above
+   somebody else's value. It reads as corrupted data. */
+.detail-grid > div {
+  min-width: 0;
 }
 
 .detail-grid dt {

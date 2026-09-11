@@ -14,7 +14,7 @@ import {
   canConfirmDischargeOf,
   canTickChecklistItem,
   canWorkBillingDesk,
-  canWorkDischargeChecklist,
+  canOpenDischargeBoard,
 } from '../types/permissions';
 import { admissionCategoryLabels } from '../types/patients';
 import {
@@ -48,14 +48,17 @@ import {
 export function DischargePage() {
   const session = useSession();
   const role = session?.principal.role;
-  const canWork = canWorkDischargeChecklist(role);
+  const canWork = canOpenDischargeBoard(role);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // The hook cannot go behind an early return, so it is switched off instead. Nobody who
   // cannot work the checklist should be asking the server at all.
+  // includeDischarged on purpose. Without it this screen empties itself the moment the work is
+  // done: you confirm a discharge, the row vanishes, and there is nowhere left to look up what
+  // just happened. The finished ones come back sorted below everybody still in the building.
   const candidates = useQuery({
-    ...listDischargeCandidatesOptions({ query: { pageSize: 50 } }),
+    ...listDischargeCandidatesOptions({ query: { includeDischarged: true, pageSize: 50 } }),
     enabled: canWork,
   });
 
@@ -64,21 +67,30 @@ export function DischargePage() {
       <>
         <h1>Discharge</h1>
         <p className="empty">
-          Discharges are worked by ward nurses, doctors and the duty manager.
+          Discharges are worked by ward nurses, doctors, the duty manager, reception and the
+          hospital administrator. Ambulance crew and equipment managers have no part in one.
         </p>
       </>
     );
   }
 
-  const rows = candidates.data?.items ?? [];
+  const all = candidates.data?.items ?? [];
+
+  // Two lists out of one call, because they are two different things to look at. The top one
+  // is work to do; the bottom one is a record of work finished, and mixing them puts a patient
+  // who left last Tuesday in among the ones a nurse is trying to get home today.
+  const rows = all.filter((row) => !row.is_discharged);
+  const finished = all.filter((row) => row.is_discharged);
   const ready = rows.filter((row) => row.outstanding_items.length === 0);
 
   return (
     <>
       <h1>Discharge</h1>
       <p className="muted">
-        Everyone currently in a bed, with what is still outstanding before they can go. Being on
-        this list changes nothing on its own — a person confirms the discharge.
+        Everyone currently in the building, what they owe, and what is still outstanding before
+        they can go. The bill is raised and settled here too — a discharge is one piece of
+        paper, not two screens. Being on this list changes nothing on its own: a person
+        confirms the discharge.
       </p>
 
       {candidates.isError ? (
@@ -141,6 +153,50 @@ export function DischargePage() {
         </div>
       )}
 
+      {!candidates.isError && (
+        <div className="card">
+          <h2>Already gone home</h2>
+          <p className="muted">
+            Discharges that are finished. Nothing here can be changed — a confirmed discharge is
+            a record of what happened, not a form. Open one to read the checklist, who signed it
+            off and the bill as it was handed over.
+          </p>
+
+          {candidates.isLoading ? (
+            <p className="empty">Loading…</p>
+          ) : finished.length === 0 ? (
+            <p className="empty">
+              Nobody has been discharged yet. The first one you confirm appears here.
+            </p>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Patient</th>
+                  <th>Where they were</th>
+                  <th>Care level</th>
+                  <th>Days</th>
+                  <th>Left</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {finished.map((row) => (
+                  <CandidateRow
+                    key={row.admission_id}
+                    row={row}
+                    selected={row.admission_id === selectedId}
+                    onSelect={() =>
+                      setSelectedId(row.admission_id === selectedId ? null : row.admission_id)
+                    }
+                  />
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
       {selectedId && (
         <DischargeDetail
           admissionId={selectedId}
@@ -182,7 +238,15 @@ function CandidateRow({
       <td>{admissionCategoryLabels[row.admission_category]}</td>
       <td>{row.days_in_bed}</td>
       <td>
-        {outstanding.length === 0 ? (
+        {row.is_discharged ? (
+          // Nothing is outstanding on a finished visit by definition - it could not have been
+          // confirmed otherwise - so the column carries the useful fact instead.
+          <span className="small">
+            {row.discharged_at
+              ? new Date(row.discharged_at).toLocaleString()
+              : 'Discharged'}
+          </span>
+        ) : outstanding.length === 0 ? (
           <span className="badge status-available">Ready</span>
         ) : (
           <span className="small">{outstanding.map(checklistLabel).join(', ')}</span>
@@ -292,36 +356,105 @@ function DischargeDetail({
   const isDischarged = visit.status === 'discharged';
 
   return (
-    <div className="card">
-      <div className="dialog-head">
+    // The whole card prints, not just the charges table. A discharge document IS the bill:
+    // who was cleared by which doctor, what it cost, who took the money, who sent them home
+    // and what they were told. Printing the expenses alone produced a piece of paper that
+    // proved a number and nothing else.
+    <div className="card printable">
+      <div className="print-only print-head">
+        <h2>CareLanka Hospital</h2>
+        <p>Discharge statement</p>
+      </div>
+
+      <div className="dialog-head no-print">
         <h2>
           {visit.patient?.full_name ?? 'Visit'}{' '}
           <span className="badge">{admissionCategoryLabels[visit.admission_category]}</span>
         </h2>
-        <button type="button" className="secondary small" onClick={onClose}>
-          Close
-        </button>
+        <div className="actions">
+          <button type="button" className="secondary small" onClick={() => window.print()}>
+            Print / save
+          </button>
+          <button type="button" className="secondary small" onClick={onClose}>
+            Close
+          </button>
+        </div>
       </div>
 
+      {/* The same heading again for the printed copy, without the buttons. */}
+      <h3 className="print-only">
+        {visit.patient?.full_name}
+        {visit.patient?.patient_code ? ` · ${visit.patient.patient_code}` : ''}
+      </h3>
+
       <dl className="detail-grid">
-        <dt>Where</dt>
-        <dd>{visit.bed_number ? `${visit.ward_name} · bed ${visit.bed_number}` : 'No bed'}</dd>
-        <dt>Status</dt>
-        <dd>{visit.status.replaceAll('_', ' ')}</dd>
-        <dt>Admitted by</dt>
-        <dd>
-          {visit.category_set_by_staff_name ?? <span className="muted">Unknown</span>}
-          {visit.category_set_at && (
+        <div>
+          <dt>Patient</dt>
+          <dd>
+            {visit.patient?.full_name ?? <span className="muted">Unknown</span>}
             <div className="small muted">
-              {new Date(visit.category_set_at).toLocaleString()}
+              {visit.patient?.patient_code}
+              {visit.patient?.nic ? ` · ${visit.patient.nic}` : ''}
             </div>
-          )}
-        </dd>
+          </dd>
+        </div>
+        <div>
+          <dt>Where</dt>
+          <dd>
+            {visit.bed_number ? (
+              <>
+                {visit.ward_name}
+                <div className="small muted">Bed {visit.bed_number}</div>
+              </>
+            ) : (
+              <span className="muted">No bed</span>
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>Care level</dt>
+          <dd>{admissionCategoryLabels[visit.admission_category]}</dd>
+        </div>
+        <div>
+          <dt>Admitted</dt>
+          <dd>
+            {visit.admitted_at ? (
+              new Date(visit.admitted_at).toLocaleString()
+            ) : (
+              <span className="muted">Not recorded</span>
+            )}
+            {visit.category_set_by_staff_name && (
+              <div className="small muted">by {visit.category_set_by_staff_name}</div>
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>Status</dt>
+          <dd>
+            {visit.status.replaceAll('_', ' ')}
+            {isDischarged && visit.discharged_at && (
+              <div className="small muted">
+                {new Date(visit.discharged_at).toLocaleString()}
+              </div>
+            )}
+          </dd>
+        </div>
       </dl>
 
-      {/* ---------- 1. the wall ---------- */}
+      {/* ---------- the bill ---------- */}
 
-      <h3>1 · Cleared by a doctor</h3>
+      <h3>Charges</h3>
+
+      <BillPanel admissionId={admissionId} canSettle={maySettle && !isDischarged} showPrint={false} />
+
+      {/* ---------- who signed what ---------- */}
+      {/*
+        Below the bill and part of the same document, because that is what a discharge paper
+        is. Three names and three times: the doctor who said they were well enough, the person
+        who took the money, and the person who actually sent them home.
+      */}
+
+      <h3>Sign-off</h3>
 
       <ChecklistRow
         item={cleared?.item}
@@ -333,73 +466,83 @@ function DischargeDetail({
         }
       />
 
-      {/* ---------- 2. the money ---------- */}
-
-      <h3>2 · The bill</h3>
-
-      <BillPanel admissionId={admissionId} canSettle={maySettle && !isDischarged} />
-
-      {/* ---------- 3. what settling wrote ---------- */}
-
-      <h3>3 · Bill settled</h3>
-
       <ChecklistRow item={settled?.item} itemKey="billing_settled" mayTick={false} />
 
-      {/* ---------- 4. send them home ---------- */}
-
-      <h3>4 · Send them home</h3>
-
-      {isDischarged ? (
-        <p className="empty">
-          Already discharged
-          {visit.discharged_at && ` at ${new Date(visit.discharged_at).toLocaleString()}`}
-          {visit.discharge?.confirmed_by_staff_name &&
-            ` by ${visit.discharge.confirmed_by_staff_name}`}
-          .
-        </p>
-      ) : !mayConfirm ? (
-        <p className="empty">
-          {visit.admission_category === 'icu' || visit.admission_category === 'hdu'
-            ? 'An ICU or HDU discharge is the duty manager’s decision.'
-            : 'Confirming a discharge is the ward nurse’s or the duty manager’s.'}
-        </p>
-      ) : (
-        <>
-          <div className="field">
-            <label htmlFor="summary-note">
-              What the patient takes home with them <span className="muted">(optional)</span>
-            </label>
-            <textarea
-              id="summary-note"
-              rows={3}
-              maxLength={2000}
-              value={summaryNote}
-              placeholder="Rest for three days. Come back if the swelling returns."
-              onChange={(event) => setSummaryNote(event.target.value)}
-            />
+      <dl className="detail-grid" style={{ marginTop: '0.9rem' }}>
+        <div>
+          <dt>Discharged by</dt>
+          <dd>
+            {visit.discharge?.confirmed_by_staff_name ?? (
+              <span className="muted">Not yet</span>
+            )}
+            {visit.discharged_at && (
+              <div className="small muted">
+                {new Date(visit.discharged_at).toLocaleString()}
+              </div>
+            )}
+          </dd>
+        </div>
+        {visit.discharge?.summary_note && (
+          <div>
+            <dt>What they were told</dt>
+            <dd>{visit.discharge.summary_note}</dd>
           </div>
+        )}
+      </dl>
 
-          <button
-            type="button"
-            disabled={!allMandatoryTicked || confirm.isPending}
-            onClick={() =>
-              confirm.mutate({
-                path: { admissionId },
-                body: { summary_note: summaryNote.trim() || null },
-              })
-            }
-          >
-            {confirm.isPending ? 'Discharging…' : 'Confirm discharge'}
-          </button>
+      {/* ---------- the act itself ---------- */}
 
-          {!allMandatoryTicked && (
-            <p className="hint">
-              Disabled until steps 1 and 3 are both done. This ends the visit, frees the bed and
-              sends someone home, so it does not happen halfway.
-            </p>
-          )}
-        </>
-      )}
+      <div className="no-print">
+        {isDischarged ? (
+          <p className="hint">
+            This visit is over. Everything above is a record of what happened and nothing on it
+            can be changed.
+          </p>
+        ) : !mayConfirm ? (
+          <p className="hint">
+            {visit.admission_category === 'icu' || visit.admission_category === 'hdu'
+              ? 'An ICU or HDU discharge is the duty manager’s decision.'
+              : 'Confirming a discharge is the ward nurse’s or the duty manager’s.'}
+          </p>
+        ) : (
+          <>
+            <div className="field">
+              <label htmlFor="summary-note">
+                What the patient takes home with them <span className="muted">(optional)</span>
+              </label>
+              <textarea
+                id="summary-note"
+                rows={3}
+                maxLength={2000}
+                value={summaryNote}
+                placeholder="Rest for three days. Come back if the swelling returns."
+                onChange={(event) => setSummaryNote(event.target.value)}
+              />
+              <p className="hint">This is printed on the discharge paper they take away.</p>
+            </div>
+
+            <button
+              type="button"
+              disabled={!allMandatoryTicked || confirm.isPending}
+              onClick={() =>
+                confirm.mutate({
+                  path: { admissionId },
+                  body: { summary_note: summaryNote.trim() || null },
+                })
+              }
+            >
+              {confirm.isPending ? 'Discharging…' : 'Confirm discharge'}
+            </button>
+
+            {!allMandatoryTicked && (
+              <p className="hint">
+                Disabled until a doctor has cleared them and the bill is settled. This ends the
+                visit, frees the bed and sends somebody home, so it does not happen halfway.
+              </p>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

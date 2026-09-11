@@ -283,7 +283,7 @@ export function PatientsPage() {
                         role={role}
                         assigning={assigningId === row.id}
                         open={openId === row.id}
-                        onAssign={() => openAssign(row.id)}
+                        onAssign={(mode) => openAssign(row.id, mode)}
                         onDetails={() => openDetails(row.id)}
                       />
                     </td>

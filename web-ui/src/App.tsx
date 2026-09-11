@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { AppointmentsPage } from './pages/AppointmentsPage';
-import { BillingPage } from './pages/BillingPage';
+import { BillingSettingsPage } from './pages/BillingSettingsPage';
 import { CapacityPage } from './pages/CapacityPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DischargePage } from './pages/DischargePage';
@@ -54,7 +54,11 @@ export function App() {
         <Route path="/patients" element={<PatientsPage />} />
         <Route path="/appointments" element={<AppointmentsPage />} />
         <Route path="/discharge" element={<DischargePage />} />
-        <Route path="/billing" element={<BillingPage />} />
+        {/* Billing is not a screen of its own any more - it is part of a discharge. Kept as a
+            redirect rather than deleted so an old bookmark or a link in someone's notes still
+            lands somewhere useful. */}
+        <Route path="/billing" element={<Navigate to="/discharge" replace />} />
+        <Route path="/billing-settings" element={<BillingSettingsPage />} />
         <Route path="/capacity" element={<CapacityPage />} />
         <Route path="/wards" element={<WardsPage />} />
         <Route path="/equipment" element={<EquipmentPage />} />

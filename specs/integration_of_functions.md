@@ -118,6 +118,7 @@ The second version keeps working when hold expiry, out-of-service beds or a new 
 | **`Bed`** — exists, number, condition, repairs | **Equipment (M3)** | Patient (to find candidates) | Equipment only |
 | `Patient`, `Admission`, `Discharge`, `DischargeChecklistItem` | **Patient (M4)** | Emergency, Staff (aggregates only) | Patient only |
 | **`Bill`, `BillLineItem`** — what a visit costs and whether it is paid | **Patient (M4)** — *claimed 2026-09-11, see §11.10* | Nobody yet | Patient only |
+| **`BillingRate`, `AdmissionFeeRate`** — what the hospital charges | **Patient (M4)** — *added 2026-09-11, see §11.13* | Nobody yet | Read: any staff. Write: administrator only |
 | **`BedAssignment`** — who is in a bed, holds, approvals | **Patient (M4)** | Equipment (before servicing a bed) | Patient only |
 | `Ward` — name, type, gender policy | **Patient (M4)** — *see §11.1* | All | Patient only |
 | `AgentWorkflow`, `AgentProposedChange` | **Common (group-owned)** — *DECIDED, §11.2* | All five agents | All five agents, by `workflow_id` |
@@ -708,6 +709,67 @@ says so out loud.
 **Rates are a static C# table** (`Services/Patient/BillingRates.cs`), invented numbers, no
 `billing_rates` table and no admin screen. If the group wants prices editable, that is one
 file's worth of seam and somebody has to own the screen.
+
+---
+
+
+**11.11 (OPEN — raised by M4 on 2026-09-11, for Kaveesha / M1) — `WardType` gained three
+members.**
+
+The ward board went from ten wards split by sex to the eight the hospital actually has, and
+three of them had no matching type: **`surgical`, `emergency`, `mental_health`** now sit
+alongside `icu`, `hdu`, `general`, `maternity`, `pediatric` and `isolation`.
+
+**Why they are types and not just names.** The bed-day rate is read off the ward type. Calling
+a surgical ward a `general` one makes a surgical bed and an ordinary bed the same price, with
+no way to tell them apart on a bill — and hard rules H2 and H4 would treat them as one ward
+too.
+
+**Nothing breaks.** The placement ladder puts all three on the same rung as `general`, which is
+the catch-all arm of `BedPlacementRules.Rung` — so no existing rule changed, and an `inpatient`
+is placeable in all three exactly as before.
+
+**What M1 needs to decide.** `emergency-spec.yaml` publishes `WardTypeHint`, which mirrors
+`WardType` and still lists six values. **It has not been touched** — it is Kaveesha's file, and
+a disagreement about somebody else's schema is an open item, not an edit. Nothing is broken
+today because the endpoint that uses it does not exist yet. Either add the three members when
+that endpoint is built, or decide that a routing *hint* deliberately carries a coarser
+vocabulary than the ward register and say so in the description.
+
+**11.12 (DECIDED by M4 on 2026-09-11) — `Policies.PatientEditor` now includes general staff.**
+
+It was ward nurse and duty manager. It is now **the same three roles as `PatientRegistrar`** —
+general staff, ward nurse, duty manager.
+
+**Why.** Reception types the patient record and could not correct it. Somebody who misspelt a
+name, pressed Register and then noticed had no way back to it at all: the next lookup found the
+record and offered to admit it, misspelling and all. That is not a safeguard, it is a typo that
+has to be chased through a ward nurse.
+
+**The rule, stated once:** whoever may create a record may correct it.
+
+**Scope.** `PUT /patients/{id}` only. `AdmissionEditor` is untouched and is still ward nurse and
+duty manager — chasing a visit's paperwork is a different job from fixing a name.
+
+**11.13 (OPEN — announced by M4 on 2026-09-11) — prices are a table now, and the administrator
+owns them.**
+
+`BillingRates.cs` said out loud that a `billing_rates` table would be "a migration, a role, a
+screen and a set of tests for a number that is edited once a year". That held while the numbers
+were invented constants nobody could change. It stopped holding when the hospital administrator
+was given the job of setting them.
+
+**What was built.** `BillingRate` (ward type × expense) and `AdmissionFeeRate` (care level),
+migration `Patient_AddBillingRates`, `GET`/`PUT /billing/rates`, and a React screen at
+`/billing-settings`. Both tables are M4's and nobody else writes them.
+
+**Two properties worth knowing, because they are what make it safe.** A cell with no row falls
+back to the built-in default, so the grid is complete on a database that has never seen the
+screen. And the price is still **copied onto the bill line when the line is written** — editing
+a rate prices tomorrow's bills and never rewrites one a patient has already been handed.
+
+**Read is `AnyStaff`, write is `HospitalAdministrator`.** Everyone at the desk needs the
+suggested price in the box in front of them; deciding what that price is is a different job.
 
 ---
 

@@ -1,4 +1,5 @@
 using CareLanka.Api.Data;
+using CareLanka.Api.Data.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace CareLanka.Api.Services.Patient;
@@ -65,6 +66,85 @@ public static class BedLabels
     /// half comes from <see cref="BedHold"/>, so this agrees with every other read of "is that
     /// bed still held".
     /// </remarks>
+    /// <summary>
+    /// The bed they are in, or - for a visit that is over - the last bed they were in.
+    /// </summary>
+    /// <remarks>
+    /// <b>Releasing a bed is not the same as never having had one.</b> A discharge releases the
+    /// assignment, so <see cref="LiveByAdmissionAsync"/> finds nothing and the screen said
+    /// "No bed" about a patient who had just spent three days in GEN-02. That is not a missing
+    /// value, it is the wrong answer to the question a record is asking - which is "where were
+    /// they?", not "where are they now?".
+    ///
+    /// Live first, always. A patient who currently holds a bed must never be labelled with an
+    /// older one, so the fallback only applies where there is no live row at all.
+    ///
+    /// Use this for anything that displays <b>history</b>. Use <see cref="LiveByAdmissionAsync"/>
+    /// for anything that answers "who is in this bed right now" - a board, a capacity count, a
+    /// placement decision.
+    /// </remarks>
+    public static async Task<IReadOnlyDictionary<Guid, BedLabel>> CurrentOrLastByAdmissionAsync(
+        CareLankaDbContext db,
+        IBedRegistryService beds,
+        IReadOnlyCollection<Guid> admissionIds,
+        DateTimeOffset now,
+        CancellationToken ct = default)
+    {
+        if (admissionIds.Count == 0)
+        {
+            return BedLabel.None;
+        }
+
+        var ids = admissionIds.ToList();
+
+        var assignments = await db.BedAssignments
+            .AsNoTracking()
+            .Where(assignment => ids.Contains(assignment.AdmissionId))
+            .Select(assignment => new
+            {
+                assignment.AdmissionId,
+                assignment.BedId,
+                assignment.Status,
+                assignment.OccupiedAt,
+                assignment.ReleasedAt,
+                assignment.CreatedAt
+            })
+            .ToListAsync(ct);
+
+        if (assignments.Count == 0)
+        {
+            return BedLabel.None;
+        }
+
+        // One bed per admission: the live one if there is one, otherwise the one they were in
+        // most recently. A corrected bed leaves a released row behind, and the patient was
+        // never really in it - ordering by when the row was written puts the real one last.
+        var chosen = assignments
+            .GroupBy(assignment => assignment.AdmissionId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .OrderBy(assignment => assignment.Status == AssignmentStatus.Released)
+                    .ThenByDescending(assignment => assignment.ReleasedAt ?? DateTimeOffset.MaxValue)
+                    .ThenByDescending(assignment => assignment.OccupiedAt ?? assignment.CreatedAt)
+                    .First()
+                    .BedId);
+
+        var byBedId = await ByBedIdAsync(db, beds, chosen.Values.Distinct().ToList(), ct);
+
+        var result = new Dictionary<Guid, BedLabel>();
+
+        foreach (var (admissionId, bedId) in chosen)
+        {
+            if (byBedId.TryGetValue(bedId, out var label))
+            {
+                result[admissionId] = label;
+            }
+        }
+
+        return result;
+    }
+
     public static async Task<IReadOnlyDictionary<Guid, BedLabel>> LiveByAdmissionAsync(
         CareLankaDbContext db,
         IBedRegistryService beds,

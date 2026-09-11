@@ -1,32 +1,33 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   createAdmissionMutation,
   createPatientMutation,
+  getPatientOptions,
   lookupPatientMutation,
+  updatePatientMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
 import type {
   Admission,
   AdmissionCategory,
   AdmissionUrgency,
-  Gender,
   Patient,
   PatientSummary,
 } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
+import { nicProblem } from '../types/identifiers';
 import {
-  birthYears,
-  dateOfBirthProblem,
-  daysInMonth,
-  fieldLimits,
-  monthNames,
-  nicProblem,
-  phoneProblem,
-  toIsoDate,
-} from '../types/identifiers';
-import { canRegisterPatient } from '../types/permissions';
+  PatientFields,
+  emptyPatientForm,
+  onSubmit,
+  patientFormBody,
+  patientFormFrom,
+  patientFormProblems,
+  usePatientForm,
+} from './intake-form';
+import { canEditPatient, canRegisterPatient } from '../types/permissions';
 import {
   admissionCategories,
   admissionCategoryHints,
@@ -35,7 +36,6 @@ import {
   admissionUrgencyLabels,
   detailFieldLabel,
   genderLabels,
-  genders,
   patientIdentifier,
 } from '../types/patients';
 
@@ -47,7 +47,15 @@ import {
 // A second record for the same person is the most damaging data problem in this component,
 // and it stays invisible until somebody needs the history.
 
-type Step = 'find' | 'register' | 'admit' | 'done';
+type Step = 'find' | 'register' | 'edit' | 'admit' | 'done';
+
+// 'edit' is the same form as 'register', pointed at PUT /patients/{id} instead of POST.
+//
+// It exists because registering somebody WRITES THEM TO THE DATABASE, and "Start over" only
+// clears the boxes on screen. Somebody who misspelt a name, pressed Register and then pressed
+// Start over had no way back to it at all: the next lookup found the record and offered to
+// admit it, misspelling and all. A form that can create a record and not correct one is a form
+// that turns every typo into a permanent one.
 
 export function IntakePage() {
   const session = useSession();
@@ -57,6 +65,23 @@ export function IntakePage() {
   const [patient, setPatient] = useState<Patient | PatientSummary | null>(null);
   const [knownNic, setKnownNic] = useState('');
   const [admission, setAdmission] = useState<Admission | null>(null);
+
+  // Where "Cancel" and "Save" go back to. Editing is reached from two places and they are not
+  // the same place: from the admit step it is a detour, and going back to admit is right. From
+  // the lookup it is a correction on somebody who may already be in a bed, and dropping them on
+  // the admit step would offer an Admit button that the server refuses with cl_pat_006.
+  const [editReturn, setEditReturn] = useState<'find' | 'admit'>('admit');
+
+  function leaveEdit() {
+    if (editReturn === 'find') {
+      // Back to the lookup, not to the record they were just editing. The lookup is the screen
+      // that knows whether this person can be admitted, and it asks the server again.
+      restart();
+      return;
+    }
+
+    setStep('admit');
+  }
 
   function restart() {
     setStep('find');
@@ -89,9 +114,15 @@ export function IntakePage() {
 
       {step === 'find' && (
         <FindStep
+          canEdit={canEditPatient(role)}
           onExisting={(found) => {
             setPatient(found);
             setStep('admit');
+          }}
+          onEditExisting={(found) => {
+            setPatient(found);
+            setEditReturn('find');
+            setStep('edit');
           }}
           onNew={(nic) => {
             setKnownNic(nic);
@@ -111,10 +142,26 @@ export function IntakePage() {
         />
       )}
 
+      {step === 'edit' && patient && (
+        <EditStep
+          patientId={patient.id}
+          onBack={leaveEdit}
+          onSaved={(saved) => {
+            setPatient(saved);
+            leaveEdit();
+          }}
+        />
+      )}
+
       {step === 'admit' && patient && (
         <AdmitStep
           patient={patient}
           staffId={session?.principal.id ?? ''}
+          canEdit={canEditPatient(role)}
+          onEdit={() => {
+            setEditReturn('admit');
+            setStep('edit');
+          }}
           onBack={restart}
           onAdmitted={(created) => {
             setAdmission(created);
@@ -133,6 +180,9 @@ function Steps({ current }: { current: Step }) {
   const labels: Record<Step, string> = {
     find: '1. Find them',
     register: '2. Register',
+    // Correcting details is a detour off step 3, not a step of its own - so it lights up
+    // "Register", which is the step whose work is being redone.
+    edit: '2. Register',
     admit: '3. Admit',
     done: 'Done',
   };
@@ -143,7 +193,11 @@ function Steps({ current }: { current: Step }) {
         <span
           key={value}
           role="listitem"
-          className={value === current ? 'badge' : 'badge retired'}
+          className={
+            value === current || (current === 'edit' && value === 'register')
+              ? 'badge'
+              : 'badge retired'
+          }
         >
           {labels[value]}
         </span>
@@ -162,32 +216,15 @@ type LookupResult = {
   hasOpenAdmission: boolean;
 };
 
-/**
- * How much room is left in a field, shown only once it starts to matter.
- *
- * A counter sitting under every box from the moment the form loads is noise; one that appears
- * at three quarters full is a warning. Either way the input's own maxLength is what stops the
- * typing - this only explains why it stopped.
- */
-function Counter({ value, limit }: { value: string; limit: number }) {
-  if (value.length < limit * 0.75) {
-    return null;
-  }
-
-  const left = limit - value.length;
-
-  return (
-    <p className={left === 0 ? 'field-error' : 'hint'}>
-      {left === 0 ? `That is the limit - ${limit} characters.` : `${left} characters left.`}
-    </p>
-  );
-}
-
 function FindStep({
+  canEdit,
   onExisting,
+  onEditExisting,
   onNew,
 }: {
+  canEdit: boolean;
   onExisting: (patient: PatientSummary) => void;
+  onEditExisting: (patient: PatientSummary) => void;
   onNew: (nic: string) => void;
 }) {
   const [nic, setNic] = useState('');
@@ -271,6 +308,21 @@ function FindStep({
               Admit this patient
             </button>
           )}
+
+          {/* Offered whether or not they can be admitted. A wrong date of birth on somebody
+              already in a bed is still wrong, and this screen is where the desk has just
+              noticed it. */}
+          {canEdit && (
+            <p style={{ marginTop: '0.6rem' }}>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => onEditExisting(result.patient as PatientSummary)}
+              >
+                Edit their details
+              </button>
+            </p>
+          )}
         </div>
       )}
 
@@ -313,8 +365,11 @@ function FindStep({
 }
 
 // ---------------------------------------------------------------------------
-// Step 2 - register
+// Step 2 - register, and its detour: edit
 // ---------------------------------------------------------------------------
+//
+// Both render the same eight boxes from intake-form.tsx. They differ in the verb and in one
+// fact: registering invents a record, editing corrects one that already exists.
 
 function RegisterStep({
   nic,
@@ -328,40 +383,8 @@ function RegisterStep({
   const queryClient = useQueryClient();
   const unidentified = nic.length === 0;
 
-  const [fullName, setFullName] = useState(unidentified ? 'Unidentified patient' : '');
-  const [gender, setGender] = useState<Gender>(unidentified ? 'unknown' : 'male');
-  const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('');
-  const [contactName, setContactName] = useState('');
-  const [contactPhone, setContactPhone] = useState('');
-
-  // Three pickers rather than one <input type="date">. The native control opens on this month,
-  // and a patient born in 1997 is a long way back from there - which is how a desk ends up
-  // leaving date of birth blank on every record.
-  const [birthYear, setBirthYear] = useState<number | null>(null);
-  const [birthMonth, setBirthMonth] = useState<number | null>(null);
-  const [birthDay, setBirthDay] = useState<number | null>(null);
-
-  const dateOfBirth = toIsoDate(birthYear, birthMonth, birthDay);
-
-  // Told at the field, not on submit. The server checks all of this too - a browser is not a
-  // boundary - but a form that accepts what you typed and then fails on submit makes you hunt
-  // for which of eight boxes was wrong.
-  const phoneError = phoneProblem(phone);
-  const contactPhoneError = phoneProblem(contactPhone);
-  const dateOfBirthError = dateOfBirthProblem(dateOfBirth);
-
-  // A part-filled date is not an error, it is an unfinished one. Saying "that is not a date" to
-  // somebody who has picked the year and is reaching for the month is just rude.
-  const dateIncomplete =
-    (birthYear !== null || birthMonth !== null || birthDay !== null) && dateOfBirth === '';
-
-  const blocked =
-    fullName.trim().length === 0 ||
-    phoneError !== null ||
-    contactPhoneError !== null ||
-    dateOfBirthError !== null ||
-    dateIncomplete;
+  const form = usePatientForm(emptyPatientForm(unidentified));
+  const problems = patientFormProblems(form.value);
 
   const register = useMutation({
     ...createPatientMutation(),
@@ -379,28 +402,6 @@ function RegisterStep({
     },
   });
 
-  function submit(event: FormEvent) {
-    event.preventDefault();
-
-    // Blank optional fields go as null, not "". The server computes missing_fields off the
-    // patient row, so an empty string would count as filled in and the desk would never be
-    // told to chase it.
-    const orNull = (value: string) => (value.trim().length > 0 ? value.trim() : null);
-
-    register.mutate({
-      body: {
-        full_name: fullName.trim(),
-        nic: unidentified ? null : nic,
-        gender,
-        date_of_birth: orNull(dateOfBirth),
-        phone: orNull(phone),
-        address: orNull(address),
-        emergency_contact_name: orNull(contactName),
-        emergency_contact_phone: orNull(contactPhone),
-      },
-    });
-  }
-
   return (
     <div className="card">
       <h2>Register a new patient</h2>
@@ -417,154 +418,156 @@ function RegisterStep({
         </p>
       )}
 
-      <form onSubmit={submit}>
-        <div className="row">
-          <div className="field">
-            <label htmlFor="reg-name">Full name</label>
-            <input
-              id="reg-name"
-              value={fullName}
-              maxLength={fieldLimits.fullName}
-              onChange={(event) => setFullName(event.target.value)}
-              required
-            />
-            <Counter value={fullName} limit={fieldLimits.fullName} />
-          </div>
-          <div className="field">
-            <label htmlFor="reg-gender">Gender</label>
-            <select
-              id="reg-gender"
-              value={gender}
-              onChange={(event) => setGender(event.target.value as Gender)}
-            >
-              {genders.map((value) => (
-                <option key={value} value={value}>
-                  {genderLabels[value]}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+      {/* Said before the button, not after it. "Start over" clears these boxes and nothing
+          else, so somebody who expects it to undo the registration is in for a surprise the
+          next time they look the patient up. */}
+      <p className="hint" style={{ marginBottom: '0.9rem' }}>
+        Registering saves the record. If something is wrong afterwards you can still correct it
+        from the next step — but &ldquo;Start over&rdquo; only empties the boxes, it does not
+        undo a registration.
+      </p>
+
+      <form
+        onSubmit={onSubmit(() =>
+          register.mutate({
+            body: patientFormBody(form.value, unidentified ? null : nic),
+          }),
+        )}
+      >
+        <PatientFields value={form.value} set={form.set} idPrefix="reg" />
 
         <div className="row">
-          <div className="field">
-            <label htmlFor="reg-dob-day">Date of birth</label>
-            <div className="row" style={{ gap: '0.4rem' }}>
-              <select
-                id="reg-dob-day"
-                aria-label="Day of birth"
-                value={birthDay ?? ''}
-                onChange={(event) =>
-                  setBirthDay(event.target.value === '' ? null : Number(event.target.value))
-                }
-              >
-                <option value="">Day</option>
-                {Array.from(
-                  { length: daysInMonth(birthYear, birthMonth) },
-                  (_, index) => index + 1,
-                ).map((day) => (
-                  <option key={day} value={day}>
-                    {day}
-                  </option>
-                ))}
-              </select>
-              <select
-                aria-label="Month of birth"
-                value={birthMonth ?? ''}
-                onChange={(event) =>
-                  setBirthMonth(event.target.value === '' ? null : Number(event.target.value))
-                }
-              >
-                <option value="">Month</option>
-                {monthNames.map((name, index) => (
-                  <option key={name} value={index + 1}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-              <select
-                aria-label="Year of birth"
-                value={birthYear ?? ''}
-                onChange={(event) =>
-                  setBirthYear(event.target.value === '' ? null : Number(event.target.value))
-                }
-              >
-                <option value="">Year</option>
-                {birthYears().map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {dateOfBirthError && <p className="field-error">{dateOfBirthError}</p>}
-            {dateIncomplete && !dateOfBirthError && (
-              <p className="hint">Pick all three, or leave all three blank.</p>
-            )}
-          </div>
-        </div>
-
-        <div className="row">
-          <div className="field">
-            <label htmlFor="reg-phone">Phone</label>
-            <input
-              id="reg-phone"
-              value={phone}
-              inputMode="tel"
-              maxLength={20}
-              placeholder="0771234567"
-              aria-invalid={phoneError !== null}
-              onChange={(event) => setPhone(event.target.value)}
-            />
-            {phoneError && <p className="field-error">{phoneError}</p>}
-          </div>
-          <div className="field">
-            <label htmlFor="reg-address">Address</label>
-            <input
-              id="reg-address"
-              value={address}
-              maxLength={fieldLimits.address}
-              onChange={(event) => setAddress(event.target.value)}
-            />
-            <Counter value={address} limit={fieldLimits.address} />
-          </div>
-        </div>
-
-        <div className="row">
-          <div className="field">
-            {/* "Emergency contact" sitting next to "Emergency contact phone" reads as though
-                the first one also wants a number. Say what goes in the box. */}
-            <label htmlFor="reg-contact-name">Who to ring in an emergency</label>
-            <input
-              id="reg-contact-name"
-              value={contactName}
-              maxLength={fieldLimits.contactName}
-              placeholder="Nilanthi Gunawardena"
-              onChange={(event) => setContactName(event.target.value)}
-            />
-            <p className="hint">Their name.</p>
-          </div>
-          <div className="field">
-            <label htmlFor="reg-contact-phone">Their phone number</label>
-            <input
-              id="reg-contact-phone"
-              value={contactPhone}
-              inputMode="tel"
-              maxLength={20}
-              placeholder="0779876543"
-              aria-invalid={contactPhoneError !== null}
-              onChange={(event) => setContactPhone(event.target.value)}
-            />
-            {contactPhoneError && <p className="field-error">{contactPhoneError}</p>}
-          </div>
-        </div>
-
-        <div className="row">
-          <button type="submit" disabled={register.isPending || blocked}>
+          <button type="submit" disabled={register.isPending || problems.blocked}>
             {register.isPending ? 'Registering...' : 'Register and continue'}
           </button>
           <button type="button" className="secondary" onClick={onBack}>
             Start over
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+/**
+ * Correcting a record that already exists.
+ *
+ * The NIC is not on this form. Changing who a record IS, rather than what it says, is how one
+ * person's history ends up on another person's record — so a wrong NIC is a new registration
+ * and a merge, not a text box. The rest is fair game: names get misheard and phone numbers get
+ * mistyped, constantly.
+ */
+function EditStep({
+  patientId,
+  onBack,
+  onSaved,
+}: {
+  patientId: string;
+  onBack: () => void;
+  onSaved: (patient: Patient) => void;
+}) {
+  const queryClient = useQueryClient();
+
+  // Read back rather than reused from the lookup, because the lookup returns a PatientSummary -
+  // five fields - and this form has eight. Editing from the summary would blank the address and
+  // both emergency contact fields on every save, which is the worst kind of bug: it looks like
+  // it worked.
+  const existing = useQuery(getPatientOptions({ path: { id: patientId } }));
+
+  const form = usePatientForm(emptyPatientForm(false));
+  const problems = patientFormProblems(form.value);
+
+  // Filled in once the record arrives. Keyed off the fetched data, not a mount, because the
+  // query is not resolved on the first render.
+  const [loadedId, setLoadedId] = useState<string | null>(null);
+
+  if (existing.data && loadedId !== existing.data.id) {
+    setLoadedId(existing.data.id);
+    form.replace(patientFormFrom(existing.data));
+  }
+
+  const save = useMutation({
+    ...updatePatientMutation(),
+    onSuccess: (saved) => {
+      toast.success(`${saved.full_name} updated.`);
+
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const id = (query.queryKey[0] as { _id?: string } | undefined)?._id;
+
+          return id === 'listPatients' || id === 'getPatient' || id === 'listPatientWorklist';
+        },
+      });
+
+      onSaved(saved);
+    },
+  });
+
+  if (existing.isLoading) {
+    return (
+      <div className="card">
+        <p className="empty">Loading their details…</p>
+      </div>
+    );
+  }
+
+  if (existing.isError || !existing.data) {
+    return (
+      <div className="card">
+        <div className="empty">
+          <p>Could not load their details.</p>
+          <button type="button" className="secondary" onClick={() => void existing.refetch()}>
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const patient = existing.data;
+
+  return (
+    <div className="card">
+      <h2>Edit their details</h2>
+      <p className="muted" style={{ marginBottom: '0.9rem' }}>
+        Patient ID <code>{patient.patient_code}</code>
+        {patient.nic ? (
+          <>
+            {' '}
+            · NIC <strong>{patient.nic}</strong>
+          </>
+        ) : (
+          <>
+            {' '}
+            · Reference <strong>{patient.temp_reference}</strong>
+          </>
+        )}
+      </p>
+
+      <p className="hint" style={{ marginBottom: '0.9rem' }}>
+        The NIC is not editable here. Changing who a record <em>is</em>, rather than what it
+        says, is how one person&rsquo;s history ends up on another person&rsquo;s record.
+      </p>
+
+      <form
+        onSubmit={onSubmit(() =>
+          save.mutate({
+            path: { id: patientId },
+
+            // The NIC goes back exactly as it came. Omitting it would read as "no NIC" and the
+            // server would treat this as an unidentified arrival.
+            body: patientFormBody(form.value, patient.nic ?? null),
+          }),
+        )}
+      >
+        <PatientFields value={form.value} set={form.set} idPrefix="edit" />
+
+        <div className="row">
+          <button type="submit" disabled={save.isPending || problems.blocked}>
+            {save.isPending ? 'Saving...' : 'Save and go back'}
+          </button>
+          <button type="button" className="secondary" onClick={onBack}>
+            Cancel
           </button>
         </div>
       </form>
@@ -579,11 +582,15 @@ function RegisterStep({
 function AdmitStep({
   patient,
   staffId,
+  canEdit,
+  onEdit,
   onBack,
   onAdmitted,
 }: {
   patient: Patient | PatientSummary;
   staffId: string;
+  canEdit: boolean;
+  onEdit: () => void;
   onBack: () => void;
   onAdmitted: (admission: Admission) => void;
 }) {
@@ -631,7 +638,26 @@ function AdmitStep({
   return (
     <div className="card">
       <h2>Admit</h2>
+
+      {/* Read this before the table, not after it. This is the last point at which a typo is
+          cheap: after admitting, the name is on the wristband, the bed and the bill. */}
+      <p className="muted" style={{ marginBottom: '0.6rem' }}>
+        <strong>Check this is right before you admit them.</strong> Anything wrong here follows
+        the patient onto their wristband, their bed and their bill.
+      </p>
+
       <PatientCard patient={patient} />
+
+      {canEdit && (
+        <p style={{ marginTop: '0.6rem' }}>
+          {/* Not `secondary`, and directly under the table it edits. Phrased as a question and
+              greyed out, this read as decoration and people pressed "Start over" instead -
+              which does not undo a registration and never did. */}
+          <button type="button" onClick={onEdit}>
+            Edit these details
+          </button>
+        </p>
+      )}
 
       <form onSubmit={submit} style={{ marginTop: '0.9rem' }}>
         <div className="row">
@@ -687,9 +713,19 @@ function AdmitStep({
             {admit.isPending ? 'Admitting...' : 'Admit patient'}
           </button>
           <button type="button" className="secondary" onClick={onBack}>
-            Start over
+            Serve someone else
           </button>
         </div>
+
+        {/* Said out loud, because the button used to say "Start over" and that is exactly what
+            somebody presses when they spot a wrong name. It abandons the ADMISSION. The
+            patient is registered and stays registered - there is no undo for that, which is
+            why the edit button above exists. */}
+        <p className="hint">
+          &ldquo;Serve someone else&rdquo; leaves this admission unfinished and goes back to the
+          lookup. <strong>It does not delete the patient</strong> — they are registered now.
+          Use <strong>Edit these details</strong> above to fix something.
+        </p>
       </form>
     </div>
   );
@@ -770,6 +806,40 @@ function PatientCard({ patient }: { patient: Patient | PatientSummary }) {
           <th scope="row">Date of birth</th>
           <td>{patient.date_of_birth ?? <span className="muted">Not recorded</span>}</td>
         </tr>
+
+        {/* The other three, when we have them. A desk asked to "check this is right" against a
+            table showing five of the eight fields they just typed cannot actually check it -
+            a mistyped phone number would never appear.
+
+            A PatientSummary carries only the five above, which is why this is conditional
+            rather than three more rows: coming from the lookup there is nothing to show, and
+            three rows reading "Not recorded" would look like missing data rather than an
+            unread field. */}
+        {'phone' in patient && (
+          <>
+            <tr>
+              <th scope="row">Phone</th>
+              <td>{patient.phone ?? <span className="muted">Not recorded</span>}</td>
+            </tr>
+            <tr>
+              <th scope="row">Address</th>
+              <td>{patient.address ?? <span className="muted">Not recorded</span>}</td>
+            </tr>
+            <tr>
+              <th scope="row">Emergency contact</th>
+              <td>
+                {patient.emergency_contact_name ? (
+                  <>
+                    {patient.emergency_contact_name}
+                    {patient.emergency_contact_phone ? ` · ${patient.emergency_contact_phone}` : ''}
+                  </>
+                ) : (
+                  <span className="muted">Not recorded</span>
+                )}
+              </td>
+            </tr>
+          </>
+        )}
       </tbody>
     </table>
   );

@@ -21,10 +21,12 @@ import {
 
 // One bill, everywhere a bill is shown.
 //
-// It lives here rather than inside BillingPage because the discharge screen needs the same
-// thing. "Where does the billing happen?" was a fair question to ask of a discharge checklist
-// that had a `Bill settled` box, no bill on the page, and no way to get to one — the answer was
-// a different screen that half the roles working the checklist cannot even open.
+// It lives in components/ rather than in a page because it started out on a billing screen of
+// its own. That screen is gone (2026-09-12): "where does the billing happen?" was a fair
+// question to ask of a discharge checklist that had a `Bill settled` box, no bill on the page
+// and no way to reach one — and the answer, a second screen, meant walking the same visit
+// twice while neither page could see what the other had done. There is one screen now and this
+// is the part of it that is the bill.
 //
 // Two things it deliberately does NOT do:
 //
@@ -173,8 +175,12 @@ export function BillPanel({
 
       {/* The printable half. Everything outside it is hidden by the print stylesheet, so what
           comes out of the printer is a bill and not a screenshot of an app. */}
-      <BillPrintout bill={data} />
+      <BillPrintout bill={data} standalone={showPrint} />
 
+      {/* Everything below is a control, not the document. The discharge card prints as a
+          whole, so the charge form and the settle form have to say so themselves - otherwise
+          the patient's copy of their bill comes out with an empty "Add a charge" form on it. */}
+      <div className="no-print">
       {frozen ? (
         <p className="hint">
           Settled{data.settled_at && ` at ${new Date(data.settled_at).toLocaleString()}`}
@@ -350,6 +356,7 @@ export function BillPanel({
           </p>
         </>
       )}
+      </div>
     </>
   );
 }
@@ -361,27 +368,75 @@ export function BillPanel({
  * already renders the numbers, it saves to PDF from the print dialog anyway, and it does not
  * put a document-generation dependency into a project that needs one screen of it.
  */
-export function BillPrintout({ bill }: { bill: Bill }) {
+export function BillPrintout({
+  bill,
+  standalone = true,
+}: {
+  bill: Bill;
+  /**
+   * Whether this is the whole printed document or a section of a bigger one.
+   *
+   * On the discharge screen it is a section: the card around it owns the hospital heading, the
+   * patient block and the `printable` class, and repeating all three inside would print the
+   * patient's name twice under two different headings.
+   */
+  standalone?: boolean;
+}) {
   return (
-    <div className="printable">
-      <div className="print-only print-head">
-        <h2>CareLanka Hospital</h2>
-        <p>Statement of charges</p>
-      </div>
+    <div className={standalone ? 'printable' : undefined}>
+      {standalone && (
+        <div className="print-only print-head">
+          <h2>CareLanka Hospital</h2>
+          <p>Statement of charges</p>
+        </div>
+      )}
 
+      {/* Each label and value wrapped, so the grid cannot split a pair across rows and leave
+          every label sitting above somebody else's value. */}
       <dl className="detail-grid">
-        <dt>Patient</dt>
-        <dd>
-          {bill.patient.full_name}
-          <div className="small muted">
-            {bill.patient.patient_code}
-            {bill.patient.nic && ` · ${bill.patient.nic}`}
+        {standalone && (
+          <div>
+            <dt>Patient</dt>
+            <dd>
+              {bill.patient.full_name}
+              <div className="small muted">
+                {bill.patient.patient_code}
+                {bill.patient.nic && ` · ${bill.patient.nic}`}
+              </div>
+            </dd>
           </div>
-        </dd>
-        <dt>Bill number</dt>
-        <dd>{bill.bill_number}</dd>
-        <dt>Raised</dt>
-        <dd>{new Date(bill.created_at).toLocaleString()}</dd>
+        )}
+        <div>
+          <dt>Bill number</dt>
+          <dd>{bill.bill_number}</dd>
+        </div>
+        <div>
+          <dt>Raised</dt>
+          <dd>
+            {new Date(bill.created_at).toLocaleString()}
+            {/* Who issued it. A bill handed across a counter names the person who wrote it,
+                and "who do I ask about this charge?" is the first question at the desk. */}
+            {bill.raised_by_staff_name && (
+              <div className="small muted">by {bill.raised_by_staff_name}</div>
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>Settled</dt>
+          <dd>
+            {bill.settled ? (
+              <>
+                {bill.settled_by_staff_name ?? 'Paid'}
+                <div className="small muted">
+                  {bill.settled_at && new Date(bill.settled_at).toLocaleString()}
+                  {bill.settlement_note && ` · ${bill.settlement_note}`}
+                </div>
+              </>
+            ) : (
+              <span className="muted">Not yet</span>
+            )}
+          </dd>
+        </div>
       </dl>
 
       <table>

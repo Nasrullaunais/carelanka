@@ -28,6 +28,7 @@ public sealed class PatientOpenApiContractTests
     [InlineData("ReleaseReason")]
     [InlineData("WorklistKind")]
     [InlineData("WorklistStatus")]
+    [InlineData("BillLineSource")]
     public async Task Published_enum_values_match_the_contract_in_order(string enumName)
     {
         var generated = await GenerateAsync();
@@ -65,6 +66,12 @@ public sealed class PatientOpenApiContractTests
     [InlineData("BedOccupancyStatus")]
     [InlineData("AssignBedRequest")]
     [InlineData("WorklistRow")]
+    [InlineData("DischargeCandidate")]
+    [InlineData("ChecklistItem")]
+    [InlineData("Bill")]
+    [InlineData("BillLine")]
+    [InlineData("AddBillChargeRequest")]
+    [InlineData("OutstandingBill")]
     public async Task Published_schema_required_members_match_the_contract(string schemaName)
     {
         var generated = await GenerateAsync();
@@ -77,6 +84,54 @@ public sealed class PatientOpenApiContractTests
         Assert.True(expected.SetEquals(actual),
             $"{schemaName} required members differ. Contract: {string.Join(", ", expected.Order())}. "
             + $"Generated: {string.Join(", ", actual.Order())}.");
+    }
+
+    [Fact]
+    public async Task Billing_and_discharge_publish_the_operationIds_the_web_client_generates_against()
+    {
+        var generated = await GenerateAsync();
+        var paths = generated.RootElement.GetProperty("paths");
+
+        Assert.Equal(
+            "listDischargeCandidates",
+            paths.GetProperty("/discharges/candidates").GetProperty("get")
+                .GetProperty("operationId").GetString());
+        Assert.Equal(
+            "updateDischargeChecklist",
+            paths.GetProperty("/discharges/{admissionId}/checklist").GetProperty("patch")
+                .GetProperty("operationId").GetString());
+        Assert.Equal(
+            "confirmDischarge",
+            paths.GetProperty("/discharges/{admissionId}/confirm").GetProperty("post")
+                .GetProperty("operationId").GetString());
+        Assert.Equal(
+            "getAdmissionBill",
+            paths.GetProperty("/admissions/{admissionId}/bill").GetProperty("get")
+                .GetProperty("operationId").GetString());
+        Assert.Equal(
+            "settleBill",
+            paths.GetProperty("/admissions/{admissionId}/bill/settle").GetProperty("post")
+                .GetProperty("operationId").GetString());
+        Assert.Equal(
+            "listOutstandingBills",
+            paths.GetProperty("/billing/outstanding").GetProperty("get")
+                .GetProperty("operationId").GetString());
+    }
+
+    [Fact]
+    public async Task The_checklist_request_still_publishes_billing_settled_even_though_it_is_refused()
+    {
+        var generated = await GenerateAsync();
+
+        var properties = generated.RootElement
+            .GetProperty("components").GetProperty("schemas")
+            .GetProperty("ChecklistUpdateRequest").GetProperty("properties");
+
+        // The key stays published on purpose. Dropping it would make a client that sends it
+        // look like it had a typo, when what it actually has is a design it has not read:
+        // settling the bill is the only thing that writes this box. The 409 is the answer, and
+        // a 400 for an unknown property would have been the wrong one.
+        Assert.True(properties.TryGetProperty("billing_settled", out _));
     }
 
     [Fact]
@@ -435,7 +490,7 @@ public sealed class PatientOpenApiContractTests
     // both are omitted rather than returned empty. This pins that, so re-adding them is a
     // decision rather than an accident.
     [Fact]
-    public async Task AdmissionDetail_omits_the_two_blocks_that_have_no_table_behind_them_yet()
+    public async Task AdmissionDetail_omits_only_the_block_that_still_has_no_table_behind_it()
     {
         var generated = await GenerateAsync();
         var properties = generated.RootElement
@@ -443,8 +498,15 @@ public sealed class PatientOpenApiContractTests
             .GetProperty("properties");
 
         Assert.True(properties.TryGetProperty("bed_assignments", out _));
+
+        // discharge and bill arrived with step 7. They are published as nullable rather than
+        // omitted, because "nobody has opened one yet" and "this API does not serve it" are
+        // different facts and a client has to be able to tell them apart.
+        Assert.True(properties.TryGetProperty("discharge", out _));
+        Assert.True(properties.TryGetProperty("bill", out _));
+
+        // workflows still has no table. AgentWorkflow is common and unbuilt (ADR 3).
         Assert.False(properties.TryGetProperty("workflows", out _));
-        Assert.False(properties.TryGetProperty("discharge", out _));
     }
 
     private static string[] Responses(JsonElement operation)

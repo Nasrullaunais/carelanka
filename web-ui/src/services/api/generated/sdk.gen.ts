@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AssignBedManuallyData, AssignBedManuallyErrors, AssignBedManuallyResponses, AssignEquipmentItemData, AssignEquipmentItemErrors, AssignEquipmentItemResponses, CancelAdmissionData, CancelAdmissionErrors, CancelAdmissionResponses, CheckInAppointmentData, CheckInAppointmentErrors, CheckInAppointmentResponses, CompleteAdmissionDetailsData, CompleteAdmissionDetailsErrors, CompleteAdmissionDetailsResponses, CompleteMaintenanceScheduleData, CompleteMaintenanceScheduleErrors, CompleteMaintenanceScheduleResponses, CompleteVisitData, CompleteVisitErrors, CompleteVisitResponses, CreateAdmissionData, CreateAdmissionErrors, CreateAdmissionResponses, CreateAppointmentData, CreateAppointmentErrors, CreateAppointmentResponses, CreateBedData, CreateBedErrors, CreateBedResponses, CreateEquipmentCategoryData, CreateEquipmentCategoryErrors, CreateEquipmentCategoryResponses, CreateEquipmentItemData, CreateEquipmentItemErrors, CreateEquipmentItemResponses, CreateMaintenanceScheduleData, CreateMaintenanceScheduleErrors, CreateMaintenanceScheduleResponses, CreatePatientData, CreatePatientErrors, CreatePatientResponses, CreatePharmacyCategoryData, CreatePharmacyCategoryErrors, CreatePharmacyCategoryResponses, CreatePharmacyItemData, CreatePharmacyItemErrors, CreatePharmacyItemResponses, CreateWardData, CreateWardErrors, CreateWardResponses, GetAdmissionData, GetAdmissionErrors, GetAdmissionResponses, GetBedOccupancyData, GetBedOccupancyErrors, GetBedOccupancyResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetEquipmentItemByTagData, GetEquipmentItemByTagErrors, GetEquipmentItemByTagResponses, GetEquipmentItemData, GetEquipmentItemErrors, GetEquipmentItemResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetPatientData, GetPatientErrors, GetPatientResponses, GetPharmacyItemData, GetPharmacyItemErrors, GetPharmacyItemResponses, GetWardCapacityData, GetWardCapacityErrors, GetWardCapacityResponses, GetWardOccupancyData, GetWardOccupancyErrors, GetWardOccupancyResponses, LinkPatientAccountData, LinkPatientAccountErrors, LinkPatientAccountResponses, ListAdmissionsData, ListAdmissionsErrors, ListAdmissionsResponses, ListAppointmentsData, ListAppointmentsErrors, ListAppointmentsResponses, ListBedAvailabilityData, ListBedAvailabilityErrors, ListBedAvailabilityResponses, ListBedsData, ListBedsErrors, ListBedsResponses, ListEquipmentCategoriesData, ListEquipmentCategoriesErrors, ListEquipmentCategoriesResponses, ListEquipmentItemsData, ListEquipmentItemsErrors, ListEquipmentItemsResponses, ListMaintenanceSchedulesData, ListMaintenanceSchedulesErrors, ListMaintenanceSchedulesResponses, ListPatientsData, ListPatientsErrors, ListPatientsResponses, ListPatientWorklistData, ListPatientWorklistErrors, ListPatientWorklistResponses, ListPharmacyCategoriesData, ListPharmacyCategoriesErrors, ListPharmacyCategoriesResponses, ListPharmacyItemsData, ListPharmacyItemsErrors, ListPharmacyItemsResponses, ListPharmacyTransactionsData, ListPharmacyTransactionsErrors, ListPharmacyTransactionsResponses, ListWardsData, ListWardsErrors, ListWardsResponses, LoginData, LoginErrors, LoginPatientData, LoginPatientErrors, LoginPatientResponses, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, LookupPatientData, LookupPatientErrors, LookupPatientResponses, MarkArrivedData, MarkArrivedErrors, MarkArrivedResponses, RecordPharmacyTransactionData, RecordPharmacyTransactionErrors, RecordPharmacyTransactionResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RegisterPatientAccountData, RegisterPatientAccountErrors, RegisterPatientAccountResponses, ReleaseEquipmentItemData, ReleaseEquipmentItemErrors, ReleaseEquipmentItemResponses, ReportEquipmentFaultData, ReportEquipmentFaultErrors, ReportEquipmentFaultResponses, RetireBedData, RetireBedErrors, RetireBedResponses, UpdateBedData, UpdateBedErrors, UpdateBedResponses, UpdateEquipmentItemData, UpdateEquipmentItemErrors, UpdateEquipmentItemResponses, UpdatePatientData, UpdatePatientErrors, UpdatePatientResponses } from './types.gen';
+import type { AddBillChargeData, AddBillChargeErrors, AddBillChargeResponses, AssignBedManuallyData, AssignBedManuallyErrors, AssignBedManuallyResponses, AssignEquipmentItemData, AssignEquipmentItemErrors, AssignEquipmentItemResponses, CancelAdmissionData, CancelAdmissionErrors, CancelAdmissionResponses, CheckInAppointmentData, CheckInAppointmentErrors, CheckInAppointmentResponses, CompleteAdmissionDetailsData, CompleteAdmissionDetailsErrors, CompleteAdmissionDetailsResponses, CompleteMaintenanceScheduleData, CompleteMaintenanceScheduleErrors, CompleteMaintenanceScheduleResponses, CompleteVisitData, CompleteVisitErrors, CompleteVisitResponses, ConfirmDischargeData, ConfirmDischargeErrors, ConfirmDischargeResponses, CreateAdmissionData, CreateAdmissionErrors, CreateAdmissionResponses, CreateAppointmentData, CreateAppointmentErrors, CreateAppointmentResponses, CreateBedData, CreateBedErrors, CreateBedResponses, CreateEquipmentCategoryData, CreateEquipmentCategoryErrors, CreateEquipmentCategoryResponses, CreateEquipmentItemData, CreateEquipmentItemErrors, CreateEquipmentItemResponses, CreateMaintenanceScheduleData, CreateMaintenanceScheduleErrors, CreateMaintenanceScheduleResponses, CreatePatientData, CreatePatientErrors, CreatePatientResponses, CreatePharmacyCategoryData, CreatePharmacyCategoryErrors, CreatePharmacyCategoryResponses, CreatePharmacyItemData, CreatePharmacyItemErrors, CreatePharmacyItemResponses, CreateWardData, CreateWardErrors, CreateWardResponses, GetAdmissionBillData, GetAdmissionBillErrors, GetAdmissionBillResponses, GetAdmissionData, GetAdmissionErrors, GetAdmissionResponses, GetBedOccupancyData, GetBedOccupancyErrors, GetBedOccupancyResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetEquipmentItemByTagData, GetEquipmentItemByTagErrors, GetEquipmentItemByTagResponses, GetEquipmentItemData, GetEquipmentItemErrors, GetEquipmentItemResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetPatientData, GetPatientErrors, GetPatientResponses, GetPharmacyItemData, GetPharmacyItemErrors, GetPharmacyItemResponses, GetWardCapacityData, GetWardCapacityErrors, GetWardCapacityResponses, GetWardOccupancyData, GetWardOccupancyErrors, GetWardOccupancyResponses, LinkPatientAccountData, LinkPatientAccountErrors, LinkPatientAccountResponses, ListAdmissionsData, ListAdmissionsErrors, ListAdmissionsResponses, ListAppointmentsData, ListAppointmentsErrors, ListAppointmentsResponses, ListBedAvailabilityData, ListBedAvailabilityErrors, ListBedAvailabilityResponses, ListBedsData, ListBedsErrors, ListBedsResponses, ListDischargeCandidatesData, ListDischargeCandidatesErrors, ListDischargeCandidatesResponses, ListEquipmentCategoriesData, ListEquipmentCategoriesErrors, ListEquipmentCategoriesResponses, ListEquipmentItemsData, ListEquipmentItemsErrors, ListEquipmentItemsResponses, ListMaintenanceSchedulesData, ListMaintenanceSchedulesErrors, ListMaintenanceSchedulesResponses, ListOutstandingBillsData, ListOutstandingBillsErrors, ListOutstandingBillsResponses, ListPatientsData, ListPatientsErrors, ListPatientsResponses, ListPatientWorklistData, ListPatientWorklistErrors, ListPatientWorklistResponses, ListPharmacyCategoriesData, ListPharmacyCategoriesErrors, ListPharmacyCategoriesResponses, ListPharmacyItemsData, ListPharmacyItemsErrors, ListPharmacyItemsResponses, ListPharmacyTransactionsData, ListPharmacyTransactionsErrors, ListPharmacyTransactionsResponses, ListWardsData, ListWardsErrors, ListWardsResponses, LoginData, LoginErrors, LoginPatientData, LoginPatientErrors, LoginPatientResponses, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, LookupPatientData, LookupPatientErrors, LookupPatientResponses, MarkArrivedData, MarkArrivedErrors, MarkArrivedResponses, PrepareAdmissionBillData, PrepareAdmissionBillErrors, PrepareAdmissionBillResponses, RecordPharmacyTransactionData, RecordPharmacyTransactionErrors, RecordPharmacyTransactionResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RegisterPatientAccountData, RegisterPatientAccountErrors, RegisterPatientAccountResponses, ReleaseEquipmentItemData, ReleaseEquipmentItemErrors, ReleaseEquipmentItemResponses, RemoveBillChargeData, RemoveBillChargeErrors, RemoveBillChargeResponses, ReportEquipmentFaultData, ReportEquipmentFaultErrors, ReportEquipmentFaultResponses, RetireBedData, RetireBedErrors, RetireBedResponses, SettleBillData, SettleBillErrors, SettleBillResponses, UpdateBedData, UpdateBedErrors, UpdateBedResponses, UpdateDischargeChecklistData, UpdateDischargeChecklistErrors, UpdateDischargeChecklistResponses, UpdateEquipmentItemData, UpdateEquipmentItemErrors, UpdateEquipmentItemResponses, UpdatePatientData, UpdatePatientErrors, UpdatePatientResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -344,6 +344,152 @@ export const retireBed = <ThrowOnError extends boolean = false>(options: Options
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/beds/{id}/retire',
     ...options
+});
+
+/**
+ * The bill for a visit. 404 until somebody prepares one — a bill is written the first time
+ * it is asked for, because a stay that has not happened yet cannot be priced.
+ */
+export const getAdmissionBill = <ThrowOnError extends boolean = false>(options: Options<GetAdmissionBillData, ThrowOnError>): RequestResult<GetAdmissionBillResponses, GetAdmissionBillErrors, ThrowOnError> => (options.client ?? client).get<GetAdmissionBillResponses, GetAdmissionBillErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admissions/{admissionId}/bill',
+    ...options
+});
+
+/**
+ * Work the bill out from the stay, and open one if this visit has none.
+ *
+ * Every generated line is replaced — one admission fee, and one line per bed the patient
+ * has actually been in, at that ward's day rate. Typed charges are left exactly as they
+ * are, so preparing again a day later updates the bed days and keeps the X-ray.
+ *
+ * Refused with 409 once the bill is settled: that is the paper the patient was handed.
+ */
+export const prepareAdmissionBill = <ThrowOnError extends boolean = false>(options: Options<PrepareAdmissionBillData, ThrowOnError>): RequestResult<PrepareAdmissionBillResponses, PrepareAdmissionBillErrors, ThrowOnError> => (options.client ?? client).post<PrepareAdmissionBillResponses, PrepareAdmissionBillErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admissions/{admissionId}/bill',
+    ...options
+});
+
+/**
+ * Add a charge reception types in — an X-ray, a dressing pack, a consultant's fee.
+ *
+ * Typed rather than generated because no table in this component records a treatment
+ * against an admission. Asking a human to type what happened is honest; inventing line
+ * items from tables that do not exist is not.
+ */
+export const addBillCharge = <ThrowOnError extends boolean = false>(options: Options<AddBillChargeData, ThrowOnError>): RequestResult<AddBillChargeResponses, AddBillChargeErrors, ThrowOnError> => (options.client ?? client).post<AddBillChargeResponses, AddBillChargeErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admissions/{admissionId}/bill/charges',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Take a typed charge off again. A generated line is refused with 409 — it would come
+ * straight back the next time anyone prepared the bill.
+ */
+export const removeBillCharge = <ThrowOnError extends boolean = false>(options: Options<RemoveBillChargeData, ThrowOnError>): RequestResult<RemoveBillChargeResponses, RemoveBillChargeErrors, ThrowOnError> => (options.client ?? client).delete<RemoveBillChargeResponses, RemoveBillChargeErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admissions/{admissionId}/bill/charges/{lineId}',
+    ...options
+});
+
+/**
+ * The money is in. Freezes the bill and ticks `billing_settled` on the discharge checklist,
+ * in one transaction.
+ *
+ * That tick has no other way of being written — `PATCH /discharges/{id}/checklist` refuses
+ * the key. So the bill and the checklist cannot disagree about whether a patient has paid.
+ *
+ * Settling a visit nobody prepared a bill for works the bill out first, so a visit with no
+ * bill can never deadlock a discharge.
+ */
+export const settleBill = <ThrowOnError extends boolean = false>(options: Options<SettleBillData, ThrowOnError>): RequestResult<SettleBillResponses, SettleBillErrors, ThrowOnError> => (options.client ?? client).post<SettleBillResponses, SettleBillErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admissions/{admissionId}/bill/settle',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Reception's worklist: visits in the building whose money has not been taken yet.
+ *
+ * Includes visits with no bill row at all, which is most of them. A list of bills would
+ * have shown an empty screen and left the work invisible.
+ *
+ * A discharged visit is never here: confirming a discharge needs `billing_settled`, and
+ * only settling writes that.
+ */
+export const listOutstandingBills = <ThrowOnError extends boolean = false>(options?: Options<ListOutstandingBillsData, ThrowOnError>): RequestResult<ListOutstandingBillsResponses, ListOutstandingBillsErrors, ThrowOnError> => (options?.client ?? client).get<ListOutstandingBillsResponses, ListOutstandingBillsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/billing/outstanding',
+    ...options
+});
+
+/**
+ * Patients whose checklist says they could go home, and the ones with a box or two left.
+ * A plain rule over the checklist rows, not an agent — checking whether three boxes are
+ * ticked is a `WHERE` clause.
+ *
+ * The list is advisory. Being on it changes nothing until a human confirms.
+ */
+export const listDischargeCandidates = <ThrowOnError extends boolean = false>(options?: Options<ListDischargeCandidatesData, ThrowOnError>): RequestResult<ListDischargeCandidatesResponses, ListDischargeCandidatesErrors, ThrowOnError> => (options?.client ?? client).get<ListDischargeCandidatesResponses, ListDischargeCandidatesErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/discharges/candidates',
+    ...options
+});
+
+/**
+ * Tick discharge checklist items. Any subset; a key left out is not touched.
+ *
+ * Each item is gated by role, not just by login:
+ *
+ * - `clinical_clearance` — **Doctor only.** This is the wall. Without it nothing flags and
+ * nothing discharges, and no automated process can ever set it.
+ * - `medication_issued`, `follow_up_recorded`, `transport_arranged` — Ward Nurse.
+ * - `billing_settled` — **refused here.** Settle the bill instead
+ * (`POST /api/admissions/{id}/bill/settle`), which is what writes it. One fact, one
+ * place: a paid bill and an unticked box cannot happen.
+ *
+ * Ticking the last mandatory box moves the admission to `ready_for_discharge`; unticking
+ * one moves it back to `admitted`.
+ */
+export const updateDischargeChecklist = <ThrowOnError extends boolean = false>(options: Options<UpdateDischargeChecklistData, ThrowOnError>): RequestResult<UpdateDischargeChecklistResponses, UpdateDischargeChecklistErrors, ThrowOnError> => (options.client ?? client).patch<UpdateDischargeChecklistResponses, UpdateDischargeChecklistErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/discharges/{admissionId}/checklist',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Confirm the discharge — the second high-impact human gate in this component.
+ *
+ * It ends the admission, frees the bed for the next patient, and sends someone home. In one
+ * transaction it sets `discharged_at`, releases the bed assignment with
+ * `release_reason: discharged`, and moves the admission to `discharged`.
+ *
+ * Ward Nurse for `outpatient`, `day_case` and `inpatient`; **Duty Manager for `icu` and
+ * `hdu`**, which depends on the admission rather than the route and so is checked in the
+ * service. Refused with 409 if any mandatory checklist item is unticked.
+ */
+export const confirmDischarge = <ThrowOnError extends boolean = false>(options: Options<ConfirmDischargeData, ThrowOnError>): RequestResult<ConfirmDischargeResponses, ConfirmDischargeErrors, ThrowOnError> => (options.client ?? client).post<ConfirmDischargeResponses, ConfirmDischargeErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/discharges/{admissionId}/confirm',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**

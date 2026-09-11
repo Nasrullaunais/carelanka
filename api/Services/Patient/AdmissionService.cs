@@ -28,11 +28,19 @@ public sealed class AdmissionService : IAdmissionService
 
     private readonly CareLankaDbContext _db;
     private readonly IBedRegistryService _beds;
+    private readonly IDischargeService _discharges;
+    private readonly IBillingService _billing;
 
-    public AdmissionService(CareLankaDbContext db, IBedRegistryService beds)
+    public AdmissionService(
+        CareLankaDbContext db,
+        IBedRegistryService beds,
+        IDischargeService discharges,
+        IBillingService billing)
     {
         _db = db;
         _beds = beds;
+        _discharges = discharges;
+        _billing = billing;
     }
 
     public async Task<PagedResult<AdmissionSummary>> ListAsync(
@@ -125,7 +133,13 @@ public sealed class AdmissionService : IAdmissionService
             BedAssignments = admission.BedAssignments
                 .OrderByDescending(b => b.CreatedAt)
                 .Select(assignment => ToBedAssignment(assignment, beds))
-                .ToList()
+                .ToList(),
+
+            // Both null on a visit nobody has opened a checklist or a bill for, which is the
+            // ordinary state of one that has just started. Omitting the key instead would make
+            // "not started" and "not served yet" look the same to a client.
+            Discharge = await _discharges.FindForAdmissionAsync(id, ct),
+            Bill = await _billing.FindForAdmissionAsync(id, ct)
         };
 
         return Fill(detail, admission, beds);
@@ -359,6 +373,11 @@ public sealed class AdmissionService : IAdmissionService
             {
                 hold.Status = AssignmentStatus.Occupied;
                 hold.ReservedUntil = null;
+
+                // When the stay in THIS bed started, which is what the bill is priced from.
+                // The same instant as admitted_at for a first bed, and not the same at all for
+                // a second one after a mid-stay transfer.
+                hold.OccupiedAt = admission.AdmittedAt;
             }
         }, ct);
 
@@ -601,23 +620,7 @@ public sealed class AdmissionService : IAdmissionService
             .Distinct()
             .ToList();
 
-        if (bedIds.Count == 0)
-        {
-            return BedLabel.None;
-        }
-
-        var beds = await _beds.ListBedsByIdAsync(bedIds, ct);
-
-        var wardNames = await _db.Wards
-            .AsNoTracking()
-            .Where(ward => beds.Select(bed => bed.WardId).Contains(ward.Id))
-            .ToDictionaryAsync(ward => ward.Id, ward => ward.Name, ct);
-
-        return beds.ToDictionary(
-            bed => bed.Id,
-            bed => new BedLabel(
-                wardNames.TryGetValue(bed.WardId, out var name) ? name : string.Empty,
-                bed.BedNumber));
+        return await BedLabels.ByBedIdAsync(_db, _beds, bedIds, ct);
     }
 
     /// <summary>
@@ -672,19 +675,6 @@ public sealed class AdmissionService : IAdmissionService
 
     private static string? Clean(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-    /// <summary>Where a bed is, for display. Equipment's bed number, our ward name.</summary>
-    /// <param name="WardName">Empty when the ward behind a historical assignment has been retired.</param>
-    /// <param name="BedNumber">Empty when the bed itself has been retired since.</param>
-    private readonly record struct BedLabel(string WardName, string BedNumber)
-    {
-        /// <summary>Nothing to label. The ordinary case for an admission that has never held a bed.</summary>
-        public static readonly IReadOnlyDictionary<Guid, BedLabel> None =
-            new Dictionary<Guid, BedLabel>();
-
-        /// <summary>A bed Equipment's register no longer has. Empty, not invented.</summary>
-        public static readonly BedLabel Unknown = new(string.Empty, string.Empty);
-    }
 
     private static bool IsUniqueViolation(DbUpdateException exception, string constraintName)
         => exception.InnerException is PostgresException

@@ -19,7 +19,7 @@ import {
   canAssignBed,
   canCompleteVisit,
   canMarkArrived,
-  canReadWorklist,
+  canReadPatientDetails,
 } from '../types/permissions';
 import { localDateTime } from '../types/datetime';
 import { whyNotPlaceable } from '../types/beds';
@@ -64,7 +64,7 @@ export function PatientsPage() {
 
   // Gated rather than skipped: the hook cannot go behind the early return, and without this
   // an administrator opening the URL fires a request that 403s and toasts red.
-  const canRead = canReadWorklist(role);
+  const canRead = canReadPatientDetails(role);
 
   const board = useQuery({
     ...listPatientWorklistOptions({

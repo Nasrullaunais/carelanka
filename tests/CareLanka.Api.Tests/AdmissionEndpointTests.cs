@@ -205,14 +205,21 @@ public sealed class AdmissionEndpointTests
 
         using var body = await ReadJsonAsync(await client.GetAsync($"/api/admissions/{id}"));
 
-        // Empty because nothing can hold a bed until step 6 — an empty list, never a missing key.
+        // Empty because nothing holds a bed on a visit this new — an empty list, never a
+        // missing key.
         Assert.Equal(JsonValueKind.Array, body.RootElement.GetProperty("bed_assignments").ValueKind);
         Assert.Empty(body.RootElement.GetProperty("bed_assignments").EnumerateArray());
 
-        // workflows and discharge have no table behind them yet, so they are left out rather
-        // than faked. See AdmissionDetail and STUBS.md.
+        // discharge and bill are present and null. Nobody has opened a checklist or a bill for
+        // a visit that started a second ago, and null says exactly that — which is a different
+        // fact from "this API does not serve it", and a client has to be able to tell them
+        // apart. Both were omitted keys until step 7.
+        Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("discharge").ValueKind);
+        Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("bill").ValueKind);
+
+        // workflows still has no table behind it, so it is left out rather than faked.
+        // AgentWorkflow is common and unbuilt (ADR 3). See AdmissionDetail and STUBS.md.
         Assert.False(body.RootElement.TryGetProperty("workflows", out _));
-        Assert.False(body.RootElement.TryGetProperty("discharge", out _));
     }
 
     [Fact]
@@ -725,17 +732,28 @@ public sealed class AdmissionEndpointTests
     }
 
     [Fact]
-    public async Task An_administrator_may_read_patient_records_but_not_the_admissions_worklist()
+    public async Task An_administrator_reads_the_worklist_as_well_as_the_register_but_still_cannot_write()
     {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var patientId = await NewPatientAsync(nurse, "Administrator Reads");
+        var id = await CreateIdAsync(nurse, patientId, await NurseIdAsync());
+
         using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
 
-        // Admissions are clinical work. patient-spec.yaml lists ward nurse and duty manager
-        // only, which is narrower than who may read the patient register.
+        // The admissions board opened to this role on 2026-09-11, when PatientReader and
+        // AdmissionReader were collapsed into PatientDetails. Less a widening than an
+        // admission that the old split was never real - GET /patients/{id} already returned
+        // this role every admission with its care level and status.
         var admissions = await administrator.GetAsync("/api/admissions");
         var patients = await administrator.GetAsync("/api/patients");
 
-        Assert.Equal(HttpStatusCode.Forbidden, admissions.StatusCode);
+        // Reading only. AdmissionEditor is untouched and still the nurse's and the manager's.
+        var completed = await administrator.PatchAsJsonAsync(
+            $"/api/admissions/{id}/details", new { address = "1 Admin Way" });
+
+        Assert.Equal(HttpStatusCode.OK, admissions.StatusCode);
         Assert.Equal(HttpStatusCode.OK, patients.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, completed.StatusCode);
     }
 
     [Fact]
@@ -745,9 +763,9 @@ public sealed class AdmissionEndpointTests
         var patientId = await NewPatientAsync(nurse, "Doctor Reads");
         var id = await CreateIdAsync(nurse, patientId, await NurseIdAsync());
 
-        // This is why AdmissionReader and AdmissionEditor are two policies and not one. A
-        // doctor has to see who is in and open a visit; chasing a patient's missing address
-        // is desk work, and one policy over both would have handed them the second for free.
+        // This is why reading and editing are two policies and not one. A doctor has to see
+        // who is in and open a visit; chasing a patient's missing address is desk work, and one
+        // policy over both would have handed them the second for free.
         using var doctor = await ClientAsync(ApiApplication.DoctorEmail);
         var list = await doctor.GetAsync("/api/admissions");
         var read = await doctor.GetAsync($"/api/admissions/{id}");

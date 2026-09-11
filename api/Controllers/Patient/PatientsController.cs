@@ -23,7 +23,7 @@ public class PatientsController : ControllerBase
     /// Search patients. `search` matches patient code, full name, NIC, phone or temporary
     /// reference. Equipment Management reads this to find a patient's code.
     /// </summary>
-    [Authorize(Policy = Policies.PatientReader)]
+    [Authorize(Policy = Policies.PatientDetails)]
     [HttpGet(Name = "listPatients")]
     [ProducesResponseType(typeof(PagedResult<PatientSummary>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
@@ -39,7 +39,7 @@ public class PatientsController : ControllerBase
         => Ok(await _patients.ListAsync(search, page, pageSize, sortBy, sortDir, ct));
 
     /// <summary>Get one patient with their visit history. One patient, many admissions.</summary>
-    [Authorize(Policy = Policies.PatientReader)]
+    [Authorize(Policy = Policies.PatientDetails)]
     [HttpGet("{id:guid}", Name = "getPatient")]
     [ProducesResponseType(typeof(PatientDetail), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]

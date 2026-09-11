@@ -54,36 +54,32 @@ export function canReportFault(role: PrincipalRole | undefined): boolean {
  * Policies.PatientRegistrar on POST /api/patients, POST /api/patients/lookup and
  * POST /api/admissions. Registering someone and admitting them are the same permission:
  * both are intake, and splitting them would let a role start a job it cannot finish.
+ *
+ * Ambulance crew came off this list on 2026-09-11 and general staff went on. The crew are the
+ * emergency response team; the paperwork happens at the hospital desk.
  */
 export function canRegisterPatient(role: PrincipalRole | undefined): boolean {
-  return role === 'ward_nurse' || role === 'ambulance_crew' || role === 'duty_manager';
+  return role === 'general_staff' || role === 'ward_nurse' || role === 'duty_manager';
 }
 
 /**
- * Policies.PatientReader on GET /api/patients and GET /api/patients/{id}.
+ * Policies.PatientDetails on GET /api/patients, GET /api/patients/{id}, GET /api/admissions,
+ * GET /api/admissions/{id} and GET /api/patient-worklist.
  *
- * Deliberately not the same set as canRegisterPatient. Ambulance crew may register and look
- * up by NIC but may not browse the register, so intake must not offer them a name search.
+ * Six of the seven staff roles; ambulance crew is the one left out. This used to be two
+ * helpers, mirroring two server policies, and the split was never real: a PatientDetail
+ * carries the patient's admissions, so every reader could already see care level, urgency and
+ * status through GET /patients/{id} whichever policy they were on.
  */
-export function canReadPatients(role: PrincipalRole | undefined): boolean {
-  return (
-    role === 'ward_nurse' ||
-    role === 'duty_manager' ||
-    role === 'hospital_administrator' ||
-    role === 'doctor'
-  );
-}
-
-/** Policies.AdmissionReader on GET /api/admissions. Clinical work, so no administrator. */
-export function canReadAdmissions(role: PrincipalRole | undefined): boolean {
-  return role === 'ward_nurse' || role === 'duty_manager' || role === 'doctor';
+export function canReadPatientDetails(role: PrincipalRole | undefined): boolean {
+  return isStaff(role) && role !== 'ambulance_crew';
 }
 
 /**
  * Policies.AdmissionEditor on PATCH /api/admissions/{id}/details.
  *
- * Narrower than canReadAdmissions on purpose: a doctor reads the worklist but does not chase
- * a patient's missing paperwork, which is desk work.
+ * Narrower than canReadPatientDetails on purpose: a doctor reads the worklist but does not
+ * chase a patient's missing paperwork, which is desk work.
  */
 export function canEditAdmissions(role: PrincipalRole | undefined): boolean {
   return role === 'ward_nurse' || role === 'duty_manager';
@@ -124,11 +120,69 @@ export function canAssignBed(role: PrincipalRole | undefined): boolean {
 }
 
 /**
- * Policies.AdmissionReader on GET /api/patient-worklist. The same roles as the admissions
- * list, because it is the same data read a different way.
+ * Policies.DischargeChecklist on GET /api/discharges/candidates and
+ * PATCH /api/discharges/{admissionId}/checklist.
+ *
+ * Wider than the roles that may tick any one box, because the boxes belong to different
+ * people. canTickChecklistItem below is the per-box half.
  */
-export function canReadWorklist(role: PrincipalRole | undefined): boolean {
-  return canReadAdmissions(role);
+export function canWorkDischargeChecklist(role: PrincipalRole | undefined): boolean {
+  return role === 'ward_nurse' || role === 'doctor' || role === 'duty_manager';
+}
+
+/**
+ * Which box this role may tick, mirroring DischargeService.TickedBy.
+ *
+ * `billing_settled` is nobody's: settling the bill writes it and the checklist endpoint
+ * refuses the key outright, so the screen renders it as a state and never as a control.
+ */
+export function canTickChecklistItem(
+  role: PrincipalRole | undefined,
+  item: string,
+): boolean {
+  if (item === 'billing_settled') {
+    return false;
+  }
+
+  return item === 'clinical_clearance' ? role === 'doctor' : role === 'ward_nurse';
+}
+
+/**
+ * Policies.AdmissionEditor on POST /api/discharges/{admissionId}/confirm.
+ *
+ * Only half the rule, like canAssignBed. ICU and HDU discharges are the duty manager's, which
+ * depends on the admission rather than the route, so DischargeService answers 403 at run time
+ * and canConfirmDischargeOf below hides the button before that can happen.
+ */
+export function canConfirmDischarge(role: PrincipalRole | undefined): boolean {
+  return role === 'ward_nurse' || role === 'duty_manager';
+}
+
+/** The other half: a ward nurse confirms everything except ICU and HDU. */
+export function canConfirmDischargeOf(
+  role: PrincipalRole | undefined,
+  category: string,
+): boolean {
+  if (!canConfirmDischarge(role)) {
+    return false;
+  }
+
+  return role === 'duty_manager' || (category !== 'icu' && category !== 'hdu');
+}
+
+/**
+ * Policies.BillingDesk on the four bill writes and GET /api/billing/outstanding.
+ *
+ * Reception is general staff and they are who takes money. The administrator is here because
+ * they can already do everything at the desk, and the duty manager because there is nobody
+ * else in the building at three in the morning.
+ */
+export function canWorkBillingDesk(role: PrincipalRole | undefined): boolean {
+  return (
+    role === 'general_staff' ||
+    role === 'hospital_administrator' ||
+    role === 'duty_manager'
+  );
 }
 
 /**

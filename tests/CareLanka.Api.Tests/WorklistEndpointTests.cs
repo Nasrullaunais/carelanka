@@ -332,9 +332,12 @@ public sealed class WorklistEndpointTests
     [Fact]
     public async Task A_role_that_cannot_read_admissions_cannot_read_the_board_either()
     {
-        using var equipment = await ClientAsync(ApiApplication.EquipmentEmail);
+        // Ambulance crew, not equipment management. The equipment manager gained this list on
+        // 2026-09-11 when PatientReader and AdmissionReader became one PatientDetails policy;
+        // the crew is now the only staff role on neither.
+        using var ambulance = await ClientAsync(ApiApplication.AmbulanceEmail);
 
-        var refused = await equipment.GetAsync("/api/patient-worklist");
+        var refused = await ambulance.GetAsync("/api/patient-worklist");
 
         Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
     }

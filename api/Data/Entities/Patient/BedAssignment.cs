@@ -24,6 +24,15 @@ public class BedAssignment : AuditedEntity
     // Null once the patient is actually in the bed.
     public DateTimeOffset? ReservedUntil { get; set; }
 
+    // When the patient was actually put in the bed - the moment the hold became an occupancy.
+    // Null while it is still only a hold, and null on rows written before billing existed.
+    //
+    // Added because nothing recorded it. For a single stay Admission.AdmittedAt happens to be
+    // the same instant, but a patient moved to a second bed mid-stay has two occupancies and
+    // one arrival time, so "how long was this patient in THIS bed" had no answer at all. The
+    // bill is priced off this, falling back to CreatedAt for the older rows.
+    public DateTimeOffset? OccupiedAt { get; set; }
+
     public AssignedBy AssignedBy { get; set; }
 
     // No FK: AgentWorkflow is common and has not been built. Null when a human picked the bed.

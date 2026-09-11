@@ -166,33 +166,42 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.DutyManager),
         EnumWire.ToWire(StaffRole.HospitalAdministrator)));
 
+    // Reception does the paperwork; the ambulance crew does not. Removed 2026-09-11 — see the
+    // remarks on Policies.PatientRegistrar and integration_of_functions.md §11.9.
     options.AddPolicy(Policies.PatientRegistrar, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.GeneralStaff),
         EnumWire.ToWire(StaffRole.WardNurse),
-        EnumWire.ToWire(StaffRole.AmbulanceCrew),
         EnumWire.ToWire(StaffRole.DutyManager)));
 
-    options.AddPolicy(Policies.PatientReader, policy => policy.RequireRole(
+    // One policy where PatientReader and AdmissionReader used to be two. Six of the seven staff
+    // roles; ambulance crew is the one left out. See Policies.PatientDetails for why the split
+    // was never real.
+    options.AddPolicy(Policies.PatientDetails, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.GeneralStaff),
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager),
         EnumWire.ToWire(StaffRole.HospitalAdministrator),
         EnumWire.ToWire(StaffRole.Doctor),
-
-        // Added 2026-09-11 so Equipment Management can look a patient up and copy their
-        // patient_code onto their own screen. Reading only — PatientEditor and
-        // PatientRegistrar are untouched, and admissions stay closed to this role.
         EnumWire.ToWire(StaffRole.EquipmentManager)));
 
     options.AddPolicy(Policies.PatientEditor, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
 
-    options.AddPolicy(Policies.AdmissionReader, policy => policy.RequireRole(
-        EnumWire.ToWire(StaffRole.WardNurse),
-        EnumWire.ToWire(StaffRole.DutyManager),
-        EnumWire.ToWire(StaffRole.Doctor)));
-
     options.AddPolicy(Policies.AdmissionEditor, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager)));
+
+    // Reads the candidate list and ticks boxes. Which boxes is the service's business, not the
+    // route's - clinical_clearance is the doctor's alone and billing_settled is nobody's.
+    options.AddPolicy(Policies.DischargeChecklist, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.Doctor),
+        EnumWire.ToWire(StaffRole.DutyManager)));
+
+    options.AddPolicy(Policies.BillingDesk, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.GeneralStaff),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator),
         EnumWire.ToWire(StaffRole.DutyManager)));
 
     // The same two roles as AdmissionEditor, under a name that says which job it is. Checking
@@ -262,6 +271,8 @@ builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 builder.Services.AddScoped<IBedAssignmentService, BedAssignmentService>();
 builder.Services.AddScoped<IBedOccupancyService, BedOccupancyService>();
 builder.Services.AddScoped<IWorklistService, WorklistService>();
+builder.Services.AddScoped<IDischargeService, DischargeService>();
+builder.Services.AddScoped<IBillingService, BillingService>();
 
 // Real: ward bed counts now come from Equipment's register instead of a constant.
 // Scoped, not Singleton — it delegates to IBedService, which is scoped because it holds a

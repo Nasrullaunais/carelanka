@@ -1,11 +1,13 @@
 import type { PrincipalRole } from '../services/api/generated';
 import {
-  canReadAdmissions,
+  canReadPatientDetails,
   canReadCapacity,
   canReadEquipment,
   canReadWards,
   canRegisterPatient,
   canWorkAppointmentDesk,
+  canWorkBillingDesk,
+  canWorkDischargeChecklist,
 } from './permissions';
 
 // Every place a staff member can go, in one list. The dashboard reads it and so does anything
@@ -31,13 +33,25 @@ export const destinations: Destination[] = [
     to: '/patients',
     label: 'Patients',
     description: 'Who is in the hospital now, with their intake details and times.',
-    canAccess: canReadAdmissions,
+    canAccess: canReadPatientDetails,
   },
   {
     to: '/appointments',
     label: 'Expected visits',
     description: 'Who has booked to come in. Take a booking, or check someone in.',
     canAccess: canWorkAppointmentDesk,
+  },
+  {
+    to: '/discharge',
+    label: 'Discharge',
+    description: 'Who could go home, what is still outstanding, and the sign-off that sends them.',
+    canAccess: canWorkDischargeChecklist,
+  },
+  {
+    to: '/billing',
+    label: 'Billing',
+    description: 'What a visit costs, taking the money, and a bill to hand across the counter.',
+    canAccess: canWorkBillingDesk,
   },
   {
     to: '/capacity',

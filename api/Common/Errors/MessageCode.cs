@@ -97,5 +97,20 @@ public enum MessageCode
     // discharge has a checklist, an approver and a bed to give back.
     VisitNeedsDischargeNotComplete,
 
-    VisitNeedsNoBed
+    VisitNeedsNoBed,
+
+    // Discharge, step 7.
+    ChecklistItemWrongRole,
+
+    DischargeChecklistIncomplete,
+
+    DischargeNeedsDutyManager,
+
+    // Billing. billing_settled is not a box anyone ticks by hand - settling the bill is what
+    // writes it, so the money and the checklist cannot disagree.
+    BillingTickedBySettlingOnly,
+
+    BillAlreadySettled,
+
+    BillLineNotRemovable
 }

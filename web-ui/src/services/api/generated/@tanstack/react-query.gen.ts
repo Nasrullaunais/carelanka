@@ -3,8 +3,8 @@
 import { type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { assignBedManually, assignEquipmentItem, cancelAdmission, checkInAppointment, completeAdmissionDetails, completeMaintenanceSchedule, completeVisit, createAdmission, createAppointment, createBed, createEquipmentCategory, createEquipmentItem, createMaintenanceSchedule, createPatient, createPharmacyCategory, createPharmacyItem, createWard, getAdmission, getBedOccupancy, getCurrentUser, getEquipmentItem, getEquipmentItemByTag, getHealth, getPatient, getPharmacyItem, getWardCapacity, getWardOccupancy, linkPatientAccount, listAdmissions, listAppointments, listBedAvailability, listBeds, listEquipmentCategories, listEquipmentItems, listMaintenanceSchedules, listPatients, listPatientWorklist, listPharmacyCategories, listPharmacyItems, listPharmacyTransactions, listWards, login, loginPatient, logout, lookupPatient, markArrived, type Options, recordPharmacyTransaction, refreshToken, registerPatientAccount, releaseEquipmentItem, reportEquipmentFault, retireBed, updateBed, updateEquipmentItem, updatePatient } from '../sdk.gen';
-import type { AssignBedManuallyData, AssignBedManuallyError, AssignBedManuallyResponse, AssignEquipmentItemData, AssignEquipmentItemError, AssignEquipmentItemResponse, CancelAdmissionData, CancelAdmissionError, CancelAdmissionResponse, CheckInAppointmentData, CheckInAppointmentError, CheckInAppointmentResponse, CompleteAdmissionDetailsData, CompleteAdmissionDetailsError, CompleteAdmissionDetailsResponse, CompleteMaintenanceScheduleData, CompleteMaintenanceScheduleError, CompleteMaintenanceScheduleResponse, CompleteVisitData, CompleteVisitError, CompleteVisitResponse, CreateAdmissionData, CreateAdmissionError, CreateAdmissionResponse, CreateAppointmentData, CreateAppointmentError, CreateAppointmentResponse, CreateBedData, CreateBedError, CreateBedResponse, CreateEquipmentCategoryData, CreateEquipmentCategoryError, CreateEquipmentCategoryResponse, CreateEquipmentItemData, CreateEquipmentItemError, CreateEquipmentItemResponse, CreateMaintenanceScheduleData, CreateMaintenanceScheduleError, CreateMaintenanceScheduleResponse, CreatePatientData, CreatePatientError, CreatePatientResponse, CreatePharmacyCategoryData, CreatePharmacyCategoryError, CreatePharmacyCategoryResponse, CreatePharmacyItemData, CreatePharmacyItemError, CreatePharmacyItemResponse, CreateWardData, CreateWardError, CreateWardResponse, GetAdmissionData, GetAdmissionError, GetAdmissionResponse, GetBedOccupancyData, GetBedOccupancyError, GetBedOccupancyResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetEquipmentItemByTagData, GetEquipmentItemByTagError, GetEquipmentItemByTagResponse, GetEquipmentItemData, GetEquipmentItemError, GetEquipmentItemResponse, GetHealthData, GetHealthError, GetHealthResponse, GetPatientData, GetPatientError, GetPatientResponse, GetPharmacyItemData, GetPharmacyItemError, GetPharmacyItemResponse, GetWardCapacityData, GetWardCapacityError, GetWardCapacityResponse, GetWardOccupancyData, GetWardOccupancyError, GetWardOccupancyResponse, LinkPatientAccountData, LinkPatientAccountError, LinkPatientAccountResponse, ListAdmissionsData, ListAdmissionsError, ListAdmissionsResponse, ListAppointmentsData, ListAppointmentsError, ListAppointmentsResponse, ListBedAvailabilityData, ListBedAvailabilityError, ListBedAvailabilityResponse, ListBedsData, ListBedsError, ListBedsResponse, ListEquipmentCategoriesData, ListEquipmentCategoriesError, ListEquipmentCategoriesResponse, ListEquipmentItemsData, ListEquipmentItemsError, ListEquipmentItemsResponse, ListMaintenanceSchedulesData, ListMaintenanceSchedulesError, ListMaintenanceSchedulesResponse, ListPatientsData, ListPatientsError, ListPatientsResponse, ListPatientWorklistData, ListPatientWorklistError, ListPatientWorklistResponse, ListPharmacyCategoriesData, ListPharmacyCategoriesError, ListPharmacyCategoriesResponse, ListPharmacyItemsData, ListPharmacyItemsError, ListPharmacyItemsResponse, ListPharmacyTransactionsData, ListPharmacyTransactionsError, ListPharmacyTransactionsResponse, ListWardsData, ListWardsError, ListWardsResponse, LoginData, LoginError, LoginPatientData, LoginPatientError, LoginPatientResponse, LoginResponse, LogoutData, LogoutError, LogoutResponse, LookupPatientData, LookupPatientError, LookupPatientResponse, MarkArrivedData, MarkArrivedError, MarkArrivedResponse, RecordPharmacyTransactionData, RecordPharmacyTransactionError, RecordPharmacyTransactionResponse, RefreshTokenData, RefreshTokenError, RefreshTokenResponse, RegisterPatientAccountData, RegisterPatientAccountError, RegisterPatientAccountResponse, ReleaseEquipmentItemData, ReleaseEquipmentItemError, ReleaseEquipmentItemResponse, ReportEquipmentFaultData, ReportEquipmentFaultError, ReportEquipmentFaultResponse, RetireBedData, RetireBedError, RetireBedResponse, UpdateBedData, UpdateBedError, UpdateBedResponse, UpdateEquipmentItemData, UpdateEquipmentItemError, UpdateEquipmentItemResponse, UpdatePatientData, UpdatePatientError, UpdatePatientResponse } from '../types.gen';
+import { addBillCharge, assignBedManually, assignEquipmentItem, cancelAdmission, checkInAppointment, completeAdmissionDetails, completeMaintenanceSchedule, completeVisit, confirmDischarge, createAdmission, createAppointment, createBed, createEquipmentCategory, createEquipmentItem, createMaintenanceSchedule, createPatient, createPharmacyCategory, createPharmacyItem, createWard, getAdmission, getAdmissionBill, getBedOccupancy, getCurrentUser, getEquipmentItem, getEquipmentItemByTag, getHealth, getPatient, getPharmacyItem, getWardCapacity, getWardOccupancy, linkPatientAccount, listAdmissions, listAppointments, listBedAvailability, listBeds, listDischargeCandidates, listEquipmentCategories, listEquipmentItems, listMaintenanceSchedules, listOutstandingBills, listPatients, listPatientWorklist, listPharmacyCategories, listPharmacyItems, listPharmacyTransactions, listWards, login, loginPatient, logout, lookupPatient, markArrived, type Options, prepareAdmissionBill, recordPharmacyTransaction, refreshToken, registerPatientAccount, releaseEquipmentItem, removeBillCharge, reportEquipmentFault, retireBed, settleBill, updateBed, updateDischargeChecklist, updateEquipmentItem, updatePatient } from '../sdk.gen';
+import type { AddBillChargeData, AddBillChargeError, AddBillChargeResponse, AssignBedManuallyData, AssignBedManuallyError, AssignBedManuallyResponse, AssignEquipmentItemData, AssignEquipmentItemError, AssignEquipmentItemResponse, CancelAdmissionData, CancelAdmissionError, CancelAdmissionResponse, CheckInAppointmentData, CheckInAppointmentError, CheckInAppointmentResponse, CompleteAdmissionDetailsData, CompleteAdmissionDetailsError, CompleteAdmissionDetailsResponse, CompleteMaintenanceScheduleData, CompleteMaintenanceScheduleError, CompleteMaintenanceScheduleResponse, CompleteVisitData, CompleteVisitError, CompleteVisitResponse, ConfirmDischargeData, ConfirmDischargeError, ConfirmDischargeResponse, CreateAdmissionData, CreateAdmissionError, CreateAdmissionResponse, CreateAppointmentData, CreateAppointmentError, CreateAppointmentResponse, CreateBedData, CreateBedError, CreateBedResponse, CreateEquipmentCategoryData, CreateEquipmentCategoryError, CreateEquipmentCategoryResponse, CreateEquipmentItemData, CreateEquipmentItemError, CreateEquipmentItemResponse, CreateMaintenanceScheduleData, CreateMaintenanceScheduleError, CreateMaintenanceScheduleResponse, CreatePatientData, CreatePatientError, CreatePatientResponse, CreatePharmacyCategoryData, CreatePharmacyCategoryError, CreatePharmacyCategoryResponse, CreatePharmacyItemData, CreatePharmacyItemError, CreatePharmacyItemResponse, CreateWardData, CreateWardError, CreateWardResponse, GetAdmissionBillData, GetAdmissionBillError, GetAdmissionBillResponse, GetAdmissionData, GetAdmissionError, GetAdmissionResponse, GetBedOccupancyData, GetBedOccupancyError, GetBedOccupancyResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetEquipmentItemByTagData, GetEquipmentItemByTagError, GetEquipmentItemByTagResponse, GetEquipmentItemData, GetEquipmentItemError, GetEquipmentItemResponse, GetHealthData, GetHealthError, GetHealthResponse, GetPatientData, GetPatientError, GetPatientResponse, GetPharmacyItemData, GetPharmacyItemError, GetPharmacyItemResponse, GetWardCapacityData, GetWardCapacityError, GetWardCapacityResponse, GetWardOccupancyData, GetWardOccupancyError, GetWardOccupancyResponse, LinkPatientAccountData, LinkPatientAccountError, LinkPatientAccountResponse, ListAdmissionsData, ListAdmissionsError, ListAdmissionsResponse, ListAppointmentsData, ListAppointmentsError, ListAppointmentsResponse, ListBedAvailabilityData, ListBedAvailabilityError, ListBedAvailabilityResponse, ListBedsData, ListBedsError, ListBedsResponse, ListDischargeCandidatesData, ListDischargeCandidatesError, ListDischargeCandidatesResponse, ListEquipmentCategoriesData, ListEquipmentCategoriesError, ListEquipmentCategoriesResponse, ListEquipmentItemsData, ListEquipmentItemsError, ListEquipmentItemsResponse, ListMaintenanceSchedulesData, ListMaintenanceSchedulesError, ListMaintenanceSchedulesResponse, ListOutstandingBillsData, ListOutstandingBillsError, ListOutstandingBillsResponse, ListPatientsData, ListPatientsError, ListPatientsResponse, ListPatientWorklistData, ListPatientWorklistError, ListPatientWorklistResponse, ListPharmacyCategoriesData, ListPharmacyCategoriesError, ListPharmacyCategoriesResponse, ListPharmacyItemsData, ListPharmacyItemsError, ListPharmacyItemsResponse, ListPharmacyTransactionsData, ListPharmacyTransactionsError, ListPharmacyTransactionsResponse, ListWardsData, ListWardsError, ListWardsResponse, LoginData, LoginError, LoginPatientData, LoginPatientError, LoginPatientResponse, LoginResponse, LogoutData, LogoutError, LogoutResponse, LookupPatientData, LookupPatientError, LookupPatientResponse, MarkArrivedData, MarkArrivedError, MarkArrivedResponse, PrepareAdmissionBillData, PrepareAdmissionBillError, PrepareAdmissionBillResponse, RecordPharmacyTransactionData, RecordPharmacyTransactionError, RecordPharmacyTransactionResponse, RefreshTokenData, RefreshTokenError, RefreshTokenResponse, RegisterPatientAccountData, RegisterPatientAccountError, RegisterPatientAccountResponse, ReleaseEquipmentItemData, ReleaseEquipmentItemError, ReleaseEquipmentItemResponse, RemoveBillChargeData, RemoveBillChargeError, RemoveBillChargeResponse, ReportEquipmentFaultData, ReportEquipmentFaultError, ReportEquipmentFaultResponse, RetireBedData, RetireBedError, RetireBedResponse, SettleBillData, SettleBillError, SettleBillResponse, UpdateBedData, UpdateBedError, UpdateBedResponse, UpdateDischargeChecklistData, UpdateDischargeChecklistError, UpdateDischargeChecklistResponse, UpdateEquipmentItemData, UpdateEquipmentItemError, UpdateEquipmentItemResponse, UpdatePatientData, UpdatePatientError, UpdatePatientResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -664,6 +664,281 @@ export const retireBedMutation = (options?: Partial<Options<RetireBedData>>): Us
     const mutationOptions: UseMutationOptions<RetireBedResponse, RetireBedError, Options<RetireBedData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await retireBed({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getAdmissionBillQueryKey = (options: Options<GetAdmissionBillData>) => createQueryKey('getAdmissionBill', options);
+
+/**
+ * The bill for a visit. 404 until somebody prepares one — a bill is written the first time
+ * it is asked for, because a stay that has not happened yet cannot be priced.
+ */
+export const getAdmissionBillOptions = (options: Options<GetAdmissionBillData>) => queryOptions<GetAdmissionBillResponse, GetAdmissionBillError, GetAdmissionBillResponse, ReturnType<typeof getAdmissionBillQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getAdmissionBill({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getAdmissionBillQueryKey(options)
+});
+
+/**
+ * Work the bill out from the stay, and open one if this visit has none.
+ *
+ * Every generated line is replaced — one admission fee, and one line per bed the patient
+ * has actually been in, at that ward's day rate. Typed charges are left exactly as they
+ * are, so preparing again a day later updates the bed days and keeps the X-ray.
+ *
+ * Refused with 409 once the bill is settled: that is the paper the patient was handed.
+ */
+export const prepareAdmissionBillMutation = (options?: Partial<Options<PrepareAdmissionBillData>>): UseMutationOptions<PrepareAdmissionBillResponse, PrepareAdmissionBillError, Options<PrepareAdmissionBillData>> => {
+    const mutationOptions: UseMutationOptions<PrepareAdmissionBillResponse, PrepareAdmissionBillError, Options<PrepareAdmissionBillData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await prepareAdmissionBill({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Add a charge reception types in — an X-ray, a dressing pack, a consultant's fee.
+ *
+ * Typed rather than generated because no table in this component records a treatment
+ * against an admission. Asking a human to type what happened is honest; inventing line
+ * items from tables that do not exist is not.
+ */
+export const addBillChargeMutation = (options?: Partial<Options<AddBillChargeData>>): UseMutationOptions<AddBillChargeResponse, AddBillChargeError, Options<AddBillChargeData>> => {
+    const mutationOptions: UseMutationOptions<AddBillChargeResponse, AddBillChargeError, Options<AddBillChargeData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await addBillCharge({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Take a typed charge off again. A generated line is refused with 409 — it would come
+ * straight back the next time anyone prepared the bill.
+ */
+export const removeBillChargeMutation = (options?: Partial<Options<RemoveBillChargeData>>): UseMutationOptions<RemoveBillChargeResponse, RemoveBillChargeError, Options<RemoveBillChargeData>> => {
+    const mutationOptions: UseMutationOptions<RemoveBillChargeResponse, RemoveBillChargeError, Options<RemoveBillChargeData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await removeBillCharge({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * The money is in. Freezes the bill and ticks `billing_settled` on the discharge checklist,
+ * in one transaction.
+ *
+ * That tick has no other way of being written — `PATCH /discharges/{id}/checklist` refuses
+ * the key. So the bill and the checklist cannot disagree about whether a patient has paid.
+ *
+ * Settling a visit nobody prepared a bill for works the bill out first, so a visit with no
+ * bill can never deadlock a discharge.
+ */
+export const settleBillMutation = (options?: Partial<Options<SettleBillData>>): UseMutationOptions<SettleBillResponse, SettleBillError, Options<SettleBillData>> => {
+    const mutationOptions: UseMutationOptions<SettleBillResponse, SettleBillError, Options<SettleBillData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await settleBill({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listOutstandingBillsQueryKey = (options?: Options<ListOutstandingBillsData>) => createQueryKey('listOutstandingBills', options);
+
+/**
+ * Reception's worklist: visits in the building whose money has not been taken yet.
+ *
+ * Includes visits with no bill row at all, which is most of them. A list of bills would
+ * have shown an empty screen and left the work invisible.
+ *
+ * A discharged visit is never here: confirming a discharge needs `billing_settled`, and
+ * only settling writes that.
+ */
+export const listOutstandingBillsOptions = (options?: Options<ListOutstandingBillsData>) => queryOptions<ListOutstandingBillsResponse, ListOutstandingBillsError, ListOutstandingBillsResponse, ReturnType<typeof listOutstandingBillsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listOutstandingBills({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listOutstandingBillsQueryKey(options)
+});
+
+export const listOutstandingBillsInfiniteQueryKey = (options?: Options<ListOutstandingBillsData>): QueryKey<Options<ListOutstandingBillsData>> => createQueryKey('listOutstandingBills', options, true);
+
+/**
+ * Reception's worklist: visits in the building whose money has not been taken yet.
+ *
+ * Includes visits with no bill row at all, which is most of them. A list of bills would
+ * have shown an empty screen and left the work invisible.
+ *
+ * A discharged visit is never here: confirming a discharge needs `billing_settled`, and
+ * only settling writes that.
+ */
+export const listOutstandingBillsInfiniteOptions = (options?: Options<ListOutstandingBillsData>) => {
+    const opts = infiniteQueryOptions<ListOutstandingBillsResponse, ListOutstandingBillsError, InfiniteData<ListOutstandingBillsResponse>, QueryKey<Options<ListOutstandingBillsData>>, number | Pick<QueryKey<Options<ListOutstandingBillsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListOutstandingBillsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listOutstandingBills({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listOutstandingBillsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+export const listDischargeCandidatesQueryKey = (options?: Options<ListDischargeCandidatesData>) => createQueryKey('listDischargeCandidates', options);
+
+/**
+ * Patients whose checklist says they could go home, and the ones with a box or two left.
+ * A plain rule over the checklist rows, not an agent — checking whether three boxes are
+ * ticked is a `WHERE` clause.
+ *
+ * The list is advisory. Being on it changes nothing until a human confirms.
+ */
+export const listDischargeCandidatesOptions = (options?: Options<ListDischargeCandidatesData>) => queryOptions<ListDischargeCandidatesResponse, ListDischargeCandidatesError, ListDischargeCandidatesResponse, ReturnType<typeof listDischargeCandidatesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listDischargeCandidates({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listDischargeCandidatesQueryKey(options)
+});
+
+export const listDischargeCandidatesInfiniteQueryKey = (options?: Options<ListDischargeCandidatesData>): QueryKey<Options<ListDischargeCandidatesData>> => createQueryKey('listDischargeCandidates', options, true);
+
+/**
+ * Patients whose checklist says they could go home, and the ones with a box or two left.
+ * A plain rule over the checklist rows, not an agent — checking whether three boxes are
+ * ticked is a `WHERE` clause.
+ *
+ * The list is advisory. Being on it changes nothing until a human confirms.
+ */
+export const listDischargeCandidatesInfiniteOptions = (options?: Options<ListDischargeCandidatesData>) => {
+    const opts = infiniteQueryOptions<ListDischargeCandidatesResponse, ListDischargeCandidatesError, InfiniteData<ListDischargeCandidatesResponse>, QueryKey<Options<ListDischargeCandidatesData>>, number | Pick<QueryKey<Options<ListDischargeCandidatesData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListDischargeCandidatesData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listDischargeCandidates({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listDischargeCandidatesInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+/**
+ * Tick discharge checklist items. Any subset; a key left out is not touched.
+ *
+ * Each item is gated by role, not just by login:
+ *
+ * - `clinical_clearance` — **Doctor only.** This is the wall. Without it nothing flags and
+ * nothing discharges, and no automated process can ever set it.
+ * - `medication_issued`, `follow_up_recorded`, `transport_arranged` — Ward Nurse.
+ * - `billing_settled` — **refused here.** Settle the bill instead
+ * (`POST /api/admissions/{id}/bill/settle`), which is what writes it. One fact, one
+ * place: a paid bill and an unticked box cannot happen.
+ *
+ * Ticking the last mandatory box moves the admission to `ready_for_discharge`; unticking
+ * one moves it back to `admitted`.
+ */
+export const updateDischargeChecklistMutation = (options?: Partial<Options<UpdateDischargeChecklistData>>): UseMutationOptions<UpdateDischargeChecklistResponse, UpdateDischargeChecklistError, Options<UpdateDischargeChecklistData>> => {
+    const mutationOptions: UseMutationOptions<UpdateDischargeChecklistResponse, UpdateDischargeChecklistError, Options<UpdateDischargeChecklistData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await updateDischargeChecklist({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Confirm the discharge — the second high-impact human gate in this component.
+ *
+ * It ends the admission, frees the bed for the next patient, and sends someone home. In one
+ * transaction it sets `discharged_at`, releases the bed assignment with
+ * `release_reason: discharged`, and moves the admission to `discharged`.
+ *
+ * Ward Nurse for `outpatient`, `day_case` and `inpatient`; **Duty Manager for `icu` and
+ * `hdu`**, which depends on the admission rather than the route and so is checked in the
+ * service. Refused with 409 if any mandatory checklist item is unticked.
+ */
+export const confirmDischargeMutation = (options?: Partial<Options<ConfirmDischargeData>>): UseMutationOptions<ConfirmDischargeResponse, ConfirmDischargeError, Options<ConfirmDischargeData>> => {
+    const mutationOptions: UseMutationOptions<ConfirmDischargeResponse, ConfirmDischargeError, Options<ConfirmDischargeData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await confirmDischarge({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

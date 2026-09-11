@@ -56,7 +56,13 @@ public static class MessageCodes
             [MessageCode.BedNeedsIsolation] = "cl_pat_018",
             [MessageCode.BedWardNotInService] = "cl_pat_019",
             [MessageCode.VisitNeedsDischargeNotComplete] = "cl_pat_020",
-            [MessageCode.VisitNeedsNoBed] = "cl_pat_021"
+            [MessageCode.VisitNeedsNoBed] = "cl_pat_021",
+            [MessageCode.ChecklistItemWrongRole] = "cl_pat_022",
+            [MessageCode.DischargeChecklistIncomplete] = "cl_pat_023",
+            [MessageCode.DischargeNeedsDutyManager] = "cl_pat_024",
+            [MessageCode.BillingTickedBySettlingOnly] = "cl_pat_025",
+            [MessageCode.BillAlreadySettled] = "cl_pat_026",
+            [MessageCode.BillLineNotRemovable] = "cl_pat_027"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

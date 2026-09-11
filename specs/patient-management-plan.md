@@ -13,12 +13,14 @@ This is the design document for the Patient Management component. It explains wh
 
 Patient Management handles a patient's **stay** — from the moment the hospital first hears about them, to the moment they walk out the door.
 
-It answers four questions:
+It answers five questions:
 
 1. **Who is this person?** — the patient record, which survives across many visits
 2. **Are they in the hospital right now, and at what stage?** — the admission and its status
 3. **Which bed are they in?** — the ward register, and who is in which bed (the beds themselves belong to Equipment)
 4. **Are they ready to leave?** — the discharge checklist and confirmation
+5. **What does the visit cost, and has it been paid?** — the bill (§6.5). *Added 2026-09-11; it used
+   to be a scope-guard row in §11, and §11.10 of `integration_of_functions.md` records the claim.*
 
 ### What it deliberately does *not* do
 
@@ -42,8 +44,9 @@ It answers four questions:
 | :--- | :--- | :--- |
 | **Ward Nurse** | Flutter | Register patients, admit, complete missing details, update status, approve normal-ward beds, tick discharge checklist items, request discharge |
 | **Duty / Dispatch Manager** | React | Everything a nurse can do, plus approve ICU/HDU beds, approve downgrades, confirm ICU discharges, cancel admissions, view all wards |
-| **Hospital Administrator** | React | Manage the ward register (create and deactivate wards). Beds belong to Equipment. Read-only on patients. |
-| **Ambulance Crew** | Flutter | Create a pre-admission for a patient they are bringing in. Read-only on everything else. |
+| **Hospital Administrator** | React | Manage the ward register (create and deactivate wards). Beds belong to Equipment. Read-only on patients. May settle a bill, though reception usually does. |
+| **General Staff (reception)** | React | The front desk. Register patients and open an admission, read the patient register and the ward board, and **settle bills** — the only role whose day is mostly money. *Added 2026-09-11.* |
+| **Ambulance Crew** | Flutter | Create a pre-admission for a patient they are bringing in. **Nothing else — and as of 2026-09-11 they no longer register patients either** (`integration_of_functions.md` §11.9, addressed to M1). |
 | **Doctor** | React | Ticks `clinical_clearance` on discharge (§6.1). *(Rev — §8.10)* Reviews, edits, approves or rejects the care advisory agent's draft. The only role that can make a `CareRecommendation` visible to a patient. |
 | **Patient** | Flutter | Read **their own** admission status, ward/bed, and discharge info. Pre-register before a planned visit. Raise an emergency call (the screen is ours, the call record is Emergency's — `integration_of_functions.md` §4.1). *(Rev — §8.10)* Describe a new symptom or concern in their own words, and read back the doctor-approved response. Nothing else. |
 
@@ -389,15 +392,40 @@ This re-check **is** the deterministic validation the assignment requires ("appl
 
 ### 6.1 The checklist
 
-Stored as `jsonb` on the `Discharge` row so items can be added without a migration.
+**One row per box in `discharge_checklist_items`, not `jsonb` on the `Discharge` row.** The
+earlier draft said `jsonb`; building it settled the other way, and the reason is in
+`entity_diagram.md`: every tick records who did it and when, and a row with a foreign key to
+`StaffMember` is the honest way to say that. A sixth box is still not a migration — the item
+type is a string column with a check constraint, and `DischargeService.Mandatory` is the list.
 
-| Item | Ticked by | Notes |
-| :--- | :--- | :--- |
-| `clinical_clearance` | **Doctor** | Human only, always. Role checked from the JWT — the `StaffMember` record itself belongs to Staff Management, so there is nothing for us to build here. |
-| `medication_issued` | Ward Nurse | |
-| `billing_settled` | Hospital Administrator | |
-| `follow_up_recorded` | Ward Nurse | Optional item |
-| `transport_arranged` | Ward Nurse | Optional item |
+The rows are written **the first time anybody touches the checklist**, not at admission time.
+That way every visit already on the system when this was built got one the moment it was
+needed, with no backfill; and a visit nobody ever discharges never grows five rows it does not
+use.
+
+| Item | Ticked by | Mandatory | Notes |
+| :--- | :--- | :--- | :--- |
+| `clinical_clearance` | **Doctor** | yes | Human only, always. Role checked from the JWT — the `StaffMember` record itself belongs to Staff Management, so there is nothing for us to build here. |
+| `medication_issued` | Ward Nurse | yes | |
+| `billing_settled` | **nobody — see below** | yes | Written by settling the bill (§6.5). `PATCH /discharges/{id}/checklist` refuses this key from every role, with `cl_pat_025`. |
+| `follow_up_recorded` | Ward Nurse | no | |
+| `transport_arranged` | Ward Nurse | no | |
+
+**`billing_settled` moved off the Hospital Administrator, and then off everybody.**
+*(Decided 2026-09-11.)* Two changes in one:
+
+- **Reception, not the administrator.** The administrator creates wards and runs the
+  organisation; money is the front desk's job. So the roles that may settle a bill are
+  `GeneralStaff`, `HospitalAdministrator` and `DutyManager` — `Policies.BillingDesk`.
+- **And it is not a tick at all.** Settling the bill is what writes this box, and nothing else
+  can. A checklist endpoint that accepted `billing_settled: true` would be a second way to say
+  "this patient has paid", and two ways to write one fact is two ways for it to be wrong. The
+  screen renders it as a state with no button, and says where the button is instead.
+
+**Flagging falls out of the tick.** Ticking the last mandatory box moves the admission
+`admitted → ready_for_discharge`; unticking one moves it back. Both directions, because a nurse
+who realises the medication was not issued after all has to be able to undo it — and
+`ready_for_discharge → admitted` is a published edge for exactly that.
 
 ### 6.2 Flagging candidates — a plain rule, not the agent
 
@@ -419,6 +447,130 @@ Our agent has exactly one job — bed assignment (§8). Keeping it to one job me
 | **`icu`, `hdu`** | **Duty Manager** |
 
 Confirming discharge is high-impact: it frees the bed, ends the admission, and sends the patient home. In one transaction it sets `discharged_at`, releases the `BedAssignment` with `release_reason = discharged`, and moves the admission to `discharged`.
+
+### 6.4 Who confirms, in code
+
+`DischargeService.ConfirmAsync` takes the same `SELECT ... FOR UPDATE` row lock on the
+admission that `/arrive`, `/cancel` and `assign-bed` take, and for the same reason: a nurse
+confirming a discharge and a manager cancelling the visit both read a legal status, both pass,
+and the later write wins. Neither row is illegal on its own, so no index can catch it.
+
+Inside that transaction it stamps `discharged_at`, releases the live `BedAssignment` with
+`release_reason = discharged`, moves the admission to `discharged`, and records who signed it
+off. If any mandatory box is unticked it refuses with `cl_pat_023` naming what is missing —
+belt and braces, because the status check would refuse it anyway, but "billing_settled still
+outstanding" is an answer a nurse can act on and "cannot move from admitted to discharged" is
+not.
+
+---
+
+### 6.5 Billing — what a visit costs
+
+*Added 2026-09-11. Until then §11 listed "billing beyond a checklist tick" as out of scope,
+and that line was wrong: `billing_settled` cannot be an honest tick with nothing behind it.
+Claiming an area nobody owns is recorded in `integration_of_functions.md` §11.10 so the other
+three members can see it rather than find out.*
+
+#### What a bill is made of, and what it cannot be made of
+
+**This is the honest part and the part worth defending at the viva.** Our schema records two
+things that cost money, and no others:
+
+| Line | Priced from | A real stored fact? |
+| :--- | :--- | :--- |
+| Admission fee | `Admission.Category` — the care level a named clinician chose and signed for | yes |
+| Bed, per day, per assignment | `BedAssignment` × the type of ward the bed stands in | yes |
+| Anything clinical | — | **no table holds it** |
+
+There is no treatment table, no procedure table and no prescription table — §1 puts all three
+out of scope for the whole project, deliberately. Equipment's `PharmacyTransaction` records
+stock leaving a shelf but carries no admission id, so it cannot be attributed to a patient
+either. **So a bill generated from our data is a fee and some bed days, and that is all it can
+honestly be.**
+
+Rather than invent line items from tables that do not exist, reception types the rest:
+`POST /admissions/{id}/bill/charges` takes a description, a quantity and a unit price. A human
+entering what actually happened is truthful; a system generating an X-ray charge from no
+X-ray record is not. That is the whole design decision, and it is the answer to "but where do
+the treatments come from?".
+
+#### The shape
+
+Two tables, `bills` and `bill_line_items`, migration `Patient_AddBilling`. One bill per
+admission, enforced by `ux_bills_admission_id`.
+
+- **There is no `total` column.** The total is the sum of the lines, so the two cannot
+  disagree. Same reasoning as `all_mandatory_ticked` being a query over the checklist rows.
+- **There is no `line_total` column either.** It is quantity × unit price.
+- **The unit price is copied onto the line when the line is written**, never looked up when the
+  bill is read. Change a rate next month and every bill already raised stays exactly as the
+  patient was charged. That is the entire reason the price is a column rather than a lookup.
+- **`bill_number`** is a short code a patient quotes at the counter — `B7K2X9Q`, same alphabet
+  and same reasoning as `patient_code`. Random, not a running invoice number: a sequence would
+  publish how much business the hospital does, and two desks preparing a bill at once would
+  fight over the next one.
+- **Settled is one nullable timestamp**, `settled_at`, with who and a free-text note beside it.
+  Not a bool plus a timestamp that can contradict it — the same shape as a checklist tick.
+
+#### The rates
+
+`Services/Patient/BillingRates.cs`, in Sri Lankan rupees. **The numbers are invented** — no
+real price list was given to us, and the file says so rather than looking authoritative.
+
+| Care level | Admission fee | | Ward type | Per day |
+| :--- | ---: | :--- | :--- | ---: |
+| `icu` | 7,500 | | `icu` | 25,000 |
+| `hdu` | 5,000 | | `hdu` | 15,000 |
+| `inpatient` | 3,000 | | `isolation` | 12,000 |
+| `day_case` | 2,500 | | `maternity` | 9,000 |
+| `outpatient` | 1,500 | | `pediatric` | 8,000 |
+| | | | `general` | 6,000 |
+
+A static table in C#, not a `billing_rates` table. Nothing in this project changes a price, and
+a table would be a migration, a role, a screen and a set of tests for a number a real hospital
+edits once a year. If the group wants it editable later, the seam is one file.
+
+**Days: part of a day counts as a day, and every stay counts as at least one.** So a three-hour
+day case pays for one day and a stay of twenty-five hours pays for two. It is the only rule
+here anybody could dispute, which is why it is a method with its name on it
+(`BillingRates.BillableDays`) rather than an expression inside a loop.
+
+**One line per bed assignment**, so a patient moved mid-stay is billed each ward at its own
+rate. A bed that was only ever *held* and never slept in is not billed — nobody was in it.
+That needed a new column: `bed_assignments.occupied_at`, stamped when the hold becomes an
+occupancy. Before it, `Admission.AdmittedAt` happened to answer for a first bed and nothing at
+all answered for a second one.
+
+#### Preparing, and re-preparing
+
+`POST /admissions/{id}/bill` works the bill out from the stay. It **replaces every generated
+line and leaves every typed one alone**, so preparing again the next day updates the bed days
+and keeps the X-ray. Only a typed line can be removed (`cl_pat_027`): deleting a bed line would
+just bring it back on the next prepare.
+
+#### Settling, and the one fact
+
+`POST /admissions/{id}/bill/settle` freezes the bill and ticks `billing_settled`, in one
+transaction. It **prepares the bill first if nobody has** — without that, a visit with no bill
+row could never tick the box and therefore could never be discharged at all, which is a
+deadlock the desk would have no way out of.
+
+A settled bill is frozen: no new lines, no removals, no second settlement (`cl_pat_026`). It is
+the piece of paper the patient was handed, and the database must not drift away from it.
+
+#### Reception's screen
+
+`GET /billing/outstanding` lists **admissions**, not bills. Most visits have no bill row — one
+is written the first time somebody asks for it — so a list of bills would have shown reception
+an empty screen and left the work invisible. A discharged visit never appears, because
+confirming a discharge needs `billing_settled` and only settling writes it.
+
+#### What we are still not building
+
+Payment gateways, card processing, insurance claims, part payments, refunds, tax, discounts and
+anything with a `billing_rates` table behind it. A discount is a decision, and this component
+has nobody authorised to make one — the check constraint on `bill_line_items` refuses a
+negative quantity or price outright.
 
 ---
 
@@ -474,9 +626,20 @@ Creating, retiring and taking beds out of service are **Equipment's endpoints, n
 
 | Method | Route | Role | Notes |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/api/discharges/candidates` | Nurse, Manager | Rule-flagged list (§6.2), not an agent output |
-| `PATCH` | `/api/discharges/{admissionId}/checklist` | Nurse, Admin, Doctor | Tick items. Role-gated per item. |
+| `GET` | `/api/discharges/candidates` | Nurse, Doctor, Manager | Rule-flagged list (§6.2), not an agent output |
+| `PATCH` | `/api/discharges/{admissionId}/checklist` | Nurse, Doctor, Manager | Tick items. Role-gated per item; `billing_settled` refused from everybody. |
 | `POST` | `/api/discharges/{admissionId}/confirm` | Nurse / Manager per §6.3 | **High-impact gate.** Frees the bed. |
+
+### 7.5b Billing
+
+| Method | Route | Role | Notes |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/admissions/{admissionId}/bill` | `PatientDetails` | 404 until somebody prepares one |
+| `POST` | `/api/admissions/{admissionId}/bill` | `BillingDesk` | Work it out from the stay; replaces generated lines only |
+| `POST` | `/api/admissions/{admissionId}/bill/charges` | `BillingDesk` | A charge reception types in |
+| `DELETE` | `/api/admissions/{admissionId}/bill/charges/{lineId}` | `BillingDesk` | Typed lines only (`cl_pat_027`) |
+| `POST` | `/api/admissions/{admissionId}/bill/settle` | `BillingDesk` | **The only thing that ticks `billing_settled`** |
+| `GET` | `/api/billing/outstanding` | `BillingDesk` | Reception's worklist |
 
 ### 7.6 Patient self-service
 
@@ -797,6 +960,29 @@ Same fields as §8.8: workflow id, objective, plan, completed steps, tool calls 
 
 Protected routes by role, loading / empty / success / error states throughout. The care recommendation queue is visible only to `Doctor` — a Duty Manager can see it exists (it is not a secret workflow) but the approve/reject actions are hidden, not merely disabled, for anyone else, per the approval-gating rule in `CLAUDE.md`.
 
+### 9b. The bill screen, and the React/Flutter rule
+
+`CLAUDE.md` says React is for staff deciding things and Flutter is for patient-facing work, and
+a screen showing a patient their bill looks at first glance like it belongs in Flutter. It does
+not, and this is not an exception being carved out:
+
+- **It is operated by reception, who are staff.** The person pressing the buttons is behind the
+  counter, not in a bed.
+- **The patient's copy is paper.** They are standing at the desk, and what they leave with is
+  printed — which is a browser print stylesheet on the staff screen, not a second screen.
+- **There is no patient-facing route to build against anyway.** `mobile-ui/` has `lib/` and a
+  `pubspec.yaml` and no `android/` or `ios/`, so a Flutter bill screen would be a file nobody
+  can run.
+
+If a patient-facing "my bill" screen is wanted later it belongs in Flutter, reads a narrow
+patient-shaped response like every other `/me/*` endpoint, and does not reuse this one.
+
+**Printing is a print stylesheet, not a PDF library.** The numbers are already on screen, the
+browser's print dialog saves to PDF anyway, and one screen does not justify a
+document-generation dependency in a project with no other use for it.
+
+---
+
 ## 10. Flutter (Ward Nurse, Patient)
 
 **Nurse:**
@@ -893,7 +1079,7 @@ Every trigger already exists as a status change, so nothing new is needed on the
 | Doctor calendars, time slots, availability search, rescheduling | The component-sized part, and still out. A patient booking a date is not: `POST /me/appointments` creates an `Appointment`, staff check them in, and it becomes an ordinary admission. Rescheduling is cancel and rebook. |
 | Merging duplicate patient records | Real hospitals do this; it's a whole workflow. Prevented up front by NIC lookup, and recorded here as a known limitation. |
 | Patient transfers between wards mid-stay | Nice to have. Only if time allows — the data model already supports it (a second `BedAssignment` with `release_reason = transferred`). |
-| Billing beyond a checklist tick | Not our component. |
+| ~~Billing beyond a checklist tick~~ | **No longer true — changed 2026-09-11.** Billing is Patient Management's; see §6.5 for what it is and §11.10 of `integration_of_functions.md` for the claim. What stays out is payment gateways, insurance claims, part payments, refunds, tax and discounts. |
 | Diagnosis, treatment, prescriptions, and anything else clinical | The line from §1. The care advisory agent (§8.10) drafts a note; it does not cross this line, because nothing it produces reaches a patient without a doctor's approval standing in between. |
 | A real electronic health record — vitals, lab results, clinical notes | Out of scope, and never claimed otherwise. §8.11 reads only demographics and the administrative shape of past visits, deliberately, because that is all this schema has ever stored. |
 

@@ -30,6 +30,21 @@ application — if you have not run that script, none of these exist yet. See
 | `admin.wickrama@carelanka.lk` | `hospital_administrator` | Tharindu Wickramasinghe |
 | `equip.bandara@carelanka.lk` | `equipment_manager` | Ruwan Bandara |
 
+**Who to sign in as for the patient journey**, because it takes four different
+people on purpose and one account will not walk the whole thing:
+
+| Step | Account | Why not somebody else |
+| :--- | :--- | :--- |
+| Register and admit | `staff.jayasuriya` (reception) | The front desk does the paperwork. `crew.fernando` is refused — changed 2026-09-11 |
+| Assign the bed, mark them arrived | `nurse.perera` | The nurse is the one who can see the patient is in the bed |
+| Tick `clinical_clearance` | `dr.silva` | **A doctor and nobody else.** This is the wall |
+| Tick medication, follow-up, transport | `nurse.perera` | |
+| Prepare and settle the bill | `staff.jayasuriya` | Reception takes money. This is also the only way `billing_settled` is ever ticked |
+| Confirm the discharge | `nurse.perera` | `duty.rajapaksa` instead if the patient is ICU or HDU |
+
+An ICU or HDU bed needs `duty.rajapaksa` to assign it, and the same patient's
+discharge needs them to confirm it.
+
 ```json
 POST /api/auth/login
 {

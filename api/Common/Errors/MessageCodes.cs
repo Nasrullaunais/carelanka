@@ -35,7 +35,17 @@ public static class MessageCodes
             [MessageCode.PharmacyItemNameTaken] = "cl_equ_009",
             [MessageCode.InsufficientStock] = "cl_equ_010",
             [MessageCode.AdjustmentNeedsNote] = "cl_equ_011",
-            [MessageCode.WardNameTaken] = "cl_pat_001"
+            [MessageCode.WardNameTaken] = "cl_pat_001",
+            [MessageCode.PatientNicTaken] = "cl_pat_002",
+            [MessageCode.PatientAlreadyHasAccount] = "cl_pat_003",
+            [MessageCode.AccountAlreadyLinked] = "cl_pat_004",
+            [MessageCode.TempReferenceExhausted] = "cl_pat_005",
+            [MessageCode.PatientHasOpenAdmission] = "cl_pat_006",
+            [MessageCode.DispatchIdRequired] = "cl_pat_007",
+            [MessageCode.CategoryStaffNotFound] = "cl_pat_008",
+            [MessageCode.PatientHasOpenAppointment] = "cl_pat_009",
+            [MessageCode.AppointmentInThePast] = "cl_pat_010",
+            [MessageCode.CareLevelNeedsDutyManager] = "cl_pat_011"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

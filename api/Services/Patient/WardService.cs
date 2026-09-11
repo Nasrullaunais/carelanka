@@ -1,4 +1,4 @@
-using CareLanka.Api.Common.Errors;
+﻿using CareLanka.Api.Common.Errors;
 using CareLanka.Api.Common.Exceptions;
 using CareLanka.Api.Data;
 using CareLanka.Api.Data.Configurations.Patient;
@@ -49,8 +49,12 @@ public sealed class WardService : IWardService
         {
             Id = Guid.NewGuid(),
             Name = request.Name.Trim(),
-            WardType = request.WardType,
-            GenderPolicy = request.GenderPolicy,
+
+            // Not null: [ApiController] has already returned a 400 for a body that left either
+            // out. They are nullable on the request so that omission is an error rather than a
+            // silent default - see CreateWardRequest.
+            WardType = request.WardType!.Value,
+            GenderPolicy = request.GenderPolicy!.Value,
             IsActive = request.IsActive
         };
 

@@ -109,6 +109,7 @@ Constraint: `nic IS NOT NULL OR temp_reference IS NOT NULL` — every patient mu
 | `admitted_at` | timestamptz, nullable | When they physically arrived in the bed |
 | `discharged_at` | timestamptz, nullable | |
 | `cancel_reason` | enum, nullable | `diverted_to_other_hospital` `false_alarm` `died_en_route` `patient_refused` `no_show` |
+| `cancel_note` | string(500), nullable | The free-text half — "ambulance rerouted to Kandy, family informed". The reason is mandatory; this is not |
 | `created_at` / `updated_at` | timestamptz | |
 
 **Ward** — a physical ward. Ours (pending §15.1), managed by the Hospital Administrator, changes rarely.
@@ -269,7 +270,12 @@ discharged           -> (terminal)
 cancelled            -> (terminal)
 ```
 
-Anything not on this list returns **409 Conflict**. The table lives in one place in the service layer, not scattered through controllers.
+Anything not on this list returns **409 Conflict**. The table lives in one place in the service layer, not scattered through controllers — `AdmissionStatusMachine`, which every endpoint that moves a status calls.
+
+**Built** (step 4 of `docs/build/patient.md`). Two things about how it is enforced:
+
+- **The table is the wide question, an endpoint is the narrow one, and both are checked.** `ready_for_discharge -> admitted` is a legal move, but `POST /admissions/{id}/arrive` is not the endpoint that makes it — arriving stamps `admitted_at` and a nurse un-flagging a discharge must not. So each endpoint names the states *it* starts from as well as going through the table. Checking only the table would let one endpoint quietly do another's job.
+- **Two people acting on one visit are serialised, not merged.** A manager cancelling and a nurse marking arrival both read `bed_reserved`, both pass the check, and the later write would simply overwrite the earlier one — a cancelled patient ending up admitted. `SELECT ... FOR UPDATE` on the admission row makes the second request wait, re-read, and get the honest 409. Same row lock §5 already relies on for the bed approval.
 
 Three things worth noticing:
 
@@ -980,6 +986,16 @@ because two people share a phone far more often than is convenient.
 
 **4. How does Emergency notify us of a dispatch?** Direct API call, or via the orchestrator? Affects both of our specs.
 
+**4b. Nothing in this project has a timezone, and a date filter is where it first bites.**
+`?date=` on `GET /appointments` filters whole **UTC** days, because `scheduled_at` is a `DateTimeOffset` stored in UTC and that is all the column knows. Colombo is UTC+5:30, so "today's bookings" currently starts at 05:30 local and ends at 05:29 the next morning — a receptionist opening the worklist at 7am sees a day that began before dawn and will end before breakfast tomorrow.
+
+Fixing it inside this one filter would be worse than leaving it: the occupancy report, the discharge summary and every other component's date range would then disagree with it. It is a group decision — one hospital timezone in configuration, applied everywhere a date is turned into a range — and it belongs with whoever builds the reports. Written down here so it is found now rather than at the demo.
+
+**4c. "One open booking at a time" is a read, not a guarantee.**
+Every other uniqueness rule in this component is a partial unique index, with the read in front of it only there to give a better message — `ux_admissions_open_patient` and `ux_wards_name` both work that way. The open-appointment rule is the exception: it is only the read. Two desks booking the same patient in the same instant both pass it.
+
+Left that way on purpose. The fix is a partial unique index and therefore a migration, and every migration snapshots the whole model, so it is the change most likely to collide with a teammate's open branch. The damage if it happens is two rows on a worklist that a human can see and cancel — and the *second check-in* is still refused, by the admission index that does exist, so nobody gets admitted twice. Worth doing when a migration is being written anyway; not worth one of its own.
+
 **5. Patient app login — settled, keeping it.**
 `docs/entity_diagram.md` Open Decision 1 recommended dropping the Patient role and sending bed details by SMS instead. That entry was written on an out-of-date reading: it said the Component Plan's Flutter roles were "crew / nurse / staff only", but v2 of that plan lists **Patient** as one of four Flutter roles, and §10 here has listed the Patient screens all along.
 
@@ -996,9 +1012,11 @@ The cost the leader raised is real: a second auth path and patient-scoped author
 
 There is a demo cost to removing them too. Our emergency path leans on the contrast between a logged-in caller whose identity and history we already hold, and an unidentified arrival registered as `UNKNOWN-2026-0142` (§15.3). Drop patient accounts and the first half of that contrast goes with it.
 
-**Built:** `POST /me/appointments` (book), `GET /me/appointments` (my visits), `POST /me/appointments/{id}/cancel`, plus the staff side — `GET /appointments` (expected-visits worklist), `POST /appointments` (book on a patient's behalf) and `POST /appointments/{id}/check-in`, which turns the booking into an ordinary admission the bed agent then runs on.
+**Specified:** `POST /me/appointments` (book), `GET /me/appointments` (my visits), `POST /me/appointments/{id}/cancel`, plus the staff side — `GET /appointments` (expected-visits worklist), `POST /appointments` (book on a patient's behalf) and `POST /appointments/{id}/check-in`, which turns the booking into an ordinary admission the bed agent then runs on.
 
-The care level is still set by staff at check-in, never by the patient at booking time — the same rule every other admission path follows.
+**Built 2026-09-11: the staff three.** `GET /api/appointments`, `POST /api/appointments` and `POST /api/appointments/{id}/check-in` are live, with 24 tests. The three `/me/*` ones are still contract only — this heading said "Built" of all six before any of them existed, which was a description of the design and read as a description of the code.
+
+The care level is still set by staff at check-in, never by the patient at booking time — the same rule every other admission path follows. **A ward nurse may set `outpatient`, `day_case` or `inpatient`; `icu` and `hdu` are the duty manager's** and a nurse asking for either is a 403 carrying `cl_pat_011`. That rule reads the request body rather than the route, so it is a check in `AppointmentService` and not a policy on the action.
 
 **Knock-on for the group:** `Notification` and `DeviceToken` are written staff-only in the entity diagram and need a nullable `PatientId` if patient notifications are wanted. Not on our critical path, since our patient notifications are local rather than push.
 

@@ -12,6 +12,7 @@ import { canCreateWard } from '../types/permissions';
 import {
   genderPolicies,
   genderPolicyLabels,
+  wardTypeHints,
   wardTypeLabels,
   wardTypes,
 } from '../types/wards';
@@ -47,12 +48,6 @@ export function WardsPage() {
       <h1>Wards</h1>
       <p className="muted">
         The ward register. Owned by Patient Management and read by all four components.
-      </p>
-
-      <p className="stub-note">
-        <strong>Total beds is a stub.</strong> Equipment Management&rsquo;s bed register
-        (<code>GET /beds</code>) does not exist yet, so every ward reports the same six beds.
-        See <code>STUBS.md</code> row 1.
       </p>
 
       <div className="card">
@@ -174,6 +169,7 @@ function CreateWardCard({
                 </option>
               ))}
             </select>
+            <p className="hint">{wardTypeHints[wardType]}</p>
           </div>
           <div className="field">
             <label htmlFor="new-policy">Gender policy</label>

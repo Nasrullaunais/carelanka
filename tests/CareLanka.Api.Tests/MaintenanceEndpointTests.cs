@@ -5,6 +5,7 @@ using System.Text.Json;
 using CareLanka.Api.Data;
 using CareLanka.Api.Data.Entities.Patient;
 using CareLanka.Api.Data.Enums;
+using CareLanka.Api.Services.Patient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PatientRecord = CareLanka.Api.Data.Entities.Patient.Patient;
@@ -245,6 +246,10 @@ public sealed class MaintenanceEndpointTests
         var patient = new PatientRecord
         {
             Id = Guid.NewGuid(),
+
+            // Written straight to the table, so nothing assigns this for us. PatientService
+            // stamps it on every patient it creates and the column is NOT NULL.
+            PatientCode = PatientCodes.Next(),
             FullName = "Bed Occupant",
             Nic = $"M{Guid.NewGuid():N}"[..12],
             Gender = Gender.Male

@@ -456,7 +456,7 @@ public sealed class AdmissionEndpointTests
         });
 
         // routine is declared first, so the least urgent patient in the building was the default.
-        // Urgency feeds soft rule S2 and the worklist sort, so the mistake shows up as an order
+        // Urgency feeds the worklist sort, so the mistake shows up as an order
         // that looks deliberate.
         Assert.Equal(HttpStatusCode.BadRequest, created.StatusCode);
     }
@@ -891,30 +891,49 @@ public sealed class AdmissionEndpointTests
     /// exactly what step 6 will write, so these tests should keep passing when it lands and
     /// this helper can be deleted.
     /// </remarks>
+    /// <summary>
+    /// Gets this admission into <c>bed_reserved</c> the way the API actually does it: a real
+    /// ward, a real bed of Equipment's, and POST /assign-bed.
+    /// </summary>
+    /// <remarks>
+    /// It used to write the admission's status and a BedAssignment row straight to the
+    /// database, because nothing could reserve a bed until step 6. It can now, so it does —
+    /// which is what these tests were written to be ready for.
+    /// </remarks>
     private async Task ReserveABedAsync(string admissionId)
     {
-        using var scope = _application.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
+        using var equipment = await ClientAsync(ApiApplication.EquipmentEmail);
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
 
-        var id = Guid.Parse(admissionId);
-        var admission = await db.Admissions.FirstAsync(a => a.Id == id);
-        admission.Status = AdmissionStatus.BedReserved;
-
-        db.Add(new BedAssignment
+        var ward = await administrator.PostAsJsonAsync("/api/wards", new
         {
-            Id = Guid.NewGuid(),
-            AdmissionId = id,
-
-            // Beds are Health Equipment's register and it does not exist yet, so there is no
-            // row to point at — the column carries no foreign key for exactly this reason.
-            BedId = Guid.NewGuid(),
-
-            Status = AssignmentStatus.Reserved,
-            ReservedUntil = DateTimeOffset.UtcNow.AddMinutes(30),
-            AssignedBy = AssignedBy.User
+            name = $"Adm-Ward-{Guid.NewGuid():N}"[..24],
+            ward_type = "general",
+            gender_policy = "mixed",
+            is_active = true
         });
 
-        await db.SaveChangesAsync();
+        Assert.Equal(HttpStatusCode.Created, ward.StatusCode);
+
+        using var wardBody = await ReadJsonAsync(ward);
+
+        var bed = await equipment.PostAsJsonAsync("/api/beds", new
+        {
+            ward_id = wardBody.RootElement.GetProperty("id").GetString(),
+            bed_number = "B1",
+            has_isolation = false
+        });
+
+        Assert.Equal(HttpStatusCode.Created, bed.StatusCode);
+
+        using var bedBody = await ReadJsonAsync(bed);
+
+        var assigned = await nurse.PostAsJsonAsync(
+            $"/api/admissions/{admissionId}/assign-bed",
+            new { bed_id = bedBody.RootElement.GetProperty("id").GetString() });
+
+        Assert.Equal(HttpStatusCode.OK, assigned.StatusCode);
     }
 
     private static IReadOnlyList<string> PatientNames(JsonDocument page)

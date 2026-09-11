@@ -137,8 +137,7 @@ public sealed class WardEndpointTests
             {
                 ward_id = wardId,
                 bed_number = $"B{number}",
-                has_isolation = false,
-                nurse_station_distance = number
+                has_isolation = false
             });
 
             Assert.Equal(HttpStatusCode.Created, bed.StatusCode);

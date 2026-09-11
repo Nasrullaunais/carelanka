@@ -73,5 +73,29 @@ public enum MessageCode
 
     AppointmentInThePast,
 
-    CareLevelNeedsDutyManager
+    CareLevelNeedsDutyManager,
+
+    // Manual bed assignment. One code per hard rule, because "that bed will not work" tells a
+    // nurse nothing about which other bed might.
+    BedNeedsDutyManager,
+
+    BedDowngradeNeedsDutyManager,
+
+    BedAlreadyClaimed,
+
+    BedOutOfService,
+
+    BedWardTooAcute,
+
+    BedWardGenderPolicy,
+
+    BedNeedsIsolation,
+
+    BedWardNotInService,
+
+    // A visit that needs a bed cannot be finished with /complete. That is a discharge, and
+    // discharge has a checklist, an approver and a bed to give back.
+    VisitNeedsDischargeNotComplete,
+
+    VisitNeedsNoBed
 }

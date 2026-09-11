@@ -112,6 +112,45 @@ export function canSetHighCareLevel(role: PrincipalRole | undefined): boolean {
 }
 
 /**
+ * Policies.AdmissionEditor on POST /api/admissions/{id}/assign-bed.
+ *
+ * Only half the rule. Which *bed* a role may choose depends on the ward it stands in, so
+ * BedAssignmentService refuses ICU, HDU and any downgrade from anyone but the duty manager and
+ * answers 403 at run time. `whyNotPlaceable` in types/beds.ts is the UI half of that, and this
+ * is only "may this person place patients at all".
+ */
+export function canAssignBed(role: PrincipalRole | undefined): boolean {
+  return role === 'ward_nurse' || role === 'duty_manager';
+}
+
+/**
+ * Policies.AdmissionReader on GET /api/patient-worklist. The same roles as the admissions
+ * list, because it is the same data read a different way.
+ */
+export function canReadWorklist(role: PrincipalRole | undefined): boolean {
+  return canReadAdmissions(role);
+}
+
+/**
+ * Policies.AdmissionEditor on POST /api/admissions/{id}/complete.
+ *
+ * Only half the rule, like canAssignBed. The service also refuses a visit that *needs* a bed
+ * with cl_pat_020 — finishing that one is a discharge, with a checklist and a bed to give
+ * back. So the button is hidden on `requires_bed` rows as well as for the wrong role.
+ */
+export function canCompleteVisit(role: PrincipalRole | undefined): boolean {
+  return role === 'ward_nurse' || role === 'duty_manager';
+}
+
+/**
+ * Policies.WardNurse on POST /api/admissions/{id}/arrive. Narrower than everything else on
+ * this page: the nurse at the bedside is the one who can see the patient is in the bed.
+ */
+export function canMarkArrived(role: PrincipalRole | undefined): boolean {
+  return role === 'ward_nurse';
+}
+
+/**
  * Policies.AnyStaff on GET /api/capacity/wards and GET /api/wards/{id}/occupancy.
  *
  * Counts only, no patient identities, which is why it is open to every staff role — a porter

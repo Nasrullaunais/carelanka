@@ -178,4 +178,44 @@
     <value>Only a duty manager may check a patient in at {0} level.</value>
     <comment>Intensive and high-dependency care are the duty manager's to authorise, wherever the admission comes from.</comment>
   </data>
+  <data name="cl_pat_012" xml:space="preserve">
+    <value>Only a duty manager may assign a bed in {0} (ward type {1}).</value>
+    <comment>Intensive care and high dependency are the duty manager's wherever the request comes from. patient-management-plan.md 5.2.</comment>
+  </data>
+  <data name="cl_pat_013" xml:space="preserve">
+    <value>{0} (ward type {1}) gives less intensive care than the {2} level this patient was assessed at. Only a duty manager may approve a downgrade.</value>
+    <comment>Giving somebody less care than a clinician asked for is a decision, and it is recorded as is_downgrade on the assignment.</comment>
+  </data>
+  <data name="cl_pat_014" xml:space="preserve">
+    <value>Bed {0} has just been taken. Pick another.</value>
+    <comment>The honest answer to a race: two people assigned the same bed and ux_bed_assignments_live_bed refused the second.</comment>
+  </data>
+  <data name="cl_pat_015" xml:space="preserve">
+    <value>Bed {0} is out of service.</value>
+    <comment>Hard rule H1. Equipment Management withdraws beds for repair and we never overrule that.</comment>
+  </data>
+  <data name="cl_pat_016" xml:space="preserve">
+    <value>Bed {0} is in a ward of type {1}, which is more acute than the {2} care this patient needs.</value>
+    <comment>Hard rule H2 in the upward direction. Not generosity — it is the last ICU bed spent on somebody who does not need it.</comment>
+  </data>
+  <data name="cl_pat_017" xml:space="preserve">
+    <value>Bed {0} is in a ward with a {1} gender policy, which does not admit a patient recorded as {2}.</value>
+    <comment>Hard rule H3. Gender separation is a property of the ward, so there is no emergency exception. A patient recorded as other or unknown reaches only a mixed ward.</comment>
+  </data>
+  <data name="cl_pat_018" xml:space="preserve">
+    <value>This patient is infectious and bed {0} has no isolation.</value>
+    <comment>Hard rule H4. The flag is on the bed, not the ward — a side room is not only found in an isolation ward.</comment>
+  </data>
+  <data name="cl_pat_019" xml:space="preserve">
+    <value>Bed {0} is in a ward that is no longer in service.</value>
+    <comment>Hard rule H5. The bed is real; its ward has been retired, so nobody can be admitted into it.</comment>
+  </data>
+  <data name="cl_pat_020" xml:space="preserve">
+    <value>A {0} visit is discharged, not completed, because it has a bed to give back.</value>
+    <comment>POST /admissions/{id}/complete only finishes a visit that never needed a bed. Anything else is the discharge workflow.</comment>
+  </data>
+  <data name="cl_pat_021" xml:space="preserve">
+    <value>A {0} visit does not need a bed.</value>
+    <comment>Hard rule H0. Refuses a bed assignment for an outpatient, who is seen and sent home.</comment>
+  </data>
 </root>

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import type { FormEvent } from 'react';
+import { Fragment, useState } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -150,19 +150,6 @@ export function AppointmentsPage() {
 
       <BookVisitCard />
 
-      {checkingIn && (
-        <CheckInCard
-          appointment={checkingIn}
-          staffId={session?.principal.id ?? ''}
-          canSetHighCare={canSetHighCareLevel(role)}
-          onCancel={() => setCheckingIn(null)}
-          onCheckedIn={(admission) => {
-            setCheckingIn(null);
-            setAdmitted(admission);
-          }}
-        />
-      )}
-
       {admitted && <CheckedInCard admission={admitted} onDismiss={() => setAdmitted(null)} />}
 
       <div className="card">
@@ -178,9 +165,24 @@ export function AppointmentsPage() {
           onRetry={() => void appointments.refetch()}
           onCheckIn={(appointment) => {
             setAdmitted(null);
-            setCheckingIn(appointment);
+            setCheckingIn((current) => (current?.id === appointment.id ? null : appointment));
           }}
           showDate={date === ''}
+          openId={checkingIn?.id ?? null}
+          // A render prop rather than the form itself, so the table stays a table and does not
+          // grow a staff id, a permission check and two callbacks it has no other use for.
+          renderDrawer={(appointment) => (
+            <CheckInPanel
+              appointment={appointment}
+              staffId={session?.principal.id ?? ''}
+              canSetHighCare={canSetHighCareLevel(role)}
+              onCancel={() => setCheckingIn(null)}
+              onCheckedIn={(admission) => {
+                setCheckingIn(null);
+                setAdmitted(admission);
+              }}
+            />
+          )}
         />
 
         {appointments.data && appointments.data.total_items > 0 && (
@@ -226,6 +228,8 @@ function AppointmentTable({
   onRetry,
   onCheckIn,
   showDate,
+  openId,
+  renderDrawer,
 }: {
   appointments: Appointment[];
   isLoading: boolean;
@@ -233,6 +237,8 @@ function AppointmentTable({
   onRetry: () => void;
   onCheckIn: (appointment: Appointment) => void;
   showDate: boolean;
+  openId: string | null;
+  renderDrawer: (appointment: Appointment) => ReactNode;
 }) {
   if (isLoading) {
     return <p className="empty">Loading…</p>;
@@ -269,43 +275,54 @@ function AppointmentTable({
       </thead>
       <tbody>
         {appointments.map((appointment) => (
-          <tr key={appointment.id}>
-            <td>
-              <strong>
-                {showDate
-                  ? localDateTime(appointment.scheduled_at)
-                  : localTime(appointment.scheduled_at)}
-              </strong>
-            </td>
-            <td>
-              {appointment.patient.full_name}
-              <br />
-              <span className="muted">
-                {patientIdentifier(appointment.patient) ?? 'No NIC on record'}
-              </span>
-            </td>
-            <td>{appointment.reason ?? <span className="muted">Not given</span>}</td>
-            <td>
-              {/* A raw staff id tells nobody anything. Which of the two paths it came down does. */}
-              {appointment.booked_by_staff_id ? 'At the desk' : 'In the app'}
-            </td>
-            <td>
-              <span
-                className={appointment.status === 'scheduled' ? 'badge' : 'badge retired'}
-              >
-                {appointmentStatusLabels[appointment.status]}
-              </span>
-            </td>
-            <td>
-              {/* Only a scheduled booking can be checked in. Every other status is finished
-                  with, and offering a button that always 409s is worse than no button. */}
-              {appointment.status === 'scheduled' && (
-                <button type="button" onClick={() => onCheckIn(appointment)}>
-                  Check in
-                </button>
-              )}
-            </td>
-          </tr>
+          <Fragment key={appointment.id}>
+            <tr className={openId === appointment.id ? 'open' : undefined}>
+              <td>
+                <strong>
+                  {showDate
+                    ? localDateTime(appointment.scheduled_at)
+                    : localTime(appointment.scheduled_at)}
+                </strong>
+              </td>
+              <td>
+                {appointment.patient.full_name}
+                <br />
+                <span className="muted">
+                  {patientIdentifier(appointment.patient) ?? 'No NIC on record'}
+                </span>
+              </td>
+              <td>{appointment.reason ?? <span className="muted">Not given</span>}</td>
+              <td>
+                {/* A raw staff id tells nobody anything. Which of the two paths it came down does. */}
+                {appointment.booked_by_staff_id ? 'At the desk' : 'In the app'}
+              </td>
+              <td>
+                <span
+                  className={appointment.status === 'scheduled' ? 'badge' : 'badge retired'}
+                >
+                  {appointmentStatusLabels[appointment.status]}
+                </span>
+              </td>
+              <td>
+                {/* Only a scheduled booking can be checked in. Every other status is finished
+                    with, and offering a button that always 409s is worse than no button. */}
+                {appointment.status === 'scheduled' && (
+                  <button type="button" onClick={() => onCheckIn(appointment)}>
+                    {openId === appointment.id ? 'Cancel' : 'Check in'}
+                  </button>
+                )}
+              </td>
+            </tr>
+
+            {/* The form opens under the booking it is about. As a card elsewhere on the page it
+                was a card you had to go and find, with nothing on screen tying it to the row you
+                clicked — and on a busy morning that is how the wrong person gets checked in. */}
+            {openId === appointment.id && (
+              <tr className="drawer">
+                <td colSpan={6}>{renderDrawer(appointment)}</td>
+              </tr>
+            )}
+          </Fragment>
         ))}
       </tbody>
     </table>
@@ -339,10 +356,12 @@ function BookVisitCard() {
 
       // Every listAppointments query, not just the filter on screen: the new booking may well
       // be for a day the user is not looking at, and a stale "today" is the one they will
-      // come back to.
+      // come back to. The patients board too — a new booking is a new "not arrived" row on it.
       queryClient.invalidateQueries({
-        predicate: (query) =>
-          (query.queryKey[0] as { _id?: string } | undefined)?._id === 'listAppointments',
+        predicate: (query) => {
+          const id = (query.queryKey[0] as { _id?: string } | undefined)?._id;
+          return id === 'listAppointments' || id === 'listPatientWorklist';
+        },
       });
 
       setPatient(null);
@@ -508,7 +527,7 @@ function BookVisitCard() {
 // Check in
 // ---------------------------------------------------------------------------
 
-function CheckInCard({
+function CheckInPanel({
   appointment,
   staffId,
   canSetHighCare,
@@ -537,12 +556,17 @@ function CheckInCard({
     onSuccess: (admission) => {
       toast.success(`${appointment.patient.full_name} checked in.`);
 
-      // Two lists change: the booking is no longer expected, and there is a new admission on
-      // the worklist. A mutation invalidates everything it changed, not just what is on screen.
+      // Three lists change: the booking is no longer expected, there is a new admission on
+      // the worklist, and the patients board turns one "Not arrived" row into a visit. A
+      // mutation invalidates everything it changed, not just what is on screen.
       queryClient.invalidateQueries({
         predicate: (query) => {
           const id = (query.queryKey[0] as { _id?: string } | undefined)?._id;
-          return id === 'listAppointments' || id === 'listAdmissions';
+          return (
+            id === 'listAppointments' ||
+            id === 'listAdmissions' ||
+            id === 'listPatientWorklist'
+          );
         },
       });
 
@@ -566,8 +590,8 @@ function CheckInCard({
   }
 
   return (
-    <div className="card">
-      <h2>Check in {appointment.patient.full_name}</h2>
+    <div className="drawer-body">
+      <h3>Check in {appointment.patient.full_name}</h3>
       <p className="muted" style={{ marginBottom: '0.9rem' }}>
         Booked for {localDateTime(appointment.scheduled_at)}
         {appointment.reason ? ` — ${appointment.reason}` : ''}. From here they are an ordinary

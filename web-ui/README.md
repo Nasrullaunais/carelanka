@@ -10,7 +10,7 @@ never hand-written.**
 You need three things up, in this order.
 
 ```
-1. PostgreSQL, with the migrations applied and docs/seed/001_identity.sql run
+1. PostgreSQL, with the migrations applied and both docs/seed/*.sql run
        dotnet ef database update --project api --startup-project api
 
 2. The API, on port 5231

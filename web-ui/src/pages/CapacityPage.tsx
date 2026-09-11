@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   getWardCapacityOptions,
@@ -124,39 +124,52 @@ export function CapacityPage() {
                 </thead>
                 <tbody>
                   {wards.map((ward) => (
-                    <tr key={ward.ward_id}>
-                      <td>
-                        <strong>{ward.name}</strong>
-                      </td>
-                      <td>{wardTypeLabels[ward.ward_type]}</td>
-                      <td>
-                        {/* On the table because a male-only ward with two free beds is no use
-                            to a female patient, and the reader has to be able to see that. */}
-                        {genderPolicyLabels[ward.gender_policy]}
-                      </td>
-                      <td>{ward.total_beds}</td>
-                      <td>
-                        <span className={ward.free_beds === 0 ? 'badge retired' : 'badge'}>
-                          {ward.free_beds === 0 ? 'Full' : ward.free_beds}
-                        </span>
-                      </td>
-                      <td>
-                        <Meter total={ward.total_beds} free={ward.free_beds} />
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="secondary"
-                          onClick={() =>
-                            setSelected((current) =>
-                              current?.ward_id === ward.ward_id ? null : ward,
-                            )
-                          }
-                        >
-                          {selected?.ward_id === ward.ward_id ? 'Hide' : 'Details'}
-                        </button>
-                      </td>
-                    </tr>
+                    <Fragment key={ward.ward_id}>
+                      <tr className={selected?.ward_id === ward.ward_id ? 'open' : undefined}>
+                        <td>
+                          <strong>{ward.name}</strong>
+                        </td>
+                        <td>{wardTypeLabels[ward.ward_type]}</td>
+                        <td>
+                          {/* On the table because a male-only ward with two free beds is no use
+                              to a female patient, and the reader has to be able to see that. */}
+                          {genderPolicyLabels[ward.gender_policy]}
+                        </td>
+                        <td>{ward.total_beds}</td>
+                        <td>
+                          <span className={ward.free_beds === 0 ? 'badge retired' : 'badge'}>
+                            {ward.free_beds === 0 ? 'Full' : ward.free_beds}
+                          </span>
+                        </td>
+                        <td>
+                          <Meter total={ward.total_beds} free={ward.free_beds} />
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="secondary"
+                            onClick={() =>
+                              setSelected((current) =>
+                                current?.ward_id === ward.ward_id ? null : ward,
+                              )
+                            }
+                          >
+                            {selected?.ward_id === ward.ward_id ? 'Hide' : 'Details'}
+                          </button>
+                        </td>
+                      </tr>
+
+                      {/* Under the ward it belongs to, not at the foot of the page. With ten
+                          wards on screen, a card down there is a card you have to scroll to and
+                          then scroll back from, having lost track of which row you opened. */}
+                      {selected?.ward_id === ward.ward_id && (
+                        <tr className="drawer">
+                          <td colSpan={7}>
+                            <WardOccupancyPanel ward={ward} onClose={() => setSelected(null)} />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
@@ -167,8 +180,6 @@ export function CapacityPage() {
               Equipment, and a ward exists before anyone puts furniture in it.
             </p>
           </div>
-
-          {selected && <WardOccupancyCard ward={selected} onClose={() => setSelected(null)} />}
         </>
       )}
     </>
@@ -179,12 +190,12 @@ export function CapacityPage() {
 // One ward, broken down
 // ---------------------------------------------------------------------------
 
-function WardOccupancyCard({ ward, onClose }: { ward: WardCapacity; onClose: () => void }) {
+function WardOccupancyPanel({ ward, onClose }: { ward: WardCapacity; onClose: () => void }) {
   const occupancy = useQuery(getWardOccupancyOptions({ path: { id: ward.ward_id } }));
 
   return (
-    <div className="card">
-      <h2>{ward.name}</h2>
+    <div className="drawer-body">
+      <h3>{ward.name} — bed by bed</h3>
 
       {occupancy.isLoading && <p className="empty">Loading…</p>}
 
@@ -220,7 +231,9 @@ function WardOccupancyCard({ ward, onClose }: { ward: WardCapacity; onClose: () 
             releasing it.
           </p>
 
-          <h2 style={{ marginTop: '1.25rem' }}>Who is in the beds</h2>
+          <h4 style={{ marginTop: '1.25rem', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+            Who is in the beds
+          </h4>
           <p className="muted" style={{ marginBottom: '0.9rem' }}>
             Fifteen ordinary inpatients and two high-dependency patients are both
             &ldquo;seventeen patients&rdquo;, and they need very different numbers of staff on

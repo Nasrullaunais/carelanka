@@ -510,3 +510,47 @@ textarea {
   color: var(--ink-soft);
   line-height: 1.45;
 }
+
+/* ---------- expanded rows ---------- */
+
+/* Opening a row's detail used to append a card at the foot of the page. On a list of twenty
+   people that means scrolling past everyone else to read about one of them, and then
+   scrolling back to open the next — and on the way down you lose sight of which row you
+   clicked. So the detail is a row of the table instead, immediately under the person it is
+   about. Same for choosing a bed: the beds appear under the patient waiting for one. */
+tr.open > td {
+  background: var(--accent-soft);
+  border-bottom-color: var(--accent);
+}
+
+tr.drawer > td {
+  padding: 0;
+  background: var(--canvas);
+  border-bottom: 2px solid var(--accent);
+}
+
+.drawer-body {
+  padding: 1.1rem 1.25rem 1.25rem;
+}
+
+/* A table inside the drawer is a table inside a `td`, so it inherits nothing and its rows
+   would otherwise run straight into the outer table's. Give it the surface back. */
+.drawer-body table {
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.drawer-body table td,
+.drawer-body table th {
+  padding: 0.45rem 0.6rem;
+}
+
+/* Detail tables put the field name in a row-scoped `th`. Left as-is it renders uppercase and
+   tiny, which is the column-heading style and wrong for a label sitting beside its value. */
+.drawer-body th[scope='row'] {
+  width: 12rem;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.85rem;
+  vertical-align: top;
+}

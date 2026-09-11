@@ -23,6 +23,11 @@ public sealed class PatientOpenApiContractTests
     [InlineData("AdmissionUrgency")]
     [InlineData("AdmissionStatus")]
     [InlineData("AppointmentStatus")]
+    [InlineData("AssignmentStatus")]
+    [InlineData("AssignedBy")]
+    [InlineData("ReleaseReason")]
+    [InlineData("WorklistKind")]
+    [InlineData("WorklistStatus")]
     public async Task Published_enum_values_match_the_contract_in_order(string enumName)
     {
         var generated = await GenerateAsync();
@@ -55,6 +60,11 @@ public sealed class PatientOpenApiContractTests
     [InlineData("Appointment")]
     [InlineData("CreateAppointmentRequest")]
     [InlineData("CheckInRequest")]
+    [InlineData("AdmissionBed")]
+    [InlineData("BedAssignment")]
+    [InlineData("BedOccupancyStatus")]
+    [InlineData("AssignBedRequest")]
+    [InlineData("WorklistRow")]
     public async Task Published_schema_required_members_match_the_contract(string schemaName)
     {
         var generated = await GenerateAsync();
@@ -95,6 +105,46 @@ public sealed class PatientOpenApiContractTests
     }
 
     [Fact]
+    public async Task The_ward_board_publishes_the_operationId_the_web_client_generates_against()
+    {
+        var generated = await GenerateAsync();
+        var paths = generated.RootElement.GetProperty("paths");
+
+        Assert.Equal(
+            "listPatientWorklist",
+            paths.GetProperty("/patient-worklist").GetProperty("get")
+                .GetProperty("operationId").GetString());
+
+        // No PATCH, no POST, and not by omission. WorklistStatus is derived from two stored
+        // statuses, so a write here would be a fourth place a status could change.
+        Assert.Equal(new[] { "get" }, paths.GetProperty("/patient-worklist")
+            .EnumerateObject().Select(verb => verb.Name).ToArray());
+
+        Assert.Equal(
+            "completeVisit",
+            paths.GetProperty("/admissions/{id}/complete").GetProperty("post")
+                .GetProperty("operationId").GetString());
+    }
+
+    [Fact]
+    public async Task The_ward_board_and_complete_declare_their_failures_and_not_only_their_success()
+    {
+        var generated = await GenerateAsync();
+        var paths = generated.RootElement.GetProperty("paths");
+
+        // An endpoint declaring only its 200 generates a client that cannot type its failures.
+        Assert.Equal(
+            new[] { "200", "400", "401", "403" },
+            Responses(paths.GetProperty("/patient-worklist").GetProperty("get")));
+
+        // 409 twice over on complete: the illegal transition, and cl_pat_020 for a visit that
+        // has a bed and must be discharged instead. One status, two reasons, both documented.
+        Assert.Equal(
+            new[] { "200", "401", "403", "404", "409" },
+            Responses(paths.GetProperty("/admissions/{id}/complete").GetProperty("post")));
+    }
+
+    [Fact]
     public async Task Capacity_routes_publish_the_operationIds_the_other_components_generate_against()
     {
         var generated = await GenerateAsync();
@@ -124,6 +174,61 @@ public sealed class PatientOpenApiContractTests
         Assert.Equal(
             new[] { "200", "401", "404" },
             Responses(paths.GetProperty("/wards/{id}/occupancy").GetProperty("get")));
+    }
+
+    [Fact]
+    public async Task Bed_routes_publish_the_operationIds_both_frontends_generate_against()
+    {
+        var generated = await GenerateAsync();
+        var paths = generated.RootElement.GetProperty("paths");
+
+        // getBedOccupancy is the one Equipment Management generates against, and it is what
+        // retired the last of their stubs. The other two are ours.
+        Assert.Equal(
+            "listBedAvailability",
+            paths.GetProperty("/bed-availability").GetProperty("get").GetProperty("operationId").GetString());
+        Assert.Equal(
+            "getBedOccupancy",
+            paths.GetProperty("/beds/{id}/occupancy").GetProperty("get").GetProperty("operationId").GetString());
+        Assert.Equal(
+            "assignBedManually",
+            paths.GetProperty("/admissions/{id}/assign-bed").GetProperty("post").GetProperty("operationId").GetString());
+    }
+
+    [Fact]
+    public async Task Every_bed_operation_declares_its_failures_and_not_only_its_success()
+    {
+        var generated = await GenerateAsync();
+        var paths = generated.RootElement.GetProperty("paths");
+
+        // No 403 on either read: both are AnyStaff, so an authenticated caller is never refused
+        // and publishing a 403 would have every client branch on a status that cannot arrive.
+        // The 400 on the candidate list is real - page and pageSize are range-checked.
+        Assert.Equal(
+            new[] { "200", "400", "401" },
+            Responses(paths.GetProperty("/bed-availability").GetProperty("get")));
+        Assert.Equal(
+            new[] { "200", "401", "404" },
+            Responses(paths.GetProperty("/beds/{id}/occupancy").GetProperty("get")));
+
+        // Assigning has every one of them, and the 403 is the interesting one: which roles may
+        // place a patient depends on the bed in the body, so it is a refusal at run time.
+        Assert.Equal(
+            new[] { "200", "400", "401", "403", "404", "409" },
+            Responses(paths.GetProperty("/admissions/{id}/assign-bed").GetProperty("post")));
+    }
+
+    // The candidate list is not /api/beds on purpose - that route is Equipment Management's,
+    // and one app cannot have two pages at one address. This pins the split, because the
+    // collision would only show up as a startup crash on somebody else's branch.
+    [Fact]
+    public async Task The_candidate_list_does_not_squat_on_Equipment_s_bed_register()
+    {
+        var generated = await GenerateAsync();
+        var beds = generated.RootElement.GetProperty("paths").GetProperty("/beds");
+
+        Assert.Equal("listBeds", beds.GetProperty("get").GetProperty("operationId").GetString());
+        Assert.Equal("createBed", beds.GetProperty("post").GetProperty("operationId").GetString());
     }
 
     // patients_by_category is an open map on the wire, so nothing in the schema pins its keys.

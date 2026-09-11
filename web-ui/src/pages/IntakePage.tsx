@@ -473,7 +473,10 @@ function AdmitStep({
 
       queryClient.invalidateQueries({
         predicate: (query) =>
-          (query.queryKey[0] as { _id?: string } | undefined)?._id === 'listAdmissions',
+          // The patients board as well: a walk-in admitted here is a new row on it.
+          ['listAdmissions', 'listPatientWorklist'].includes(
+            (query.queryKey[0] as { _id?: string } | undefined)?._id ?? '',
+          ),
       });
 
       onAdmitted(created);

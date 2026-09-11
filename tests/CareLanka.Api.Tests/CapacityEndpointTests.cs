@@ -426,8 +426,7 @@ public sealed class CapacityEndpointTests
             {
                 ward_id = ward.Id,
                 bed_number = $"B{number}",
-                has_isolation = false,
-                nurse_station_distance = number
+                has_isolation = false
             });
 
             Assert.Equal(HttpStatusCode.Created, created.StatusCode);
@@ -439,15 +438,12 @@ public sealed class CapacityEndpointTests
         return ids;
     }
 
-    /// <summary>
-    /// Withdraws a bed by writing the column, because PATCH /api/beds/{id} cannot do it yet.
-    /// </summary>
+    /// <summary>Withdraws a bed by writing the column rather than through PATCH /api/beds/{id}.</summary>
     /// <remarks>
-    /// Equipment asks Patient Management whether a bed is occupied before withdrawing it, and
-    /// that answer is still <c>StubBedOccupancyPort</c> — STUBS.md row 3 — which always says
-    /// occupied and fails safe. So every withdrawal through the API is refused with
-    /// <c>cl_equ_003</c> until GET /beds/{id}/occupancy is real. The column is what the real
-    /// PATCH would set, so these tests keep passing when it lands.
+    /// The endpoint works now — step 6 made GET /beds/{id}/occupancy real and retired the stub
+    /// that used to refuse every withdrawal. It is still written directly here, so a test about
+    /// capacity counting cannot fail for a reason belonging to Equipment Management's rules.
+    /// <c>BedAssignmentEndpointTests</c> exercises the endpoint itself.
     /// </remarks>
     private async Task SetConditionAsync(Guid bedId, BedCondition condition)
     {
@@ -480,10 +476,11 @@ public sealed class CapacityEndpointTests
     /// straight to the database.
     /// </summary>
     /// <remarks>
-    /// Nothing writes a BedAssignment yet — that is step 6 — and waiting for it would leave
-    /// both of these endpoints untested until then, while two people are blocked on them
-    /// today. The rows are exactly what step 6 will write, so these tests should keep passing
-    /// when it lands and this helper can be deleted.
+    /// Written directly rather than through POST /assign-bed, which step 6 has now built. These
+    /// tests set up states that endpoint deliberately refuses — a lapsed hold, a bed in a
+    /// male-only ward, an ICU patient a nurse may not place — so going through it would mean
+    /// every capacity test also depended on every placement rule. The rows are the same ones it
+    /// writes.
     /// </remarks>
     private async Task AssignAsync(
         Guid bedId,

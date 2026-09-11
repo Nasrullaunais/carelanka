@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using CareLanka.Api.Common.Auth;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Common;
@@ -17,8 +17,13 @@ namespace CareLanka.Api.Controllers.Patient;
 public class AdmissionsController : ControllerBase
 {
     private readonly IAdmissionService _admissions;
+    private readonly IBedAssignmentService _beds;
 
-    public AdmissionsController(IAdmissionService admissions) => _admissions = admissions;
+    public AdmissionsController(IAdmissionService admissions, IBedAssignmentService beds)
+    {
+        _admissions = admissions;
+        _beds = beds;
+    }
 
     /// <summary>
     /// List admissions. With no `status` the answer is the live worklist, not the archive.
@@ -118,6 +123,29 @@ public class AdmissionsController : ControllerBase
         => Ok(await _admissions.MarkArrivedAsync(id, ct));
 
     /// <summary>
+    /// Finish a visit that never needed a bed - the scan or test is done and the patient has
+    /// gone home. Moves `admitted` to `discharged`.
+    /// </summary>
+    /// <remarks>
+    /// **Only for a visit that needs no bed** - an `outpatient`. A visit at any other care
+    /// level is refused with 409 and `cl_pat_020`: that is a discharge, and a discharge has a
+    /// checklist, a summary note, an approver and a bed to give back. This endpoint does none
+    /// of those, so it says so rather than half-doing it.
+    ///
+    /// The ward nurse or doctor who did the test is the one who knows it is finished, which is
+    /// why this is theirs and not the duty manager's.
+    /// </remarks>
+    [Authorize(Policy = Policies.AdmissionEditor)]
+    [HttpPost("{id:guid}/complete", Name = "completeVisit")]
+    [ProducesResponseType(typeof(AdmissionResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<AdmissionResponse>> CompleteVisit(Guid id, CancellationToken ct)
+        => Ok(await _admissions.CompleteAsync(id, ct));
+
+    /// <summary>
     /// Cancel an admission, with a reason, and release any bed it was holding.
     /// </summary>
     /// <remarks>
@@ -137,4 +165,34 @@ public class AdmissionsController : ControllerBase
     public async Task<ActionResult<AdmissionResponse>> CancelAdmission(
         Guid id, [FromBody] CancelAdmissionRequest request, CancellationToken ct)
         => Ok(await _admissions.CancelAsync(id, request, ct));
+
+    /// <summary>
+    /// Assign a bed by hand, bypassing the agent. Places a 30-minute hold and moves the
+    /// admission to `bed_reserved`.
+    /// </summary>
+    /// <remarks>
+    /// **The manual path must always work.** If the only way to admit a patient were through
+    /// the AI, the hospital would stop the moment the AI stopped - and it is what makes a human
+    /// genuinely in control rather than only able to say yes or no.
+    ///
+    /// The same hard rules and the same row-locked re-check as the agent's own path. A human
+    /// may overrule the agent's ranking; nobody may put an ICU patient in a general bed without
+    /// it being recorded as a downgrade.
+    ///
+    /// A ward nurse may assign a bed that matches the patient's care level. ICU, high-dependency
+    /// and any downgrade are the duty manager's, and that depends on which bed was chosen rather
+    /// than on the route - so a nurse choosing one is a 403 from the service, not a 401 from a
+    /// policy.
+    /// </remarks>
+    [Authorize(Policy = Policies.AdmissionEditor)]
+    [HttpPost("{id:guid}/assign-bed", Name = "assignBedManually")]
+    [ProducesResponseType(typeof(BedAssignment), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<BedAssignment>> AssignBedManually(
+        Guid id, [FromBody] AssignBedRequest request, CancellationToken ct)
+        => Ok(await _beds.AssignManuallyAsync(id, request, ct));
 }

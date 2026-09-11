@@ -32,6 +32,19 @@ public class AdmissionSummary
     [Required]
     public bool DetailsComplete { get; set; }
 
+    /// <summary>
+    /// Whether this visit needs a bed at all. False for an <c>outpatient</c> — a scan or a
+    /// blood test is seen and sent home.
+    /// </summary>
+    /// <remarks>
+    /// Derived from <c>admission_category</c> by <c>BedPlacementRules.RequiresBed</c> and
+    /// published so a client does not have to re-derive it. A screen that works it out for
+    /// itself is a second copy of the rule, and the two drift the first time the categories
+    /// change.
+    /// </remarks>
+    [Required]
+    public bool RequiresBed { get; set; }
+
     /// <summary>From the live bed assignment, if there is one. Null before a bed is held and after discharge.</summary>
     public string? WardName { get; set; }
 

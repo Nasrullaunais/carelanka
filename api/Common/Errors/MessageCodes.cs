@@ -46,7 +46,17 @@ public static class MessageCodes
             [MessageCode.CategoryStaffNotFound] = "cl_pat_008",
             [MessageCode.PatientHasOpenAppointment] = "cl_pat_009",
             [MessageCode.AppointmentInThePast] = "cl_pat_010",
-            [MessageCode.CareLevelNeedsDutyManager] = "cl_pat_011"
+            [MessageCode.CareLevelNeedsDutyManager] = "cl_pat_011",
+            [MessageCode.BedNeedsDutyManager] = "cl_pat_012",
+            [MessageCode.BedDowngradeNeedsDutyManager] = "cl_pat_013",
+            [MessageCode.BedAlreadyClaimed] = "cl_pat_014",
+            [MessageCode.BedOutOfService] = "cl_pat_015",
+            [MessageCode.BedWardTooAcute] = "cl_pat_016",
+            [MessageCode.BedWardGenderPolicy] = "cl_pat_017",
+            [MessageCode.BedNeedsIsolation] = "cl_pat_018",
+            [MessageCode.BedWardNotInService] = "cl_pat_019",
+            [MessageCode.VisitNeedsDischargeNotComplete] = "cl_pat_020",
+            [MessageCode.VisitNeedsNoBed] = "cl_pat_021"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

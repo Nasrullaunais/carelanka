@@ -57,6 +57,12 @@ export const destinations: Destination[] = [
     description: 'Every machine in the hospital, where it is, and whether it works.',
     canAccess: canReadEquipment,
   },
+  {
+    to: '/pharmacy',
+    label: 'Pharmacy',
+    description: 'Search medicines and supplies, see what is on the shelf, record what moves.',
+    canAccess: canReadEquipment,
+  },
 ];
 
 /** Only what this role may actually open. A tile they cannot use is worse than no tile. */

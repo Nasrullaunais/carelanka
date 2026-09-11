@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AssignEquipmentItemData, AssignEquipmentItemErrors, AssignEquipmentItemResponses, CancelAdmissionData, CancelAdmissionErrors, CancelAdmissionResponses, CheckInAppointmentData, CheckInAppointmentErrors, CheckInAppointmentResponses, CompleteAdmissionDetailsData, CompleteAdmissionDetailsErrors, CompleteAdmissionDetailsResponses, CreateAdmissionData, CreateAdmissionErrors, CreateAdmissionResponses, CreateAppointmentData, CreateAppointmentErrors, CreateAppointmentResponses, CreateBedData, CreateBedErrors, CreateBedResponses, CreateEquipmentCategoryData, CreateEquipmentCategoryErrors, CreateEquipmentCategoryResponses, CreateEquipmentItemData, CreateEquipmentItemErrors, CreateEquipmentItemResponses, CreatePatientData, CreatePatientErrors, CreatePatientResponses, CreateWardData, CreateWardErrors, CreateWardResponses, GetAdmissionData, GetAdmissionErrors, GetAdmissionResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetEquipmentItemByTagData, GetEquipmentItemByTagErrors, GetEquipmentItemByTagResponses, GetEquipmentItemData, GetEquipmentItemErrors, GetEquipmentItemResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetPatientData, GetPatientErrors, GetPatientResponses, GetWardCapacityData, GetWardCapacityErrors, GetWardCapacityResponses, GetWardOccupancyData, GetWardOccupancyErrors, GetWardOccupancyResponses, LinkPatientAccountData, LinkPatientAccountErrors, LinkPatientAccountResponses, ListAdmissionsData, ListAdmissionsErrors, ListAdmissionsResponses, ListAppointmentsData, ListAppointmentsErrors, ListAppointmentsResponses, ListBedsData, ListBedsErrors, ListBedsResponses, ListEquipmentCategoriesData, ListEquipmentCategoriesErrors, ListEquipmentCategoriesResponses, ListEquipmentItemsData, ListEquipmentItemsErrors, ListEquipmentItemsResponses, ListPatientsData, ListPatientsErrors, ListPatientsResponses, ListWardsData, ListWardsErrors, ListWardsResponses, LoginData, LoginErrors, LoginPatientData, LoginPatientErrors, LoginPatientResponses, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, LookupPatientData, LookupPatientErrors, LookupPatientResponses, MarkArrivedData, MarkArrivedErrors, MarkArrivedResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RegisterPatientAccountData, RegisterPatientAccountErrors, RegisterPatientAccountResponses, ReleaseEquipmentItemData, ReleaseEquipmentItemErrors, ReleaseEquipmentItemResponses, ReportEquipmentFaultData, ReportEquipmentFaultErrors, ReportEquipmentFaultResponses, RetireBedData, RetireBedErrors, RetireBedResponses, UpdateBedData, UpdateBedErrors, UpdateBedResponses, UpdateEquipmentItemData, UpdateEquipmentItemErrors, UpdateEquipmentItemResponses, UpdatePatientData, UpdatePatientErrors, UpdatePatientResponses } from './types.gen';
+import type { AssignEquipmentItemData, AssignEquipmentItemErrors, AssignEquipmentItemResponses, CancelAdmissionData, CancelAdmissionErrors, CancelAdmissionResponses, CheckInAppointmentData, CheckInAppointmentErrors, CheckInAppointmentResponses, CompleteAdmissionDetailsData, CompleteAdmissionDetailsErrors, CompleteAdmissionDetailsResponses, CreateAdmissionData, CreateAdmissionErrors, CreateAdmissionResponses, CreateAppointmentData, CreateAppointmentErrors, CreateAppointmentResponses, CreateBedData, CreateBedErrors, CreateBedResponses, CreateEquipmentCategoryData, CreateEquipmentCategoryErrors, CreateEquipmentCategoryResponses, CreateEquipmentItemData, CreateEquipmentItemErrors, CreateEquipmentItemResponses, CreatePatientData, CreatePatientErrors, CreatePatientResponses, CreatePharmacyCategoryData, CreatePharmacyCategoryErrors, CreatePharmacyCategoryResponses, CreatePharmacyItemData, CreatePharmacyItemErrors, CreatePharmacyItemResponses, CreateWardData, CreateWardErrors, CreateWardResponses, GetAdmissionData, GetAdmissionErrors, GetAdmissionResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetEquipmentItemByTagData, GetEquipmentItemByTagErrors, GetEquipmentItemByTagResponses, GetEquipmentItemData, GetEquipmentItemErrors, GetEquipmentItemResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetPatientData, GetPatientErrors, GetPatientResponses, GetPharmacyItemData, GetPharmacyItemErrors, GetPharmacyItemResponses, GetWardCapacityData, GetWardCapacityErrors, GetWardCapacityResponses, GetWardOccupancyData, GetWardOccupancyErrors, GetWardOccupancyResponses, LinkPatientAccountData, LinkPatientAccountErrors, LinkPatientAccountResponses, ListAdmissionsData, ListAdmissionsErrors, ListAdmissionsResponses, ListAppointmentsData, ListAppointmentsErrors, ListAppointmentsResponses, ListBedsData, ListBedsErrors, ListBedsResponses, ListEquipmentCategoriesData, ListEquipmentCategoriesErrors, ListEquipmentCategoriesResponses, ListEquipmentItemsData, ListEquipmentItemsErrors, ListEquipmentItemsResponses, ListPatientsData, ListPatientsErrors, ListPatientsResponses, ListPharmacyCategoriesData, ListPharmacyCategoriesErrors, ListPharmacyCategoriesResponses, ListPharmacyItemsData, ListPharmacyItemsErrors, ListPharmacyItemsResponses, ListPharmacyTransactionsData, ListPharmacyTransactionsErrors, ListPharmacyTransactionsResponses, ListWardsData, ListWardsErrors, ListWardsResponses, LoginData, LoginErrors, LoginPatientData, LoginPatientErrors, LoginPatientResponses, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, LookupPatientData, LookupPatientErrors, LookupPatientResponses, MarkArrivedData, MarkArrivedErrors, MarkArrivedResponses, RecordPharmacyTransactionData, RecordPharmacyTransactionErrors, RecordPharmacyTransactionResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RegisterPatientAccountData, RegisterPatientAccountErrors, RegisterPatientAccountResponses, ReleaseEquipmentItemData, ReleaseEquipmentItemErrors, ReleaseEquipmentItemResponses, ReportEquipmentFaultData, ReportEquipmentFaultErrors, ReportEquipmentFaultResponses, RetireBedData, RetireBedErrors, RetireBedResponses, UpdateBedData, UpdateBedErrors, UpdateBedResponses, UpdateEquipmentItemData, UpdateEquipmentItemErrors, UpdateEquipmentItemResponses, UpdatePatientData, UpdatePatientErrors, UpdatePatientResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -472,6 +472,83 @@ export const lookupPatient = <ThrowOnError extends boolean = false>(options?: Op
 export const linkPatientAccount = <ThrowOnError extends boolean = false>(options: Options<LinkPatientAccountData, ThrowOnError>): RequestResult<LinkPatientAccountResponses, LinkPatientAccountErrors, ThrowOnError> => (options.client ?? client).post<LinkPatientAccountResponses, LinkPatientAccountErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/patients/{id}/link-account',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List the pharmacy categories. Any staff member may read them, because anyone searching for a medicine needs them.
+ */
+export const listPharmacyCategories = <ThrowOnError extends boolean = false>(options?: Options<ListPharmacyCategoriesData, ThrowOnError>): RequestResult<ListPharmacyCategoriesResponses, ListPharmacyCategoriesErrors, ThrowOnError> => (options?.client ?? client).get<ListPharmacyCategoriesResponses, ListPharmacyCategoriesErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/pharmacy-categories',
+    ...options
+});
+
+/**
+ * Add a category. Names are compared without case, so one category cannot exist twice under different capitalisation.
+ */
+export const createPharmacyCategory = <ThrowOnError extends boolean = false>(options?: Options<CreatePharmacyCategoryData, ThrowOnError>): RequestResult<CreatePharmacyCategoryResponses, CreatePharmacyCategoryErrors, ThrowOnError> => (options?.client ?? client).post<CreatePharmacyCategoryResponses, CreatePharmacyCategoryErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/pharmacy-categories',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
+
+/**
+ * Search the pharmacy and check availability. Open to any staff member: "do we have this medicine" is a question anyone in the hospital may need to ask.
+ */
+export const listPharmacyItems = <ThrowOnError extends boolean = false>(options?: Options<ListPharmacyItemsData, ThrowOnError>): RequestResult<ListPharmacyItemsResponses, ListPharmacyItemsErrors, ThrowOnError> => (options?.client ?? client).get<ListPharmacyItemsResponses, ListPharmacyItemsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/pharmacy-items',
+    ...options
+});
+
+/**
+ * Add a medicine or supply to the catalog. Opening stock is set here; everything after is a transaction.
+ */
+export const createPharmacyItem = <ThrowOnError extends boolean = false>(options?: Options<CreatePharmacyItemData, ThrowOnError>): RequestResult<CreatePharmacyItemResponses, CreatePharmacyItemErrors, ThrowOnError> => (options?.client ?? client).post<CreatePharmacyItemResponses, CreatePharmacyItemErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/pharmacy-items',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
+
+/**
+ * One catalog entry with its current quantity.
+ */
+export const getPharmacyItem = <ThrowOnError extends boolean = false>(options: Options<GetPharmacyItemData, ThrowOnError>): RequestResult<GetPharmacyItemResponses, GetPharmacyItemErrors, ThrowOnError> => (options.client ?? client).get<GetPharmacyItemResponses, GetPharmacyItemErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/pharmacy-items/{id}',
+    ...options
+});
+
+/**
+ * One item's movement history, newest first. This is the audit trail, so nothing here is ever edited or removed.
+ */
+export const listPharmacyTransactions = <ThrowOnError extends boolean = false>(options: Options<ListPharmacyTransactionsData, ThrowOnError>): RequestResult<ListPharmacyTransactionsResponses, ListPharmacyTransactionsErrors, ThrowOnError> => (options.client ?? client).get<ListPharmacyTransactionsResponses, ListPharmacyTransactionsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/pharmacy-items/{id}/transactions',
+    ...options
+});
+
+/**
+ * Record a stock movement. Quantity on hand is never edited directly: every change is a
+ * transaction, applied as one conditional update, so stock cannot go negative and two
+ * people dispensing the last box at once cannot both succeed.
+ */
+export const recordPharmacyTransaction = <ThrowOnError extends boolean = false>(options: Options<RecordPharmacyTransactionData, ThrowOnError>): RequestResult<RecordPharmacyTransactionResponses, RecordPharmacyTransactionErrors, ThrowOnError> => (options.client ?? client).post<RecordPharmacyTransactionResponses, RecordPharmacyTransactionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/pharmacy-items/{id}/transactions',
     ...options,
     headers: {
         'Content-Type': 'application/json',

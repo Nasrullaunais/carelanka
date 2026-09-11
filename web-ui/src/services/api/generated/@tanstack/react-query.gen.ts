@@ -3,8 +3,8 @@
 import { type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { assignEquipmentItem, cancelAdmission, checkInAppointment, completeAdmissionDetails, createAdmission, createAppointment, createBed, createEquipmentCategory, createEquipmentItem, createPatient, createWard, getAdmission, getCurrentUser, getEquipmentItem, getEquipmentItemByTag, getHealth, getPatient, getWardCapacity, getWardOccupancy, linkPatientAccount, listAdmissions, listAppointments, listBeds, listEquipmentCategories, listEquipmentItems, listPatients, listWards, login, loginPatient, logout, lookupPatient, markArrived, type Options, refreshToken, registerPatientAccount, releaseEquipmentItem, reportEquipmentFault, retireBed, updateBed, updateEquipmentItem, updatePatient } from '../sdk.gen';
-import type { AssignEquipmentItemData, AssignEquipmentItemError, AssignEquipmentItemResponse, CancelAdmissionData, CancelAdmissionError, CancelAdmissionResponse, CheckInAppointmentData, CheckInAppointmentError, CheckInAppointmentResponse, CompleteAdmissionDetailsData, CompleteAdmissionDetailsError, CompleteAdmissionDetailsResponse, CreateAdmissionData, CreateAdmissionError, CreateAdmissionResponse, CreateAppointmentData, CreateAppointmentError, CreateAppointmentResponse, CreateBedData, CreateBedError, CreateBedResponse, CreateEquipmentCategoryData, CreateEquipmentCategoryError, CreateEquipmentCategoryResponse, CreateEquipmentItemData, CreateEquipmentItemError, CreateEquipmentItemResponse, CreatePatientData, CreatePatientError, CreatePatientResponse, CreateWardData, CreateWardError, CreateWardResponse, GetAdmissionData, GetAdmissionError, GetAdmissionResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetEquipmentItemByTagData, GetEquipmentItemByTagError, GetEquipmentItemByTagResponse, GetEquipmentItemData, GetEquipmentItemError, GetEquipmentItemResponse, GetHealthData, GetHealthError, GetHealthResponse, GetPatientData, GetPatientError, GetPatientResponse, GetWardCapacityData, GetWardCapacityError, GetWardCapacityResponse, GetWardOccupancyData, GetWardOccupancyError, GetWardOccupancyResponse, LinkPatientAccountData, LinkPatientAccountError, LinkPatientAccountResponse, ListAdmissionsData, ListAdmissionsError, ListAdmissionsResponse, ListAppointmentsData, ListAppointmentsError, ListAppointmentsResponse, ListBedsData, ListBedsError, ListBedsResponse, ListEquipmentCategoriesData, ListEquipmentCategoriesError, ListEquipmentCategoriesResponse, ListEquipmentItemsData, ListEquipmentItemsError, ListEquipmentItemsResponse, ListPatientsData, ListPatientsError, ListPatientsResponse, ListWardsData, ListWardsError, ListWardsResponse, LoginData, LoginError, LoginPatientData, LoginPatientError, LoginPatientResponse, LoginResponse, LogoutData, LogoutError, LogoutResponse, LookupPatientData, LookupPatientError, LookupPatientResponse, MarkArrivedData, MarkArrivedError, MarkArrivedResponse, RefreshTokenData, RefreshTokenError, RefreshTokenResponse, RegisterPatientAccountData, RegisterPatientAccountError, RegisterPatientAccountResponse, ReleaseEquipmentItemData, ReleaseEquipmentItemError, ReleaseEquipmentItemResponse, ReportEquipmentFaultData, ReportEquipmentFaultError, ReportEquipmentFaultResponse, RetireBedData, RetireBedError, RetireBedResponse, UpdateBedData, UpdateBedError, UpdateBedResponse, UpdateEquipmentItemData, UpdateEquipmentItemError, UpdateEquipmentItemResponse, UpdatePatientData, UpdatePatientError, UpdatePatientResponse } from '../types.gen';
+import { assignEquipmentItem, cancelAdmission, checkInAppointment, completeAdmissionDetails, createAdmission, createAppointment, createBed, createEquipmentCategory, createEquipmentItem, createPatient, createPharmacyCategory, createPharmacyItem, createWard, getAdmission, getCurrentUser, getEquipmentItem, getEquipmentItemByTag, getHealth, getPatient, getPharmacyItem, getWardCapacity, getWardOccupancy, linkPatientAccount, listAdmissions, listAppointments, listBeds, listEquipmentCategories, listEquipmentItems, listPatients, listPharmacyCategories, listPharmacyItems, listPharmacyTransactions, listWards, login, loginPatient, logout, lookupPatient, markArrived, type Options, recordPharmacyTransaction, refreshToken, registerPatientAccount, releaseEquipmentItem, reportEquipmentFault, retireBed, updateBed, updateEquipmentItem, updatePatient } from '../sdk.gen';
+import type { AssignEquipmentItemData, AssignEquipmentItemError, AssignEquipmentItemResponse, CancelAdmissionData, CancelAdmissionError, CancelAdmissionResponse, CheckInAppointmentData, CheckInAppointmentError, CheckInAppointmentResponse, CompleteAdmissionDetailsData, CompleteAdmissionDetailsError, CompleteAdmissionDetailsResponse, CreateAdmissionData, CreateAdmissionError, CreateAdmissionResponse, CreateAppointmentData, CreateAppointmentError, CreateAppointmentResponse, CreateBedData, CreateBedError, CreateBedResponse, CreateEquipmentCategoryData, CreateEquipmentCategoryError, CreateEquipmentCategoryResponse, CreateEquipmentItemData, CreateEquipmentItemError, CreateEquipmentItemResponse, CreatePatientData, CreatePatientError, CreatePatientResponse, CreatePharmacyCategoryData, CreatePharmacyCategoryError, CreatePharmacyCategoryResponse, CreatePharmacyItemData, CreatePharmacyItemError, CreatePharmacyItemResponse, CreateWardData, CreateWardError, CreateWardResponse, GetAdmissionData, GetAdmissionError, GetAdmissionResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetEquipmentItemByTagData, GetEquipmentItemByTagError, GetEquipmentItemByTagResponse, GetEquipmentItemData, GetEquipmentItemError, GetEquipmentItemResponse, GetHealthData, GetHealthError, GetHealthResponse, GetPatientData, GetPatientError, GetPatientResponse, GetPharmacyItemData, GetPharmacyItemError, GetPharmacyItemResponse, GetWardCapacityData, GetWardCapacityError, GetWardCapacityResponse, GetWardOccupancyData, GetWardOccupancyError, GetWardOccupancyResponse, LinkPatientAccountData, LinkPatientAccountError, LinkPatientAccountResponse, ListAdmissionsData, ListAdmissionsError, ListAdmissionsResponse, ListAppointmentsData, ListAppointmentsError, ListAppointmentsResponse, ListBedsData, ListBedsError, ListBedsResponse, ListEquipmentCategoriesData, ListEquipmentCategoriesError, ListEquipmentCategoriesResponse, ListEquipmentItemsData, ListEquipmentItemsError, ListEquipmentItemsResponse, ListPatientsData, ListPatientsError, ListPatientsResponse, ListPharmacyCategoriesData, ListPharmacyCategoriesError, ListPharmacyCategoriesResponse, ListPharmacyItemsData, ListPharmacyItemsError, ListPharmacyItemsResponse, ListPharmacyTransactionsData, ListPharmacyTransactionsError, ListPharmacyTransactionsResponse, ListWardsData, ListWardsError, ListWardsResponse, LoginData, LoginError, LoginPatientData, LoginPatientError, LoginPatientResponse, LoginResponse, LogoutData, LogoutError, LogoutResponse, LookupPatientData, LookupPatientError, LookupPatientResponse, MarkArrivedData, MarkArrivedError, MarkArrivedResponse, RecordPharmacyTransactionData, RecordPharmacyTransactionError, RecordPharmacyTransactionResponse, RefreshTokenData, RefreshTokenError, RefreshTokenResponse, RegisterPatientAccountData, RegisterPatientAccountError, RegisterPatientAccountResponse, ReleaseEquipmentItemData, ReleaseEquipmentItemError, ReleaseEquipmentItemResponse, ReportEquipmentFaultData, ReportEquipmentFaultError, ReportEquipmentFaultResponse, RetireBedData, RetireBedError, RetireBedResponse, UpdateBedData, UpdateBedError, UpdateBedResponse, UpdateEquipmentItemData, UpdateEquipmentItemError, UpdateEquipmentItemResponse, UpdatePatientData, UpdatePatientError, UpdatePatientResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -909,6 +909,191 @@ export const linkPatientAccountMutation = (options?: Partial<Options<LinkPatient
     const mutationOptions: UseMutationOptions<LinkPatientAccountResponse, LinkPatientAccountError, Options<LinkPatientAccountData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await linkPatientAccount({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listPharmacyCategoriesQueryKey = (options?: Options<ListPharmacyCategoriesData>) => createQueryKey('listPharmacyCategories', options);
+
+/**
+ * List the pharmacy categories. Any staff member may read them, because anyone searching for a medicine needs them.
+ */
+export const listPharmacyCategoriesOptions = (options?: Options<ListPharmacyCategoriesData>) => queryOptions<ListPharmacyCategoriesResponse, ListPharmacyCategoriesError, ListPharmacyCategoriesResponse, ReturnType<typeof listPharmacyCategoriesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listPharmacyCategories({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listPharmacyCategoriesQueryKey(options)
+});
+
+/**
+ * Add a category. Names are compared without case, so one category cannot exist twice under different capitalisation.
+ */
+export const createPharmacyCategoryMutation = (options?: Partial<Options<CreatePharmacyCategoryData>>): UseMutationOptions<CreatePharmacyCategoryResponse, CreatePharmacyCategoryError, Options<CreatePharmacyCategoryData>> => {
+    const mutationOptions: UseMutationOptions<CreatePharmacyCategoryResponse, CreatePharmacyCategoryError, Options<CreatePharmacyCategoryData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createPharmacyCategory({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listPharmacyItemsQueryKey = (options?: Options<ListPharmacyItemsData>) => createQueryKey('listPharmacyItems', options);
+
+/**
+ * Search the pharmacy and check availability. Open to any staff member: "do we have this medicine" is a question anyone in the hospital may need to ask.
+ */
+export const listPharmacyItemsOptions = (options?: Options<ListPharmacyItemsData>) => queryOptions<ListPharmacyItemsResponse, ListPharmacyItemsError, ListPharmacyItemsResponse, ReturnType<typeof listPharmacyItemsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listPharmacyItems({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listPharmacyItemsQueryKey(options)
+});
+
+export const listPharmacyItemsInfiniteQueryKey = (options?: Options<ListPharmacyItemsData>): QueryKey<Options<ListPharmacyItemsData>> => createQueryKey('listPharmacyItems', options, true);
+
+/**
+ * Search the pharmacy and check availability. Open to any staff member: "do we have this medicine" is a question anyone in the hospital may need to ask.
+ */
+export const listPharmacyItemsInfiniteOptions = (options?: Options<ListPharmacyItemsData>) => {
+    const opts = infiniteQueryOptions<ListPharmacyItemsResponse, ListPharmacyItemsError, InfiniteData<ListPharmacyItemsResponse>, QueryKey<Options<ListPharmacyItemsData>>, number | Pick<QueryKey<Options<ListPharmacyItemsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListPharmacyItemsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listPharmacyItems({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listPharmacyItemsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+/**
+ * Add a medicine or supply to the catalog. Opening stock is set here; everything after is a transaction.
+ */
+export const createPharmacyItemMutation = (options?: Partial<Options<CreatePharmacyItemData>>): UseMutationOptions<CreatePharmacyItemResponse, CreatePharmacyItemError, Options<CreatePharmacyItemData>> => {
+    const mutationOptions: UseMutationOptions<CreatePharmacyItemResponse, CreatePharmacyItemError, Options<CreatePharmacyItemData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createPharmacyItem({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getPharmacyItemQueryKey = (options: Options<GetPharmacyItemData>) => createQueryKey('getPharmacyItem', options);
+
+/**
+ * One catalog entry with its current quantity.
+ */
+export const getPharmacyItemOptions = (options: Options<GetPharmacyItemData>) => queryOptions<GetPharmacyItemResponse, GetPharmacyItemError, GetPharmacyItemResponse, ReturnType<typeof getPharmacyItemQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getPharmacyItem({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getPharmacyItemQueryKey(options)
+});
+
+export const listPharmacyTransactionsQueryKey = (options: Options<ListPharmacyTransactionsData>) => createQueryKey('listPharmacyTransactions', options);
+
+/**
+ * One item's movement history, newest first. This is the audit trail, so nothing here is ever edited or removed.
+ */
+export const listPharmacyTransactionsOptions = (options: Options<ListPharmacyTransactionsData>) => queryOptions<ListPharmacyTransactionsResponse, ListPharmacyTransactionsError, ListPharmacyTransactionsResponse, ReturnType<typeof listPharmacyTransactionsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listPharmacyTransactions({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listPharmacyTransactionsQueryKey(options)
+});
+
+export const listPharmacyTransactionsInfiniteQueryKey = (options: Options<ListPharmacyTransactionsData>): QueryKey<Options<ListPharmacyTransactionsData>> => createQueryKey('listPharmacyTransactions', options, true);
+
+/**
+ * One item's movement history, newest first. This is the audit trail, so nothing here is ever edited or removed.
+ */
+export const listPharmacyTransactionsInfiniteOptions = (options: Options<ListPharmacyTransactionsData>) => {
+    const opts = infiniteQueryOptions<ListPharmacyTransactionsResponse, ListPharmacyTransactionsError, InfiniteData<ListPharmacyTransactionsResponse>, QueryKey<Options<ListPharmacyTransactionsData>>, number | Pick<QueryKey<Options<ListPharmacyTransactionsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListPharmacyTransactionsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listPharmacyTransactions({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listPharmacyTransactionsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+/**
+ * Record a stock movement. Quantity on hand is never edited directly: every change is a
+ * transaction, applied as one conditional update, so stock cannot go negative and two
+ * people dispensing the last box at once cannot both succeed.
+ */
+export const recordPharmacyTransactionMutation = (options?: Partial<Options<RecordPharmacyTransactionData>>): UseMutationOptions<RecordPharmacyTransactionResponse, RecordPharmacyTransactionError, Options<RecordPharmacyTransactionData>> => {
+    const mutationOptions: UseMutationOptions<RecordPharmacyTransactionResponse, RecordPharmacyTransactionError, Options<RecordPharmacyTransactionData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await recordPharmacyTransaction({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

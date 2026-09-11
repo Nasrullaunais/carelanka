@@ -130,7 +130,7 @@ export function PatientsPage() {
                 value={search}
                 maxLength={100}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Name or NIC"
+                placeholder="Patient ID, name or NIC"
               />
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end', marginBottom: '0.85rem' }}>
@@ -222,6 +222,11 @@ export function PatientsPage() {
                   >
                     <td>
                       <strong>{row.patient.full_name}</strong>
+                      <br />
+                      {/* The patient ID first, because it is the one thing about this person
+                          that every other part of the hospital asks for — Equipment's screen
+                          wants it before it will hand out a drip stand. */}
+                      <code>{row.patient.patient_code}</code>
                       <br />
                       <span className="muted">
                         {patientIdentifier(row.patient) ?? 'No NIC on record'}

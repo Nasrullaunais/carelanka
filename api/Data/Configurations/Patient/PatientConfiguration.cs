@@ -10,6 +10,11 @@ namespace CareLanka.Api.Data.Configurations.Patient;
 // resolves to the namespace, not the class, and the file will not compile without it.
 public class PatientConfiguration : IEntityTypeConfiguration<PatientEntity>
 {
+    public const string PatientCodeUniqueIndex = "ux_patients_patient_code";
+
+    /// <summary>How long a patient code is. Short enough to read out over a ward phone.</summary>
+    public const int PatientCodeLength = 8;
+
     public const string NicUniqueIndex = "ux_patients_nic";
     public const string TempReferenceUniqueIndex = "ux_patients_temp_reference";
     public const string UserAccountUniqueIndex = "ux_patients_user_account_id";
@@ -30,6 +35,7 @@ public class PatientConfiguration : IEntityTypeConfiguration<PatientEntity>
 
         builder.HasKey(p => p.Id);
 
+        builder.Property(p => p.PatientCode).HasMaxLength(PatientCodeLength).IsRequired();
         builder.Property(p => p.FullName).HasMaxLength(200).IsRequired();
         builder.Property(p => p.Nic).HasMaxLength(20);
         builder.Property(p => p.TempReference).HasMaxLength(30);
@@ -42,6 +48,15 @@ public class PatientConfiguration : IEntityTypeConfiguration<PatientEntity>
             .HasConversion(new SnakeCaseEnumConverter<Gender>())
             .HasMaxLength(20)
             .IsRequired();
+
+        // The one unique index here NOT scoped to is_active, and deliberately so. The repo rule
+        // scopes them because a human re-enters a code after a merge or a deactivation — a ward
+        // called ICU-1 has to be creatable again. Nobody ever types a patient code in to create
+        // one; the server picks it. Handing a new person a deactivated record's code would make
+        // one wristband resolve to two people, so the database refuses it outright.
+        builder.HasIndex(p => p.PatientCode)
+            .HasDatabaseName(PatientCodeUniqueIndex)
+            .IsUnique();
 
         // Unique only where the value exists — most patients have a NIC, unidentified
         // arrivals have none, and a plain UNIQUE would allow exactly one of the latter.

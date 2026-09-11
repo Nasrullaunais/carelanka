@@ -299,12 +299,9 @@ function RegisterStep({
   const register = useMutation({
     ...createPatientMutation(),
     onSuccess: (created) => {
-      const reference = patientIdentifier(created);
-      toast.success(
-        reference
-          ? `${created.full_name} registered as ${reference}.`
-          : `${created.full_name} registered.`,
-      );
+      // The patient ID, not the NIC, because it is the thing that has to be written down
+      // now: every other part of the hospital asks for it and nowhere else shows it yet.
+      toast.success(`${created.full_name} registered. Patient ID ${created.patient_code}.`);
 
       queryClient.invalidateQueries({
         predicate: (query) =>
@@ -580,6 +577,15 @@ function DoneStep({ admission, onAnother }: { admission: Admission; onAnother: (
         {admission.patient?.full_name ?? 'The patient'} is admitted and waiting for a bed.
       </p>
 
+      {/* Repeated here on purpose. This is the screen the desk is looking at while writing
+          the wristband, and the ID is what every other component will ask for afterwards. */}
+      {admission.patient && (
+        <p>
+          Patient ID <code>{admission.patient.patient_code}</code> — write this on the
+          wristband. Equipment and the labs identify the patient by it.
+        </p>
+      )}
+
       {admission.missing_fields.length > 0 && (
         <>
           <p style={{ marginTop: '0.9rem' }}>
@@ -610,6 +616,12 @@ function PatientCard({ patient }: { patient: Patient | PatientSummary }) {
   return (
     <table>
       <tbody>
+        <tr>
+          <th scope="row">Patient ID</th>
+          <td>
+            <code>{patient.patient_code}</code>
+          </td>
+        </tr>
         <tr>
           <th scope="row">Name</th>
           <td>

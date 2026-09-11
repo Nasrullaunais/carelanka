@@ -175,7 +175,12 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager),
         EnumWire.ToWire(StaffRole.HospitalAdministrator),
-        EnumWire.ToWire(StaffRole.Doctor)));
+        EnumWire.ToWire(StaffRole.Doctor),
+
+        // Added 2026-09-11 so Equipment Management can look a patient up and copy their
+        // patient_code onto their own screen. Reading only — PatientEditor and
+        // PatientRegistrar are untouched, and admissions stay closed to this role.
+        EnumWire.ToWire(StaffRole.EquipmentManager)));
 
     options.AddPolicy(Policies.PatientEditor, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.WardNurse),

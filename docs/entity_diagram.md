@@ -5,6 +5,16 @@ single hospital / multiple wards, unified staff identity, generic agent-workflow
 audit-log schemas). PKs are `Guid` (PostgreSQL `uuid`, `default: gen_random_uuid()`)
 throughout.
 
+**Revision 2.11** — patients got a short identifier of their own. One new column, in the
+`Patient_AddPatientCode` migration. Changes marked *(Rev 2.11)*.
+
+- **`Patient.PatientCode`** — eight characters, `P7K2X9QM`. The other three components have to
+  name a patient on their own screens, and the only identifier this component published was a
+  Guid: unreadable off a wristband and untypable into a form. The Guid is still the key
+  everything stores; the code is what a person carries between screens, and searching turns it
+  back into a Guid. Its unique index is the one on `patients` **not** scoped to `is_active`,
+  for the reason set out under the table.
+
 **Revision 2.10** — the seven-state admission status machine landed (step 4 of
 `docs/build/patient.md`: `POST /admissions/{id}/arrive`, `POST /admissions/{id}/cancel`, and
 the transition table both of them go through). One new column, in the
@@ -837,6 +847,7 @@ carried to Open Decisions as item 9 rather than dropped silently.
 
 #### Patient extends SoftDeletableEntity
 ```
++ PatientCode: string(8) (non-null, unique)              -- (Rev 2.11 - new)
 + FullName: string (non-null)                           -- (Rev 2.9: was FirstName + LastName)
 + DateOfBirth: DateOnly (nullable)
 + Nic: string (nullable, unique when present)           -- (Rev 2.9: was NationalId)
@@ -850,6 +861,7 @@ carried to Open Decisions as item 9 rather than dropped silently.
 ```
 **Table:** `patients` — **built.** `Patient_AddAdmission`, `api/Data/Entities/Patient/Patient.cs`.
 **Constraints:**
+- `UNIQUE (patient_code)` — **not** scoped to `is_active`; see below *(Rev 2.11)*
 - `UNIQUE (nic) WHERE nic IS NOT NULL AND is_active`
 - `UNIQUE (temp_reference) WHERE temp_reference IS NOT NULL AND is_active` *(Rev 2.1)*
 - `UNIQUE (user_account_id) WHERE user_account_id IS NOT NULL AND is_active` *(Rev 2.5)*
@@ -880,6 +892,36 @@ and matches the value `patient-spec.yaml` already returns.
 The CHECK is the real guarantee: **every patient row carries at least one identifier.**
 The reference is never cleared once a NIC arrives later, so the paper trail, wristband and
 verbal handover from the unidentified period still resolve to the right person.
+
+*(Rev 2.11 — new)* **`PatientCode` is the handle a human uses.** Eight characters, `P` then
+seven, e.g. `P7K2X9QM`. Server-generated once at registration and never changed afterwards.
+
+The problem it solves: Equipment's assign screen asks the nurse which patient a drip stand is
+going to, and the only answer this component had was a Guid. Nobody reads
+`3f9c1a2e-8b44-4f31-9a7d-2c05e6b7d813` off a wristband, and nobody types it correctly into
+another screen. So a patient now has two identifiers, doing two different jobs:
+
+| | `Id` | `PatientCode` |
+| :--- | :--- | :--- |
+| Shape | Guid | eight characters |
+| Used by | every stored reference, every FK, every URL | people, out loud and on paper |
+| Generated | `Guid.NewGuid()` | random, from a 31-character alphabet |
+
+**Nothing stores the code as a reference.** A foreign key is still `Id`. The code is what a
+human carries between screens; the screen turns it back into an `Id` by searching for it, and
+`GET /patients?search=` matches it alongside name, NIC, phone and temp reference.
+
+**The alphabet has no `0`/`O` and no `1`/`I`/`L`** — 31 characters, so seven of them are about
+27 billion codes. Random rather than sequential: a running number publishes how many patients
+the hospital has ever registered, and two desks registering at the same moment would have to
+agree on who gets the next one.
+
+**Its unique index is the one on this table not scoped `WHERE is_active`,** against the
+repo-wide rule. That rule exists because a *human* re-enters an identifier after a merge or a
+deactivation — deactivate ward `ICU-1` and somebody has to be able to create `ICU-1` again.
+Nobody ever types a patient code in to create one; the server picks it. Reusing a deactivated
+record's code would make one wristband resolve to two different people, so the database is told
+to refuse it outright rather than relying on the generator to remember.
 
 #### Appointment extends AuditedEntity *(Rev 2 — new)*
 ```
@@ -1771,6 +1813,7 @@ CREATE UNIQUE INDEX ux_equipment_items_serial  ON equipment_items (serial_number
 CREATE UNIQUE INDEX ux_pharmacy_categories_name ON pharmacy_categories (name)         WHERE is_active;   -- (Rev 3)
 CREATE UNIQUE INDEX ux_pharmacy_items_name     ON pharmacy_items (name)               WHERE is_active;   -- (Rev 3)
 CREATE UNIQUE INDEX ux_patients_nic            ON patients (nic)            WHERE nic IS NOT NULL AND is_active;
+CREATE UNIQUE INDEX ux_patients_patient_code   ON patients (patient_code);   -- (Rev 2.11) no is_active scope, and that is deliberate: nobody re-enters a generated code
 CREATE UNIQUE INDEX ux_patients_temp_reference  ON patients (temp_reference) WHERE temp_reference IS NOT NULL AND is_active;
 CREATE UNIQUE INDEX ux_patients_user_account_id ON patients (user_account_id) WHERE user_account_id IS NOT NULL AND is_active;
 CREATE UNIQUE INDEX ux_beds_ward_distance      ON beds (ward_id, nurse_station_distance) WHERE is_active;

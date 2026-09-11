@@ -27,7 +27,7 @@ public class AdmissionsController : ControllerBase
 
     /// <summary>
     /// List admissions. With no `status` the answer is the live worklist, not the archive.
-    /// `search` matches the patient's name or NIC.
+    /// `search` matches the patient's code, name or NIC.
     /// </summary>
     [Authorize(Policy = Policies.AdmissionReader)]
     [HttpGet(Name = "listAdmissions")]

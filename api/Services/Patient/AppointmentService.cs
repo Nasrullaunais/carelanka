@@ -252,6 +252,7 @@ public sealed class AppointmentService : IAppointmentService
             Patient = new PatientSummary
             {
                 Id = appointment.Patient.Id,
+                PatientCode = appointment.Patient.PatientCode,
                 FullName = appointment.Patient.FullName,
                 Nic = appointment.Patient.Nic,
                 TempReference = appointment.Patient.TempReference,

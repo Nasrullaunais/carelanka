@@ -136,4 +136,42 @@
     <value>A ward named {0} already exists.</value>
     <comment>Only active wards are checked. A retired ward's name can be reused.</comment>
   </data>
+  <data name="cl_pat_002" xml:space="preserve">
+    <value>A patient with NIC {0} is already registered, as record {1}.</value>
+    <comment>Look the existing patient up instead of creating a second record for the same person.</comment>
+  </data>
+  <data name="cl_pat_003" xml:space="preserve">
+    <value>This patient record already has a login linked to it.</value>
+    <comment>One account, one record. Unlink before relinking.</comment>
+  </data>
+  <data name="cl_pat_004" xml:space="preserve">
+    <value>That login is already linked to another patient record.</value>
+  </data>
+  <data name="cl_pat_005" xml:space="preserve">
+    <value>Could not allocate a temporary reference. Try again.</value>
+    <comment>Only reachable if several unidentified arrivals are registered in the same instant and every retry collided.</comment>
+  </data>
+  <data name="cl_pat_006" xml:space="preserve">
+    <value>{0} is already admitted. Continue their open visit rather than starting a second.</value>
+    <comment>One person, one stay at a time. Enforced by ux_admissions_open_patient, not only by the read that precedes it.</comment>
+  </data>
+  <data name="cl_pat_007" xml:space="preserve">
+    <value>An emergency admission needs the dispatch reference from Emergency Service.</value>
+    <comment>Without it there is no link back to their record of the same journey.</comment>
+  </data>
+  <data name="cl_pat_008" xml:space="preserve">
+    <value>No staff member {0} was found to record as having chosen the care level.</value>
+  </data>
+  <data name="cl_pat_009" xml:space="preserve">
+    <value>{0} already has a visit booked. Check them in or cancel it rather than booking a second.</value>
+    <comment>One open booking at a time, so the app cannot be used to hold several slots.</comment>
+  </data>
+  <data name="cl_pat_010" xml:space="preserve">
+    <value>A visit cannot be booked for a time that has already passed.</value>
+    <comment>Always a typo at the desk. Somebody already here is admitted, not booked.</comment>
+  </data>
+  <data name="cl_pat_011" xml:space="preserve">
+    <value>Only a duty manager may check a patient in at {0} level.</value>
+    <comment>Intensive and high-dependency care are the duty manager's to authorise, wherever the admission comes from.</comment>
+  </data>
 </root>

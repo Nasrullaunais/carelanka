@@ -34,6 +34,13 @@ h2 {
   margin: 0 0 0.75rem;
 }
 
+/* Without this h3 renders bigger than h2, because the browser default is 1.17em and h2 here
+   is deliberately small. A sub-heading that shouts louder than its heading reads as broken. */
+h3 {
+  font-size: 0.95rem;
+  margin: 0 0 0.5rem;
+}
+
 .muted {
   color: var(--ink-soft);
   font-size: 0.875rem;
@@ -54,6 +61,8 @@ h2 {
 .brand {
   font-weight: 700;
   letter-spacing: -0.01em;
+  color: var(--ink);
+  text-decoration: none;
 }
 
 .shell-nav {
@@ -120,6 +129,15 @@ select {
   font: inherit;
   background: var(--surface);
   color: var(--ink);
+}
+
+/* A checkbox is not a text field. The width:100% above stretches it the width of the card,
+   which centres the little box in the middle of nowhere and pushes its own words onto the
+   next line. Affects every checkbox in the app, so it is fixed here rather than per page. */
+input[type='checkbox'] {
+  width: auto;
+  margin: 0 0.35rem 0 0;
+  vertical-align: -0.1em;
 }
 
 input:focus,
@@ -255,4 +273,240 @@ tr:last-child td {
   background: var(--canvas);
   padding: 0.05rem 0.3rem;
   border-radius: 4px;
+}
+
+/* ---------- equipment ---------- */
+
+/* Status carries the whole lifecycle, so it gets colour rather than one flat badge.
+   Maintenance and retired are deliberately not red: a machine being serviced is normal
+   work, and only an open fault warning is an alarm. */
+.badge.status-available {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.badge.status-assigned {
+  background: #e6eefc;
+  color: #1e4d9b;
+}
+
+.badge.status-maintenance {
+  background: #fdf0dc;
+  color: #8a5a08;
+}
+
+.badge.status-retired {
+  background: #f0eeee;
+  color: var(--ink-soft);
+}
+
+.badge.severity-low,
+.badge.severity-medium {
+  background: #fdf0dc;
+  color: #8a5a08;
+}
+
+.badge.severity-high,
+.badge.severity-critical {
+  background: #fbe6e7;
+  color: var(--danger);
+}
+
+.actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+button.danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+button.danger:not(.secondary) {
+  background: var(--danger);
+  color: #fff;
+}
+
+.small {
+  font-size: 0.78rem;
+}
+
+/* A name that opens the detail view. A link would suggest navigation; this stays on
+   the page and toggles a card, so it is a button wearing a link's clothes. */
+button.linklike {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+tr.selected {
+  background: var(--accent-soft);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-top: 0.9rem;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.8rem;
+  margin: 0;
+}
+
+.detail-grid dt {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+
+/* ---------- stat tiles and the fullness bar ---------- */
+
+.stats {
+  display: flex;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.stat {
+  flex: 1 1 7rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.7rem 0.85rem;
+}
+
+.stat .value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.stat .caption {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+
+.detail-grid dd {
+  margin: 0.15rem 0 0;
+}
+
+.dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.dialog-head h2 {
+  margin: 0;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 36, 31, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 50;
+}
+
+.dialog {
+  max-width: 30rem;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  margin: 0;
+}
+
+textarea {
+  width: 100%;
+  font: inherit;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  resize: vertical;
+}
+
+.stat.free {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.stat.free .value {
+  color: var(--accent);
+}
+
+/* No beds free is the one number worth colouring, because it is the one that changes what
+   somebody does next. */
+.stat.none .value {
+  color: var(--danger);
+}
+
+.meter {
+  display: block;
+  height: 8px;
+  min-width: 4rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  overflow: hidden;
+}
+
+.meter > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.meter.full > span {
+  background: var(--danger);
+}
+
+/* ---------- dashboard tiles ---------- */
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.85rem;
+  margin-top: 1.25rem;
+}
+
+.tile {
+  display: block;
+  padding: 1.1rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.tile:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.tile strong {
+  display: block;
+  margin-bottom: 0.3rem;
+}
+
+.tile span {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  line-height: 1.45;
 }

@@ -195,4 +195,29 @@ public class AdmissionsController : ControllerBase
     public async Task<ActionResult<BedAssignment>> AssignBedManually(
         Guid id, [FromBody] AssignBedRequest request, CancellationToken ct)
         => Ok(await _beds.AssignManuallyAsync(id, request, ct));
+
+    /// <summary>Move a patient into a different bed because the first one was a mistake.</summary>
+    /// <remarks>
+    /// Beds get mis-clicked. Without this the only ways out are cancelling a live visit or
+    /// leaving a patient recorded in a bed somebody else is standing next to, and a ward board
+    /// that is known to be wrong stops being read at all.
+    ///
+    /// <b>A correction, not a transfer.</b> The bed it replaces is written off and charged for
+    /// nothing, which is right for a mis-click and wrong for a patient who genuinely spent a
+    /// night in one ward and moved to another.
+    ///
+    /// The same permission and the same hard rules as assigning a bed in the first place: a
+    /// ward nurse correcting a bed still cannot correct it into intensive care.
+    /// </remarks>
+    [Authorize(Policy = Policies.AdmissionEditor)]
+    [HttpPost("{id:guid}/correct-bed", Name = "correctBed")]
+    [ProducesResponseType(typeof(BedAssignment), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<BedAssignment>> CorrectBed(
+        Guid id, [FromBody] CorrectBedRequest request, CancellationToken ct)
+        => Ok(await _beds.CorrectBedAsync(id, request, ct));
 }

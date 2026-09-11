@@ -406,10 +406,22 @@ use.
 | Item | Ticked by | Mandatory | Notes |
 | :--- | :--- | :--- | :--- |
 | `clinical_clearance` | **Doctor** | yes | Human only, always. Role checked from the JWT — the `StaffMember` record itself belongs to Staff Management, so there is nothing for us to build here. |
-| `medication_issued` | Ward Nurse | yes | |
 | `billing_settled` | **nobody — see below** | yes | Written by settling the bill (§6.5). `PATCH /discharges/{id}/checklist` refuses this key from every role, with `cl_pat_025`. |
-| `follow_up_recorded` | Ward Nurse | no | |
-| `transport_arranged` | Ward Nurse | no | |
+
+**It was five boxes until 2026-09-11.** `medication_issued`, `follow_up_recorded` and
+`transport_arranged` were removed, leaving the two above. Each of the three recorded that
+something had been **given to** or **arranged for** the patient — which is exactly what a line
+on the bill records, with a price against it. Two records of one fact is how they come to
+disagree, and the checklist copy was the one nobody could price and nobody had to fill in.
+
+Take-home medicine and transport home are **charge templates** on the bill now (§6.5), so the
+ward hands the medicine over and the desk charges for it in one act instead of two. Follow-up
+was optional, blocked nothing, and had no field behind it — it recorded that somebody had
+thought about an appointment, not that one existed. `Patient_SimplifyDischargeChecklist`
+deletes the rows and narrows the CHECK constraint.
+
+What is left is the pair that genuinely gate a discharge and that nothing else states: a doctor
+said this person is well enough to leave, and the money is settled.
 
 **`billing_settled` moved off the Hospital Administrator, and then off everybody.**
 *(Decided 2026-09-11.)* Two changes in one:
@@ -431,7 +443,7 @@ who realises the medication was not issued after all has to be able to undo it �
 
 A background rule (ordinary C#, no LLM) produces the **candidate list**: admissions where every mandatory checklist item is ticked. It writes `flagged_by = user` on the resulting `Discharge` row and moves the admission to `ready_for_discharge`.
 
-**Why this is deliberately not an AI job.** Checking "are all five boxes ticked" is a `WHERE` clause. Putting a language model in front of it would add cost, latency and a failure mode, and buy nothing. Using AI where a query works is something an examiner will spot, and it dilutes the one workflow we actually want to show off.
+**Why this is deliberately not an AI job.** Checking "are both boxes ticked" is a `WHERE` clause. Putting a language model in front of it would add cost, latency and a failure mode, and buy nothing. Using AI where a query works is something an examiner will spot, and it dilutes the one workflow we actually want to show off.
 
 Our agent has exactly one job — bed assignment (§8). Keeping it to one job means one contract, one tool list and one thing to defend at the viva, done well.
 
@@ -621,6 +633,7 @@ Creating, retiring and taking beds out of service are **Equipment's endpoints, n
 | `POST` | `/api/bed-assignments/{id}/approve` | Nurse / Manager per §5.2 | **High-impact gate.** Re-checks, locks, commits. |
 | `POST` | `/api/bed-assignments/{id}/reject` | Nurse, Manager | Requires a reason. Releases the hold. |
 | `POST` | `/api/admissions/{id}/assign-bed` | Nurse, Manager | **Manual override path.** Bypasses the agent entirely. **Built** (step 6). Nurse for a matching bed; ICU, HDU and any downgrade are the manager's, refused with `cl_pat_012` / `cl_pat_013`. |
+| `POST` | `/api/admissions/{id}/correct-bed` | Nurse, Manager | **A bed chosen by mistake, swapped for the right one.** *(Added 2026-09-11.)* Same permission and the same hard rules as assigning one. The old assignment closes as `corrected` and **bills nothing**; status and `occupied_at` carry over, so the stay is still priced from when the patient actually got into a bed. Not a ward transfer — a real move must charge the nights actually spent, and that path does not exist yet. `cl_pat_028` when they hold no bed, `cl_pat_029` when it is the bed they are already in. |
 
 ### 7.5 Discharge
 

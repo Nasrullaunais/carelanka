@@ -42,6 +42,9 @@ public class BedAssignment
 
     public Guid? ApprovedByStaffId { get; set; }
 
+    /// <summary>Their name, for a screen. Sent beside the id, never instead of it.</summary>
+    public string? ApprovedByStaffName { get; set; }
+
     public DateTimeOffset? ApprovedAt { get; set; }
 
     public string? OverrideReason { get; set; }

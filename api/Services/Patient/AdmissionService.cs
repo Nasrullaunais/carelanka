@@ -125,6 +125,7 @@ public sealed class AdmissionService : IAdmissionService
             ?? throw new NotFoundException("Admission", id);
 
         var beds = await LabelBedsAsync(new[] { admission }, ct);
+        var names = await StaffIdsAsync(admission, ct);
 
         var detail = new AdmissionDetail
         {
@@ -132,7 +133,7 @@ public sealed class AdmissionService : IAdmissionService
             // part of the audit trail, not noise.
             BedAssignments = admission.BedAssignments
                 .OrderByDescending(b => b.CreatedAt)
-                .Select(assignment => ToBedAssignment(assignment, beds))
+                .Select(assignment => ToBedAssignment(assignment, beds, names))
                 .ToList(),
 
             // Both null on a visit nobody has opened a checklist or a bill for, which is the
@@ -142,7 +143,7 @@ public sealed class AdmissionService : IAdmissionService
             Bill = await _billing.FindForAdmissionAsync(id, ct)
         };
 
-        return Fill(detail, admission, beds);
+        return Fill(detail, admission, beds, names);
     }
 
     public async Task<AdmissionResponse> CreateAsync(
@@ -222,7 +223,7 @@ public sealed class AdmissionService : IAdmissionService
         admission.Patient = patient;
 
         // A brand new admission holds no bed, so there is nothing to label.
-        return Fill(new AdmissionResponse(), admission, BedLabel.None);
+        return await FillAsync(new AdmissionResponse(), admission, BedLabel.None, ct);
     }
 
     public async Task<AdmissionResponse> CompleteDetailsAsync(
@@ -276,7 +277,8 @@ public sealed class AdmissionService : IAdmissionService
             throw new ConflictException(MessageCode.PatientNicTaken, nic, "another record");
         }
 
-        return Fill(new AdmissionResponse(), admission, await LabelBedsAsync(new[] { admission }, ct));
+        return await FillAsync(
+            new AdmissionResponse(), admission, await LabelBedsAsync(new[] { admission }, ct), ct);
     }
 
     /// <summary>Where a brand-new visit starts, which depends on whether it needs a bed.</summary>
@@ -456,7 +458,8 @@ public sealed class AdmissionService : IAdmissionService
         await _db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
 
-        return Fill(new AdmissionResponse(), admission, await LabelBedsAsync(new[] { admission }, ct));
+        return await FillAsync(
+            new AdmissionResponse(), admission, await LabelBedsAsync(new[] { admission }, ct), ct);
     }
 
     private static IOrderedQueryable<AdmissionEntity> Sort(
@@ -572,7 +575,9 @@ public sealed class AdmissionService : IAdmissionService
         };
 
     private static BedAssignmentResponse ToBedAssignment(
-        BedAssignmentEntity assignment, IReadOnlyDictionary<Guid, BedLabel> beds)
+        BedAssignmentEntity assignment,
+        IReadOnlyDictionary<Guid, BedLabel> beds,
+        IReadOnlyDictionary<Guid, string> names)
     {
         var label = beds.TryGetValue(assignment.BedId, out var found) ? found : BedLabel.Unknown;
 
@@ -594,6 +599,7 @@ public sealed class AdmissionService : IAdmissionService
             WorkflowId = assignment.WorkflowId,
             IsDowngrade = assignment.IsDowngrade,
             ApprovedByStaffId = assignment.ApprovedByStaffMemberId,
+            ApprovedByStaffName = StaffNames.Lookup(names, assignment.ApprovedByStaffMemberId),
             ApprovedAt = assignment.ApprovedAt,
             OverrideReason = assignment.OverrideReason,
             ReleasedAt = assignment.ReleasedAt,
@@ -639,8 +645,37 @@ public sealed class AdmissionService : IAdmissionService
             assignment => BedHold.IsLive(assignment, now));
     }
 
+    /// <summary>
+    /// <see cref="Fill{TResponse}"/>, having first looked up every staff name the response
+    /// carries: whoever chose the care level, and whoever approved each bed.
+    /// </summary>
+    /// <remarks>
+    /// One query for the whole response. The ids on an admission are a small, heavily repeated
+    /// set - the same nurse approves every bed on a ward - so resolving them per row would be
+    /// the same answer fetched many times.
+    /// </remarks>
+    private async Task<TResponse> FillAsync<TResponse>(
+        TResponse response,
+        AdmissionEntity admission,
+        IReadOnlyDictionary<Guid, BedLabel> beds,
+        CancellationToken ct)
+        where TResponse : AdmissionResponse
+        => Fill(response, admission, beds, await StaffIdsAsync(admission, ct));
+
+    private Task<IReadOnlyDictionary<Guid, string>> StaffIdsAsync(
+        AdmissionEntity admission, CancellationToken ct)
+        => StaffNames.ByIdAsync(
+            _db,
+            admission.BedAssignments
+                .Select(assignment => assignment.ApprovedByStaffMemberId)
+                .Append(admission.CategorySetByStaffMemberId),
+            ct);
+
     private static TResponse Fill<TResponse>(
-        TResponse response, AdmissionEntity admission, IReadOnlyDictionary<Guid, BedLabel> beds)
+        TResponse response,
+        AdmissionEntity admission,
+        IReadOnlyDictionary<Guid, BedLabel> beds,
+        IReadOnlyDictionary<Guid, string> names)
         where TResponse : AdmissionResponse
     {
         var summary = ToSummary(admission, beds, includePatient: true);
@@ -660,6 +695,8 @@ public sealed class AdmissionService : IAdmissionService
 
         response.DispatchId = admission.DispatchId;
         response.CategorySetByStaffId = admission.CategorySetByStaffMemberId;
+        response.CategorySetByStaffName =
+            StaffNames.Lookup(names, admission.CategorySetByStaffMemberId);
         response.CategorySetAt = admission.CategorySetAt;
         response.IsInfectious = admission.IsInfectious;
         response.ReportedByUserId = admission.ReportedByUserId;

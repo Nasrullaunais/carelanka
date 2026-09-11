@@ -48,6 +48,12 @@ export type Admission = {
      * The clinician who chose the care level. Recorded proof a human decided it, never an agent.
      */
     category_set_by_staff_id: string;
+    /**
+     * Who admitted this patient and chose their care level. For a walk-in that is whoever was
+     * on the desk, which is the closest thing this component stores to "who did the intake" -
+     * there are no created_by columns anywhere, by group convention.
+     */
+    category_set_by_staff_name?: string | null;
     category_set_at: string;
     is_infectious: boolean;
     /**
@@ -148,6 +154,12 @@ export type AdmissionDetail = {
      * The clinician who chose the care level. Recorded proof a human decided it, never an agent.
      */
     category_set_by_staff_id: string;
+    /**
+     * Who admitted this patient and chose their care level. For a walk-in that is whoever was
+     * on the desk, which is the closest thing this component stores to "who did the intake" -
+     * there are no created_by columns anywhere, by group convention.
+     */
+    category_set_by_staff_name?: string | null;
     category_set_at: string;
     is_infectious: boolean;
     /**
@@ -372,6 +384,10 @@ export type BedAssignment = {
      */
     is_downgrade: boolean;
     approved_by_staff_id?: string | null;
+    /**
+     * Their name, for a screen. Sent beside the id, never instead of it.
+     */
+    approved_by_staff_name?: string | null;
     approved_at?: string | null;
     override_reason?: string | null;
     released_at?: string | null;
@@ -458,6 +474,10 @@ export type Bill = {
     settled: boolean;
     settled_at?: string | null;
     settled_by_staff_id?: string | null;
+    /**
+     * Their name, for a screen. Sent beside the id, never instead of it.
+     */
+    settled_by_staff_name?: string | null;
     settlement_note?: string | null;
     patient: PatientSummary;
     created_at: string;
@@ -522,6 +542,10 @@ export type ChecklistItem = {
      */
     ticked: boolean;
     ticked_by_staff_id?: string | null;
+    /**
+     * Their name, for a screen. Sent beside the id, never instead of it.
+     */
+    ticked_by_staff_name?: string | null;
     ticked_at?: string | null;
     /**
      * A non-mandatory item can stay unticked without blocking the discharge.
@@ -539,21 +563,9 @@ export type ChecklistUpdateRequest = {
      */
     clinical_clearance?: boolean | null;
     /**
-     * Ward nurse. Mandatory.
-     */
-    medication_issued?: boolean | null;
-    /**
      * Refused here. Settle the bill instead - `POST /api/admissions/{id}/bill/settle`.
      */
     billing_settled?: boolean | null;
-    /**
-     * Ward nurse. Optional item.
-     */
-    follow_up_recorded?: boolean | null;
-    /**
-     * Ward nurse. Optional item.
-     */
-    transport_arranged?: boolean | null;
 };
 
 /**
@@ -585,6 +597,20 @@ export type ConfirmDischargeRequest = {
      * Instructions the patient can read on their own phone afterwards.
      */
     summary_note?: string | null;
+};
+
+/**
+ * Move a patient out of the bed they were put in by mistake and into the right one.
+ */
+export type CorrectBedRequest = {
+    /**
+     * The bed they should have been given, from `GET /api/bed-availability`.
+     */
+    bed_id: string;
+    /**
+     * What went wrong, for whoever reads the trail later.
+     */
+    reason?: string | null;
 };
 
 /**
@@ -703,6 +729,9 @@ export type CreatePatientRequest = {
     date_of_birth?: string | null;
     phone?: string | null;
     address?: string | null;
+    /**
+     * The name of the person to ring, not the relationship and not the number.
+     */
     emergency_contact_name?: string | null;
     emergency_contact_phone?: string | null;
 };
@@ -802,6 +831,10 @@ export type Discharge = {
      */
     all_mandatory_ticked: boolean;
     confirmed_by_staff_id?: string | null;
+    /**
+     * Their name, for a screen. Sent beside the id, never instead of it.
+     */
+    confirmed_by_staff_name?: string | null;
     confirmed_at?: string | null;
     summary_note?: string | null;
     created_at: string;
@@ -1357,7 +1390,7 @@ export type RefreshTokenRequest = {
 
 export type RelatedEntityType = 'pharmacy_item' | 'equipment_item' | 'bed';
 
-export type ReleaseReason = 'discharged' | 'hold_expired' | 'cancelled' | 'transferred' | 'rejected';
+export type ReleaseReason = 'discharged' | 'hold_expired' | 'cancelled' | 'transferred' | 'rejected' | 'corrected';
 
 /**
  * Body of POST /api/equipment-items/{id}/report-fault.
@@ -1431,6 +1464,9 @@ export type UpdatePatientRequest = {
     date_of_birth?: string | null;
     phone?: string | null;
     address?: string | null;
+    /**
+     * The name of the person to ring, not the relationship and not the number.
+     */
     emergency_contact_name?: string | null;
     emergency_contact_phone?: string | null;
 };
@@ -1941,6 +1977,49 @@ export type AssignBedManuallyResponses = {
 };
 
 export type AssignBedManuallyResponse = AssignBedManuallyResponses[keyof AssignBedManuallyResponses];
+
+export type CorrectBedData = {
+    body?: CorrectBedRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/admissions/{id}/correct-bed';
+};
+
+export type CorrectBedErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CorrectBedError = CorrectBedErrors[keyof CorrectBedErrors];
+
+export type CorrectBedResponses = {
+    /**
+     * OK
+     */
+    200: BedAssignment;
+};
+
+export type CorrectBedResponse = CorrectBedResponses[keyof CorrectBedResponses];
 
 export type ListAppointmentsData = {
     body?: never;

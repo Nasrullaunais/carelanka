@@ -47,49 +47,133 @@ export function quantity(value: number): string {
 // The discharge checklist
 // ---------------------------------------------------------------------------
 
-// The keys the server publishes on Discharge.checklist. Listed in the order they get done
-// rather than alphabetically — a nurse reads down this list.
-export const checklistOrder = [
-  'clinical_clearance',
-  'medication_issued',
-  'billing_settled',
-  'follow_up_recorded',
-  'transport_arranged',
-] as const;
+// The keys the server publishes on Discharge.checklist, in the order they get done.
+//
+// It was five until 2026-09-11. `medication_issued`, `follow_up_recorded` and
+// `transport_arranged` came off: each recorded that something had been given to or arranged for
+// the patient, which is what a line on the bill records, with a price against it. Two records
+// of one fact is how they come to disagree, and the checklist copy was the one nobody could
+// price. Transport and take-home medicine are charge templates now — see chargeTemplates below.
+export const checklistOrder = ['clinical_clearance', 'billing_settled'] as const;
 
 /**
  * Which boxes hold up a discharge, mirroring DischargeService.Mandatory.
  *
- * Only used before the server has written any rows — the checklist is created the first time
- * somebody ticks something, so a patient who has just arrived has boxes to show and no data
- * behind them. Once a row exists its own `mandatory` is what the screen reads.
+ * Both of them, which makes the set look pointless. It is used before the server has written
+ * any rows — the checklist is created the first time somebody ticks something, so a patient who
+ * has just arrived has boxes to show and no data behind them. Once a row exists its own
+ * `mandatory` is what the screen reads.
  */
 export const mandatoryChecklistItems = new Set<string>([
   'clinical_clearance',
-  'medication_issued',
   'billing_settled',
 ]);
 
 export const checklistLabels: Record<string, string> = {
   clinical_clearance: 'Cleared by a doctor',
-  medication_issued: 'Medication issued',
   billing_settled: 'Bill settled',
-  follow_up_recorded: 'Follow-up recorded',
-  transport_arranged: 'Transport arranged',
 };
 
 /** Who does it, and anything the reader needs to know before pressing the button. */
 export const checklistHints: Record<string, string> = {
   clinical_clearance:
     'A doctor only, and never anything automatic. Without this nobody goes home.',
-  medication_issued: 'The ward nurse — what the patient takes with them.',
   billing_settled:
-    'Ticked by settling the bill on the Billing screen, and by nothing else. There is no button here on purpose: the bill and this box are the same fact.',
-  follow_up_recorded: 'The ward nurse. Optional — it does not hold up a discharge.',
-  transport_arranged: 'The ward nurse. Optional — it does not hold up a discharge.',
+    'Ticked by settling the bill below, and by nothing else. There is no button here on purpose: the bill and this box are the same fact.',
 };
 
-/** Falls back to the wire value, so a sixth box added server-side still reads sensibly. */
+/** Falls back to the wire value, so a third box added server-side still reads sensibly. */
 export function checklistLabel(item: string): string {
   return checklistLabels[item] ?? item.replaceAll('_', ' ');
+}
+
+// ---------------------------------------------------------------------------
+// What reception can put on a bill
+// ---------------------------------------------------------------------------
+
+/**
+ * The things a visit is commonly charged for, as a form rather than a blank box.
+ *
+ * The bill works out two lines on its own — the care level and the bed — and nothing else,
+ * because no table in this project ties a treatment, a scan, a meal or a drug to an admission.
+ * Everything else is typed at the desk. Typed into an empty "what for" box it came out as
+ * "xray", "X-Ray" and "chest x ray" on three different bills; these give the same thing the
+ * same name and the same price every time, and "Something else" is still there for the rest.
+ *
+ * **The prices are suggestions and they are invented.** No real price list was given to us.
+ * They fill the box so the desk is not guessing, and every one of them stays editable.
+ */
+export type ChargeTemplate = {
+  key: string;
+  /** Goes onto the bill as the line description, so it is what the patient reads. */
+  label: string;
+  hint: string;
+  /** Suggested and editable. Null where the amount genuinely varies every time. */
+  unitPrice: number | null;
+  /** What the quantity counts, because "How many" alone answers nothing. */
+  quantityLabel: string;
+  defaultQuantity: number;
+};
+
+export const chargeTemplates: ChargeTemplate[] = [
+  {
+    key: 'food',
+    label: 'Meals',
+    hint: 'Food for the stay. One per day the patient was fed, which is not always one per day they were here.',
+    unitPrice: 1200,
+    quantityLabel: 'Days',
+    defaultQuantity: 1,
+  },
+  {
+    key: 'medicine',
+    label: 'Medicine during the stay',
+    hint: 'What was given on the ward. Priced from the pharmacy slip — the amount varies every time, so there is no suggestion to make.',
+    unitPrice: null,
+    quantityLabel: 'Items',
+    defaultQuantity: 1,
+  },
+  {
+    key: 'therapy',
+    label: 'Therapy',
+    hint: 'Physiotherapy and the like, per session attended.',
+    unitPrice: 4500,
+    quantityLabel: 'Sessions',
+    defaultQuantity: 1,
+  },
+  {
+    key: 'tests',
+    label: 'Tests and scans',
+    hint: 'X-rays, blood work, anything sent to a lab. Name the test in the description.',
+    unitPrice: 3500,
+    quantityLabel: 'Tests',
+    defaultQuantity: 1,
+  },
+  {
+    key: 'transport',
+    label: 'Transport home',
+    hint: 'Only when the hospital arranges it. A patient whose family collects them is not charged for it, so this is not on every bill.',
+    unitPrice: 3500,
+    quantityLabel: 'Trips',
+    defaultQuantity: 1,
+  },
+  {
+    key: 'take_home_medicine',
+    label: 'Take-home medicine',
+    hint: 'What the patient leaves with. Charging for it and handing it over used to be two separate records; now the line on the bill is the one record.',
+    unitPrice: null,
+    quantityLabel: 'Items',
+    defaultQuantity: 1,
+  },
+  {
+    key: 'other',
+    label: 'Something else',
+    hint: 'Type whatever it was. Anything that turns up on three bills running probably wants a row of its own here.',
+    unitPrice: null,
+    quantityLabel: 'How many',
+    defaultQuantity: 1,
+  },
+];
+
+export function chargeTemplate(key: string): ChargeTemplate {
+  return chargeTemplates.find((template) => template.key === key) ?? chargeTemplates[0];
 }

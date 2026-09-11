@@ -11,6 +11,9 @@ public class ChecklistItem
 
     public Guid? TickedByStaffId { get; set; }
 
+    /// <summary>Their name, for a screen. Sent beside the id, never instead of it.</summary>
+    public string? TickedByStaffName { get; set; }
+
     public DateTimeOffset? TickedAt { get; set; }
 
     /// <summary>A non-mandatory item can stay unticked without blocking the discharge.</summary>

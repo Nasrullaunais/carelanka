@@ -44,6 +44,22 @@ public interface IBedAssignmentService
         Guid admissionId, AssignBedRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Swap the bed a patient is in for a different one, because the first was chosen by
+    /// mistake. Leaves the admission's status exactly where it was.
+    /// </summary>
+    /// <remarks>
+    /// The old assignment is closed with <c>ReleaseReason.Corrected</c>, which is what tells
+    /// the bill to charge nothing for it. Every placement rule and role rule that applies to
+    /// <see cref="AssignManuallyAsync"/> applies here unchanged — correcting a bed is not a
+    /// way to reach a bed you were not allowed to choose in the first place.
+    ///
+    /// Throws <c>ConflictException</c> when the patient holds no bed (<c>cl_pat_028</c>) or is
+    /// already in the bed asked for (<c>cl_pat_029</c>).
+    /// </remarks>
+    Task<DTOs.Patient.BedAssignment> CorrectBedAsync(
+        Guid admissionId, CorrectBedRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Is anyone in this bed. Throws <c>NotFoundException</c> when Equipment's register has no
     /// live bed with that id.
     /// </summary>

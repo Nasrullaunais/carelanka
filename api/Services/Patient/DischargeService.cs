@@ -18,18 +18,21 @@ namespace CareLanka.Api.Services.Patient;
 public sealed class DischargeService : IDischargeService
 {
     /// <summary>
-    /// The five boxes, and which of them stop a discharge. Written once here rather than
-    /// scattered through the methods below, because "is this patient ready" is a question three
-    /// endpoints ask and they must all mean the same thing by it.
+    /// The boxes, and which of them stop a discharge. Written once here rather than scattered
+    /// through the methods below, because "is this patient ready" is a question three endpoints
+    /// ask and they must all mean the same thing by it.
     /// </summary>
+    /// <remarks>
+    /// Both are mandatory, so the shape looks redundant. It stays a map because the three
+    /// optional boxes removed on 2026-09-11 proved the useful thing about it: whether a box
+    /// holds up a discharge is data, and changing it should not mean editing
+    /// <see cref="Outstanding"/> as well.
+    /// </remarks>
     private static readonly IReadOnlyDictionary<DischargeChecklistItemType, bool> Mandatory =
         new Dictionary<DischargeChecklistItemType, bool>
         {
             [DischargeChecklistItemType.ClinicalClearance] = true,
-            [DischargeChecklistItemType.MedicationIssued] = true,
-            [DischargeChecklistItemType.BillingSettled] = true,
-            [DischargeChecklistItemType.FollowUpRecorded] = false,
-            [DischargeChecklistItemType.TransportArranged] = false
+            [DischargeChecklistItemType.BillingSettled] = true
         };
 
     /// <summary>
@@ -46,10 +49,7 @@ public sealed class DischargeService : IDischargeService
     private static readonly IReadOnlyDictionary<DischargeChecklistItemType, PrincipalRole> TickedBy =
         new Dictionary<DischargeChecklistItemType, PrincipalRole>
         {
-            [DischargeChecklistItemType.ClinicalClearance] = PrincipalRole.Doctor,
-            [DischargeChecklistItemType.MedicationIssued] = PrincipalRole.WardNurse,
-            [DischargeChecklistItemType.FollowUpRecorded] = PrincipalRole.WardNurse,
-            [DischargeChecklistItemType.TransportArranged] = PrincipalRole.WardNurse
+            [DischargeChecklistItemType.ClinicalClearance] = PrincipalRole.Doctor
         };
 
     /// <summary>The two care levels whose discharge is the duty manager's, from plan 6.3.</summary>
@@ -152,7 +152,7 @@ public sealed class DischargeService : IDischargeService
 
         await _db.SaveChangesAsync(ct);
 
-        return ToResponse(discharge);
+        return await ToResponseAsync(discharge, ct);
     }
 
     /// <remarks>
@@ -215,7 +215,7 @@ public sealed class DischargeService : IDischargeService
         await _db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
 
-        return ToResponse(discharge);
+        return await ToResponseAsync(discharge, ct);
     }
 
     public async Task<DischargeResponse?> FindForAdmissionAsync(
@@ -226,7 +226,7 @@ public sealed class DischargeService : IDischargeService
             .Include(row => row.ChecklistItems)
             .FirstOrDefaultAsync(row => row.AdmissionId == admissionId, ct);
 
-        return discharge is null ? null : ToResponse(discharge);
+        return discharge is null ? null : await ToResponseAsync(discharge, ct);
     }
 
     public async Task MarkBillingSettledAsync(
@@ -334,7 +334,7 @@ public sealed class DischargeService : IDischargeService
             ?? throw new NotFoundException("Admission", admissionId);
 
     /// <summary>
-    /// The discharge record for this admission, created with its five boxes if it has none.
+    /// The discharge record for this admission, created with its boxes if it has none.
     /// </summary>
     /// <remarks>
     /// Created on first touch rather than alongside the admission. Every visit already on the
@@ -431,9 +431,6 @@ public sealed class DischargeService : IDischargeService
         var wanted = new List<(DischargeChecklistItemType, bool)>();
 
         Add(DischargeChecklistItemType.ClinicalClearance, request.ClinicalClearance);
-        Add(DischargeChecklistItemType.MedicationIssued, request.MedicationIssued);
-        Add(DischargeChecklistItemType.FollowUpRecorded, request.FollowUpRecorded);
-        Add(DischargeChecklistItemType.TransportArranged, request.TransportArranged);
 
         return wanted;
 
@@ -480,7 +477,28 @@ public sealed class DischargeService : IDischargeService
         };
     }
 
-    private static DischargeResponse ToResponse(DischargeEntity discharge)
+    /// <summary>
+    /// The wire shape, with every staff id on it resolved to a name in one query.
+    /// </summary>
+    /// <remarks>
+    /// One round trip for the whole record rather than one per ticked box: a discharge carries
+    /// a handful of ids and they are usually the same two or three people.
+    /// </remarks>
+    private async Task<DischargeResponse> ToResponseAsync(
+        DischargeEntity discharge, CancellationToken ct)
+    {
+        var names = await StaffNames.ByIdAsync(
+            _db,
+            discharge.ChecklistItems
+                .Select(item => item.TickedByStaffMemberId)
+                .Append(discharge.ConfirmedByStaffMemberId),
+            ct);
+
+        return ToResponse(discharge, names);
+    }
+
+    private static DischargeResponse ToResponse(
+        DischargeEntity discharge, IReadOnlyDictionary<Guid, string> names)
         => new()
         {
             Id = discharge.Id,
@@ -495,11 +513,13 @@ public sealed class DischargeService : IDischargeService
                     {
                         Ticked = item.TickedAt is not null,
                         TickedByStaffId = item.TickedByStaffMemberId,
+                        TickedByStaffName = StaffNames.Lookup(names, item.TickedByStaffMemberId),
                         TickedAt = item.TickedAt,
                         Mandatory = item.IsMandatory
                     }),
             AllMandatoryTicked = Outstanding(discharge).Count == 0,
             ConfirmedByStaffId = discharge.ConfirmedByStaffMemberId,
+            ConfirmedByStaffName = StaffNames.Lookup(names, discharge.ConfirmedByStaffMemberId),
             ConfirmedAt = discharge.ConfirmedAt,
             SummaryNote = discharge.SummaryNote,
             CreatedAt = discharge.CreatedAt,

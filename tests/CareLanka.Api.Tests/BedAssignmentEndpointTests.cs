@@ -691,6 +691,154 @@ public sealed class BedAssignmentEndpointTests
         Assert.Equal("cl_equ_003", body.RootElement.GetProperty("code").GetString());
     }
 
+    // ---------- correcting a bed chosen by mistake ----------
+
+    [Fact]
+    public async Task Correcting_a_bed_frees_the_wrong_one_and_claims_the_right_one()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var ward = await NewWardAsync();
+        var beds = await AddBedsAsync(ward, 2);
+        var admissionId = await AssignAsync(beds[0]);
+
+        using var corrected = await ReadJsonAsync(await nurse.PostAsJsonAsync(
+            $"/api/admissions/{admissionId}/correct-bed",
+            new { bed_id = beds[1], reason = "picked the row above" }));
+
+        Assert.Equal(beds[1].ToString(), corrected.RootElement.GetProperty("bed_id").GetString());
+
+        // The wrong bed goes back on the board immediately. Leaving it claimed is how a ward
+        // ends up with a bed nobody can use and nobody can explain.
+        var wrong = await BedRowAsync(nurse, ward, beds[0]);
+        var right = await BedRowAsync(nurse, ward, beds[1]);
+
+        Assert.Equal("free", wrong.GetProperty("availability").GetString());
+        Assert.Equal("reserved", right.GetProperty("availability").GetString());
+        Assert.Equal(admissionId, right.GetProperty("occupied_by_admission_id").GetString());
+    }
+
+    [Fact]
+    public async Task A_corrected_hold_keeps_being_a_hold_and_an_occupied_bed_keeps_being_occupied()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var ward = await NewWardAsync();
+        var beds = await AddBedsAsync(ward, 2);
+        var admissionId = await OccupyAsync(beds[0]);
+
+        using var corrected = await ReadJsonAsync(await nurse.PostAsJsonAsync(
+            $"/api/admissions/{admissionId}/correct-bed", new { bed_id = beds[1] }));
+
+        // The patient did not get out of bed because the paperwork was wrong. Status carries
+        // over, and so does occupied_at - which is what the bill is priced from.
+        Assert.Equal("occupied", corrected.RootElement.GetProperty("status").GetString());
+        Assert.Equal(
+            JsonValueKind.Null, corrected.RootElement.GetProperty("reserved_until").ValueKind);
+        Assert.Equal("admitted", await StatusAsync(admissionId));
+    }
+
+    [Fact]
+    public async Task A_corrected_bed_is_charged_for_nothing()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
+        var ward = await NewWardAsync();
+        var beds = await AddBedsAsync(ward, 2);
+        var admissionId = await OccupyAsync(beds[0]);
+
+        await nurse.PostAsJsonAsync(
+            $"/api/admissions/{admissionId}/correct-bed", new { bed_id = beds[1] });
+
+        using var bill = await ReadJsonAsync(
+            await reception.PostAsync($"/api/admissions/{admissionId}/bill", null));
+
+        // The whole point of a correction being its own release reason. Every stay bills a
+        // minimum of one day, so two bed lines for one mistake is two nights charged for one.
+        var bedLines = bill.RootElement.GetProperty("lines").EnumerateArray()
+            .Where(line => line.GetProperty("source").GetString() == "bed_stay")
+            .ToList();
+
+        Assert.Single(bedLines);
+        Assert.Equal(1m, bedLines[0].GetProperty("quantity").GetDecimal());
+    }
+
+    [Fact]
+    public async Task Correcting_a_bed_obeys_the_same_rules_as_choosing_one()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var general = await NewWardAsync();
+        var icu = await NewWardAsync("icu");
+        var generalBeds = await AddBedsAsync(general, 1);
+        var icuBeds = await AddBedsAsync(icu, 1);
+        var admissionId = await AssignAsync(generalBeds[0]);
+
+        var refused = await nurse.PostAsJsonAsync(
+            $"/api/admissions/{admissionId}/correct-bed", new { bed_id = icuBeds[0] });
+
+        using var problem = await ReadJsonAsync(refused);
+
+        // Correcting a bed is not a side door to a bed this person may not choose. Same code a
+        // straight assignment would have answered with.
+        Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
+        Assert.Equal("cl_pat_012", problem.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task There_is_nothing_to_correct_for_a_patient_who_holds_no_bed()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var ward = await NewWardAsync();
+        var beds = await AddBedsAsync(ward, 1);
+        var admissionId = await NewAdmissionAsync(nurse);
+
+        var refused = await nurse.PostAsJsonAsync(
+            $"/api/admissions/{admissionId}/correct-bed", new { bed_id = beds[0] });
+
+        using var problem = await ReadJsonAsync(refused);
+
+        // Not a 404 - the admission is real and so is the bed. What this caller wants is
+        // /assign-bed, and saying so beats a generic conflict.
+        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+        Assert.Equal("cl_pat_028", problem.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Correcting_a_bed_to_the_one_they_are_already_in_is_refused()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var ward = await NewWardAsync();
+        var beds = await AddBedsAsync(ward, 1);
+        var admissionId = await AssignAsync(beds[0]);
+
+        var refused = await nurse.PostAsJsonAsync(
+            $"/api/admissions/{admissionId}/correct-bed", new { bed_id = beds[0] });
+
+        using var problem = await ReadJsonAsync(refused);
+
+        // Releasing and re-taking the same bed would throw away how long they have been in it
+        // for no gain at all.
+        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+        Assert.Equal("cl_pat_029", problem.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task A_bed_assignment_says_who_approved_it_by_name_and_not_only_by_id()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var ward = await NewWardAsync();
+        var beds = await AddBedsAsync(ward, 1);
+        var admissionId = await NewAdmissionAsync(nurse);
+
+        using var body = await ReadJsonAsync(await nurse.PostAsJsonAsync(
+            $"/api/admissions/{admissionId}/assign-bed", new { bed_id = beds[0] }));
+
+        // The id was always there and a screen cannot read it. Accountability nobody can read
+        // is not accountability.
+        Assert.Equal(
+            await NurseIdAsync(), body.RootElement.GetProperty("approved_by_staff_id").GetString());
+        Assert.Equal(
+            "WardNurse Test", body.RootElement.GetProperty("approved_by_staff_name").GetString());
+    }
+
     // ---------- access ----------
 
     [Fact]
@@ -841,6 +989,15 @@ public sealed class BedAssignmentEndpointTests
         assignment.ReservedUntil = DateTimeOffset.UtcNow.AddMinutes(-1);
 
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>The admission's current status, read back through the API.</summary>
+    private async Task<string> StatusAsync(string admissionId)
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        using var body = await ReadJsonAsync(await nurse.GetAsync($"/api/admissions/{admissionId}"));
+
+        return body.RootElement.GetProperty("status").GetString()!;
     }
 
     /// <summary>Holds a bed for a new admission through the endpoint, and answers the admission's id.</summary>

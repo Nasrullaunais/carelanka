@@ -16,6 +16,16 @@ import type {
   PatientSummary,
 } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
+import {
+  birthYears,
+  dateOfBirthProblem,
+  daysInMonth,
+  fieldLimits,
+  monthNames,
+  nicProblem,
+  phoneProblem,
+  toIsoDate,
+} from '../types/identifiers';
 import { canRegisterPatient } from '../types/permissions';
 import {
   admissionCategories,
@@ -152,6 +162,27 @@ type LookupResult = {
   hasOpenAdmission: boolean;
 };
 
+/**
+ * How much room is left in a field, shown only once it starts to matter.
+ *
+ * A counter sitting under every box from the moment the form loads is noise; one that appears
+ * at three quarters full is a warning. Either way the input's own maxLength is what stops the
+ * typing - this only explains why it stopped.
+ */
+function Counter({ value, limit }: { value: string; limit: number }) {
+  if (value.length < limit * 0.75) {
+    return null;
+  }
+
+  const left = limit - value.length;
+
+  return (
+    <p className={left === 0 ? 'field-error' : 'hint'}>
+      {left === 0 ? `That is the limit - ${limit} characters.` : `${left} characters left.`}
+    </p>
+  );
+}
+
 function FindStep({
   onExisting,
   onNew,
@@ -161,6 +192,10 @@ function FindStep({
 }) {
   const [nic, setNic] = useState('');
   const [result, setResult] = useState<LookupResult | null>(null);
+
+  // Checked here so a typo is caught before it becomes a second record for somebody who is
+  // already registered - which is the one thing this step exists to prevent.
+  const nicError = nicProblem(nic);
 
   const lookup = useMutation({
     ...lookupPatientMutation(),
@@ -196,14 +231,19 @@ function FindStep({
                 id="lookup-nic"
                 value={nic}
                 maxLength={20}
+                aria-invalid={nicError !== null}
                 onChange={(event) => setNic(event.target.value)}
                 placeholder="199534501V"
                 required
               />
+              {nicError && <p className="field-error">{nicError}</p>}
             </div>
           </div>
 
-          <button type="submit" disabled={lookup.isPending || nic.trim().length === 0}>
+          <button
+            type="submit"
+            disabled={lookup.isPending || nic.trim().length === 0 || nicError !== null}
+          >
             {lookup.isPending ? 'Looking up...' : 'Look up'}
           </button>
         </form>
@@ -290,11 +330,38 @@ function RegisterStep({
 
   const [fullName, setFullName] = useState(unidentified ? 'Unidentified patient' : '');
   const [gender, setGender] = useState<Gender>(unidentified ? 'unknown' : 'male');
-  const [dateOfBirth, setDateOfBirth] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
+
+  // Three pickers rather than one <input type="date">. The native control opens on this month,
+  // and a patient born in 1997 is a long way back from there - which is how a desk ends up
+  // leaving date of birth blank on every record.
+  const [birthYear, setBirthYear] = useState<number | null>(null);
+  const [birthMonth, setBirthMonth] = useState<number | null>(null);
+  const [birthDay, setBirthDay] = useState<number | null>(null);
+
+  const dateOfBirth = toIsoDate(birthYear, birthMonth, birthDay);
+
+  // Told at the field, not on submit. The server checks all of this too - a browser is not a
+  // boundary - but a form that accepts what you typed and then fails on submit makes you hunt
+  // for which of eight boxes was wrong.
+  const phoneError = phoneProblem(phone);
+  const contactPhoneError = phoneProblem(contactPhone);
+  const dateOfBirthError = dateOfBirthProblem(dateOfBirth);
+
+  // A part-filled date is not an error, it is an unfinished one. Saying "that is not a date" to
+  // somebody who has picked the year and is reaching for the month is just rude.
+  const dateIncomplete =
+    (birthYear !== null || birthMonth !== null || birthDay !== null) && dateOfBirth === '';
+
+  const blocked =
+    fullName.trim().length === 0 ||
+    phoneError !== null ||
+    contactPhoneError !== null ||
+    dateOfBirthError !== null ||
+    dateIncomplete;
 
   const register = useMutation({
     ...createPatientMutation(),
@@ -357,10 +424,11 @@ function RegisterStep({
             <input
               id="reg-name"
               value={fullName}
-              maxLength={200}
+              maxLength={fieldLimits.fullName}
               onChange={(event) => setFullName(event.target.value)}
               required
             />
+            <Counter value={fullName} limit={fieldLimits.fullName} />
           </div>
           <div className="field">
             <label htmlFor="reg-gender">Gender</label>
@@ -376,14 +444,63 @@ function RegisterStep({
               ))}
             </select>
           </div>
+        </div>
+
+        <div className="row">
           <div className="field">
-            <label htmlFor="reg-dob">Date of birth</label>
-            <input
-              id="reg-dob"
-              type="date"
-              value={dateOfBirth}
-              onChange={(event) => setDateOfBirth(event.target.value)}
-            />
+            <label htmlFor="reg-dob-day">Date of birth</label>
+            <div className="row" style={{ gap: '0.4rem' }}>
+              <select
+                id="reg-dob-day"
+                aria-label="Day of birth"
+                value={birthDay ?? ''}
+                onChange={(event) =>
+                  setBirthDay(event.target.value === '' ? null : Number(event.target.value))
+                }
+              >
+                <option value="">Day</option>
+                {Array.from(
+                  { length: daysInMonth(birthYear, birthMonth) },
+                  (_, index) => index + 1,
+                ).map((day) => (
+                  <option key={day} value={day}>
+                    {day}
+                  </option>
+                ))}
+              </select>
+              <select
+                aria-label="Month of birth"
+                value={birthMonth ?? ''}
+                onChange={(event) =>
+                  setBirthMonth(event.target.value === '' ? null : Number(event.target.value))
+                }
+              >
+                <option value="">Month</option>
+                {monthNames.map((name, index) => (
+                  <option key={name} value={index + 1}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <select
+                aria-label="Year of birth"
+                value={birthYear ?? ''}
+                onChange={(event) =>
+                  setBirthYear(event.target.value === '' ? null : Number(event.target.value))
+                }
+              >
+                <option value="">Year</option>
+                {birthYears().map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {dateOfBirthError && <p className="field-error">{dateOfBirthError}</p>}
+            {dateIncomplete && !dateOfBirthError && (
+              <p className="hint">Pick all three, or leave all three blank.</p>
+            )}
           </div>
         </div>
 
@@ -393,44 +510,57 @@ function RegisterStep({
             <input
               id="reg-phone"
               value={phone}
+              inputMode="tel"
               maxLength={20}
+              placeholder="0771234567"
+              aria-invalid={phoneError !== null}
               onChange={(event) => setPhone(event.target.value)}
             />
+            {phoneError && <p className="field-error">{phoneError}</p>}
           </div>
           <div className="field">
             <label htmlFor="reg-address">Address</label>
             <input
               id="reg-address"
               value={address}
-              maxLength={300}
+              maxLength={fieldLimits.address}
               onChange={(event) => setAddress(event.target.value)}
             />
+            <Counter value={address} limit={fieldLimits.address} />
           </div>
         </div>
 
         <div className="row">
           <div className="field">
-            <label htmlFor="reg-contact-name">Emergency contact</label>
+            {/* "Emergency contact" sitting next to "Emergency contact phone" reads as though
+                the first one also wants a number. Say what goes in the box. */}
+            <label htmlFor="reg-contact-name">Who to ring in an emergency</label>
             <input
               id="reg-contact-name"
               value={contactName}
-              maxLength={200}
+              maxLength={fieldLimits.contactName}
+              placeholder="Nilanthi Gunawardena"
               onChange={(event) => setContactName(event.target.value)}
             />
+            <p className="hint">Their name.</p>
           </div>
           <div className="field">
-            <label htmlFor="reg-contact-phone">Emergency contact phone</label>
+            <label htmlFor="reg-contact-phone">Their phone number</label>
             <input
               id="reg-contact-phone"
               value={contactPhone}
+              inputMode="tel"
               maxLength={20}
+              placeholder="0779876543"
+              aria-invalid={contactPhoneError !== null}
               onChange={(event) => setContactPhone(event.target.value)}
             />
+            {contactPhoneError && <p className="field-error">{contactPhoneError}</p>}
           </div>
         </div>
 
         <div className="row">
-          <button type="submit" disabled={register.isPending || fullName.trim().length === 0}>
+          <button type="submit" disabled={register.isPending || blocked}>
             {register.isPending ? 'Registering...' : 'Register and continue'}
           </button>
           <button type="button" className="secondary" onClick={onBack}>

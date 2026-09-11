@@ -36,6 +36,9 @@ public class Discharge
 
     public Guid? ConfirmedByStaffId { get; set; }
 
+    /// <summary>Their name, for a screen. Sent beside the id, never instead of it.</summary>
+    public string? ConfirmedByStaffName { get; set; }
+
     public DateTimeOffset? ConfirmedAt { get; set; }
 
     public string? SummaryNote { get; set; }

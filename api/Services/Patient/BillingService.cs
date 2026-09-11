@@ -59,7 +59,7 @@ public sealed class BillingService : IBillingService
                 .ThenInclude(admission => admission.Patient)
             .FirstOrDefaultAsync(row => row.AdmissionId == admissionId, ct);
 
-        return bill is null ? null : ToResponse(bill, bill.Admission.Patient);
+        return bill is null ? null : await ToResponseAsync(bill, bill.Admission.Patient, ct);
     }
 
     public Task<BillResponse> PrepareAsync(Guid admissionId, CancellationToken ct = default)
@@ -271,7 +271,7 @@ public sealed class BillingService : IBillingService
         await _db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
 
-        return ToResponse(bill, admission.Patient);
+        return await ToResponseAsync(bill, admission.Patient, ct);
     }
 
     private async Task<BillEntity> FindOrOpenAsync(AdmissionEntity admission, CancellationToken ct)
@@ -420,11 +420,20 @@ public sealed class BillingService : IBillingService
     /// Was the patient ever actually in this bed? A hold that lapsed or was cancelled is not a
     /// stay, and billing one would charge somebody for a bed they never saw.
     /// </summary>
+    /// <remarks>
+    /// <c>Corrected</c> is tested first and on its own. A bed chosen by mistake and swapped for
+    /// the right one keeps its <c>OccupiedAt</c>, and the replacement inherits the same
+    /// instant - that is deliberate, so the stay is priced from when the patient actually got
+    /// into a bed rather than from when the paperwork was fixed. The cost of it is that both
+    /// rows look slept-in to every other test in this method, and every stay bills a minimum of
+    /// one day, so a mis-click corrected within a minute would charge two nights for one.
+    /// </remarks>
     private static bool WasSleptIn(BedAssignmentEntity assignment)
-        => assignment.OccupiedAt is not null
-           || assignment.Status == AssignmentStatus.Occupied
-           || (assignment.Status == AssignmentStatus.Released
-               && assignment.ReleaseReason is ReleaseReason.Discharged or ReleaseReason.Transferred);
+        => assignment.ReleaseReason != ReleaseReason.Corrected
+           && (assignment.OccupiedAt is not null
+               || assignment.Status == AssignmentStatus.Occupied
+               || (assignment.Status == AssignmentStatus.Released
+                   && assignment.ReleaseReason is ReleaseReason.Discharged or ReleaseReason.Transferred));
 
     /// <summary>
     /// When the stay started. <c>OccupiedAt</c> is the honest answer; <c>CreatedAt</c> is the
@@ -526,7 +535,16 @@ public sealed class BillingService : IBillingService
 
     // ---------- mapping ----------
 
-    private static BillResponse ToResponse(BillEntity bill, PatientEntity patient)
+    private async Task<BillResponse> ToResponseAsync(
+        BillEntity bill, PatientEntity patient, CancellationToken ct)
+    {
+        var names = await StaffNames.ByIdAsync(_db, [bill.SettledByStaffMemberId], ct);
+
+        return ToResponse(bill, patient, names);
+    }
+
+    private static BillResponse ToResponse(
+        BillEntity bill, PatientEntity patient, IReadOnlyDictionary<Guid, string> names)
     {
         var lines = bill.LineItems
             .OrderBy(line => line.Source)
@@ -557,6 +575,7 @@ public sealed class BillingService : IBillingService
             Settled = bill.IsSettled,
             SettledAt = bill.SettledAt,
             SettledByStaffId = bill.SettledByStaffMemberId,
+            SettledByStaffName = StaffNames.Lookup(names, bill.SettledByStaffMemberId),
             SettlementNote = bill.SettlementNote,
             Patient = ToPatientSummary(patient),
             CreatedAt = bill.CreatedAt,

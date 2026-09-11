@@ -41,6 +41,9 @@ public class Bill
 
     public Guid? SettledByStaffId { get; set; }
 
+    /// <summary>Their name, for a screen. Sent beside the id, never instead of it.</summary>
+    public string? SettledByStaffName { get; set; }
+
     public string? SettlementNote { get; set; }
 
     /// <summary>Who the bill is for, so a printed copy needs no second request.</summary>

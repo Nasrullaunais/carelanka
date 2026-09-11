@@ -5,6 +5,12 @@ namespace CareLanka.Api.Data.Entities.Patient;
 // One row per human being, reused across visits. Never one row per admission.
 public class Patient : SoftDeletableEntity
 {
+    // The short handle a human says out loud and types into a form: P7K2X9QM. Server-generated
+    // once at registration and never changed, because it is on a wristband and in other
+    // components' records. Not the primary key — that is still the Guid, and every internal
+    // reference uses it. This exists because nobody can read a Guid over a ward phone.
+    public string PatientCode { get; set; } = null!;
+
     public string FullName { get; set; } = null!;
 
     // Nullable because an unconscious arrival has no papers, but unique whenever present so

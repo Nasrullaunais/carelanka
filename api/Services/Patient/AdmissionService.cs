@@ -83,6 +83,7 @@ public sealed class AdmissionService : IAdmissionService
 
             query = query.Where(a =>
                 EF.Functions.ILike(a.Patient.FullName, pattern)
+                || EF.Functions.ILike(a.Patient.PatientCode, pattern)
                 || (a.Patient.Nic != null && EF.Functions.ILike(a.Patient.Nic, pattern)));
         }
 
@@ -543,6 +544,7 @@ public sealed class AdmissionService : IAdmissionService
         => new()
         {
             Id = patient.Id,
+            PatientCode = patient.PatientCode,
             FullName = patient.FullName,
             Nic = patient.Nic,
             TempReference = patient.TempReference,

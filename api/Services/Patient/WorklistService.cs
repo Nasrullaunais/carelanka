@@ -68,10 +68,12 @@ public sealed class WorklistService : IWorklistService
         {
             bookings = bookings.Where(a =>
                 EF.Functions.ILike(a.Patient.FullName, pattern)
+                || EF.Functions.ILike(a.Patient.PatientCode, pattern)
                 || (a.Patient.Nic != null && EF.Functions.ILike(a.Patient.Nic, pattern)));
 
             visits = visits.Where(a =>
                 EF.Functions.ILike(a.Patient.FullName, pattern)
+                || EF.Functions.ILike(a.Patient.PatientCode, pattern)
                 || (a.Patient.Nic != null && EF.Functions.ILike(a.Patient.Nic, pattern)));
         }
 
@@ -249,6 +251,7 @@ public sealed class WorklistService : IWorklistService
             Patient = new PatientSummary
             {
                 Id = line.Patient.Id,
+                PatientCode = line.Patient.PatientCode,
                 FullName = line.Patient.FullName,
                 Nic = line.Patient.Nic,
                 TempReference = line.Patient.TempReference,

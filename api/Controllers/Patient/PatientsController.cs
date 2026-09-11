@@ -19,7 +19,10 @@ public class PatientsController : ControllerBase
 
     public PatientsController(IPatientService patients) => _patients = patients;
 
-    /// <summary>Search patients. `search` matches full name, NIC, phone or temporary reference.</summary>
+    /// <summary>
+    /// Search patients. `search` matches patient code, full name, NIC, phone or temporary
+    /// reference. Equipment Management reads this to find a patient's code.
+    /// </summary>
     [Authorize(Policy = Policies.PatientReader)]
     [HttpGet(Name = "listPatients")]
     [ProducesResponseType(typeof(PagedResult<PatientSummary>), StatusCodes.Status200OK)]

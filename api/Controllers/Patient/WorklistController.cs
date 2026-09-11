@@ -19,7 +19,7 @@ public class WorklistController : ControllerBase
     public WorklistController(IWorklistService worklist) => _worklist = worklist;
 
     /// <summary>
-    /// One page of the ward board, newest first. `search` matches the patient's name or NIC.
+    /// One page of the ward board, newest first. `search` matches the patient's code, name or NIC.
     /// </summary>
     /// <remarks>
     /// **Two tables, one list.** A row is either a booking nobody has checked in yet -

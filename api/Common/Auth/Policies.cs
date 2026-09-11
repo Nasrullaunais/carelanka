@@ -27,8 +27,10 @@ public static class Policies
     public const string PatientRegistrar = nameof(PatientRegistrar);
 
     /// <summary>
-    /// Reads patient records: ward nurse, duty manager, hospital administrator, doctor.
-    /// A doctor reads and never edits - the record is kept by the people at the desk.
+    /// Reads patient records: ward nurse, duty manager, hospital administrator, doctor,
+    /// equipment manager. A doctor reads and never edits - the record is kept by the people at
+    /// the desk. The equipment manager is here to find a patient_code, not to do clinical work,
+    /// which is why they are not on <see cref="AdmissionReader"/>.
     /// </summary>
     public const string PatientReader = nameof(PatientReader);
 

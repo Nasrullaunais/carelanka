@@ -1,4 +1,4 @@
-﻿using CareLanka.Api.Common.Errors;
+using CareLanka.Api.Common.Errors;
 using CareLanka.Api.Common.Exceptions;
 using CareLanka.Api.Data;
 using CareLanka.Api.Data.Configurations.Patient;
@@ -23,7 +23,9 @@ public sealed class PatientService : IPatientService
         AdmissionStatus.Cancelled
     ];
 
-    private const int TempReferenceAttempts = 5;
+    // How many times a save is retried when a generated value — a temp reference or a patient
+    // code — turns out to be somebody else's already.
+    private const int SaveAttempts = 5;
 
     private readonly CareLankaDbContext _db;
 
@@ -47,6 +49,7 @@ public sealed class PatientService : IPatientService
             // any index, and a nurse typing "silva" finds "De Silva".
             query = query.Where(p =>
                 EF.Functions.ILike(p.FullName, pattern)
+                || EF.Functions.ILike(p.PatientCode, pattern)
                 || (p.Nic != null && EF.Functions.ILike(p.Nic, pattern))
                 || (p.Phone != null && EF.Functions.ILike(p.Phone, pattern))
                 || (p.TempReference != null && EF.Functions.ILike(p.TempReference, pattern)));
@@ -118,6 +121,10 @@ public sealed class PatientService : IPatientService
         var patient = new PatientEntity
         {
             Id = Guid.NewGuid(),
+
+            // A candidate, not a guarantee. The unique index decides, and SaveWithIdentifierAsync
+            // draws another one if this one is already somebody's.
+            PatientCode = PatientCodes.Next(),
             FullName = request.FullName.Trim(),
             Nic = nic,
 
@@ -275,11 +282,20 @@ public sealed class PatientService : IPatientService
             }
             catch (DbUpdateException exception)
                 when (needsTempReference
-                      && attempt < TempReferenceAttempts
+                      && attempt < SaveAttempts
                       && IsUniqueViolation(exception, PatientConfiguration.TempReferenceUniqueIndex))
             {
                 // Someone else took the number between reading the highest one and inserting.
                 // Re-read and try again rather than handing the desk an error it cannot act on.
+            }
+            catch (DbUpdateException exception)
+                when (attempt < SaveAttempts
+                      && IsUniqueViolation(exception, PatientConfiguration.PatientCodeUniqueIndex))
+            {
+                // Two random codes landed on the same eight characters. One in twenty-seven
+                // billion, so this is here to be correct rather than because it will happen —
+                // draw another and save again. Nothing else about the row changes.
+                patient.PatientCode = PatientCodes.Next();
             }
         }
     }
@@ -318,6 +334,7 @@ public sealed class PatientService : IPatientService
         => new()
         {
             Id = patient.Id,
+            PatientCode = patient.PatientCode,
             FullName = patient.FullName,
             Nic = patient.Nic,
             TempReference = patient.TempReference,
@@ -353,6 +370,7 @@ public sealed class PatientService : IPatientService
         where TResponse : PatientResponse
     {
         response.Id = patient.Id;
+        response.PatientCode = patient.PatientCode;
         response.FullName = patient.FullName;
         response.Nic = patient.Nic;
         response.TempReference = patient.TempReference;

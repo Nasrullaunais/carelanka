@@ -347,6 +347,24 @@ One equipment warning ends with a human approving a different bed for a patient.
 
 M3 allocates equipment *to* wards, so they read the ward list — id, name, type — from Patient Management. Small, but it means M3 never keeps their own copy of ward names that drifts.
 
+### 6.4 A patient has a readable identifier now — `patient_code` *(added 2026-09-11, M4)*
+
+Until now the only identifier M4 published was a Guid. Nobody reads `3f9c1a2e-8b44-4f31-9a7d-2c05e6b7d813` off a wristband and nobody types it into a form correctly, so any component that has to name a patient on its own screen had nothing usable to name them by.
+
+Every patient now carries a second identifier, and the two do different jobs:
+
+| | `id` | `patient_code` |
+| :--- | :--- | :--- |
+| Shape | Guid | eight characters, `P7K2X9QM` |
+| For | every stored reference, every FK, every URL | a human, out loud and on paper |
+| Changes? | never | never |
+
+**It is published on `PatientSummary`,** so it appears on every response any component already reads that carries a patient: `Patient`, `PatientDetail`, `Admission.patient`, `Appointment.patient`, `WorklistRow.patient`. Nothing new to call for it.
+
+**Nothing stores it as a reference.** A foreign key is still the Guid, and `EquipmentItem.assigned_to_admission_id` is unchanged — the code is what a person carries between screens, not what a table carries between rows.
+
+**`search` matches it** on `GET /patients`, `GET /admissions` and `GET /patient-worklist`, alongside name and NIC. That is the whole of what M4 provides here. **What any other component does with the code is theirs to design** — M4 has built nothing on anyone else's side and is not proposing to.
+
 ---
 
 ## 7. The rule that binds all four components
@@ -430,6 +448,10 @@ Injected as interfaces inside the API, and exposed as REST endpoints so the AI a
 | `IBedOccupancyService.GetStatusAsync(bedId)` | `GET /api/beds/{id}/occupancy` | M3 | Whether a bed is occupied or held — **check this before servicing it** | **Live 2026-09-11** |
 | `IBedAssignmentService.ListAvailabilityAsync(…)` | `GET /api/bed-availability` | M4, and the bed agent | Equipment's register joined with our assignments, hold expiry applied | **Live 2026-09-11** |
 | `CreatePreAdmissionAsync(dispatch)` | `POST /api/admissions/pre-admit` | M1 | Creates an admission from a dispatch | Not built |
+
+**Every response carrying a patient now carries `patient_code` as well** — eight characters,
+the handle a human uses where a Guid cannot be read out or typed in. §6.4 says what it is and
+what it is not; §11.8 records the one permission change that came with it.
 
 **`GET /api/patient-worklist` is Patient's own screen, not a contract for anybody else.**
 Listed here only so nobody claims the route: it unions Patient's `Appointment` and `Admission`
@@ -574,6 +596,36 @@ is scoped by that value.
 The read is one line — `Patients.Where(p => p.UserAccountId == account.Id)` — but
 `AuthService` is **common**, not M4's, so M4 has not written it. Whoever owns common picks
 it up, or the group agrees M4 may. Until then the link is written and never read.
+
+**11.8 (RESOLVED 2026-09-11) — an Equipment token can now read the patient register.**
+*(Raised and closed by M4 on 2026-09-11, while adding `patient_code` — §6.4.)*
+
+The problem: `GET /patients` was `PatientReader` — ward nurse, duty manager, hospital
+administrator, doctor. An `EquipmentManager` typing a patient code into M3's assign screen
+got a 403, so the code M4 had just published was unreachable from the one screen it was added
+for.
+
+**Fix, agreed with M3: `EquipmentManager` was added to `PatientReader`.** One line in
+`Program.cs`; no new endpoint. M3 finds the patient, copies the eight characters, and builds
+their own screen around them.
+
+What that does and does not grant:
+
+| | |
+| :--- | :--- |
+| `GET /patients`, `GET /patients/{id}` | **now allowed** for `EquipmentManager` |
+| `POST /patients`, `PUT /patients/{id}` | still refused — `PatientRegistrar` / `PatientEditor` are untouched |
+| `GET /admissions`, `GET /patient-worklist` | still refused — `AdmissionReader` is untouched |
+
+**Worth being honest about the trade:** those two reads carry NIC, phone, address, date of
+birth and, on the detail, the patient's admission history. An inventory role can now see all
+of it. The narrower alternative was a resolve-by-code endpoint answering a name and nothing
+else; the group took the simpler option knowingly. If that ever needs tightening, the seam is
+one policy in `Program.cs` and one test,
+`Equipment_management_can_look_a_patient_up_to_copy_their_code_but_cannot_change_anything`.
+
+**M4 stops here.** How M3 uses the code — what their screen asks for, and what their assign
+endpoint takes — is theirs to decide and theirs to build. M4 has written nothing on that side.
 
 ---
 

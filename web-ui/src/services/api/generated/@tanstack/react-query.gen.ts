@@ -43,7 +43,7 @@ export const listAdmissionsQueryKey = (options?: Options<ListAdmissionsData>) =>
 
 /**
  * List admissions. With no `status` the answer is the live worklist, not the archive.
- * `search` matches the patient's name or NIC.
+ * `search` matches the patient's code, name or NIC.
  */
 export const listAdmissionsOptions = (options?: Options<ListAdmissionsData>) => queryOptions<ListAdmissionsResponse, ListAdmissionsError, ListAdmissionsResponse, ReturnType<typeof listAdmissionsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -91,7 +91,7 @@ export const listAdmissionsInfiniteQueryKey = (options?: Options<ListAdmissionsD
 
 /**
  * List admissions. With no `status` the answer is the live worklist, not the archive.
- * `search` matches the patient's name or NIC.
+ * `search` matches the patient's code, name or NIC.
  */
 export const listAdmissionsInfiniteOptions = (options?: Options<ListAdmissionsData>) => {
     const opts = infiniteQueryOptions<ListAdmissionsResponse, ListAdmissionsError, InfiniteData<ListAdmissionsResponse>, QueryKey<Options<ListAdmissionsData>>, number | Pick<QueryKey<Options<ListAdmissionsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
@@ -393,7 +393,7 @@ export const checkInAppointmentMutation = (options?: Partial<Options<CheckInAppo
 export const listPatientWorklistQueryKey = (options?: Options<ListPatientWorklistData>) => createQueryKey('listPatientWorklist', options);
 
 /**
- * One page of the ward board, newest first. `search` matches the patient's name or NIC.
+ * One page of the ward board, newest first. `search` matches the patient's code, name or NIC.
  *
  * **Two tables, one list.** A row is either a booking nobody has checked in yet -
  * `kind = booking`, `status = not_arrived` - or a visit that has started, `kind = visit`.
@@ -428,7 +428,7 @@ export const listPatientWorklistOptions = (options?: Options<ListPatientWorklist
 export const listPatientWorklistInfiniteQueryKey = (options?: Options<ListPatientWorklistData>): QueryKey<Options<ListPatientWorklistData>> => createQueryKey('listPatientWorklist', options, true);
 
 /**
- * One page of the ward board, newest first. `search` matches the patient's name or NIC.
+ * One page of the ward board, newest first. `search` matches the patient's code, name or NIC.
  *
  * **Two tables, one list.** A row is either a booking nobody has checked in yet -
  * `kind = booking`, `status = not_arrived` - or a visit that has started, `kind = visit`.
@@ -924,7 +924,8 @@ export const getWardCapacityOptions = (options?: Options<GetWardCapacityData>) =
 export const listPatientsQueryKey = (options?: Options<ListPatientsData>) => createQueryKey('listPatients', options);
 
 /**
- * Search patients. `search` matches full name, NIC, phone or temporary reference.
+ * Search patients. `search` matches patient code, full name, NIC, phone or temporary
+ * reference. Equipment Management reads this to find a patient's code.
  */
 export const listPatientsOptions = (options?: Options<ListPatientsData>) => queryOptions<ListPatientsResponse, ListPatientsError, ListPatientsResponse, ReturnType<typeof listPatientsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -942,7 +943,8 @@ export const listPatientsOptions = (options?: Options<ListPatientsData>) => quer
 export const listPatientsInfiniteQueryKey = (options?: Options<ListPatientsData>): QueryKey<Options<ListPatientsData>> => createQueryKey('listPatients', options, true);
 
 /**
- * Search patients. `search` matches full name, NIC, phone or temporary reference.
+ * Search patients. `search` matches patient code, full name, NIC, phone or temporary
+ * reference. Equipment Management reads this to find a patient's code.
  */
 export const listPatientsInfiniteOptions = (options?: Options<ListPatientsData>) => {
     const opts = infiniteQueryOptions<ListPatientsResponse, ListPatientsError, InfiniteData<ListPatientsResponse>, QueryKey<Options<ListPatientsData>>, number | Pick<QueryKey<Options<ListPatientsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(

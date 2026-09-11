@@ -20,7 +20,7 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 
 /**
  * List admissions. With no `status` the answer is the live worklist, not the archive.
- * `search` matches the patient's name or NIC.
+ * `search` matches the patient's code, name or NIC.
  */
 export const listAdmissions = <ThrowOnError extends boolean = false>(options?: Options<ListAdmissionsData, ThrowOnError>): RequestResult<ListAdmissionsResponses, ListAdmissionsErrors, ThrowOnError> => (options?.client ?? client).get<ListAdmissionsResponses, ListAdmissionsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -207,7 +207,7 @@ export const checkInAppointment = <ThrowOnError extends boolean = false>(options
 });
 
 /**
- * One page of the ward board, newest first. `search` matches the patient's name or NIC.
+ * One page of the ward board, newest first. `search` matches the patient's code, name or NIC.
  *
  * **Two tables, one list.** A row is either a booking nobody has checked in yet -
  * `kind = booking`, `status = not_arrived` - or a visit that has started, `kind = visit`.
@@ -478,7 +478,8 @@ export const getWardCapacity = <ThrowOnError extends boolean = false>(options?: 
 });
 
 /**
- * Search patients. `search` matches full name, NIC, phone or temporary reference.
+ * Search patients. `search` matches patient code, full name, NIC, phone or temporary
+ * reference. Equipment Management reads this to find a patient's code.
  */
 export const listPatients = <ThrowOnError extends boolean = false>(options?: Options<ListPatientsData, ThrowOnError>): RequestResult<ListPatientsResponses, ListPatientsErrors, ThrowOnError> => (options?.client ?? client).get<ListPatientsResponses, ListPatientsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

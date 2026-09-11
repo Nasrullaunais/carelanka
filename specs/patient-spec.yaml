@@ -106,9 +106,12 @@ paths:
       tags: [Patients]
       summary: Search patients
       description: |
-        Roles: WardNurse, DutyManager, HospitalAdministrator, Doctor.
+        Roles: WardNurse, DutyManager, HospitalAdministrator, Doctor, EquipmentManager.
 
-        `search` matches full name, NIC, phone, or temp reference.
+        `search` matches patient code, full name, NIC, phone, or temp reference.
+
+        EquipmentManager is on this list to find a patient's `patient_code` and carry it onto
+        their own screen. Read-only, and it does not extend to admissions.
       operationId: listPatients
       parameters:
         - name: search
@@ -145,7 +148,7 @@ paths:
     get:
       tags: [Patients]
       summary: Get one patient with their visit history
-      description: 'Roles: WardNurse, DutyManager, HospitalAdministrator, Doctor.'
+      description: 'Roles: WardNurse, DutyManager, HospitalAdministrator, Doctor, EquipmentManager.'
       operationId: getPatient
       responses:
         '200':
@@ -336,7 +339,7 @@ paths:
           schema: { type: boolean }
         - name: search
           in: query
-          description: Matches patient name or NIC.
+          description: Matches patient code, name or NIC.
           schema: { type: string }
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
@@ -1310,7 +1313,7 @@ paths:
       parameters:
         - name: search
           in: query
-          description: Matches patient name or NIC, case-insensitively.
+          description: Matches patient code, name or NIC, case-insensitively.
           schema: { type: string }
         - name: includeFinished
           in: query
@@ -2186,9 +2189,18 @@ components:
 
     PatientSummary:
       type: object
-      required: [id, full_name, gender]
+      required: [id, patient_code, full_name, gender]
       properties:
         id: { type: string, format: uuid }
+        patient_code:
+          type: string
+          minLength: 8
+          maxLength: 8
+          description: >-
+            The short handle staff say out loud and type into a form, e.g. P7K2X9QM. Eight
+            characters, server-generated once at registration and never changed. Other
+            components identify a patient by this; `id` stays the key any stored reference uses.
+          example: P7K2X9QM
         full_name: { type: string }
         nic: { type: string, nullable: true }
         temp_reference:

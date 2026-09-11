@@ -12,6 +12,17 @@ public class PatientSummary
     [Required]
     public Guid Id { get; set; }
 
+    /// <summary>
+    /// The short handle staff use out loud and type into a form: <c>P7K2X9QM</c>. Eight
+    /// characters, generated once at registration and never changed. Other components identify
+    /// a patient by this; <c>id</c> stays the key every stored reference uses.
+    /// </summary>
+    [Required]
+    // Always exactly eight, both ways. The length is published so a form field can cap itself
+    // at the right number rather than guessing from an example.
+    [StringLength(8, MinimumLength = 8)]
+    public string PatientCode { get; set; } = null!;
+
     [Required]
     public string FullName { get; set; } = null!;
 

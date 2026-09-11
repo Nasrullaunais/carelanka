@@ -778,6 +778,12 @@ export type MaintenanceType = 'routine_service' | 'calibration' | 'repair';
  */
 export type Patient = {
     id: string;
+    /**
+     * The short handle staff use out loud and type into a form: `P7K2X9QM`. Eight
+     * characters, generated once at registration and never changed. Other components identify
+     * a patient by this; `id` stays the key every stored reference uses.
+     */
+    patient_code: string;
     full_name: string;
     /**
      * Null for an unidentified arrival; that row carries a TempReference instead.
@@ -808,6 +814,12 @@ export type Patient = {
  */
 export type PatientDetail = {
     id: string;
+    /**
+     * The short handle staff use out loud and type into a form: `P7K2X9QM`. Eight
+     * characters, generated once at registration and never changed. Other components identify
+     * a patient by this; `id` stays the key every stored reference uses.
+     */
+    patient_code: string;
     full_name: string;
     /**
      * Null for an unidentified arrival; that row carries a TempReference instead.
@@ -890,6 +902,12 @@ export type PatientSortField = 'full_name' | 'created_at';
  */
 export type PatientSummary = {
     id: string;
+    /**
+     * The short handle staff use out loud and type into a form: `P7K2X9QM`. Eight
+     * characters, generated once at registration and never changed. Other components identify
+     * a patient by this; `id` stays the key every stored reference uses.
+     */
+    patient_code: string;
     full_name: string;
     /**
      * Null for an unidentified arrival; that row carries a TempReference instead.

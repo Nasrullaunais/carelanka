@@ -41,6 +41,68 @@ public sealed class PatientEndpointTests
     }
 
     [Fact]
+    public async Task Registering_hands_back_an_eight_character_patient_code_staff_can_read_out()
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+
+        using var body = await ReadJsonAsync(await CreateAsync(client, "Coded Patient", nic: NewNic()));
+        var code = body.RootElement.GetProperty("patient_code").GetString();
+
+        // P then seven characters, with no 0/O and no 1/I/L in the alphabet. Somebody reads
+        // this off a wristband and somebody else types it into another component's form, and
+        // those are the characters they get wrong.
+        Assert.Matches("^P[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{7}$", code);
+    }
+
+    [Fact]
+    public async Task Two_patients_registered_one_after_the_other_never_share_a_code()
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+
+        using var first = await ReadJsonAsync(await CreateAsync(client, "Code A", nic: NewNic()));
+        using var second = await ReadJsonAsync(await CreateAsync(client, "Code B", nic: NewNic()));
+
+        Assert.NotEqual(
+            first.RootElement.GetProperty("patient_code").GetString(),
+            second.RootElement.GetProperty("patient_code").GetString());
+    }
+
+    [Fact]
+    public async Task A_patient_code_is_what_another_component_searches_on_to_find_the_person()
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+
+        using var created = await ReadJsonAsync(await CreateAsync(client, "Findable By Code", nic: NewNic()));
+        var code = created.RootElement.GetProperty("patient_code").GetString();
+
+        // The whole point of the code: Equipment's screen is handed eight characters by a
+        // nurse and has to turn them into this person. Searching is how.
+        using var found = await ReadJsonAsync(await client.GetAsync($"/api/patients?search={code}"));
+
+        Assert.Equal(1, found.RootElement.GetProperty("total_items").GetInt32());
+        Assert.Equal(
+            created.RootElement.GetProperty("id").GetString(),
+            found.RootElement.GetProperty("items")[0].GetProperty("id").GetString());
+    }
+
+    [Fact]
+    public async Task Editing_a_patient_never_moves_their_code_because_it_is_already_on_a_wristband()
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+        var nic = NewNic();
+
+        using var created = await ReadJsonAsync(await CreateAsync(client, "Before Rename", nic: nic));
+        var id = created.RootElement.GetProperty("id").GetString();
+        var code = created.RootElement.GetProperty("patient_code").GetString();
+
+        using var updated = await ReadJsonAsync(await client.PutAsJsonAsync(
+            $"/api/patients/{id}",
+            new { full_name = "After Rename", gender = "female", nic, phone = NewPhone() }));
+
+        Assert.Equal(code, updated.RootElement.GetProperty("patient_code").GetString());
+    }
+
+    [Fact]
     public async Task An_arrival_with_no_nic_and_no_phone_is_given_a_temp_reference_rather_than_refused()
     {
         using var client = await ClientAsync(ApiApplication.NurseEmail);
@@ -470,6 +532,35 @@ public sealed class PatientEndpointTests
 
         Assert.Equal(HttpStatusCode.OK, read.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, edit.StatusCode);
+    }
+
+    [Fact]
+    public async Task Equipment_management_can_look_a_patient_up_to_copy_their_code_but_cannot_change_anything()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var nic = NewNic();
+        var id = await CreateIdAsync(nurse, "Equipment Looks Me Up", nic);
+
+        // The whole reason this role was let in: their assign screen needs the eight characters,
+        // and the only way to get them is to find the patient.
+        using var equipment = await ClientAsync(ApiApplication.EquipmentEmail);
+        using var list = await ReadJsonAsync(await equipment.GetAsync($"/api/patients?search={nic}"));
+
+        Assert.Equal(1, list.RootElement.GetProperty("total_items").GetInt32());
+        Assert.Matches(
+            "^P[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{7}$",
+            list.RootElement.GetProperty("items")[0].GetProperty("patient_code").GetString());
+
+        // Reading, and nothing else. Registering and editing stay with the desk, and the
+        // admissions board stays closed — finding a code is not clinical work.
+        var edit = await equipment.PutAsJsonAsync(
+            $"/api/patients/{id}", new { full_name = "Renamed By Equipment", gender = "male", nic });
+        var register = await CreateAsync(equipment, "Registered By Equipment", nic: NewNic());
+        var admissions = await equipment.GetAsync("/api/admissions");
+
+        Assert.Equal(HttpStatusCode.Forbidden, edit.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, register.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, admissions.StatusCode);
     }
 
     [Fact]

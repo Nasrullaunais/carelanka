@@ -1,8 +1,10 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { AppointmentsPage } from './pages/AppointmentsPage';
+import { BillingPage } from './pages/BillingPage';
 import { CapacityPage } from './pages/CapacityPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { DischargePage } from './pages/DischargePage';
 import { EquipmentPage } from './pages/EquipmentPage';
 import { IntakePage } from './pages/IntakePage';
 import { LoginPage } from './pages/LoginPage';
@@ -51,6 +53,8 @@ export function App() {
         <Route path="/intake" element={<IntakePage />} />
         <Route path="/patients" element={<PatientsPage />} />
         <Route path="/appointments" element={<AppointmentsPage />} />
+        <Route path="/discharge" element={<DischargePage />} />
+        <Route path="/billing" element={<BillingPage />} />
         <Route path="/capacity" element={<CapacityPage />} />
         <Route path="/wards" element={<WardsPage />} />
         <Route path="/equipment" element={<EquipmentPage />} />

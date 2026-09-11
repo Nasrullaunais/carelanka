@@ -196,46 +196,7 @@ public sealed class WorklistService : IWorklistService
             return new Dictionary<Guid, BedLabel>();
         }
 
-        var live = await _db.BedAssignments
-            .AsNoTracking()
-            .Where(assignment => visitIds.Contains(assignment.AdmissionId))
-            .Where(BedHold.LiveOn(now))
-            .Select(assignment => new { assignment.AdmissionId, assignment.BedId })
-            .ToListAsync(ct);
-
-        if (live.Count == 0)
-        {
-            return new Dictionary<Guid, BedLabel>();
-        }
-
-        // Equipment's beds, read through the one adapter allowed to touch them.
-        var registered = await _beds.ListBedsByIdAsync(
-            live.Select(claim => claim.BedId).Distinct().ToList(), ct);
-
-        var wardNames = await _db.Wards
-            .AsNoTracking()
-            .Where(ward => registered.Select(bed => bed.WardId).Contains(ward.Id))
-            .ToDictionaryAsync(ward => ward.Id, ward => ward.Name, ct);
-
-        var byBedId = registered.ToDictionary(
-            bed => bed.Id,
-            bed => new BedLabel(
-                wardNames.TryGetValue(bed.WardId, out var name) ? name : string.Empty,
-                bed.BedNumber));
-
-        // At most one live assignment per admission — ux_bed_assignments_live_admission makes
-        // that a database guarantee, so nothing here can actually discard one.
-        var result = new Dictionary<Guid, BedLabel>();
-
-        foreach (var claim in live)
-        {
-            if (byBedId.TryGetValue(claim.BedId, out var label))
-            {
-                result[claim.AdmissionId] = label;
-            }
-        }
-
-        return result;
+        return await BedLabels.LiveByAdmissionAsync(_db, _beds, visitIds, now, ct);
     }
 
     private static WorklistRow ToRow(Line line, IReadOnlyDictionary<Guid, BedLabel> beds)
@@ -332,6 +293,4 @@ public sealed class WorklistService : IWorklistService
         public DateTimeOffset When { get; init; }
     }
 
-    /// <summary>Where a bed is, for display. Equipment's bed number, our ward name.</summary>
-    private readonly record struct BedLabel(string WardName, string BedNumber);
 }

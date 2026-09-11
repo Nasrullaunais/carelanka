@@ -29,7 +29,7 @@ public class AdmissionsController : ControllerBase
     /// List admissions. With no `status` the answer is the live worklist, not the archive.
     /// `search` matches the patient's code, name or NIC.
     /// </summary>
-    [Authorize(Policy = Policies.AdmissionReader)]
+    [Authorize(Policy = Policies.PatientDetails)]
     [HttpGet(Name = "listAdmissions")]
     [ProducesResponseType(typeof(PagedResult<AdmissionSummary>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
@@ -53,7 +53,7 @@ public class AdmissionsController : ControllerBase
     /// Get one admission with its bed history. Nothing is deleted or overwritten, so rejected
     /// and expired assignments stay on the list — this is the audit trail.
     /// </summary>
-    [Authorize(Policy = Policies.AdmissionReader)]
+    [Authorize(Policy = Policies.PatientDetails)]
     [HttpGet("{id:guid}", Name = "getAdmission")]
     [ProducesResponseType(typeof(AdmissionDetail), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]

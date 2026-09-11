@@ -5,6 +5,19 @@ export type ClientOptions = {
 };
 
 /**
+ * A charge reception types in - an X-ray, a dressing pack, a consultant's fee.
+ */
+export type AddBillChargeRequest = {
+    description: string;
+    /**
+     * Nullable so that leaving it out is a 400 rather than a silent zero - the same trap as
+     * every required value type in this component.
+     */
+    quantity: number;
+    unit_price: number;
+};
+
+/**
  * One hospital visit, in full. The spec builds this from AdmissionSummary + AuditFields, so this inherits rather than repeating the summary fields.
  */
 export type Admission = {
@@ -161,9 +174,11 @@ export type AdmissionDetail = {
     created_at?: string;
     updated_at?: string;
     /**
-     * Every assignment ever made, including rejected and expired ones. Empty until step 6 puts beds behind it.
+     * Every assignment ever made, including rejected and expired ones.
      */
     bed_assignments: Array<BedAssignment>;
+    discharge?: Discharge;
+    bill?: Bill;
 };
 
 /**
@@ -416,6 +431,57 @@ export type BedPagedResult = {
 };
 
 /**
+ * What a visit costs. Bed days and an admission fee are generated from what the hospital
+ * actually recorded; everything else is a line somebody at the desk typed.
+ */
+export type Bill = {
+    id: string;
+    admission_id: string;
+    /**
+     * The handle a patient quotes at the counter.
+     */
+    bill_number: string;
+    /**
+     * Sri Lankan rupees. Fixed - this component does not do currency conversion.
+     */
+    currency: string;
+    lines: Array<BillLine>;
+    /**
+     * The sum of the lines. Not stored, so it cannot disagree with them.
+     */
+    total: number;
+    /**
+     * True once the money is in. This is the same fact as the `billing_settled` checklist
+     * item, written once - settling is what ticks the box, and the box cannot be ticked any
+     * other way.
+     */
+    settled: boolean;
+    settled_at?: string | null;
+    settled_by_staff_id?: string | null;
+    settlement_note?: string | null;
+    patient: PatientSummary;
+    created_at: string;
+    updated_at: string;
+};
+
+/**
+ * One line on a bill.
+ */
+export type BillLine = {
+    id: string;
+    source: BillLineSource;
+    description: string;
+    quantity: number;
+    unit_price: number;
+    /**
+     * Quantity x unit price. Computed, never stored.
+     */
+    line_total: number;
+};
+
+export type BillLineSource = 'admission_fee' | 'bed_stay' | 'manual';
+
+/**
  * Why a visit was called off. Always a human's claim, which is why the reason is mandatory:
  * a computer cannot know whether the ambulance was diverted, the patient died, or it is
  * simply stuck in traffic.
@@ -448,6 +514,49 @@ export type CheckInRequest = {
 };
 
 /**
+ * One tickable box on the discharge checklist.
+ */
+export type ChecklistItem = {
+    /**
+     * Derived from `ticked_at`, never stored separately, so the two cannot disagree.
+     */
+    ticked: boolean;
+    ticked_by_staff_id?: string | null;
+    ticked_at?: string | null;
+    /**
+     * A non-mandatory item can stay unticked without blocking the discharge.
+     */
+    mandatory: boolean;
+};
+
+/**
+ * Any subset of the checklist. A key left out is not touched; a key set to `false` is
+ * unticked.
+ */
+export type ChecklistUpdateRequest = {
+    /**
+     * Doctor only. The wall: without it nothing flags and nothing discharges.
+     */
+    clinical_clearance?: boolean | null;
+    /**
+     * Ward nurse. Mandatory.
+     */
+    medication_issued?: boolean | null;
+    /**
+     * Refused here. Settle the bill instead - `POST /api/admissions/{id}/bill/settle`.
+     */
+    billing_settled?: boolean | null;
+    /**
+     * Ward nurse. Optional item.
+     */
+    follow_up_recorded?: boolean | null;
+    /**
+     * Ward nurse. Optional item.
+     */
+    transport_arranged?: boolean | null;
+};
+
+/**
  * Body of PATCH /api/admissions/{id}/details. Any subset of the fields that were missing —
  * a key left out is left alone, which is what makes this different from the PUT on a patient.
  */
@@ -466,6 +575,16 @@ export type CompleteDetailsRequest = {
  */
 export type CompleteMaintenanceScheduleRequest = {
     notes?: string | null;
+};
+
+/**
+ * What a nurse writes on the way out.
+ */
+export type ConfirmDischargeRequest = {
+    /**
+     * Instructions the patient can read on their own phone afterwards.
+     */
+    summary_note?: string | null;
 };
 
 /**
@@ -665,6 +784,66 @@ export type CurrentPrincipal = {
 };
 
 /**
+ * The discharge record for one admission - its checklist, and who signed it off.
+ */
+export type Discharge = {
+    id: string;
+    admission_id: string;
+    flagged_by: AssignedBy;
+    flagged_at: string;
+    /**
+     * Keyed by the item name - `clinical_clearance`, `billing_settled` and so on.
+     */
+    checklist: {
+        [key: string]: ChecklistItem;
+    };
+    /**
+     * What the candidate list is a query for, and what confirming a discharge needs.
+     */
+    all_mandatory_ticked: boolean;
+    confirmed_by_staff_id?: string | null;
+    confirmed_at?: string | null;
+    summary_note?: string | null;
+    created_at: string;
+    updated_at: string;
+};
+
+/**
+ * A patient who could go home. Produced by a plain rule - every mandatory box ticked - and not
+ * by the agent: checking whether three boxes are ticked is a WHERE clause.
+ */
+export type DischargeCandidate = {
+    admission_id: string;
+    patient: PatientSummary;
+    /**
+     * Empty when the patient holds no bed.
+     */
+    ward_name: string;
+    bed_number: string;
+    admission_category: AdmissionCategory;
+    admitted_at?: string | null;
+    days_in_bed: number;
+    /**
+     * Empty for a true candidate. Populated rows are shown as "nearly ready".
+     */
+    outstanding_items: Array<string>;
+};
+
+/**
+ * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
+ */
+export type DischargeCandidatePagedResult = {
+    items: Array<DischargeCandidate>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    /**
+     * Always at least 1, so an empty list does not render as "page 1 of 0".
+     */
+    total_pages: number;
+};
+
+/**
  * One of the equipment categories. A table, not an enum, so a sixth can be added without a migration.
  */
 export type EquipmentCategory = {
@@ -852,6 +1031,49 @@ export type MaintenanceSchedulePagedResult = {
 export type MaintenanceStatus = 'scheduled' | 'in_progress' | 'completed' | 'overdue' | 'cancelled';
 
 export type MaintenanceType = 'routine_service' | 'calibration' | 'repair';
+
+/**
+ * One row on reception's worklist: a visit whose money has not been taken yet.
+ */
+export type OutstandingBill = {
+    admission_id: string;
+    patient: PatientSummary;
+    status: AdmissionStatus;
+    admission_category: AdmissionCategory;
+    ward_name: string;
+    bed_number: string;
+    admitted_at?: string | null;
+    /**
+     * Null when nobody has prepared a bill for this visit yet.
+     */
+    bill_number?: string | null;
+    /**
+     * Always false on the default list, and the reason `includeSettled` exists: a patient
+     * who asks for their bill again at the counter has already paid.
+     */
+    settled: boolean;
+    settled_at?: string | null;
+    /**
+     * What the bill comes to as it stands - the prepared total, or what preparing it now would
+     * produce. Advisory: the bill screen is what actually writes the lines.
+     */
+    estimated_total: number;
+    currency: string;
+};
+
+/**
+ * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
+ */
+export type OutstandingBillPagedResult = {
+    items: Array<OutstandingBill>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    /**
+     * Always at least 1, so an empty list does not render as "page 1 of 0".
+     */
+    total_pages: number;
+};
 
 /**
  * A patient record as the API publishes it. The spec builds this from PatientSummary + AuditFields, so this inherits rather than repeating the identity fields.
@@ -1142,6 +1364,18 @@ export type ReleaseReason = 'discharged' | 'hold_expired' | 'cancelled' | 'trans
  */
 export type ReportFaultRequest = {
     description: string;
+};
+
+/**
+ * Taking the money.
+ */
+export type SettleBillRequest = {
+    /**
+     * How it was paid, in whatever words reception uses - "cash", "card ending 4417",
+     * "insurance, claim 88231". Free text on purpose: a payment-method enum is the first step
+     * of a payments system, and this component is not building one.
+     */
+    settlement_note?: string | null;
 };
 
 /**
@@ -2206,6 +2440,367 @@ export type RetireBedResponses = {
 };
 
 export type RetireBedResponse = RetireBedResponses[keyof RetireBedResponses];
+
+export type GetAdmissionBillData = {
+    body?: never;
+    path: {
+        admissionId: string;
+    };
+    query?: never;
+    url: '/admissions/{admissionId}/bill';
+};
+
+export type GetAdmissionBillErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetAdmissionBillError = GetAdmissionBillErrors[keyof GetAdmissionBillErrors];
+
+export type GetAdmissionBillResponses = {
+    /**
+     * OK
+     */
+    200: Bill;
+};
+
+export type GetAdmissionBillResponse = GetAdmissionBillResponses[keyof GetAdmissionBillResponses];
+
+export type PrepareAdmissionBillData = {
+    body?: never;
+    path: {
+        admissionId: string;
+    };
+    query?: never;
+    url: '/admissions/{admissionId}/bill';
+};
+
+export type PrepareAdmissionBillErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type PrepareAdmissionBillError = PrepareAdmissionBillErrors[keyof PrepareAdmissionBillErrors];
+
+export type PrepareAdmissionBillResponses = {
+    /**
+     * OK
+     */
+    200: Bill;
+};
+
+export type PrepareAdmissionBillResponse = PrepareAdmissionBillResponses[keyof PrepareAdmissionBillResponses];
+
+export type AddBillChargeData = {
+    body?: AddBillChargeRequest;
+    path: {
+        admissionId: string;
+    };
+    query?: never;
+    url: '/admissions/{admissionId}/bill/charges';
+};
+
+export type AddBillChargeErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type AddBillChargeError = AddBillChargeErrors[keyof AddBillChargeErrors];
+
+export type AddBillChargeResponses = {
+    /**
+     * OK
+     */
+    200: Bill;
+};
+
+export type AddBillChargeResponse = AddBillChargeResponses[keyof AddBillChargeResponses];
+
+export type RemoveBillChargeData = {
+    body?: never;
+    path: {
+        admissionId: string;
+        lineId: string;
+    };
+    query?: never;
+    url: '/admissions/{admissionId}/bill/charges/{lineId}';
+};
+
+export type RemoveBillChargeErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RemoveBillChargeError = RemoveBillChargeErrors[keyof RemoveBillChargeErrors];
+
+export type RemoveBillChargeResponses = {
+    /**
+     * OK
+     */
+    200: Bill;
+};
+
+export type RemoveBillChargeResponse = RemoveBillChargeResponses[keyof RemoveBillChargeResponses];
+
+export type SettleBillData = {
+    body?: SettleBillRequest;
+    path: {
+        admissionId: string;
+    };
+    query?: never;
+    url: '/admissions/{admissionId}/bill/settle';
+};
+
+export type SettleBillErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type SettleBillError = SettleBillErrors[keyof SettleBillErrors];
+
+export type SettleBillResponses = {
+    /**
+     * OK
+     */
+    200: Bill;
+};
+
+export type SettleBillResponse = SettleBillResponses[keyof SettleBillResponses];
+
+export type ListOutstandingBillsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        search?: string;
+        includeSettled?: boolean;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/billing/outstanding';
+};
+
+export type ListOutstandingBillsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListOutstandingBillsError = ListOutstandingBillsErrors[keyof ListOutstandingBillsErrors];
+
+export type ListOutstandingBillsResponses = {
+    /**
+     * OK
+     */
+    200: OutstandingBillPagedResult;
+};
+
+export type ListOutstandingBillsResponse = ListOutstandingBillsResponses[keyof ListOutstandingBillsResponses];
+
+export type ListDischargeCandidatesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        wardId?: string;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/discharges/candidates';
+};
+
+export type ListDischargeCandidatesErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListDischargeCandidatesError = ListDischargeCandidatesErrors[keyof ListDischargeCandidatesErrors];
+
+export type ListDischargeCandidatesResponses = {
+    /**
+     * OK
+     */
+    200: DischargeCandidatePagedResult;
+};
+
+export type ListDischargeCandidatesResponse = ListDischargeCandidatesResponses[keyof ListDischargeCandidatesResponses];
+
+export type UpdateDischargeChecklistData = {
+    body?: ChecklistUpdateRequest;
+    path: {
+        admissionId: string;
+    };
+    query?: never;
+    url: '/discharges/{admissionId}/checklist';
+};
+
+export type UpdateDischargeChecklistErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type UpdateDischargeChecklistError = UpdateDischargeChecklistErrors[keyof UpdateDischargeChecklistErrors];
+
+export type UpdateDischargeChecklistResponses = {
+    /**
+     * OK
+     */
+    200: Discharge;
+};
+
+export type UpdateDischargeChecklistResponse = UpdateDischargeChecklistResponses[keyof UpdateDischargeChecklistResponses];
+
+export type ConfirmDischargeData = {
+    body?: ConfirmDischargeRequest;
+    path: {
+        admissionId: string;
+    };
+    query?: never;
+    url: '/discharges/{admissionId}/confirm';
+};
+
+export type ConfirmDischargeErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ConfirmDischargeError = ConfirmDischargeErrors[keyof ConfirmDischargeErrors];
+
+export type ConfirmDischargeResponses = {
+    /**
+     * OK
+     */
+    200: Discharge;
+};
+
+export type ConfirmDischargeResponse = ConfirmDischargeResponses[keyof ConfirmDischargeResponses];
 
 export type ListEquipmentCategoriesData = {
     body?: never;

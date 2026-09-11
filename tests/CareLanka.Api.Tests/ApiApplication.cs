@@ -22,6 +22,15 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
     public const string InactiveEmail = "inactive.tests@carelanka.invalid";
     public const string DoctorEmail = "doctor.tests@carelanka.invalid";
     public const string EquipmentEmail = "equipment.tests@carelanka.invalid";
+
+    // Reception. On PatientRegistrar and PatientDetails since 2026-09-11, and the only role
+    // besides the duty manager and the administrator that may settle a bill.
+    public const string ReceptionEmail = "reception.tests@carelanka.invalid";
+
+    // The role that is on nothing in Patient Management. Ambulance crew came off
+    // PatientRegistrar on 2026-09-11 and was never on the reading policy, so it is what a
+    // "this role is refused" test needs.
+    public const string AmbulanceEmail = "ambulance.tests@carelanka.invalid";
     public const string SigningKey = "test-signing-key-that-is-at-least-32-characters";
 
     private readonly string _databasePassword = Guid.NewGuid().ToString("N");
@@ -76,7 +85,9 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
             Staff(InactiveEmail, StaffRole.Doctor, false, passwords),
             Staff(DoctorEmail, StaffRole.Doctor, true, passwords),
             Staff(AdministratorEmail, StaffRole.HospitalAdministrator, true, passwords),
-            Staff(EquipmentEmail, StaffRole.EquipmentManager, true, passwords));
+            Staff(EquipmentEmail, StaffRole.EquipmentManager, true, passwords),
+            Staff(ReceptionEmail, StaffRole.GeneralStaff, true, passwords),
+            Staff(AmbulanceEmail, StaffRole.AmbulanceCrew, true, passwords));
         await db.SaveChangesAsync();
     }
 

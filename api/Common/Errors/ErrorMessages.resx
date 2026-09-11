@@ -218,4 +218,28 @@
     <value>A {0} visit does not need a bed.</value>
     <comment>Hard rule H0. Refuses a bed assignment for an outpatient, who is seen and sent home.</comment>
   </data>
+  <data name="cl_pat_022" xml:space="preserve">
+    <value>{0} is ticked by a {1}, not by you.</value>
+    <comment>Discharge checklist. clinical_clearance is the doctor's alone; the rest belong to the ward nurse.</comment>
+  </data>
+  <data name="cl_pat_023" xml:space="preserve">
+    <value>This discharge is not ready: {0} still outstanding.</value>
+    <comment>Every mandatory checklist item has to be ticked before a patient can be sent home.</comment>
+  </data>
+  <data name="cl_pat_024" xml:space="preserve">
+    <value>Sending an {0} patient home is the duty manager's decision.</value>
+    <comment>A ward nurse confirms outpatient, day_case and inpatient discharges. ICU and HDU are one rung higher.</comment>
+  </data>
+  <data name="cl_pat_025" xml:space="preserve">
+    <value>Tick billing_settled by settling the bill, not by hand.</value>
+    <comment>One fact in one place. Settling the bill is the only thing that writes this box, so a paid bill and an unticked box cannot happen.</comment>
+  </data>
+  <data name="cl_pat_026" xml:space="preserve">
+    <value>Bill {0} is settled and cannot be changed.</value>
+    <comment>A settled bill is frozen: no new lines, no removals, no second settlement.</comment>
+  </data>
+  <data name="cl_pat_027" xml:space="preserve">
+    <value>That line was worked out from the patient's stay and is not removable.</value>
+    <comment>Only a line somebody typed can be deleted. A bed or fee line changes by preparing the bill again.</comment>
+  </data>
 </root>

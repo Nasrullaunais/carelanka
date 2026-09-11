@@ -116,7 +116,8 @@ The second version keeps working when hold expiry, out-of-service beds or a new 
 | `StaffMember`, `Shift`, `Allocation`, `LeaveRequest` | **Staff (M2)** | All — everyone stores staff IDs | Staff only |
 | `EquipmentItem`, `EquipmentCategory`, `PharmacyItem`, `PharmacyCategory`, `PharmacyTransaction`, `MaintenanceSchedule`, `Warning`, `ActionRequest` | **Equipment (M3)** | Patient (ward equipment readiness); any staff (search/availability) | Equipment only |
 | **`Bed`** — exists, number, condition, repairs | **Equipment (M3)** | Patient (to find candidates) | Equipment only |
-| `Patient`, `Admission`, `Discharge` | **Patient (M4)** | Emergency, Staff (aggregates only) | Patient only |
+| `Patient`, `Admission`, `Discharge`, `DischargeChecklistItem` | **Patient (M4)** | Emergency, Staff (aggregates only) | Patient only |
+| **`Bill`, `BillLineItem`** — what a visit costs and whether it is paid | **Patient (M4)** — *claimed 2026-09-11, see §11.10* | Nobody yet | Patient only |
 | **`BedAssignment`** — who is in a bed, holds, approvals | **Patient (M4)** | Equipment (before servicing a bed) | Patient only |
 | `Ward` — name, type, gender policy | **Patient (M4)** — *see §11.1* | All | Patient only |
 | `AgentWorkflow`, `AgentProposedChange` | **Common (group-owned)** — *DECIDED, §11.2* | All five agents | All five agents, by `workflow_id` |
@@ -615,7 +616,26 @@ What that does and does not grant:
 | :--- | :--- |
 | `GET /patients`, `GET /patients/{id}` | **now allowed** for `EquipmentManager` |
 | `POST /patients`, `PUT /patients/{id}` | still refused — `PatientRegistrar` / `PatientEditor` are untouched |
-| `GET /admissions`, `GET /patient-worklist` | still refused — `AdmissionReader` is untouched |
+| ~~`GET /admissions`, `GET /patient-worklist`~~ | **now allowed too — changed 2026-09-11.** See below. |
+
+**Amended 2026-09-11 — the last row of that table stopped being true, and the honest reading is
+that it was never quite true.** `PatientReader` and `AdmissionReader` were collapsed into one
+policy, `PatientDetails`, because the split was describing one level of access under two names:
+`PatientDetail` inherits `Patient` and adds the patient's admissions, so **every**
+`PatientReader` role — including this one — could already read care level, urgency and status
+through `GET /patients/{id}`, whether or not it was on `AdmissionReader`. The door the table
+promised was shut had a window next to it.
+
+So rather than keep two names over one reality, there is now one policy and one sentence about
+it. `PatientDetails` is **six of the seven staff roles**: `GeneralStaff`, `WardNurse`,
+`DutyManager`, `HospitalAdministrator`, `Doctor`, `EquipmentManager`. `AmbulanceCrew` is the
+one left out.
+
+**What actually changed for M3**, as opposed to what was already possible: the admissions list
+and the ward board are now reachable with an equipment token. If the group wants that tightened,
+the seam is still one policy in `Program.cs`, and the narrower alternative is still the one from
+before — a resolve-by-code endpoint answering a name and nothing else. Writing is unchanged and
+remains `WardNurse` + `DutyManager` in every case.
 
 **Worth being honest about the trade:** those two reads carry NIC, phone, address, date of
 birth and, on the detail, the patient's admission history. An inventory role can now see all
@@ -626,6 +646,68 @@ one policy in `Program.cs` and one test,
 
 **M4 stops here.** How M3 uses the code — what their screen asks for, and what their assign
 endpoint takes — is theirs to decide and theirs to build. M4 has written nothing on that side.
+
+**11.9 (OPEN — raised by M4 on 2026-09-11, for Kaveesha / M1) — the ambulance crew no longer
+registers patients.**
+
+**What changed.** `Policies.PatientRegistrar` is now `GeneralStaff`, `WardNurse`,
+`DutyManager`. `AmbulanceCrew` came off it. The reasoning is that the crew are the emergency
+response team and the paperwork is done at the hospital desk — and reception, who had no access
+to this component at all, are who actually do it.
+
+**Why this is M1's problem and not only M4's.** §4.2 of this file has the emergency flow
+creating a patient record with a `temp_reference` for an unidentified casualty, and
+`emergency-spec.yaml` is written around `DutyManager` and `AmbulanceCrew` — `GeneralStaff` does
+not appear in it anywhere. After this change that record is created at the desk, not at the
+scene.
+
+**What is and is not affected today:**
+
+| | |
+| :--- | :--- |
+| `POST /patients`, `POST /patients/lookup`, `POST /admissions` | `AmbulanceCrew` now gets 403 |
+| `GET /patients`, `GET /admissions`, `GET /patient-worklist` | `AmbulanceCrew` was never on these and still is not — it is the one staff role on no Patient Management policy |
+| `POST /admissions/pre-admit` | **not built.** Its `Roles:` line in `patient-spec.yaml` still says `AmbulanceCrew, DutyManager`, so the spec and `Policies.cs` currently disagree about that role. Nothing is broken today because there is no code behind it — but it has to be settled before there is. |
+
+**M4 has not edited `emergency-spec.yaml`.** It is Kaveesha's file. Three ways out, and the
+choice is hers: put `GeneralStaff` into the emergency flow; keep `AmbulanceCrew` on
+`pre-admit` alone as a documented exception, since a pre-admission is a dispatch record rather
+than desk paperwork; or argue the crew should keep registration and M4 reverts.
+
+---
+
+**11.10 (OPEN — announced by M4 on 2026-09-11) — Patient Management has claimed billing.**
+
+Not a question, and not a request. It is here because claiming an unowned area silently is
+exactly what this section exists to prevent.
+
+**What was built.** `Bill` and `BillLineItem`, migration `Patient_AddBilling`, six endpoints
+under `/admissions/{id}/bill` and `/billing/outstanding`, and a React screen for reception.
+Design is `patient-management-plan.md` §6.5; the contract is `patient-spec.yaml`.
+
+**Why.** `billing_settled` has been a mandatory discharge checklist item since the first draft,
+and §11 of the plan listed billing as out of scope in the same breath. A mandatory tick with
+nothing behind it is a box somebody presses to make a screen go green, which is worse than not
+having it.
+
+**What it does not touch.** Nobody else's tables. It reads `Admission`, `BedAssignment` and
+`Ward`, all of which are M4's, plus Equipment's bed register through the existing
+`IBedRegistryService` port — the same read step 6 already does, no new dependency.
+
+**What it deliberately cannot do, and why the other three should know.** A generated bill is an
+admission fee and bed days, and nothing else, because **nothing in this project records a
+treatment, a procedure or a drug against an admission.** Equipment's `PharmacyTransaction` has
+a `performed_by_staff_id` and no admission id, so a dispensed medicine cannot be attributed to
+a patient even in principle. Reception types clinical charges by hand.
+
+**If M3 ever wants pharmacy on a bill**, the missing piece is on their side: an admission id (or
+a `patient_code`) on `PharmacyTransaction`. That is their table and their call, and M4 has
+written nothing on that side. Until then the by-hand line is the honest answer and the plan
+says so out loud.
+
+**Rates are a static C# table** (`Services/Patient/BillingRates.cs`), invented numbers, no
+`billing_rates` table and no admin screen. If the group wants prices editable, that is one
+file's worth of seam and somebody has to own the screen.
 
 ---
 

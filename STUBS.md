@@ -174,8 +174,30 @@ needs from others" sections of `integration_of_functions.md` (§10, §16, §21,
 | ~~M2, M3~~ | ~~Ward list — id, name, type~~ | ~~**M4**~~ | **BUILT 2026-09-09 — not a stub any more.** `GET /api/wards` is live and every staff role may read it; `POST /api/wards` is admin-only. Shape: `specs/patient-spec.yaml`. Filters: `?wardType=` and `?isActive=` (defaults true) |
 | ~~M3 Equipment~~ | ~~Is this bed occupied or held?~~ | ~~**M4**~~ | **BUILT 2026-09-11 — not a stub any more.** `GET /api/beds/{id}/occupancy` is live for every staff role. `occupied` is true while a live assignment exists: status `occupied`, or `reserved` with a `reserved_until` still ahead. **A lapsed hold does not block servicing.** 404 for a bed the register does not have, deliberately, because "free" is the one direction this answer must never be wrong in |
 | M3 Equipment | Admission summary by ID | **M4** | For displaying who an assigned item belongs to |
+| M4 Patient | A dispensed medicine, tied to an admission | **M3** | **Nothing to stub yet — the column does not exist.** `PharmacyTransaction` records what left the shelf and who took it, and carries no admission or patient id, so a medicine cannot be put on a bill even in principle. M4 has **not** faked it: billing generates an admission fee and bed days only, and reception types clinical charges by hand (`patient-management-plan.md` §6.5). If M3 ever adds the link, the bill can price it — their table, their call. `integration_of_functions.md` §11.10 |
 | ~~all four~~ | ~~Agent workflow tables~~ | ~~group~~ | **Not a stub — DECIDED 2026-09-07.** Common, built once. Contract: `specs/common-spec.yaml` (`GET /workflows`, `GET /workflows/{workflowId}`, the approve/reject/revise gate). Reasoning: `docs/ADR.md` ADR 3 |
 | ~~all four~~ | ~~Login + a JWT with your role claim~~ | ~~**Common (group-owned)**~~ | **BUILT 2026-09-07 — not a stub, and never was one.** `POST /auth/login`, `POST /auth/patient/register`, `POST /auth/patient/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me`. Write `[Authorize(Policy = Policies.X)]` against the real thing. Setup and test accounts: `api/README.md` |
+
+### A gap that is honestly empty rather than quietly stubbed
+
+Billing landed on 2026-09-11 and it needs clinical charges it cannot get. The tempting move was
+a `StubTreatmentService` returning a plausible X-ray and a plausible dressing pack, so the demo
+bill would look full.
+
+**That would have been the worst kind of stub**, and worth writing down as the counter-example
+to row 3 above. A fake bed-occupancy answer is visibly wrong the moment two people want the same
+bed. A fake *charge* is a number on a piece of paper handed to a patient, it looks exactly like
+a real one, and nothing in the system would ever contradict it.
+
+So there is no stub. The bill contains what the schema actually records — a care level and time
+in a bed — and a person types the rest. `patient-management-plan.md` §6.5 says so in the design
+doc, the endpoint description says so in the contract, and the screen says so to reception.
+
+**The rule that falls out:** stub a *fact somebody else will later compute*. Never stub a fact
+nobody has ever recorded, because there is nothing for the real implementation to replace it
+with.
+
+---
 
 ### The one that should not have been stubbed for long, and was not
 

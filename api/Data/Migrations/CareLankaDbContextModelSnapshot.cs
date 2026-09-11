@@ -1059,6 +1059,10 @@ namespace CareLanka.Api.Data.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("is_downgrade");
 
+                    b.Property<DateTimeOffset?>("OccupiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occupied_at");
+
                     b.Property<string>("OverrideReason")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -1118,6 +1122,122 @@ namespace CareLanka.Api.Data.Migrations
                             t.HasCheckConstraint("ck_bed_assignments_release_reason", "release_reason IS NULL OR release_reason IN ('discharged', 'hold_expired', 'cancelled', 'transferred', 'rejected')");
 
                             t.HasCheckConstraint("ck_bed_assignments_status", "status IN ('reserved', 'occupied', 'released')");
+                        });
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.Bill", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AdmissionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("admission_id");
+
+                    b.Property<string>("BillNumber")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("bill_number");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("SettledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("settled_at");
+
+                    b.Property<Guid?>("SettledByStaffMemberId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("settled_by_staff_member_id");
+
+                    b.Property<string>("SettlementNote")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("settlement_note");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_bills");
+
+                    b.HasIndex("AdmissionId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_bills_admission_id");
+
+                    b.HasIndex("BillNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ux_bills_bill_number");
+
+                    b.HasIndex("SettledByStaffMemberId")
+                        .HasDatabaseName("ix_bills_settled_by_staff_member_id");
+
+                    b.ToTable("bills", (string)null);
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.BillLineItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("BedAssignmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("bed_assignment_id");
+
+                    b.Property<Guid>("BillId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("bill_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("quantity");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("source");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("unit_price");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_bill_line_items");
+
+                    b.HasIndex("BillId")
+                        .HasDatabaseName("ix_bill_line_items_bill_id");
+
+                    b.ToTable("bill_line_items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_bill_line_items_quantity", "quantity > 0");
+
+                            t.HasCheckConstraint("ck_bill_line_items_source", "source IN ('admission_fee', 'bed_stay', 'manual')");
+
+                            t.HasCheckConstraint("ck_bill_line_items_unit_price", "unit_price >= 0");
                         });
                 });
 
@@ -1527,6 +1647,36 @@ namespace CareLanka.Api.Data.Migrations
                     b.Navigation("Admission");
                 });
 
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.Bill", b =>
+                {
+                    b.HasOne("CareLanka.Api.Data.Entities.Patient.Admission", "Admission")
+                        .WithOne()
+                        .HasForeignKey("CareLanka.Api.Data.Entities.Patient.Bill", "AdmissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_bills_admissions_admission_id");
+
+                    b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", null)
+                        .WithMany()
+                        .HasForeignKey("SettledByStaffMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_bills_staff_members_settled_by_staff_member_id");
+
+                    b.Navigation("Admission");
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.BillLineItem", b =>
+                {
+                    b.HasOne("CareLanka.Api.Data.Entities.Patient.Bill", "Bill")
+                        .WithMany("LineItems")
+                        .HasForeignKey("BillId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_bill_line_items_bills_bill_id");
+
+                    b.Navigation("Bill");
+                });
+
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.Discharge", b =>
                 {
                     b.HasOne("CareLanka.Api.Data.Entities.Patient.Admission", "Admission")
@@ -1602,6 +1752,11 @@ namespace CareLanka.Api.Data.Migrations
                     b.Navigation("BedAssignments");
 
                     b.Navigation("Discharge");
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.Bill", b =>
+                {
+                    b.Navigation("LineItems");
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.Discharge", b =>

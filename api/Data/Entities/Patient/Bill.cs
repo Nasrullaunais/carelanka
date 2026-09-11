@@ -1,0 +1,32 @@
+using CareLanka.Api.Data.Enums;
+
+namespace CareLanka.Api.Data.Entities.Patient;
+
+// What a visit costs. One per admission, created the first time anyone asks for it rather than
+// at admission time - a stay that has not happened yet cannot be priced.
+//
+// There is no Total column. The total is the sum of the lines, so the two can never disagree.
+public class Bill : AuditedEntity
+{
+    public Guid AdmissionId { get; set; }
+
+    public Admission Admission { get; set; } = null!;
+
+    // The handle a patient quotes at the counter: B7K2X9Q. Same alphabet and the same reasoning
+    // as a patient code - see BillCodes.
+    public string BillNumber { get; set; } = null!;
+
+    // Null means unsettled. One nullable timestamp rather than a bool plus a timestamp that can
+    // contradict it, the same shape as a checklist tick.
+    public DateTimeOffset? SettledAt { get; set; }
+
+    public Guid? SettledByStaffMemberId { get; set; }
+
+    // How it was paid, in whatever words reception uses. Free text on purpose: a payment-method
+    // enum is the start of a payments system, and this component is not building one.
+    public string? SettlementNote { get; set; }
+
+    public ICollection<BillLineItem> LineItems { get; set; } = new List<BillLineItem>();
+
+    public bool IsSettled => SettledAt is not null;
+}

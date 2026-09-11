@@ -489,13 +489,49 @@ public sealed class PatientEndpointTests
         using var anonymous = _application.CreateClient();
         var withoutToken = await CreateAsync(anonymous, "Anonymous", nic: NewNic());
 
-        // An administrator manages wards and reads records; they do not stand at the intake
-        // desk. patient-spec.yaml lists nurse, ambulance crew and duty manager only.
+        // An administrator manages wards and runs the organisation; they do not stand at the
+        // intake desk. patient-spec.yaml lists general staff, nurse and duty manager only.
         using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
         var wrongRole = await CreateAsync(administrator, "Wrong Role", nic: NewNic());
 
         Assert.Equal(HttpStatusCode.Unauthorized, withoutToken.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, wrongRole.StatusCode);
+    }
+
+    [Fact]
+    public async Task Reception_registers_patients_and_the_ambulance_crew_no_longer_does()
+    {
+        // Changed 2026-09-11. The crew are the emergency response team and the paperwork is
+        // done at the hospital desk, so general staff went onto PatientRegistrar and ambulance
+        // crew came off it. Not a tidy-up: it decides who creates the record for an
+        // unidentified casualty, which is why integration_of_functions.md 11.9 raises it with
+        // Emergency rather than leaving it as our own detail.
+        using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
+        var byReception = await CreateAsync(reception, "Registered At The Desk", nic: NewNic());
+
+        using var ambulance = await ClientAsync(ApiApplication.AmbulanceEmail);
+        var byAmbulance = await CreateAsync(ambulance, "Registered At The Scene", nic: NewNic());
+
+        Assert.Equal(HttpStatusCode.Created, byReception.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, byAmbulance.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_ambulance_crew_is_the_one_staff_role_that_cannot_read_a_patient_record()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var id = await CreateIdAsync(nurse, "Not For The Crew", NewNic());
+
+        // PatientDetails is six of the seven staff roles. This is the seventh, and the test
+        // exists so that "six of seven" stays a decision rather than becoming an accident.
+        using var ambulance = await ClientAsync(ApiApplication.AmbulanceEmail);
+        var read = await ambulance.GetAsync($"/api/patients/{id}");
+        var list = await ambulance.GetAsync("/api/patients");
+        var admissions = await ambulance.GetAsync("/api/admissions");
+
+        Assert.Equal(HttpStatusCode.Forbidden, read.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, list.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, admissions.StatusCode);
     }
 
     [Fact]
@@ -551,16 +587,22 @@ public sealed class PatientEndpointTests
             "^P[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{7}$",
             list.RootElement.GetProperty("items")[0].GetProperty("patient_code").GetString());
 
-        // Reading, and nothing else. Registering and editing stay with the desk, and the
-        // admissions board stays closed — finding a code is not clinical work.
+        // **The admissions board is now open to them, and it was not before.** Collapsing
+        // PatientReader and AdmissionReader into one PatientDetails policy on 2026-09-11 did
+        // that, and the honest reading is that it always was open: a PatientDetail carries the
+        // patient's admissions, so this role could already see care level, urgency and status
+        // through GET /patients/{id}. Two policies were describing one level of access.
+        // integration_of_functions.md 11.8 now says so rather than promising a closed door.
+        var admissions = await equipment.GetAsync("/api/admissions");
+
+        // Writing is what actually stays shut. Registering and editing are still the desk's.
         var edit = await equipment.PutAsJsonAsync(
             $"/api/patients/{id}", new { full_name = "Renamed By Equipment", gender = "male", nic });
         var register = await CreateAsync(equipment, "Registered By Equipment", nic: NewNic());
-        var admissions = await equipment.GetAsync("/api/admissions");
 
+        Assert.Equal(HttpStatusCode.OK, admissions.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, edit.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, register.StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, admissions.StatusCode);
     }
 
     [Fact]

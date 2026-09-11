@@ -33,7 +33,7 @@
 | 5 | `GET /capacity/wards` + `GET /wards/{id}/occupancy` | **Done.** M1 and M2 are unblocked. Hold expiry lives in `CapacityService` and nowhere else |
 | 6 | **Manual bed assignment, no AI** | **Done.** Pick a bed by hand, with the 30-minute hold. The concurrency guarantee lives in the partial unique index, not in code |
 | 6b | **Visits that need no bed (H0) + the patients board** | **Done.** An `outpatient` never enters `awaiting_bed`. `GET /api/patient-worklist` unions bookings and visits so the board can say "not arrived". **No migration** |
-| 7 | Discharge checklist + confirmation | `clinical_clearance` gated on the `doctor` role claim |
+| 7 | Discharge checklist + confirmation | **Done.** `clinical_clearance` gated on the `doctor` role claim. **Billing came with it** — `billing_settled` cannot be an honest tick with nothing behind it |
 | 8 | Codegen gate | |
 | 9 | React: admissions dashboard, bed board, occupancy report | |
 | 10 | Flutter: nurse screens, then the patient's own-stay screens | Local notifications on status change is your device feature |
@@ -210,6 +210,84 @@ Two traps the union set, both worth not repeating:
 
 ---
 
+**Step 7 is complete, and billing came with it.** Three discharge endpoints
+(`GET /api/discharges/candidates`, `PATCH /api/discharges/{id}/checklist`,
+`POST /api/discharges/{id}/confirm`) and six billing ones under `/api/admissions/{id}/bill` and
+`/api/billing/outstanding`. Migration `Patient_AddBilling`: `bills`, `bill_line_items`, and one
+new column on `bed_assignments`. Two React screens, `/discharge` and `/billing`. 16 new tests.
+
+**Billing was out of scope and is not any more.** `patient-management-plan.md` §11 listed
+"billing beyond a checklist tick" as deliberately not built, in the same document that made
+`billing_settled` a mandatory item. A required tick with nothing behind it is a box somebody
+presses to turn a screen green. It is claimed openly in `integration_of_functions.md` §11.10 so
+the other three can see it rather than find out.
+
+Things settled while building it:
+
+- **A bill can only contain what the schema records, and this one says so out loud.** An
+  admission fee from the care level, and a line per bed per day — and nothing clinical, because
+  no table anywhere ties a treatment, a scan or a drug to an admission. Equipment's
+  `PharmacyTransaction` has no admission id. So reception types clinical charges by hand, and
+  the design doc, the contract and the screen all state that rather than generating plausible
+  line items from nothing. The tempting stub here would have been the most dangerous one in the
+  project — see the new section in `STUBS.md`.
+- **`billing_settled` is not tickable by anybody.** Settling the bill writes it, in the same
+  transaction, and `PATCH /checklist` refuses the key from every role with `cl_pat_025`. Two
+  ways to write one fact is two ways for it to be wrong, and this is the one fact where the
+  disagreement would be a patient told they still owe money they have paid.
+- **Settle prepares the bill first if nobody has.** Without that, a visit nobody billed could
+  never tick the box and therefore could never be discharged — a deadlock with no way out from
+  the desk. Found by asking what happens on the least interesting path.
+- **`bed_assignments.occupied_at` had to exist.** Nothing recorded when a hold became an
+  occupancy. For a single stay `Admission.AdmittedAt` happens to be the same instant; for a
+  patient moved to a second bed mid-stay there were two occupancies and one arrival time, so
+  "how long was this patient in *this* bed" had no answer. One nullable column, with
+  `CreatedAt` as the fallback for rows written before it.
+- **EF saves a new child as an UPDATE if you set its key yourself.** Adding a `BillLineItem` to
+  a tracked `bill.LineItems` and calling `SaveChanges` produced
+  *"expected to affect 1 row, actually affected 0"*. Change tracking decides Added-versus-
+  Modified for an entity it meets through a navigation by looking at the key, and a non-default
+  Guid means "this row already exists". Every new child now goes through `_db.X.Add` as well as
+  the collection. The same trap is in `DischargeService` for checklist items.
+- **The discharge row is created on first touch, not at admission.** Every visit already on
+  `main` got one the moment it was needed, so there was no backfill and no data migration — and
+  a visit nobody discharges never grows five rows it does not use. The entity comment said
+  "created at admission time"; it was never true, and now it does not claim to be.
+- **`Discharge` stores rows, not `jsonb`.** §6.1 of the plan said `jsonb`; step 2 built
+  `discharge_checklist_items` and the plan had never been corrected. Fixed now: a tick records
+  who and when, and that wants a foreign key rather than a blob.
+- **Three services had each written out the same bed-label join.** `BedLabels` is now one file
+  with two methods, and `AdmissionService`, `WorklistService` and `DischargeService` all call
+  it. It was two copies before this step and would have been three.
+- **A React fallback got a badge wrong, and only the browser found it.** A checklist with no
+  rows yet still has to render five boxes, and the placeholder marked everything except
+  follow-up as required — so "Transport arranged" showed a Required badge next to a hint saying
+  it was optional. Tests could not see it; walking the screen could. The fallback now reads the
+  same mandatory list the server does.
+
+**The policy rework that came with it** — `Policies.cs` is group-owned, so this is in the PR
+body too:
+
+- **`PatientReader` + `AdmissionReader` → one `PatientDetails`.** The split was never real: a
+  `PatientDetail` carries the patient's admissions, so every `PatientReader` role could already
+  read care level, urgency and status through `GET /patients/{id}`. Two names over one level of
+  access. Now six of the seven staff roles, ambulance crew excluded. `integration_of_functions.md`
+  §11.8 was promising equipment management a closed door that had a window next to it, and now
+  says so.
+- **`PatientRegistrar` = general staff, ward nurse, duty manager.** Ambulance crew removed — the
+  crew are the response team, the paperwork is done at the desk. **This one reaches into
+  Emergency**, because their spec is written around ambulance crew and duty manager and
+  `GeneralStaff` does not appear in it. Raised as §11.9 for Kaveesha; `emergency-spec.yaml` is
+  hers and has not been touched.
+- **Two new policies**, `DischargeChecklist` (nurse, doctor, manager) and `BillingDesk` (general
+  staff, administrator, duty manager). Confirming a discharge reuses `AdmissionEditor`.
+- **Four existing tests changed because the rule changed**, not to go green: equipment
+  management can now read the admissions board, the administrator can too, the worklist refusal
+  test moved to ambulance crew, and `AdmissionDetail` now serves `discharge` and `bill` instead
+  of omitting them.
+
+---
+
 **Step 6 is complete, and it retired the last stub pointing at us.** Three endpoints:
 `GET /api/bed-availability`, `POST /api/admissions/{id}/assign-bed` and
 `GET /api/beds/{id}/occupancy`. **No migration** — `ux_bed_assignments_live_bed` landed with
@@ -356,4 +434,6 @@ Two things your Flutter screens must handle:
 ~~`GET /beds/{id}/occupancy` (M3)~~ **built 2026-09-11**, `POST /admissions/pre-admit` (M1).
 
 **So `POST /admissions/pre-admit` for Kaveesha is the only thing anybody is still waiting on
-us for.**
+us for** — and after the policy rework on 2026-09-11 its `Roles:` line and `Policies.cs`
+disagree about `AmbulanceCrew`. Nothing is broken today because the endpoint does not exist, but
+that has to be settled before it does. `integration_of_functions.md` §11.9.

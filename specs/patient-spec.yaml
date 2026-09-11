@@ -48,6 +48,10 @@ tags:
     description: Agent proposals, human approval, and manual override.
   - name: Discharge
     description: Discharge checklist and confirmation.
+  - name: Billing
+    description: >-
+      What a visit costs and taking the money for it. Claimed by Patient Management on
+      2026-09-11 - see integration_of_functions.md section 11.10.
   - name: Care Recommendations
     description: |
       The second agent. A patient describes a symptom or concern; the agent drafts a
@@ -71,10 +75,13 @@ paths:
       tags: [Patients]
       summary: Register a patient
       description: |
-        Roles: WardNurse, AmbulanceCrew, DutyManager.
+        Roles: GeneralStaff, WardNurse, DutyManager.
 
         Creates a patient record. The record is created BY staff ABOUT a person - the patient
         does not sign up for it and may never have an account.
+
+        AmbulanceCrew was removed on 2026-09-11: the paperwork is done at the hospital desk, not
+        at the scene. See `integration_of_functions.md` §11.9, which is addressed to M1.
 
         Minimum viable identity: a name plus an NIC or phone. If neither identifier is available
         (unconscious arrival, no documents), omit both and the server generates a
@@ -106,12 +113,15 @@ paths:
       tags: [Patients]
       summary: Search patients
       description: |
-        Roles: WardNurse, DutyManager, HospitalAdministrator, Doctor, EquipmentManager.
+        Roles: GeneralStaff, WardNurse, DutyManager, HospitalAdministrator, Doctor, EquipmentManager.
 
         `search` matches patient code, full name, NIC, phone, or temp reference.
 
-        EquipmentManager is on this list to find a patient's `patient_code` and carry it onto
-        their own screen. Read-only, and it does not extend to admissions.
+        Six of the seven staff roles; AmbulanceCrew is the one left out. `PatientReader` and
+        `AdmissionReader` were collapsed into one `PatientDetails` policy on 2026-09-11, because
+        the split was never real - a `PatientDetail` already carries the patient's admissions, so
+        every reader could see care level, urgency and status through `GET /patients/{id}`
+        whichever policy they were on. Writing is unchanged and still WardNurse + DutyManager.
       operationId: listPatients
       parameters:
         - name: search
@@ -148,7 +158,7 @@ paths:
     get:
       tags: [Patients]
       summary: Get one patient with their visit history
-      description: 'Roles: WardNurse, DutyManager, HospitalAdministrator, Doctor, EquipmentManager.'
+      description: 'Roles: GeneralStaff, WardNurse, DutyManager, HospitalAdministrator, Doctor, EquipmentManager.'
       operationId: getPatient
       responses:
         '200':
@@ -185,7 +195,7 @@ paths:
       tags: [Patients]
       summary: Find an existing patient by NIC before registering a new one
       description: |
-        Roles: WardNurse, AmbulanceCrew, DutyManager.
+        Roles: GeneralStaff, WardNurse, DutyManager.
 
         Business operation beyond CRUD. Duplicate patient records are the single most damaging
         data problem in this component - a returning patient must keep one record with many
@@ -274,7 +284,7 @@ paths:
       tags: [Admissions]
       summary: Start an admission
       description: |
-        Roles: WardNurse, AmbulanceCrew, DutyManager.
+        Roles: GeneralStaff, WardNurse, DutyManager.
 
         Creates a visit in status `awaiting_bed`.
 
@@ -307,7 +317,7 @@ paths:
       tags: [Admissions]
       summary: List admissions
       description: >-
-        Roles: WardNurse, DutyManager, Doctor. Nurses are scoped to their own ward - NOT ENFORCED YET,
+        Roles: GeneralStaff, WardNurse, DutyManager, HospitalAdministrator, Doctor, EquipmentManager. Nurses are scoped to their own ward - NOT ENFORCED YET,
         see STUBS.md. It needs both which ward a nurse works in (Staff Management, unbuilt)
         and which ward an admission is in (a live BedAssignment, step 6).
       operationId: listAdmissions
@@ -373,7 +383,7 @@ paths:
       tags: [Admissions]
       summary: Get one admission with its full history
       description: |
-        Roles: WardNurse, DutyManager, Doctor.
+        Roles: GeneralStaff, WardNurse, DutyManager, HospitalAdministrator, Doctor, EquipmentManager.
 
         Includes every bed assignment (accepted, rejected and expired), every agent run, and
         every status change. Nothing is deleted or overwritten, so this is the audit trail.
@@ -535,6 +545,11 @@ paths:
       summary: Create a pre-admission from an ambulance dispatch
       description: |
         Roles: AmbulanceCrew, DutyManager, and the Emergency Service component.
+
+        **OPEN.** AmbulanceCrew was removed from the patient-registration policy on 2026-09-11,
+        so this line and `Policies.PatientRegistrar` now disagree about that role. This endpoint
+        is not built yet, so nothing is broken today - but it has to be settled before it is.
+        `integration_of_functions.md` §11.9, addressed to M1.
 
         Called by Emergency Service (Member 1) when an ambulance is dispatched to this hospital,
         so a bed can be found BEFORE the patient arrives. That head start is the whole reason
@@ -976,7 +991,7 @@ paths:
       tags: [Discharge]
       summary: Patients whose checklist says they could go home
       description: |
-        Roles: WardNurse, DutyManager.
+        Roles: WardNurse, Doctor, DutyManager.
 
         Produced by a plain rule, not by the agent: every mandatory checklist item is ticked.
         Checking whether five boxes are ticked is a WHERE clause, and putting a language model
@@ -1016,15 +1031,24 @@ paths:
       tags: [Discharge]
       summary: Tick discharge checklist items
       description: |
+        Roles: WardNurse, Doctor, DutyManager. Any subset of the keys; one left out is not touched.
+
         Each item is gated by role, not just by login:
 
         - `clinical_clearance` - Doctor only. This is the wall. Without it nothing flags and
           nothing discharges, and no automated process can ever set it. The `StaffMember` record
           itself belongs to Staff Management; here we only check the role claim on the JWT.
         - `medication_issued`, `follow_up_recorded`, `transport_arranged` - WardNurse
-        - `billing_settled` - HospitalAdministrator
+        - `billing_settled` - **refused here, by everybody.** Settle the bill instead
+          (`POST /admissions/{admissionId}/bill/settle`, GeneralStaff / HospitalAdministrator /
+          DutyManager), which is the only thing that writes this box. Sending the key is 409
+          `cl_pat_025`. One fact in one place: a paid bill and an unticked box cannot happen.
 
-        Every tick records who did it and when.
+        Every tick records who did it and when. Ticking the last mandatory item moves the
+        admission to `ready_for_discharge`; unticking one moves it back to `admitted`.
+
+        Reception, not the Hospital Administrator, settles a bill - **changed 2026-09-11.** The
+        administrator creates wards and runs the organisation; money is the front desk's job.
       operationId: updateDischargeChecklist
       requestBody:
         required: true
@@ -1068,13 +1092,7 @@ paths:
       requestBody:
         content:
           application/json:
-            schema:
-              type: object
-              properties:
-                summary_note:
-                  type: string
-                  maxLength: 2000
-                  description: Instructions the patient can read on their own phone afterwards.
+            schema: { $ref: '#/components/schemas/ConfirmDischargeRequest' }
       responses:
         '200':
           description: Discharged, bed freed
@@ -1089,6 +1107,227 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  # ------------------------------------------------------------------
+  # Billing
+  # ------------------------------------------------------------------
+  #
+  # Claimed by Patient Management on 2026-09-11. It used to be a scope-guard row in
+  # patient-management-plan.md section 11, and it is not any more, because "billing_settled"
+  # cannot be an honest tick with nothing behind it. Recorded as an open item in
+  # integration_of_functions.md section 11.10 so the other three members can see it.
+
+  /admissions/{admissionId}/bill:
+    parameters:
+      - name: admissionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Billing]
+      summary: The bill for a visit
+      description: |
+        Roles: GeneralStaff, WardNurse, DutyManager, HospitalAdministrator, Doctor, EquipmentManager.
+
+        404 until somebody prepares one. A bill is written the first time it is asked for,
+        because a stay that has not finished cannot be priced.
+      operationId: getAdmissionBill
+      responses:
+        '200':
+          description: The bill
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bill' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Billing]
+      summary: Work the bill out from the stay
+      description: |
+        Roles: GeneralStaff, HospitalAdministrator, DutyManager.
+
+        Opens a bill if this visit has none, then replaces every generated line: one admission
+        fee priced off the care level, and one line per bed the patient has actually been in, at
+        that ward's day rate. Typed charges are left alone, so preparing again a day later
+        updates the bed days and keeps the X-ray.
+
+        **What a bill can and cannot contain.** Nothing in this component records a treatment, a
+        procedure, a scan or a drug against an admission - Equipment's `PharmacyTransaction` has
+        no admission column. So the generated half is bed time and care level, and everything
+        else is a line reception types. Stated rather than faked; see
+        `patient-management-plan.md` section 6.5.
+      operationId: prepareAdmissionBill
+      responses:
+        '200':
+          description: The prepared bill
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bill' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The bill is settled and frozen (`cl_pat_026`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /admissions/{admissionId}/bill/charges:
+    parameters:
+      - name: admissionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Billing]
+      summary: Add a charge reception types in
+      description: |
+        Roles: GeneralStaff, HospitalAdministrator, DutyManager.
+
+        An X-ray, a dressing pack, a consultant's fee. Typed rather than generated because no
+        table records one; asking a human to type what happened is honest, inventing line items
+        from tables that do not exist is not.
+      operationId: addBillCharge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddBillChargeRequest' }
+      responses:
+        '200':
+          description: The bill, with the charge on it
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bill' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The bill is settled and frozen (`cl_pat_026`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /admissions/{admissionId}/bill/charges/{lineId}:
+    parameters:
+      - name: admissionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: lineId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      tags: [Billing]
+      summary: Take a typed charge off again
+      description: |
+        Roles: GeneralStaff, HospitalAdministrator, DutyManager.
+
+        Only a `manual` line. A generated one is refused with `cl_pat_027` - it would come
+        straight back the next time anyone prepared the bill.
+      operationId: removeBillCharge
+      responses:
+        '200':
+          description: The bill, without that line
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bill' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: A generated line (`cl_pat_027`), or the bill is settled (`cl_pat_026`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /admissions/{admissionId}/bill/settle:
+    parameters:
+      - name: admissionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Billing]
+      summary: Take the money - and the only thing that ticks billing_settled
+      description: |
+        Roles: GeneralStaff, HospitalAdministrator, DutyManager.
+
+        Freezes the bill and ticks `billing_settled` on the discharge checklist, in one
+        transaction. `PATCH /discharges/{admissionId}/checklist` refuses that key outright, so
+        the bill and the checklist cannot disagree about whether a patient has paid.
+
+        Settling a visit nobody prepared a bill for works the bill out first, so a visit with no
+        bill can never deadlock a discharge.
+      operationId: settleBill
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SettleBillRequest' }
+      responses:
+        '200':
+          description: Settled, and the checklist box ticked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bill' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Already settled (`cl_pat_026`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /billing/outstanding:
+    get:
+      tags: [Billing]
+      summary: Reception's worklist - who has not paid
+      description: |
+        Roles: GeneralStaff, HospitalAdministrator, DutyManager.
+
+        Visits still in the building whose money has not been taken. Includes visits with no
+        bill row at all, which is most of them - a list of bills would have shown an empty screen
+        and left the work invisible.
+
+        A discharged visit is never on the default list: confirming a discharge needs
+        `billing_settled`, and only settling writes that. `includeSettled` is how you reach one
+        anyway - a patient asking for another copy of their bill at the counter has already paid
+        and has usually already gone home.
+      operationId: listOutstandingBills
+      parameters:
+        - name: search
+          in: query
+          description: Matches patient code, full name or NIC.
+          schema: { type: string }
+        - name: includeSettled
+          in: query
+          description: >-
+            Widens the list to every visit that has a bill, in any status, discharged included.
+            The reprint path. Default false, which is the work-still-to-do list.
+          schema: { type: boolean, default: false }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of unpaid visits
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/OutstandingBill' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   # ------------------------------------------------------------------
   # Patient self-service
@@ -1285,7 +1524,7 @@ paths:
       tags: [Admissions]
       summary: The ward board - bookings and visits in one list
       description: |
-        Roles: WardNurse, Doctor, DutyManager - the same as `GET /admissions`.
+        Roles: GeneralStaff, WardNurse, DutyManager, HospitalAdministrator, Doctor, EquipmentManager. The same as `GET /admissions`, because it is the same data read a different way.
 
         **Two tables, one list.** A row is either a booking nobody has checked in yet
         (`kind: booking`, `status: not_arrived`) or a visit that has started (`kind: visit`).
@@ -2435,8 +2674,16 @@ components:
                 - $ref: '#/components/schemas/Discharge'
               nullable: true
               description: >-
-                NOT SERVED YET - the API omits this key. The discharge checklist is step 7 of
-                docs/build/patient.md and no row is written before then.
+                The discharge checklist, or null when nobody has opened one for this visit. The
+                row is written on first touch rather than at admission time, so null is the
+                ordinary state of a patient who has just arrived - not a gap in the data.
+            bill:
+              allOf:
+                - $ref: '#/components/schemas/Bill'
+              nullable: true
+              description: >-
+                What the visit costs, or null when nobody has prepared a bill. Read-only here;
+                the bill is written through /admissions/{admissionId}/bill.
 
     # ---------- ward and bed ----------
 
@@ -2701,16 +2948,27 @@ components:
 
     ChecklistUpdateRequest:
       type: object
-      description: Any subset. Each key is role-gated; clinical_clearance is Doctor-only.
+      description: |
+        Any subset. A key left out is not touched; a key set to `false` is unticked.
+
+        Each key is role-gated: `clinical_clearance` is Doctor-only, the rest are the ward
+        nurse's - except `billing_settled`, which is refused from everybody. Settling the bill
+        writes that one.
       properties:
-        clinical_clearance: { type: boolean }
-        medication_issued: { type: boolean }
-        billing_settled: { type: boolean }
-        follow_up_recorded: { type: boolean }
-        transport_arranged: { type: boolean }
+        clinical_clearance: { type: boolean, nullable: true }
+        medication_issued: { type: boolean, nullable: true }
+        billing_settled:
+          type: boolean
+          nullable: true
+          description: >-
+            Published so the vocabulary is honest, and always refused with 409 `cl_pat_025`.
+            Settle the bill instead - POST /admissions/{admissionId}/bill/settle.
+        follow_up_recorded: { type: boolean, nullable: true }
+        transport_arranged: { type: boolean, nullable: true }
 
     ChecklistItem:
       type: object
+      required: [ticked, mandatory]
       properties:
         ticked: { type: boolean }
         ticked_by_staff_id: { type: string, format: uuid, nullable: true }
@@ -2736,18 +2994,153 @@ components:
 
     DischargeCandidate:
       type: object
+      required:
+        [admission_id, patient, ward_name, bed_number, admission_category, days_in_bed,
+         outstanding_items]
       properties:
         admission_id: { type: string, format: uuid }
         patient: { $ref: '#/components/schemas/PatientSummary' }
-        ward_name: { type: string }
+        ward_name:
+          type: string
+          description: Empty when the patient holds no bed, e.g. an outpatient.
         bed_number: { type: string }
         admission_category: { $ref: '#/components/schemas/AdmissionCategory' }
-        admitted_at: { type: string, format: date-time }
+        admitted_at: { type: string, format: date-time, nullable: true }
         days_in_bed: { type: integer }
         outstanding_items:
           type: array
           items: { type: string }
           description: Empty for a true candidate. Populated rows are shown as "nearly ready".
+
+    ConfirmDischargeRequest:
+      type: object
+      properties:
+        summary_note:
+          type: string
+          maxLength: 2000
+          nullable: true
+          description: Instructions the patient can read on their own phone afterwards.
+
+    # ---------- billing ----------
+
+    BillLineSource:
+      type: string
+      description: |
+        Where a line came from, and what may be done to it.
+
+        `admission_fee` and `bed_stay` are worked out from the visit and are replaced every time
+        the bill is prepared. `manual` is what somebody at the desk typed, is never touched by
+        preparing, and is the only kind that can be removed.
+      enum:
+        - admission_fee
+        - bed_stay
+        - manual
+
+    BillLine:
+      type: object
+      required: [id, source, description, quantity, unit_price, line_total]
+      properties:
+        id: { type: string, format: uuid }
+        source: { $ref: '#/components/schemas/BillLineSource' }
+        description: { type: string }
+        quantity: { type: number, format: double }
+        unit_price: { type: number, format: double }
+        line_total:
+          type: number
+          format: double
+          description: Quantity x unit price. Computed, never stored.
+
+    Bill:
+      type: object
+      description: |
+        What a visit costs.
+
+        **Bed days and an admission fee are generated; everything else is typed.** Nothing in
+        this component records a treatment, a procedure or a drug against an admission, so the
+        generated half prices what the hospital actually stored - the care level a clinician
+        signed for, and time in a bed from the `BedAssignment` rows - and reception types the
+        rest. The rate is copied onto the line when the line is written, so changing a price
+        later never rewrites a bill already raised.
+      required:
+        [id, admission_id, bill_number, currency, lines, total, settled, patient,
+         created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        admission_id: { type: string, format: uuid }
+        bill_number:
+          type: string
+          description: The handle a patient quotes at the counter, e.g. B7K2X9Q.
+        currency:
+          type: string
+          description: Always LKR. This component does not convert currency.
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/BillLine' }
+        total:
+          type: number
+          format: double
+          description: The sum of the lines. Not stored, so it cannot disagree with them.
+        settled:
+          type: boolean
+          description: >-
+            The same fact as the `billing_settled` checklist item, written once. Settling is
+            what ticks that box and the box cannot be ticked any other way.
+        settled_at: { type: string, format: date-time, nullable: true }
+        settled_by_staff_id: { type: string, format: uuid, nullable: true }
+        settlement_note:
+          type: string
+          nullable: true
+          description: How it was paid, in reception's own words. Free text, not an enum.
+        patient: { $ref: '#/components/schemas/PatientSummary' }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    AddBillChargeRequest:
+      type: object
+      required: [description, quantity, unit_price]
+      properties:
+        description: { type: string, maxLength: 200, minLength: 1 }
+        quantity: { type: number, format: double, minimum: 0.01, maximum: 9999.99 }
+        unit_price: { type: number, format: double, minimum: 0, maximum: 9999999.99 }
+
+    SettleBillRequest:
+      type: object
+      properties:
+        settlement_note:
+          type: string
+          maxLength: 300
+          nullable: true
+          description: 'How it was paid - "cash", "card ending 4417", "insurance, claim 88231".'
+
+    OutstandingBill:
+      type: object
+      description: One row on reception's worklist - a visit whose money has not been taken yet.
+      required:
+        [admission_id, patient, status, admission_category, ward_name, bed_number,
+         settled, estimated_total, currency]
+      properties:
+        admission_id: { type: string, format: uuid }
+        patient: { $ref: '#/components/schemas/PatientSummary' }
+        status: { $ref: '#/components/schemas/AdmissionStatus' }
+        admission_category: { $ref: '#/components/schemas/AdmissionCategory' }
+        ward_name: { type: string }
+        bed_number: { type: string }
+        admitted_at: { type: string, format: date-time, nullable: true }
+        bill_number:
+          type: string
+          nullable: true
+          description: Null when nobody has prepared a bill for this visit yet.
+        settled:
+          type: boolean
+          description: Always false on the default list. Only `includeSettled=true` can return a paid one.
+        settled_at: { type: string, format: date-time, nullable: true }
+        estimated_total:
+          type: number
+          format: double
+          description: >-
+            The prepared total, or what preparing it now would produce. Advisory - the bill
+            screen is what actually writes the lines.
+        currency: { type: string }
 
     # ---------- patient self-service ----------
 

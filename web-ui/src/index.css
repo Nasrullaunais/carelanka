@@ -554,3 +554,88 @@ tr.drawer > td {
   font-size: 0.85rem;
   vertical-align: top;
 }
+
+/* ---------------------------------------------------------------------------
+   Printing a bill
+
+   Reception hands a patient a piece of paper across the counter, so the bill has
+   to come out of a printer looking like a bill. This is a print stylesheet
+   rather than a PDF library: the numbers are already on screen, the browser's
+   print dialog saves to PDF anyway, and one screen does not justify a
+   document-generation dependency.
+
+   Everything outside `.printable` is hidden, so what prints is the statement and
+   not a photograph of the app.
+   --------------------------------------------------------------------------- */
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  /* Hide the whole page, then walk `.printable` and its ancestors back into
+     view. Simpler than tagging every wrapper that should disappear, and it
+     cannot be forgotten when a new one is added. */
+  body * {
+    visibility: hidden;
+  }
+
+  .printable,
+  .printable * {
+    visibility: visible;
+  }
+
+  .printable {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    padding: 0;
+    color: #000;
+    background: #fff;
+  }
+
+  .no-print,
+  .printable button {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block;
+  }
+
+  .print-head {
+    margin-bottom: 1.2rem;
+    border-bottom: 2px solid #000;
+  }
+
+  .print-head h2 {
+    margin: 0;
+    color: #000;
+  }
+
+  .print-foot {
+    margin-top: 1.2rem;
+    font-weight: 600;
+  }
+
+  .printable table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .printable th,
+  .printable td {
+    border-bottom: 1px solid #999;
+    color: #000;
+    background: #fff;
+  }
+
+  .printable .muted,
+  .printable .small {
+    color: #444;
+  }
+
+  .printable dl.detail-grid dt {
+    color: #000;
+  }
+}

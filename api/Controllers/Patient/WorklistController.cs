@@ -39,7 +39,7 @@ public class WorklistController : ControllerBase
     /// union of two tables whose time columns mean different things would order it by a column
     /// nobody asked for.
     /// </remarks>
-    [Authorize(Policy = Policies.AdmissionReader)]
+    [Authorize(Policy = Policies.PatientDetails)]
     [HttpGet(Name = "listPatientWorklist")]
     [ProducesResponseType(typeof(PagedResult<WorklistRow>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]

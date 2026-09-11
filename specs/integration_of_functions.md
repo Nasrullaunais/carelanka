@@ -422,15 +422,21 @@ Every arrow between components is either **read-only** or **a call to the owner'
 
 Injected as interfaces inside the API, and exposed as REST endpoints so the AI agents (which may run outside ASP.NET Core) can reach them.
 
-| Interface method | Endpoint | For | Returns |
-| :--- | :--- | :--- | :--- |
-| `GetWardCapacityAsync()` | `GET /api/capacity/wards` | M1 | Free/total beds per ward, with type and gender policy |
-| `GetWardOccupancyAsync(wardId)` | `GET /api/wards/{id}/occupancy` | M2 | Occupied counts, care mix, incoming next 2h |
-| `ListWardsAsync()` | `GET /api/wards` | M3 | Ward id, name, type |
-| `GetBedOccupancyAsync(bedId)` | `GET /api/beds/{id}/occupancy` | M3 | Whether a bed is occupied or held — **check this before servicing it** |
-| `CreatePreAdmissionAsync(dispatch)` | `POST /api/admissions/pre-admit` | M1 | Creates an admission from a dispatch |
+| Interface method | Endpoint | For | Returns | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| `ICapacityService.GetWardCapacityAsync()` | `GET /api/capacity/wards` | M1 | Free/total beds per ward, with type and gender policy | **Live 2026-09-11** |
+| `ICapacityService.GetWardOccupancyAsync(wardId)` | `GET /api/wards/{id}/occupancy` | M2 | Occupied counts, care mix, incoming next 2h | **Live 2026-09-11** |
+| `IWardService.ListAsync()` | `GET /api/wards` | M3 | Ward id, name, type | Live 2026-09-09 |
+| `GetBedOccupancyAsync(bedId)` | `GET /api/beds/{id}/occupancy` | M3 | Whether a bed is occupied or held — **check this before servicing it** | Not built |
+| `CreatePreAdmissionAsync(dispatch)` | `POST /api/admissions/pre-admit` | M1 | Creates an admission from a dispatch | Not built |
 
-All JWT-protected and role-restricted. Aggregate endpoints return **counts, never patient identities.**
+All JWT-protected and role-restricted. Aggregate endpoints return **counts, never patient identities** — `CapacityEndpointTests` asserts a patient's name appears in neither response body.
+
+**Both capacity reads are `AnyStaff`.** Any authenticated staff token may call them, so Emergency and Staff Management need no special role for their own agents.
+
+**The free/occupied rule is written once, in `CapacityService`, and §4.3's warning is the reason.** A bed is free when it exists in Equipment's register, its condition is `usable`, and no live `BedAssignment` of ours references it — where "live" means occupied, or reserved with a `reserved_until` still in the future. **A hold past its expiry counts as free with nobody having done anything to it.** Re-implementing that on the calling side is the mistake §4.3 spells out: it works today and quietly goes wrong the first time a hold lapses.
+
+**Define your own port over these, the way M4 does over M3's bed register.** `IPatientCapacityService` on Emergency's side (§4.3) and whatever M2 calls theirs, each delegating to `ICapacityService`. Same pattern as `IBedRegistryService` → `IBedService`, so one file breaks if a signature changes rather than every caller.
 
 ## 10. What Patient Management needs from others
 
@@ -528,6 +534,22 @@ is byte-identical — currently `PagedResult`, `ProblemDetails`, `ValidationProb
 silently regress.
 
 *Also resolved:* `Doctor` is a Staff Management role — M4 only checks the JWT claim. Bed ownership split agreed (§6.1). No SMS integration; the group's Maps API covers the third-party requirement. `emergency-spec.yaml` is no longer the 212-byte stub — see §22–§26 for what it now publishes, including the dispatch notification, `patient_is_caller` and `caller_user_id` that §10 was waiting on.
+
+**11.7 — `GET /auth/me` always answers `patient_id: null`, and now it should not.**
+*(Raised by M4 on 2026-09-09, found while building `POST /patients/{id}/link-account`.)*
+
+`CurrentPrincipal.PatientId` is documented as "the linked medical record, if staff have
+linked one". `AuthService.ToPrincipal(PatientAccount)` hard-codes it to `null`, which was
+correct while nothing could create the link. That endpoint now exists: a Duty Manager links
+an account to a record and `Patient.UserAccountId` is set.
+
+So today a patient signs in through the Flutter app and the API tells them they have no
+medical record even when staff have linked one. Every `/me/*` screen in Patient Management
+is scoped by that value.
+
+The read is one line — `Patients.Where(p => p.UserAccountId == account.Id)` — but
+`AuthService` is **common**, not M4's, so M4 has not written it. Whoever owns common picks
+it up, or the group agrees M4 may. Until then the link is written and never read.
 
 ---
 

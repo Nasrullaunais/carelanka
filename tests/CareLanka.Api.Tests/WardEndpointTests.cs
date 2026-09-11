@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using CareLanka.Api.Services.Patient.Stubs;
 using Xunit;
 
 namespace CareLanka.Api.Tests;
@@ -109,17 +108,50 @@ public sealed class WardEndpointTests
     }
 
     [Fact]
-    public async Task Total_beds_comes_from_the_bed_register_and_is_never_stored()
+    public async Task A_ward_with_no_beds_reports_zero_rather_than_a_made_up_number()
     {
         using var client = await ClientAsync(ApiApplication.AdministratorEmail);
 
         var created = await CreateWardAsync(client, NewWardName(), "general", "male");
         using var body = await ReadJsonAsync(created);
 
-        // STUB — while Equipment's register is faked this is a constant. See STUBS.md row 1.
-        Assert.Equal(
-            StubBedRegistryService.BedsPerWard,
-            body.RootElement.GetProperty("total_beds").GetInt32());
+        // Equipment's register leaves a ward with no beds out of its result entirely, so this
+        // is the case where "absent" has to become 0 rather than a missing property.
+        Assert.Equal(0, body.RootElement.GetProperty("total_beds").GetInt32());
+    }
+
+    [Fact]
+    public async Task Total_beds_counts_what_equipment_actually_registered_and_is_never_stored()
+    {
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
+        using var equipment = await ClientAsync(ApiApplication.EquipmentEmail);
+
+        var name = NewWardName();
+        using var ward = await ReadJsonAsync(await CreateWardAsync(administrator, name, "icu", "mixed"));
+        var wardId = ward.RootElement.GetProperty("id").GetString()!;
+
+        // Beds are Equipment Management's table. We only ever read the count back.
+        for (var number = 1; number <= 3; number++)
+        {
+            var bed = await equipment.PostAsJsonAsync("/api/beds", new
+            {
+                ward_id = wardId,
+                bed_number = $"B{number}",
+                has_isolation = false,
+                nurse_station_distance = number
+            });
+
+            Assert.Equal(HttpStatusCode.Created, bed.StatusCode);
+        }
+
+        using var listed = await ReadJsonAsync(await administrator.GetAsync("/api/wards"));
+        var counted = listed.RootElement.EnumerateArray()
+            .Single(w => w.GetProperty("name").GetString() == name)
+            .GetProperty("total_beds").GetInt32();
+
+        // Counted on every read, never stored on the ward row: two sources of truth would drift
+        // the moment Equipment retires a bed.
+        Assert.Equal(3, counted);
     }
 
     [Fact]
@@ -154,6 +186,38 @@ public sealed class WardEndpointTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    // A missing enum is an error, not a default. [Required] on a plain C# enum always passes,
+    // because the model binder has already turned an absent key into the first declared member.
+    // Every other test in this class sends a full body, which is why neither of these was caught.
+
+    [Fact]
+    public async Task A_ward_with_no_type_is_refused_rather_than_created_as_an_icu()
+    {
+        using var client = await ClientAsync(ApiApplication.AdministratorEmail);
+
+        var created = await client.PostAsJsonAsync(
+            "/api/wards", new { name = NewWardName(), gender_policy = "mixed" });
+
+        // icu is declared first, so the old default built the most expensive kind of ward in the
+        // hospital out of a typo - and Ward's schema is frozen and depended on by three other
+        // components, so a wrong ward_type is not a local mistake.
+        Assert.Equal(HttpStatusCode.BadRequest, created.StatusCode);
+        Assert.Equal("application/problem+json", created.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task A_ward_with_no_gender_policy_is_refused_rather_than_created_male_only()
+    {
+        using var client = await ClientAsync(ApiApplication.AdministratorEmail);
+
+        var created = await client.PostAsJsonAsync(
+            "/api/wards", new { name = NewWardName(), ward_type = "general" });
+
+        // male is declared first, so the old default quietly halved the ward's usable beds: the
+        // policy is an input to hard rule H3, and a male-only ward takes no female patients.
+        Assert.Equal(HttpStatusCode.BadRequest, created.StatusCode);
     }
 
     // /api/auth/login is rate limited to 20 requests a minute per IP, and this class shares

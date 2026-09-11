@@ -43,6 +43,25 @@ public enum MessageCode
     EquipmentNotAssigned,
 
     // Patient Management — cl_pat_*
+    WardNameTaken,
 
-    WardNameTaken
+    PatientNicTaken,
+
+    PatientAlreadyHasAccount,
+
+    AccountAlreadyLinked,
+
+    TempReferenceExhausted,
+
+    PatientHasOpenAdmission,
+
+    DispatchIdRequired,
+
+    CategoryStaffNotFound,
+
+    PatientHasOpenAppointment,
+
+    AppointmentInThePast,
+
+    CareLevelNeedsDutyManager
 }

@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
@@ -12,7 +12,6 @@ using CareLanka.Api.Services.Common;
 using CareLanka.Api.Services.Equipment;
 using CareLanka.Api.Services.Equipment.Stubs;
 using CareLanka.Api.Services.Patient;
-using CareLanka.Api.Services.Patient.Stubs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Formatters;
@@ -166,7 +165,44 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.WorkflowStarter, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.DutyManager),
         EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
+    options.AddPolicy(Policies.PatientRegistrar, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.AmbulanceCrew),
+        EnumWire.ToWire(StaffRole.DutyManager)));
+
+    options.AddPolicy(Policies.PatientReader, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator),
+        EnumWire.ToWire(StaffRole.Doctor)));
+
+    options.AddPolicy(Policies.PatientEditor, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager)));
+
+    options.AddPolicy(Policies.AdmissionReader, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager),
+        EnumWire.ToWire(StaffRole.Doctor)));
+
+    options.AddPolicy(Policies.AdmissionEditor, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager)));
+
+    // The same two roles as AdmissionEditor, under a name that says which job it is. Checking
+    // somebody in at icu or hdu narrows further to the duty manager alone, and that rule reads
+    // the request body, so it lives in AppointmentService rather than here.
+    options.AddPolicy(Policies.AppointmentDesk, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager)));
 });
+
+// 20 a minute per IP in production. Configurable only so the integration tests can raise it:
+// every test class shares one IP, so the whole suite spends one budget, and at 20 the next
+// test anybody adds fails on a 429 that reads like a broken login. Nothing sets this outside
+// the test fixture, and the default is what ships.
+var authRequestsPerMinute = builder.Configuration.GetValue("RateLimits:AuthPerMinute", 20);
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -174,7 +210,7 @@ builder.Services.AddRateLimiter(options =>
         partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         factory: _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 20,
+            PermitLimit = authRequestsPerMinute,
             Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0
         }));
@@ -211,14 +247,22 @@ builder.Services.AddScoped<IBedService, BedService>();
 builder.Services.AddScoped<IEquipmentCategoryService, EquipmentCategoryService>();
 builder.Services.AddScoped<IEquipmentItemService, EquipmentItemService>();
 builder.Services.AddScoped<IWardService, WardService>();
+builder.Services.AddScoped<IPatientService, PatientService>();
+builder.Services.AddScoped<IAdmissionService, AdmissionService>();
+builder.Services.AddScoped<ICapacityService, CapacityService>();
+builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 
-// STUB registrations - each module still stands in for the other. STUBS.md rows 1, 2
-// and 3. Both real implementations now live on this branch, so these three lines are
-// the whole of what is left to swap, but doing so is a behaviour change rather than a
-// merge resolution and belongs in its own commit.
+// Real: ward bed counts now come from Equipment's register instead of a constant.
+// Scoped, not Singleton — it delegates to IBedService, which is scoped because it holds a
+// DbContext. Registering it as a singleton captures one DbContext for the life of the app.
+builder.Services.AddScoped<IBedRegistryService, BedRegistryService>();
+
+// STUB registrations - Equipment still stands in for Patient Management. STUBS.md rows 2
+// and 3. Row 2 can be swapped whenever M3 wants: IWardService is real. Row 3 cannot yet —
+// occupancy is the presence of a live BedAssignment, and no service writes those until
+// step 6 of build/patient.md.
 builder.Services.AddSingleton<IWardDirectory, StubWardDirectory>();
 builder.Services.AddSingleton<IBedOccupancyPort, StubBedOccupancyPort>();
-builder.Services.AddSingleton<IBedRegistryService, StubBedRegistryService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>

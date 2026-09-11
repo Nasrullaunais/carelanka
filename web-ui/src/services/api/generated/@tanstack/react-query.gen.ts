@@ -3,8 +3,335 @@
 import { type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { assignEquipmentItem, createBed, createEquipmentCategory, createEquipmentItem, createWard, getCurrentUser, getEquipmentItem, getEquipmentItemByTag, getHealth, listBeds, listEquipmentCategories, listEquipmentItems, listWards, login, loginPatient, logout, type Options, refreshToken, registerPatientAccount, releaseEquipmentItem, reportEquipmentFault, retireBed, updateBed, updateEquipmentItem } from '../sdk.gen';
-import type { AssignEquipmentItemData, AssignEquipmentItemError, AssignEquipmentItemResponse, CreateBedData, CreateBedError, CreateBedResponse, CreateEquipmentCategoryData, CreateEquipmentCategoryError, CreateEquipmentCategoryResponse, CreateEquipmentItemData, CreateEquipmentItemError, CreateEquipmentItemResponse, CreateWardData, CreateWardError, CreateWardResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetEquipmentItemByTagData, GetEquipmentItemByTagError, GetEquipmentItemByTagResponse, GetEquipmentItemData, GetEquipmentItemError, GetEquipmentItemResponse, GetHealthData, GetHealthError, GetHealthResponse, ListBedsData, ListBedsError, ListBedsResponse, ListEquipmentCategoriesData, ListEquipmentCategoriesError, ListEquipmentCategoriesResponse, ListEquipmentItemsData, ListEquipmentItemsError, ListEquipmentItemsResponse, ListWardsData, ListWardsError, ListWardsResponse, LoginData, LoginError, LoginPatientData, LoginPatientError, LoginPatientResponse, LoginResponse, LogoutData, LogoutError, LogoutResponse, RefreshTokenData, RefreshTokenError, RefreshTokenResponse, RegisterPatientAccountData, RegisterPatientAccountError, RegisterPatientAccountResponse, ReleaseEquipmentItemData, ReleaseEquipmentItemError, ReleaseEquipmentItemResponse, ReportEquipmentFaultData, ReportEquipmentFaultError, ReportEquipmentFaultResponse, RetireBedData, RetireBedError, RetireBedResponse, UpdateBedData, UpdateBedError, UpdateBedResponse, UpdateEquipmentItemData, UpdateEquipmentItemError, UpdateEquipmentItemResponse } from '../types.gen';
+import { assignEquipmentItem, cancelAdmission, checkInAppointment, completeAdmissionDetails, createAdmission, createAppointment, createBed, createEquipmentCategory, createEquipmentItem, createPatient, createWard, getAdmission, getCurrentUser, getEquipmentItem, getEquipmentItemByTag, getHealth, getPatient, getWardCapacity, getWardOccupancy, linkPatientAccount, listAdmissions, listAppointments, listBeds, listEquipmentCategories, listEquipmentItems, listPatients, listWards, login, loginPatient, logout, lookupPatient, markArrived, type Options, refreshToken, registerPatientAccount, releaseEquipmentItem, reportEquipmentFault, retireBed, updateBed, updateEquipmentItem, updatePatient } from '../sdk.gen';
+import type { AssignEquipmentItemData, AssignEquipmentItemError, AssignEquipmentItemResponse, CancelAdmissionData, CancelAdmissionError, CancelAdmissionResponse, CheckInAppointmentData, CheckInAppointmentError, CheckInAppointmentResponse, CompleteAdmissionDetailsData, CompleteAdmissionDetailsError, CompleteAdmissionDetailsResponse, CreateAdmissionData, CreateAdmissionError, CreateAdmissionResponse, CreateAppointmentData, CreateAppointmentError, CreateAppointmentResponse, CreateBedData, CreateBedError, CreateBedResponse, CreateEquipmentCategoryData, CreateEquipmentCategoryError, CreateEquipmentCategoryResponse, CreateEquipmentItemData, CreateEquipmentItemError, CreateEquipmentItemResponse, CreatePatientData, CreatePatientError, CreatePatientResponse, CreateWardData, CreateWardError, CreateWardResponse, GetAdmissionData, GetAdmissionError, GetAdmissionResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetEquipmentItemByTagData, GetEquipmentItemByTagError, GetEquipmentItemByTagResponse, GetEquipmentItemData, GetEquipmentItemError, GetEquipmentItemResponse, GetHealthData, GetHealthError, GetHealthResponse, GetPatientData, GetPatientError, GetPatientResponse, GetWardCapacityData, GetWardCapacityError, GetWardCapacityResponse, GetWardOccupancyData, GetWardOccupancyError, GetWardOccupancyResponse, LinkPatientAccountData, LinkPatientAccountError, LinkPatientAccountResponse, ListAdmissionsData, ListAdmissionsError, ListAdmissionsResponse, ListAppointmentsData, ListAppointmentsError, ListAppointmentsResponse, ListBedsData, ListBedsError, ListBedsResponse, ListEquipmentCategoriesData, ListEquipmentCategoriesError, ListEquipmentCategoriesResponse, ListEquipmentItemsData, ListEquipmentItemsError, ListEquipmentItemsResponse, ListPatientsData, ListPatientsError, ListPatientsResponse, ListWardsData, ListWardsError, ListWardsResponse, LoginData, LoginError, LoginPatientData, LoginPatientError, LoginPatientResponse, LoginResponse, LogoutData, LogoutError, LogoutResponse, LookupPatientData, LookupPatientError, LookupPatientResponse, MarkArrivedData, MarkArrivedError, MarkArrivedResponse, RefreshTokenData, RefreshTokenError, RefreshTokenResponse, RegisterPatientAccountData, RegisterPatientAccountError, RegisterPatientAccountResponse, ReleaseEquipmentItemData, ReleaseEquipmentItemError, ReleaseEquipmentItemResponse, ReportEquipmentFaultData, ReportEquipmentFaultError, ReportEquipmentFaultResponse, RetireBedData, RetireBedError, RetireBedResponse, UpdateBedData, UpdateBedError, UpdateBedResponse, UpdateEquipmentItemData, UpdateEquipmentItemError, UpdateEquipmentItemResponse, UpdatePatientData, UpdatePatientError, UpdatePatientResponse } from '../types.gen';
+
+export type QueryKey<TOptions extends Options> = [
+    Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
+        _id: string;
+        _infinite?: boolean;
+        tags?: ReadonlyArray<string>;
+    }
+];
+
+const createQueryKey = <TOptions extends Options>(id: string, options?: TOptions, infinite?: boolean, tags?: ReadonlyArray<string>): [
+    QueryKey<TOptions>[0]
+] => {
+    const params: QueryKey<TOptions>[0] = { _id: id, baseUrl: options?.baseUrl || (options?.client ?? client).getConfig().baseUrl } as QueryKey<TOptions>[0];
+    if (infinite) {
+        params._infinite = infinite;
+    }
+    if (tags) {
+        params.tags = tags;
+    }
+    if (options?.body) {
+        params.body = options.body;
+    }
+    if (options?.headers) {
+        params.headers = options.headers;
+    }
+    if (options?.path) {
+        params.path = options.path;
+    }
+    if (options?.query) {
+        params.query = options.query;
+    }
+    return [params];
+};
+
+export const listAdmissionsQueryKey = (options?: Options<ListAdmissionsData>) => createQueryKey('listAdmissions', options);
+
+/**
+ * List admissions. With no `status` the answer is the live worklist, not the archive.
+ * `search` matches the patient's name or NIC.
+ */
+export const listAdmissionsOptions = (options?: Options<ListAdmissionsData>) => queryOptions<ListAdmissionsResponse, ListAdmissionsError, ListAdmissionsResponse, ReturnType<typeof listAdmissionsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listAdmissions({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listAdmissionsQueryKey(options)
+});
+
+const createInfiniteParams = <K extends Pick<QueryKey<Options>[0], 'body' | 'headers' | 'path' | 'query'>>(queryKey: QueryKey<Options>, page: K) => {
+    const params = { ...queryKey[0] };
+    if (page.body) {
+        params.body = {
+            ...queryKey[0].body as any,
+            ...page.body as any
+        };
+    }
+    if (page.headers) {
+        params.headers = {
+            ...queryKey[0].headers,
+            ...page.headers
+        };
+    }
+    if (page.path) {
+        params.path = {
+            ...queryKey[0].path as any,
+            ...page.path as any
+        };
+    }
+    if (page.query) {
+        params.query = {
+            ...queryKey[0].query as any,
+            ...page.query as any
+        };
+    }
+    return params as unknown as typeof page;
+};
+
+export const listAdmissionsInfiniteQueryKey = (options?: Options<ListAdmissionsData>): QueryKey<Options<ListAdmissionsData>> => createQueryKey('listAdmissions', options, true);
+
+/**
+ * List admissions. With no `status` the answer is the live worklist, not the archive.
+ * `search` matches the patient's name or NIC.
+ */
+export const listAdmissionsInfiniteOptions = (options?: Options<ListAdmissionsData>) => {
+    const opts = infiniteQueryOptions<ListAdmissionsResponse, ListAdmissionsError, InfiniteData<ListAdmissionsResponse>, QueryKey<Options<ListAdmissionsData>>, number | Pick<QueryKey<Options<ListAdmissionsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListAdmissionsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listAdmissions({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listAdmissionsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+/**
+ * Start an admission. Creates a visit in status `awaiting_bed`. The care level and the
+ * clinician who chose it are both required — that pair is the proof a human decided it.
+ */
+export const createAdmissionMutation = (options?: Partial<Options<CreateAdmissionData>>): UseMutationOptions<CreateAdmissionResponse, CreateAdmissionError, Options<CreateAdmissionData>> => {
+    const mutationOptions: UseMutationOptions<CreateAdmissionResponse, CreateAdmissionError, Options<CreateAdmissionData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createAdmission({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getAdmissionQueryKey = (options: Options<GetAdmissionData>) => createQueryKey('getAdmission', options);
+
+/**
+ * Get one admission with its bed history. Nothing is deleted or overwritten, so rejected
+ * and expired assignments stay on the list — this is the audit trail.
+ */
+export const getAdmissionOptions = (options: Options<GetAdmissionData>) => queryOptions<GetAdmissionResponse, GetAdmissionError, GetAdmissionResponse, ReturnType<typeof getAdmissionQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getAdmission({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getAdmissionQueryKey(options)
+});
+
+/**
+ * Fill in details that were missing at registration. A field left out is left alone, and
+ * completeness is recalculated here rather than trusted from the caller.
+ *
+ * Completeness is deliberately not part of `status`: a patient can be admitted and still
+ * have paperwork outstanding, and one field cannot express both without ambiguity.
+ */
+export const completeAdmissionDetailsMutation = (options?: Partial<Options<CompleteAdmissionDetailsData>>): UseMutationOptions<CompleteAdmissionDetailsResponse, CompleteAdmissionDetailsError, Options<CompleteAdmissionDetailsData>> => {
+    const mutationOptions: UseMutationOptions<CompleteAdmissionDetailsResponse, CompleteAdmissionDetailsError, Options<CompleteAdmissionDetailsData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await completeAdmissionDetails({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Mark the patient as physically present in the bed. Moves `bed_reserved` to `admitted`,
+ * sets `admitted_at`, and turns the hold on the bed into an occupancy so it can no longer
+ * expire.
+ *
+ * Rejected with 409 from any other status: a patient cannot arrive into a bed that was
+ * never approved. The ward nurse is at the bedside, which is why this is theirs and not
+ * the duty manager's.
+ */
+export const markArrivedMutation = (options?: Partial<Options<MarkArrivedData>>): UseMutationOptions<MarkArrivedResponse, MarkArrivedError, Options<MarkArrivedData>> => {
+    const mutationOptions: UseMutationOptions<MarkArrivedResponse, MarkArrivedError, Options<MarkArrivedData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await markArrived({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Cancel an admission, with a reason, and release any bed it was holding.
+ *
+ * Always a human act, never automatic, which is why the reason is mandatory and why this
+ * is the duty manager's. A hold expiring frees a bed by itself because that is cheap and
+ * reversible; declaring that a patient is not coming is neither. Refused with 409 once
+ * they are `admitted` - discharge them instead.
+ */
+export const cancelAdmissionMutation = (options?: Partial<Options<CancelAdmissionData>>): UseMutationOptions<CancelAdmissionResponse, CancelAdmissionError, Options<CancelAdmissionData>> => {
+    const mutationOptions: UseMutationOptions<CancelAdmissionResponse, CancelAdmissionError, Options<CancelAdmissionData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await cancelAdmission({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listAppointmentsQueryKey = (options?: Options<ListAppointmentsData>) => createQueryKey('listAppointments', options);
+
+/**
+ * The expected-visits worklist: who is coming in, so the desk knows before they walk up.
+ *
+ * The patient's own view of the same booking is `GET /me/appointments`, and the two are
+ * deliberately different shapes — this one carries who booked it and which admission it
+ * became, neither of which is the patient's business.
+ *
+ * `date` filters on whole UTC days, which is what the column stores.
+ */
+export const listAppointmentsOptions = (options?: Options<ListAppointmentsData>) => queryOptions<ListAppointmentsResponse, ListAppointmentsError, ListAppointmentsResponse, ReturnType<typeof listAppointmentsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listAppointments({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listAppointmentsQueryKey(options)
+});
+
+export const listAppointmentsInfiniteQueryKey = (options?: Options<ListAppointmentsData>): QueryKey<Options<ListAppointmentsData>> => createQueryKey('listAppointments', options, true);
+
+/**
+ * The expected-visits worklist: who is coming in, so the desk knows before they walk up.
+ *
+ * The patient's own view of the same booking is `GET /me/appointments`, and the two are
+ * deliberately different shapes — this one carries who booked it and which admission it
+ * became, neither of which is the patient's business.
+ *
+ * `date` filters on whole UTC days, which is what the column stores.
+ */
+export const listAppointmentsInfiniteOptions = (options?: Options<ListAppointmentsData>) => {
+    const opts = infiniteQueryOptions<ListAppointmentsResponse, ListAppointmentsError, InfiniteData<ListAppointmentsResponse>, QueryKey<Options<ListAppointmentsData>>, number | Pick<QueryKey<Options<ListAppointmentsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListAppointmentsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listAppointments({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listAppointmentsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+/**
+ * Book a visit on a patient's behalf — the desk equivalent of the patient booking it in
+ * the app themselves.
+ *
+ * Records who took the booking, off the token. That field is null for a self-booking,
+ * which is how the two paths stay tellable apart afterwards.
+ *
+ * One open booking at a time, and never a booking for somebody already admitted.
+ */
+export const createAppointmentMutation = (options?: Partial<Options<CreateAppointmentData>>): UseMutationOptions<CreateAppointmentResponse, CreateAppointmentError, Options<CreateAppointmentData>> => {
+    const mutationOptions: UseMutationOptions<CreateAppointmentResponse, CreateAppointmentError, Options<CreateAppointmentData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createAppointment({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Check an expected patient in. Turns the booking into an admission with
+ * `source = pre_registered`, in one transaction.
+ *
+ * The care level is chosen here, by the staff member at the desk — not by the patient
+ * when they booked, and not by an agent. `category_set_by_staff_id` records who chose it.
+ *
+ * A ward nurse may check somebody in as outpatient, day_case or inpatient. `icu` and
+ * `hdu` are the duty manager's, so a nurse asking for either is a 403 — the rule depends
+ * on the body rather than the route, which is why it is not a policy.
+ *
+ * From here the admission behaves like any other: it needs a bed, so the bed agent runs
+ * on it exactly as it would for a walk-in. Returns the admission, not the appointment,
+ * because the admission is what the desk works from next.
+ */
+export const checkInAppointmentMutation = (options?: Partial<Options<CheckInAppointmentData>>): UseMutationOptions<CheckInAppointmentResponse, CheckInAppointmentError, Options<CheckInAppointmentData>> => {
+    const mutationOptions: UseMutationOptions<CheckInAppointmentResponse, CheckInAppointmentError, Options<CheckInAppointmentData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await checkInAppointment({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
 
 /**
  * Staff login. The same 401 for a wrong password, an unknown email and a deactivated account, so the endpoint cannot be used to discover which emails exist.
@@ -91,39 +418,6 @@ export const logoutMutation = (options?: Partial<Options<LogoutData>>): UseMutat
     return mutationOptions;
 };
 
-export type QueryKey<TOptions extends Options> = [
-    Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
-        _id: string;
-        _infinite?: boolean;
-        tags?: ReadonlyArray<string>;
-    }
-];
-
-const createQueryKey = <TOptions extends Options>(id: string, options?: TOptions, infinite?: boolean, tags?: ReadonlyArray<string>): [
-    QueryKey<TOptions>[0]
-] => {
-    const params: QueryKey<TOptions>[0] = { _id: id, baseUrl: options?.baseUrl || (options?.client ?? client).getConfig().baseUrl } as QueryKey<TOptions>[0];
-    if (infinite) {
-        params._infinite = infinite;
-    }
-    if (tags) {
-        params.tags = tags;
-    }
-    if (options?.body) {
-        params.body = options.body;
-    }
-    if (options?.headers) {
-        params.headers = options.headers;
-    }
-    if (options?.path) {
-        params.path = options.path;
-    }
-    if (options?.query) {
-        params.query = options.query;
-    }
-    return [params];
-};
-
 export const getCurrentUserQueryKey = (options?: Options<GetCurrentUserData>) => createQueryKey('getCurrentUser', options);
 
 /**
@@ -159,35 +453,6 @@ export const listBedsOptions = (options?: Options<ListBedsData>) => queryOptions
     },
     queryKey: listBedsQueryKey(options)
 });
-
-const createInfiniteParams = <K extends Pick<QueryKey<Options>[0], 'body' | 'headers' | 'path' | 'query'>>(queryKey: QueryKey<Options>, page: K) => {
-    const params = { ...queryKey[0] };
-    if (page.body) {
-        params.body = {
-            ...queryKey[0].body as any,
-            ...page.body as any
-        };
-    }
-    if (page.headers) {
-        params.headers = {
-            ...queryKey[0].headers,
-            ...page.headers
-        };
-    }
-    if (page.path) {
-        params.path = {
-            ...queryKey[0].path as any,
-            ...page.path as any
-        };
-    }
-    if (page.query) {
-        params.query = {
-            ...queryKey[0].query as any,
-            ...page.query as any
-        };
-    }
-    return params as unknown as typeof page;
-};
 
 export const listBedsInfiniteQueryKey = (options?: Options<ListBedsData>): QueryKey<Options<ListBedsData>> => createQueryKey('listBeds', options, true);
 
@@ -492,6 +757,168 @@ export const getHealthOptions = (options?: Options<GetHealthData>) => queryOptio
     queryKey: getHealthQueryKey(options)
 });
 
+export const getWardCapacityQueryKey = (options?: Options<GetWardCapacityData>) => createQueryKey('getWardCapacity', options);
+
+/**
+ * Free bed counts across all wards. Consumed by Emergency Service's dispatch and routing
+ * agent to choose where to send an ambulance.
+ *
+ * `free_beds` counts beds that are usable, unoccupied, and not under a live hold. A hold
+ * past its `reserved_until` counts as free, and that expiry rule lives in this service so
+ * no other component re-implements it differently.
+ *
+ * Counts only. No patient data crosses this boundary.
+ */
+export const getWardCapacityOptions = (options?: Options<GetWardCapacityData>) => queryOptions<GetWardCapacityResponse, GetWardCapacityError, GetWardCapacityResponse, ReturnType<typeof getWardCapacityQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getWardCapacity({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getWardCapacityQueryKey(options)
+});
+
+export const listPatientsQueryKey = (options?: Options<ListPatientsData>) => createQueryKey('listPatients', options);
+
+/**
+ * Search patients. `search` matches full name, NIC, phone or temporary reference.
+ */
+export const listPatientsOptions = (options?: Options<ListPatientsData>) => queryOptions<ListPatientsResponse, ListPatientsError, ListPatientsResponse, ReturnType<typeof listPatientsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listPatients({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listPatientsQueryKey(options)
+});
+
+export const listPatientsInfiniteQueryKey = (options?: Options<ListPatientsData>): QueryKey<Options<ListPatientsData>> => createQueryKey('listPatients', options, true);
+
+/**
+ * Search patients. `search` matches full name, NIC, phone or temporary reference.
+ */
+export const listPatientsInfiniteOptions = (options?: Options<ListPatientsData>) => {
+    const opts = infiniteQueryOptions<ListPatientsResponse, ListPatientsError, InfiniteData<ListPatientsResponse>, QueryKey<Options<ListPatientsData>>, number | Pick<QueryKey<Options<ListPatientsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListPatientsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listPatients({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listPatientsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+/**
+ * Register a patient. Call lookup first when an NIC is available — a returning patient must
+ * keep one record with many admissions, not gain a second identity.
+ */
+export const createPatientMutation = (options?: Partial<Options<CreatePatientData>>): UseMutationOptions<CreatePatientResponse, CreatePatientError, Options<CreatePatientData>> => {
+    const mutationOptions: UseMutationOptions<CreatePatientResponse, CreatePatientError, Options<CreatePatientData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createPatient({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getPatientQueryKey = (options: Options<GetPatientData>) => createQueryKey('getPatient', options);
+
+/**
+ * Get one patient with their visit history. One patient, many admissions.
+ */
+export const getPatientOptions = (options: Options<GetPatientData>) => queryOptions<GetPatientResponse, GetPatientError, GetPatientResponse, ReturnType<typeof getPatientQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getPatient({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getPatientQueryKey(options)
+});
+
+/**
+ * Update a patient record. A full replace — a field left out is cleared.
+ */
+export const updatePatientMutation = (options?: Partial<Options<UpdatePatientData>>): UseMutationOptions<UpdatePatientResponse, UpdatePatientError, Options<UpdatePatientData>> => {
+    const mutationOptions: UseMutationOptions<UpdatePatientResponse, UpdatePatientError, Options<UpdatePatientData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await updatePatient({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Find an existing patient by NIC before registering a new one. A miss is a 200 with
+ * found = false; not knowing someone is the normal answer at a registration desk.
+ */
+export const lookupPatientMutation = (options?: Partial<Options<LookupPatientData>>): UseMutationOptions<LookupPatientResponse, LookupPatientError, Options<LookupPatientData>> => {
+    const mutationOptions: UseMutationOptions<LookupPatientResponse, LookupPatientError, Options<LookupPatientData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await lookupPatient({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Attach a patient login to an existing record. A record and an account are different
+ * things — staff link them deliberately, after checking identity.
+ */
+export const linkPatientAccountMutation = (options?: Partial<Options<LinkPatientAccountData>>): UseMutationOptions<LinkPatientAccountResponse, LinkPatientAccountError, Options<LinkPatientAccountData>> => {
+    const mutationOptions: UseMutationOptions<LinkPatientAccountResponse, LinkPatientAccountError, Options<LinkPatientAccountData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await linkPatientAccount({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
 export const listWardsQueryKey = (options?: Options<ListWardsData>) => createQueryKey('listWards', options);
 
 /**
@@ -526,3 +953,29 @@ export const createWardMutation = (options?: Partial<Options<CreateWardData>>): 
     };
     return mutationOptions;
 };
+
+export const getWardOccupancyQueryKey = (options: Options<GetWardOccupancyData>) => createQueryKey('getWardOccupancy', options);
+
+/**
+ * Occupancy and care mix for one ward. Consumed by Staff Management to work out staffing
+ * demand.
+ *
+ * `patients_by_category` is the useful part: fifteen routine inpatients and two
+ * high-dependency patients need very different staffing, even though both are "seventeen
+ * patients". `incoming_next_2h` is what lets the staff allocation agent staff AHEAD of a
+ * rush instead of reacting to one.
+ *
+ * Counts only. No patient identities cross this boundary.
+ */
+export const getWardOccupancyOptions = (options: Options<GetWardOccupancyData>) => queryOptions<GetWardOccupancyResponse, GetWardOccupancyError, GetWardOccupancyResponse, ReturnType<typeof getWardOccupancyQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getWardOccupancy({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getWardOccupancyQueryKey(options)
+});

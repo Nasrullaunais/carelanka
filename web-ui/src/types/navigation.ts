@@ -2,6 +2,7 @@ import type { PrincipalRole } from '../services/api/generated';
 import {
   canReadAdmissions,
   canReadCapacity,
+  canReadEquipment,
   canReadWards,
   canRegisterPatient,
   canWorkAppointmentDesk,
@@ -49,6 +50,18 @@ export const destinations: Destination[] = [
     label: 'Wards',
     description: 'The ward register — what each ward is for and who it takes.',
     canAccess: canReadWards,
+  },
+  {
+    to: '/equipment',
+    label: 'Equipment',
+    description: 'Every machine in the hospital, where it is, and whether it works.',
+    canAccess: canReadEquipment,
+  },
+  {
+    to: '/pharmacy',
+    label: 'Pharmacy',
+    description: 'Search medicines and supplies, see what is on the shelf, record what moves.',
+    canAccess: canReadEquipment,
   },
 ];
 

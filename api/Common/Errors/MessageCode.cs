@@ -50,6 +50,8 @@ public enum MessageCode
 
     AdjustmentNeedsNote,
 
+    MaintenanceNotCompletable,
+
     // Patient Management — cl_pat_*
     WardNameTaken,
 

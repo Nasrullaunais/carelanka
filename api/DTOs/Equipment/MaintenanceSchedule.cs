@@ -15,6 +15,10 @@ public class MaintenanceSchedule
     [Required]
     public Guid AssetId { get; set; }
 
+    /// <summary>Human-readable, so a task list does not read as a column of GUIDs. Built from whichever asset the row points at.</summary>
+    [Required]
+    public string AssetLabel { get; set; } = string.Empty;
+
     [Required]
     public MaintenanceType ScheduleType { get; set; }
 

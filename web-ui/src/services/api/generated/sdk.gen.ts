@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AssignEquipmentItemData, AssignEquipmentItemErrors, AssignEquipmentItemResponses, CancelAdmissionData, CancelAdmissionErrors, CancelAdmissionResponses, CheckInAppointmentData, CheckInAppointmentErrors, CheckInAppointmentResponses, CompleteAdmissionDetailsData, CompleteAdmissionDetailsErrors, CompleteAdmissionDetailsResponses, CreateAdmissionData, CreateAdmissionErrors, CreateAdmissionResponses, CreateAppointmentData, CreateAppointmentErrors, CreateAppointmentResponses, CreateBedData, CreateBedErrors, CreateBedResponses, CreateEquipmentCategoryData, CreateEquipmentCategoryErrors, CreateEquipmentCategoryResponses, CreateEquipmentItemData, CreateEquipmentItemErrors, CreateEquipmentItemResponses, CreatePatientData, CreatePatientErrors, CreatePatientResponses, CreateWardData, CreateWardErrors, CreateWardResponses, GetAdmissionData, GetAdmissionErrors, GetAdmissionResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetEquipmentItemByTagData, GetEquipmentItemByTagErrors, GetEquipmentItemByTagResponses, GetEquipmentItemData, GetEquipmentItemErrors, GetEquipmentItemResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetPatientData, GetPatientErrors, GetPatientResponses, GetWardCapacityData, GetWardCapacityErrors, GetWardCapacityResponses, GetWardOccupancyData, GetWardOccupancyErrors, GetWardOccupancyResponses, LinkPatientAccountData, LinkPatientAccountErrors, LinkPatientAccountResponses, ListAdmissionsData, ListAdmissionsErrors, ListAdmissionsResponses, ListAppointmentsData, ListAppointmentsErrors, ListAppointmentsResponses, ListBedsData, ListBedsErrors, ListBedsResponses, ListEquipmentCategoriesData, ListEquipmentCategoriesErrors, ListEquipmentCategoriesResponses, ListEquipmentItemsData, ListEquipmentItemsErrors, ListEquipmentItemsResponses, ListPatientsData, ListPatientsErrors, ListPatientsResponses, ListWardsData, ListWardsErrors, ListWardsResponses, LoginData, LoginErrors, LoginPatientData, LoginPatientErrors, LoginPatientResponses, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, LookupPatientData, LookupPatientErrors, LookupPatientResponses, MarkArrivedData, MarkArrivedErrors, MarkArrivedResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RegisterPatientAccountData, RegisterPatientAccountErrors, RegisterPatientAccountResponses, ReleaseEquipmentItemData, ReleaseEquipmentItemErrors, ReleaseEquipmentItemResponses, ReportEquipmentFaultData, ReportEquipmentFaultErrors, ReportEquipmentFaultResponses, RetireBedData, RetireBedErrors, RetireBedResponses, UpdateBedData, UpdateBedErrors, UpdateBedResponses, UpdateEquipmentItemData, UpdateEquipmentItemErrors, UpdateEquipmentItemResponses, UpdatePatientData, UpdatePatientErrors, UpdatePatientResponses } from './types.gen';
+import type { AssignBedManuallyData, AssignBedManuallyErrors, AssignBedManuallyResponses, AssignEquipmentItemData, AssignEquipmentItemErrors, AssignEquipmentItemResponses, CancelAdmissionData, CancelAdmissionErrors, CancelAdmissionResponses, CheckInAppointmentData, CheckInAppointmentErrors, CheckInAppointmentResponses, CompleteAdmissionDetailsData, CompleteAdmissionDetailsErrors, CompleteAdmissionDetailsResponses, CompleteVisitData, CompleteVisitErrors, CompleteVisitResponses, CreateAdmissionData, CreateAdmissionErrors, CreateAdmissionResponses, CreateAppointmentData, CreateAppointmentErrors, CreateAppointmentResponses, CreateBedData, CreateBedErrors, CreateBedResponses, CreateEquipmentCategoryData, CreateEquipmentCategoryErrors, CreateEquipmentCategoryResponses, CreateEquipmentItemData, CreateEquipmentItemErrors, CreateEquipmentItemResponses, CreatePatientData, CreatePatientErrors, CreatePatientResponses, CreateWardData, CreateWardErrors, CreateWardResponses, GetAdmissionData, GetAdmissionErrors, GetAdmissionResponses, GetBedOccupancyData, GetBedOccupancyErrors, GetBedOccupancyResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetEquipmentItemByTagData, GetEquipmentItemByTagErrors, GetEquipmentItemByTagResponses, GetEquipmentItemData, GetEquipmentItemErrors, GetEquipmentItemResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetPatientData, GetPatientErrors, GetPatientResponses, GetWardCapacityData, GetWardCapacityErrors, GetWardCapacityResponses, GetWardOccupancyData, GetWardOccupancyErrors, GetWardOccupancyResponses, LinkPatientAccountData, LinkPatientAccountErrors, LinkPatientAccountResponses, ListAdmissionsData, ListAdmissionsErrors, ListAdmissionsResponses, ListAppointmentsData, ListAppointmentsErrors, ListAppointmentsResponses, ListBedAvailabilityData, ListBedAvailabilityErrors, ListBedAvailabilityResponses, ListBedsData, ListBedsErrors, ListBedsResponses, ListEquipmentCategoriesData, ListEquipmentCategoriesErrors, ListEquipmentCategoriesResponses, ListEquipmentItemsData, ListEquipmentItemsErrors, ListEquipmentItemsResponses, ListPatientsData, ListPatientsErrors, ListPatientsResponses, ListPatientWorklistData, ListPatientWorklistErrors, ListPatientWorklistResponses, ListWardsData, ListWardsErrors, ListWardsResponses, LoginData, LoginErrors, LoginPatientData, LoginPatientErrors, LoginPatientResponses, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, LookupPatientData, LookupPatientErrors, LookupPatientResponses, MarkArrivedData, MarkArrivedErrors, MarkArrivedResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RegisterPatientAccountData, RegisterPatientAccountErrors, RegisterPatientAccountResponses, ReleaseEquipmentItemData, ReleaseEquipmentItemErrors, ReleaseEquipmentItemResponses, ReportEquipmentFaultData, ReportEquipmentFaultErrors, ReportEquipmentFaultResponses, RetireBedData, RetireBedErrors, RetireBedResponses, UpdateBedData, UpdateBedErrors, UpdateBedResponses, UpdateEquipmentItemData, UpdateEquipmentItemErrors, UpdateEquipmentItemResponses, UpdatePatientData, UpdatePatientErrors, UpdatePatientResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -85,6 +85,24 @@ export const markArrived = <ThrowOnError extends boolean = false>(options: Optio
 });
 
 /**
+ * Finish a visit that never needed a bed - the scan or test is done and the patient has
+ * gone home. Moves `admitted` to `discharged`.
+ *
+ * **Only for a visit that needs no bed** - an `outpatient`. A visit at any other care
+ * level is refused with 409 and `cl_pat_020`: that is a discharge, and a discharge has a
+ * checklist, a summary note, an approver and a bed to give back. This endpoint does none
+ * of those, so it says so rather than half-doing it.
+ *
+ * The ward nurse or doctor who did the test is the one who knows it is finished, which is
+ * why this is theirs and not the duty manager's.
+ */
+export const completeVisit = <ThrowOnError extends boolean = false>(options: Options<CompleteVisitData, ThrowOnError>): RequestResult<CompleteVisitResponses, CompleteVisitErrors, ThrowOnError> => (options.client ?? client).post<CompleteVisitResponses, CompleteVisitErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admissions/{id}/complete',
+    ...options
+});
+
+/**
  * Cancel an admission, with a reason, and release any bed it was holding.
  *
  * Always a human act, never automatic, which is why the reason is mandatory and why this
@@ -95,6 +113,33 @@ export const markArrived = <ThrowOnError extends boolean = false>(options: Optio
 export const cancelAdmission = <ThrowOnError extends boolean = false>(options: Options<CancelAdmissionData, ThrowOnError>): RequestResult<CancelAdmissionResponses, CancelAdmissionErrors, ThrowOnError> => (options.client ?? client).post<CancelAdmissionResponses, CancelAdmissionErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admissions/{id}/cancel',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Assign a bed by hand, bypassing the agent. Places a 30-minute hold and moves the
+ * admission to `bed_reserved`.
+ *
+ * **The manual path must always work.** If the only way to admit a patient were through
+ * the AI, the hospital would stop the moment the AI stopped - and it is what makes a human
+ * genuinely in control rather than only able to say yes or no.
+ *
+ * The same hard rules and the same row-locked re-check as the agent's own path. A human
+ * may overrule the agent's ranking; nobody may put an ICU patient in a general bed without
+ * it being recorded as a downgrade.
+ *
+ * A ward nurse may assign a bed that matches the patient's care level. ICU, high-dependency
+ * and any downgrade are the duty manager's, and that depends on which bed was chosen rather
+ * than on the route - so a nurse choosing one is a 403 from the service, not a 401 from a
+ * policy.
+ */
+export const assignBedManually = <ThrowOnError extends boolean = false>(options: Options<AssignBedManuallyData, ThrowOnError>): RequestResult<AssignBedManuallyResponses, AssignBedManuallyErrors, ThrowOnError> => (options.client ?? client).post<AssignBedManuallyResponses, AssignBedManuallyErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admissions/{id}/assign-bed',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -159,6 +204,32 @@ export const checkInAppointment = <ThrowOnError extends boolean = false>(options
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * One page of the ward board, newest first. `search` matches the patient's name or NIC.
+ *
+ * **Two tables, one list.** A row is either a booking nobody has checked in yet -
+ * `kind = booking`, `status = not_arrived` - or a visit that has started, `kind = visit`.
+ * A booking that has been checked in appears once, as its visit, never twice.
+ *
+ * This exists because `GET /admissions` cannot answer the question. An admission is
+ * created by arriving, so a list of admissions can never say "not arrived" about anybody,
+ * and the patient booked in for a scan at eleven was invisible until she walked in.
+ *
+ * **Read-only, and derived.** `status` is a reading of `AppointmentStatus` or
+ * `AdmissionStatus`, not a fourth stored status. Nothing transitions between its values;
+ * every write still goes to `/appointments/{id}/check-in`, `/admissions/{id}/assign-bed`
+ * and the rest. So there is no `PATCH` here and there never will be.
+ *
+ * No `sortBy`. It is a worklist read top to bottom, not a report - and one sort key over a
+ * union of two tables whose time columns mean different things would order it by a column
+ * nobody asked for.
+ */
+export const listPatientWorklist = <ThrowOnError extends boolean = false>(options?: Options<ListPatientWorklistData, ThrowOnError>): RequestResult<ListPatientWorklistResponses, ListPatientWorklistErrors, ThrowOnError> => (options?.client ?? client).get<ListPatientWorklistResponses, ListPatientWorklistErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/patient-worklist',
+    ...options
 });
 
 /**
@@ -477,6 +548,41 @@ export const linkPatientAccount = <ThrowOnError extends boolean = false>(options
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * List beds with their availability. This is the candidate list the bed agent will work
+ * from, and the one a nurse picks from by hand today.
+ *
+ * `free` applies hold expiry, so a bed whose 30-minute reservation has lapsed is reported
+ * free with nobody having released it. That expiry rule lives in one place in this
+ * component and is not re-implemented per endpoint.
+ *
+ * Retired wards and retired beds are absent rather than listed as unavailable.
+ */
+export const listBedAvailability = <ThrowOnError extends boolean = false>(options?: Options<ListBedAvailabilityData, ThrowOnError>): RequestResult<ListBedAvailabilityResponses, ListBedAvailabilityErrors, ThrowOnError> => (options?.client ?? client).get<ListBedAvailabilityResponses, ListBedAvailabilityErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/bed-availability',
+    ...options
+});
+
+/**
+ * Is anyone in this bed?
+ *
+ * Equipment Management calls this **before** taking a bed out of service for repair or
+ * maintenance. Servicing a bed is their operation on their own table, but a bed with a
+ * patient in it must not be withdrawn, and only we know whether it is occupied.
+ *
+ * `occupied` is true when a live assignment exists: status `occupied`, or `reserved` with
+ * a `reserved_until` still in the future. A lapsed hold does not block servicing.
+ *
+ * The hard rule this exists to enforce: **maintenance never evicts a patient.** If the
+ * answer is occupied, Equipment waits for discharge.
+ */
+export const getBedOccupancy = <ThrowOnError extends boolean = false>(options: Options<GetBedOccupancyData, ThrowOnError>): RequestResult<GetBedOccupancyResponses, GetBedOccupancyErrors, ThrowOnError> => (options.client ?? client).get<GetBedOccupancyResponses, GetBedOccupancyErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/beds/{id}/occupancy',
+    ...options
 });
 
 /**

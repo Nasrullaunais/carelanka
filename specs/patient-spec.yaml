@@ -449,6 +449,46 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/IllegalTransition' }
 
+  /admissions/{id}/complete:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Admissions]
+      summary: Finish a visit that never needed a bed
+      description: |
+        Roles: WardNurse, Doctor.
+
+        **Business op.** The scan or the test is done and the patient has gone home. Moves
+        `admitted` to `discharged` and stamps `discharged_at`.
+
+        **Only for a visit with `requires_bed: false`.** A visit at any other care level is
+        refused with 409 and `cl_pat_020`, because finishing that one is a *discharge*: it has
+        a checklist, a summary note, an approver and a bed to give back, and this endpoint does
+        none of those. It says so rather than half-doing it. The discharge workflow is step 7
+        of docs/build/patient.md.
+
+        Two hops through `ready_for_discharge`, the way manual bed assignment goes through
+        `awaiting_approval`: the published transition table has no `admitted -> discharged`
+        edge and this is not the place to invent one. For a visit with no bed and no checklist,
+        being ready to go and going are the same act. Nothing observes the middle state.
+      operationId: completeVisit
+      responses:
+        '200':
+          description: The visit, now discharged
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Admission' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: >-
+            Already finished or never started (`cl_err_*` illegal transition), or the visit has
+            a bed and must be discharged instead (`cl_pat_020`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
   /admissions/{id}/cancel:
     parameters:
       - $ref: '#/components/parameters/PathId'
@@ -660,7 +700,12 @@ paths:
           schema: { $ref: '#/components/schemas/WardType' }
         - name: availability
           in: query
-          description: '`free` applies hold expiry, so a bed with a lapsed reservation is reported free.'
+          description: |
+            `free` applies hold expiry, so a bed with a lapsed reservation is reported free.
+
+            Omitted means `all`. The generated document publishes this as a named
+            `BedAvailabilityFilter` schema with no `default`, because OpenAPI 3.0 allows no
+            sibling keys next to a `$ref` - the server still defaults to `all`.
           schema:
             type: string
             enum: [free, reserved, occupied, out_of_service, all]
@@ -683,6 +728,7 @@ paths:
                       items:
                         type: array
                         items: { $ref: '#/components/schemas/AdmissionBed' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /beds/{id}/occupancy:
@@ -901,15 +947,7 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [bed_id]
-              properties:
-                bed_id: { type: string, format: uuid }
-                override_reason:
-                  type: string
-                  maxLength: 500
-                  description: Required when overriding a proposal the agent made.
+            schema: { $ref: '#/components/schemas/AssignBedRequest' }
       responses:
         '200':
           description: Assigned. Admission moves to `bed_reserved`.
@@ -1238,6 +1276,66 @@ paths:
   # ------------------------------------------------------------------
   # Appointments - staff side
   # ------------------------------------------------------------------
+
+  /patient-worklist:
+    get:
+      tags: [Admissions]
+      summary: The ward board - bookings and visits in one list
+      description: |
+        Roles: WardNurse, Doctor, DutyManager - the same as `GET /admissions`.
+
+        **Two tables, one list.** A row is either a booking nobody has checked in yet
+        (`kind: booking`, `status: not_arrived`) or a visit that has started (`kind: visit`).
+
+        **Why this exists and `GET /admissions` cannot do it.** An `Admission` is created by
+        arriving, so a list of admissions can never say "not arrived" about anybody. The
+        patient booked in for a scan at eleven was invisible until she walked through the
+        door, and the desk had to read a second screen to find her.
+
+        **One row per person's business, never two.** A booking that has been checked in is
+        terminal at `checked_in` and is left out; its admission stands for it. So a booking
+        becomes a visit on this list rather than appearing beside it.
+
+        **Read-only and derived.** `status` is a reading of `AppointmentStatus` or
+        `AdmissionStatus`, not a fourth stored status - see `WorklistStatus`. Nothing
+        transitions between its values, and every write still goes to the endpoint that owns
+        the row: `/appointments/{id}/check-in`, `/admissions/{id}/assign-bed`,
+        `/admissions/{id}/arrive`, `/admissions/{id}/complete`. There is no PATCH here and
+        there will not be one.
+
+        No `sortBy`. It is a worklist read top to bottom, newest first - not a report. One
+        sort key across two tables whose time columns mean different things would order it by
+        a column nobody asked for.
+      operationId: listPatientWorklist
+      parameters:
+        - name: search
+          in: query
+          description: Matches patient name or NIC, case-insensitively.
+          schema: { type: string }
+        - name: includeFinished
+          in: query
+          description: >-
+            False - the default - is who the hospital is dealing with now. True adds visits
+            that are discharged or cancelled, which is the archive rather than the board.
+          schema: { type: boolean, default: false }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of the ward board
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/WorklistRow' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /appointments:
     get:
@@ -1870,6 +1968,105 @@ components:
         same word, one shared app - so the names have to differ.
       enum: [routine, urgent, emergency]
 
+    WorklistKind:
+      type: string
+      description: |
+        Which table a ward-board row came out of, and therefore what can be done to it. A
+        `booking` is checked in; a `visit` gets a bed, arrives, or is completed. A screen that
+        cannot tell the two apart offers the wrong button.
+      enum: [booking, visit]
+
+    WorklistStatus:
+      type: string
+      description: |
+        What the ward board says about one person, in the words a nurse uses.
+
+        **Derived, never stored.** It is a reading of two other stored statuses -
+        `AppointmentStatus` for a booking and `AdmissionStatus` for a visit - and it exists
+        because neither on its own answers "what is happening with this patient". Nothing
+        transitions between these values; the transition rules live on `AdmissionStatus`,
+        which is the authoritative one.
+
+        | Value | What it means | Read from |
+        | :--- | :--- | :--- |
+        | `not_arrived` | Booked in, not here yet | appointment `scheduled` |
+        | `awaiting_bed` | Here, needs a bed, has not got one | `awaiting_bed`, `awaiting_approval` |
+        | `bed_ready` | A bed is held; nobody has marked them as being in it | `bed_reserved` |
+        | `admitted` | In the hospital and being treated | `admitted`, `ready_for_discharge` |
+        | `completed` | Done and gone home | `discharged` |
+        | `cancelled` | Called off | `cancelled` |
+
+        `awaiting_approval` reads as `awaiting_bed` because from the board's point of view it
+        is the same situation and the same thing to do about it. `ready_for_discharge` reads
+        as `admitted` because they are still in the bed - the flag says they could go home,
+        not that they have.
+
+        `bed_ready` is deliberately not folded into `awaiting_bed`, because the hold expires
+        after thirty minutes: "a bed is waiting, go and collect them" is a different job from
+        "find them a bed", and it is the one with a clock on it.
+      enum: [not_arrived, awaiting_bed, bed_ready, admitted, completed, cancelled]
+
+    WorklistRow:
+      type: object
+      description: |
+        One line of the ward board: one patient, and what is happening with them right now.
+
+        Deliberately not `AdmissionSummary` with extra nullable fields. Half the columns on a
+        booking are genuinely unknown rather than null-as-in-empty - nobody has chosen a care
+        level for a patient who has not arrived - and making the admission schema pretend
+        otherwise would turn every one of its fields optional for every caller.
+      required: [id, kind, patient, status, requires_bed, when]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: The appointment id or the admission id, depending on `kind`.
+        kind: { $ref: '#/components/schemas/WorklistKind' }
+        patient: { $ref: '#/components/schemas/PatientSummary' }
+        status: { $ref: '#/components/schemas/WorklistStatus' }
+        requires_bed:
+          type: boolean
+          description: >-
+            False for a booking as well as for an outpatient. Nobody has chosen a care level
+            for somebody who has not arrived, so "does this need a bed" has no answer yet -
+            and a screen must not offer to assign one on a guess.
+        source:
+          allOf:
+            - $ref: '#/components/schemas/AdmissionSource'
+          nullable: true
+          description: How they came in. Null on a booking - they have not come in.
+        admission_category:
+          allOf:
+            - $ref: '#/components/schemas/AdmissionCategory'
+          nullable: true
+          description: >-
+            Null on a booking. The care level is set by staff at check-in, never at booking
+            time.
+        urgency:
+          allOf:
+            - $ref: '#/components/schemas/AdmissionUrgency'
+          nullable: true
+        ward_name:
+          type: string
+          nullable: true
+          description: Where they are, from the live bed assignment. Null when no bed is held.
+        bed_number: { type: string, nullable: true }
+        when:
+          type: string
+          format: date-time
+          description: |
+            The one time that matters for this row: when a booking is due, or when a visit
+            started. Two different facts under one name on purpose - the board is read top to
+            bottom as a chronology, and a column that was `scheduled_at` on some rows and
+            blank on others could not be read that way at all. A visit not yet marked as
+            arrived falls back to when its record was opened, which is the closest true thing.
+        reason:
+          type: string
+          nullable: true
+          description: >-
+            Why they are coming, as the desk or the patient typed it - "Scan", "Blood test".
+            Null on a visit: the reason is not carried onto the admission.
+
     AdmissionStatus:
       type: string
       description: |
@@ -2120,9 +2317,26 @@ components:
             because forcing a sentence out of a nurse in a hurry produces "n/a" and nothing
             else. Stored on the admission and published back as `cancel_note`.
 
+    AssignBedRequest:
+      type: object
+      required: [bed_id]
+      description: |
+        Named rather than inlined so the drift gate can hold it against the generated document.
+        It was inline while nothing implemented it.
+      properties:
+        bed_id: { type: string, format: uuid }
+        override_reason:
+          type: string
+          maxLength: 500
+          nullable: true
+          description: >-
+            Why a human ignored what the agent proposed. Nothing requires it yet: there are no
+            proposals to override until the agent lands, and this endpoint is also the ordinary
+            path when nobody asked the agent at all.
+
     AdmissionSummary:
       type: object
-      required: [id, source, admission_category, urgency, status, details_complete]
+      required: [id, source, admission_category, urgency, status, details_complete, requires_bed]
       properties:
         id: { type: string, format: uuid }
         patient: { $ref: '#/components/schemas/PatientSummary' }
@@ -2131,6 +2345,21 @@ components:
         urgency: { $ref: '#/components/schemas/AdmissionUrgency' }
         status: { $ref: '#/components/schemas/AdmissionStatus' }
         details_complete: { type: boolean }
+        requires_bed:
+          type: boolean
+          description: |
+            **Hard rule H0.** Whether this visit needs a bed at all. False for an
+            `outpatient` - a scan, a blood test, a dressing change - who is seen and sent
+            home. True for every other care level, `day_case` included: a day case is on a
+            real bed for hours and it is a bed nobody else can have.
+
+            Derived from `admission_category` and never stored, so the two cannot disagree.
+            Published rather than left to the client, because a screen that works it out for
+            itself is a second copy of the rule.
+
+            A visit with `requires_bed: false` never enters `awaiting_bed`. It is `admitted`
+            from the moment the record is opened, and `POST /admissions/{id}/assign-bed`
+            refuses it with `cl_pat_021`.
         ward_name: { type: string, nullable: true }
         bed_number: { type: string, nullable: true }
         expected_arrival: { type: string, format: date-time, nullable: true }
@@ -2226,6 +2455,7 @@ components:
     BedOccupancyStatus:
       type: object
       description: Answer to "may this bed be taken out of service?" - consumed by Equipment Management.
+      required: [bed_id, occupied, may_take_out_of_service]
       properties:
         bed_id: { type: string, format: uuid }
         occupied:
@@ -2242,20 +2472,26 @@ components:
 
     AdmissionBed:
       description: |
-        A bed as this component sees it. `id`, `ward_id`, `bed_number`, `has_isolation`,
-        `nurse_station_distance` and `condition` are read from Equipment Management's register
-        and are never written here. `availability` and `occupied_by_admission_id` are computed
+        A bed as this component sees it. `id`, `ward_id`, `bed_number`, `has_isolation` and
+        `condition` are read from Equipment Management's register and are never written here. `availability` and `occupied_by_admission_id` are computed
         from our own BedAssignment rows.
       allOf:
         - $ref: '#/components/schemas/AuditFields'
         - type: object
+          required:
+            - id
+            - ward_id
+            - ward_name
+            - bed_number
+            - has_isolation
+            - condition
+            - availability
           properties:
             id: { type: string, format: uuid }
             ward_id: { type: string, format: uuid }
             ward_name: { type: string }
             bed_number: { type: string }
             has_isolation: { type: boolean }
-            nurse_station_distance: { type: integer }
             condition: { $ref: '#/components/schemas/BedCondition' }
             availability:
               type: string
@@ -2344,6 +2580,15 @@ components:
       allOf:
         - $ref: '#/components/schemas/AuditFields'
         - type: object
+          required:
+            - id
+            - admission_id
+            - bed_id
+            - ward_name
+            - bed_number
+            - status
+            - assigned_by
+            - is_downgrade
           properties:
             id: { type: string, format: uuid }
             admission_id: { type: string, format: uuid }

@@ -1,4 +1,4 @@
-﻿using CareLanka.Api.Common.Errors;
+using CareLanka.Api.Common.Errors;
 using CareLanka.Api.Common.Exceptions;
 using CareLanka.Api.Common.Persistence;
 using CareLanka.Api.Data;
@@ -27,8 +27,13 @@ public sealed class AdmissionService : IAdmissionService
     ];
 
     private readonly CareLankaDbContext _db;
+    private readonly IBedRegistryService _beds;
 
-    public AdmissionService(CareLankaDbContext db) => _db = db;
+    public AdmissionService(CareLankaDbContext db, IBedRegistryService beds)
+    {
+        _db = db;
+        _beds = beds;
+    }
 
     public async Task<PagedResult<AdmissionSummary>> ListAsync(
         IReadOnlyCollection<AdmissionStatus>? statuses,
@@ -42,7 +47,14 @@ public sealed class AdmissionService : IAdmissionService
         SortDirection sortDir,
         CancellationToken ct = default)
     {
-        var query = _db.Admissions.AsNoTracking().Include(a => a.Patient).AsQueryable();
+        // BedAssignments as well as the patient: ward_name and bed_number are on every row of
+        // this list, and they are reached through the live assignment. Loaded with the page
+        // rather than queried per row.
+        var query = _db.Admissions
+            .AsNoTracking()
+            .Include(a => a.Patient)
+            .Include(a => a.BedAssignments)
+            .AsQueryable();
 
         // No status filter means the worklist, not the archive. A ward board showing every
         // admission the hospital has ever had is useless by the second week.
@@ -87,8 +99,10 @@ public sealed class AdmissionService : IAdmissionService
             .Take(pageSize)
             .ToListAsync(ct);
 
+        var beds = await LabelBedsAsync(admissions, ct);
+
         return PagedResult<AdmissionSummary>.From(
-            admissions.Select(a => ToSummary(a, includePatient: true)).ToList(),
+            admissions.Select(a => ToSummary(a, beds, includePatient: true)).ToList(),
             page, pageSize, totalItems);
     }
 
@@ -101,17 +115,19 @@ public sealed class AdmissionService : IAdmissionService
             .FirstOrDefaultAsync(a => a.Id == id, ct)
             ?? throw new NotFoundException("Admission", id);
 
+        var beds = await LabelBedsAsync(new[] { admission }, ct);
+
         var detail = new AdmissionDetail
         {
             // Newest first, and nothing is filtered out: a rejected or expired assignment is
             // part of the audit trail, not noise.
             BedAssignments = admission.BedAssignments
                 .OrderByDescending(b => b.CreatedAt)
-                .Select(ToBedAssignment)
+                .Select(assignment => ToBedAssignment(assignment, beds))
                 .ToList()
         };
 
-        return Fill(detail, admission);
+        return Fill(detail, admission, beds);
     }
 
     public async Task<AdmissionResponse> CreateAsync(
@@ -158,14 +174,17 @@ public sealed class AdmissionService : IAdmissionService
             Category = request.AdmissionCategory!.Value,
             Urgency = request.Urgency!.Value,
 
-            // Every admission starts here. Getting a bed is a separate, approved step.
-            Status = AdmissionStatus.AwaitingBed,
+            // A visit that needs a bed starts on the bed board; getting one is a separate,
+            // approved step. A visit that does not need a bed has no board to sit on and is
+            // admitted the moment the record is opened — see NewVisitStatus below.
+            Status = NewVisitStatus(request.AdmissionCategory!.Value),
 
             IsInfectious = request.IsInfectious,
             CategorySetByStaffMemberId = request.CategorySetByStaffId,
             CategorySetAt = DateTimeOffset.UtcNow,
             DispatchId = string.IsNullOrWhiteSpace(request.DispatchId) ? null : request.DispatchId.Trim(),
-            ExpectedArrivalAt = request.ExpectedArrival,
+            ExpectedArrivalAt = NewVisitExpectedArrival(request),
+            AdmittedAt = NewVisitAdmittedAt(request.AdmissionCategory!.Value),
             MissingFields = MissingFieldsFor(patient)
         };
 
@@ -187,7 +206,8 @@ public sealed class AdmissionService : IAdmissionService
 
         admission.Patient = patient;
 
-        return Fill(new AdmissionResponse(), admission);
+        // A brand new admission holds no bed, so there is nothing to label.
+        return Fill(new AdmissionResponse(), admission, BedLabel.None);
     }
 
     public async Task<AdmissionResponse> CompleteDetailsAsync(
@@ -195,6 +215,7 @@ public sealed class AdmissionService : IAdmissionService
     {
         var admission = await _db.Admissions
             .Include(a => a.Patient)
+            .Include(a => a.BedAssignments)
             .FirstOrDefaultAsync(a => a.Id == id, ct)
             ?? throw new NotFoundException("Admission", id);
 
@@ -240,8 +261,81 @@ public sealed class AdmissionService : IAdmissionService
             throw new ConflictException(MessageCode.PatientNicTaken, nic, "another record");
         }
 
-        return Fill(new AdmissionResponse(), admission);
+        return Fill(new AdmissionResponse(), admission, await LabelBedsAsync(new[] { admission }, ct));
     }
+
+    /// <summary>Where a brand-new visit starts, which depends on whether it needs a bed.</summary>
+    /// <remarks>
+    /// A visit that needs a bed starts at <c>awaiting_bed</c>: it goes on the bed board and
+    /// waits for one to be assigned and approved.
+    ///
+    /// A visit that does not — an outpatient scan, a blood test — starts at <c>admitted</c>,
+    /// because opening the record *is* the arrival. There is nothing to wait for and no board
+    /// to wait on. Putting them at <c>awaiting_bed</c> was the bug: the only edge into
+    /// <c>admitted</c> is from <c>bed_reserved</c>, so a patient who would never be given a
+    /// bed could never reach it, could never be discharged, and sat on the ward board as
+    /// "awaiting bed" until somebody cancelled them.
+    /// </remarks>
+    private static AdmissionStatus NewVisitStatus(AdmissionCategory category)
+        => BedPlacementRules.RequiresBed(category)
+            ? AdmissionStatus.AwaitingBed
+            : AdmissionStatus.Admitted;
+
+    /// <summary>The arrival stamp a new visit is born with. Null unless it skipped the board.</summary>
+    private static DateTimeOffset? NewVisitAdmittedAt(AdmissionCategory category)
+        => BedPlacementRules.RequiresBed(category) ? null : DateTimeOffset.UtcNow;
+
+    /// <summary>
+    /// The expected-arrival time a new visit keeps. Always null for a visit needing no bed.
+    /// </summary>
+    /// <remarks>
+    /// An outpatient record is opened with the patient in front of you, so "expected at" is
+    /// already in the past by the time it is written. Kept, it would put somebody standing at
+    /// the desk into the next two hours' incoming count on the capacity screen — the same
+    /// reason check-in drops it. Dropped rather than refused: a booking carried the time for a
+    /// good reason up to this point, and a 400 here would be punishing the caller for it.
+    /// </remarks>
+    private static DateTimeOffset? NewVisitExpectedArrival(CreateAdmissionRequest request)
+        => BedPlacementRules.RequiresBed(request.AdmissionCategory!.Value)
+            ? request.ExpectedArrival
+            : null;
+
+    /// <summary>
+    /// Ends a visit that never needed a bed: the scan is done, the patient has gone home.
+    /// </summary>
+    /// <remarks>
+    /// Narrow on purpose. This is **not** the discharge workflow — that is step 7 of
+    /// build/patient.md, it has a checklist, a summary note and an approver, and it has to
+    /// release the bed. A visit holding a bed is refused here and told so, rather than being
+    /// quietly half-discharged by an endpoint that does not know how to give the bed back.
+    ///
+    /// Two hops, the way assigning a bed by hand does it: the published table has no
+    /// <c>admitted -&gt; discharged</c> edge and this is not the place to invent one. For a
+    /// visit with no bed and no checklist, being ready to go and going are the same act, so
+    /// both moves happen and both are checked. Nothing observes the middle state.
+    /// </remarks>
+    public Task<AdmissionResponse> CompleteAsync(Guid id, CancellationToken ct = default)
+        => InTransitionAsync(id, admission =>
+        {
+            if (BedPlacementRules.RequiresBed(admission.Category))
+            {
+                throw new ConflictException(
+                    MessageCode.VisitNeedsDischargeNotComplete,
+                    EnumWire.ToWire(admission.Category));
+            }
+
+            AdmissionStatusMachine.EnsureMove(
+                admission.Status,
+                AdmissionStatus.ReadyForDischarge,
+                AdmissionStatus.Admitted);
+            AdmissionStatusMachine.EnsureMove(
+                AdmissionStatus.ReadyForDischarge,
+                AdmissionStatus.Discharged,
+                AdmissionStatus.ReadyForDischarge);
+
+            admission.Status = AdmissionStatus.Discharged;
+            admission.DischargedAt = DateTimeOffset.UtcNow;
+        }, ct);
 
     public Task<AdmissionResponse> MarkArrivedAsync(Guid id, CancellationToken ct = default)
         => InTransitionAsync(id, admission =>
@@ -342,7 +436,7 @@ public sealed class AdmissionService : IAdmissionService
         await _db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
 
-        return Fill(new AdmissionResponse(), admission);
+        return Fill(new AdmissionResponse(), admission, await LabelBedsAsync(new[] { admission }, ct));
     }
 
     private static IOrderedQueryable<AdmissionEntity> Sort(
@@ -410,8 +504,21 @@ public sealed class AdmissionService : IAdmissionService
         return missing;
     }
 
-    private static AdmissionSummary ToSummary(AdmissionEntity admission, bool includePatient)
-        => new()
+    private static AdmissionSummary ToSummary(
+        AdmissionEntity admission,
+        IReadOnlyDictionary<Guid, BedLabel> beds,
+        bool includePatient)
+    {
+        // Where this patient is *now*, which is the live assignment and nothing else. A
+        // released row is history and an expired hold is a bed somebody else may already have,
+        // so naming either here would put a patient in a bed they are not in.
+        var live = LiveAssignment(admission);
+
+        var label = live is not null && beds.TryGetValue(live.BedId, out var found)
+            ? found
+            : (BedLabel?)null;
+
+        return new AdmissionSummary
         {
             Id = admission.Id,
             Patient = includePatient ? ToPatientSummary(admission.Patient) : null,
@@ -420,15 +527,17 @@ public sealed class AdmissionService : IAdmissionService
             Urgency = admission.Urgency,
             Status = admission.Status,
             DetailsComplete = admission.DetailsComplete,
+            RequiresBed = BedPlacementRules.RequiresBed(admission.Category),
 
-            // Ward and bed stay null until step 6 puts a live BedAssignment behind them, and
-            // reading the names needs Equipment's register — STUBS.md row 1.
-            WardName = null,
-            BedNumber = null,
+            // Null when nobody has been given a bed yet, which is the ordinary state of an
+            // admission in awaiting_bed. Not an error and not a gap in the data.
+            WardName = label?.WardName,
+            BedNumber = label?.BedNumber,
 
             ExpectedArrival = admission.ExpectedArrivalAt,
             AdmittedAt = admission.AdmittedAt
         };
+    }
 
     private static PatientSummary ToPatientSummary(PatientEntity patient)
         => new()
@@ -441,17 +550,22 @@ public sealed class AdmissionService : IAdmissionService
             DateOfBirth = patient.DateOfBirth
         };
 
-    private static BedAssignmentResponse ToBedAssignment(BedAssignmentEntity assignment)
-        => new()
+    private static BedAssignmentResponse ToBedAssignment(
+        BedAssignmentEntity assignment, IReadOnlyDictionary<Guid, BedLabel> beds)
+    {
+        var label = beds.TryGetValue(assignment.BedId, out var found) ? found : BedLabel.Unknown;
+
+        return new BedAssignmentResponse
         {
             Id = assignment.Id,
             AdmissionId = assignment.AdmissionId,
             BedId = assignment.BedId,
 
-            // STUB — the ward and bed names live in Equipment's register. See STUBS.md row 1.
-            // No assignment rows exist until step 6, so this mapper does not run today.
-            WardName = string.Empty,
-            BedNumber = string.Empty,
+            // Read from Equipment's register, never stored on our row. Empty when the bed has
+            // since been retired: the assignment is history and the frame it names is gone, so
+            // there is no name to give. The id is still there for anyone who needs to trace it.
+            WardName = label.WardName,
+            BedNumber = label.BedNumber,
 
             Status = assignment.Status,
             ReservedUntil = assignment.ReservedUntil,
@@ -466,11 +580,65 @@ public sealed class AdmissionService : IAdmissionService
             CreatedAt = assignment.CreatedAt,
             UpdatedAt = assignment.UpdatedAt
         };
+    }
 
-    private static TResponse Fill<TResponse>(TResponse response, AdmissionEntity admission)
+    /// <summary>
+    /// Ward name and bed number for every bed these admissions have ever been assigned to.
+    /// </summary>
+    /// <remarks>
+    /// Two reads for a whole page rather than two per row: one into Equipment's register
+    /// through the adapter, one into our own ward table. An admission that has never held a bed
+    /// contributes nothing and costs nothing — both reads are skipped entirely.
+    /// </remarks>
+    private async Task<IReadOnlyDictionary<Guid, BedLabel>> LabelBedsAsync(
+        IReadOnlyCollection<AdmissionEntity> admissions, CancellationToken ct)
+    {
+        var bedIds = admissions
+            .SelectMany(admission => admission.BedAssignments)
+            .Select(assignment => assignment.BedId)
+            .Distinct()
+            .ToList();
+
+        if (bedIds.Count == 0)
+        {
+            return BedLabel.None;
+        }
+
+        var beds = await _beds.ListBedsByIdAsync(bedIds, ct);
+
+        var wardNames = await _db.Wards
+            .AsNoTracking()
+            .Where(ward => beds.Select(bed => bed.WardId).Contains(ward.Id))
+            .ToDictionaryAsync(ward => ward.Id, ward => ward.Name, ct);
+
+        return beds.ToDictionary(
+            bed => bed.Id,
+            bed => new BedLabel(
+                wardNames.TryGetValue(bed.WardId, out var name) ? name : string.Empty,
+                bed.BedNumber));
+    }
+
+    /// <summary>
+    /// The assignment that claims a bed for this admission right now, or null when none does.
+    /// </summary>
+    /// <remarks>
+    /// At most one can qualify: <c>ux_bed_assignments_live_admission</c> makes a live
+    /// assignment per admission unique. The expiry half comes from <see cref="BedHold"/>, so
+    /// this agrees with every other read of "is that bed still held".
+    /// </remarks>
+    private static BedAssignmentEntity? LiveAssignment(AdmissionEntity admission)
+    {
+        var now = DateTimeOffset.UtcNow;
+
+        return admission.BedAssignments.FirstOrDefault(
+            assignment => BedHold.IsLive(assignment, now));
+    }
+
+    private static TResponse Fill<TResponse>(
+        TResponse response, AdmissionEntity admission, IReadOnlyDictionary<Guid, BedLabel> beds)
         where TResponse : AdmissionResponse
     {
-        var summary = ToSummary(admission, includePatient: true);
+        var summary = ToSummary(admission, beds, includePatient: true);
 
         response.Id = summary.Id;
         response.Patient = summary.Patient;
@@ -479,6 +647,7 @@ public sealed class AdmissionService : IAdmissionService
         response.Urgency = summary.Urgency;
         response.Status = summary.Status;
         response.DetailsComplete = summary.DetailsComplete;
+        response.RequiresBed = summary.RequiresBed;
         response.WardName = summary.WardName;
         response.BedNumber = summary.BedNumber;
         response.ExpectedArrival = summary.ExpectedArrival;
@@ -501,6 +670,19 @@ public sealed class AdmissionService : IAdmissionService
 
     private static string? Clean(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <summary>Where a bed is, for display. Equipment's bed number, our ward name.</summary>
+    /// <param name="WardName">Empty when the ward behind a historical assignment has been retired.</param>
+    /// <param name="BedNumber">Empty when the bed itself has been retired since.</param>
+    private readonly record struct BedLabel(string WardName, string BedNumber)
+    {
+        /// <summary>Nothing to label. The ordinary case for an admission that has never held a bed.</summary>
+        public static readonly IReadOnlyDictionary<Guid, BedLabel> None =
+            new Dictionary<Guid, BedLabel>();
+
+        /// <summary>A bed Equipment's register no longer has. Empty, not invented.</summary>
+        public static readonly BedLabel Unknown = new(string.Empty, string.Empty);
+    }
 
     private static bool IsUniqueViolation(DbUpdateException exception, string constraintName)
         => exception.InnerException is PostgresException

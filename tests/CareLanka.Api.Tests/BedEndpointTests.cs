@@ -2,8 +2,13 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using CareLanka.Api.Data;
+using CareLanka.Api.Data.Entities.Patient;
+using CareLanka.Api.Data.Enums;
 using CareLanka.Api.Services.Equipment;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using PatientRecord = CareLanka.Api.Data.Entities.Patient.Patient;
 using Xunit;
 
 namespace CareLanka.Api.Tests;
@@ -131,8 +136,13 @@ public sealed class BedEndpointTests
         Assert.Equal(1, body.RootElement.GetProperty("total_pages").GetInt32());
     }
 
+    // These four used to be two, and both asserted a 409 for an *empty* bed. That was
+    // STUBS.md row 3 answering "occupied" for everything, which was deliberate and fail-safe:
+    // a stub answering "free" would have let maintenance be booked on a bed with a patient in
+    // it. The comment there said the assertion changes to 200 the day M4 lands
+    // GET /beds/{id}/occupancy. It has, so it did.
     [Fact]
-    public async Task Taking_a_bed_out_of_service_is_refused_while_it_reads_as_occupied()
+    public async Task Taking_an_empty_bed_out_of_service_is_allowed()
     {
         using var client = await EquipmentClientAsync();
         var id = await NewBedIdAsync(client);
@@ -141,22 +151,49 @@ public sealed class BedEndpointTests
             $"/api/beds/{id}", new { condition = "out_of_service" });
         using var body = await ReadJsonAsync(response);
 
-        // STUBS.md row 3: the occupancy stub answers "occupied" on purpose, so this is the
-        // fail-safe path rather than a bug. The assertion changes to 200 the day M4 lands
-        // GET /beds/{id}/occupancy, and that is the point of asserting it now.
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("out_of_service", body.RootElement.GetProperty("condition").GetString());
+    }
+
+    [Fact]
+    public async Task Taking_a_bed_out_of_service_is_refused_while_a_patient_is_in_it()
+    {
+        using var client = await EquipmentClientAsync();
+        var id = await NewBedIdAsync(client);
+        await OccupyAsync(id);
+
+        var response = await client.PatchAsJsonAsync(
+            $"/api/beds/{id}", new { condition = "out_of_service" });
+        using var body = await ReadJsonAsync(response);
+
+        // Maintenance never evicts a patient. Not our rule to bend: only Patient Management
+        // knows whether the bed is occupied, and this is their answer being respected.
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal("cl_equ_003", body.RootElement.GetProperty("code").GetString());
     }
 
     [Fact]
-    public async Task Retiring_a_bed_is_refused_while_it_reads_as_occupied()
+    public async Task Retiring_an_empty_bed_is_allowed()
     {
         using var client = await EquipmentClientAsync();
         var id = await NewBedIdAsync(client);
 
         var response = await client.PostAsync($"/api/beds/{id}/retire", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Retiring_a_bed_is_refused_while_a_patient_is_in_it()
+    {
+        using var client = await EquipmentClientAsync();
+        var id = await NewBedIdAsync(client);
+        await OccupyAsync(id);
+
+        var response = await client.PostAsync($"/api/beds/{id}/retire", null);
         using var body = await ReadJsonAsync(response);
 
+        // Retiring is irreversible, so it asks the same question an out-of-service edit does.
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal("cl_equ_003", body.RootElement.GetProperty("code").GetString());
     }
@@ -247,6 +284,57 @@ public sealed class BedEndpointTests
         Assert.Equal(2, counts[stocked]);
         Assert.DoesNotContain(empty, counts.Keys);
     }
+
+    /// <summary>
+    /// Puts a live assignment on this bed, so Patient Management answers "occupied".
+    /// </summary>
+    /// <remarks>
+    /// Written straight to their table rather than through POST /assign-bed, because this bed
+    /// belongs to a random ward id these tests never registered and their placement rules would
+    /// rightly refuse it. What matters here is only that a live row exists.
+    /// </remarks>
+    private async Task OccupyAsync(Guid bedId)
+    {
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        var patient = new PatientRecord
+        {
+            Id = Guid.NewGuid(),
+            FullName = "Bed Occupant",
+            Nic = $"E{Guid.NewGuid():N}"[..12],
+            Gender = Gender.Male
+        };
+
+        var admission = new Admission
+        {
+            Id = Guid.NewGuid(),
+            PatientId = patient.Id,
+            Source = AdmissionSource.WalkIn,
+            Category = AdmissionCategory.Inpatient,
+            Urgency = AdmissionUrgency.Routine,
+            Status = AdmissionStatus.Admitted,
+            CategorySetByStaffMemberId = await SomeStaffIdAsync(db),
+            CategorySetAt = DateTimeOffset.UtcNow,
+            MissingFields = []
+        };
+
+        db.Add(patient);
+        db.Add(admission);
+        db.Add(new BedAssignment
+        {
+            Id = Guid.NewGuid(),
+            AdmissionId = admission.Id,
+            BedId = bedId,
+            Status = AssignmentStatus.Occupied,
+            AssignedBy = AssignedBy.User
+        });
+
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task<Guid> SomeStaffIdAsync(CareLankaDbContext db)
+        => await db.StaffMembers.Select(staff => staff.Id).FirstAsync();
 
     private async Task<Guid> NewBedIdAsync(HttpClient client)
     {

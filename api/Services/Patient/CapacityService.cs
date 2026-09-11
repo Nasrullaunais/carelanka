@@ -1,10 +1,8 @@
-using System.Linq.Expressions;
 using CareLanka.Api.Common.Persistence;
 using CareLanka.Api.Data;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Patient;
 using Microsoft.EntityFrameworkCore;
-using BedAssignmentEntity = CareLanka.Api.Data.Entities.Patient.BedAssignment;
 
 namespace CareLanka.Api.Services.Patient;
 
@@ -90,7 +88,7 @@ public sealed class CapacityService : ICapacityService
             : await _db.BedAssignments
                 .AsNoTracking()
                 .Where(assignment => bedIds.Contains(assignment.BedId))
-                .Where(LiveOn(now))
+                .Where(BedHold.LiveOn(now))
                 .Select(assignment => new Claim(
                     assignment.Status,
                     assignment.Admission.Category,
@@ -138,32 +136,13 @@ public sealed class CapacityService : ICapacityService
         var claimed = await _db.BedAssignments
             .AsNoTracking()
             .Where(assignment => ids.Contains(assignment.BedId))
-            .Where(LiveOn(now))
+            .Where(BedHold.LiveOn(now))
             .Select(assignment => assignment.BedId)
             .Distinct()
             .ToListAsync(ct);
 
         return claimed.ToHashSet();
     }
-
-    /// <summary>
-    /// What counts as a claim on a bed: somebody is in it, or a hold on it still stands.
-    /// </summary>
-    /// <remarks>
-    /// The one place the expiry rule is written, because the spec promises exactly that — "that
-    /// expiry logic lives here, in the owning service, so no other component re-implements it
-    /// differently".
-    ///
-    /// A <c>reserved</c> row with no <c>reserved_until</c> counts as live. It should not exist:
-    /// a hold with no expiry is a bed held forever. But if one ever does, the database index
-    /// <c>ux_bed_assignments_live_bed</c> already treats it as claiming the bed, so reporting it
-    /// free would offer a dispatcher a bed the next INSERT then refuses. Under-reporting sends
-    /// an ambulance one ward further; over-reporting sends it to a bed that is not there.
-    /// </remarks>
-    private static Expression<Func<BedAssignmentEntity, bool>> LiveOn(DateTimeOffset now)
-        => assignment => assignment.Status == AssignmentStatus.Occupied
-            || (assignment.Status == AssignmentStatus.Reserved
-                && (assignment.ReservedUntil == null || assignment.ReservedUntil > now));
 
     /// <summary>Whether a held bed's patient is due inside the next two hours.</summary>
     /// <remarks>

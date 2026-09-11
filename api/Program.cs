@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
@@ -251,18 +251,26 @@ builder.Services.AddScoped<IPatientService, PatientService>();
 builder.Services.AddScoped<IAdmissionService, AdmissionService>();
 builder.Services.AddScoped<ICapacityService, CapacityService>();
 builder.Services.AddScoped<IAppointmentService, AppointmentService>();
+builder.Services.AddScoped<IBedAssignmentService, BedAssignmentService>();
+builder.Services.AddScoped<IBedOccupancyService, BedOccupancyService>();
+builder.Services.AddScoped<IWorklistService, WorklistService>();
 
 // Real: ward bed counts now come from Equipment's register instead of a constant.
 // Scoped, not Singleton — it delegates to IBedService, which is scoped because it holds a
 // DbContext. Registering it as a singleton captures one DbContext for the life of the app.
 builder.Services.AddScoped<IBedRegistryService, BedRegistryService>();
 
-// STUB registrations - Equipment still stands in for Patient Management. STUBS.md rows 2
-// and 3. Row 2 can be swapped whenever M3 wants: IWardService is real. Row 3 cannot yet —
-// occupancy is the presence of a live BedAssignment, and no service writes those until
-// step 6 of build/patient.md.
+// STUB registration — Equipment still stands in for Patient Management on ward names.
+// STUBS.md row 2, swappable whenever M3 wants: IWardService is real.
 builder.Services.AddSingleton<IWardDirectory, StubWardDirectory>();
-builder.Services.AddSingleton<IBedOccupancyPort, StubBedOccupancyPort>();
+
+// Real, as of step 6: occupancy is the presence of a live BedAssignment, and there is now a
+// service that writes those. This retires the one genuinely dangerous stub in the project —
+// the fake answered "occupied" for every bed, so no bed could be withdrawn or retired at all.
+//
+// Scoped, not Singleton like the stub it replaces. It reaches a DbContext through
+// IBedOccupancyService; a singleton would capture one DbContext for the life of the app.
+builder.Services.AddScoped<IBedOccupancyPort, BedOccupancyAdapter>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>

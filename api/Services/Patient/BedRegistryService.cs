@@ -1,6 +1,8 @@
+using System.Linq.Expressions;
 using CareLanka.Api.Data;
 using CareLanka.Api.Services.Equipment;
 using Microsoft.EntityFrameworkCore;
+using BedEntity = CareLanka.Api.Data.Entities.Equipment.Bed;
 
 namespace CareLanka.Api.Services.Patient;
 
@@ -52,7 +54,56 @@ public sealed class BedRegistryService : IBedRegistryService
         return await _db.Beds
             .AsNoTracking()
             .Where(bed => ids.Contains(bed.WardId))
-            .Select(bed => new RegisteredBed(bed.Id, bed.WardId, bed.Condition))
+            .Select(Projection)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<RegisteredBed>> ListBedsByIdAsync(
+        IReadOnlyCollection<Guid> bedIds, CancellationToken cancellationToken = default)
+    {
+        if (bedIds.Count == 0)
+        {
+            return Array.Empty<RegisteredBed>();
+        }
+
+        var ids = bedIds.Distinct().ToList();
+
+        return await _db.Beds
+            .AsNoTracking()
+            .Where(bed => ids.Contains(bed.Id))
+            .Select(Projection)
+            .ToListAsync(cancellationToken);
+    }
+
+    // Their FindByIdAsync, not a query of our own: it already applies the global filter that
+    // hides a retired bed, and a second copy of that read here is a second chance to forget it.
+    public async Task<RegisteredBed?> FindBedAsync(
+        Guid bedId, CancellationToken cancellationToken = default)
+    {
+        var bed = await _beds.FindByIdAsync(bedId, cancellationToken);
+
+        return bed is null ? null : Project(bed);
+    }
+
+    /// <summary>
+    /// Their row, narrowed to the eight fields we read. One definition, so a field added to their
+    /// bed cannot appear in one of our answers and not the other.
+    /// </summary>
+    /// <remarks>
+    /// An expression and not an ordinary method, because the list above runs as SQL. A method
+    /// call inside <c>Select</c> is not something EF can translate, and that fails at run time
+    /// rather than at compile time — the same trap the urgency sort in AdmissionService warns
+    /// about. Written once here and compiled once below for the single-bed path.
+    /// </remarks>
+    private static readonly Expression<Func<BedEntity, RegisteredBed>> Projection =
+        bed => new RegisteredBed(
+            bed.Id,
+            bed.WardId,
+            bed.BedNumber,
+            bed.HasIsolation,
+            bed.Condition,
+            bed.CreatedAt,
+            bed.UpdatedAt);
+
+    private static readonly Func<BedEntity, RegisteredBed> Project = Projection.Compile();
 }

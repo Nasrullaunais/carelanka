@@ -137,7 +137,6 @@ They create beds, retire them, and mark them out of service for repair. We need 
 | `ward_id` | Which ward the bed sits in |
 | `bed_number` | Unique within a ward |
 | `has_isolation` | Side room / curtained isolation capability — drives hard rule H4 |
-| `nurse_station_distance` | 1 = closest. Drives soft rule S2. |
 | `condition` | `usable` / `out_of_service` — drives hard rule H1 |
 
 **Why occupancy is not a column here.** Whether a bed is free is not stored on the bed at all — it is the presence or absence of a live row in our `BedAssignment`. That is what lets Equipment own the bed without either of us writing to the other's table:
@@ -333,6 +332,14 @@ reserved_until = (expected_arrival OR now) + 30 minutes
 
 **Implementation:** no background job needed. Any reservation past its `reserved_until` is treated as expired at read time. A bed with an expired hold is simply a free bed. Nothing can drift out of sync because there is nothing to keep in sync.
 
+**Built** (step 6 of `docs/build/patient.md`). Three corrections that only appeared once it was real:
+
+- **`reserved_until` is `max(expected_arrival, now) + 30 minutes`,** not `(expected_arrival OR now) + 30`. An arrival time already in the past would otherwise produce a hold that had expired before it was written — the bed reserved and free in the same instant. Somebody overdue gets a fresh thirty minutes. **Still open:** an arrival expected days away holds a bed for days, which is the opposite of what this section wants from expiry. Nothing caps it; a visit booked that far out probably should not be reserving a bed at all.
+- **Read time is not enough on the write path.** `ux_bed_assignments_live_bed` covers every row with status `reserved` or `occupied`, and a unique index cannot consult the clock. So a lapsed hold reads as free everywhere and still blocks the next `INSERT`. Assigning a bed closes lapsed holds on it first, as `release_reason = hold_expired`, and returns the admission that was holding it to `awaiting_bed` — which is what §5.4 says the clock is allowed to do on nobody's approval. The row is closed, never deleted.
+- **The rule lives in `BedHold`, not in `CapacityService`.** It had one reader when it was written and now has four. Written twice inside that one file on purpose: EF cannot translate a method call inside a query, so the SQL half is an expression and the in-memory half is a method, kept adjacent.
+
+Not yet built: a sweep that closes lapsed holds nobody has since re-assigned over. Until one exists, an admission whose hold ran out sits in `bed_reserved` with no live bed until somebody takes that bed. Every *read* is honest about the bed; only the admission's own status lags.
+
 ### 5.4 Releasing a bed vs cancelling an admission
 
 These are different events with different rules, and gluing them together causes trouble.
@@ -461,7 +468,7 @@ Creating, retiring and taking beds out of service are **Equipment's endpoints, n
 | `GET` | `/api/workflows/{workflowId}` | Nurse, Manager | Plan, steps, tool calls, timings, validation results, status |
 | `POST` | `/api/bed-assignments/{id}/approve` | Nurse / Manager per §5.2 | **High-impact gate.** Re-checks, locks, commits. |
 | `POST` | `/api/bed-assignments/{id}/reject` | Nurse, Manager | Requires a reason. Releases the hold. |
-| `POST` | `/api/admissions/{id}/assign-bed` | Nurse, Manager | **Manual override path.** Bypasses the agent entirely. |
+| `POST` | `/api/admissions/{id}/assign-bed` | Nurse, Manager | **Manual override path.** Bypasses the agent entirely. **Built** (step 6). Nurse for a matching bed; ICU, HDU and any downgrade are the manager's, refused with `cl_pat_012` / `cl_pat_013`. |
 
 ### 7.5 Discharge
 
@@ -576,19 +583,41 @@ Four tools. Three read, one write, and the write can only ever create a proposal
 
 | | Rule |
 | :--- | :--- |
+| H0 | The visit must need a bed at all |
 | H1 | The bed must be free and `usable` |
 | H2 | Ward type must match the admission category, or be an approved downgrade (§8.6) |
 | H3 | The ward's `gender_policy` must accept this patient's gender |
 | H4 | An infectious patient must get a bed with `has_isolation = true` |
 | H5 | The ward must be `is_active` |
 
+**Built** (step 6), in `Services/Patient/BedPlacementRules.cs`, and the manual endpoint runs the same table the agent will — otherwise "the AI cannot do X" is only true of the AI. Four things worth knowing:
+
+- **H0 was missing, and its absence was a live bug.** Every admission was created at
+  `awaiting_bed`, and the only edge into `admitted` runs through a bed being assigned and
+  approved. So a patient in for a scan or a blood test — who is never going to be given a bed —
+  sat on the bed board forever, was offered an "Assign bed" button, and could not be discharged
+  by any route at all. `BedPlacementRules.RequiresBed` is the rule: **`outpatient` needs no
+  bed; every other care level does.** `day_case` is on the bed side deliberately — a day case is
+  minor surgery or dialysis, they are on a real bed for hours, and it is a bed nobody else can
+  have. Only `outpatient` means "seen standing up".
+
+  Derived from `admission_category`, never stored, and published as `requires_bed` on
+  `AdmissionSummary` so no client re-derives it. A visit with `requires_bed: false` is
+  `admitted` from the moment its record is opened, and `POST /admissions/{id}/assign-bed`
+  refuses it with `cl_pat_021`. Finishing it is `POST /admissions/{id}/complete`, which is
+  **not** the discharge workflow (§7): a visit with a bed is refused there with `cl_pat_020`,
+  because a discharge has a checklist, a summary note, an approver and a bed to give back.
+- **H1 is split in two.** "Usable" is a property of the bed and is checked here. "Free" is a race and is not: no read can settle it, and `ux_bed_assignments_live_bed` is what does. Adding a prior read would make the index look like belt-and-braces rather than the rule.
+- **H2 refuses an upgrade too.** Ward types sit on three rungs — `icu`, `hdu`, and everything else — with `day_case` and `outpatient` on the bottom rung alongside `inpatient`, because there is no ward type below `general`. A general patient into an ICU bed is a 409 for anybody, duty manager included.
+- **H3 sends `other` and `unknown` to a mixed ward only.** Exactly what `Gender.Unknown` was added for: an unidentified arrival lands somewhere by rule rather than on a guess about which single-sex ward they belong in.
+- **H5 reads as "no active ward for this bed".** A retired ward is invisible to the global query filter, so a missing ward and a retired one are the same answer, and both are a 409 rather than a 404 — the bed is real, its ward just cannot take a patient.
+
 **Soft rules — the agent ranks candidates by these.** Breaking one is fine; it just makes for a worse choice.
 
 | | Rule |
 | :--- | :--- |
 | S1 | Prefer the ward with lower current occupancy — spread the load |
-| S2 | Higher urgency → prefer a lower `nurse_station_distance` |
-| S3 | Prefer a ward the patient has been in before, if any — continuity |
+| S2 | Prefer a ward the patient has been in before, if any — continuity |
 
 Note that gender separation is a **property of the ward**, not an exception the agent makes in a hurry. ICU and pediatric wards are `mixed` because real ICUs are open bays; general wards are `male` or `female`. The agent applies one rule to every ward and never has a special case for emergencies.
 
@@ -963,7 +992,7 @@ Rule-based assertions, not an LLM judge. The assignment allows LLM-as-judge only
 Beds are settled — Equipment owns the `Bed` register, we own `BedAssignment` (§3.1). Wards are not. Our argument: `gender_policy` and `ward_type` drive the agent's hard rules, and Equipment has no use for them. Written as ours; Member 3 and the group to confirm.
 
 **1b. The bed register shape — agree it with Member 3 this week.**
-This is our hardest external dependency: no readable bed register, no candidates for the agent. We need `id`, `ward_id`, `bed_number`, `condition`, `has_isolation`, `nurse_station_distance`. Seed a local stub in the meantime so we can build and test before their component exists.
+This is our hardest external dependency: no readable bed register, no candidates for the agent. We need `id`, `ward_id`, `bed_number`, `condition` and `has_isolation`. Seed a local stub in the meantime so we can build and test before their component exists.
 
 **2. Who owns the shared agent-workflow tables?**
 All four agents must persist workflow state. §9.1 of the assignment requires it, and the rubric scores it under a **group** criterion — *"Integrated Architecture, Agent Orchestration and State Management (10)"* — not an individual one. §10 also requires one workflow that crosses all four agents. Four separately designed workflow schemas would make that trace a four-way join.
@@ -1017,6 +1046,50 @@ There is a demo cost to removing them too. Our emergency path leans on the contr
 **Built 2026-09-11: the staff three.** `GET /api/appointments`, `POST /api/appointments` and `POST /api/appointments/{id}/check-in` are live, with 24 tests. The three `/me/*` ones are still contract only — this heading said "Built" of all six before any of them existed, which was a description of the design and read as a description of the code.
 
 The care level is still set by staff at check-in, never by the patient at booking time — the same rule every other admission path follows. **A ward nurse may set `outpatient`, `day_case` or `inpatient`; `icu` and `hdu` are the duty manager's** and a nurse asking for either is a 403 carrying `cl_pat_011`. That rule reads the request body rather than the route, so it is a check in `AppointmentService` and not a policy on the action.
+
+### The patients board is two tables, not one
+
+**Built 2026-09-11.** `GET /api/patient-worklist`, with `WorklistRow`, `WorklistKind` and
+`WorklistStatus`.
+
+**The problem, in one sentence:** an `Admission` is created by *arriving*, so a list of
+admissions can never say "not arrived" about anybody. The patient who booked a scan for eleven
+was invisible on the patients screen until she walked through the door, and the desk had to
+read a second screen to find her.
+
+So the board unions the two tables that between them describe a person's business with the
+hospital: **scheduled `Appointment`s** and **`Admission`s**. A booking that has been checked in
+is terminal at `checked_in` and is left out — its admission stands for it — so a booking
+*becomes* a visit on the board rather than appearing beside it. One row per person, never two.
+
+`WorklistStatus` is **derived and never stored.** It is a reading of `AppointmentStatus` or
+`AdmissionStatus`, and nothing transitions between its values: the transition rules stay on
+`AdmissionStatus`, which is the authoritative one, and every write still goes to the endpoint
+that owns the row. There is no `PATCH /patient-worklist` and there will not be one.
+
+| Board says | Read from |
+| :--- | :--- |
+| `not_arrived` | appointment `scheduled` |
+| `awaiting_bed` | `awaiting_bed`, `awaiting_approval` |
+| `bed_ready` | `bed_reserved` |
+| `admitted` | `admitted`, `ready_for_discharge` |
+| `completed` | `discharged` |
+| `cancelled` | `cancelled` |
+
+Two of those collapses are decisions, not shortcuts. `awaiting_approval` reads as
+`awaiting_bed` because the situation and the job it creates are identical: the patient has no
+bed and somebody has to see to it. `bed_ready` is deliberately **not** folded into
+`awaiting_bed`, because the hold expires in thirty minutes — "a bed is waiting, go and collect
+them" is the one row on the board with a clock on it.
+
+**Paged in one query, and it has to be.** The union carries only an id and the one time the
+board sorts on; both sides are then read by id for the twenty rows that survive paging. Two
+things went wrong on the way there and are worth not repeating: a full flat projection of both
+tables fails at run time with *"reading as Int32 is not supported for character varying"* —
+a `UNION` takes each column's type from its first branch, and every enum is a bare `null` on
+the booking branch and a converted string on the visit branch. And paging each table
+separately and stitching the halves is simply wrong: a page boundary of the combined list falls
+in the middle of neither half, so a row is shown twice while another is never shown at all.
 
 **Knock-on for the group:** `Notification` and `DeviceToken` are written staff-only in the entity diagram and need a nullable `PatientId` if patient notifications are wanted. Not on our critical path, since our patient notifications are local rather than push.
 

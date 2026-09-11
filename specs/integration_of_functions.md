@@ -427,14 +427,38 @@ Injected as interfaces inside the API, and exposed as REST endpoints so the AI a
 | `ICapacityService.GetWardCapacityAsync()` | `GET /api/capacity/wards` | M1 | Free/total beds per ward, with type and gender policy | **Live 2026-09-11** |
 | `ICapacityService.GetWardOccupancyAsync(wardId)` | `GET /api/wards/{id}/occupancy` | M2 | Occupied counts, care mix, incoming next 2h | **Live 2026-09-11** |
 | `IWardService.ListAsync()` | `GET /api/wards` | M3 | Ward id, name, type | Live 2026-09-09 |
-| `GetBedOccupancyAsync(bedId)` | `GET /api/beds/{id}/occupancy` | M3 | Whether a bed is occupied or held — **check this before servicing it** | Not built |
+| `IBedOccupancyService.GetStatusAsync(bedId)` | `GET /api/beds/{id}/occupancy` | M3 | Whether a bed is occupied or held — **check this before servicing it** | **Live 2026-09-11** |
+| `IBedAssignmentService.ListAvailabilityAsync(…)` | `GET /api/bed-availability` | M4, and the bed agent | Equipment's register joined with our assignments, hold expiry applied | **Live 2026-09-11** |
 | `CreatePreAdmissionAsync(dispatch)` | `POST /api/admissions/pre-admit` | M1 | Creates an admission from a dispatch | Not built |
+
+**`GET /api/patient-worklist` is Patient's own screen, not a contract for anybody else.**
+Listed here only so nobody claims the route: it unions Patient's `Appointment` and `Admission`
+tables into one ward board so the patients screen can say "not arrived" about somebody who has
+booked but not turned up. Read-only, `AdmissionReader` roles, and its `WorklistStatus` is
+derived from the two stored statuses rather than being a third one. Other components should
+keep reading `GET /api/capacity/wards` and `GET /api/wards/{id}/occupancy` for counts — this
+one carries patient identities and is the desk's view, not an aggregate.
+
+**`POST /api/admissions/{id}/complete` finishes a visit that never needed a bed** — an
+`outpatient` scan or blood test. Not the discharge workflow: a visit holding a bed is refused
+with `cl_pat_020`, because discharge releases a bed and Equipment's register has to see that
+happen. Nothing outside Patient calls it.
 
 All JWT-protected and role-restricted. Aggregate endpoints return **counts, never patient identities** — `CapacityEndpointTests` asserts a patient's name appears in neither response body.
 
 **Both capacity reads are `AnyStaff`.** Any authenticated staff token may call them, so Emergency and Staff Management need no special role for their own agents.
 
-**The free/occupied rule is written once, in `CapacityService`, and §4.3's warning is the reason.** A bed is free when it exists in Equipment's register, its condition is `usable`, and no live `BedAssignment` of ours references it — where "live" means occupied, or reserved with a `reserved_until` still in the future. **A hold past its expiry counts as free with nobody having done anything to it.** Re-implementing that on the calling side is the mistake §4.3 spells out: it works today and quietly goes wrong the first time a hold lapses.
+**`GET /beds/{id}/occupancy` is Equipment's side of the same rule, and M3's port over it is
+already written** — `IBedOccupancyPort` in `Services/Equipment/`, now backed by
+`BedOccupancyAdapter` instead of the stub that answered "occupied" for every bed. It is
+`Scoped`, not `Singleton`, because it reaches a `DbContext`. **A lapsed hold does not block
+servicing**, and an unknown bed id is a 404 rather than a confident "free".
+
+**The free/occupied rule is written once, in `BedHold`, and §4.3's warning is the reason.** A bed is free when it exists in Equipment's register, its condition is `usable`, and no live `BedAssignment` of ours references it — where "live" means occupied, or reserved with a `reserved_until` still in the future. **A hold past its expiry counts as free with nobody having done anything to it.** Re-implementing that on the calling side is the mistake §4.3 spells out: it works today and quietly goes wrong the first time a hold lapses.
+
+*(It lived in `CapacityService` until 2026-09-11, when bed availability, manual assignment and the occupancy answer became three more readers of it. Same rule, one home, four callers.)*
+
+**One thing no caller can apply for itself:** the partial unique index `ux_bed_assignments_live_bed` covers any `reserved` row and cannot consult a clock, so a lapsed hold reads as free and still refuses the next `INSERT`. Whatever writes an assignment must close lapsed holds on that bed first. Only Patient Management writes `BedAssignment`, so only we have to know this — recorded here so it is not rediscovered.
 
 **Define your own port over these, the way M4 does over M3's bed register.** `IPatientCapacityService` on Emergency's side (§4.3) and whatever M2 calls theirs, each delegating to `ICapacityService`. Same pattern as `IBedRegistryService` → `IBedService`, so one file breaks if a signature changes rather than every caller.
 

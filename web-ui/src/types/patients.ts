@@ -58,10 +58,14 @@ export const admissionUrgencyLabels: Record<AdmissionUrgency, string> = {
   emergency: 'Emergency - seen now',
 };
 
+// How the patient got here — the three routes into the hospital, and nothing else. Whether
+// they have actually turned up yet is a status, not a route.
 export const admissionSourceLabels: Record<AdmissionSource, string> = {
   emergency: 'Ambulance',
   walk_in: 'Walk-in',
-  pre_registered: 'Booked visit',
+  // "Appointment", not "Booked visit": it is what everyone calls it, and the board's Arrived
+  // by column has to read as one of three plain routes.
+  pre_registered: 'Appointment',
 };
 
 // Every status, in the order a visit moves through them. Passing the whole list to

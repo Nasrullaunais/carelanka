@@ -8,7 +8,9 @@ namespace CareLanka.Api.Services.Patient;
 
 /// <summary>
 /// One row per hospital visit. For an emergency the row exists before the patient arrives,
-/// which is why an admission starts at <c>awaiting_bed</c> with no arrival time.
+/// which is why a visit needing a bed starts at <c>awaiting_bed</c> with no arrival time.
+/// A visit needing no bed — an outpatient scan or blood test — starts at <c>admitted</c>
+/// instead, because opening the record is the arrival. See BedPlacementRules.RequiresBed.
 /// </summary>
 public interface IAdmissionService
 {
@@ -40,6 +42,17 @@ public interface IAdmissionService
     /// Throws IllegalTransitionException from any other status.
     /// </summary>
     Task<AdmissionResponse> MarkArrivedAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The scan or test is done and the patient has gone home. Only for a visit that never
+    /// needed a bed, and only from <c>admitted</c>.
+    /// </summary>
+    /// <remarks>
+    /// Throws ConflictException carrying <c>cl_pat_020</c> for a visit that does need a bed:
+    /// that is a discharge, it has a checklist and a bed to release, and this endpoint knows
+    /// how to do neither.
+    /// </remarks>
+    Task<AdmissionResponse> CompleteAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// The visit is called off and any held bed goes back to the pool. Not permitted once the

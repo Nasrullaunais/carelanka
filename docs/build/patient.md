@@ -31,7 +31,8 @@
 | 3 | Patient + Admission CRUD | Including `temp_reference` for unidentified arrivals |
 | 4 | **The 7-state admission status machine** | **Done.** `awaiting_bed → awaiting_approval → bed_reserved → admitted → ready_for_discharge → discharged`, plus `cancelled`. Illegal transitions → 409 |
 | 5 | `GET /capacity/wards` + `GET /wards/{id}/occupancy` | **Done.** M1 and M2 are unblocked. Hold expiry lives in `CapacityService` and nowhere else |
-| 6 | **Manual bed assignment, no AI** | Pick a bed by hand, with the 30-minute hold. The concurrency guarantee lives in the partial unique index, not in code |
+| 6 | **Manual bed assignment, no AI** | **Done.** Pick a bed by hand, with the 30-minute hold. The concurrency guarantee lives in the partial unique index, not in code |
+| 6b | **Visits that need no bed (H0) + the patients board** | **Done.** An `outpatient` never enters `awaiting_bed`. `GET /api/patient-worklist` unions bookings and visits so the board can say "not arrived". **No migration** |
 | 7 | Discharge checklist + confirmation | `clinical_clearance` gated on the `doctor` role claim |
 | 8 | Codegen gate | |
 | 9 | React: admissions dashboard, bed board, occupancy report | |
@@ -164,6 +165,101 @@ integration tests through HTTP. Things settled while building it:
   `AdmissionEndpointTests.ReserveABedAsync` writes exactly what step 6 will write, so the tests
   should keep passing when it lands and the helper can then be deleted.
 
+**Step 6b: an outpatient does not need a bed, and the board is two tables.** Added after
+step 6, because using the screen found a bug step 6 could not see.
+
+**What was wrong.** `CreateAsync` started *every* admission at `awaiting_bed`, and the only
+edge into `admitted` runs `awaiting_bed → awaiting_approval → bed_reserved → admitted`. Every
+one of those steps is about a bed. So a patient here for a scan or a blood test — who is never
+going to be given one — sat on the bed board indefinitely, was offered an "Assign bed" button,
+and had no route to `discharged` at all. The only way out of their visit was to cancel it.
+
+**Four changes, and no migration**, because the rule is derived rather than stored:
+
+- **`BedPlacementRules.RequiresBed(category)` — hard rule H0.** `outpatient` needs no bed;
+  every other care level does, `day_case` included (they are on a real bed for hours).
+  Published as `requires_bed` on `AdmissionSummary` so no client re-derives it.
+- **A visit needing no bed is born `admitted`,** with `admitted_at` stamped and
+  `expected_arrival` dropped — opening the record *is* the arrival. `assign-bed` refuses it
+  with `cl_pat_021` before the transition check, because "cannot move from admitted to
+  awaiting_approval" tells a nurse nothing.
+- **`POST /admissions/{id}/complete`** ends it. Two hops through `ready_for_discharge`, the way
+  `assign-bed` goes through `awaiting_approval`. **Deliberately not step 7:** a visit holding a
+  bed is refused with `cl_pat_020`, because a discharge has a checklist, a summary note, an
+  approver and a bed to give back, and this endpoint does none of those.
+- **`GET /api/patient-worklist`** unions scheduled `Appointment`s with `Admission`s, so the
+  patients screen can show somebody who has booked and not turned up. An admission is created
+  by arriving, so a list of admissions could never say "not arrived" about anybody. A
+  checked-in booking appears once, as its visit.
+
+Two traps the union set, both worth not repeating:
+
+- **A flat projection of both tables fails at run time**, not at compile time:
+  *"reading as Int32 is not supported for character varying"*. A `UNION` takes each column's
+  type from its first branch, and every enum is a bare `null` on the booking branch and a
+  converted string on the visit branch. The union now carries **only an id and one timestamp**;
+  both sides are read by id afterwards, for the twenty rows that survive paging.
+- **Paging the two halves separately and stitching them is wrong.** A page boundary of the
+  combined list falls in the middle of neither half, so one row is shown twice and another
+  never at all. `WorklistEndpointTests` asserts two pages of a six-row union are six distinct
+  ids.
+
+17 new tests. `WorklistStatus` is derived and never stored — the transition rules stay on
+`AdmissionStatus`, and the contract test asserts `/patient-worklist` publishes **only** a
+`get`, so nobody adds a write that would make it a fourth place a status can change.
+
+---
+
+**Step 6 is complete, and it retired the last stub pointing at us.** Three endpoints:
+`GET /api/bed-availability`, `POST /api/admissions/{id}/assign-bed` and
+`GET /api/beds/{id}/occupancy`. **No migration** — `ux_bed_assignments_live_bed` landed with
+`Patient_AddAdmission` at step 2, and nothing in this step needed a new column. 35 new tests.
+Eight things settled while building it:
+
+- **The hold rule moved out of `CapacityService` into `BedHold`.** It had one reader; it now has
+  four, and copying it into each of them is exactly what `patient-spec.yaml` promises we will
+  not do. It is written **twice inside that one file**, on purpose: `LiveOn` is an expression
+  because EF turns it into SQL, `IsLive` is a plain method for rows already in memory, and EF
+  cannot translate a method call inside a query. Two spellings side by side beat two spellings
+  in two files.
+- **An expired hold still holds its slot in the index, so the write path has to close it.** The
+  index covers every row with status `reserved` or `occupied`, and a unique index cannot consult
+  the clock — so a lapsed hold reads as free everywhere and is still un-assignable in practice.
+  A nurse picks the bed the list just offered and gets a 409 they cannot act on. `assign-bed`
+  now releases lapsed holds on that bed first, as `release_reason = hold_expired`, and puts the
+  admission that was holding it back to `awaiting_bed`. **This is the one place expiry is
+  written rather than applied at read time**, and it is the bug this step nearly shipped.
+- **`awaiting_bed -> bed_reserved` is not an edge, and it did not become one.** The published
+  table goes through `awaiting_approval`, and the endpoint moves two hops in one transaction:
+  assigning by hand *is* the proposal and the approval in one act, so both moves happen and both
+  are checked. Nothing observes the middle state. Adding the edge would have meant editing the
+  workflow in three documents plus two drift tests to save one line.
+- **H2 refuses an *upgrade* as well as an unapproved downgrade.** Ward types map onto three
+  rungs — icu, hdu, everything else — and `day_case` / `outpatient` sit on the bottom rung with
+  `inpatient` because there is no ward type below `general`. A general patient into an ICU bed is
+  a 409 even for a duty manager: it is not generosity, it is the last ICU bed spent on somebody
+  who does not need it.
+- **The approval split is a 403 from the service, twice over.** ICU and HDU are the duty
+  manager's (`cl_pat_012`); so is any downgrade (`cl_pat_013`), checked first because a downgrade
+  into HDU is both and "this is a downgrade" is the more specific complaint. It cannot be an
+  `[Authorize]` policy because it depends on which bed the body names — same shape as check-in.
+- **One message code per hard rule, not one for "that bed will not work".** `cl_pat_014` taken,
+  `015` out of service, `016` too acute, `017` gender policy, `018` isolation, `019` retired
+  ward. A nurse who is told which rule refused them knows which other bed to try.
+- **`bed_id` had to be nullable to be required.** `[Required]` on a plain `Guid` always passes:
+  the binder turns an absent key into `Guid.Empty`, so the request got as far as a 404 for the
+  all-zeroes bed instead of a 400. The same trap as every required enum in this component, found
+  by a test that omits the key. **The published contract is unchanged.**
+- **The occupancy answer is its own interface, to break a dependency cycle.** Assigning a bed
+  needs Equipment's register, and Equipment's bed service asks us about occupancy — one service
+  doing both is `BedService -> occupancy -> bed register -> BedService`, which the container
+  throws on at the first request. `IBedOccupancyService` reads nothing but our own
+  `bed_assignments`, so nothing points back.
+
+Two things this step made possible and deliberately did not do: the `wardId` filter on
+`GET /admissions` (now unblocked — a ward is reachable through a live assignment), and a sweep
+that closes lapsed holds nobody has re-assigned over. Both are in `STUBS.md`.
+
 **Steps 13–16 are self-contained.** Nothing else in the group depends on the care advisory
 agent, and it depends on nothing outside this component beyond the `doctor` role claim,
 which auth already issues. Build it in parallel with the bed-agent track or after it — it
@@ -173,9 +269,9 @@ does not gate anyone and nobody gates it.
 
 ## Things that will bite
 
-**The concurrency guarantee is the index, not your code.** Two nurses assigning the same
-bed at the same moment both pass an application-level "is it free" check. The partial
-unique index is what actually stops it:
+**The concurrency guarantee is the index, not your code** — *and the index cannot read a
+clock.* Two nurses assigning the same bed at the same moment both pass an application-level
+"is it free" check. The partial unique index is what actually stops it:
 
 ```sql
 CREATE UNIQUE INDEX ux_bed_assignments_live_bed ON bed_assignments (bed_id)
@@ -186,6 +282,13 @@ A hold and an occupancy both claim the bed, so one index covers both races. Ther
 separate `bed_reservations` table — see the step 2 note below.
 
 Catch the constraint violation and return 409. Do not try to prevent it with a prior read.
+
+**The trap inside that:** the index covers any `reserved` row, and it has no idea whether the
+hold has run out. So an expired hold makes a bed report *free* on every read and stay
+*un-assignable* in the database. Whatever writes an assignment has to close lapsed holds on that
+bed first — the one place the 30-minute rule is written down rather than applied at read time.
+Step 6 does it in `BedAssignmentService.ReleaseLapsedHoldsAsync`; step 11 must go through the
+same path.
 
 **A patient record is not a patient account.** A `Patient` row is a medical record created
 by staff, and it exists whether or not that person ever installs the app — an unconscious
@@ -243,12 +346,14 @@ Two things your Flutter screens must handle:
 
 | What | From | Contract |
 | :--- | :--- | :--- |
-| `GET /beds` — the bed register | M3 | **Your hardest dependency.** The bed agent has nothing to reason over without it |
+| ~~`GET /beds` — the bed register~~ | M3 | **Real since 2026-09-10.** Read it through `IBedRegistryService`, which is the one file in this component that knows Equipment's bed table exists. Never write it |
 | `POST /staff/lookup` | M2 | Rendering "Approved by …" |
 | Dispatch notification | M1 | Triggers your pre-admission |
 
 **Others are waiting on you for:** ~~`Ward` (all three)~~ **built**,
 ~~`GET /capacity/wards` (M1)~~ **built 2026-09-11**,
 ~~`GET /wards/{id}/occupancy` (M2)~~ **built 2026-09-11**,
-`GET /beds/{id}/occupancy` (M3 — they cannot service any bed safely until this is real, and
-it is now the only one of the four still outstanding), `POST /admissions/pre-admit` (M1).
+~~`GET /beds/{id}/occupancy` (M3)~~ **built 2026-09-11**, `POST /admissions/pre-admit` (M1).
+
+**So `POST /admissions/pre-admit` for Kaveesha is the only thing anybody is still waiting on
+us for.**

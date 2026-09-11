@@ -3,8 +3,8 @@
 import { type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { assignEquipmentItem, cancelAdmission, checkInAppointment, completeAdmissionDetails, createAdmission, createAppointment, createBed, createEquipmentCategory, createEquipmentItem, createPatient, createWard, getAdmission, getCurrentUser, getEquipmentItem, getEquipmentItemByTag, getHealth, getPatient, getWardCapacity, getWardOccupancy, linkPatientAccount, listAdmissions, listAppointments, listBeds, listEquipmentCategories, listEquipmentItems, listPatients, listWards, login, loginPatient, logout, lookupPatient, markArrived, type Options, refreshToken, registerPatientAccount, releaseEquipmentItem, reportEquipmentFault, retireBed, updateBed, updateEquipmentItem, updatePatient } from '../sdk.gen';
-import type { AssignEquipmentItemData, AssignEquipmentItemError, AssignEquipmentItemResponse, CancelAdmissionData, CancelAdmissionError, CancelAdmissionResponse, CheckInAppointmentData, CheckInAppointmentError, CheckInAppointmentResponse, CompleteAdmissionDetailsData, CompleteAdmissionDetailsError, CompleteAdmissionDetailsResponse, CreateAdmissionData, CreateAdmissionError, CreateAdmissionResponse, CreateAppointmentData, CreateAppointmentError, CreateAppointmentResponse, CreateBedData, CreateBedError, CreateBedResponse, CreateEquipmentCategoryData, CreateEquipmentCategoryError, CreateEquipmentCategoryResponse, CreateEquipmentItemData, CreateEquipmentItemError, CreateEquipmentItemResponse, CreatePatientData, CreatePatientError, CreatePatientResponse, CreateWardData, CreateWardError, CreateWardResponse, GetAdmissionData, GetAdmissionError, GetAdmissionResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetEquipmentItemByTagData, GetEquipmentItemByTagError, GetEquipmentItemByTagResponse, GetEquipmentItemData, GetEquipmentItemError, GetEquipmentItemResponse, GetHealthData, GetHealthError, GetHealthResponse, GetPatientData, GetPatientError, GetPatientResponse, GetWardCapacityData, GetWardCapacityError, GetWardCapacityResponse, GetWardOccupancyData, GetWardOccupancyError, GetWardOccupancyResponse, LinkPatientAccountData, LinkPatientAccountError, LinkPatientAccountResponse, ListAdmissionsData, ListAdmissionsError, ListAdmissionsResponse, ListAppointmentsData, ListAppointmentsError, ListAppointmentsResponse, ListBedsData, ListBedsError, ListBedsResponse, ListEquipmentCategoriesData, ListEquipmentCategoriesError, ListEquipmentCategoriesResponse, ListEquipmentItemsData, ListEquipmentItemsError, ListEquipmentItemsResponse, ListPatientsData, ListPatientsError, ListPatientsResponse, ListWardsData, ListWardsError, ListWardsResponse, LoginData, LoginError, LoginPatientData, LoginPatientError, LoginPatientResponse, LoginResponse, LogoutData, LogoutError, LogoutResponse, LookupPatientData, LookupPatientError, LookupPatientResponse, MarkArrivedData, MarkArrivedError, MarkArrivedResponse, RefreshTokenData, RefreshTokenError, RefreshTokenResponse, RegisterPatientAccountData, RegisterPatientAccountError, RegisterPatientAccountResponse, ReleaseEquipmentItemData, ReleaseEquipmentItemError, ReleaseEquipmentItemResponse, ReportEquipmentFaultData, ReportEquipmentFaultError, ReportEquipmentFaultResponse, RetireBedData, RetireBedError, RetireBedResponse, UpdateBedData, UpdateBedError, UpdateBedResponse, UpdateEquipmentItemData, UpdateEquipmentItemError, UpdateEquipmentItemResponse, UpdatePatientData, UpdatePatientError, UpdatePatientResponse } from '../types.gen';
+import { assignBedManually, assignEquipmentItem, cancelAdmission, checkInAppointment, completeAdmissionDetails, completeVisit, createAdmission, createAppointment, createBed, createEquipmentCategory, createEquipmentItem, createPatient, createWard, getAdmission, getBedOccupancy, getCurrentUser, getEquipmentItem, getEquipmentItemByTag, getHealth, getPatient, getWardCapacity, getWardOccupancy, linkPatientAccount, listAdmissions, listAppointments, listBedAvailability, listBeds, listEquipmentCategories, listEquipmentItems, listPatients, listPatientWorklist, listWards, login, loginPatient, logout, lookupPatient, markArrived, type Options, refreshToken, registerPatientAccount, releaseEquipmentItem, reportEquipmentFault, retireBed, updateBed, updateEquipmentItem, updatePatient } from '../sdk.gen';
+import type { AssignBedManuallyData, AssignBedManuallyError, AssignBedManuallyResponse, AssignEquipmentItemData, AssignEquipmentItemError, AssignEquipmentItemResponse, CancelAdmissionData, CancelAdmissionError, CancelAdmissionResponse, CheckInAppointmentData, CheckInAppointmentError, CheckInAppointmentResponse, CompleteAdmissionDetailsData, CompleteAdmissionDetailsError, CompleteAdmissionDetailsResponse, CompleteVisitData, CompleteVisitError, CompleteVisitResponse, CreateAdmissionData, CreateAdmissionError, CreateAdmissionResponse, CreateAppointmentData, CreateAppointmentError, CreateAppointmentResponse, CreateBedData, CreateBedError, CreateBedResponse, CreateEquipmentCategoryData, CreateEquipmentCategoryError, CreateEquipmentCategoryResponse, CreateEquipmentItemData, CreateEquipmentItemError, CreateEquipmentItemResponse, CreatePatientData, CreatePatientError, CreatePatientResponse, CreateWardData, CreateWardError, CreateWardResponse, GetAdmissionData, GetAdmissionError, GetAdmissionResponse, GetBedOccupancyData, GetBedOccupancyError, GetBedOccupancyResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetEquipmentItemByTagData, GetEquipmentItemByTagError, GetEquipmentItemByTagResponse, GetEquipmentItemData, GetEquipmentItemError, GetEquipmentItemResponse, GetHealthData, GetHealthError, GetHealthResponse, GetPatientData, GetPatientError, GetPatientResponse, GetWardCapacityData, GetWardCapacityError, GetWardCapacityResponse, GetWardOccupancyData, GetWardOccupancyError, GetWardOccupancyResponse, LinkPatientAccountData, LinkPatientAccountError, LinkPatientAccountResponse, ListAdmissionsData, ListAdmissionsError, ListAdmissionsResponse, ListAppointmentsData, ListAppointmentsError, ListAppointmentsResponse, ListBedAvailabilityData, ListBedAvailabilityError, ListBedAvailabilityResponse, ListBedsData, ListBedsError, ListBedsResponse, ListEquipmentCategoriesData, ListEquipmentCategoriesError, ListEquipmentCategoriesResponse, ListEquipmentItemsData, ListEquipmentItemsError, ListEquipmentItemsResponse, ListPatientsData, ListPatientsError, ListPatientsResponse, ListPatientWorklistData, ListPatientWorklistError, ListPatientWorklistResponse, ListWardsData, ListWardsError, ListWardsResponse, LoginData, LoginError, LoginPatientData, LoginPatientError, LoginPatientResponse, LoginResponse, LogoutData, LogoutError, LogoutResponse, LookupPatientData, LookupPatientError, LookupPatientResponse, MarkArrivedData, MarkArrivedError, MarkArrivedResponse, RefreshTokenData, RefreshTokenError, RefreshTokenResponse, RegisterPatientAccountData, RegisterPatientAccountError, RegisterPatientAccountResponse, ReleaseEquipmentItemData, ReleaseEquipmentItemError, ReleaseEquipmentItemResponse, ReportEquipmentFaultData, ReportEquipmentFaultError, ReportEquipmentFaultResponse, RetireBedData, RetireBedError, RetireBedResponse, UpdateBedData, UpdateBedError, UpdateBedResponse, UpdateEquipmentItemData, UpdateEquipmentItemError, UpdateEquipmentItemResponse, UpdatePatientData, UpdatePatientError, UpdatePatientResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -200,6 +200,32 @@ export const markArrivedMutation = (options?: Partial<Options<MarkArrivedData>>)
 };
 
 /**
+ * Finish a visit that never needed a bed - the scan or test is done and the patient has
+ * gone home. Moves `admitted` to `discharged`.
+ *
+ * **Only for a visit that needs no bed** - an `outpatient`. A visit at any other care
+ * level is refused with 409 and `cl_pat_020`: that is a discharge, and a discharge has a
+ * checklist, a summary note, an approver and a bed to give back. This endpoint does none
+ * of those, so it says so rather than half-doing it.
+ *
+ * The ward nurse or doctor who did the test is the one who knows it is finished, which is
+ * why this is theirs and not the duty manager's.
+ */
+export const completeVisitMutation = (options?: Partial<Options<CompleteVisitData>>): UseMutationOptions<CompleteVisitResponse, CompleteVisitError, Options<CompleteVisitData>> => {
+    const mutationOptions: UseMutationOptions<CompleteVisitResponse, CompleteVisitError, Options<CompleteVisitData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await completeVisit({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
  * Cancel an admission, with a reason, and release any bed it was holding.
  *
  * Always a human act, never automatic, which is why the reason is mandatory and why this
@@ -211,6 +237,37 @@ export const cancelAdmissionMutation = (options?: Partial<Options<CancelAdmissio
     const mutationOptions: UseMutationOptions<CancelAdmissionResponse, CancelAdmissionError, Options<CancelAdmissionData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await cancelAdmission({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Assign a bed by hand, bypassing the agent. Places a 30-minute hold and moves the
+ * admission to `bed_reserved`.
+ *
+ * **The manual path must always work.** If the only way to admit a patient were through
+ * the AI, the hospital would stop the moment the AI stopped - and it is what makes a human
+ * genuinely in control rather than only able to say yes or no.
+ *
+ * The same hard rules and the same row-locked re-check as the agent's own path. A human
+ * may overrule the agent's ranking; nobody may put an ICU patient in a general bed without
+ * it being recorded as a downgrade.
+ *
+ * A ward nurse may assign a bed that matches the patient's care level. ICU, high-dependency
+ * and any downgrade are the duty manager's, and that depends on which bed was chosen rather
+ * than on the route - so a nurse choosing one is a 403 from the service, not a 401 from a
+ * policy.
+ */
+export const assignBedManuallyMutation = (options?: Partial<Options<AssignBedManuallyData>>): UseMutationOptions<AssignBedManuallyResponse, AssignBedManuallyError, Options<AssignBedManuallyData>> => {
+    const mutationOptions: UseMutationOptions<AssignBedManuallyResponse, AssignBedManuallyError, Options<AssignBedManuallyData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await assignBedManually({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -331,6 +388,88 @@ export const checkInAppointmentMutation = (options?: Partial<Options<CheckInAppo
         }
     };
     return mutationOptions;
+};
+
+export const listPatientWorklistQueryKey = (options?: Options<ListPatientWorklistData>) => createQueryKey('listPatientWorklist', options);
+
+/**
+ * One page of the ward board, newest first. `search` matches the patient's name or NIC.
+ *
+ * **Two tables, one list.** A row is either a booking nobody has checked in yet -
+ * `kind = booking`, `status = not_arrived` - or a visit that has started, `kind = visit`.
+ * A booking that has been checked in appears once, as its visit, never twice.
+ *
+ * This exists because `GET /admissions` cannot answer the question. An admission is
+ * created by arriving, so a list of admissions can never say "not arrived" about anybody,
+ * and the patient booked in for a scan at eleven was invisible until she walked in.
+ *
+ * **Read-only, and derived.** `status` is a reading of `AppointmentStatus` or
+ * `AdmissionStatus`, not a fourth stored status. Nothing transitions between its values;
+ * every write still goes to `/appointments/{id}/check-in`, `/admissions/{id}/assign-bed`
+ * and the rest. So there is no `PATCH` here and there never will be.
+ *
+ * No `sortBy`. It is a worklist read top to bottom, not a report - and one sort key over a
+ * union of two tables whose time columns mean different things would order it by a column
+ * nobody asked for.
+ */
+export const listPatientWorklistOptions = (options?: Options<ListPatientWorklistData>) => queryOptions<ListPatientWorklistResponse, ListPatientWorklistError, ListPatientWorklistResponse, ReturnType<typeof listPatientWorklistQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listPatientWorklist({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listPatientWorklistQueryKey(options)
+});
+
+export const listPatientWorklistInfiniteQueryKey = (options?: Options<ListPatientWorklistData>): QueryKey<Options<ListPatientWorklistData>> => createQueryKey('listPatientWorklist', options, true);
+
+/**
+ * One page of the ward board, newest first. `search` matches the patient's name or NIC.
+ *
+ * **Two tables, one list.** A row is either a booking nobody has checked in yet -
+ * `kind = booking`, `status = not_arrived` - or a visit that has started, `kind = visit`.
+ * A booking that has been checked in appears once, as its visit, never twice.
+ *
+ * This exists because `GET /admissions` cannot answer the question. An admission is
+ * created by arriving, so a list of admissions can never say "not arrived" about anybody,
+ * and the patient booked in for a scan at eleven was invisible until she walked in.
+ *
+ * **Read-only, and derived.** `status` is a reading of `AppointmentStatus` or
+ * `AdmissionStatus`, not a fourth stored status. Nothing transitions between its values;
+ * every write still goes to `/appointments/{id}/check-in`, `/admissions/{id}/assign-bed`
+ * and the rest. So there is no `PATCH` here and there never will be.
+ *
+ * No `sortBy`. It is a worklist read top to bottom, not a report - and one sort key over a
+ * union of two tables whose time columns mean different things would order it by a column
+ * nobody asked for.
+ */
+export const listPatientWorklistInfiniteOptions = (options?: Options<ListPatientWorklistData>) => {
+    const opts = infiniteQueryOptions<ListPatientWorklistResponse, ListPatientWorklistError, InfiniteData<ListPatientWorklistResponse>, QueryKey<Options<ListPatientWorklistData>>, number | Pick<QueryKey<Options<ListPatientWorklistData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListPatientWorklistData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listPatientWorklist({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listPatientWorklistInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
 };
 
 /**
@@ -918,6 +1057,96 @@ export const linkPatientAccountMutation = (options?: Partial<Options<LinkPatient
     };
     return mutationOptions;
 };
+
+export const listBedAvailabilityQueryKey = (options?: Options<ListBedAvailabilityData>) => createQueryKey('listBedAvailability', options);
+
+/**
+ * List beds with their availability. This is the candidate list the bed agent will work
+ * from, and the one a nurse picks from by hand today.
+ *
+ * `free` applies hold expiry, so a bed whose 30-minute reservation has lapsed is reported
+ * free with nobody having released it. That expiry rule lives in one place in this
+ * component and is not re-implemented per endpoint.
+ *
+ * Retired wards and retired beds are absent rather than listed as unavailable.
+ */
+export const listBedAvailabilityOptions = (options?: Options<ListBedAvailabilityData>) => queryOptions<ListBedAvailabilityResponse, ListBedAvailabilityError, ListBedAvailabilityResponse, ReturnType<typeof listBedAvailabilityQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listBedAvailability({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listBedAvailabilityQueryKey(options)
+});
+
+export const listBedAvailabilityInfiniteQueryKey = (options?: Options<ListBedAvailabilityData>): QueryKey<Options<ListBedAvailabilityData>> => createQueryKey('listBedAvailability', options, true);
+
+/**
+ * List beds with their availability. This is the candidate list the bed agent will work
+ * from, and the one a nurse picks from by hand today.
+ *
+ * `free` applies hold expiry, so a bed whose 30-minute reservation has lapsed is reported
+ * free with nobody having released it. That expiry rule lives in one place in this
+ * component and is not re-implemented per endpoint.
+ *
+ * Retired wards and retired beds are absent rather than listed as unavailable.
+ */
+export const listBedAvailabilityInfiniteOptions = (options?: Options<ListBedAvailabilityData>) => {
+    const opts = infiniteQueryOptions<ListBedAvailabilityResponse, ListBedAvailabilityError, InfiniteData<ListBedAvailabilityResponse>, QueryKey<Options<ListBedAvailabilityData>>, number | Pick<QueryKey<Options<ListBedAvailabilityData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListBedAvailabilityData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listBedAvailability({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listBedAvailabilityInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+export const getBedOccupancyQueryKey = (options: Options<GetBedOccupancyData>) => createQueryKey('getBedOccupancy', options);
+
+/**
+ * Is anyone in this bed?
+ *
+ * Equipment Management calls this **before** taking a bed out of service for repair or
+ * maintenance. Servicing a bed is their operation on their own table, but a bed with a
+ * patient in it must not be withdrawn, and only we know whether it is occupied.
+ *
+ * `occupied` is true when a live assignment exists: status `occupied`, or `reserved` with
+ * a `reserved_until` still in the future. A lapsed hold does not block servicing.
+ *
+ * The hard rule this exists to enforce: **maintenance never evicts a patient.** If the
+ * answer is occupied, Equipment waits for discharge.
+ */
+export const getBedOccupancyOptions = (options: Options<GetBedOccupancyData>) => queryOptions<GetBedOccupancyResponse, GetBedOccupancyError, GetBedOccupancyResponse, ReturnType<typeof getBedOccupancyQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getBedOccupancy({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getBedOccupancyQueryKey(options)
+});
 
 export const listWardsQueryKey = (options?: Options<ListWardsData>) => createQueryKey('listWards', options);
 

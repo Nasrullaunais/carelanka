@@ -16,6 +16,11 @@ export type Admission = {
     status: AdmissionStatus;
     details_complete: boolean;
     /**
+     * Whether this visit needs a bed at all. False for an `outpatient` — a scan or a
+     * blood test is seen and sent home.
+     */
+    requires_bed: boolean;
+    /**
      * From the live bed assignment, if there is one. Null before a bed is held and after discharge.
      */
     ward_name?: string | null;
@@ -57,6 +62,45 @@ export type Admission = {
     updated_at?: string;
 };
 
+/**
+ * A bed as this component sees it: Equipment Management's frame, with our answer to whether
+ * anyone is in it.
+ */
+export type AdmissionBed = {
+    id: string;
+    ward_id: string;
+    ward_name: string;
+    bed_number: string;
+    /**
+     * Side room or curtained isolation. Hard rule H4: an infectious patient needs one.
+     */
+    has_isolation: boolean;
+    condition: BedCondition;
+    availability: BedAvailability;
+    /**
+     * The visit holding or occupying this bed, and null when nothing is. Set for a hold as
+     * well as an occupancy: a bed board needs to show who is coming, not only who is here,
+     * and `availability` already says which of the two this is.
+     */
+    occupied_by_admission_id?: string | null;
+    created_at?: string;
+    updated_at?: string;
+};
+
+/**
+ * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
+ */
+export type AdmissionBedPagedResult = {
+    items: Array<AdmissionBed>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    /**
+     * Always at least 1, so an empty list does not render as "page 1 of 0".
+     */
+    total_pages: number;
+};
+
 export type AdmissionCategory = 'icu' | 'hdu' | 'inpatient' | 'day_case' | 'outpatient';
 
 /**
@@ -71,6 +115,11 @@ export type AdmissionDetail = {
     urgency: AdmissionUrgency;
     status: AdmissionStatus;
     details_complete: boolean;
+    /**
+     * Whether this visit needs a bed at all. False for an `outpatient` — a scan or a
+     * blood test is seen and sent home.
+     */
+    requires_bed: boolean;
     /**
      * From the live bed assignment, if there is one. Null before a bed is held and after discharge.
      */
@@ -137,6 +186,11 @@ export type AdmissionSummary = {
     urgency: AdmissionUrgency;
     status: AdmissionStatus;
     details_complete: boolean;
+    /**
+     * Whether this visit needs a bed at all. False for an `outpatient` — a scan or a
+     * blood test is seen and sent home.
+     */
+    requires_bed: boolean;
     /**
      * From the live bed assignment, if there is one. Null before a bed is held and after discharge.
      */
@@ -205,6 +259,22 @@ export type AppointmentPagedResult = {
 export type AppointmentStatus = 'scheduled' | 'checked_in' | 'completed' | 'cancelled' | 'no_show';
 
 export type AssetType = 'equipment_item' | 'bed';
+
+/**
+ * Pick a bed for an admission by hand, without the agent.
+ */
+export type AssignBedRequest = {
+    /**
+     * Equipment Management's bed id, from `GET /api/bed-availability`.
+     */
+    bed_id: string;
+    /**
+     * Why a human ignored what the agent proposed. Optional, and nothing requires it yet:
+     * there are no proposals to override until the agent lands at step 11, and this endpoint
+     * is also the ordinary path when nobody asked the agent at all.
+     */
+    override_reason?: string | null;
+};
 
 /**
  * Body of POST /api/equipment-items/{id}/assign.
@@ -295,7 +365,41 @@ export type BedAssignment = {
     updated_at?: string;
 };
 
+/**
+ * Whether a bed can be used right now. Computed from Equipment's condition and our own
+ * assignment rows — never stored, because two sources of truth for "is bed 12 free" drift.
+ */
+export type BedAvailability = 'free' | 'reserved' | 'occupied' | 'out_of_service';
+
+/**
+ * What `GET /api/bed-availability` filters on: the four states a bed can be in, plus
+ * `all`, which is the default.
+ */
+export type BedAvailabilityFilter = 'free' | 'reserved' | 'occupied' | 'out_of_service' | 'all';
+
 export type BedCondition = 'usable' | 'out_of_service';
+
+/**
+ * The answer to "may this bed be taken out of service?", read by Equipment Management before
+ * they withdraw a bed for repair.
+ */
+export type BedOccupancyStatus = {
+    bed_id: string;
+    /**
+     * True while a live assignment exists. A hold past its expiry does not count.
+     */
+    occupied: boolean;
+    assignment_status?: AssignmentStatus;
+    /**
+     * When the hold lapses, if the bed is held rather than lived in.
+     */
+    reserved_until?: string | null;
+    /**
+     * The direct answer, so Equipment does not have to re-derive it. False while a patient is
+     * in the bed or a live hold stands.
+     */
+    may_take_out_of_service: boolean;
+};
 
 /**
  * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
@@ -1031,6 +1135,59 @@ export type WarningStatus = 'open' | 'acknowledged' | 'action_taken' | 'dismisse
 
 export type WarningType = 'low_stock' | 'medicine_expiring' | 'maintenance_overdue' | 'equipment_faulty';
 
+export type WorklistKind = 'booking' | 'visit';
+
+/**
+ * One line of the ward board: one patient, and what is happening with them right now.
+ */
+export type WorklistRow = {
+    /**
+     * The appointment id or the admission id, depending on `kind`.
+     */
+    id: string;
+    kind: WorklistKind;
+    patient: PatientSummary;
+    status: WorklistStatus;
+    /**
+     * Whether this visit needs a bed at all. False for an outpatient scan or blood test, and
+     * false for a booking, because nobody has chosen a care level for it yet.
+     */
+    requires_bed: boolean;
+    source?: AdmissionSource;
+    admission_category?: AdmissionCategory;
+    urgency?: AdmissionUrgency;
+    /**
+     * Where they are, from the live bed assignment. Null when no bed is held.
+     */
+    ward_name?: string | null;
+    bed_number?: string | null;
+    /**
+     * The one time that matters for this row: when a booking is due, or when a visit started.
+     */
+    when: string;
+    /**
+     * Why they are coming, as the desk or the patient typed it - "Scan", "Blood test". Null on
+     * a visit: the reason is not carried onto the admission.
+     */
+    reason?: string | null;
+};
+
+/**
+ * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
+ */
+export type WorklistRowPagedResult = {
+    items: Array<WorklistRow>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    /**
+     * Always at least 1, so an empty list does not render as "page 1 of 0".
+     */
+    total_pages: number;
+};
+
+export type WorklistStatus = 'not_arrived' | 'awaiting_bed' | 'bed_ready' | 'admitted' | 'completed' | 'cancelled';
+
 export type ListAdmissionsData = {
     body?: never;
     path?: never;
@@ -1232,6 +1389,45 @@ export type MarkArrivedResponses = {
 
 export type MarkArrivedResponse = MarkArrivedResponses[keyof MarkArrivedResponses];
 
+export type CompleteVisitData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/admissions/{id}/complete';
+};
+
+export type CompleteVisitErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CompleteVisitError = CompleteVisitErrors[keyof CompleteVisitErrors];
+
+export type CompleteVisitResponses = {
+    /**
+     * OK
+     */
+    200: Admission;
+};
+
+export type CompleteVisitResponse = CompleteVisitResponses[keyof CompleteVisitResponses];
+
 export type CancelAdmissionData = {
     body?: CancelAdmissionRequest;
     path: {
@@ -1274,6 +1470,49 @@ export type CancelAdmissionResponses = {
 };
 
 export type CancelAdmissionResponse = CancelAdmissionResponses[keyof CancelAdmissionResponses];
+
+export type AssignBedManuallyData = {
+    body?: AssignBedRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/admissions/{id}/assign-bed';
+};
+
+export type AssignBedManuallyErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type AssignBedManuallyError = AssignBedManuallyErrors[keyof AssignBedManuallyErrors];
+
+export type AssignBedManuallyResponses = {
+    /**
+     * OK
+     */
+    200: BedAssignment;
+};
+
+export type AssignBedManuallyResponse = AssignBedManuallyResponses[keyof AssignBedManuallyResponses];
 
 export type ListAppointmentsData = {
     body?: never;
@@ -1396,6 +1635,44 @@ export type CheckInAppointmentResponses = {
 };
 
 export type CheckInAppointmentResponse = CheckInAppointmentResponses[keyof CheckInAppointmentResponses];
+
+export type ListPatientWorklistData = {
+    body?: never;
+    path?: never;
+    query?: {
+        search?: string;
+        includeFinished?: boolean;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/patient-worklist';
+};
+
+export type ListPatientWorklistErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListPatientWorklistError = ListPatientWorklistErrors[keyof ListPatientWorklistErrors];
+
+export type ListPatientWorklistResponses = {
+    /**
+     * OK
+     */
+    200: WorklistRowPagedResult;
+};
+
+export type ListPatientWorklistResponse = ListPatientWorklistResponses[keyof ListPatientWorklistResponses];
 
 export type LoginData = {
     body?: StaffLoginRequest;
@@ -2382,6 +2659,73 @@ export type LinkPatientAccountResponses = {
 };
 
 export type LinkPatientAccountResponse = LinkPatientAccountResponses[keyof LinkPatientAccountResponses];
+
+export type ListBedAvailabilityData = {
+    body?: never;
+    path?: never;
+    query?: {
+        wardId?: string;
+        wardType?: WardType;
+        needsIsolation?: boolean;
+        availability?: BedAvailabilityFilter;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/bed-availability';
+};
+
+export type ListBedAvailabilityErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+};
+
+export type ListBedAvailabilityError = ListBedAvailabilityErrors[keyof ListBedAvailabilityErrors];
+
+export type ListBedAvailabilityResponses = {
+    /**
+     * OK
+     */
+    200: AdmissionBedPagedResult;
+};
+
+export type ListBedAvailabilityResponse = ListBedAvailabilityResponses[keyof ListBedAvailabilityResponses];
+
+export type GetBedOccupancyData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/beds/{id}/occupancy';
+};
+
+export type GetBedOccupancyErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetBedOccupancyError = GetBedOccupancyErrors[keyof GetBedOccupancyErrors];
+
+export type GetBedOccupancyResponses = {
+    /**
+     * OK
+     */
+    200: BedOccupancyStatus;
+};
+
+export type GetBedOccupancyResponse = GetBedOccupancyResponses[keyof GetBedOccupancyResponses];
 
 export type ListWardsData = {
     body?: never;

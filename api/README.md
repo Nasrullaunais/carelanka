@@ -64,7 +64,19 @@ For a deployed environment it is an environment variable instead:
 ```
 dotnet ef database update --project api
 psql -U postgres -d carelanka -f docs/seed/001_identity.sql
+psql -U postgres -d carelanka -f docs/seed/002_patient_wards.sql
+psql -U postgres -d carelanka -f docs/seed/003_equipment_beds.sql
 ```
+
+All three seeds are idempotent — re-run them any time, in that order.
+
+002 is the ward board: ten wards. Run on a database that already has hand-typed
+placeholder wards, it renames them onto their real names rather than replacing them,
+so beds already registered in them survive.
+
+003 puts 128 beds in those ten wards, two of them out for repair. `beds` is Equipment
+Management's table and this only fills it with dev data — it decides nothing about the
+bed model.
 
 ## 4. Run it
 

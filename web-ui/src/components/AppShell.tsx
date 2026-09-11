@@ -31,6 +31,7 @@ export function AppShell() {
         <nav className="shell-nav">
           {canReadWards(role) && <NavLink to="/wards">Wards</NavLink>}
           {canReadEquipment(role) && <NavLink to="/equipment">Equipment</NavLink>}
+          {canReadEquipment(role) && <NavLink to="/pharmacy">Pharmacy</NavLink>}
         </nav>
 
         {session && (

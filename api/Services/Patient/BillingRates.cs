@@ -49,8 +49,11 @@ public static class BillingRates
             [WardType.Icu] = 25_000m,
             [WardType.Hdu] = 15_000m,
             [WardType.Isolation] = 12_000m,
+            [WardType.Surgical] = 12_000m,
+            [WardType.Emergency] = 10_000m,
             [WardType.Maternity] = 9_000m,
             [WardType.Pediatric] = 8_000m,
+            [WardType.MentalHealth] = 7_000m,
             [WardType.General] = 6_000m
         };
 

@@ -44,6 +44,55 @@ export function quantity(value: number): string {
 }
 
 // ---------------------------------------------------------------------------
+// The price grid
+// ---------------------------------------------------------------------------
+
+/**
+ * What each expense is called on the settings screen, keyed by the `expense_key` the API
+ * publishes. These are the same keys as `chargeTemplates` below, on purpose: the price the
+ * administrator sets here is the price that turns up in reception's box.
+ *
+ * A key the API sends that is missing here falls back to the key itself rather than rendering
+ * an empty cell, so a new expense added server-side is ugly for one commit instead of invisible.
+ */
+export const expenseLabels: Record<string, string> = {
+  bed_day: 'Bed, per day',
+  food: 'Meals, per day',
+  medicine: 'Medicine during the stay',
+  therapy: 'Therapy, per session',
+  tests: 'Tests and scans, each',
+  transport: 'Transport home',
+  take_home_medicine: 'Take-home medicine',
+};
+
+/** One line of plain English per expense, so the administrator knows what they are pricing. */
+export const expenseHints: Record<string, string> = {
+  bed_day:
+    'The only one the system fills in by itself, off the ward the patient is actually lying in.',
+  food: 'Charged per day the patient was fed, which is not always per day they were here.',
+  medicine: 'Priced off the pharmacy slip, so it is different every time.',
+  therapy: 'Physiotherapy and the like, per session attended.',
+  tests: 'X-rays, blood work, anything sent to a lab.',
+  transport: 'Only when the hospital arranges it.',
+  take_home_medicine: 'What the patient leaves with.',
+};
+
+export function expenseLabel(key: string): string {
+  return expenseLabels[key] ?? key;
+}
+
+/**
+ * Whether a zero in this cell means "free" or "we cannot guess".
+ *
+ * Medicine has no fixed price and never will — the desk reads it off a slip. Showing `LKR 0.00`
+ * against it reads as "no charge", which is the opposite of true, so those cells say
+ * "typed at the desk" instead.
+ */
+export function isUnpriceable(key: string): boolean {
+  return key === 'medicine' || key === 'take_home_medicine';
+}
+
+// ---------------------------------------------------------------------------
 // The discharge checklist
 // ---------------------------------------------------------------------------
 

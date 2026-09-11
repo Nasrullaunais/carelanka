@@ -6,8 +6,8 @@ import {
   canReadWards,
   canRegisterPatient,
   canWorkAppointmentDesk,
-  canWorkBillingDesk,
-  canWorkDischargeChecklist,
+  canOpenDischargeBoard,
+  canSetBillingRates,
 } from './permissions';
 
 // Every place a staff member can go, in one list. The dashboard reads it and so does anything
@@ -41,17 +41,22 @@ export const destinations: Destination[] = [
     description: 'Who has booked to come in. Take a booking, or check someone in.',
     canAccess: canWorkAppointmentDesk,
   },
+  // One tile, not two. Billing used to be its own screen, which meant the same visit was
+  // walked twice through two pages - a nurse ticked a box on one and reception took the money
+  // on the other, and neither could see what the other had done. The discharge screen is the
+  // whole of a discharge now, bill included.
   {
     to: '/discharge',
-    label: 'Discharge',
-    description: 'Who could go home, what is still outstanding, and the sign-off that sends them.',
-    canAccess: canWorkDischargeChecklist,
+    label: 'Discharge and billing',
+    description:
+      'Who could go home: what they owe, what is still outstanding, and the sign-off that sends them.',
+    canAccess: canOpenDischargeBoard,
   },
   {
-    to: '/billing',
-    label: 'Billing',
-    description: 'What a visit costs, taking the money, and a bill to hand across the counter.',
-    canAccess: canWorkBillingDesk,
+    to: '/billing-settings',
+    label: 'Billing settings',
+    description: 'What the hospital charges: every expense, in every kind of ward.',
+    canAccess: canSetBillingRates,
   },
   {
     to: '/capacity',

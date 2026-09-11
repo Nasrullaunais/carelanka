@@ -37,6 +37,12 @@ public class Bill
     [Required]
     public bool Settled { get; set; }
 
+    /// <summary>Who issued it. Printed on the bill, so it is a name on a document, not audit data.</summary>
+    public Guid? RaisedByStaffId { get; set; }
+
+    /// <summary>Their name, for a screen. Sent beside the id, never instead of it.</summary>
+    public string? RaisedByStaffName { get; set; }
+
     public DateTimeOffset? SettledAt { get; set; }
 
     public Guid? SettledByStaffId { get; set; }

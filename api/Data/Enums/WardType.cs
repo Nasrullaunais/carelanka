@@ -9,5 +9,13 @@ public enum WardType
     General,
     Maternity,
     Pediatric,
-    Isolation
+    Isolation,
+
+    // Added 2026-09-11 with the real ward board. Each is its own type rather than a
+    // differently-named general ward because the bed-day rate is read off the ward type -
+    // a surgical bed and an ordinary one are not the same price, and with one type they
+    // could never be told apart on a bill.
+    Surgical,
+    Emergency,
+    MentalHealth
 }

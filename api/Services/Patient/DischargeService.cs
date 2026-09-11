@@ -56,9 +56,20 @@ public sealed class DischargeService : IDischargeService
     private static readonly AdmissionCategory[] NeedsDutyManager =
         [AdmissionCategory.Icu, AdmissionCategory.Hdu];
 
-    /// <summary>A visit still in the building. Nothing else can be on the candidate list.</summary>
+    /// <summary>A visit still in the building. Nothing else can be a candidate.</summary>
     private static readonly AdmissionStatus[] OnTheWard =
         [AdmissionStatus.Admitted, AdmissionStatus.ReadyForDischarge];
+
+    /// <summary>
+    /// The same list plus the ones already gone, for <c>includeDischarged</c>.
+    /// </summary>
+    /// <remarks>
+    /// A discharged visit is not a candidate and never becomes one again. It is on this list
+    /// only so the screen can show what has happened — the alternative was a discharge page
+    /// that empties itself the moment the work is done and keeps no record of any of it.
+    /// </remarks>
+    private static readonly AdmissionStatus[] OnTheWardOrGone =
+        [AdmissionStatus.Admitted, AdmissionStatus.ReadyForDischarge, AdmissionStatus.Discharged];
 
     private readonly CareLankaDbContext _db;
     private readonly IBedRegistryService _beds;
@@ -73,9 +84,11 @@ public sealed class DischargeService : IDischargeService
     }
 
     public async Task<PagedResult<DischargeCandidate>> ListCandidatesAsync(
-        Guid? wardId, int page, int pageSize, CancellationToken ct = default)
+        Guid? wardId, bool includeDischarged, int page, int pageSize, CancellationToken ct = default)
     {
         var now = DateTimeOffset.UtcNow;
+
+        var statuses = includeDischarged ? OnTheWardOrGone : OnTheWard;
 
         var query = _db.Admissions
             .AsNoTracking()
@@ -83,7 +96,7 @@ public sealed class DischargeService : IDischargeService
             .Include(admission => admission.BedAssignments)
             .Include(admission => admission.Discharge!)
                 .ThenInclude(discharge => discharge.ChecklistItems)
-            .Where(admission => OnTheWard.Contains(admission.Status));
+            .Where(admission => statuses.Contains(admission.Status));
 
         if (wardId is { } onlyWard)
         {
@@ -100,15 +113,25 @@ public sealed class DischargeService : IDischargeService
 
         var admissions = await query.ToListAsync(ct);
 
-        var labels = await BedLabels.LiveByAdmissionAsync(
+        // CurrentOrLast, not Live. With includeDischarged this list carries finished visits,
+        // and a discharge releases the bed - so the live lookup answered "No bed" about a
+        // patient who had just spent three days in GEN-02.
+        var labels = await BedLabels.CurrentOrLastByAdmissionAsync(
             _db, _beds, admissions.Select(admission => admission.Id).ToList(), now, ct);
 
         var candidates = admissions
             .Select(admission => ToCandidate(admission, labels, now))
 
-            // Ready first, then whoever has least left to do, then longest stay. A ward nurse
-            // works down this list, so the order is the order the work gets done in.
-            .OrderBy(candidate => candidate.OutstandingItems.Count)
+            // Everyone still here first, whatever their state - a finished visit is a record,
+            // and a record must never push live work down the page. Then: ready first, then
+            // whoever has least left to do, then longest stay. A ward nurse works down this
+            // list, so the order is the order the work gets done in.
+            .OrderBy(candidate => candidate.IsDischarged)
+            .ThenBy(candidate => candidate.OutstandingItems.Count)
+
+            // Among the finished ones, most recently discharged first: the one somebody is
+            // looking up is almost always the one that just happened.
+            .ThenByDescending(candidate => candidate.DischargedAt ?? DateTimeOffset.MinValue)
             .ThenByDescending(candidate => candidate.DaysInBed)
             .ThenBy(candidate => candidate.Patient.FullName)
             .ToList();
@@ -471,9 +494,14 @@ public sealed class DischargeService : IDischargeService
             AdmissionCategory = admission.Category,
             AdmittedAt = admission.AdmittedAt,
             DaysInBed = admission.AdmittedAt is { } admitted
-                ? BillingRates.BillableDays(admitted, now)
+
+                // Counted to when they LEFT, not to now, or a stay that ended last week would
+                // grow by a day every day it sat in the records list.
+                ? BillingRates.BillableDays(admitted, admission.Discharge?.ConfirmedAt ?? now)
                 : 0,
-            OutstandingItems = outstanding
+            OutstandingItems = outstanding,
+            IsDischarged = admission.Status == AdmissionStatus.Discharged,
+            DischargedAt = admission.Discharge?.ConfirmedAt
         };
     }
 

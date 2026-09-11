@@ -1054,6 +1054,13 @@ paths:
         - name: wardId
           in: query
           schema: { type: string, format: uuid }
+        - name: includeDischarged
+          in: query
+          description: >-
+            Also return visits that are already over, as records. They sort below everyone
+            still in the building and are never candidates for anything. Without them this
+            screen forgets every patient the moment the work on them is finished.
+          schema: { type: boolean, default: false }
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
       responses:
@@ -1332,6 +1339,62 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /billing/rates:
+    get:
+      tags: [Billing]
+      summary: The price grid - every expense, in every kind of ward
+      description: |
+        Roles: any staff.
+
+        What the hospital charges. Read by anyone who shows a price, because everyone at the
+        billing desk needs the suggested price in the box in front of them.
+
+        The grid is always complete. A cell with no row in `billing_rates` falls back to the
+        built-in default rather than coming back empty, so a fresh database and one the
+        administrator has been editing for a year answer this the same shape.
+      operationId: getBillingRates
+      responses:
+        '200':
+          description: The whole grid
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BillingRateBook' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+    put:
+      tags: [Billing]
+      summary: Change prices
+      description: |
+        Roles: HospitalAdministrator.
+
+        Deliberately a narrower role than the billing desk. Reception takes the money the price
+        list says to take; deciding what that price is is a decision about what the hospital
+        charges, and a desk that can rewrite the list as it bills is a desk that can charge
+        whatever it likes.
+
+        **This never alters a bill already raised.** The price is copied onto the line when the
+        line is written, so a change here prices tomorrow's bills and leaves every bill a
+        patient has already been handed exactly as it was.
+
+        Only the cells that changed need to be sent. An unknown `expense_key` is a 400 rather
+        than a stored row, or the grid would carry a price against nothing forever.
+      operationId: updateBillingRates
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateBillingRatesRequest' }
+      responses:
+        '200':
+          description: The grid as it now stands
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BillingRateBook' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /billing/outstanding:
     get:
@@ -2384,7 +2447,7 @@ components:
 
     WardType:
       type: string
-      enum: [icu, hdu, general, maternity, pediatric, isolation]
+      enum: [icu, hdu, general, maternity, pediatric, isolation, surgical, emergency, mental_health]
 
     GenderPolicy:
       type: string
@@ -3125,7 +3188,7 @@ components:
       type: object
       required:
         [admission_id, patient, ward_name, bed_number, admission_category, days_in_bed,
-         outstanding_items]
+         outstanding_items, is_discharged]
       properties:
         admission_id: { type: string, format: uuid }
         patient: { $ref: '#/components/schemas/PatientSummary' }
@@ -3140,6 +3203,17 @@ components:
           type: array
           items: { type: string }
           description: Empty for a true candidate. Populated rows are shown as "nearly ready".
+        is_discharged:
+          type: boolean
+          description: >-
+            True when the visit is over. Only ever set on rows returned because
+            `includeDischarged` was asked for; such a row is a record and never a candidate,
+            and the screen offers no control on it.
+        discharged_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When they actually left. Null while they are still in the building.
 
     ConfirmDischargeRequest:
       type: object
@@ -3214,6 +3288,14 @@ components:
           description: >-
             The same fact as the `billing_settled` checklist item, written once. Settling is
             what ticks that box and the box cannot be ticked any other way.
+        raised_by_staff_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: >-
+            Who issued the bill. Printed on it - a document handed across a counter names the
+            person who wrote it, which is why this is a domain field and not audit data.
+        raised_by_staff_name: { type: string, nullable: true }
         settled_at: { type: string, format: date-time, nullable: true }
         settled_by_staff_id: { type: string, format: uuid, nullable: true }
         settled_by_staff_name: { type: string, nullable: true }
@@ -3241,6 +3323,90 @@ components:
           maxLength: 300
           nullable: true
           description: 'How it was paid - "cash", "card ending 4417", "insurance, claim 88231".'
+
+    BillingRateBook:
+      type: object
+      description: >-
+        The whole price grid. Every kind of ward, with every expense priced under it, plus the
+        admission fees - which are priced by care level and not by ward, because the fee is
+        charged before anybody knows which ward the patient will end up in.
+      required: [wards, admission_fees, currency]
+      properties:
+        wards:
+          type: array
+          items: { $ref: '#/components/schemas/WardRates' }
+        admission_fees:
+          type: array
+          items: { $ref: '#/components/schemas/AdmissionFee' }
+        currency:
+          type: string
+          description: Fixed at LKR. This component does not convert currency and does not pretend to.
+
+    WardRates:
+      type: object
+      required: [ward_type, expenses]
+      properties:
+        ward_type: { $ref: '#/components/schemas/WardType' }
+        expenses:
+          type: array
+          items: { $ref: '#/components/schemas/ExpenseRate' }
+
+    ExpenseRate:
+      type: object
+      required: [expense_key, amount]
+      properties:
+        expense_key:
+          type: string
+          description: >-
+            Stable key - `bed_day`, `food`, `medicine`, `therapy`, `tests`, `transport`,
+            `take_home_medicine`. `bed_day` is the only one applied automatically; the rest are
+            the suggested prices reception sees when typing a charge.
+        amount:
+          type: number
+          format: double
+          description: >-
+            Rupees. Zero means there is no suggested price, not that it is free - medicine is
+            priced off a pharmacy slip that is different every time.
+
+    AdmissionFee:
+      type: object
+      required: [category, amount]
+      properties:
+        category: { $ref: '#/components/schemas/AdmissionCategory' }
+        amount: { type: number, format: double }
+
+    UpdateBillingRatesRequest:
+      type: object
+      description: Only the cells that changed need to be sent.
+      properties:
+        expenses:
+          type: array
+          maxItems: 200
+          items: { $ref: '#/components/schemas/WardExpenseRateUpdate' }
+        admission_fees:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/AdmissionFeeUpdate' }
+
+    WardExpenseRateUpdate:
+      type: object
+      required: [ward_type, expense_key, amount]
+      properties:
+        ward_type: { $ref: '#/components/schemas/WardType' }
+        expense_key: { type: string, minLength: 1, maxLength: 40 }
+        amount:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 10000000
+          description: A negative price is not a discount, it is a typo that pays the patient.
+
+    AdmissionFeeUpdate:
+      type: object
+      required: [category, amount]
+      properties:
+        category: { $ref: '#/components/schemas/AdmissionCategory' }
+        amount: { type: number, format: double, minimum: 0, maximum: 10000000 }
 
     OutstandingBill:
       type: object

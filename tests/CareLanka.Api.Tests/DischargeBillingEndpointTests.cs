@@ -503,6 +503,174 @@ public sealed class DischargeBillingEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
     }
 
+    [Fact]
+    public async Task A_finished_discharge_is_a_record_rather_than_a_row_that_vanishes()
+    {
+        var visit = await ReadyToGoAsync();
+
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+
+        var confirmed = await nurse.PostAsJsonAsync(
+            $"/api/discharges/{visit.AdmissionId}/confirm", new { summary_note = "Home." });
+
+        Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
+
+        // Off the work list, which is right: a patient who has gone home is not somebody a
+        // nurse is trying to get home.
+        Assert.Null(await FindCandidateAsync(nurse, visit.AdmissionId, includeDischarged: false));
+
+        // But still findable, which is the point of includeDischarged. Without it the discharge
+        // screen empties itself the moment the work is done and keeps no record of any of it -
+        // you confirm a discharge, the row disappears, and there is nowhere left to look up
+        // what just happened.
+        var record = await FindCandidateAsync(nurse, visit.AdmissionId, includeDischarged: true);
+
+        Assert.NotNull(record);
+        Assert.True(record!.Value.GetProperty("is_discharged").GetBoolean());
+
+        // The time they left is on the record. It is the one fact somebody looking this up
+        // afterwards actually wants, and "outstanding items" is empty by definition here - it
+        // could not have been confirmed otherwise.
+        Assert.NotEqual(
+            JsonValueKind.Null, record.Value.GetProperty("discharged_at").ValueKind);
+
+        Assert.Empty(record.Value.GetProperty("outstanding_items").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task A_finished_stay_counts_days_to_when_they_left_and_not_to_now()
+    {
+        var visit = await AdmittedVisitAsync();
+
+        // Admitted ten days ago, then home five days ago. A record read today must say five,
+        // not ten: the stay stopped when they left.
+        //
+        // AdmittedAt and not the bed's OccupiedAt, because days_in_bed is counted from the
+        // admission - the bill is the thing counted from the bed.
+        await BackdateAdmissionAsync(visit.AdmissionId, TimeSpan.FromDays(10));
+
+        using var doctor = await ClientAsync(ApiApplication.DoctorEmail);
+        using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+
+        await TickAsync(doctor, visit.AdmissionId, new { clinical_clearance = true });
+        await reception.PostAsJsonAsync(
+            $"/api/admissions/{visit.AdmissionId}/bill/settle", new { settlement_note = "cash" });
+
+        var confirmed = await nurse.PostAsJsonAsync(
+            $"/api/discharges/{visit.AdmissionId}/confirm", new { });
+
+        Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
+
+        // 5.5 rather than 5. The two backdates are taken from two UtcNow calls milliseconds
+        // apart, so an exact five-day gap lands a hair over five days - and part of a day
+        // counts as a day, which rounds it to six. Half a day of slack keeps the test about
+        // the rule rather than about the clock.
+        await BackdateDischargeAsync(visit.AdmissionId, TimeSpan.FromDays(5.5));
+
+        var record = await FindCandidateAsync(nurse, visit.AdmissionId, includeDischarged: true);
+
+        // Admitted ten days ago, left four and a half days later: five billable days. Counted
+        // to now instead it would be ten, and it would grow by one every day nobody touched
+        // it - a number on a record that changes while nothing happens is worse than none.
+        Assert.Equal(5, record!.Value.GetProperty("days_in_bed").GetInt32());
+    }
+
+    /// <summary>Moves the start of a visit into the past, which no endpoint offers.</summary>
+    private async Task BackdateAdmissionAsync(string admissionId, TimeSpan by)
+    {
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        var id = Guid.Parse(admissionId);
+
+        var admission = await db.Admissions.FirstAsync(row => row.Id == id);
+        admission.AdmittedAt = DateTimeOffset.UtcNow - by;
+
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Moves a confirmed discharge into the past. No endpoint offers this and no clock in a
+    /// test can wait for it.
+    /// </summary>
+    private async Task BackdateDischargeAsync(string admissionId, TimeSpan by)
+    {
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        var id = Guid.Parse(admissionId);
+
+        var discharge = await db.Discharges.FirstAsync(row => row.AdmissionId == id);
+        discharge.ConfirmedAt = DateTimeOffset.UtcNow - by;
+
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task<JsonElement?> FindCandidateAsync(
+        HttpClient client, string admissionId, bool includeDischarged)
+    {
+        var response = await client.GetAsync(
+            $"/api/discharges/candidates?pageSize=100&includeDischarged={includeDischarged}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var body = await ReadJsonAsync(response);
+
+        foreach (var row in body.RootElement.GetProperty("items").EnumerateArray())
+        {
+            if (row.GetProperty("admission_id").GetString() == admissionId)
+            {
+                return row.Clone();
+            }
+        }
+
+        return null;
+    }
+
+    [Fact]
+    public async Task A_discharged_visit_still_says_which_bed_they_were_in()
+    {
+        var visit = await ReadyToGoAsync();
+
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+
+        var before = await FindCandidateAsync(nurse, visit.AdmissionId, includeDischarged: false);
+        Assert.Equal(visit.BedNumber, before!.Value.GetProperty("bed_number").GetString());
+
+        await nurse.PostAsJsonAsync($"/api/discharges/{visit.AdmissionId}/confirm", new { });
+
+        // Discharging RELEASES the bed assignment, so a live-only lookup finds nothing and the
+        // screen said "No bed" about somebody who had just spent three days in GEN-02. That is
+        // not a missing value, it is the wrong answer to the question a record asks - "where
+        // were they?", not "where are they now?".
+        var after = await FindCandidateAsync(nurse, visit.AdmissionId, includeDischarged: true);
+
+        Assert.Equal(visit.BedNumber, after!.Value.GetProperty("bed_number").GetString());
+        Assert.NotEqual(string.Empty, after.Value.GetProperty("ward_name").GetString());
+    }
+
+    [Fact]
+    public async Task A_bill_names_the_person_who_raised_it()
+    {
+        var visit = await AdmittedVisitAsync();
+
+        using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
+
+        var prepared = await reception.PostAsync($"/api/admissions/{visit.AdmissionId}/bill", null);
+        Assert.Equal(HttpStatusCode.OK, prepared.StatusCode);
+
+        using var body = await ReadJsonAsync(prepared);
+
+        // A bill is a document handed across a counter, and "who do I ask about this charge?"
+        // is the first question at the desk. Recorded when the bill is opened, not when it is
+        // paid - those can be two different people and often are.
+        // The seeded reception account is FirstName = the role, LastName = "Test".
+        Assert.Equal(
+            "GeneralStaff Test",
+            body.RootElement.GetProperty("raised_by_staff_name").GetString());
+    }
+
     // ---------- helpers ----------
 
     private sealed record TestVisit(string AdmissionId, Guid BedId, string BedNumber);

@@ -47,6 +47,9 @@ const wardRung: Record<WardType, number> = {
   maternity: 2,
   pediatric: 2,
   isolation: 2,
+  surgical: 2,
+  emergency: 2,
+  mental_health: 2,
 };
 
 /** Whether a ward with this policy takes a patient recorded as this gender. */

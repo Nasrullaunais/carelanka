@@ -36,6 +36,8 @@ public class CareLankaDbContext : DbContext
     public DbSet<DischargeChecklistItem> DischargeChecklistItems => Set<DischargeChecklistItem>();
     public DbSet<Bill> Bills => Set<Bill>();
     public DbSet<BillLineItem> BillLineItems => Set<BillLineItem>();
+    public DbSet<BillingRate> BillingRates => Set<BillingRate>();
+    public DbSet<AdmissionFeeRate> AdmissionFeeRates => Set<AdmissionFeeRate>();
 
     // Never add configuration here. Write Data/Configurations/{Component}/ instead,
     // or all four of us conflict on this method every migration.

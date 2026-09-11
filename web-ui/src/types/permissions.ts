@@ -63,6 +63,16 @@ export function canRegisterPatient(role: PrincipalRole | undefined): boolean {
 }
 
 /**
+ * Policies.PatientEditor on PUT /api/patients/{id}.
+ *
+ * The same three roles as canRegisterPatient, and that is the whole rule: whoever may create a
+ * record may correct it. Reception types the record, so reception fixes the typo in it.
+ */
+export function canEditPatient(role: PrincipalRole | undefined): boolean {
+  return canRegisterPatient(role);
+}
+
+/**
  * Policies.PatientDetails on GET /api/patients, GET /api/patients/{id}, GET /api/admissions,
  * GET /api/admissions/{id} and GET /api/patient-worklist.
  *
@@ -128,6 +138,22 @@ export function canAssignBed(role: PrincipalRole | undefined): boolean {
  */
 export function canWorkDischargeChecklist(role: PrincipalRole | undefined): boolean {
   return role === 'ward_nurse' || role === 'doctor' || role === 'duty_manager';
+}
+
+/**
+ * Policies.DischargeBoard on GET /api/discharges/candidates.
+ *
+ * Everyone who does any part of sending a patient home, which now includes reception: the
+ * discharge screen is the whole of a discharge, the bill is raised and settled on it, and
+ * reception is general staff. A separate billing screen was the alternative and it meant
+ * walking the same visit twice through two pages.
+ *
+ * Opening the screen is not permission to do anything on it. Ticking clinical clearance is
+ * still the doctor's, the bill is still canWorkBillingDesk, and confirming is still
+ * canConfirmDischargeOf — the page hides every control this role cannot use.
+ */
+export function canOpenDischargeBoard(role: PrincipalRole | undefined): boolean {
+  return canWorkDischargeChecklist(role) || canWorkBillingDesk(role);
 }
 
 /**
@@ -212,6 +238,21 @@ export function canMarkArrived(role: PrincipalRole | undefined): boolean {
  */
 export function canReadCapacity(role: PrincipalRole | undefined): boolean {
   return isStaff(role);
+}
+
+/**
+ * Policies.HospitalAdministrator on PUT /api/billing/rates.
+ *
+ * Narrower than canWorkBillingDesk on purpose, and the two are different jobs. Reception takes
+ * the money the price list says to take; deciding what that price is is a decision about what
+ * the hospital charges, and a desk that can rewrite the price list as it bills is a desk that
+ * can charge whatever it likes.
+ *
+ * Reading the grid is Policies.AnyStaff — everyone at the desk needs the suggested price in
+ * the box in front of them — so there is no matching read helper here.
+ */
+export function canSetBillingRates(role: PrincipalRole | undefined): boolean {
+  return role === 'hospital_administrator';
 }
 
 export const roleLabels: Record<PrincipalRole, string> = {

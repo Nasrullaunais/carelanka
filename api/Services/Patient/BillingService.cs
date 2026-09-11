@@ -31,17 +31,20 @@ public sealed class BillingService : IBillingService
     private readonly CareLankaDbContext _db;
     private readonly IBedRegistryService _beds;
     private readonly IDischargeService _discharges;
+    private readonly IBillingRateService _rates;
     private readonly ICurrentUser _currentUser;
 
     public BillingService(
         CareLankaDbContext db,
         IBedRegistryService beds,
         IDischargeService discharges,
+        IBillingRateService rates,
         ICurrentUser currentUser)
     {
         _db = db;
         _beds = beds;
         _discharges = discharges;
+        _rates = rates;
         _currentUser = currentUser;
     }
 
@@ -196,6 +199,10 @@ public sealed class BillingService : IBillingService
         var labels = await BedLabels.LiveByAdmissionAsync(_db, _beds, admissionIds, now, ct);
         var wardTypes = await WardTypesByBedAsync(admissions, ct);
 
+        // One snapshot for the whole page. Read per row, an administrator saving a new rate
+        // mid-request would put two different prices on one list of what people owe.
+        var prices = await _rates.GetPriceListAsync(ct);
+
         var rows = new List<OutstandingBill>();
 
         foreach (var admission in admissions)
@@ -206,7 +213,7 @@ public sealed class BillingService : IBillingService
             // preparing it now would produce. Advisory - the bill screen is what writes lines.
             var estimated = bills.TryGetValue(admission.Id, out var bill) && bill.LineItems.Count > 0
                 ? bill.LineItems.Sum(line => line.LineTotal)
-                : GenerateLines(admission, Guid.Empty, wardTypes, labels: null, now)
+                : GenerateLines(admission, Guid.Empty, wardTypes, labels: null, prices, now)
                     .Sum(line => line.LineTotal);
 
             rows.Add(new OutstandingBill
@@ -289,7 +296,11 @@ public sealed class BillingService : IBillingService
         {
             Id = Guid.NewGuid(),
             AdmissionId = admission.Id,
-            BillNumber = await NextBillNumberAsync(ct)
+            BillNumber = await NextBillNumberAsync(ct),
+
+            // Whoever opened it. Printed on the bill, because a document handed across a
+            // counter names the person who issued it.
+            RaisedByStaffMemberId = _currentUser.Id
         };
 
         _db.Bills.Add(bill);
@@ -320,8 +331,10 @@ public sealed class BillingService : IBillingService
             admission.BedAssignments.Select(assignment => assignment.BedId).Distinct().ToList(),
             ct);
 
+        var prices = await _rates.GetPriceListAsync(ct);
+
         foreach (var line in GenerateLines(
-            admission, bill.Id, wardTypes, labels, DateTimeOffset.UtcNow))
+            admission, bill.Id, wardTypes, labels, prices, DateTimeOffset.UtcNow))
         {
             Add(bill, line);
         }
@@ -367,6 +380,7 @@ public sealed class BillingService : IBillingService
         Guid billId,
         IReadOnlyDictionary<Guid, WardType> wardTypesByBedId,
         IReadOnlyDictionary<Guid, BedLabel>? labels,
+        PriceList prices,
         DateTimeOffset now)
     {
         var lines = new List<BillLineEntity>
@@ -378,7 +392,7 @@ public sealed class BillingService : IBillingService
                 Source = BillLineSource.AdmissionFee,
                 Description = $"Admission fee ({EnumWire.ToWire(admission.Category)})",
                 Quantity = 1m,
-                UnitPrice = BillingRates.AdmissionFee(admission.Category)
+                UnitPrice = prices.AdmissionFee(admission.Category)
             }
         };
 
@@ -408,7 +422,7 @@ public sealed class BillingService : IBillingService
                 Source = BillLineSource.BedStay,
                 Description = Describe(label, wardType),
                 Quantity = days,
-                UnitPrice = BillingRates.BedDay(wardType),
+                UnitPrice = prices.BedDay(wardType),
                 BedAssignmentId = stay.Id
             });
         }
@@ -538,7 +552,8 @@ public sealed class BillingService : IBillingService
     private async Task<BillResponse> ToResponseAsync(
         BillEntity bill, PatientEntity patient, CancellationToken ct)
     {
-        var names = await StaffNames.ByIdAsync(_db, [bill.SettledByStaffMemberId], ct);
+        var names = await StaffNames.ByIdAsync(
+            _db, [bill.SettledByStaffMemberId, bill.RaisedByStaffMemberId], ct);
 
         return ToResponse(bill, patient, names);
     }
@@ -572,6 +587,8 @@ public sealed class BillingService : IBillingService
             // The sum of what is printed, worked out from the same list the patient is looking
             // at. Not a column, so it cannot drift away from the lines it came from.
             Total = decimal.Round(lines.Sum(line => line.LineTotal), 2),
+            RaisedByStaffId = bill.RaisedByStaffMemberId,
+            RaisedByStaffName = StaffNames.Lookup(names, bill.RaisedByStaffMemberId),
             Settled = bill.IsSettled,
             SettledAt = bill.SettledAt,
             SettledByStaffId = bill.SettledByStaffMemberId,

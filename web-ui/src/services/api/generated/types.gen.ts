@@ -193,6 +193,16 @@ export type AdmissionDetail = {
     bill?: Bill;
 };
 
+export type AdmissionFee = {
+    category: AdmissionCategory;
+    amount: number;
+};
+
+export type AdmissionFeeUpdate = {
+    category: AdmissionCategory;
+    amount: number;
+};
+
 /**
  * What GET /api/admissions sorts on. Four fields, because those are the four the spec publishes.
  */
@@ -472,6 +482,14 @@ export type Bill = {
      * other way.
      */
     settled: boolean;
+    /**
+     * Who issued it. Printed on the bill, so it is a name on a document, not audit data.
+     */
+    raised_by_staff_id?: string | null;
+    /**
+     * Their name, for a screen. Sent beside the id, never instead of it.
+     */
+    raised_by_staff_name?: string | null;
     settled_at?: string | null;
     settled_by_staff_id?: string | null;
     /**
@@ -500,6 +518,24 @@ export type BillLine = {
 };
 
 export type BillLineSource = 'admission_fee' | 'bed_stay' | 'manual';
+
+/**
+ * The whole price grid, as GET /api/billing/rates returns it.
+ */
+export type BillingRateBook = {
+    /**
+     * One entry per kind of ward, in the order the settings screen shows them.
+     */
+    wards: Array<WardRates>;
+    /**
+     * The one-off charge for opening a visit, by care level.
+     */
+    admission_fees: Array<AdmissionFee>;
+    /**
+     * Fixed. This component does not convert currency and does not pretend to.
+     */
+    currency: string;
+};
 
 /**
  * Why a visit was called off. Always a human's claim, which is why the reason is mandatory:
@@ -860,6 +896,15 @@ export type DischargeCandidate = {
      * Empty for a true candidate. Populated rows are shown as "nearly ready".
      */
     outstanding_items: Array<string>;
+    /**
+     * True when this patient has already gone home. Only ever set on rows returned because
+     * `includeDischarged` was asked for.
+     */
+    is_discharged: boolean;
+    /**
+     * When they actually left. Null while they are still in the building.
+     */
+    discharged_at?: string | null;
 };
 
 /**
@@ -991,6 +1036,20 @@ export type EquipmentItemSummaryPagedResult = {
 };
 
 export type EquipmentStatus = 'available' | 'assigned' | 'maintenance' | 'retired';
+
+/**
+ * One cell of the grid.
+ */
+export type ExpenseRate = {
+    /**
+     * Stable key — `bed_day`, `food`, `therapy`. What the client matches on.
+     */
+    expense_key: string;
+    /**
+     * Rupees. Zero means there is no suggested price, not that it is free.
+     */
+    amount: number;
+};
 
 export type Gender = 'male' | 'female' | 'other' | 'unknown';
 
@@ -1439,6 +1498,14 @@ export type UpdateBedRequest = {
 };
 
 /**
+ * Body of PUT /api/billing/rates. Only the cells that changed need to be sent.
+ */
+export type UpdateBillingRatesRequest = {
+    expenses?: Array<WardExpenseRateUpdate> | null;
+    admission_fees?: Array<AdmissionFeeUpdate> | null;
+};
+
+/**
  * Body of PUT /api/equipment-items/{id}. Every field is optional; an absent field is left alone.
  */
 export type UpdateEquipmentItemRequest = {
@@ -1531,6 +1598,15 @@ export type WardCapacitySummary = {
     wards: Array<WardCapacity>;
 };
 
+export type WardExpenseRateUpdate = {
+    ward_type: WardType;
+    expense_key: string;
+    /**
+     * A negative price is not a discount, it is a typo that pays the patient.
+     */
+    amount: number;
+};
+
 /**
  * How full one ward is and what kind of care the people in it need. Read by Staff
  * Management (Member 2) to work out staffing demand — counts only, no patient identities.
@@ -1570,7 +1646,15 @@ export type WardOccupancy = {
     incoming_next_2h: number;
 };
 
-export type WardType = 'icu' | 'hdu' | 'general' | 'maternity' | 'pediatric' | 'isolation';
+/**
+ * Every expense priced for one kind of ward.
+ */
+export type WardRates = {
+    ward_type: WardType;
+    expenses: Array<ExpenseRate>;
+};
+
+export type WardType = 'icu' | 'hdu' | 'general' | 'maternity' | 'pediatric' | 'isolation' | 'surgical' | 'emergency' | 'mental_health';
 
 /**
  * A problem the threshold sweep found, or a fault a person reported.
@@ -2758,11 +2842,74 @@ export type ListOutstandingBillsResponses = {
 
 export type ListOutstandingBillsResponse = ListOutstandingBillsResponses[keyof ListOutstandingBillsResponses];
 
+export type GetBillingRatesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/billing/rates';
+};
+
+export type GetBillingRatesErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type GetBillingRatesError = GetBillingRatesErrors[keyof GetBillingRatesErrors];
+
+export type GetBillingRatesResponses = {
+    /**
+     * OK
+     */
+    200: BillingRateBook;
+};
+
+export type GetBillingRatesResponse = GetBillingRatesResponses[keyof GetBillingRatesResponses];
+
+export type UpdateBillingRatesData = {
+    body?: UpdateBillingRatesRequest;
+    path?: never;
+    query?: never;
+    url: '/billing/rates';
+};
+
+export type UpdateBillingRatesErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type UpdateBillingRatesError = UpdateBillingRatesErrors[keyof UpdateBillingRatesErrors];
+
+export type UpdateBillingRatesResponses = {
+    /**
+     * OK
+     */
+    200: BillingRateBook;
+};
+
+export type UpdateBillingRatesResponse = UpdateBillingRatesResponses[keyof UpdateBillingRatesResponses];
+
 export type ListDischargeCandidatesData = {
     body?: never;
     path?: never;
     query?: {
         wardId?: string;
+        includeDischarged?: boolean;
         page?: number;
         pageSize?: number;
     };

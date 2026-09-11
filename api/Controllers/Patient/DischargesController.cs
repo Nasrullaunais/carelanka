@@ -29,8 +29,13 @@ public class DischargesController : ControllerBase
     /// </summary>
     /// <remarks>
     /// The list is advisory. Being on it changes nothing until a human confirms.
+    ///
+    /// `includeDischarged` adds the visits that are already over, as records. They sort below
+    /// everyone still in the building, carry `is_discharged` and `discharged_at`, and are never
+    /// candidates for anything — without them this screen forgets every patient the moment the
+    /// work on them is finished.
     /// </remarks>
-    [Authorize(Policy = Policies.DischargeChecklist)]
+    [Authorize(Policy = Policies.DischargeBoard)]
     [HttpGet("candidates", Name = "listDischargeCandidates")]
     [ProducesResponseType(typeof(PagedResult<DischargeCandidate>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
@@ -38,10 +43,11 @@ public class DischargesController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
     public async Task<ActionResult<PagedResult<DischargeCandidate>>> ListDischargeCandidates(
         [FromQuery] Guid? wardId,
+        [FromQuery] bool includeDischarged = false,
         [FromQuery][Range(1, int.MaxValue)] int page = 1,
         [FromQuery][Range(1, 100)] int pageSize = 20,
         CancellationToken ct = default)
-        => Ok(await _discharges.ListCandidatesAsync(wardId, page, pageSize, ct));
+        => Ok(await _discharges.ListCandidatesAsync(wardId, includeDischarged, page, pageSize, ct));
 
     /// <summary>
     /// Tick discharge checklist items. Any subset; a key left out is not touched.

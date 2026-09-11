@@ -11,8 +11,16 @@ public interface IDischargeService
     /// Patients who could go home, and the ones who nearly could. A plain rule over the
     /// checklist rows, not an agent.
     /// </summary>
+    /// <param name="includeDischarged">
+    /// Also return visits that are already over, as records. They are never candidates and the
+    /// screen offers no control on one.
+    /// </param>
     Task<PagedResult<DischargeCandidate>> ListCandidatesAsync(
-        Guid? wardId, int page, int pageSize, CancellationToken cancellationToken = default);
+        Guid? wardId,
+        bool includeDischarged,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
 
     /// <summary>Tick or untick boxes. Each key is gated on the caller's role.</summary>
     Task<DischargeResponse> UpdateChecklistAsync(

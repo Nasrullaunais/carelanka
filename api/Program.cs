@@ -184,7 +184,12 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.Doctor),
         EnumWire.ToWire(StaffRole.EquipmentManager)));
 
+    // General staff added 2026-09-11, and it matches PatientRegistrar exactly on purpose.
+    // Reception types the record; without this the one person who can see the typo is the one
+    // person who cannot fix it, and the correction has to be chased through a ward nurse.
+    // Whoever may create a record may correct it.
     options.AddPolicy(Policies.PatientEditor, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.GeneralStaff),
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
 
@@ -198,6 +203,14 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.Doctor),
         EnumWire.ToWire(StaffRole.DutyManager)));
+
+    // Reading the board only - every write on that screen keeps its own narrower policy.
+    options.AddPolicy(Policies.DischargeBoard, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.Doctor),
+        EnumWire.ToWire(StaffRole.DutyManager),
+        EnumWire.ToWire(StaffRole.GeneralStaff),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
 
     options.AddPolicy(Policies.BillingDesk, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.GeneralStaff),
@@ -273,6 +286,7 @@ builder.Services.AddScoped<IBedOccupancyService, BedOccupancyService>();
 builder.Services.AddScoped<IWorklistService, WorklistService>();
 builder.Services.AddScoped<IDischargeService, DischargeService>();
 builder.Services.AddScoped<IBillingService, BillingService>();
+builder.Services.AddScoped<IBillingRateService, BillingRateService>();
 
 // Real: ward bed counts now come from Equipment's register instead of a constant.
 // Scoped, not Singleton — it delegates to IBedService, which is scoped because it holds a

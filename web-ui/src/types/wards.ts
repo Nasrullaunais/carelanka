@@ -13,6 +13,9 @@ export const wardTypeLabels: Record<WardType, string> = {
   maternity: 'Maternity',
   pediatric: "Children's ward",
   isolation: 'Isolation',
+  surgical: 'Surgical ward',
+  emergency: 'Emergency ward',
+  mental_health: 'Mental health ward',
 };
 
 /** One line of plain English per ward type, shown under the picker rather than in it. */
@@ -23,6 +26,9 @@ export const wardTypeHints: Record<WardType, string> = {
   maternity: 'Childbirth and immediate aftercare.',
   pediatric: 'Children. Age, not illness, is what puts someone here.',
   isolation: 'Infection risk. A patient who must not share air with the rest of the ward.',
+  surgical: 'Before and after an operation. Ordinary beds, with the theatre next door.',
+  emergency: 'The first few hours. Somebody who has just come in and is not yet placed.',
+  mental_health: 'Psychiatric care. A ward, not a level of medical intensity.',
 };
 
 export const genderPolicyLabels: Record<GenderPolicy, string> = {

@@ -3,9 +3,11 @@ import { AppShell } from './components/AppShell';
 import { AppointmentsPage } from './pages/AppointmentsPage';
 import { CapacityPage } from './pages/CapacityPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { EquipmentPage } from './pages/EquipmentPage';
 import { IntakePage } from './pages/IntakePage';
 import { LoginPage } from './pages/LoginPage';
 import { PatientsPage } from './pages/PatientsPage';
+import { PharmacyPage } from './pages/PharmacyPage';
 import { WardsPage } from './pages/WardsPage';
 import { clearSession } from './services/auth/session';
 import { useSession } from './services/auth/useSession';
@@ -51,6 +53,8 @@ export function App() {
         <Route path="/appointments" element={<AppointmentsPage />} />
         <Route path="/capacity" element={<CapacityPage />} />
         <Route path="/wards" element={<WardsPage />} />
+        <Route path="/equipment" element={<EquipmentPage />} />
+        <Route path="/pharmacy" element={<PharmacyPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

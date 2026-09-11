@@ -462,6 +462,13 @@ export type CompleteDetailsRequest = {
 };
 
 /**
+ * Body of POST /api/maintenance-schedules/{id}/complete. Who did the work comes from the token, never the body.
+ */
+export type CompleteMaintenanceScheduleRequest = {
+    notes?: string | null;
+};
+
+/**
  * Body of POST /api/admissions. Creates a visit in status `awaiting_bed`.
  */
 export type CreateAdmissionRequest = {
@@ -550,6 +557,20 @@ export type CreateEquipmentItemRequest = {
 };
 
 /**
+ * Body of POST /api/maintenance-schedules. The manual path, with no agent involved.
+ */
+export type CreateMaintenanceScheduleRequest = {
+    asset_type: AssetType;
+    /**
+     * The equipment item or bed being serviced. Polymorphic, so it carries no foreign key.
+     */
+    asset_id: string;
+    schedule_type: MaintenanceType;
+    scheduled_date: string;
+    notes?: string | null;
+};
+
+/**
  * Body of POST /api/patients. Registration is done BY staff ABOUT a person — the patient does
  * not sign up for it and may never have an account.
  */
@@ -565,6 +586,47 @@ export type CreatePatientRequest = {
     address?: string | null;
     emergency_contact_name?: string | null;
     emergency_contact_phone?: string | null;
+};
+
+/**
+ * Body of POST /api/pharmacy-categories.
+ */
+export type CreatePharmacyCategoryRequest = {
+    name: string;
+    requires_prescription?: boolean;
+};
+
+/**
+ * Body of POST /api/pharmacy-items.
+ */
+export type CreatePharmacyItemRequest = {
+    name: string;
+    category_id: string;
+    manufacturer?: string | null;
+    batch_number?: string | null;
+    expiry_date?: string | null;
+    unit: string;
+    /**
+     * Opening stock. Every later change is a transaction, never a direct edit.
+     */
+    quantity_on_hand?: number;
+    reorder_threshold?: number;
+    unit_price?: number | null;
+};
+
+/**
+ * Body of POST /api/pharmacy-items/{id}/transactions.
+ */
+export type CreatePharmacyTransactionRequest = {
+    type: PharmacyTransactionType;
+    /**
+     * Always positive. Type decides whether stock goes up or down.
+     */
+    quantity: number;
+    /**
+     * Mandatory for an adjustment. A stocktake correction nobody explained is unauditable.
+     */
+    note?: string | null;
 };
 
 /**
@@ -758,6 +820,10 @@ export type MaintenanceSchedule = {
     id: string;
     asset_type: AssetType;
     asset_id: string;
+    /**
+     * Human-readable, so a task list does not read as a column of GUIDs. Built from whichever asset the row points at.
+     */
+    asset_label: string;
     schedule_type: MaintenanceType;
     scheduled_date: string;
     status: MaintenanceStatus;
@@ -767,6 +833,20 @@ export type MaintenanceSchedule = {
     created_by: RaisedBy;
     created_at: string;
     updated_at: string;
+};
+
+/**
+ * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
+ */
+export type MaintenanceSchedulePagedResult = {
+    items: Array<MaintenanceSchedule>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    /**
+     * Always at least 1, so an empty list does not render as "page 1 of 0".
+     */
+    total_pages: number;
 };
 
 export type MaintenanceStatus = 'scheduled' | 'in_progress' | 'completed' | 'overdue' | 'cancelled';
@@ -916,6 +996,102 @@ export type PatientSummaryPagedResult = {
      */
     total_pages: number;
 };
+
+/**
+ * One of the pharmacy categories. Seeded with the five from the component plan.
+ */
+export type PharmacyCategory = {
+    id: string;
+    name: string;
+    /**
+     * Whether dispensing anything in this category needs a doctor's prescription. Recorded here; the clinical decision is not ours.
+     */
+    requires_prescription: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
+/**
+ * A catalog entry and how much of it is on the shelf.
+ */
+export type PharmacyItem = {
+    id: string;
+    name: string;
+    category_id: string;
+    category_name: string;
+    manufacturer?: string | null;
+    /**
+     * Medicines are tracked by batch, which is also how a recall is issued.
+     */
+    batch_number?: string | null;
+    /**
+     * Null for things that do not expire. Drives the medicine_expiring warning.
+     */
+    expiry_date?: string | null;
+    unit: string;
+    quantity_on_hand: number;
+    reorder_threshold: number;
+    unit_price?: number | null;
+    /**
+     * Computed as quantity_on_hand > 0, never stored, so it cannot drift out of step with the quantity.
+     */
+    is_available: boolean;
+    /**
+     * Computed the same way. What the low-stock sweep keys off.
+     */
+    below_threshold: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
+/**
+ * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
+ */
+export type PharmacyItemPagedResult = {
+    items: Array<PharmacyItem>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    /**
+     * Always at least 1, so an empty list does not render as "page 1 of 0".
+     */
+    total_pages: number;
+};
+
+/**
+ * One movement of stock. Immutable once written, which is why there is no updated_at.
+ */
+export type PharmacyTransaction = {
+    id: string;
+    pharmacy_item_id: string;
+    type: PharmacyTransactionType;
+    /**
+     * Always positive. The type is what gives it a sign.
+     */
+    quantity: number;
+    /**
+     * Staff Management owns the person; this is the id and nothing more.
+     */
+    performed_by_staff_id: string;
+    note?: string | null;
+    created_at: string;
+};
+
+/**
+ * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
+ */
+export type PharmacyTransactionPagedResult = {
+    items: Array<PharmacyTransaction>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    /**
+     * Always at least 1, so an empty list does not render as "page 1 of 0".
+     */
+    total_pages: number;
+};
+
+export type PharmacyTransactionType = 'received' | 'dispensed' | 'adjusted' | 'expired_removed';
 
 export type PrincipalRole = 'ward_nurse' | 'doctor' | 'ambulance_crew' | 'general_staff' | 'duty_manager' | 'hospital_administrator' | 'equipment_manager' | 'patient';
 
@@ -2430,6 +2606,129 @@ export type GetWardCapacityResponses = {
 
 export type GetWardCapacityResponse = GetWardCapacityResponses[keyof GetWardCapacityResponses];
 
+export type ListMaintenanceSchedulesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: MaintenanceStatus;
+        assetType?: AssetType;
+        overdue?: boolean;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/maintenance-schedules';
+};
+
+export type ListMaintenanceSchedulesErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListMaintenanceSchedulesError = ListMaintenanceSchedulesErrors[keyof ListMaintenanceSchedulesErrors];
+
+export type ListMaintenanceSchedulesResponses = {
+    /**
+     * OK
+     */
+    200: MaintenanceSchedulePagedResult;
+};
+
+export type ListMaintenanceSchedulesResponse = ListMaintenanceSchedulesResponses[keyof ListMaintenanceSchedulesResponses];
+
+export type CreateMaintenanceScheduleData = {
+    body?: CreateMaintenanceScheduleRequest;
+    path?: never;
+    query?: never;
+    url: '/maintenance-schedules';
+};
+
+export type CreateMaintenanceScheduleErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CreateMaintenanceScheduleError = CreateMaintenanceScheduleErrors[keyof CreateMaintenanceScheduleErrors];
+
+export type CreateMaintenanceScheduleResponses = {
+    /**
+     * Created
+     */
+    201: MaintenanceSchedule;
+};
+
+export type CreateMaintenanceScheduleResponse = CreateMaintenanceScheduleResponses[keyof CreateMaintenanceScheduleResponses];
+
+export type CompleteMaintenanceScheduleData = {
+    body?: CompleteMaintenanceScheduleRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/maintenance-schedules/{id}/complete';
+};
+
+export type CompleteMaintenanceScheduleErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CompleteMaintenanceScheduleError = CompleteMaintenanceScheduleErrors[keyof CompleteMaintenanceScheduleErrors];
+
+export type CompleteMaintenanceScheduleResponses = {
+    /**
+     * OK
+     */
+    200: MaintenanceSchedule;
+};
+
+export type CompleteMaintenanceScheduleResponse = CompleteMaintenanceScheduleResponses[keyof CompleteMaintenanceScheduleResponses];
+
 export type ListPatientsData = {
     body?: never;
     path?: never;
@@ -2659,6 +2958,262 @@ export type LinkPatientAccountResponses = {
 };
 
 export type LinkPatientAccountResponse = LinkPatientAccountResponses[keyof LinkPatientAccountResponses];
+
+export type ListPharmacyCategoriesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/pharmacy-categories';
+};
+
+export type ListPharmacyCategoriesErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+};
+
+export type ListPharmacyCategoriesError = ListPharmacyCategoriesErrors[keyof ListPharmacyCategoriesErrors];
+
+export type ListPharmacyCategoriesResponses = {
+    /**
+     * OK
+     */
+    200: Array<PharmacyCategory>;
+};
+
+export type ListPharmacyCategoriesResponse = ListPharmacyCategoriesResponses[keyof ListPharmacyCategoriesResponses];
+
+export type CreatePharmacyCategoryData = {
+    body?: CreatePharmacyCategoryRequest;
+    path?: never;
+    query?: never;
+    url: '/pharmacy-categories';
+};
+
+export type CreatePharmacyCategoryErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CreatePharmacyCategoryError = CreatePharmacyCategoryErrors[keyof CreatePharmacyCategoryErrors];
+
+export type CreatePharmacyCategoryResponses = {
+    /**
+     * Created
+     */
+    201: PharmacyCategory;
+};
+
+export type CreatePharmacyCategoryResponse = CreatePharmacyCategoryResponses[keyof CreatePharmacyCategoryResponses];
+
+export type ListPharmacyItemsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        search?: string;
+        categoryId?: string;
+        availableOnly?: boolean;
+        page?: number;
+        pageSize?: number;
+        sortBy?: string;
+        sortDir?: string;
+    };
+    url: '/pharmacy-items';
+};
+
+export type ListPharmacyItemsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+};
+
+export type ListPharmacyItemsError = ListPharmacyItemsErrors[keyof ListPharmacyItemsErrors];
+
+export type ListPharmacyItemsResponses = {
+    /**
+     * OK
+     */
+    200: PharmacyItemPagedResult;
+};
+
+export type ListPharmacyItemsResponse = ListPharmacyItemsResponses[keyof ListPharmacyItemsResponses];
+
+export type CreatePharmacyItemData = {
+    body?: CreatePharmacyItemRequest;
+    path?: never;
+    query?: never;
+    url: '/pharmacy-items';
+};
+
+export type CreatePharmacyItemErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CreatePharmacyItemError = CreatePharmacyItemErrors[keyof CreatePharmacyItemErrors];
+
+export type CreatePharmacyItemResponses = {
+    /**
+     * Created
+     */
+    201: PharmacyItem;
+};
+
+export type CreatePharmacyItemResponse = CreatePharmacyItemResponses[keyof CreatePharmacyItemResponses];
+
+export type GetPharmacyItemData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/pharmacy-items/{id}';
+};
+
+export type GetPharmacyItemErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetPharmacyItemError = GetPharmacyItemErrors[keyof GetPharmacyItemErrors];
+
+export type GetPharmacyItemResponses = {
+    /**
+     * OK
+     */
+    200: PharmacyItem;
+};
+
+export type GetPharmacyItemResponse = GetPharmacyItemResponses[keyof GetPharmacyItemResponses];
+
+export type ListPharmacyTransactionsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/pharmacy-items/{id}/transactions';
+};
+
+export type ListPharmacyTransactionsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type ListPharmacyTransactionsError = ListPharmacyTransactionsErrors[keyof ListPharmacyTransactionsErrors];
+
+export type ListPharmacyTransactionsResponses = {
+    /**
+     * OK
+     */
+    200: PharmacyTransactionPagedResult;
+};
+
+export type ListPharmacyTransactionsResponse = ListPharmacyTransactionsResponses[keyof ListPharmacyTransactionsResponses];
+
+export type RecordPharmacyTransactionData = {
+    body?: CreatePharmacyTransactionRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/pharmacy-items/{id}/transactions';
+};
+
+export type RecordPharmacyTransactionErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RecordPharmacyTransactionError = RecordPharmacyTransactionErrors[keyof RecordPharmacyTransactionErrors];
+
+export type RecordPharmacyTransactionResponses = {
+    /**
+     * Created
+     */
+    201: PharmacyItem;
+};
+
+export type RecordPharmacyTransactionResponse = RecordPharmacyTransactionResponses[keyof RecordPharmacyTransactionResponses];
 
 export type ListBedAvailabilityData = {
     body?: never;

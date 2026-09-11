@@ -275,6 +275,101 @@ tr:last-child td {
   border-radius: 4px;
 }
 
+/* ---------- equipment ---------- */
+
+/* Status carries the whole lifecycle, so it gets colour rather than one flat badge.
+   Maintenance and retired are deliberately not red: a machine being serviced is normal
+   work, and only an open fault warning is an alarm. */
+.badge.status-available {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.badge.status-assigned {
+  background: #e6eefc;
+  color: #1e4d9b;
+}
+
+.badge.status-maintenance {
+  background: #fdf0dc;
+  color: #8a5a08;
+}
+
+.badge.status-retired {
+  background: #f0eeee;
+  color: var(--ink-soft);
+}
+
+.badge.severity-low,
+.badge.severity-medium {
+  background: #fdf0dc;
+  color: #8a5a08;
+}
+
+.badge.severity-high,
+.badge.severity-critical {
+  background: #fbe6e7;
+  color: var(--danger);
+}
+
+.actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+button.danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+button.danger:not(.secondary) {
+  background: var(--danger);
+  color: #fff;
+}
+
+.small {
+  font-size: 0.78rem;
+}
+
+/* A name that opens the detail view. A link would suggest navigation; this stays on
+   the page and toggles a card, so it is a button wearing a link's clothes. */
+button.linklike {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+tr.selected {
+  background: var(--accent-soft);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-top: 0.9rem;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.8rem;
+  margin: 0;
+}
+
+.detail-grid dt {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+
 /* ---------- stat tiles and the fullness bar ---------- */
 
 .stats {
@@ -301,6 +396,49 @@ tr:last-child td {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--ink-soft);
+}
+
+.detail-grid dd {
+  margin: 0.15rem 0 0;
+}
+
+.dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.dialog-head h2 {
+  margin: 0;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 36, 31, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 50;
+}
+
+.dialog {
+  max-width: 30rem;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  margin: 0;
+}
+
+textarea {
+  width: 100%;
+  font: inherit;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  resize: vertical;
 }
 
 .stat.free {

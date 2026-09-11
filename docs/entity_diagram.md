@@ -560,89 +560,215 @@ shift starting in two hours, which the previous two-value enum could not express
 
 ### Health Equipment
 
-> **STALE — this section does not match `equipment-spec.yaml`. Member 3 owns the fix.**
-> *(flagged 2026-09-07)*
+> **Reconciled with `equipment-spec.yaml` and the shipped code.** *(Rev 3 — Member 3,
+> 2026-09-11. Closes Open Decision 12.)*
 >
-> `CLAUDE.md`'s rule is that where the diagram and a member's own committed spec disagree,
-> **the spec wins**. So the five entities below are wrong in two directions:
+> The five entities here used to describe a database nobody was going to build. What
+> changed, and why:
 >
-> | In the diagram, not in the spec | In the spec, not in the diagram |
-> | :--- | :--- |
-> | `EquipmentType` (spec calls it `EquipmentCategory`) | `PharmacyCategory` |
-> | `StockLevel` | `PharmacyItem` |
-> | | `PharmacyTransaction` |
-> | | `ActionRequest` |
-> | | `Bed` — defined under Patient Management below, but owned here |
+> | Was | Now | Why |
+> | :--- | :--- | :--- |
+> | `EquipmentType` | **`EquipmentCategory`** | Renamed to the name the spec publishes. Same table, same job. |
+> | `StockLevel` | **`PharmacyItem`** | Absorbed. See the answer below. |
+> | — | **`PharmacyCategory`**, **`PharmacyTransaction`**, **`ActionRequest`** | Published by the spec, modelled nowhere until now. |
 >
-> This matters beyond tidiness: **§6 and §15 require the ER diagram as a submitted,
-> graded artefact**, and right now it describes a database we are not going to build.
+> **The two questions this section was flagged on, answered:**
 >
-> Two questions only Member 3 can answer, which is why this is a flag and not an edit:
-> **(1)** Does `StockLevel` survive for equipment consumables, or did `PharmacyItem`
-> replace it entirely? **(2)** Is the pharmacy quantity central or per-ward
-> (`equipment-management-plan.md` §15 leaves this open)?
+> **(1) `StockLevel` does not survive.** `PharmacyItem` replaced it outright. The old model
+> split consumables from durable assets and counted them per ward. The built model keeps one
+> catalog row per medicine or supply with its quantity on it, and every change to that
+> quantity is a `PharmacyTransaction`. Keeping `StockLevel` as well would mean two tables
+> answering "how many do we have", which is exactly the drift the transaction log exists to
+> prevent.
+>
+> **(2) Pharmacy stock is central, not per-ward.** One quantity per item for the whole
+> hospital, so there is no `WardId` on `PharmacyItem`. This is a deliberate simplification
+> recorded in `equipment-management-plan.md` §15, and §16 open question 1 is the group's
+> decision to revisit it. Equipment, unlike pharmacy, *is* located: `EquipmentItem.WardId`
+> says where a machine sits.
+>
+> `Bed` is owned by this component but defined under Patient Management below, next to the
+> `BedAssignment` it is read with. That split is settled in `integration_of_functions.md`
+> §6.1: we own the frame, they own the occupant.
+>
+> **Not yet built:** `ActionRequest` is modelled here from the spec but has no table or
+> endpoints yet. Everything else in this section is live on `main`.
 
-#### EquipmentType extends SoftDeletableEntity
+#### EquipmentCategory extends SoftDeletableEntity *(Rev 3 — renamed from `EquipmentType`)*
 ```
-+ Name: string (unique, non-null)
++ Name: string (non-null, max 150)
 ```
-**Table:** `equipment_types`
-**Note:** Shared taxonomy used by both durable `EquipmentItem` rows and aggregate
-`StockLevel` rows, giving the Equipment Monitoring Agent one vocabulary for
-"required equipment" across both. *(Decision 33)*
+**Table:** `equipment_categories`
+**Constraint:** UNIQUE(Name) **WHERE is_active**
+**Note:** A table rather than an enum, so a sixth category is a row and not a migration.
+Seeded with the five from `equipment-management-plan.md` §1.1. The unique index is scoped
+to live rows for the reason every other one in this schema is: retiring a category must not
+make its name unusable forever, and the global query filter would hide the clashing row from
+the service-layer duplicate check. *(Decision 33, revised)*
 
-#### EquipmentItem extends SoftDeletableEntity
+#### EquipmentItem extends SoftDeletableEntity *(Rev 3 — fields aligned to the spec)*
 ```
-+ EquipmentTypeId: Guid (non-null) FK → EquipmentType.Id
-+ WardId: Guid (non-null) FK → Ward.Id
-+ SerialNumber: string (unique, nullable)
-+ Status: EquipmentItemStatus (non-null)
++ Name: string (non-null, max 150)
++ CategoryId: Guid (non-null) FK → EquipmentCategory.Id
++ Model: string (non-null, max 100)
++ Manufacturer: string (non-null, max 150)
++ PurchaseDate: DateOnly (non-null)
++ Status: EquipmentStatus (non-null)
++ WardId: Guid (nullable) -- Patient Management's ward; null means the central store
++ AssignedToAdmissionId: Guid (nullable) -- set while Status = assigned
++ AssetTag: string (non-null, max 50)
++ SerialNumber: string (nullable, max 100)
++ NextMaintenanceDue: DateOnly (nullable)
 ```
 **Table:** `equipment_items`
-**Note:** Durable, individually-tracked assets (ventilators, monitors). *(Decision 8)*
+**Constraints:** UNIQUE(AssetTag) **WHERE is_active** · UNIQUE(SerialNumber) **WHERE
+is_active AND serial_number IS NOT NULL** · CHECK(status IN the enum)
+**Indexes:** `(CategoryId)` · `(WardId)` · `(Status)` · `(NextMaintenanceDue) WHERE status
+<> 'retired'`
+**Note:** Durable, individually tracked assets. `WardId` and `AssignedToAdmissionId` are
+bare references into Patient Management's tables — no foreign key, because we never write
+them. Asset tags are meant to be unique across beds and equipment together; Postgres cannot
+index across two tables, so that half is enforced in application code and is a **known gap**
+tracked as issue #17. *(Decision 8)*
 
-#### StockLevel extends AuditedEntity
+#### Bed extends SoftDeletableEntity — **owned here, defined under Patient Management**
+See the `Bed` entry in the Patient Management section. Listed here so this section is a
+complete inventory of what Member 3 owns.
+
+#### PharmacyCategory extends SoftDeletableEntity *(Rev 3 — new)*
 ```
-+ EquipmentTypeId: Guid (non-null) FK → EquipmentType.Id
-+ WardId: Guid (non-null) FK → Ward.Id
-+ Quantity: int (non-null)
++ Name: string (non-null, max 150)
++ RequiresPrescription: bool (non-null)
+```
+**Table:** `pharmacy_categories`
+**Constraint:** UNIQUE(Name) **WHERE is_active**
+**Note:** The five from `equipment-management-plan.md` §1.2, seeded by
+`docs/seed/002_pharmacy_categories.sql`. `RequiresPrescription` records the rule; deciding
+what a patient should actually be given is clinical staff's call and never this component's.
+
+#### PharmacyItem extends SoftDeletableEntity *(Rev 3 — new; replaces `StockLevel`)*
+```
++ Name: string (non-null, max 200)
++ CategoryId: Guid (non-null) FK → PharmacyCategory.Id
++ Manufacturer: string (nullable, max 150)
++ BatchNumber: string (nullable, max 50)
++ ExpiryDate: DateOnly (nullable)
++ Unit: string (non-null, max 20) -- tablet, bottle, box
++ QuantityOnHand: int (non-null)
 + ReorderThreshold: int (non-null)
++ UnitPrice: decimal(12,2) (nullable)
 ```
-**Table:** `stock_levels`
-**Constraint:** UNIQUE(EquipmentTypeId, WardId)
-**Note:** Aggregate count for bulk/consumable items (bandages, syringes) — not
-individually serialized. *(Decisions 8, 33)*
+**Table:** `pharmacy_items`
+**Constraints:** UNIQUE(Name) **WHERE is_active** · CHECK(quantity_on_hand >= 0) ·
+CHECK(reorder_threshold >= 0)
+**Indexes:** `(CategoryId)` · `(ExpiryDate) WHERE expiry_date IS NOT NULL`
+**Note:** One catalog row per medicine or supply, central to the hospital. **No
+`IsAvailable` column**: availability is `quantity_on_hand > 0`, computed when the row is
+read, for the same reason occupancy is not a column on `Bed` — one source of truth, nothing
+to drift. `QuantityOnHand` is never written directly by a caller; every change is a
+`PharmacyTransaction` applied as one conditional `UPDATE ... WHERE quantity_on_hand >= :qty`,
+so it cannot go negative and two people dispensing at once cannot both succeed past zero.
+The check constraint is the last line of defence under that. The expiry index is filtered
+because the expiry sweep never asks about bandages.
 
-#### MaintenanceSchedule extends AuditedEntity
+#### PharmacyTransaction extends Entity *(Rev 3 — new)*
 ```
-+ EquipmentItemId: Guid (non-null) FK → EquipmentItem.Id
-+ DueDate: DateOnly (non-null)
-+ CompletedDate: DateOnly (nullable)
++ PharmacyItemId: Guid (non-null) FK → PharmacyItem.Id
++ Type: PharmacyTransactionType (non-null)
++ Quantity: int (non-null) -- always positive; Type gives the sign
++ PerformedByStaffId: Guid (non-null) -- Staff Management's row, id only
++ Note: string (nullable, max 300)
+```
+**Table:** `pharmacy_transactions`
+**Constraints:** CHECK(quantity > 0) · CHECK(type IN the enum)
+**Index:** `(PharmacyItemId, CreatedAt DESC)` — serves the history endpoint and the usage
+rate the low-stock warning needs
+**Note:** `Entity`, not `AuditedEntity`, and **no soft delete**: this is the audit trail, so
+there is no `UpdatedAt` because nothing updates and no `IsActive` because nothing is
+withdrawn. It also carries **no navigation back to `PharmacyItem`** in the EF model.
+`PharmacyItem` has a global query filter, and a required navigation into a filtered entity
+makes an `Include` silently drop history rows once an item is retired — the trail has to
+outlive the thing it describes. An `adjusted` row requires a `Note`; a stocktake correction
+nobody explained cannot be audited later.
+
+#### MaintenanceSchedule extends AuditedEntity *(Rev 3 — now polymorphic)*
+```
++ AssetType: AssetType (non-null) -- equipment_item | bed
++ AssetId: Guid (non-null) -- polymorphic target id
++ ScheduleType: MaintenanceType (non-null)
++ ScheduledDate: DateOnly (non-null)
 + Status: MaintenanceStatus (non-null)
++ PerformedByStaffId: Guid (nullable)
++ CompletedAt: DateTimeOffset (nullable)
 + Notes: string (nullable)
++ CreatedBy: RaisedBy (non-null) -- agent | user
 ```
 **Table:** `maintenance_schedules`
-**Note:** Event log (one row per service/inspection), not a single recurring-schedule
-row — "next due" is derived as the latest open row. Doubles as service history.
-*(Decision 24)*
+**Indexes:** `(AssetType, AssetId)` · `(ScheduledDate) WHERE status IN ('scheduled','overdue')`
+**Note:** *(Rev 3)* No longer an `EquipmentItemId` foreign key. Beds and equipment share one
+scheduling flow rather than two, so the reference is polymorphic and unconstrained — which is
+the cost of that choice, stated rather than hidden. **`Status` never holds `overdue` in the
+database**: it is derived on read from `scheduled_date < today AND status = 'scheduled'`,
+so there is nothing cached to drift. One row per service event, so it doubles as service
+history. `CreatedBy` records whether the sweep or a person scheduled it. *(Decision 24,
+revised)*
 
-#### Warning extends AuditedEntity
+#### Warning extends AuditedEntity *(Rev 3 — fields aligned to the spec)*
 ```
-+ EntityType: string (non-null) -- "EquipmentItem" | "StockLevel"
-+ EntityId: Guid (non-null) -- polymorphic target id
 + Type: WarningType (non-null)
 + Severity: WarningSeverity (non-null)
++ RelatedEntityType: RelatedEntityType (non-null) -- pharmacy_item | equipment_item | bed
++ RelatedEntityId: Guid (non-null) -- polymorphic target id
++ WardId: Guid (nullable)
++ RecommendedAction: string (non-null)
 + Status: WarningStatus (non-null)
++ RaisedBy: RaisedBy (non-null) -- agent | user
++ WorkflowId: Guid (nullable) FK → AgentWorkflow.Id
++ AcknowledgedByStaffId: Guid (nullable)
++ AcknowledgedAt: DateTimeOffset (nullable)
 + ResolvedAt: DateTimeOffset (nullable)
 ```
 **Table:** `warnings`
-**Constraint:** UNIQUE(EntityType, EntityId, Type) **WHERE Status = 'Open'** *(Rev 2)*
-**Note:** Deterministic/system-detected (threshold check), not agent-created. The
-Equipment Monitoring Agent reviews open `Warning` rows and produces a prioritised
-`AgentWorkflow` recommendation pointing back at one via `(EntityType, EntityId)`.
-*(Decisions 17, 34)*
-*(Rev 2)* `DetectedAt` removed — it duplicated the inherited `CreatedAt` exactly. The
-partial UNIQUE stops the threshold job inserting a duplicate open warning on every tick.
+**Index:** `(Status)` — every dashboard filters on open warnings
+**Note:** *(Rev 3)* The polymorphic target is a typed enum now, not a free string, and it
+gained `pharmacy_item`. `RecommendedAction` is a short human sentence, never the model's raw
+reasoning. `RaisedBy` distinguishes the threshold sweep and a person reporting a fault from
+anything the agent infers; a reported fault starts at `high` severity because a person
+saying the machine is broken outranks what a sweep guesses.
+*(Rev 3)* The Rev 2 partial UNIQUE on `(EntityType, EntityId, Type) WHERE Status = 'Open'`
+is **not** in the shipped schema. It was written for a sweep that inserts on every tick, and
+that sweep does not exist yet. It has to come back with it, or the first run will duplicate
+every open warning. Tracked in `docs/build/equipment.md` step 7.
+
+#### ActionRequest extends AuditedEntity *(Rev 3 — new; **not built yet**)*
+```
++ WarningId: Guid (nullable) FK → Warning.Id
++ ActionType: ActionType (non-null)
++ Details: jsonb (non-null) -- shape depends on ActionType
++ EstimatedCost: decimal (nullable)
++ Urgency: Urgency (non-null)
++ ProposedBy: RaisedBy (non-null)
++ WorkflowId: Guid (nullable) FK → AgentWorkflow.Id
++ RequiresApproval: bool (non-null)
++ AutoApproved: bool (non-null)
++ Status: ActionRequestStatus (non-null)
++ ApprovedByStaffId: Guid (nullable)
++ ApprovedAt: DateTimeOffset (nullable)
++ RejectionReason: string (nullable)
++ ExecutedAt: DateTimeOffset (nullable)
+```
+**Table:** `action_requests`
+**Index:** `(Status)` — the approvals queue
+**Note:** The human-approval gate, and the screen `equipment-management-plan.md` calls the
+demo. The agent proposes rows here and never writes anything else; a person with the right
+role decides whether the action happens. **`RequiresApproval` is computed once at creation
+by a deterministic threshold rule, never by the model** — that is what stops a persuasive
+model approving its own spending. `Details` is `jsonb` because its shape follows
+`ActionType`, and each shape is documented in `equipment-spec.yaml`. Approving above the
+threshold flips `Status` and executes the action **in one transaction**, so a half-approved
+request cannot exist. Before any action touching a `Bed`, the server asks Patient Management
+whether it is occupied, in the same request, before committing — maintenance never evicts a
+patient.
 
 ---
 
@@ -1121,7 +1247,7 @@ approval.
 automatically via an EF Core `SaveChanges` interceptor. Scoped to the main
 aggregate-root entities plus the two allocation/assignment tables that agent workflows
 mutate — `EmergencyCall`, `Dispatch`, `Ambulance`, `StaffMember`, `Shift`,
-**`Allocation`** *(Rev 2)*, `LeaveRequest`, `EquipmentItem`, `StockLevel`,
+**`Allocation`** *(Rev 2)*, `LeaveRequest`, `EquipmentItem`, `PharmacyItem` *(Rev 3)*,
 `MaintenanceSchedule`, `Patient`, `Admission`, **`BedAssignment`** *(Rev 2)*,
 `Discharge`, `Ward`, `Bed`, `AgentWorkflow`.
 `PerformedByStaffMemberId` nullable for system-initiated changes (e.g. deterministic
@@ -1224,30 +1350,118 @@ Was `{Leave, ShiftSwap}`. `Leave` renamed `Annual`; `Sick` and `Emergency` added
 Pending, Approved, Rejected
 ```
 
-### EquipmentItemStatus
+### EquipmentStatus *(Rev 3 — renamed from `EquipmentItemStatus`, values replaced)*
 ```
-Operational, UnderMaintenance, OutOfService
+Available, Assigned, Maintenance, Retired
 ```
+Serialized as `available`, `assigned`, `maintenance`, `retired`.
 
-### MaintenanceStatus
-```
-Scheduled, Completed, Overdue
-```
+*(Rev 3)* The old `Operational, UnderMaintenance, OutOfService` described a machine's
+condition. These describe where it is in its life, which is what the register actually
+tracks: `Assigned` says a patient has it, and `Retired` is terminal — a replacement is a new
+row, never a revived one. Every status change goes through one guard, so an illegal move is
+a 409 and never a quiet success. Reporting a fault is the single documented exemption from
+that table: it moves an item to `Maintenance` from any state but `Retired`, including while
+a patient has it, because refusing that would leave a known-faulty machine reading as usable.
 
-### WarningType
+### BedCondition *(Rev 3 — new)*
 ```
-LowStock, OverdueMaintenance
+Usable, OutOfService
 ```
+Serialized as `usable`, `out_of_service`. A bed's condition, which is ours. Whether anyone is
+in it is Patient Management's and is never a column here.
+
+### MaintenanceType *(Rev 3 — new)*
+```
+RoutineService, Calibration, Repair
+```
+Serialized as `routine_service`, `calibration`, `repair`.
+
+### MaintenanceStatus *(Rev 3 — values replaced)*
+```
+Scheduled, InProgress, Completed, Overdue, Cancelled
+```
+Serialized as `scheduled`, `in_progress`, `completed`, `overdue`, `cancelled`.
+
+*(Rev 3)* **`Overdue` is never stored.** It is derived on read from `scheduled_date < today
+AND status = 'scheduled'`, so nothing has to be swept nightly and nothing can drift.
+
+### AssetType *(Rev 3 — new)*
+```
+EquipmentItem, Bed
+```
+Serialized as `equipment_item`, `bed`. What a `MaintenanceSchedule` row points at.
+
+### PharmacyTransactionType *(Rev 3 — new)*
+```
+Received, Dispensed, Adjusted, ExpiredRemoved
+```
+Serialized as `received`, `dispensed`, `adjusted`, `expired_removed`.
+
+Quantity on a transaction is always positive; **this is what gives it a sign**, so a row can
+never be read two ways. `Dispensed` and `ExpiredRemoved` take stock and are guarded;
+`Received` and `Adjusted` add it.
+
+**Open:** `equipment-management-plan.md` §5.1 describes `Adjusted` as `±quantity`, but the
+published request carries a positive quantity with no sign and the documented 409 names only
+the two taking types. A stocktake that finds *fewer* boxes therefore cannot be recorded
+today. Settling it needs a sign on the request or a fifth value here.
+
+### WarningType *(Rev 3 — values replaced)*
+```
+LowStock, MedicineExpiring, MaintenanceOverdue, EquipmentFaulty
+```
+Serialized as `low_stock`, `medicine_expiring`, `maintenance_overdue`, `equipment_faulty`.
 
 ### WarningSeverity
 ```
 Low, Medium, High, Critical
 ```
+Serialized as `low`, `medium`, `high`, `critical`.
 
-### WarningStatus
+### WarningStatus *(Rev 3 — values replaced)*
 ```
-Open, Resolved
+Open, Acknowledged, ActionTaken, Dismissed
 ```
+Serialized as `open`, `acknowledged`, `action_taken`, `dismissed`.
+
+*(Rev 3)* `Resolved` is gone. A warning that led somewhere is `action_taken`; one a person
+judged not worth acting on is `dismissed`. Collapsing both into "resolved" loses which
+happened, and the agent-performance report is exactly the question of which.
+
+### RelatedEntityType *(Rev 3 — new)*
+```
+PharmacyItem, EquipmentItem, Bed
+```
+Serialized as `pharmacy_item`, `equipment_item`, `bed`. What a `Warning` points at.
+
+### RaisedBy *(Rev 3 — new)*
+```
+Agent, User
+```
+Serialized as `agent`, `user`. Who raised a warning or proposed an action. The distinction is
+load-bearing: the agent-performance report and the approval threshold both read it.
+
+### ActionType *(Rev 3 — new)*
+```
+ReorderPharmacyStock, ScheduleMaintenance, ReallocateEquipment, RetireEquipment,
+DisposeExpiredStock
+```
+Serialized as `reorder_pharmacy_stock`, `schedule_maintenance`, `reallocate_equipment`,
+`retire_equipment`, `dispose_expired_stock`. Decides the shape of `ActionRequest.Details`.
+
+### ActionRequestStatus *(Rev 3 — new)*
+```
+PendingApproval, Approved, Rejected, Completed
+```
+Serialized as `pending_approval`, `approved`, `rejected`, `completed`.
+
+### Urgency *(Rev 3 — new)*
+```
+Routine, Urgent, Critical
+```
+Serialized as `routine`, `urgent`, `critical`. Feeds the deterministic approval threshold:
+`Urgent` or `Critical` always requires a human.
 
 ### AdmissionCategory *(Rev 2 — changed; Rev 2.2 — wire values pinned)*
 ```
@@ -1550,9 +1764,12 @@ CREATE UNIQUE INDEX ux_patient_accounts_phone ON patient_accounts (phone_number)
 CREATE UNIQUE INDEX ux_ambulances_reg          ON ambulances (registration_number)   WHERE is_active;
 CREATE UNIQUE INDEX ux_wards_name              ON wards (name)                       WHERE is_active;
 CREATE UNIQUE INDEX ux_beds_ward_number        ON beds (ward_id, bed_number)         WHERE is_active;
-CREATE UNIQUE INDEX ux_equipment_types_name    ON equipment_types (name)             WHERE is_active;
+CREATE UNIQUE INDEX ux_equipment_categories_name ON equipment_categories (name)      WHERE is_active;   -- (Rev 3)
+CREATE UNIQUE INDEX ux_equipment_items_asset_tag ON equipment_items (asset_tag)       WHERE is_active;   -- (Rev 3)
 CREATE UNIQUE INDEX ux_equipment_items_serial  ON equipment_items (serial_number)
     WHERE is_active AND serial_number IS NOT NULL;
+CREATE UNIQUE INDEX ux_pharmacy_categories_name ON pharmacy_categories (name)         WHERE is_active;   -- (Rev 3)
+CREATE UNIQUE INDEX ux_pharmacy_items_name     ON pharmacy_items (name)               WHERE is_active;   -- (Rev 3)
 CREATE UNIQUE INDEX ux_patients_nic            ON patients (nic)            WHERE nic IS NOT NULL AND is_active;
 CREATE UNIQUE INDEX ux_patients_temp_reference  ON patients (temp_reference) WHERE temp_reference IS NOT NULL AND is_active;
 CREATE UNIQUE INDEX ux_patients_user_account_id ON patients (user_account_id) WHERE user_account_id IS NOT NULL AND is_active;
@@ -1599,8 +1816,14 @@ ALTER TABLE shifts ADD CONSTRAINT ck_shifts_headcount
            AND minimum_headcount <= headcount_needed);
 ALTER TABLE ward_staffing_rules ADD CONSTRAINT ck_wsr_min CHECK (minimum_headcount > 0);
 
-ALTER TABLE stock_levels ADD CONSTRAINT ck_stock_nonneg
-    CHECK (quantity >= 0 AND reorder_threshold >= 0);
+-- (Rev 3) stock_levels is gone; pharmacy_items carries the quantity now. The check is the
+-- last line of defence under the conditional UPDATE that is the real guard.
+ALTER TABLE pharmacy_items ADD CONSTRAINT ck_pharmacy_items_quantity
+    CHECK (quantity_on_hand >= 0);
+ALTER TABLE pharmacy_items ADD CONSTRAINT ck_pharmacy_items_reorder_threshold
+    CHECK (reorder_threshold >= 0);
+ALTER TABLE pharmacy_transactions ADD CONSTRAINT ck_pharmacy_transactions_quantity
+    CHECK (quantity > 0);
 
 ALTER TABLE leave_requests ADD CONSTRAINT ck_leave_dates CHECK (start_date <= end_date);
 ALTER TABLE leave_requests ADD CONSTRAINT ck_leave_swap_fields
@@ -1737,12 +1960,14 @@ CREATE INDEX ix_admissions_missing_fields ON admissions USING gin (missing_field
 | Ward | Shift | 1:N | Shift.WardId |
 | Ward | WardStaffingRule | 1:N | WardStaffingRule.WardId |
 | Ward | EquipmentItem | 1:N | EquipmentItem.WardId |
-| Ward | StockLevel | 1:N | StockLevel.WardId |
 | Ward | Dispatch | 1:N (nullable) | Dispatch.DestinationWardId |
 | Skill | Shift | 1:N (nullable) | Shift.RequiredSkillId |
-| EquipmentType | EquipmentItem | 1:N | EquipmentItem.EquipmentTypeId |
-| EquipmentType | StockLevel | 1:N | StockLevel.EquipmentTypeId |
-| EquipmentItem | MaintenanceSchedule | 1:N | MaintenanceSchedule.EquipmentItemId |
+| EquipmentCategory | EquipmentItem | 1:N | EquipmentItem.CategoryId *(Rev 3)* |
+| PharmacyCategory | PharmacyItem | 1:N | PharmacyItem.CategoryId *(Rev 3)* |
+| PharmacyItem | PharmacyTransaction | 1:N | PharmacyTransaction.PharmacyItemId *(Rev 3)* |
+| Warning | ActionRequest | 1:N (nullable) | ActionRequest.WarningId *(Rev 3)* |
+| AgentWorkflow | ActionRequest | 1:N (nullable) | ActionRequest.WorkflowId *(Rev 3)* |
+| AgentWorkflow | Warning | 1:N (nullable) | Warning.WorkflowId *(Rev 3)* |
 | Admission | BedAssignment | 1:N | BedAssignment.AdmissionId |
 | Admission | Discharge | 1:1 | Discharge.AdmissionId |
 | Bed | BedAssignment | 1:N | BedAssignment.BedId |
@@ -1755,7 +1980,8 @@ CREATE INDEX ix_admissions_missing_fields ON admissions USING gin (missing_field
 | Appointment | Admission | 1:1 (nullable) | Appointment.AdmissionId *(Rev 2.9)* |
 | LeaveRequest | StaffMember | N:1 (nullable) ×2 | ReviewedBy…, SwapWith… |
 | LeaveRequest | Shift | N:1 (nullable) | LeaveRequest.SwapShiftId |
-| Warning | EquipmentItem \| StockLevel | N:1 (polymorphic) | (EntityType, EntityId) |
+| MaintenanceSchedule | EquipmentItem \| Bed | N:1 (polymorphic) | (AssetType, AssetId) *(Rev 3)* |
+| Warning | PharmacyItem \| EquipmentItem \| Bed | N:1 (polymorphic) | (RelatedEntityType, RelatedEntityId) *(Rev 3)* |
 | AgentWorkflow | any domain entity | N:1 (polymorphic) | (EntityType, EntityId) |
 | AuditLog | any audited entity | N:1 (polymorphic) | (EntityType, EntityId) |
 
@@ -1764,7 +1990,9 @@ CREATE INDEX ix_admissions_missing_fields ON admissions USING gin (missing_field
 ## Soft-Delete & History Model
 
 Soft-deletable entities (`SoftDeletableEntity`): `StaffMember`, `Patient`, `Ambulance`,
-`EquipmentItem`, `EquipmentType`, `Ward`, `Bed`. These are FK targets of historical
+`EquipmentItem`, `EquipmentCategory`, `PharmacyCategory`, `PharmacyItem`, `Ward`, `Bed`.
+*(Rev 3)* `PharmacyTransaction` is deliberately **not** on this list — it is the audit trail,
+so nothing withdraws it. These are FK targets of historical
 rows (`Allocation`, `Admission`, `Dispatch`, `MaintenanceSchedule`, `BedAssignment`,
 etc.) — hard-deleting them would cascade-destroy that history or be blocked by FK
 constraints (`ON DELETE RESTRICT`). *(Decision 21)*
@@ -1801,11 +2029,14 @@ rows are mutated after insert; pure join/append-only tables (`DispatchCrew`,
 | Shift | shifts | | changed |
 | Allocation | allocations | | changed |
 | LeaveRequest | leave_requests | | changed |
-| EquipmentType | equipment_types | ✓ | |
-| EquipmentItem | equipment_items | ✓ | |
-| StockLevel | stock_levels | | |
-| MaintenanceSchedule | maintenance_schedules | | |
-| Warning | warnings | | changed |
+| EquipmentCategory | equipment_categories | ✓ | **renamed (3)** |
+| EquipmentItem | equipment_items | ✓ | changed (3) |
+| PharmacyCategory | pharmacy_categories | ✓ | **new (3)** |
+| PharmacyItem | pharmacy_items | ✓ | **new (3)** |
+| PharmacyTransaction | pharmacy_transactions | | **new (3)** |
+| MaintenanceSchedule | maintenance_schedules | | changed (3) |
+| Warning | warnings | | changed (3) |
+| ActionRequest | action_requests | | **new (3), not built** |
 | Ward | wards | ✓ | changed |
 | Bed | beds | ✓ | changed |
 | Patient | patients | ✓ | changed |
@@ -1840,7 +2071,8 @@ exception handler, the audit interceptor, the agent workflow tables and the Coor
 Agent. Contract: `specs/common-spec.yaml`. Reasoning: `docs/ADR.md` ADR 3.
 
 **Note:** `Ward` sits under Patient Management but is referenced by all four components
-(`Shift.WardId`, `EquipmentItem.WardId`, `StockLevel.WardId`, `Dispatch.DestinationWardId`).
+(`Shift.WardId`, `EquipmentItem.WardId`, `Dispatch.DestinationWardId`). *(Rev 3)* Pharmacy
+stock is central, so `PharmacyItem` has no `WardId`.
 Treat its schema as frozen once agreed — changes to it break three other members.
 
 **Note (Rev 2.2 — review item 3):** `Bed` moved from Patient Management to Health
@@ -1934,7 +2166,7 @@ trivial to extend, and the CHECK preserves integrity. This is ADR-worthy.
 
 **4. `Skill` soft-deletability.** `Skill` is an admin-editable lookup table and an FK
 target of `StaffMemberSkill` and now `Shift` — the exact profile Decision 21 covers, and
-the same profile as `EquipmentType`, which *is* soft-deletable. It should almost certainly
+the same profile as `EquipmentCategory` *(Rev 3)*, which *is* soft-deletable. It should almost certainly
 extend `SoftDeletableEntity` too. Left unchanged pending sign-off.
 
 **5. `StaffMember.Department: string` alongside a `Ward` entity.** Free-text department
@@ -1965,12 +2197,19 @@ turned over between patients is a real state and somebody owns it. Options: a th
 Member 4 decides — adding it means changing a committed enum, so it is not a diagram-only
 change.
 
-**12. Health Equipment entities are stale in this diagram.** *(2026-09-07)* See the
-banner on the Health Equipment section above. `EquipmentType` and `StockLevel` are
-published nowhere; `PharmacyCategory`, `PharmacyItem`, `PharmacyTransaction` and
-`ActionRequest` are published in `equipment-spec.yaml` and modelled nowhere here. The spec
-wins, so the diagram needs updating to match. **Member 3 owns this**, and it is on the
-critical path for the submitted ER diagram, not just for tidiness.
+**12. ~~Health Equipment entities are stale in this diagram.~~** **CLOSED** *(Rev 3,
+2026-09-11, Member 3.)* `EquipmentType` is now `EquipmentCategory`, `StockLevel` is absorbed
+into `PharmacyItem`, and `PharmacyCategory`, `PharmacyItem`, `PharmacyTransaction` and
+`ActionRequest` are modelled. The enums, the unique indexes, the check constraints, the
+relationship table, the soft-delete list and the table-name mapping were all brought in line
+at the same time. Eight of the nine entities are live on `main`; `ActionRequest` is modelled
+from the spec and not built yet, which the section says on its face.
+
+> One thing this closure did **not** settle, and it is a real gap rather than tidiness. The
+> Rev 2 partial unique index on open warnings — `(EntityType, EntityId, Type) WHERE Status =
+> 'Open'` — is not in the shipped schema. It exists to stop the threshold sweep inserting a
+> duplicate open warning on every tick, and the sweep is not built yet. It has to come back
+> with it.
 
 **11. Is Equipment one role or two?** *(Rev 2.2)* This diagram and `staff-spec.yaml` carry
 a single `EquipmentManager`. `equipment-management-plan.md` §2 is written around two

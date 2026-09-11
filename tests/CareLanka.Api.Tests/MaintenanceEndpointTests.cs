@@ -2,6 +2,12 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using CareLanka.Api.Data;
+using CareLanka.Api.Data.Entities.Patient;
+using CareLanka.Api.Data.Enums;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using PatientRecord = CareLanka.Api.Data.Entities.Patient.Patient;
 using Xunit;
 
 namespace CareLanka.Api.Tests;
@@ -174,6 +180,7 @@ public sealed class MaintenanceEndpointTests
             nurse_station_distance = 1
         }));
         var bedId = bed.RootElement.GetProperty("id").GetGuid();
+        await OccupyAsync(bedId);
 
         var response = await client.PostAsJsonAsync("/api/maintenance-schedules", new
         {
@@ -184,9 +191,7 @@ public sealed class MaintenanceEndpointTests
         });
         using var body = await ReadJsonAsync(response);
 
-        // STUBS.md row 3: the occupancy stub answers "occupied" on purpose, so this is the
-        // fail-safe path rather than a bug. Maintenance never evicts a patient, and the
-        // check happens before anything is written.
+        // Maintenance never evicts a patient, and the check happens before anything is written.
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal("cl_equ_003", body.RootElement.GetProperty("code").GetString());
 
@@ -217,6 +222,59 @@ public sealed class MaintenanceEndpointTests
         // Reporting a fault is open to any staff member, because the nurse at the bedside is
         // who finds it. Scheduling and closing the work is not.
         Assert.Equal(HttpStatusCode.Forbidden, read.StatusCode);
+    }
+
+    /// <summary>
+    /// Puts a live assignment on this bed, so Patient Management answers "occupied".
+    /// </summary>
+    /// <remarks>
+    /// This test needed no setup while the occupancy port was StubBedOccupancyPort, which
+    /// answered "occupied" for every bed ever created. BedOccupancyAdapter answers truthfully,
+    /// so an empty bed is now free and the booking is correctly allowed. Occupying the bed is
+    /// what the test always meant to assert.
+    ///
+    /// Written straight to Patient Management's table rather than through POST /assign-bed,
+    /// because this bed belongs to a random ward id these tests never registered and their
+    /// placement rules would rightly refuse it. What matters here is only that a live row exists.
+    /// </remarks>
+    private async Task OccupyAsync(Guid bedId)
+    {
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        var patient = new PatientRecord
+        {
+            Id = Guid.NewGuid(),
+            FullName = "Bed Occupant",
+            Nic = $"M{Guid.NewGuid():N}"[..12],
+            Gender = Gender.Male
+        };
+
+        var admission = new Admission
+        {
+            Id = Guid.NewGuid(),
+            PatientId = patient.Id,
+            Source = AdmissionSource.WalkIn,
+            Category = AdmissionCategory.Inpatient,
+            Urgency = AdmissionUrgency.Routine,
+            Status = AdmissionStatus.Admitted,
+            CategorySetByStaffMemberId = await db.StaffMembers.Select(staff => staff.Id).FirstAsync(),
+            CategorySetAt = DateTimeOffset.UtcNow,
+            MissingFields = []
+        };
+
+        db.Add(patient);
+        db.Add(admission);
+        db.Add(new BedAssignment
+        {
+            Id = Guid.NewGuid(),
+            AdmissionId = admission.Id,
+            BedId = bedId,
+            Status = AssignmentStatus.Occupied,
+            AssignedBy = AssignedBy.User
+        });
+
+        await db.SaveChangesAsync();
     }
 
     private record Item(Guid Id, string Name, string AssetTag);

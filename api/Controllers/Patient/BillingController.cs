@@ -130,8 +130,10 @@ public class BillingController : ControllerBase
     /// Includes visits with no bill row at all, which is most of them. A list of bills would
     /// have shown an empty screen and left the work invisible.
     ///
-    /// A discharged visit is never here: confirming a discharge needs `billing_settled`, and
-    /// only settling writes that.
+    /// A discharged visit is never on the default list: confirming a discharge needs
+    /// `billing_settled`, and only settling writes that. `includeSettled=true` is how you reach
+    /// one anyway — it widens the list to every visit that has a bill, in any status, which is
+    /// what a patient asking for another copy of their bill at the counter needs.
     /// </remarks>
     [Authorize(Policy = Policies.BillingDesk)]
     [HttpGet("billing/outstanding", Name = "listOutstandingBills")]
@@ -141,8 +143,9 @@ public class BillingController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
     public async Task<ActionResult<PagedResult<OutstandingBill>>> ListOutstandingBills(
         [FromQuery] string? search,
+        [FromQuery] bool includeSettled = false,
         [FromQuery][Range(1, int.MaxValue)] int page = 1,
         [FromQuery][Range(1, 100)] int pageSize = 20,
         CancellationToken ct = default)
-        => Ok(await _billing.ListOutstandingAsync(search, page, pageSize, ct));
+        => Ok(await _billing.ListOutstandingAsync(search, includeSettled, page, pageSize, ct));
 }

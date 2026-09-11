@@ -41,7 +41,18 @@ public interface IBillingService
     Task<BillResponse> SettleAsync(
         Guid admissionId, SettleBillRequest request, CancellationToken cancellationToken = default);
 
-    /// <summary>Reception's worklist: visits whose money has not been taken yet.</summary>
+    /// <summary>
+    /// Reception's worklist: visits whose money has not been taken yet.
+    /// </summary>
+    /// <param name="includeSettled">
+    /// Widens it to every visit that has a bill at all, whatever its status - including
+    /// discharged ones. This is how a paid bill is found again when the patient asks for
+    /// another copy at the counter, which the settled-only-disappears version made impossible.
+    /// </param>
     Task<PagedResult<OutstandingBill>> ListOutstandingAsync(
-        string? search, int page, int pageSize, CancellationToken cancellationToken = default);
+        string? search,
+        bool includeSettled,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
 }

@@ -37,6 +37,15 @@ public class OutstandingBill
     public string? BillNumber { get; set; }
 
     /// <summary>
+    /// Always false on the default list, and the reason <c>includeSettled</c> exists: a patient
+    /// who asks for their bill again at the counter has already paid.
+    /// </summary>
+    [Required]
+    public bool Settled { get; set; }
+
+    public DateTimeOffset? SettledAt { get; set; }
+
+    /// <summary>
     /// What the bill comes to as it stands - the prepared total, or what preparing it now would
     /// produce. Advisory: the bill screen is what actually writes the lines.
     /// </summary>

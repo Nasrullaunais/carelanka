@@ -1048,6 +1048,12 @@ export type OutstandingBill = {
      */
     bill_number?: string | null;
     /**
+     * Always false on the default list, and the reason `includeSettled` exists: a patient
+     * who asks for their bill again at the counter has already paid.
+     */
+    settled: boolean;
+    settled_at?: string | null;
+    /**
      * What the bill comes to as it stands - the prepared total, or what preparing it now would
      * produce. Advisory: the bill screen is what actually writes the lines.
      */
@@ -2640,6 +2646,7 @@ export type ListOutstandingBillsData = {
     path?: never;
     query?: {
         search?: string;
+        includeSettled?: boolean;
         page?: number;
         pageSize?: number;
     };

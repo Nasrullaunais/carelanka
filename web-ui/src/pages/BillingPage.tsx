@@ -41,11 +41,16 @@ export function BillingPage() {
 
   const [search, setSearch] = useState('');
   const [applied, setApplied] = useState('');
+  const [includeSettled, setIncludeSettled] = useState(false);
   const [selected, setSelected] = useState<OutstandingBill | null>(null);
 
   const outstanding = useQuery({
     ...listOutstandingBillsOptions({
-      query: { ...(applied ? { search: applied } : {}), pageSize: 50 },
+      query: {
+        ...(applied ? { search: applied } : {}),
+        ...(includeSettled ? { includeSettled: true } : {}),
+        pageSize: 50,
+      },
     }),
     enabled: canWork,
   });
@@ -63,18 +68,28 @@ export function BillingPage() {
   }
 
   const rows = outstanding.data?.items ?? [];
-  const owed = rows.reduce((sum, row) => sum + row.estimated_total, 0);
+
+  // Only the unpaid ones count towards what the hospital is owed. With the toggle on, the list
+  // is a search result rather than a worklist, and adding paid bills into the total would make
+  // the headline number jump for no reason anybody could explain.
+  const owed = rows
+    .filter((row) => !row.settled)
+    .reduce((sum, row) => sum + row.estimated_total, 0);
 
   return (
     <>
       <h1>Billing</h1>
       <p className="muted">
         Visits in the building whose money has not been taken yet. Most have no bill written
-        until you open one — a stay cannot be priced before it happens.
+        until you open one — a stay cannot be priced before it happens. Tick the box below to
+        find a bill somebody has already paid.
       </p>
 
       <div className="card">
-        <h2>Unpaid visits</h2>
+        {/* The heading follows the toggle. With paid bills in the list it is a search result,
+            not a worklist, and calling it "unpaid" while a row says "Paid" is the kind of small
+            contradiction that makes people distrust the whole screen. */}
+        <h2>{includeSettled ? 'Find a bill' : 'Unpaid visits'}</h2>
 
         <form
           className="row"
@@ -99,8 +114,31 @@ export function BillingPage() {
           </div>
         </form>
 
+        <div className="field">
+          <label htmlFor="include-settled">
+            <input
+              id="include-settled"
+              type="checkbox"
+              checked={includeSettled}
+              onChange={(event) => {
+                setIncludeSettled(event.target.checked);
+                setSelected(null);
+              }}
+            />{' '}
+            Include bills already paid
+          </label>
+          <p className="hint">
+            Off, this is the work still to do. On, it finds any visit that has a bill at all —
+            including patients who have paid and gone home — so you can print someone a second
+            copy when they ask at the counter.
+          </p>
+        </div>
+
         <div className="stats">
-          <Stat caption="Unpaid visits" value={String(rows.length)} />
+          <Stat
+            caption={includeSettled ? 'Bills found' : 'Unpaid visits'}
+            value={String(rows.length)}
+          />
           <Stat caption="Outstanding" value={money(owed)} />
         </div>
 
@@ -114,7 +152,11 @@ export function BillingPage() {
         ) : outstanding.isLoading ? (
           <p className="empty">Loading…</p>
         ) : rows.length === 0 ? (
-          <p className="empty">Nothing outstanding.</p>
+          <p className="empty">
+            {includeSettled
+              ? 'No bills match that search.'
+              : 'Nothing outstanding.'}
+          </p>
         ) : (
           <table>
             <thead>
@@ -124,6 +166,7 @@ export function BillingPage() {
                 <th>Care level</th>
                 <th>Bill</th>
                 <th>Comes to</th>
+                <th>Paid</th>
                 <th />
               </tr>
             </thead>
@@ -153,6 +196,20 @@ export function BillingPage() {
                   </td>
                   <td>{money(row.estimated_total, row.currency)}</td>
                   <td>
+                    {row.settled ? (
+                      <>
+                        <span className="badge status-available">Paid</span>
+                        {row.settled_at && (
+                          <div className="small muted">
+                            {new Date(row.settled_at).toLocaleDateString()}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <span className="muted">No</span>
+                    )}
+                  </td>
+                  <td>
                     <button
                       type="button"
                       className="secondary small"
@@ -172,8 +229,9 @@ export function BillingPage() {
         )}
 
         <p className="hint">
-          &ldquo;Comes to&rdquo; is what the bill would total if you opened it now — the stay is
-          still running, so it moves. Opening the bill is what writes the lines down.
+          &ldquo;Comes to&rdquo; is what the bill would total if you opened it now — for a visit
+          still running, that moves. Opening the bill is what writes the lines down; once it is
+          paid the figure is fixed.
         </p>
       </div>
 

@@ -384,6 +384,39 @@ public sealed class DischargeBillingEndpointTests
         Assert.Null(await OutstandingRowAsync(reception, visit.AdmissionId));
     }
 
+    [Fact]
+    public async Task A_settled_bill_can_still_be_found_and_reprinted_after_the_patient_has_gone_home()
+    {
+        var visit = await ReadyToGoAsync();
+
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        await nurse.PostAsJsonAsync($"/api/discharges/{visit.AdmissionId}/confirm", new { });
+
+        using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
+
+        // Gone from the work-still-to-do list, which is the whole point of that list.
+        Assert.Null(await OutstandingRowAsync(reception, visit.AdmissionId));
+
+        // Still reachable, which is the whole point of includeSettled. Without it a patient who
+        // asks for another copy of their bill at the counter cannot be served at all: they have
+        // paid, so they are off the outstanding list, and they have gone home, so they are not
+        // even an open visit any more. Found by walking the screen, not by a test.
+        var row = await OutstandingRowAsync(reception, visit.AdmissionId, includeSettled: true);
+
+        Assert.NotNull(row);
+        Assert.True(row!.Value.GetProperty("settled").GetBoolean());
+        Assert.Equal("discharged", row.Value.GetProperty("status").GetString());
+        Assert.Equal(9000m, row.Value.GetProperty("estimated_total").GetDecimal());
+        Assert.NotEqual(JsonValueKind.Null, row.Value.GetProperty("bill_number").ValueKind);
+
+        // And the bill itself still reads, which is what the print view renders.
+        using var bill = await ReadJsonAsync(
+            await reception.GetAsync($"/api/admissions/{visit.AdmissionId}/bill"));
+
+        Assert.True(bill.RootElement.GetProperty("settled").GetBoolean());
+        Assert.Equal(9000m, bill.RootElement.GetProperty("total").GetDecimal());
+    }
+
     // ---------- confirming ----------
 
     [Fact]
@@ -554,9 +587,11 @@ public sealed class DischargeBillingEndpointTests
             .Clone();
     }
 
-    private static async Task<JsonElement?> OutstandingRowAsync(HttpClient client, string admissionId)
+    private static async Task<JsonElement?> OutstandingRowAsync(
+        HttpClient client, string admissionId, bool includeSettled = false)
     {
-        var response = await client.GetAsync("/api/billing/outstanding?pageSize=100");
+        var response = await client.GetAsync(
+            $"/api/billing/outstanding?pageSize=100&includeSettled={includeSettled}");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         using var body = await ReadJsonAsync(response);

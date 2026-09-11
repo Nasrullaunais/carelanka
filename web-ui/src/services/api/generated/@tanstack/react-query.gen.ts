@@ -787,8 +787,10 @@ export const listOutstandingBillsQueryKey = (options?: Options<ListOutstandingBi
  * Includes visits with no bill row at all, which is most of them. A list of bills would
  * have shown an empty screen and left the work invisible.
  *
- * A discharged visit is never here: confirming a discharge needs `billing_settled`, and
- * only settling writes that.
+ * A discharged visit is never on the default list: confirming a discharge needs
+ * `billing_settled`, and only settling writes that. `includeSettled=true` is how you reach
+ * one anyway — it widens the list to every visit that has a bill, in any status, which is
+ * what a patient asking for another copy of their bill at the counter needs.
  */
 export const listOutstandingBillsOptions = (options?: Options<ListOutstandingBillsData>) => queryOptions<ListOutstandingBillsResponse, ListOutstandingBillsError, ListOutstandingBillsResponse, ReturnType<typeof listOutstandingBillsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -811,8 +813,10 @@ export const listOutstandingBillsInfiniteQueryKey = (options?: Options<ListOutst
  * Includes visits with no bill row at all, which is most of them. A list of bills would
  * have shown an empty screen and left the work invisible.
  *
- * A discharged visit is never here: confirming a discharge needs `billing_settled`, and
- * only settling writes that.
+ * A discharged visit is never on the default list: confirming a discharge needs
+ * `billing_settled`, and only settling writes that. `includeSettled=true` is how you reach
+ * one anyway — it widens the list to every visit that has a bill, in any status, which is
+ * what a patient asking for another copy of their bill at the counter needs.
  */
 export const listOutstandingBillsInfiniteOptions = (options?: Options<ListOutstandingBillsData>) => {
     const opts = infiniteQueryOptions<ListOutstandingBillsResponse, ListOutstandingBillsError, InfiniteData<ListOutstandingBillsResponse>, QueryKey<Options<ListOutstandingBillsData>>, number | Pick<QueryKey<Options<ListOutstandingBillsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(

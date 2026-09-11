@@ -1294,14 +1294,22 @@ paths:
         bill row at all, which is most of them - a list of bills would have shown an empty screen
         and left the work invisible.
 
-        A discharged visit is never here: confirming a discharge needs `billing_settled`, and
-        only settling writes that.
+        A discharged visit is never on the default list: confirming a discharge needs
+        `billing_settled`, and only settling writes that. `includeSettled` is how you reach one
+        anyway - a patient asking for another copy of their bill at the counter has already paid
+        and has usually already gone home.
       operationId: listOutstandingBills
       parameters:
         - name: search
           in: query
           description: Matches patient code, full name or NIC.
           schema: { type: string }
+        - name: includeSettled
+          in: query
+          description: >-
+            Widens the list to every visit that has a bill, in any status, discharged included.
+            The reprint path. Default false, which is the work-still-to-do list.
+          schema: { type: boolean, default: false }
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
       responses:
@@ -3109,7 +3117,7 @@ components:
       description: One row on reception's worklist - a visit whose money has not been taken yet.
       required:
         [admission_id, patient, status, admission_category, ward_name, bed_number,
-         estimated_total, currency]
+         settled, estimated_total, currency]
       properties:
         admission_id: { type: string, format: uuid }
         patient: { $ref: '#/components/schemas/PatientSummary' }
@@ -3122,6 +3130,10 @@ components:
           type: string
           nullable: true
           description: Null when nobody has prepared a bill for this visit yet.
+        settled:
+          type: boolean
+          description: Always false on the default list. Only `includeSettled=true` can return a paid one.
+        settled_at: { type: string, format: date-time, nullable: true }
         estimated_total:
           type: number
           format: double

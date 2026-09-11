@@ -135,7 +135,7 @@ public sealed class BillingService : IBillingService
         }, ct);
 
     public async Task<PagedResult<OutstandingBill>> ListOutstandingAsync(
-        string? search, int page, int pageSize, CancellationToken ct = default)
+        string? search, bool includeSettled, int page, int pageSize, CancellationToken ct = default)
     {
         var now = DateTimeOffset.UtcNow;
 
@@ -143,13 +143,28 @@ public sealed class BillingService : IBillingService
             .AsNoTracking()
             .Include(admission => admission.Patient)
             .Include(admission => admission.BedAssignments)
-            .Where(admission => StillOwing.Contains(admission.Status))
+            .AsQueryable();
 
-            // No bill row at all is the common case - a bill is written the first time somebody
-            // asks for one - so a list of bills would have shown reception an empty screen and
-            // left the work invisible.
-            .Where(admission => !_db.Bills.Any(bill =>
-                bill.AdmissionId == admission.Id && bill.SettledAt != null));
+        if (includeSettled)
+        {
+            // Every visit that has a bill at all, in any status, discharged included. This is
+            // the reprint path: a patient who asks for their bill again at the counter has
+            // already paid and has usually already gone home, so the default list - which is
+            // about work still to do - cannot reach them.
+            query = query.Where(admission =>
+                _db.Bills.Any(bill => bill.AdmissionId == admission.Id));
+        }
+        else
+        {
+            query = query
+                .Where(admission => StillOwing.Contains(admission.Status))
+
+                // No bill row at all is the common case - a bill is written the first time
+                // somebody asks for one - so a list of bills would have shown reception an
+                // empty screen and left the work invisible.
+                .Where(admission => !_db.Bills.Any(bill =>
+                    bill.AdmissionId == admission.Id && bill.SettledAt != null));
+        }
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -204,6 +219,8 @@ public sealed class BillingService : IBillingService
                 BedNumber = label.BedNumber,
                 AdmittedAt = admission.AdmittedAt,
                 BillNumber = bill?.BillNumber,
+                Settled = bill?.IsSettled ?? false,
+                SettledAt = bill?.SettledAt,
                 EstimatedTotal = decimal.Round(estimated, 2),
                 Currency = BillingRates.Currency
             });

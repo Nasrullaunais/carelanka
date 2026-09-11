@@ -35,6 +35,7 @@ public static class MessageCodes
             [MessageCode.PharmacyItemNameTaken] = "cl_equ_009",
             [MessageCode.InsufficientStock] = "cl_equ_010",
             [MessageCode.AdjustmentNeedsNote] = "cl_equ_011",
+            [MessageCode.MaintenanceNotCompletable] = "cl_equ_012",
             [MessageCode.WardNameTaken] = "cl_pat_001",
             [MessageCode.PatientNicTaken] = "cl_pat_002",
             [MessageCode.PatientAlreadyHasAccount] = "cl_pat_003",

@@ -639,3 +639,27 @@ tr.drawer > td {
     color: #000;
   }
 }
+
+
+/* ---------- field-level validation ---------- */
+
+/* Said at the field rather than after submit. A form that accepts what you typed and then
+   fails leaves you hunting for which of eight boxes was wrong. */
+.field-error {
+  font-size: 0.78rem;
+  color: var(--danger);
+  margin-top: 0.35rem;
+  line-height: 1.4;
+}
+
+/* The border carries it too, so the error is findable by scanning rather than by reading. */
+input[aria-invalid='true'],
+select[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+/* The counter and the hint sit tight under their own field, unlike a .hint closing a section. */
+.field > .hint,
+.field > .field-error {
+  margin-top: 0.35rem;
+}

@@ -8,10 +8,12 @@ import {
   updateDischargeChecklistMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
 import type { ChecklistItem, DischargeCandidate } from '../services/api/generated';
+import { BillPanel } from '../components/BillPanel';
 import { useSession } from '../services/auth/useSession';
 import {
   canConfirmDischargeOf,
   canTickChecklistItem,
+  canWorkBillingDesk,
   canWorkDischargeChecklist,
 } from '../types/permissions';
 import { admissionCategoryLabels } from '../types/patients';
@@ -20,7 +22,6 @@ import {
   checklistLabel,
   checklistOrder,
   mandatoryChecklistItems,
-  money,
 } from '../types/billing';
 
 // Sending a patient home. The left half is who could go; the right half is the one checklist
@@ -35,9 +36,14 @@ import {
 //   "Cleared by a doctor" — offering it and answering 403 is a worse screen than not offering
 //   it, because the nurse cannot tell a permission from a bug.
 //
-//   "Bill settled" has no button for anybody. It is written by settling the bill on the
-//   Billing screen and nowhere else, so the money and the tick are one fact rather than two
-//   that can drift apart.
+//   "Bill settled" has no button for anybody. It is written by settling the bill — which now
+//   happens on THIS page, in the middle of the flow — and nowhere else, so the money and the
+//   tick are one fact rather than two that can drift apart.
+//
+// The order down the page is the order the job is done in: a doctor says the patient is well
+// enough, the bill is filled in and paid, and then somebody sends them home. It used to be a
+// table of five boxes with the bill on a different screen, and "where does the billing happen?"
+// was a fair question to ask of it.
 
 export function DischargePage() {
   const session = useSession();
@@ -129,9 +135,8 @@ export function DischargePage() {
           )}
 
           <p className="hint">
-            &ldquo;Ready to go&rdquo; means every mandatory box is ticked — a doctor's clearance,
-            the medication, and the bill. Follow-up and transport are useful but do not hold
-            anybody up.
+            &ldquo;Ready to go&rdquo; means both required things are done — a doctor has cleared
+            the patient, and the bill is settled. Nothing else holds a discharge up.
           </p>
         </div>
       )}
@@ -270,7 +275,6 @@ function DischargeDetail({
 
   const visit = admission.data;
   const checklist = visit.discharge?.checklist ?? {};
-  const bill = visit.bill;
 
   // Fall back to the published vocabulary when no checklist row exists yet, so the boxes are
   // on screen before anybody has touched them. The server creates the rows on first tick.
@@ -279,8 +283,12 @@ function DischargeDetail({
     item: checklist[key] as ChecklistItem | undefined,
   }));
 
+  const cleared = items.find((entry) => entry.key === 'clinical_clearance');
+  const settled = items.find((entry) => entry.key === 'billing_settled');
+
   const allMandatoryTicked = visit.discharge?.all_mandatory_ticked ?? false;
   const mayConfirm = canConfirmDischargeOf(role, visit.admission_category);
+  const maySettle = canWorkBillingDesk(role);
   const isDischarged = visit.status === 'discharged';
 
   return (
@@ -297,102 +305,57 @@ function DischargeDetail({
 
       <dl className="detail-grid">
         <dt>Where</dt>
-        <dd>
-          {visit.bed_number ? `${visit.ward_name} · bed ${visit.bed_number}` : 'No bed'}
-        </dd>
+        <dd>{visit.bed_number ? `${visit.ward_name} · bed ${visit.bed_number}` : 'No bed'}</dd>
         <dt>Status</dt>
         <dd>{visit.status.replaceAll('_', ' ')}</dd>
-        <dt>Bill</dt>
+        <dt>Admitted by</dt>
         <dd>
-          {bill ? (
-            <>
-              {money(bill.total, bill.currency)} ·{' '}
-              {bill.settled ? (
-                <span className="badge status-available">Settled</span>
-              ) : (
-                <span className="badge severity-high">Not settled</span>
-              )}
-              <div className="small muted">{bill.bill_number}</div>
-            </>
-          ) : (
-            <span className="muted">Not prepared yet</span>
+          {visit.category_set_by_staff_name ?? <span className="muted">Unknown</span>}
+          {visit.category_set_at && (
+            <div className="small muted">
+              {new Date(visit.category_set_at).toLocaleString()}
+            </div>
           )}
         </dd>
       </dl>
 
-      <h3>Checklist</h3>
+      {/* ---------- 1. the wall ---------- */}
 
-      <table>
-        <thead>
-          <tr>
-            <th>Item</th>
-            <th>State</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {items.map(({ key, item }) => {
-            const ticked = item?.ticked ?? false;
-            const mandatory = item?.mandatory ?? mandatoryChecklistItems.has(key);
-            const mayTick = canTickChecklistItem(role, key) && !isDischarged;
+      <h3>1 · Cleared by a doctor</h3>
 
-            return (
-              <tr key={key}>
-                <td>
-                  <strong>{checklistLabel(key)}</strong>
-                  {mandatory && <span className="badge">Required</span>}
-                  <div className="small muted">{checklistHints[key]}</div>
-                </td>
-                <td>
-                  {ticked ? (
-                    <>
-                      <span className="badge status-available">Done</span>
-                      {item?.ticked_at && (
-                        <div className="small muted">
-                          {new Date(item.ticked_at).toLocaleString()}
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <span className="muted">Not yet</span>
-                  )}
-                </td>
-                <td>
-                  {/* Hidden, not disabled. A control the user cannot use reads as a broken
-                      screen; an absent one reads as somebody else's job. */}
-                  {mayTick && (
-                    <button
-                      type="button"
-                      className="secondary small"
-                      disabled={tick.isPending}
-                      onClick={() =>
-                        tick.mutate({
-                          path: { admissionId },
-                          body: { [key]: !ticked },
-                        })
-                      }
-                    >
-                      {ticked ? 'Untick' : 'Tick'}
-                    </button>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <ChecklistRow
+        item={cleared?.item}
+        itemKey="clinical_clearance"
+        mayTick={canTickChecklistItem(role, 'clinical_clearance') && !isDischarged}
+        pending={tick.isPending}
+        onToggle={(ticked) =>
+          tick.mutate({ path: { admissionId }, body: { clinical_clearance: ticked } })
+        }
+      />
 
-      <p className="hint">
-        Ticking the last required box moves this visit to <strong>ready for discharge</strong>;
-        unticking one moves it back. &ldquo;Bill settled&rdquo; is the exception — it is written
-        by settling the bill on the Billing screen, so the money and the box are one fact.
-      </p>
+      {/* ---------- 2. the money ---------- */}
 
-      <h3>Confirm</h3>
+      <h3>2 · The bill</h3>
+
+      <BillPanel admissionId={admissionId} canSettle={maySettle && !isDischarged} />
+
+      {/* ---------- 3. what settling wrote ---------- */}
+
+      <h3>3 · Bill settled</h3>
+
+      <ChecklistRow item={settled?.item} itemKey="billing_settled" mayTick={false} />
+
+      {/* ---------- 4. send them home ---------- */}
+
+      <h3>4 · Send them home</h3>
 
       {isDischarged ? (
         <p className="empty">
-          Already discharged{visit.discharged_at && ` at ${new Date(visit.discharged_at).toLocaleString()}`}.
+          Already discharged
+          {visit.discharged_at && ` at ${new Date(visit.discharged_at).toLocaleString()}`}
+          {visit.discharge?.confirmed_by_staff_name &&
+            ` by ${visit.discharge.confirmed_by_staff_name}`}
+          .
         </p>
       ) : !mayConfirm ? (
         <p className="empty">
@@ -431,12 +394,72 @@ function DischargeDetail({
 
           {!allMandatoryTicked && (
             <p className="hint">
-              Disabled until every required box is ticked. This ends the visit, frees the bed and
+              Disabled until steps 1 and 3 are both done. This ends the visit, frees the bed and
               sends someone home, so it does not happen halfway.
             </p>
           )}
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * One line of the checklist: what it is, whether it is done, and a button only if this person
+ * is the one who does it.
+ *
+ * Hidden rather than disabled. A control the user cannot use reads as a broken screen; an
+ * absent one reads as somebody else's job. `billing_settled` passes `mayTick: false` from every
+ * role, because settling the bill is what writes it and there is no second way.
+ */
+function ChecklistRow({
+  item,
+  itemKey,
+  mayTick,
+  pending,
+  onToggle,
+}: {
+  item: ChecklistItem | undefined;
+  itemKey: string;
+  mayTick: boolean;
+  pending?: boolean;
+  onToggle?: (ticked: boolean) => void;
+}) {
+  const ticked = item?.ticked ?? false;
+  const mandatory = item?.mandatory ?? mandatoryChecklistItems.has(itemKey);
+
+  return (
+    <div className="row" style={{ alignItems: 'flex-start' }}>
+      <div className="field">
+        <strong>{checklistLabel(itemKey)}</strong>
+        {mandatory && <span className="badge">Required</span>}
+        <div className="small muted">{checklistHints[itemKey]}</div>
+      </div>
+      <div className="field">
+        {ticked ? (
+          <>
+            <span className="badge status-available">Done</span>
+            <div className="small muted">
+              {item?.ticked_by_staff_name && <strong>{item.ticked_by_staff_name}</strong>}
+              {item?.ticked_at && ` · ${new Date(item.ticked_at).toLocaleString()}`}
+            </div>
+          </>
+        ) : (
+          <span className="muted">Not yet</span>
+        )}
+      </div>
+      <div style={{ alignSelf: 'center' }}>
+        {mayTick && onToggle && (
+          <button
+            type="button"
+            className="secondary small"
+            disabled={pending}
+            onClick={() => onToggle(!ticked)}
+          >
+            {ticked ? 'Untick' : 'Tick'}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

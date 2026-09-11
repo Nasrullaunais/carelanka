@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   assignBedManuallyMutation,
+  correctBedMutation,
   completeVisitMutation,
   getAdmissionOptions,
   getPatientOptions,
@@ -62,6 +63,10 @@ export function PatientsPage() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
 
+  // Which job the bed drawer is doing. Same panel, same rules, two different endpoints behind
+  // it: picking a first bed, or swapping one that was chosen by mistake.
+  const [bedMode, setBedMode] = useState<'assign' | 'correct'>('assign');
+
   // Gated rather than skipped: the hook cannot go behind the early return, and without this
   // an administrator opening the URL fires a request that 403s and toasts red.
   const canRead = canReadPatientDetails(role);
@@ -107,9 +112,10 @@ export function PatientsPage() {
     setOpenId((current) => (current === id ? null : id));
   }
 
-  function openAssign(id: string) {
+  function openAssign(id: string, mode: 'assign' | 'correct' = 'assign') {
     setOpenId(null);
-    setAssigningId((current) => (current === id ? null : id));
+    setBedMode(mode);
+    setAssigningId((current) => (current === id && bedMode === mode ? null : id));
   }
 
   return (
@@ -291,7 +297,11 @@ export function PatientsPage() {
                   {assigningId === row.id && (
                     <tr className="drawer">
                       <td colSpan={5}>
-                        <AssignBedPanel row={row} onDone={() => setAssigningId(null)} />
+                        <AssignBedPanel
+                          row={row}
+                          mode={bedMode}
+                          onDone={() => setAssigningId(null)}
+                        />
                       </td>
                     </tr>
                   )}
@@ -390,7 +400,7 @@ function RowActions({
   role: Parameters<typeof canAssignBed>[0];
   assigning: boolean;
   open: boolean;
-  onAssign: () => void;
+  onAssign: (mode: 'assign' | 'correct') => void;
   onDetails: () => void;
 }) {
   const invalidate = useBoardInvalidation();
@@ -425,10 +435,21 @@ function RowActions({
       )}
 
       {row.status === 'awaiting_bed' && row.requires_bed && canAssignBed(role) && (
-        <button type="button" onClick={onAssign}>
+        <button type="button" onClick={() => onAssign('assign')}>
           {assigning ? 'Cancel' : 'Assign bed'}
         </button>
       )}
+
+      {/* Beds get mis-clicked, and the alternative to fixing one is a ward board that is known
+          to be wrong - which is a board people stop reading. Offered from the moment they hold
+          a bed right up until they leave. */}
+      {(row.status === 'bed_ready' || row.status === 'admitted') &&
+        row.requires_bed &&
+        canAssignBed(role) && (
+          <button type="button" className="secondary" onClick={() => onAssign('correct')}>
+            {assigning ? 'Cancel' : 'Wrong bed?'}
+          </button>
+        )}
 
       {/* The hold lapses in thirty minutes, so this is the row with a clock on it. */}
       {row.status === 'bed_ready' && canMarkArrived(role) && (
@@ -473,10 +494,20 @@ function RowActions({
  * bed stands in, which is what hard rules H2 and H3 turn on; and the admission detail carries
  * `is_infectious`, which the board row does not.
  */
-function AssignBedPanel({ row, onDone }: { row: WorklistRow; onDone: () => void }) {
+function AssignBedPanel({
+  row,
+  onDone,
+  mode = 'assign',
+}: {
+  row: WorklistRow;
+  onDone: () => void;
+  /** `correct` swaps the bed they are already in for one that was chosen by mistake. */
+  mode?: 'assign' | 'correct';
+}) {
   const session = useSession();
   const invalidate = useBoardInvalidation();
   const [reason, setReason] = useState('');
+  const correcting = mode === 'correct';
 
   const visit = useQuery(getAdmissionOptions({ path: { id: row.id } }));
   const wards = useQuery(listWardsOptions({}));
@@ -488,18 +519,62 @@ function AssignBedPanel({ row, onDone }: { row: WorklistRow; onDone: () => void 
     listBedAvailabilityOptions({ query: { availability: 'free', pageSize: 100 } }),
   );
 
+  // A walk-in is standing at the desk, so choosing their bed and saying they are in it are
+  // the same act to the person doing it. Two buttons for it was one button too many - and until
+  // the second was pressed the thirty-minute hold could take the bed back from a patient lying
+  // in it.
+  //
+  // Two calls and not one, because the API keeps them separate on purpose: somebody expected
+  // later gets a bed kept EMPTY for them, and /arrive is what says they turned up. Chaining
+  // here rather than merging them server-side leaves that distinction where it belongs. If the
+  // second call fails the first still stands - the patient holds the bed, the button reappears,
+  // and the hold expiry is the backstop.
+  const alreadyHere = visit.data?.source === 'walk_in';
+
+  const arrive = useMutation({
+    ...markArrivedMutation(),
+    onSuccess: () => {
+      invalidate();
+      onDone();
+    },
+  });
+
   const assign = useMutation({
     ...assignBedManuallyMutation(),
     onSuccess: (assignment) => {
+      if (alreadyHere) {
+        toast.success(
+          `${row.patient.full_name} is in ${assignment.ward_name} · ${assignment.bed_number}.`,
+        );
+
+        arrive.mutate({ path: { id: row.id } });
+        return;
+      }
+
       toast.success(
-        `${row.patient.full_name} is holding ${assignment.ward_name} · ` +
-          `${assignment.bed_number}. The hold lapses if they are not marked as arrived.`,
+        `${assignment.ward_name} · ${assignment.bed_number} is being held for ` +
+          `${row.patient.full_name}. The hold lapses if they are not marked as arrived.`,
       );
 
       invalidate();
       onDone();
     },
   });
+
+  const correct = useMutation({
+    ...correctBedMutation(),
+    onSuccess: (assignment) => {
+      toast.success(
+        `Moved to ${assignment.ward_name} · ${assignment.bed_number}. ` +
+          'The old bed is free again and is charged for nothing.',
+      );
+
+      invalidate();
+      onDone();
+    },
+  });
+
+  const writing = assign.isPending || arrive.isPending || correct.isPending;
 
   const wardsById = new Map((wards.data ?? []).map((ward) => [ward.id, ward]));
 
@@ -523,11 +598,32 @@ function AssignBedPanel({ row, onDone }: { row: WorklistRow; onDone: () => void 
 
   return (
     <div className="drawer-body">
-      <h3>A bed for {row.patient.full_name}</h3>
+      <h3>
+        {correcting ? 'A different bed for' : 'A bed for'} {row.patient.full_name}
+      </h3>
       <p className="muted">
-        Choosing a bed holds it for thirty minutes. If the patient is not marked as arrived by
-        then the hold lapses on its own and the bed goes back to whoever needs it — nobody has
-        to undo anything.
+        {correcting ? (
+          <>
+            The bed they are in now goes back on the board and is{' '}
+            <strong>charged for nothing</strong>, because it was never really theirs. Their
+            status and the time they have been in a bed both carry over, so the bill is
+            unaffected.
+            <br />
+            This is for a bed picked by mistake. A patient genuinely moving ward is a transfer,
+            which is not built yet — using this for one would give a night&rsquo;s bed away.
+          </>
+        ) : alreadyHere ? (
+          <>
+            They are at the desk, so choosing a bed puts them straight into it — one act,
+            not two. Their stay, and the bill, start now.
+          </>
+        ) : (
+          <>
+            Choosing a bed holds it for thirty minutes. If the patient is not marked as arrived
+            by then the hold lapses on its own and the bed goes back to whoever needs it —
+            nobody has to undo anything.
+          </>
+        )}
       </p>
 
       {loading ? (
@@ -583,19 +679,27 @@ function AssignBedPanel({ row, onDone }: { row: WorklistRow; onDone: () => void 
                     {why === null ? (
                       <button
                         type="button"
-                        disabled={assign.isPending}
+                        disabled={writing}
                         onClick={() =>
-                          assign.mutate({
-                            path: { id: row.id },
-                            body: {
-                              bed_id: bed.id,
-                              override_reason:
-                                reason.trim().length > 0 ? reason.trim() : undefined,
-                            },
-                          })
+                          correcting
+                            ? correct.mutate({
+                                path: { id: row.id },
+                                body: {
+                                  bed_id: bed.id,
+                                  reason: reason.trim().length > 0 ? reason.trim() : undefined,
+                                },
+                              })
+                            : assign.mutate({
+                                path: { id: row.id },
+                                body: {
+                                  bed_id: bed.id,
+                                  override_reason:
+                                    reason.trim().length > 0 ? reason.trim() : undefined,
+                                },
+                              })
                         }
                       >
-                        Choose
+                        {correcting ? 'Move here' : alreadyHere ? 'Put them here' : 'Choose'}
                       </button>
                     ) : (
                       // Listed with its reason rather than hidden. A ward nurse looking at an
@@ -615,17 +719,22 @@ function AssignBedPanel({ row, onDone }: { row: WorklistRow; onDone: () => void 
           )}
 
           <div className="field" style={{ marginTop: '0.9rem' }}>
-            <label htmlFor="override-reason">Note (optional)</label>
+            <label htmlFor="override-reason">
+              {correcting ? 'What went wrong' : 'Note'} (optional)
+            </label>
             <input
               id="override-reason"
               value={reason}
               maxLength={500}
               onChange={(event) => setReason(event.target.value)}
-              placeholder="Why this bed rather than another"
+              placeholder={
+                correcting ? 'Picked the row above' : 'Why this bed rather than another'
+              }
             />
             <p className="hint">
-              Kept on the record. Once the bed agent is running this is where you say why you
-              ignored what it suggested.
+              {correcting
+                ? 'Kept on the record. Not required - somebody fixing their own mis-click ten seconds later has nothing useful to write.'
+                : 'Kept on the record. Once the bed agent is running this is where you say why you ignored what it suggested.'}
             </p>
           </div>
         </>
@@ -654,6 +763,12 @@ function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void 
     ...getAdmissionOptions({ path: { id: row.id } }),
     enabled: row.kind === 'visit',
   });
+
+  // The assignment they are in now. Released rows are kept as history, so "who put them here"
+  // is the first one that is NOT released, not simply the first one in the list.
+  const liveBed = visit.data?.bed_assignments?.find(
+    (assignment) => assignment.status !== 'released',
+  );
 
   return (
     <div className="drawer-body">
@@ -734,8 +849,14 @@ function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void 
                 <Field label="Record opened">
                   {visit.data.created_at ? localDateTime(visit.data.created_at) : null}
                 </Field>
+                <Field label="Admitted by" empty="Not recorded">
+                  {visit.data.category_set_by_staff_name}
+                </Field>
                 <Field label="Care level chosen">
                   {localDateTime(visit.data.category_set_at)}
+                </Field>
+                <Field label="Bed given by" empty="No bed assigned">
+                  {liveBed?.approved_by_staff_name ?? (liveBed ? 'Not recorded' : null)}
                 </Field>
                 <Field label="Expected">
                   {visit.data.expected_arrival

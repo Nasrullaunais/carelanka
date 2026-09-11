@@ -242,4 +242,12 @@
     <value>That line was worked out from the patient's stay and is not removable.</value>
     <comment>Only a line somebody typed can be deleted. A bed or fee line changes by preparing the bill again.</comment>
   </data>
+  <data name="cl_pat_028" xml:space="preserve">
+    <value>This patient is not in a bed, so there is no bed to correct.</value>
+    <comment>Correcting a bed swaps a live assignment for another. With no live assignment there is nothing to swap, and the patient should simply be assigned a bed instead.</comment>
+  </data>
+  <data name="cl_pat_029" xml:space="preserve">
+    <value>The patient is already in bed {0}.</value>
+    <comment>Correcting a bed to the one they are already in would release and re-take the same bed, losing the time they have been in it for no reason.</comment>
+  </data>
 </root>

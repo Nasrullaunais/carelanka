@@ -62,7 +62,9 @@ public static class MessageCodes
             [MessageCode.DischargeNeedsDutyManager] = "cl_pat_024",
             [MessageCode.BillingTickedBySettlingOnly] = "cl_pat_025",
             [MessageCode.BillAlreadySettled] = "cl_pat_026",
-            [MessageCode.BillLineNotRemovable] = "cl_pat_027"
+            [MessageCode.BillLineNotRemovable] = "cl_pat_027",
+            [MessageCode.BedNotAssigned] = "cl_pat_028",
+            [MessageCode.BedAlreadyTheirs] = "cl_pat_029"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

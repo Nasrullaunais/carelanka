@@ -657,6 +657,122 @@ public sealed class PatientEndpointTests
         Assert.Equal(HttpStatusCode.BadRequest, updated.StatusCode);
     }
 
+    // ---------- what a filled-in identifier has to look like ----------
+
+    [Theory]
+    [InlineData("199534501V")]       // old NIC, nine digits and a V
+    [InlineData("199534501x")]       // the X form, lower case
+    [InlineData("199745600321")]     // new NIC, twelve digits
+    [InlineData("N1234567")]         // a passport, for a patient who is not Sri Lankan
+    public async Task An_nic_in_any_form_the_desk_actually_sees_is_accepted(string nic)
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+
+        var created = await CreateAsync(client, "Valid Identifier", nic: nic);
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("20041109")]         // eight digits - a truncated NIC, not a passport
+    [InlineData("1997456003211")]    // thirteen digits - one too many
+    [InlineData("12345")]            // too short to be anything
+    [InlineData("1995 34501 V")]     // spaces, which nothing accepts
+    public async Task A_mistyped_nic_is_refused_rather_than_stored(string nic)
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+
+        var refused = await CreateAsync(client, "Mistyped Identifier", nic: nic);
+
+        // Every one of these is digits-only or punctuated, which is the whole reason the
+        // passport branch has to require a letter: without that condition a truncated NIC
+        // would be waved through as "a passport, presumably" and the check would catch nothing.
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_near_miss_nic_with_a_letter_in_it_is_accepted_and_that_is_the_known_cost()
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+
+        // 199534501Z is an old NIC with the wrong final letter - and also a perfectly ordinary
+        // passport number in some country, which is a distinction no regular expression can
+        // make. Accepting passports at all is what buys this, and the group chose that over
+        // registering every foreign patient against a temp reference. Written down as a test
+        // rather than left to be rediscovered as a bug.
+        var created = await CreateAsync(client, "Near Miss", nic: "199534501Z");
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+    }
+
+    [Fact]
+    public async Task An_arrival_with_no_papers_is_still_registered()
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+
+        // The rules say what a filled-in field has to look like. None of them make it required
+        // - an unconscious arrival has nothing to give and still has to reach a ward.
+        var created = await CreateAsync(client, "No Papers At All");
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("0771234567")]
+    [InlineData("+94771234567")]
+    public async Task A_phone_number_in_either_form_is_accepted(string phone)
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+
+        var created = await CreateAsync(client, "Reachable", nic: NewNic(), phone: phone);
+
+        // +94771234567 is the same number as 0771234567, read off a phone that has roamed.
+        // Refusing it teaches the desk to retype numbers, which is where digits get dropped.
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("077123456")]        // nine digits
+    [InlineData("07712345678")]      // eleven
+    [InlineData("771234567")]        // no leading zero
+    [InlineData("077-123-4567")]     // punctuation
+    public async Task A_phone_number_that_is_not_ten_digits_is_refused(string phone)
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+
+        var refused = await CreateAsync(client, "Unreachable", nic: NewNic(), phone: phone);
+
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_date_of_birth_in_the_future_or_a_mistyped_year_is_refused()
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+
+        var tomorrow = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1));
+
+        var future = await client.PostAsJsonAsync("/api/patients", new
+        {
+            full_name = "Not Born Yet",
+            nic = NewNic(),
+            gender = "male",
+            date_of_birth = tomorrow.ToString("yyyy-MM-dd")
+        });
+
+        // 1097 for 1997 - the mistake this is actually aimed at, rather than demographics.
+        var ancient = await client.PostAsJsonAsync("/api/patients", new
+        {
+            full_name = "Mistyped Year",
+            nic = NewNic(),
+            gender = "male",
+            date_of_birth = "1097-08-14"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, future.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, ancient.StatusCode);
+    }
+
     // ---------- helpers ----------
 
     private static Task<HttpResponseMessage> CreateAsync(

@@ -123,7 +123,141 @@ public sealed class BedAssignmentService : IBedAssignmentService
 
         var assignment = await WriteAsync(admissionId, bed, request.OverrideReason, ct);
 
-        return ToResponse(assignment, ward!.Name, bed.BedNumber);
+        return await ToResponseAsync(assignment, ward!.Name, bed.BedNumber, ct);
+    }
+
+    public async Task<BedAssignmentResponse> CorrectBedAsync(
+        Guid admissionId, CorrectBedRequest request, CancellationToken ct = default)
+    {
+        // Not null: [ApiController] has already returned a 400 for a body that left it out.
+        var bedId = request.BedId!.Value;
+
+        var bed = await _beds.FindBedAsync(bedId, ct)
+            ?? throw new NotFoundException("Bed", bedId);
+
+        var ward = await FindWardAsync(bed.WardId, ct);
+
+        var admission = await _db.Admissions
+            .AsNoTracking()
+            .Include(candidate => candidate.Patient)
+            .FirstOrDefaultAsync(candidate => candidate.Id == admissionId, ct)
+            ?? throw new NotFoundException("Admission", admissionId);
+
+        // Every rule the original placement had to pass, asked again on the replacement.
+        // Correcting a bed is not a side door to a bed this person may not choose.
+        EnsureMayApprove(admission.Category, ward);
+
+        BedPlacementRules.EnsurePlaceable(
+            admission.Category, admission.Patient.Gender, admission.IsInfectious, ward, bed);
+
+        var assignment = await SwapAsync(admissionId, bed, request.Reason, ct);
+
+        return await ToResponseAsync(assignment, ward!.Name, bed.BedNumber, ct);
+    }
+
+    /// <summary>
+    /// Closes the live assignment as a correction and opens a new one on the chosen bed, in one
+    /// transaction, with the admission row locked.
+    /// </summary>
+    /// <remarks>
+    /// <b>Two saves, not one, and that is the whole difficulty here.</b>
+    /// <c>ux_bed_assignments_live_admission</c> allows one live row per admission and
+    /// <c>ux_bed_assignments_live_bed</c> one per bed. PostgreSQL checks a unique index per
+    /// statement, and a unique index cannot be deferred - so if EF happens to emit the INSERT
+    /// of the new row before the UPDATE that releases the old one, the correction dies on an
+    /// index whose rule was never actually broken. Releasing first, in its own
+    /// <c>SaveChanges</c>, makes the order ours rather than EF's.
+    ///
+    /// <b>The status is carried over, not restarted.</b> A patient already in a bed stays
+    /// <c>admitted</c> and the new row keeps the original <c>OccupiedAt</c>, so the bill is
+    /// priced from when they actually got into a bed and not from when somebody noticed the
+    /// paperwork was wrong. Correcting the bed of a patient who has not arrived leaves the hold
+    /// a hold, with its original expiry.
+    /// </remarks>
+    private async Task<BedAssignmentEntity> SwapAsync(
+        Guid admissionId,
+        RegisteredBed bed,
+        string? reason,
+        CancellationToken ct)
+    {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+
+        await _db.Database.ExecuteSqlAsync(
+            $"SELECT id FROM admissions WHERE id = {admissionId} FOR UPDATE", ct);
+
+        var admission = await _db.Admissions
+            .Include(candidate => candidate.BedAssignments)
+            .FirstOrDefaultAsync(candidate => candidate.Id == admissionId, ct)
+            ?? throw new NotFoundException("Admission", admissionId);
+
+        var live = admission.BedAssignments
+            .FirstOrDefault(assignment => assignment.Status != AssignmentStatus.Released)
+
+            // Not a 404: the admission is real and so is the bed. There is simply nothing to
+            // correct, and what this caller wants is /assign-bed.
+            ?? throw new ConflictException(MessageCode.BedNotAssigned);
+
+        if (live.BedId == bed.Id)
+        {
+            throw new ConflictException(MessageCode.BedAlreadyTheirs, bed.BedNumber);
+        }
+
+        var now = DateTimeOffset.UtcNow;
+
+        // Carried before the old row is touched, because the new row inherits both.
+        var wasOccupied = live.Status == AssignmentStatus.Occupied;
+        var occupiedAt = live.OccupiedAt;
+        var reservedUntil = live.ReservedUntil;
+
+        live.Status = AssignmentStatus.Released;
+        live.ReservedUntil = null;
+        live.ReleasedAt = now;
+        live.ReleaseReason = ReleaseReason.Corrected;
+
+        // The old row gives up its slot in both indexes here, and only here.
+        await _db.SaveChangesAsync(ct);
+
+        await ReleaseLapsedHoldsAsync(bed.Id, now, ct);
+
+        var assignment = new BedAssignmentEntity
+        {
+            Id = Guid.NewGuid(),
+            AdmissionId = admissionId,
+            BedId = bed.Id,
+            Status = wasOccupied ? AssignmentStatus.Occupied : AssignmentStatus.Reserved,
+            ReservedUntil = wasOccupied ? null : reservedUntil,
+            OccupiedAt = occupiedAt,
+
+            // A human corrected a human's mistake. Nothing about a correction is the agent's,
+            // and recording one as the agent's would poison the report that measures it.
+            AssignedBy = AssignedBy.User,
+            WorkflowId = null,
+
+            IsDowngrade = live.IsDowngrade,
+
+            ApprovedByStaffMemberId = _currentUser.Id,
+            ApprovedAt = now,
+            OverrideReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim()
+        };
+
+        _db.BedAssignments.Add(assignment);
+
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException exception)
+            when (IsUniqueViolation(exception, BedAssignmentConfiguration.LiveBedUniqueIndex))
+        {
+            // Somebody else took the replacement bed in the gap. The index is the only thing
+            // that can know, and the transaction rolls back - so the patient keeps the wrong
+            // bed rather than ending up in none at all, which is the safer of the two.
+            throw new ConflictException(MessageCode.BedAlreadyClaimed, bed.BedNumber);
+        }
+
+        await transaction.CommitAsync(ct);
+
+        return assignment;
     }
 
     public async Task<BedOccupancyStatus> GetBedOccupancyAsync(Guid bedId, CancellationToken ct = default)
@@ -434,8 +568,19 @@ public sealed class BedAssignmentService : IBedAssignmentService
             _ => availability == BedAvailability.OutOfService
         };
 
+    private async Task<BedAssignmentResponse> ToResponseAsync(
+        BedAssignmentEntity assignment, string wardName, string bedNumber, CancellationToken ct)
+    {
+        var names = await StaffNames.ByIdAsync(_db, [assignment.ApprovedByStaffMemberId], ct);
+
+        return ToResponse(assignment, wardName, bedNumber, names);
+    }
+
     private static BedAssignmentResponse ToResponse(
-        BedAssignmentEntity assignment, string wardName, string bedNumber)
+        BedAssignmentEntity assignment,
+        string wardName,
+        string bedNumber,
+        IReadOnlyDictionary<Guid, string> names)
         => new()
         {
             Id = assignment.Id,
@@ -449,6 +594,7 @@ public sealed class BedAssignmentService : IBedAssignmentService
             WorkflowId = assignment.WorkflowId,
             IsDowngrade = assignment.IsDowngrade,
             ApprovedByStaffId = assignment.ApprovedByStaffMemberId,
+            ApprovedByStaffName = StaffNames.Lookup(names, assignment.ApprovedByStaffMemberId),
             ApprovedAt = assignment.ApprovedAt,
             OverrideReason = assignment.OverrideReason,
             ReleasedAt = assignment.ReleasedAt,

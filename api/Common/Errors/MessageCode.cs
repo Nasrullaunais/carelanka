@@ -112,5 +112,10 @@ public enum MessageCode
 
     BillAlreadySettled,
 
-    BillLineNotRemovable
+    BillLineNotRemovable,
+
+    // Correcting a bed that was chosen by mistake.
+    BedNotAssigned,
+
+    BedAlreadyTheirs
 }

@@ -982,6 +982,57 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
+  /admissions/{id}/correct-bed:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Bed Assignment]
+      summary: Move a patient into a different bed because the first was a mistake
+      description: |
+        Roles: WardNurse for matching beds, DutyManager for ICU, HDU and downgrades - the same
+        permission and the same hard rules as assigning a bed in the first place. Correcting a
+        bed is not a side door to a bed this person may not choose.
+
+        Beds get mis-clicked. Without this the only ways out are cancelling a live visit or
+        leaving a patient recorded in a bed somebody else is standing next to, and a ward board
+        that is known to be wrong stops being read at all.
+
+        **A correction, not a transfer.** The assignment it replaces is closed with
+        `release_reason: corrected` and is charged for nothing, on the grounds that it never
+        really happened. That is right for a mis-click and wrong for a patient who genuinely
+        spent a night in one ward and moved to another - every stay bills a minimum of one day,
+        so using this for a real move gives a night away. A real transfer needs its own path
+        and does not exist yet.
+
+        The admission's status does not move. A patient already in a bed stays `admitted` and
+        the replacement inherits the original `occupied_at`, so the bill is priced from when
+        they actually got into a bed rather than from when the paperwork was fixed. Correcting
+        the bed of a patient who has not arrived leaves the hold a hold, with its original
+        expiry.
+      operationId: correctBed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CorrectBedRequest' }
+      responses:
+        '200':
+          description: Corrected. The new assignment, with the status the old one had.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BedAssignment' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: >-
+            The patient holds no bed (`cl_pat_028`), is already in the bed asked for
+            (`cl_pat_029`), or the replacement is taken or breaks a hard rule.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
   # ------------------------------------------------------------------
   # Discharge
   # ------------------------------------------------------------------
@@ -1038,7 +1089,6 @@ paths:
         - `clinical_clearance` - Doctor only. This is the wall. Without it nothing flags and
           nothing discharges, and no automated process can ever set it. The `StaffMember` record
           itself belongs to Staff Management; here we only check the role claim on the JWT.
-        - `medication_issued`, `follow_up_recorded`, `transport_arranged` - WardNurse
         - `billing_settled` - **refused here, by everybody.** Settle the bill instead
           (`POST /admissions/{admissionId}/bill/settle`, GeneralStaff / HospitalAdministrator /
           DutyManager), which is the only thing that writes this box. Sending the key is 409
@@ -2355,7 +2405,13 @@ components:
 
     ReleaseReason:
       type: string
-      enum: [discharged, hold_expired, cancelled, transferred, rejected]
+      description: |
+        Why a bed assignment was closed. `corrected` and `transferred` look alike and bill
+        differently: a correction is a bed chosen by mistake and is charged for nothing, a
+        transfer is a patient who genuinely moved and is charged for the nights they were
+        there. Getting the two the wrong way round either gives a night away or bills one
+        twice.
+      enum: [discharged, hold_expired, cancelled, transferred, rejected, corrected]
 
     BedAgentOutcome:
       type: string
@@ -2414,13 +2470,49 @@ components:
           type: string
           maxLength: 20
           nullable: true
-          description: Omit for an unidentified arrival; the server then generates a temp_reference.
+          pattern: '^(\d{9}[VvXx]|\d{12}|(?=.*[A-Za-z])[A-Za-z0-9]{6,15})$'
+          description: |
+            A Sri Lankan NIC in either form, or a passport number. Omit for an unidentified
+            arrival; the server then generates a temp_reference.
+
+            Three alternatives: the old NIC (nine digits and a V or an X), the new NIC (twelve
+            digits), or a passport (six to fifteen letters and digits, **with at least one
+            letter**). That last condition is what makes the check worth having - without it
+            every mistyped NIC would be waved through as "a passport, presumably".
+
+            The known cost: `199534501Z` is an old NIC with the wrong final letter, and also a
+            perfectly ordinary passport number in some country. No pattern can tell those
+            apart, so it is accepted. Passport numbering is not standardised, and a wide range
+            beats registering every foreign patient against a temp reference.
+          example: '199745600321'
         gender: { $ref: '#/components/schemas/Gender' }
-        date_of_birth: { type: string, format: date, nullable: true }
-        phone: { type: string, maxLength: 20, nullable: true }
+        date_of_birth:
+          type: string
+          format: date
+          nullable: true
+          description: >-
+            Refused if it is in the future or more than 120 years ago. Aimed at 1097 for 1997,
+            not at demographics.
+        phone:
+          type: string
+          maxLength: 20
+          nullable: true
+          pattern: '^(0\d{9}|\+94\d{9})$'
+          description: >-
+            Ten digits from a leading zero, or the +94 form, which is the same number as read
+            off a phone that has roamed.
+          example: '0771234567'
         address: { type: string, maxLength: 300, nullable: true }
-        emergency_contact_name: { type: string, maxLength: 200, nullable: true }
-        emergency_contact_phone: { type: string, maxLength: 20, nullable: true }
+        emergency_contact_name:
+          type: string
+          maxLength: 200
+          nullable: true
+          description: The name of the person to ring, not the relationship and not the number.
+        emergency_contact_phone:
+          type: string
+          maxLength: 20
+          nullable: true
+          pattern: '^(0\d{9}|\+94\d{9})$' 
 
     UpdatePatientRequest:
       allOf:
@@ -2568,6 +2660,24 @@ components:
             because forcing a sentence out of a nurse in a hurry produces "n/a" and nothing
             else. Stored on the admission and published back as `cancel_note`.
 
+    CorrectBedRequest:
+      type: object
+      required: [bed_id]
+      properties:
+        bed_id:
+          type: string
+          format: uuid
+          description: The bed they should have been given, from GET /bed-availability.
+        reason:
+          type: string
+          maxLength: 500
+          nullable: true
+          description: >-
+            What went wrong, for whoever reads the trail later. Optional and not a rule - a
+            nurse fixing their own mis-click ten seconds later has nothing useful to write, and
+            demanding a sentence trains everybody to type "correction", which is the field's
+            own name.
+
     AssignBedRequest:
       type: object
       required: [bed_id]
@@ -2625,6 +2735,14 @@ components:
           properties:
             dispatch_id: { type: string, nullable: true }
             category_set_by_staff_id: { type: string, format: uuid }
+            category_set_by_staff_name:
+              type: string
+              nullable: true
+              description: >-
+                Who admitted this patient and chose their care level. For a walk-in that is
+                whoever was on the desk, and it is the closest thing this component stores to
+                "who did the intake" - there are no created_by columns anywhere, by group
+                convention. Absent when no staff member matches the id.
             category_set_at: { type: string, format: date-time }
             is_infectious: { type: boolean }
             reported_by_user_id:
@@ -2866,6 +2984,7 @@ components:
               type: boolean
               description: True when the bed is below the requested category. Always needs DutyManager approval.
             approved_by_staff_id: { type: string, format: uuid, nullable: true }
+            approved_by_staff_name: { type: string, nullable: true }
             approved_at: { type: string, format: date-time, nullable: true }
             override_reason: { type: string, nullable: true }
             released_at: { type: string, format: date-time, nullable: true }
@@ -2951,20 +3070,22 @@ components:
       description: |
         Any subset. A key left out is not touched; a key set to `false` is unticked.
 
-        Each key is role-gated: `clinical_clearance` is Doctor-only, the rest are the ward
-        nurse's - except `billing_settled`, which is refused from everybody. Settling the bill
+        Which leaves exactly one key anybody can actually send. `clinical_clearance` is
+        Doctor-only and `billing_settled` is refused from everybody, because settling the bill
         writes that one.
+
+        It was five keys until 2026-09-11. `medication_issued`, `follow_up_recorded` and
+        `transport_arranged` were removed: each recorded that something had been given to or
+        arranged for the patient, which is what a line on the bill records, with a price
+        against it. Two records of one fact is how they come to disagree.
       properties:
         clinical_clearance: { type: boolean, nullable: true }
-        medication_issued: { type: boolean, nullable: true }
         billing_settled:
           type: boolean
           nullable: true
           description: >-
             Published so the vocabulary is honest, and always refused with 409 `cl_pat_025`.
             Settle the bill instead - POST /admissions/{admissionId}/bill/settle.
-        follow_up_recorded: { type: boolean, nullable: true }
-        transport_arranged: { type: boolean, nullable: true }
 
     ChecklistItem:
       type: object
@@ -2972,6 +3093,13 @@ components:
       properties:
         ticked: { type: boolean }
         ticked_by_staff_id: { type: string, format: uuid, nullable: true }
+        ticked_by_staff_name:
+          type: string
+          nullable: true
+          description: >-
+            Sent beside the id, never instead of it. A name is not unique and people change
+            theirs; the id is what an audit turns on. Absent when no staff member matches.
+          example: Nimal Silva
         ticked_at: { type: string, format: date-time, nullable: true }
         mandatory: { type: boolean }
 
@@ -2989,6 +3117,7 @@ components:
               additionalProperties: { $ref: '#/components/schemas/ChecklistItem' }
             all_mandatory_ticked: { type: boolean }
             confirmed_by_staff_id: { type: string, format: uuid, nullable: true }
+            confirmed_by_staff_name: { type: string, nullable: true }
             confirmed_at: { type: string, format: date-time, nullable: true }
             summary_note: { type: string, nullable: true }
 
@@ -3087,6 +3216,7 @@ components:
             what ticks that box and the box cannot be ticked any other way.
         settled_at: { type: string, format: date-time, nullable: true }
         settled_by_staff_id: { type: string, format: uuid, nullable: true }
+        settled_by_staff_name: { type: string, nullable: true }
         settlement_note:
           type: string
           nullable: true

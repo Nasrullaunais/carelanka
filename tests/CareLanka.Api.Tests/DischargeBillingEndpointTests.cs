@@ -50,22 +50,19 @@ public sealed class DischargeBillingEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, byManager.StatusCode);
         Assert.Equal(HttpStatusCode.OK, byDoctor.StatusCode);
 
+        // The code the nurse's refusal carries. It used to be asserted by a test about the
+        // ward nurse's own boxes, and there are no ward nurse boxes any more.
+        using var refusal = await ReadJsonAsync(byNurse);
+        Assert.Equal("cl_pat_022", refusal.RootElement.GetProperty("code").GetString());
+
         using var body = await ReadJsonAsync(byDoctor);
         Assert.True(Checklist(body, "clinical_clearance").GetProperty("ticked").GetBoolean());
-    }
 
-    [Fact]
-    public async Task A_doctor_does_not_do_the_ward_nurses_boxes()
-    {
-        var visit = await AdmittedVisitAsync();
-
-        using var doctor = await ClientAsync(ApiApplication.DoctorEmail);
-        var refused = await TickAsync(doctor, visit.AdmissionId, new { medication_issued = true });
-
-        using var problem = await ReadJsonAsync(refused);
-
-        Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
-        Assert.Equal("cl_pat_022", problem.RootElement.GetProperty("code").GetString());
+        // The doctor's name travels with the tick. An audit trail of bare ids is one nobody
+        // reads, and this box is the one somebody will be asked to account for.
+        Assert.Equal(
+            "Doctor Test",
+            Checklist(body, "clinical_clearance").GetProperty("ticked_by_staff_name").GetString());
     }
 
     [Fact]
@@ -99,14 +96,12 @@ public sealed class DischargeBillingEndpointTests
     {
         var visit = await AdmittedVisitAsync();
 
-        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         using var doctor = await ClientAsync(ApiApplication.DoctorEmail);
         using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
 
-        await TickAsync(nurse, visit.AdmissionId, new { medication_issued = true });
         await TickAsync(doctor, visit.AdmissionId, new { clinical_clearance = true });
 
-        // Two of three. Still admitted, because the bill is the third.
+        // One of two. Still admitted, because the bill is the other one.
         Assert.Equal("admitted", await StatusAsync(visit.AdmissionId));
 
         var settled = await reception.PostAsJsonAsync(
@@ -121,13 +116,13 @@ public sealed class DischargeBillingEndpointTests
     {
         var visit = await ReadyToGoAsync();
 
-        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
-        var untick = await TickAsync(nurse, visit.AdmissionId, new { medication_issued = false });
+        using var doctor = await ClientAsync(ApiApplication.DoctorEmail);
+        var untick = await TickAsync(doctor, visit.AdmissionId, new { clinical_clearance = false });
 
         Assert.Equal(HttpStatusCode.OK, untick.StatusCode);
 
-        // ready_for_discharge -> admitted is a published edge for exactly this: a nurse who
-        // realises the medication was not issued after all.
+        // ready_for_discharge -> admitted is a published edge for exactly this: a doctor who
+        // looks again and is no longer happy to let the patient go.
         Assert.Equal("admitted", await StatusAsync(visit.AdmissionId));
 
         using var body = await ReadJsonAsync(untick);
@@ -140,14 +135,15 @@ public sealed class DischargeBillingEndpointTests
         var visit = await AdmittedVisitAsync();
 
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
-        await TickAsync(nurse, visit.AdmissionId, new { medication_issued = true });
+        using var doctor = await ClientAsync(ApiApplication.DoctorEmail);
+        await TickAsync(doctor, visit.AdmissionId, new { clinical_clearance = true });
 
         var row = await CandidateAsync(nurse, visit.AdmissionId);
 
         // A patient with one box left is the person a nurse is looking for, so they are on the
         // list with the reason attached, not filtered off it.
         Assert.Equal(
-            new[] { "billing_settled", "clinical_clearance" },
+            new[] { "billing_settled" },
             row.GetProperty("outstanding_items").EnumerateArray()
                 .Select(item => item.GetString())
                 .ToArray());
@@ -427,7 +423,6 @@ public sealed class DischargeBillingEndpointTests
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         using var doctor = await ClientAsync(ApiApplication.DoctorEmail);
 
-        await TickAsync(nurse, visit.AdmissionId, new { medication_issued = true });
         await TickAsync(doctor, visit.AdmissionId, new { clinical_clearance = true });
 
         var refused = await nurse.PostAsJsonAsync(
@@ -544,11 +539,9 @@ public sealed class DischargeBillingEndpointTests
     {
         var visit = await AdmittedVisitAsync(wardType, category);
 
-        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         using var doctor = await ClientAsync(ApiApplication.DoctorEmail);
         using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
 
-        await TickAsync(nurse, visit.AdmissionId, new { medication_issued = true });
         await TickAsync(doctor, visit.AdmissionId, new { clinical_clearance = true });
 
         var settled = await reception.PostAsJsonAsync(

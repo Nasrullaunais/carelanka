@@ -1129,13 +1129,18 @@ the flag and the boxes cannot disagree. How far through their stay the patient i
 **Table:** `discharge_checklist_items` — **built.** `Patient_AddAdmission`.
 **Constraint:** UNIQUE(DischargeId, ItemType)
 
-*(Rev 2.9)* **Five item types, and each row says whether it blocks.** The spec's
-`ChecklistUpdateRequest` publishes `clinical_clearance`, `medication_issued`,
-`billing_settled`, `follow_up_recorded` and `transport_arranged`, and its `ChecklistItem`
-carries a `mandatory` flag — a follow-up appointment that has not been booked should not
-hold a well patient in a bed, but an unpaid bill might. `ticked` is not a column:
-`TickedAt IS NOT NULL` is the answer, so a boolean and a timestamp can never contradict
-each other.
+*(Rev 3.0)* **Two item types, and each row still says whether it blocks.** The spec's
+`ChecklistUpdateRequest` publishes `clinical_clearance` and `billing_settled`, and its
+`ChecklistItem` keeps its `mandatory` flag even though both are currently mandatory — whether
+a box holds up a discharge is data, not a rule spread through three endpoints. `ticked` is not
+a column: `TickedAt IS NOT NULL` is the answer, so a boolean and a timestamp can never
+contradict each other.
+
+*(Rev 2.9 had five.)* `medication_issued`, `follow_up_recorded` and `transport_arranged` came
+off on 2026-09-11 — each recorded that something had been given to or arranged for the
+patient, which is what a line on the bill records, with a price against it. See
+`patient-management-plan.md` §6.1. The migration deletes those rows before narrowing the
+CHECK constraint, because a CHECK cannot be added to a table that already breaks it.
 **Note:** *(Rev 2)* The patient flow's step 7 is "staff tick a checklist (doctor's
 clearance, medicine, bill settled) → all ticked → shows on a 'ready to go' list". A single
 A single readiness enum could not represent independently tickable items or record
@@ -1711,15 +1716,18 @@ Readiness is `all_mandatory_ticked`, computed from the `DischargeChecklistItem` 
 read. A stored copy of a value derived from other rows is a value that can drift, and this
 one had no transition rules to justify storing it — unlike `AdmissionStatus`, which does.
 
-### DischargeChecklistItemType *(Rev 2 — new; Rev 2.9 — aligned to the spec)*
+### DischargeChecklistItemType *(Rev 2 — new; Rev 2.9 — aligned to the spec; Rev 3.0 — cut to two)*
 ```
-ClinicalClearance, MedicationIssued, BillingSettled, FollowUpRecorded, TransportArranged
+ClinicalClearance, BillingSettled
 ```
-Serialized as `clinical_clearance`, `medication_issued`, `billing_settled`,
-`follow_up_recorded`, `transport_arranged` — the five keys `ChecklistUpdateRequest`
-publishes. Rev 2's three were a shorter list under different names for the same boxes;
-the committed spec wins. `ClinicalClearance` is the Doctor-only one, enforced in the
-service against the role claim, not in the schema.
+Serialized as `clinical_clearance` and `billing_settled` — the two keys
+`ChecklistUpdateRequest` publishes. `ClinicalClearance` is the Doctor-only one, enforced in
+the service against the role claim, not in the schema. `BillingSettled` is nobody's: settling
+the bill writes it, in the same transaction as the money.
+
+Rev 2.9's other three — `MedicationIssued`, `FollowUpRecorded`, `TransportArranged` — were
+removed on 2026-09-11. They duplicated what the bill records, and are charge templates on the
+bill now. `Patient_SimplifyDischargeChecklist` deletes the rows and narrows the CHECK.
 
 ### AgentType
 ```

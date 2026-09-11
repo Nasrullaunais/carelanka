@@ -13,6 +13,13 @@ public class Admission : AdmissionSummary
     [Required]
     public Guid CategorySetByStaffId { get; set; }
 
+    /// <summary>
+    /// Who admitted this patient and chose their care level. For a walk-in that is whoever was
+    /// on the desk, which is the closest thing this component stores to "who did the intake" -
+    /// there are no created_by columns anywhere, by group convention.
+    /// </summary>
+    public string? CategorySetByStaffName { get; set; }
+
     [Required]
     public DateTimeOffset CategorySetAt { get; set; }
 

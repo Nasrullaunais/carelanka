@@ -59,7 +59,10 @@ public static class MessageCodes
             [MessageCode.VisitNeedsNoBed] = "cl_pat_021",
             [MessageCode.ChecklistItemWrongRole] = "cl_pat_022",
             [MessageCode.DischargeChecklistIncomplete] = "cl_pat_023",
-            [MessageCode.DischargeNeedsDutyManager] = "cl_pat_024",
+            // cl_pat_024 is retired, not free. It meant "sending an icu/hdu patient home is the
+            // duty manager's decision" and the rule was removed on 2026-09-12 - the checklist is
+            // the gate now. Never reuse the number: a client still branching on it would silently
+            // match whatever took its place.
             [MessageCode.BillingTickedBySettlingOnly] = "cl_pat_025",
             [MessageCode.BillAlreadySettled] = "cl_pat_026",
             [MessageCode.BillLineNotRemovable] = "cl_pat_027",

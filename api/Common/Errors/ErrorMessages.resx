@@ -179,8 +179,8 @@
     <comment>Intensive and high-dependency care are the duty manager's to authorise, wherever the admission comes from.</comment>
   </data>
   <data name="cl_pat_012" xml:space="preserve">
-    <value>Only a duty manager may assign a bed in {0} (ward type {1}).</value>
-    <comment>Intensive care and high dependency are the duty manager's wherever the request comes from. patient-management-plan.md 5.2.</comment>
+    <value>{0} (ward type {1}) gives more intensive care than the {2} level this patient was assessed at. Only a duty manager may approve that.</value>
+    <comment>The step up. Revised 2026-09-12: this used to refuse every ICU and HDU ward regardless of the patient, which stopped a nurse bedding an ICU patient in the ICU bed that matched them. The rule is now the match alone - see patient-management-plan.md 5.2.</comment>
   </data>
   <data name="cl_pat_013" xml:space="preserve">
     <value>{0} (ward type {1}) gives less intensive care than the {2} level this patient was assessed at. Only a duty manager may approve a downgrade.</value>
@@ -225,10 +225,6 @@
   <data name="cl_pat_023" xml:space="preserve">
     <value>This discharge is not ready: {0} still outstanding.</value>
     <comment>Every mandatory checklist item has to be ticked before a patient can be sent home.</comment>
-  </data>
-  <data name="cl_pat_024" xml:space="preserve">
-    <value>Sending an {0} patient home is the duty manager's decision.</value>
-    <comment>A ward nurse confirms outpatient, day_case and inpatient discharges. ICU and HDU are one rung higher.</comment>
   </data>
   <data name="cl_pat_025" xml:space="preserve">
     <value>Tick billing_settled by settling the bill, not by hand.</value>

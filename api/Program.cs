@@ -206,6 +206,15 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
 
+    // The other end of the same visit, and the same three roles. Reception settles the bill and
+    // hands over the paperwork, so it finishes the discharge rather than fetching a nurse for
+    // the last click. The care-level narrowing that used to sit in DischargeService is gone -
+    // the checklist is the gate, and its clinical box is a doctor's alone.
+    options.AddPolicy(Policies.DischargeConfirmer, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.GeneralStaff),
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager)));
+
     // Reads the candidate list and ticks boxes. Which boxes is the service's business, not the
     // route's - clinical_clearance is the doctor's alone and billing_settled is nobody's.
     options.AddPolicy(Policies.DischargeChecklist, policy => policy.RequireRole(

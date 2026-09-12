@@ -281,6 +281,8 @@ body too:
   hers and has not been touched.
 - **Two new policies**, `DischargeChecklist` (nurse, doctor, manager) and `BillingDesk` (general
   staff, administrator, duty manager). Confirming a discharge reuses `AdmissionEditor`.
+  **Superseded 2026-09-12** — confirming is now its own `DischargeConfirmer` (general staff,
+  nurse, duty manager) and the ICU/HDU narrowing is gone. See the addendum below.
 - **Four existing tests changed because the rule changed**, not to go green: equipment
   management can now read the admissions board, the administrator can too, the worklist refusal
   test moved to ambulance crew, and `AdmissionDetail` now serves `discharge` and `bill` instead
@@ -322,6 +324,9 @@ Eight things settled while building it:
   manager's (`cl_pat_012`); so is any downgrade (`cl_pat_013`), checked first because a downgrade
   into HDU is both and "this is a downgrade" is the more specific complaint. It cannot be an
   `[Authorize]` policy because it depends on which bed the body names — same shape as check-in.
+  **Revised 2026-09-12 — ICU and HDU are no longer special.** The split is now the mismatch
+  alone: `cl_pat_012` is the step *up*, `cl_pat_013` the step down, and a matching ward is
+  anybody's. See the addendum below.
 - **One message code per hard rule, not one for "that bed will not work".** `cl_pat_014` taken,
   `015` out of service, `016` too acute, `017` gender policy, `018` isolation, `019` retired
   ward. A nurse who is told which rule refused them knows which other bed to try.
@@ -346,9 +351,21 @@ the group as `integration_of_functions.md` §11.14.
   `correct-bed`, replacing `AdmissionEditor` there. Reception beds the walk-in it just
   registered. `AdmissionEditor` is untouched, so reception still cannot cancel a visit or
   confirm a discharge.
+- **The role rule is now the mismatch and nothing else.** `NeedsDutyManager` no longer names
+  `icu`/`hdu` at all: it is `IsDowngrade || IsMoreAcuteThanNeeded`. An ICU bed for an ICU patient
+  is a match, so a nurse or reception may make it — the old rule made the hospital's most urgent
+  admission wait for a signature on the obvious. Scarcity is an argument against giving an ICU
+  bed to somebody who does *not* need one, which is the step-up case, and that is still gated.
 - **The duty manager may place a patient in a ward more acute than assessed**, which H2 used to
-  refuse for everybody. Needed no new role rule: every more-acute ward is `icu` or `hdu`, so
-  `NeedsDutyManager` already covered it.
+  refuse for everybody. That is the step-up gate above, and the one place `cl_pat_012` now fires.
+- **Discharge went the same way, and for the same reason.** New `Policies.DischargeConfirmer`
+  (general staff, ward nurse, duty manager) on `POST /discharges/{id}/confirm`, and
+  `DischargeService.EnsureMayConfirm` deleted outright — ICU and HDU discharges are no longer
+  the duty manager's. **`cl_pat_024` is retired and its number must never be reused.** The gate
+  was always the checklist: `clinical_clearance` is a doctor's alone and `billing_settled` is
+  written only by settling the bill, so nobody goes home un-cleared or unpaid whoever confirms
+  it. A duty manager signing after the doctor had already cleared the patient was delay, not
+  safety. Reception is on the list because it settles the bill on that same screen.
 - **New hard rule H6 and code `cl_pat_030`** — a `pediatric` ward takes only patients under 18.
   One-directional, and an unrecorded date of birth counts as an adult. No override, because like
   the gender policy it is a property of the ward.

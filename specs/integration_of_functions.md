@@ -789,15 +789,45 @@ home. `AdmissionEditor` is untouched and is still ward nurse and duty manager.
 **Widening the route did not widen which bed anyone may choose.** That reads the ward the
 chosen bed stands in, which is in the request body and cannot be a route policy, so
 `BedAssignmentService.EnsureMayApprove` still answers 403 (`cl_pat_012` / `cl_pat_013`) for
-anything off the care level's own path. Verified live: doctor, administrator, equipment manager
-and ambulance crew are all still refused the route outright.
+anything off the care level's own path — see change 2. Verified live: doctor, administrator,
+equipment manager and ambulance crew are all still refused the route outright.
 
-**2. Hard rule H2 upward is now the duty manager's to overrule.** It used to be a 409 for
-everybody. An overflowing general ward next to an empty intensive-care bed is a real night in a
-real hospital, and the person who carries the cost of that empty bed is the person who should be
-able to spend one. Nurses and reception see a 403 instead, because every ward more acute than a
-patient needs is an `icu` or `hdu` ward and those were already theirs to refuse. The React bed
-picker colours these buttons amber so an off-path bed cannot be taken by accident.
+**2. The role split is now the care-level match, and nothing else.** `NeedsDutyManager` no
+longer names `icu` or `hdu` at all — it is "does this ward give the care this patient was
+assessed as needing, yes or no".
+
+- **A matching ward is anybody's** who may place a patient, **intensive care included.** An ICU
+  bed for an ICU patient is the right bed; making a nurse find a duty manager for it delayed the
+  most urgent admission in the hospital for a decision nobody had to make. The scarcity argument
+  is about not giving an ICU bed to somebody who does *not* need one — which is the step up, and
+  that is still gated.
+- **A mismatched ward is the duty manager's alone**, in both directions: a downgrade
+  (`cl_pat_013`) or a ward more acute than assessed (`cl_pat_012`). Hard rule H2 upward used to
+  be a flat 409 for everybody; the duty manager may now overrule it, for the night when the
+  general ward is full and there is an empty ICU bed. The React bed picker colours these buttons
+  **amber** so an off-path bed is never taken by accident.
+
+**For the viva, since §5.2 used to call the ICU rule a high-impact approval gate.** The **AI
+gate is untouched** — every agent proposal is still an `AgentProposedChange` a human approves,
+and no agent places anybody. What changed is only which human approves a routine, correctly
+matched placement. The surviving role gate is the off-path bed, which is where the judgement
+call actually is.
+
+**2b. Discharge went the same way.** New `Policies.DischargeConfirmer` — general staff, ward
+nurse, duty manager — on `POST /discharges/{admissionId}/confirm`, replacing `AdmissionEditor`
+there, and the ICU/HDU narrowing inside `DischargeService` is **deleted**. Any of those three
+now confirms a discharge at any care level.
+
+**`cl_pat_024` is retired. Do not reuse the number** — a client still branching on it would
+silently match whatever took its place. It is the only code this project has ever withdrawn.
+
+**Why this is not a loosening of patient safety.** The gate was never the role; it is the
+checklist. `ConfirmAsync` refuses with `cl_pat_023` unless both mandatory items are ticked, and
+`clinical_clearance` is **a doctor's alone** — no other role and no automated process can set
+it. So no patient goes home without a doctor having cleared them, whoever presses confirm. The
+duty manager's signature came *after* the doctor's and added a second wait, not a second
+judgement. Reception is on the list because it settles the bill and hands over the discharge
+document on that same screen.
 
 **3. New hard rule H6, and a new code `cl_pat_030`.** A `pediatric` ward admits only patients
 under 18. One-directional — a child is not confined to one, or a child needing intensive care

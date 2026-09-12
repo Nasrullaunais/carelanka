@@ -97,8 +97,8 @@ export function BillingSettingsPage() {
       <>
         <h1>Billing settings</h1>
         <p className="empty">
-          Your role cannot set prices. Only the hospital administrator can — deciding what the
-          hospital charges is a different job from taking the money.
+          Your role cannot set prices. Only the hospital administrator can — setting rates is a
+          separate responsibility from taking payment.
         </p>
       </>
     );
@@ -159,7 +159,7 @@ export function BillingSettingsPage() {
     <>
       <h1>Billing settings</h1>
       <p className="muted">
-        What the hospital charges, in {currency}. Every expense, in every kind of ward.
+        What the hospital charges, in {currency}. Every expense, for every type of ward.
       </p>
 
       <div className="card">
@@ -170,9 +170,9 @@ export function BillingSettingsPage() {
           as it was.
         </p>
         <p className="muted">
-          Only <strong>Bed, per day</strong> is applied on its own — worked out from the ward
-          the patient is actually lying in. The rest are the suggested prices that appear in
-          reception&rsquo;s box when they type a charge, and reception can still overwrite one.
+          Only <strong>Bed, per day</strong> is applied automatically, from the ward the patient
+          is in. The rest are default prices that appear when reception enters a charge, and
+          reception can still change them.
         </p>
       </div>
 
@@ -192,9 +192,8 @@ export function BillingSettingsPage() {
           <div className="card">
             <h2>Admission fee</h2>
             <p className="muted">
-              The one-off charge for opening a visit. Priced by the care level a clinician
-              recorded, not by the ward — it is charged before anybody knows which ward the
-              patient will end up in.
+              The one-off charge for opening an admission. Priced by the care level a clinician
+              recorded, not by the ward — it is charged before the ward is known.
             </p>
 
             <table>
@@ -251,7 +250,7 @@ export function BillingSettingsPage() {
                           <strong>{expenseLabel(expense.expense_key)}</strong>
                           <br />
                           <span className="muted">
-                            {expenseHints[expense.expense_key] ?? 'Typed at the desk.'}
+                            {expenseHints[expense.expense_key] ?? 'Entered at the desk.'}
                           </span>
                         </td>
                         <td>
@@ -289,8 +288,8 @@ export function BillingSettingsPage() {
 
             {pendingCount > 0 && !save.isPending && (
               <p className="hint">
-                {pendingCount} box{pendingCount === 1 ? '' : 'es'} changed and not yet saved.
-                Each one says what it was before.
+                {pendingCount} price{pendingCount === 1 ? '' : 's'} changed and not yet saved.
+                Each shows its previous value.
               </p>
             )}
           </div>
@@ -344,11 +343,11 @@ function PriceBox({
       {invalid ? (
         <p className="field-error">A price is a number, and never below zero.</p>
       ) : dirty ? (
-        <p className="hint">Was {money(original, currency)}.</p>
+        <p className="hint">Previously {money(original, currency)}.</p>
       ) : unpriceable && original === 0 ? (
         // Zero here does not mean free, it means we cannot guess. Saying so stops somebody
         // "fixing" it to a number that would then be wrong on every bill.
-        <p className="hint">No suggestion — the desk types this one off the slip.</p>
+        <p className="hint">No default — reception enters this from the slip.</p>
       ) : null}
     </div>
   );

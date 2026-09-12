@@ -138,9 +138,8 @@ function CreateWardCard({
     <div className="card">
       <h2>Create a ward</h2>
       <p className="muted" style={{ marginBottom: '0.9rem' }}>
-        Gender policy is a property of the ward, not a rule the bed agent bends under
-        pressure. ICU and pediatric wards are mixed because real intensive care units are
-        open bays.
+        Gender policy is a property of the ward and the bed agent cannot override it. ICU and
+        pediatric wards are mixed, because intensive care units are open bays.
       </p>
 
       <form onSubmit={submit}>

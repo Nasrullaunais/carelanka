@@ -104,8 +104,6 @@ public enum MessageCode
 
     DischargeChecklistIncomplete,
 
-    DischargeNeedsDutyManager,
-
     // Billing. billing_settled is not a box anyone ticks by hand - settling the bill is what
     // writes it, so the money and the checklist cannot disagree.
     BillingTickedBySettlingOnly,

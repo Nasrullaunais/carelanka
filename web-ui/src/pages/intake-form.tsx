@@ -173,7 +173,7 @@ export function Counter({ value, limit }: { value: string; limit: number }) {
 
   return (
     <p className={left === 0 ? 'field-error' : 'hint'}>
-      {left === 0 ? `That is the limit - ${limit} characters.` : `${left} characters left.`}
+      {left === 0 ? `Limit reached - ${limit} characters.` : `${left} characters left.`}
     </p>
   );
 }
@@ -280,12 +280,12 @@ export function PatientFields({
           {problems.dateOfBirth && <p className="field-error">{problems.dateOfBirth}</p>}
           {problems.dateIncomplete && !problems.dateOfBirth && (
             <p className="hint">
-              {identified ? 'Pick all three.' : 'Pick all three, or leave all three blank.'}
+              {identified ? 'Select all three.' : 'Select all three, or leave all three blank.'}
             </p>
           )}
           {problems.missing.dateOfBirth && (
             <p className="field-error">
-              Required. The ward a patient can be given depends on their age.
+              Required. Ward eligibility depends on the patient's age.
             </p>
           )}
         </div>
@@ -327,7 +327,7 @@ export function PatientFields({
           {/* "Emergency contact" sitting next to "Emergency contact phone" reads as though the
               first one also wants a number. Say what goes in the box. */}
           <label htmlFor={`${idPrefix}-contact-name`}>
-            Who to ring in an emergency {identified && <span className="muted">(optional)</span>}
+            Emergency contact name {identified && <span className="muted">(optional)</span>}
           </label>
           <input
             id={`${idPrefix}-contact-name`}
@@ -336,11 +336,11 @@ export function PatientFields({
             placeholder="Nilanthi Gunawardena"
             onChange={(event) => set('contactName', event.target.value)}
           />
-          <p className="hint">Their name.</p>
+          <p className="hint">Who to call in an emergency.</p>
         </div>
         <div className="field">
           <label htmlFor={`${idPrefix}-contact-phone`}>
-            Their phone number {identified && <span className="muted">(optional)</span>}
+            Emergency contact phone {identified && <span className="muted">(optional)</span>}
           </label>
           <input
             id={`${idPrefix}-contact-phone`}

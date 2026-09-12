@@ -96,7 +96,7 @@ export function BillPanel({
   const prepare = useMutation({
     ...prepareAdmissionBillMutation(),
     onSuccess: (result) => {
-      toast.success(`Bill ${result.bill_number} worked out.`);
+      toast.success(`Bill ${result.bill_number} prepared.`);
       void refreshAll();
     },
   });
@@ -121,7 +121,7 @@ export function BillPanel({
   const settle = useMutation({
     ...settleBillMutation(),
     onSuccess: (result) => {
-      toast.success(`Bill ${result.bill_number} settled. The checklist box is ticked.`);
+      toast.success(`Bill ${result.bill_number} settled. Bill settled is now ticked.`);
       void refreshAll();
     },
   });
@@ -136,7 +136,7 @@ export function BillPanel({
     return (
       <>
         <p className="empty">
-          No bill has been opened for this visit yet.
+          No bill has been raised for this admission yet.
           {canSettle && (
             <>
               <br />
@@ -146,15 +146,15 @@ export function BillPanel({
                 disabled={prepare.isPending}
                 onClick={() => prepare.mutate({ path: { admissionId } })}
               >
-                {prepare.isPending ? 'Working it out…' : 'Open the bill'}
+                {prepare.isPending ? 'Preparing…' : 'Raise the bill'}
               </button>
             </>
           )}
         </p>
         <p className="hint">
           {canSettle
-            ? "That reads the visit — the care level and every bed the patient has been in — and writes the lines down at today's rates."
-            : 'Reception opens the bill and takes the money. Nothing on the ward is held up by it until the discharge itself.'}
+            ? "This reads the admission — the care level and every bed used — and adds those lines at today's rates."
+            : 'Reception raises the bill and takes payment. Nothing on the ward is held up until the discharge itself.'}
         </p>
       </>
     );
@@ -185,14 +185,13 @@ export function BillPanel({
         <p className="hint">
           Settled{data.settled_at && ` at ${new Date(data.settled_at).toLocaleString()}`}
           {data.settled_by_staff_name && ` by ${data.settled_by_staff_name}`}
-          {data.settlement_note && ` — ${data.settlement_note}`}. A settled bill is frozen: it is
-          the piece of paper the patient was handed, so nothing may be added to it afterwards.
+          {data.settlement_note && ` — ${data.settlement_note}`}. A settled bill is final and
+          cannot be changed.
         </p>
       ) : !canSettle ? (
         <p className="hint">
-          <strong>{money(data.total, data.currency)} outstanding.</strong> Taking money is
-          reception's job, not the ward's — this is here so you can see where the discharge has
-          got to, not so you can settle it.
+          <strong>{money(data.total, data.currency)} outstanding.</strong> Payment is taken by
+          reception. This is shown so the ward can see how far the discharge has got.
         </p>
       ) : (
         <>
@@ -214,7 +213,7 @@ export function BillPanel({
           >
             <div className="row">
               <div className="field">
-                <label htmlFor="charge-kind">What for</label>
+                <label htmlFor="charge-kind">Charge type</label>
                 <select
                   id="charge-kind"
                   value={templateKey}
@@ -228,7 +227,7 @@ export function BillPanel({
                 </select>
               </div>
               <div className="field">
-                <label htmlFor="charge-description">How it reads on the bill</label>
+                <label htmlFor="charge-description">Description on the bill</label>
                 <input
                   id="charge-description"
                   required
@@ -244,20 +243,20 @@ export function BillPanel({
                   id="charge-quantity"
                   required
                   type="number"
-                  min="0.01"
-                  step="0.01"
+                  min="1"
+                  step="1"
                   value={chargeQuantity}
                   onChange={(event) => setChargeQuantity(event.target.value)}
                 />
               </div>
               <div className="field">
-                <label htmlFor="charge-price">Each (LKR)</label>
+                <label htmlFor="charge-price">Unit price (LKR)</label>
                 <input
                   id="charge-price"
                   required
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="any"
                   value={unitPrice}
                   placeholder="3500"
                   onChange={(event) => setUnitPrice(event.target.value)}
@@ -276,16 +275,15 @@ export function BillPanel({
             {template.unitPrice !== null && (
               <>
                 {' '}
-                <strong>The price shown is a suggestion and it is invented</strong> — no real
-                price list was given to us. Change it to whatever was actually charged.
+                The price shown is a default. Change it to the amount actually charged.
               </>
             )}
           </p>
 
           <p className="hint">
-            Treatments, meals, scans and medicines are typed here because nothing in the system
-            records them against a visit. Bed time and care level are the only things it can
-            price on its own, and it does — those lines are already above.
+            Treatments, meals, tests and medicines are entered by hand — nothing in the system
+            records them against an admission. The admission fee and bed charges are worked out
+            automatically and are already listed above.
           </p>
 
           <h3>Settle</h3>
@@ -293,7 +291,7 @@ export function BillPanel({
           <div className="row">
             <div className="field">
               <label htmlFor="settlement-note">
-                How it was paid <span className="muted">(optional)</span>
+                Payment method <span className="muted">(optional)</span>
               </label>
               <input
                 id="settlement-note"
@@ -314,15 +312,15 @@ export function BillPanel({
                   })
                 }
               >
-                {settle.isPending ? 'Settling…' : `Take ${money(data.total, data.currency)}`}
+                {settle.isPending ? 'Settling…' : `Settle ${money(data.total, data.currency)}`}
               </button>
             </div>
           </div>
 
           <p className="hint">
-            Settling freezes the bill and ticks <strong>Bill settled</strong> on the discharge
-            checklist, in one go. That box cannot be ticked any other way, so the money and the
-            ward's checklist can never disagree.
+            Settling makes the bill final and ticks <strong>Bill settled</strong> on the
+            discharge checklist. That item cannot be ticked any other way, so the payment and
+            the checklist can never disagree.
           </p>
 
           <div className="actions" style={{ marginTop: '0.9rem' }}>
@@ -350,9 +348,9 @@ export function BillPanel({
           </div>
 
           <p className="hint">
-            Recalculating replaces the fee and bed lines with today's numbers and leaves typed
-            charges alone. Only a typed charge can be removed — a bed line would come straight
-            back.
+            Recalculating replaces the admission fee and bed lines with today's rates and leaves
+            entered charges alone. Only an entered charge can be removed — a bed line would come
+            straight back.
           </p>
         </>
       )}
@@ -411,7 +409,7 @@ export function BillPrintout({
           <dd>{bill.bill_number}</dd>
         </div>
         <div>
-          <dt>Raised</dt>
+          <dt>Raised on</dt>
           <dd>
             {new Date(bill.created_at).toLocaleString()}
             {/* Who issued it. A bill handed across a counter names the person who wrote it,
@@ -442,9 +440,9 @@ export function BillPrintout({
       <table>
         <thead>
           <tr>
-            <th>What for</th>
-            <th>How many</th>
-            <th>Each</th>
+            <th>Description</th>
+            <th>Quantity</th>
+            <th>Unit price</th>
             <th>Amount</th>
           </tr>
         </thead>

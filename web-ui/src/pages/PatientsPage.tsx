@@ -123,8 +123,8 @@ export function PatientsPage() {
     <>
       <h1>Patients</h1>
       <p className="muted">
-        Everyone the hospital is dealing with right now — booked in and not here yet, waiting
-        for a bed, in a bed, or done. Open a row for their intake details and times.
+        Everyone currently in the hospital's care: expected, waiting for a bed, in a bed, or
+        finished. Open a row for the patient's details and times.
       </p>
 
       <div className="card">
@@ -177,15 +177,16 @@ export function PatientsPage() {
               Include finished visits
             </label>
             <p className="hint">
-              Off, this is today's business. On, it adds everyone already discharged or
-              cancelled as well.
+              Also lists visits that are already discharged or cancelled.
             </p>
           </div>
         </form>
       </div>
 
       <div className="card">
-        <h2>{includeFinished ? 'Everyone, including finished' : 'On the board now'}</h2>
+        <h2>
+          {includeFinished ? 'All patients, including finished visits' : 'Current patients'}
+        </h2>
 
         {board.isLoading ? (
           <p className="empty">Loading…</p>
@@ -202,7 +203,7 @@ export function PatientsPage() {
           <p className="empty">
             {submitted
               ? `Nobody on the board matches “${submitted}”.`
-              : 'Nobody is booked in or in the hospital.'}
+              : 'No patients are expected or admitted.'}
           </p>
         ) : (
           <table>
@@ -409,7 +410,7 @@ function RowActions({
   const arrive = useMutation({
     ...markArrivedMutation(),
     onSuccess: () => {
-      toast.success(`${row.patient.full_name} is in the bed.`);
+      toast.success(`${row.patient.full_name} marked as arrived.`);
       invalidate();
     },
   });
@@ -417,7 +418,7 @@ function RowActions({
   const complete = useMutation({
     ...completeVisitMutation(),
     onSuccess: () => {
-      toast.success(`${row.patient.full_name} is finished and can go home.`);
+      toast.success(`${row.patient.full_name}'s visit is complete.`);
       invalidate();
     },
   });
@@ -448,7 +449,7 @@ function RowActions({
         row.requires_bed &&
         canAssignBed(role) && (
           <button type="button" className="secondary" onClick={() => onAssign('correct')}>
-            {assigning ? 'Cancel' : 'Wrong bed?'}
+            {assigning ? 'Cancel' : 'Change bed'}
           </button>
         )}
 
@@ -459,7 +460,7 @@ function RowActions({
           disabled={pending}
           onClick={() => arrive.mutate({ path: { id: row.id } })}
         >
-          {arrive.isPending ? 'Saving…' : 'They are in the bed'}
+          {arrive.isPending ? 'Saving…' : 'Mark arrived'}
         </button>
       )}
 
@@ -472,7 +473,7 @@ function RowActions({
           disabled={pending}
           onClick={() => complete.mutate({ path: { id: row.id } })}
         >
-          {complete.isPending ? 'Saving…' : 'Mark completed'}
+          {complete.isPending ? 'Saving…' : 'Complete visit'}
         </button>
       )}{' '}
       <button type="button" className="secondary" onClick={onDetails}>
@@ -563,8 +564,8 @@ function AssignBedPanel({
       }
 
       toast.success(
-        `${assignment.ward_name} · ${assignment.bed_number} is being held for ` +
-          `${row.patient.full_name}. The hold lapses if they are not marked as arrived.`,
+        `${assignment.ward_name} · ${assignment.bed_number} is held for ` +
+          `${row.patient.full_name}. The hold expires if they are not marked as arrived.`,
       );
 
       invalidate();
@@ -577,7 +578,7 @@ function AssignBedPanel({
     onSuccess: (assignment) => {
       toast.success(
         `Moved to ${assignment.ward_name} · ${assignment.bed_number}. ` +
-          'The old bed is free again and is charged for nothing.',
+          'The previous bed is free again and is not charged for.',
       );
 
       invalidate();
@@ -616,29 +617,26 @@ function AssignBedPanel({
   return (
     <div className="drawer-body">
       <h3>
-        {correcting ? 'A different bed for' : 'A bed for'} {row.patient.full_name}
+        {correcting ? 'Change bed for' : 'Assign a bed to'} {row.patient.full_name}
       </h3>
       <p className="muted">
         {correcting ? (
           <>
-            The bed they are in now goes back on the board and is{' '}
-            <strong>charged for nothing</strong>, because it was never really theirs. Their
-            status and the time they have been in a bed both carry over, so the bill is
-            unaffected.
+            The current bed returns to the board and is <strong>not charged for</strong>. The
+            patient&rsquo;s status and time in a bed carry over, so the bill is unaffected.
             <br />
-            This is for a bed picked by mistake. A patient genuinely moving ward is a transfer,
-            which is not built yet — using this for one would give a night&rsquo;s bed away.
+            For a bed chosen by mistake only. A genuine ward transfer is not built yet, and
+            using this instead would write off a night&rsquo;s bed charge.
           </>
         ) : alreadyHere ? (
           <>
-            They are at the desk, so choosing a bed puts them straight into it — one act,
-            not two. Their stay, and the bill, start now.
+            The patient is at the desk, so assigning a bed admits them to it directly. Their
+            stay and their bill start now.
           </>
         ) : (
           <>
-            Choosing a bed holds it for thirty minutes, and a ward nurse confirms they are in
-            it. If nobody does by then the hold lapses on its own and the bed goes back to
-            whoever needs it — nobody has to undo anything.
+            Assigning a bed holds it for thirty minutes, and a ward nurse confirms the patient
+            is in it. If nobody does, the hold expires on its own and the bed is released.
           </>
         )}
       </p>
@@ -662,8 +660,8 @@ function AssignBedPanel({
         </div>
       ) : candidates.length === 0 ? (
         <p className="empty">
-          No bed in the hospital is free. The patient stays waiting for one — that is a real
-          answer, not a failure, and it is the duty manager's to solve.
+          No beds are free. The patient stays on the waiting list until one is — capacity is the
+          duty manager's to resolve.
         </p>
       ) : (
         <>
@@ -672,7 +670,7 @@ function AssignBedPanel({
               <tr>
                 <th>Bed</th>
                 <th>Ward</th>
-                <th>Takes</th>
+                <th>Accepts</th>
                 <th>Isolation</th>
                 <th />
               </tr>
@@ -728,13 +726,13 @@ function AssignBedPanel({
                         >
                           {placement.kind === 'override'
                             ? correcting
-                              ? 'Move here anyway'
-                              : 'Use this anyway'
+                              ? 'Move anyway'
+                              : 'Assign anyway'
                             : correcting
                               ? 'Move here'
                               : alreadyHere
-                                ? 'Put them here'
-                                : 'Choose'}
+                                ? 'Assign and admit'
+                                : 'Assign'}
                         </button>
                         {placement.kind === 'override' && (
                           <p className="hint" style={{ marginTop: '0.25rem' }}>
@@ -751,28 +749,27 @@ function AssignBedPanel({
 
           {usable.length === 0 && (
             <p className="empty">
-              Beds are free, but none of them will take this patient. The reason is on each row.
+              Beds are free, but none of them accepts this patient. The reason is on each row.
             </p>
           )}
 
           {missing > 0 && (
             <p className="field-error" style={{ marginTop: '0.6rem' }}>
-              {missing} more free {missing === 1 ? 'bed is' : 'beds are'} not shown here. This
-              list is incomplete — tell whoever maintains this screen before choosing.
+              {missing} more free {missing === 1 ? 'bed is' : 'beds are'} not shown. This list
+              is incomplete — report it before assigning a bed from it.
             </p>
           )}
 
           {overrides.length > 0 && (
             <p className="hint" style={{ marginTop: '0.6rem' }}>
-              The amber buttons are beds the patient&rsquo;s care level does not point at. You
-              may use one because you are the duty manager; it is recorded as your decision, so
-              say why in the note.
+              Amber buttons are beds outside the patient&rsquo;s care level. You may use one as
+              duty manager; it is recorded as your decision, so give a reason in the note.
             </p>
           )}
 
           <div className="field" style={{ marginTop: '0.9rem' }}>
             <label htmlFor="override-reason">
-              {correcting ? 'What went wrong' : 'Note'} (optional)
+              {correcting ? 'Reason for the change' : 'Note'} (optional)
             </label>
             <input
               id="override-reason"
@@ -780,13 +777,13 @@ function AssignBedPanel({
               maxLength={500}
               onChange={(event) => setReason(event.target.value)}
               placeholder={
-                correcting ? 'Picked the row above' : 'Why this bed rather than another'
+                correcting ? 'Wrong row selected' : 'Why this bed rather than another'
               }
             />
             <p className="hint">
               {correcting
-                ? 'Kept on the record. Not required - somebody fixing their own mis-click ten seconds later has nothing useful to write.'
-                : 'Kept on the record. Once the bed agent is running this is where you say why you ignored what it suggested.'}
+                ? 'Kept on the record. Not required.'
+                : 'Kept on the record. Once the bed agent is running, this is where you record why its suggestion was not followed.'}
             </p>
           </div>
         </>
@@ -824,7 +821,7 @@ function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void 
 
   return (
     <div className="drawer-body">
-      <h3>Intake details</h3>
+      <h3>Patient details</h3>
       {patient.isLoading && <p className="empty">Loading…</p>}
       {patient.data && (
         <table>
@@ -846,7 +843,9 @@ function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void 
             <Field label="Registered">
               {patient.data.created_at ? localDateTime(patient.data.created_at) : null}
             </Field>
-            <Field label="App login">{patient.data.has_account ? 'Linked' : 'None'}</Field>
+            <Field label="Mobile app account">
+              {patient.data.has_account ? 'Linked' : 'None'}
+            </Field>
           </tbody>
         </table>
       )}
@@ -854,20 +853,19 @@ function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void 
       {row.kind === 'booking' ? (
         <>
           <h4 style={{ marginTop: '1.25rem', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
-            This booking
+            This appointment
           </h4>
           <table>
             <tbody>
-              <Field label="Due">{localDateTime(row.when)}</Field>
+              <Field label="Scheduled for">{localDateTime(row.when)}</Field>
               <Field label="Reason" empty="Not given">
                 {row.reason}
               </Field>
             </tbody>
           </table>
           <p className="hint">
-            There is no visit record yet. Checking them in at the bookings desk is what creates
-            one, and the care level is chosen there — by the person at the desk, never by the
-            patient when they booked.
+            There is no visit record yet. Checking the patient in at the bookings desk creates
+            one, and the care level is recorded there by the member of staff at the desk.
           </p>
         </>
       ) : (
@@ -879,15 +877,13 @@ function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void 
           {visit.data && (
             <table>
               <tbody>
-                <Field label="Came in as">{admissionSourceLabels[visit.data.source]}</Field>
+                <Field label="Arrived by">{admissionSourceLabels[visit.data.source]}</Field>
                 <Field label="Care level">
                   {admissionCategoryLabels[visit.data.admission_category]}
                 </Field>
                 <Field label="Urgency">{admissionUrgencyLabels[visit.data.urgency]}</Field>
                 <Field label="Needs a bed">
-                  {visit.data.requires_bed
-                    ? 'Yes'
-                    : 'No — seen and sent home, so no bed is ever held'}
+                  {visit.data.requires_bed ? 'Yes' : 'No — outpatient, no bed is held'}
                 </Field>
                 <Field label="Needs isolation">{visit.data.is_infectious ? 'Yes' : 'No'}</Field>
                 <Field
@@ -907,10 +903,10 @@ function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void 
                 <Field label="Care level chosen">
                   {localDateTime(visit.data.category_set_at)}
                 </Field>
-                <Field label="Bed given by" empty="No bed assigned">
+                <Field label="Bed assigned by" empty="No bed assigned">
                   {liveBed?.approved_by_staff_name ?? (liveBed ? 'Not recorded' : null)}
                 </Field>
-                <Field label="Expected">
+                <Field label="Expected at">
                   {visit.data.expected_arrival
                     ? localDateTime(visit.data.expected_arrival)
                     : null}
@@ -918,7 +914,7 @@ function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void 
                 <Field label="Arrived" empty="Not yet">
                   {visit.data.admitted_at ? localDateTime(visit.data.admitted_at) : null}
                 </Field>
-                <Field label="Finished">
+                <Field label="Discharged">
                   {visit.data.discharged_at ? localDateTime(visit.data.discharged_at) : null}
                 </Field>
               </tbody>
@@ -928,7 +924,7 @@ function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void 
           {visit.data && visit.data.missing_fields.length > 0 && (
             <>
               <p style={{ marginTop: '0.9rem' }}>
-                <strong>Paperwork still outstanding:</strong>
+                <strong>Details still missing:</strong>
               </p>
               <ul>
                 {visit.data.missing_fields.map((field) => (

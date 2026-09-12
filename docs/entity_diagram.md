@@ -1542,7 +1542,7 @@ three sit on the same rung as `general` in `BedPlacementRules.Rung`, so no place
 changed — what they buy is a price and a name, not a new level of care.
 
 `emergency-spec.yaml` publishes a separate `WardTypeHint` that still lists six. That is
-Kaveesha's file and an open item, not an edit — see `integration_of_functions.md` §11.11.
+Nasrulla Unais's file and an open item, not an edit — see `integration_of_functions.md` §11.11.
 
 ### AdmissionUrgency *(Rev 2.2 — replaces AcuityLevel)*
 ```

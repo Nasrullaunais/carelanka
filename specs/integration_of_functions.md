@@ -648,7 +648,7 @@ one policy in `Program.cs` and one test,
 **M4 stops here.** How M3 uses the code — what their screen asks for, and what their assign
 endpoint takes — is theirs to decide and theirs to build. M4 has written nothing on that side.
 
-**11.9 (OPEN — raised by M4 on 2026-09-11, for Kaveesha / M1) — the ambulance crew no longer
+**11.9 (OPEN — raised by M4 on 2026-09-11, for Nasrulla Unais / M1) — the ambulance crew no longer
 registers patients.**
 
 **What changed.** `Policies.PatientRegistrar` is now `GeneralStaff`, `WardNurse`,
@@ -670,7 +670,7 @@ scene.
 | `GET /patients`, `GET /admissions`, `GET /patient-worklist` | `AmbulanceCrew` was never on these and still is not — it is the one staff role on no Patient Management policy |
 | `POST /admissions/pre-admit` | **not built.** Its `Roles:` line in `patient-spec.yaml` still says `AmbulanceCrew, DutyManager`, so the spec and `Policies.cs` currently disagree about that role. Nothing is broken today because there is no code behind it — but it has to be settled before there is. |
 
-**M4 has not edited `emergency-spec.yaml`.** It is Kaveesha's file. Three ways out, and the
+**M4 has not edited `emergency-spec.yaml`.** It is Nasrulla Unais's file. Three ways out, and the
 choice is hers: put `GeneralStaff` into the emergency flow; keep `AmbulanceCrew` on
 `pre-admit` alone as a documented exception, since a pre-admission is a dispatch record rather
 than desk paperwork; or argue the crew should keep registration and M4 reverts.
@@ -713,7 +713,7 @@ file's worth of seam and somebody has to own the screen.
 ---
 
 
-**11.11 (OPEN — raised by M4 on 2026-09-11, for Kaveesha / M1) — `WardType` gained three
+**11.11 (OPEN — raised by M4 on 2026-09-11, for Nasrulla Unais / M1) — `WardType` gained three
 members.**
 
 The ward board went from ten wards split by sex to the eight the hospital actually has, and
@@ -730,7 +730,7 @@ the catch-all arm of `BedPlacementRules.Rung` — so no existing rule changed, a
 is placeable in all three exactly as before.
 
 **What M1 needs to decide.** `emergency-spec.yaml` publishes `WardTypeHint`, which mirrors
-`WardType` and still lists six values. **It has not been touched** — it is Kaveesha's file, and
+`WardType` and still lists six values. **It has not been touched** — it is Nasrulla Unais's file, and
 a disagreement about somebody else's schema is an open item, not an edit. Nothing is broken
 today because the endpoint that uses it does not exist yet. Either add the three members when
 that endpoint is built, or decide that a routing *hint* deliberately carries a coarser
@@ -971,7 +971,7 @@ Mirrors §10's and §16's format, from Staff's side — read from `staff-spec.ya
 
 ## 22. Emergency ↔ Patient Management (Member 4) — confirmed from Emergency's side
 
-§4 above already documents this boundary from Patient Management's side, written before `emergency-spec.yaml` existed. `emergency-spec.yaml` (Member 1, Kaveesha) now agrees with every point found there:
+§4 above already documents this boundary from Patient Management's side, written before `emergency-spec.yaml` existed. `emergency-spec.yaml` (Member 1, Nasrulla Unais) now agrees with every point found there:
 
 - **The call screen split holds.** Patient Management builds the emergency-call form (a patient-role Flutter screen); Emergency owns `POST /emergency-calls`, the `EmergencyCall` record and everything downstream. Neither side writes the other's table.
 - **`patient_is_caller` and `caller_user_id` are now on the wire, as §4.2 and §10 asked for.** `emergency-spec.yaml`'s `CreateEmergencyCallRequest` carries `patient_is_caller` as a required field. **`caller_user_id` is not a request field** — it is read from the JWT of whoever posts the call, because a client that could name its own caller id could file a call under somebody else's account. It is null for a call logged at the front desk on behalf of a walk-in or phone caller. Both are carried forward unchanged onto the dispatch notification's `DispatchNotification` schema, matching the JSON shape §4.2 already specified field-for-field: `dispatch_id`, `caller_user_id`, `patient_is_caller`, `patient_id`, `provisional_name`, `provisional_gender`, `expected_arrival`, `urgency`, `destination_ward_type_hint`.

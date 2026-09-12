@@ -7,7 +7,7 @@ using WardEntity = CareLanka.Api.Data.Entities.Patient.Ward;
 namespace CareLanka.Api.Services.Patient;
 
 /// <summary>
-/// Hard rules H1–H5 from patient-management-plan.md §8.5, in one place, as ordinary C#.
+/// Hard rules H1–H6 from patient-management-plan.md §8.5, in one place, as ordinary C#.
 /// </summary>
 /// <remarks>
 /// **These are never the model's job.** The agent at step 11 proposes a bed and then this
@@ -79,8 +79,20 @@ public static class BedPlacementRules
         => Rung(wardType) > Rung(category);
 
     /// <summary>
-    /// A ward a ward nurse may not place into on their own: intensive care, high dependency,
-    /// or any step down from the care the patient was assessed as needing.
+    /// Whether this ward gives more intensive care than the admission was filed at — a routine
+    /// inpatient placed into intensive care.
+    /// </summary>
+    /// <remarks>
+    /// Every such ward is <c>icu</c> or <c>hdu</c>, because those are the only two ward types
+    /// above the ordinary-bed rung. So <see cref="NeedsDutyManager"/> already covers this case
+    /// and no separate role rule is needed for it.
+    /// </remarks>
+    public static bool IsMoreAcuteThanNeeded(AdmissionCategory category, WardType wardType)
+        => Rung(wardType) < Rung(category);
+
+    /// <summary>
+    /// A ward a ward nurse or reception may not place into on their own: intensive care, high
+    /// dependency, or any step down from the care the patient was assessed as needing.
     /// </summary>
     /// <remarks>
     /// patient-management-plan.md §5.2. ICU beds are the scarcest thing in a hospital, and a
@@ -91,15 +103,52 @@ public static class BedPlacementRules
     public static bool NeedsDutyManager(AdmissionCategory category, WardType wardType)
         => wardType is WardType.Icu or WardType.Hdu || IsDowngrade(category, wardType);
 
+    /// <summary>The age from which a patient is an adult, and so no longer a pediatric case.</summary>
+    public const int PediatricAgeLimit = 18;
+
+    /// <summary>
+    /// Whether the patient is under <see cref="PediatricAgeLimit"/> on this date. An unrecorded
+    /// date of birth is <b>not</b> a child.
+    /// </summary>
+    /// <remarks>
+    /// Unknown reads as adult on purpose, the same way <c>Gender.Unknown</c> reaches only a
+    /// mixed ward: the children's ward is the narrower place to put somebody, so it takes a
+    /// recorded fact to earn it rather than the absence of one. An unidentified arrival who
+    /// turns out to be a child gets their date of birth filled in, and the ward appears.
+    /// </remarks>
+    public static bool IsChild(DateOnly? dateOfBirth, DateOnly asOf)
+    {
+        if (dateOfBirth is not { } born)
+        {
+            return false;
+        }
+
+        var age = asOf.Year - born.Year;
+
+        // Their birthday has not come round yet this year, so they are a year younger than the
+        // subtraction says.
+        if (born > asOf.AddYears(-age))
+        {
+            age--;
+        }
+
+        return age < PediatricAgeLimit;
+    }
+
     /// <summary>
     /// Refuses, as a 409, a bed that breaks any hard rule for this admission. Returns whether
     /// the placement counts as a downgrade, which is the one thing the caller has to record.
     /// </summary>
     /// <param name="category">The care level a clinician filed this admission at. Never ours to change.</param>
     /// <param name="gender">The patient's, as recorded. <c>unknown</c> is a real value here, not a gap.</param>
+    /// <param name="dateOfBirth">The patient's, or null when nobody has recorded one. Drives H6.</param>
     /// <param name="isInfectious">Set by staff. Drives H4.</param>
     /// <param name="ward">The ward the bed stands in, or null when it is missing or retired (H5).</param>
     /// <param name="bed">The bed, as Equipment's register publishes it.</param>
+    /// <param name="mayPlaceMoreAcute">
+    /// Whether the caller may overrule H2 upward — the duty manager, and nobody else. Defaults
+    /// to false, so the agent's proposals are judged without the exception.
+    /// </param>
     /// <remarks>
     /// H1's "free" half is deliberately **not** here. Whether a bed is taken is a race, not a
     /// property of the bed, and no read can settle it — the partial unique index
@@ -109,9 +158,11 @@ public static class BedPlacementRules
     public static bool EnsurePlaceable(
         AdmissionCategory category,
         Gender gender,
+        DateOnly? dateOfBirth,
         bool isInfectious,
         WardEntity? ward,
-        RegisteredBed bed)
+        RegisteredBed bed,
+        bool mayPlaceMoreAcute = false)
     {
         // H5 — the ward must be active. A retired ward is invisible to every other read we do,
         // so a bed still pointing at one is a bed nobody should be admitted into. Reported as a
@@ -131,7 +182,12 @@ public static class BedPlacementRules
         // H2 — the ward must match the care level, or be a step down from it. A step *up* is
         // refused: putting a routine inpatient in intensive care is not an act of generosity,
         // it is the last ICU bed spent on somebody who does not need it.
-        if (Rung(ward.WardType) < Rung(category))
+        //
+        // The duty manager may overrule it, because the person who owns the consequence of an
+        // empty intensive-care bed is the person who should be able to spend one. Nobody else
+        // reaches this line — every more-acute ward is icu or hdu, and EnsureMayApprove has
+        // already refused those to everyone but the duty manager.
+        if (!mayPlaceMoreAcute && IsMoreAcuteThanNeeded(category, ward.WardType))
         {
             throw new ConflictException(
                 MessageCode.BedWardTooAcute,
@@ -154,6 +210,20 @@ public static class BedPlacementRules
                 bed.BedNumber,
                 EnumWire.ToWire(ward.GenderPolicy),
                 EnumWire.ToWire(gender));
+        }
+
+        // H6 — a children's ward takes children. Like the gender policy above it this is a
+        // property of the ward and not a judgement call, so the duty manager has no exception
+        // to make: an adult in a pediatric bay is wrong however full the hospital is.
+        //
+        // One-directional. A child may go in any ward the other rules allow — a 6-year-old
+        // needing intensive care goes to intensive care — it is only the pediatric ward that
+        // is closed to adults.
+        if (ward.WardType == WardType.Pediatric
+            && !IsChild(dateOfBirth, DateOnly.FromDateTime(DateTime.UtcNow)))
+        {
+            throw new ConflictException(
+                MessageCode.BedWardPediatricAdult, bed.BedNumber, PediatricAgeLimit);
         }
 
         // H4 — an infectious patient needs a bed that can isolate them. The flag is on the bed

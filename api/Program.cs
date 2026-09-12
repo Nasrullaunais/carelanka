@@ -197,6 +197,15 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
 
+    // Reception added 2026-09-12. A walk-in is registered, admitted and bedded by the person at
+    // the desk, and stopping at the bed meant handing the last step to a nurse who is not
+    // standing there. The narrow half of the rule - which bed - is BedAssignmentService's, so
+    // widening this route does not widen what reception may choose.
+    options.AddPolicy(Policies.BedAssigner, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.GeneralStaff),
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager)));
+
     // Reads the candidate list and ticks boxes. Which boxes is the service's business, not the
     // route's - clinical_clearance is the doctor's alone and billing_settled is nobody's.
     options.AddPolicy(Policies.DischargeChecklist, policy => policy.RequireRole(

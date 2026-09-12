@@ -117,5 +117,8 @@ public enum MessageCode
     // Correcting a bed that was chosen by mistake.
     BedNotAssigned,
 
-    BedAlreadyTheirs
+    BedAlreadyTheirs,
+
+    // H6. A children's ward, and a patient who is not a child - or whose age nobody recorded.
+    BedWardPediatricAdult
 }

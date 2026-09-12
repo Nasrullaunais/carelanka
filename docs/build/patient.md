@@ -315,8 +315,9 @@ Eight things settled while building it:
 - **H2 refuses an *upgrade* as well as an unapproved downgrade.** Ward types map onto three
   rungs — icu, hdu, everything else — and `day_case` / `outpatient` sit on the bottom rung with
   `inpatient` because there is no ward type below `general`. A general patient into an ICU bed is
-  a 409 even for a duty manager: it is not generosity, it is the last ICU bed spent on somebody
-  who does not need it.
+  a 409: it is not generosity, it is the last ICU bed spent on somebody who does not need it.
+  **Revised 2026-09-12 — the duty manager may now overrule this** (see the step 6 addendum
+  below); a nurse or reception gets a 403 first and never reaches the 409.
 - **The approval split is a 403 from the service, twice over.** ICU and HDU are the duty
   manager's (`cl_pat_012`); so is any downgrade (`cl_pat_013`), checked first because a downgrade
   into HDU is both and "this is a downgrade" is the more specific complaint. It cannot be an
@@ -337,6 +338,26 @@ Eight things settled while building it:
 Two things this step made possible and deliberately did not do: the `wardId` filter on
 `GET /admissions` (now unblocked — a ward is reachable through a live assignment), and a sweep
 that closes lapsed holds nobody has re-assigned over. Both are in `STUBS.md`.
+
+**Step 6 addendum (2026-09-12) — who may place a patient, and a rule about age.** Recorded for
+the group as `integration_of_functions.md` §11.14.
+
+- **New `Policies.BedAssigner`** — general staff, ward nurse, duty manager — on `assign-bed` and
+  `correct-bed`, replacing `AdmissionEditor` there. Reception beds the walk-in it just
+  registered. `AdmissionEditor` is untouched, so reception still cannot cancel a visit or
+  confirm a discharge.
+- **The duty manager may place a patient in a ward more acute than assessed**, which H2 used to
+  refuse for everybody. Needed no new role rule: every more-acute ward is `icu` or `hdu`, so
+  `NeedsDutyManager` already covered it.
+- **New hard rule H6 and code `cl_pat_030`** — a `pediatric` ward takes only patients under 18.
+  One-directional, and an unrecorded date of birth counts as an adult. No override, because like
+  the gender policy it is a property of the ward.
+- **`GET /bed-availability` now allows `pageSize` up to 500.** At the shared cap of 100 the
+  seeded hospital's 135 beds were cut off mid-alphabet, so pediatric and surgical beds could
+  never be chosen — silently, which is what made it dangerous. **Found by clicking the screen,
+  not by a test**, and the same walkthrough caught two more: reception got a red "your role does
+  not allow this" from the walk-in `/arrive` chain that only a ward nurse may call, and an ICU
+  bed for an ICU patient was wrongly coloured as an override when it is simply the right bed.
 
 **Steps 13–16 are self-contained.** Nothing else in the group depends on the care advisory
 agent, and it depends on nothing outside this component beyond the `doctor` role claim,

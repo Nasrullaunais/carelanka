@@ -771,6 +771,51 @@ a rate prices tomorrow's bills and never rewrites one a patient has already been
 **Read is `AnyStaff`, write is `HospitalAdministrator`.** Everyone at the desk needs the
 suggested price in the box in front of them; deciding what that price is is a different job.
 
+**11.14 (DECIDED by M4 on 2026-09-12) — a new `Policies.BedAssigner`, and the duty manager may
+now place a patient in a ward more acute than assessed.**
+
+Three changes, all inside Patient Management, but the first is a new entry in the group-owned
+`Policies.cs` and the second changes a published hard rule, so both are recorded here.
+
+**1. `Policies.BedAssigner` — general staff, ward nurse, duty manager.** New policy, now on
+`POST /admissions/{id}/assign-bed` and `POST /admissions/{id}/correct-bed`, which previously
+used `AdmissionEditor`. Reception registers, admits and beds a walk-in standing at the desk;
+stopping one step short handed the final act to a ward nurse who is not there.
+
+**Deliberately not just widening `AdmissionEditor`,** which also guards cancelling a visit and
+confirming a discharge. Reception bedding a walk-in does not imply reception sending somebody
+home. `AdmissionEditor` is untouched and is still ward nurse and duty manager.
+
+**Widening the route did not widen which bed anyone may choose.** That reads the ward the
+chosen bed stands in, which is in the request body and cannot be a route policy, so
+`BedAssignmentService.EnsureMayApprove` still answers 403 (`cl_pat_012` / `cl_pat_013`) for
+anything off the care level's own path. Verified live: doctor, administrator, equipment manager
+and ambulance crew are all still refused the route outright.
+
+**2. Hard rule H2 upward is now the duty manager's to overrule.** It used to be a 409 for
+everybody. An overflowing general ward next to an empty intensive-care bed is a real night in a
+real hospital, and the person who carries the cost of that empty bed is the person who should be
+able to spend one. Nurses and reception see a 403 instead, because every ward more acute than a
+patient needs is an `icu` or `hdu` ward and those were already theirs to refuse. The React bed
+picker colours these buttons amber so an off-path bed cannot be taken by accident.
+
+**3. New hard rule H6, and a new code `cl_pat_030`.** A `pediatric` ward admits only patients
+under 18. One-directional — a child is not confined to one, or a child needing intensive care
+could not be given it. **A patient with no recorded date of birth is refused**, on the same
+reasoning as H3's handling of `unknown`. Unlike H2 there is no duty-manager override: like the
+gender policy it is a property of the ward, not a judgement call.
+
+**Consequence for everyone else: a date of birth now matters clinically.** The React intake
+form requires one for any patient who can give one. **M1 in particular** — an unidentified
+casualty record with no date of birth cannot be placed in the children's ward, which is correct
+but worth knowing before it surprises somebody at the demo.
+
+**One unrelated bug fixed in passing.** `GET /bed-availability` capped `pageSize` at 100 like
+every other paged route. The seeded hospital has 135 beds, so the picker silently cut off
+mid-alphabet and pediatric and surgical beds could never be chosen at all. That one endpoint now
+allows up to 500 — it feeds a complete candidate list, not a page anybody browses — and the
+screen says so if the list is ever incomplete again.
+
 ---
 
 ## 12. For the other three members

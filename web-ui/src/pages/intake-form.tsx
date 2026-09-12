@@ -73,8 +73,19 @@ export function patientFormFrom(patient: Patient): PatientFormValue {
  * Told at the field, not on submit. The server checks all of this too - a browser is not a
  * boundary - but a form that accepts what you typed and then fails on submit makes you hunt for
  * which of eight boxes was wrong.
+ *
+ * `identified` is what decides whether a blank box is an error. Somebody with a NIC is standing
+ * at the desk answering questions, so leaving their address out is an omission and the desk
+ * should be made to fix it now rather than leave it as paperwork to chase. An unconscious
+ * arrival cannot answer any of them, and a form that will not submit without a date of birth
+ * for a patient nobody can name is a form that stops them being admitted at all.
+ *
+ * Date of birth is the one that earns this on its own: the bed board reads it to decide whether
+ * a children's ward is offered, so a blank one quietly costs a child the right ward.
+ *
+ * The emergency contact stays optional either way. Plenty of people genuinely arrive alone.
  */
-export function patientFormProblems(value: PatientFormValue) {
+export function patientFormProblems(value: PatientFormValue, identified = false) {
   const dateOfBirth = toIsoDate(value.birthYear, value.birthMonth, value.birthDay);
 
   const phone = phoneProblem(value.phone);
@@ -87,12 +98,21 @@ export function patientFormProblems(value: PatientFormValue) {
     (value.birthYear !== null || value.birthMonth !== null || value.birthDay !== null) &&
     dateOfBirth === '';
 
+  const missing = {
+    phone: identified && value.phone.trim().length === 0,
+    address: identified && value.address.trim().length === 0,
+    dateOfBirth: identified && dateOfBirth === '' && !dateIncomplete,
+  };
+
   const blocked =
     value.fullName.trim().length === 0 ||
     phone !== null ||
     contactPhone !== null ||
     dateOfBirthError !== null ||
-    dateIncomplete;
+    dateIncomplete ||
+    missing.phone ||
+    missing.address ||
+    missing.dateOfBirth;
 
   return {
     isoDate: dateOfBirth,
@@ -100,6 +120,7 @@ export function patientFormProblems(value: PatientFormValue) {
     contactPhone,
     dateOfBirth: dateOfBirthError,
     dateIncomplete,
+    missing,
     blocked,
   };
 }
@@ -161,13 +182,19 @@ export function PatientFields({
   value,
   set,
   idPrefix,
+  identified = false,
 }: {
   value: PatientFormValue;
   set: <K extends keyof PatientFormValue>(key: K, next: PatientFormValue[K]) => void;
   /** Register and edit can both be mounted in one session, so the ids must not collide. */
   idPrefix: string;
+  /**
+   * Whether this patient can answer questions about themselves. Everything except the emergency
+   * contact is required when they can. See {@link patientFormProblems}.
+   */
+  identified?: boolean;
 }) {
-  const problems = patientFormProblems(value);
+  const problems = patientFormProblems(value, identified);
 
   return (
     <>
@@ -252,7 +279,14 @@ export function PatientFields({
           </div>
           {problems.dateOfBirth && <p className="field-error">{problems.dateOfBirth}</p>}
           {problems.dateIncomplete && !problems.dateOfBirth && (
-            <p className="hint">Pick all three, or leave all three blank.</p>
+            <p className="hint">
+              {identified ? 'Pick all three.' : 'Pick all three, or leave all three blank.'}
+            </p>
+          )}
+          {problems.missing.dateOfBirth && (
+            <p className="field-error">
+              Required. The ward a patient can be given depends on their age.
+            </p>
           )}
         </div>
       </div>
@@ -266,10 +300,12 @@ export function PatientFields({
             inputMode="tel"
             maxLength={20}
             placeholder="0771234567"
-            aria-invalid={problems.phone !== null}
+            aria-invalid={problems.phone !== null || problems.missing.phone}
+            required={identified}
             onChange={(event) => set('phone', event.target.value)}
           />
           {problems.phone && <p className="field-error">{problems.phone}</p>}
+          {problems.missing.phone && <p className="field-error">Required.</p>}
         </div>
         <div className="field">
           <label htmlFor={`${idPrefix}-address`}>Address</label>
@@ -277,8 +313,11 @@ export function PatientFields({
             id={`${idPrefix}-address`}
             value={value.address}
             maxLength={fieldLimits.address}
+            aria-invalid={problems.missing.address}
+            required={identified}
             onChange={(event) => set('address', event.target.value)}
           />
+          {problems.missing.address && <p className="field-error">Required.</p>}
           <Counter value={value.address} limit={fieldLimits.address} />
         </div>
       </div>
@@ -287,7 +326,9 @@ export function PatientFields({
         <div className="field">
           {/* "Emergency contact" sitting next to "Emergency contact phone" reads as though the
               first one also wants a number. Say what goes in the box. */}
-          <label htmlFor={`${idPrefix}-contact-name`}>Who to ring in an emergency</label>
+          <label htmlFor={`${idPrefix}-contact-name`}>
+            Who to ring in an emergency {identified && <span className="muted">(optional)</span>}
+          </label>
           <input
             id={`${idPrefix}-contact-name`}
             value={value.contactName}
@@ -298,7 +339,9 @@ export function PatientFields({
           <p className="hint">Their name.</p>
         </div>
         <div className="field">
-          <label htmlFor={`${idPrefix}-contact-phone`}>Their phone number</label>
+          <label htmlFor={`${idPrefix}-contact-phone`}>
+            Their phone number {identified && <span className="muted">(optional)</span>}
+          </label>
           <input
             id={`${idPrefix}-contact-phone`}
             value={value.contactPhone}

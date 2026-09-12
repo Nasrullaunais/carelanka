@@ -35,6 +35,13 @@ public class BedAvailabilityController : ControllerBase
     /// component and is not re-implemented per endpoint.
     ///
     /// Retired wards and retired beds are absent rather than listed as unavailable.
+    ///
+    /// <b>pageSize goes to 500 here, where every other paged route stops at 100.</b> This one
+    /// feeds a bed picker, which is a complete candidate list and not a page anybody browses -
+    /// a nurse choosing a bed has to see every bed the patient could go in. At 100 the seeded
+    /// hospital's 135 beds were cut off mid-alphabet with nothing on screen saying so, and
+    /// pediatric and surgical beds could not be chosen at all. The service already loads every
+    /// bed to apply hold expiry and pages in memory, so the higher ceiling costs nothing new.
     /// </remarks>
     [Authorize(Policy = Policies.AnyStaff)]
     [HttpGet(Name = "listBedAvailability")]
@@ -47,7 +54,7 @@ public class BedAvailabilityController : ControllerBase
         [FromQuery] bool? needsIsolation,
         [FromQuery] BedAvailabilityFilter availability = BedAvailabilityFilter.All,
         [FromQuery][Range(1, int.MaxValue)] int page = 1,
-        [FromQuery][Range(1, 100)] int pageSize = 20,
+        [FromQuery][Range(1, 500)] int pageSize = 20,
         CancellationToken ct = default)
         => Ok(await _assignments.ListAvailabilityAsync(
             wardId, wardType, availability, needsIsolation, page, pageSize, ct));

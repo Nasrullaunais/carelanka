@@ -36,14 +36,21 @@ people on purpose and one account will not walk the whole thing:
 | Step | Account | Why not somebody else |
 | :--- | :--- | :--- |
 | Register and admit | `staff.jayasuriya` (reception) | The front desk does the paperwork. `crew.fernando` is refused — changed 2026-09-11 |
-| Assign the bed, mark them arrived | `nurse.perera` | The nurse is the one who can see the patient is in the bed |
+| Assign the bed | `staff.jayasuriya` or `nurse.perera` | Reception can bed a walk-in standing at the desk — changed 2026-09-12. Only for a bed matching the care level |
+| Mark them arrived | `nurse.perera` | **The nurse and nobody else**, not even the duty manager: she is the one who can see the patient is in the bed. So a bed reception assigns stays *held* until she confirms it |
 | Tick `clinical_clearance` | `dr.silva` | **A doctor and nobody else.** This is the wall |
 | Tick medication, follow-up, transport | `nurse.perera` | |
 | Prepare and settle the bill | `staff.jayasuriya` | Reception takes money. This is also the only way `billing_settled` is ever ticked |
 | Confirm the discharge | `nurse.perera` | `duty.rajapaksa` instead if the patient is ICU or HDU |
 
 An ICU or HDU bed needs `duty.rajapaksa` to assign it, and the same patient's
-discharge needs them to confirm it.
+discharge needs them to confirm it. So does any bed that does not match the care
+level — a downgrade, or a ward more acute than assessed. Those show as **amber**
+buttons in the bed picker rather than the ordinary green.
+
+**A children's ward only takes patients under 18**, and a patient with no recorded
+date of birth counts as an adult. So give a test patient a real date of birth if you
+want to see the pediatric ward offered.
 
 ```json
 POST /api/auth/login

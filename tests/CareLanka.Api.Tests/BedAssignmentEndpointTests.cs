@@ -459,7 +459,25 @@ public sealed class BedAssignmentEndpointTests
     }
 
     [Fact]
-    public async Task An_ordinary_patient_is_not_put_into_an_icu_bed_by_anybody()
+    public async Task An_ordinary_patient_is_not_put_into_an_icu_bed_by_a_nurse()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var ward = await NewWardAsync(wardType: "icu");
+        var beds = await AddBedsAsync(ward, 1);
+        var admissionId = await NewAdmissionAsync(nurse, category: "inpatient");
+
+        var assigned = await nurse.PostAsJsonAsync(
+            $"/api/admissions/{admissionId}/assign-bed", new { bed_id = beds[0] });
+        using var body = await ReadJsonAsync(assigned);
+
+        // A 403 and not a 409. Spending an intensive-care bed on somebody who does not need one
+        // is a decision, and it is the duty manager's - so the objection is to who is asking.
+        Assert.Equal(HttpStatusCode.Forbidden, assigned.StatusCode);
+        Assert.Equal("cl_pat_012", body.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task A_duty_manager_may_put_an_ordinary_patient_into_an_icu_bed()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         using var manager = await ClientAsync(ApiApplication.ManagerEmail);
@@ -471,13 +489,126 @@ public sealed class BedAssignmentEndpointTests
             $"/api/admissions/{admissionId}/assign-bed", new { bed_id = beds[0] });
         using var body = await ReadJsonAsync(assigned);
 
-        // Hard rule H2 in the upward direction, and refused even for a duty manager. Not an act
-        // of generosity — it is the last ICU bed spent on somebody who does not need it.
-        Assert.Equal(HttpStatusCode.Conflict, assigned.StatusCode);
-        Assert.Equal("cl_pat_016", body.RootElement.GetProperty("code").GetString());
+        // Hard rule H2 upward, overruled. The person who carries the cost of an empty
+        // intensive-care bed is the person who may spend one - an overflowing general ward with
+        // an empty ICU next to it is a real night in a real hospital.
+        Assert.Equal(HttpStatusCode.OK, assigned.StatusCode);
+
+        // Not a downgrade: they are getting more care than assessed, not less.
+        Assert.False(body.RootElement.GetProperty("is_downgrade").GetBoolean());
+    }
+
+    // ---------- who may place a patient at all ----------
+
+    [Fact]
+    public async Task Reception_may_assign_a_bed_that_matches_the_care_level()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
+        var ward = await NewWardAsync();
+        var beds = await AddBedsAsync(ward, 1);
+        var admissionId = await NewAdmissionAsync(nurse, category: "inpatient");
+
+        var assigned = await reception.PostAsJsonAsync(
+            $"/api/admissions/{admissionId}/assign-bed", new { bed_id = beds[0] });
+
+        // A walk-in is registered, admitted and bedded by the person standing at the desk.
+        Assert.Equal(HttpStatusCode.OK, assigned.StatusCode);
+    }
+
+    [Fact]
+    public async Task Reception_may_not_assign_an_icu_bed()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
+        var ward = await NewWardAsync(wardType: "icu");
+        var beds = await AddBedsAsync(ward, 1);
+        var admissionId = await NewAdmissionAsync(nurse, category: "icu");
+
+        var assigned = await reception.PostAsJsonAsync(
+            $"/api/admissions/{admissionId}/assign-bed", new { bed_id = beds[0] });
+        using var body = await ReadJsonAsync(assigned);
+
+        // Reaching the route is not permission to choose any bed on it. Widening the policy
+        // widened who may place a patient, not where.
+        Assert.Equal(HttpStatusCode.Forbidden, assigned.StatusCode);
+        Assert.Equal("cl_pat_012", body.RootElement.GetProperty("code").GetString());
     }
 
     // ---------- the hard rules ----------
+
+    [Fact]
+    public async Task A_children_ward_takes_a_child()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var ward = await NewWardAsync(wardType: "pediatric");
+        var beds = await AddBedsAsync(ward, 1);
+
+        var admissionId = await NewAdmissionAsync(
+            nurse, dateOfBirth: DateTime.UtcNow.AddYears(-9).ToString("yyyy-MM-dd"));
+
+        var assigned = await nurse.PostAsJsonAsync(
+            $"/api/admissions/{admissionId}/assign-bed", new { bed_id = beds[0] });
+
+        Assert.Equal(HttpStatusCode.OK, assigned.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_children_ward_refuses_an_adult()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+        var ward = await NewWardAsync(wardType: "pediatric");
+        var beds = await AddBedsAsync(ward, 1);
+
+        var admissionId = await NewAdmissionAsync(
+            nurse, dateOfBirth: DateTime.UtcNow.AddYears(-34).ToString("yyyy-MM-dd"));
+
+        // Asked as the duty manager on purpose: H6 is a property of the ward, like the gender
+        // policy, so there is nobody who may overrule it.
+        var assigned = await manager.PostAsJsonAsync(
+            $"/api/admissions/{admissionId}/assign-bed", new { bed_id = beds[0] });
+        using var body = await ReadJsonAsync(assigned);
+
+        Assert.Equal(HttpStatusCode.Conflict, assigned.StatusCode);
+        Assert.Equal("cl_pat_030", body.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task A_children_ward_refuses_a_patient_with_no_date_of_birth()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var ward = await NewWardAsync(wardType: "pediatric");
+        var beds = await AddBedsAsync(ward, 1);
+        var admissionId = await NewAdmissionAsync(nurse);
+
+        var assigned = await nurse.PostAsJsonAsync(
+            $"/api/admissions/{admissionId}/assign-bed", new { bed_id = beds[0] });
+        using var body = await ReadJsonAsync(assigned);
+
+        // Unknown reads as adult, the same way an unknown gender reaches only a mixed ward: the
+        // narrower place takes a recorded fact to earn, not the absence of one.
+        Assert.Equal(HttpStatusCode.Conflict, assigned.StatusCode);
+        Assert.Equal("cl_pat_030", body.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task A_child_may_still_be_placed_outside_a_children_ward()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var ward = await NewWardAsync();
+        var beds = await AddBedsAsync(ward, 1);
+
+        var admissionId = await NewAdmissionAsync(
+            nurse, dateOfBirth: DateTime.UtcNow.AddYears(-4).ToString("yyyy-MM-dd"));
+
+        var assigned = await nurse.PostAsJsonAsync(
+            $"/api/admissions/{admissionId}/assign-bed", new { bed_id = beds[0] });
+
+        // One-directional. H6 closes the children's ward to adults; it does not confine
+        // children to it, or a child needing intensive care could not be given it.
+        Assert.Equal(HttpStatusCode.OK, assigned.StatusCode);
+    }
 
     [Fact]
     public async Task A_bed_out_of_service_is_refused()
@@ -1032,13 +1163,15 @@ public sealed class BedAssignmentEndpointTests
         string category = "inpatient",
         string gender = "male",
         bool isInfectious = false,
-        DateTimeOffset? expectedArrival = null)
+        DateTimeOffset? expectedArrival = null,
+        string? dateOfBirth = null)
     {
         var patient = await nurse.PostAsJsonAsync("/api/patients", new
         {
             full_name = $"Bed Patient {Guid.NewGuid():N}"[..28],
             gender,
-            nic = $"D{Guid.NewGuid():N}"[..12]
+            nic = $"D{Guid.NewGuid():N}"[..12],
+            date_of_birth = dateOfBirth
         });
 
         Assert.Equal(HttpStatusCode.Created, patient.StatusCode);

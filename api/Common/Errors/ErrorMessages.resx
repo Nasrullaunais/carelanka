@@ -250,4 +250,20 @@
     <value>Bed {0} is in a children's ward, which admits patients under {1}. Record the patient's date of birth if it is missing.</value>
     <comment>Hard rule H6. Like the gender policy it is a property of the ward, so there is no duty-manager override. An unrecorded date of birth reads as an adult, and the message says how to fix that.</comment>
   </data>
+  <data name="cl_pat_031" xml:space="preserve">
+    <value>Those details belong to a record we already hold for someone else. Ask at the hospital desk.</value>
+    <comment>Patient self-service. Stops one signup taking over another person's medical record by typing their NIC. Deliberately says nothing about whose record it is, or whether that person has a login.</comment>
+  </data>
+  <data name="cl_pat_032" xml:space="preserve">
+    <value>Your record is registered under a different NIC. Ask at the hospital desk to have it changed.</value>
+    <comment>Patient self-service. Which human a login belongs to is not something the app may change; correcting it is desk work with a person to check it.</comment>
+  </data>
+  <data name="cl_pat_033" xml:space="preserve">
+    <value>Your login is not linked to a hospital record yet. Fill in your details first.</value>
+    <comment>Patient self-service. A login on its own is not a medical record - POST /me/pre-register is what joins the two. Answers a read (404) and a booking (409) alike, so the wording names the fix rather than the endpoint.</comment>
+  </data>
+  <data name="cl_pat_034" xml:space="preserve">
+    <value>You have no current stay.</value>
+    <comment>Patient self-service. Not being in hospital is the ordinary state, so this is a plain sentence and not an error the app should make a fuss about.</comment>
+  </data>
 </root>

@@ -72,6 +72,11 @@ public sealed class PatientOpenApiContractTests
     [InlineData("BillLine")]
     [InlineData("AddBillChargeRequest")]
     [InlineData("OutstandingBill")]
+    [InlineData("PreRegisterRequest")]
+    [InlineData("MyProfile")]
+    [InlineData("MyAdmission")]
+    [InlineData("MyAppointment")]
+    [InlineData("BookAppointmentRequest")]
     public async Task Published_schema_required_members_match_the_contract(string schemaName)
     {
         var generated = await GenerateAsync();
@@ -84,6 +89,105 @@ public sealed class PatientOpenApiContractTests
         Assert.True(expected.SetEquals(actual),
             $"{schemaName} required members differ. Contract: {string.Join(", ", expected.Order())}. "
             + $"Generated: {string.Join(", ", actual.Order())}.");
+    }
+
+    [Fact]
+    public async Task Patient_self_service_publishes_the_operationIds_the_mobile_client_generates_against()
+    {
+        var generated = await GenerateAsync();
+        var paths = generated.RootElement.GetProperty("paths");
+
+        Assert.Equal(
+            "preRegisterSelf",
+            paths.GetProperty("/me/pre-register").GetProperty("post")
+                .GetProperty("operationId").GetString());
+        Assert.Equal(
+            "getMyProfile",
+            paths.GetProperty("/me/profile").GetProperty("get")
+                .GetProperty("operationId").GetString());
+        Assert.Equal(
+            "getMyAdmission",
+            paths.GetProperty("/me/admission").GetProperty("get")
+                .GetProperty("operationId").GetString());
+        Assert.Equal(
+            "getMyHistory",
+            paths.GetProperty("/me/history").GetProperty("get")
+                .GetProperty("operationId").GetString());
+        Assert.Equal(
+            "bookMyAppointment",
+            paths.GetProperty("/me/appointments").GetProperty("post")
+                .GetProperty("operationId").GetString());
+        Assert.Equal(
+            "listMyAppointments",
+            paths.GetProperty("/me/appointments").GetProperty("get")
+                .GetProperty("operationId").GetString());
+        Assert.Equal(
+            "cancelMyAppointment",
+            paths.GetProperty("/me/appointments/{id}/cancel").GetProperty("post")
+                .GetProperty("operationId").GetString());
+    }
+
+    [Fact]
+    public async Task Pre_register_publishes_no_admission_shape_and_no_arrival_date()
+    {
+        var generated = await GenerateAsync();
+
+        // The correction of 2026-09-12, pinned. Creating an Admission here would need
+        // category_set_by_staff_member_id, which is the recorded proof that a clinician chose
+        // the care level - and a patient tapping a form on their phone is not one. If somebody
+        // puts either back, this fails rather than the invariant quietly going.
+        var request = generated.RootElement
+            .GetProperty("components").GetProperty("schemas")
+            .GetProperty("PreRegisterRequest").GetProperty("properties");
+
+        Assert.False(request.TryGetProperty("expected_arrival", out _));
+        Assert.False(request.TryGetProperty("reason_for_visit", out _));
+
+        var responses = generated.RootElement
+            .GetProperty("paths").GetProperty("/me/pre-register").GetProperty("post")
+            .GetProperty("responses");
+
+        // 200 and not 201: called twice with the same NIC it is the same record both times, so
+        // there is no second resource for a 201 to be about.
+        Assert.True(responses.TryGetProperty("200", out var ok));
+        Assert.False(responses.TryGetProperty("201", out _));
+
+        Assert.Equal(
+            "#/components/schemas/MyProfile",
+            ok.GetProperty("content").GetProperty("application/json")
+                .GetProperty("schema").GetProperty("$ref").GetString());
+    }
+
+    [Fact]
+    public async Task Every_self_service_operation_declares_its_failures_and_not_only_its_success()
+    {
+        var generated = await GenerateAsync();
+        var paths = generated.RootElement.GetProperty("paths");
+
+        // An endpoint declaring only its 200 generates a client that cannot type its failures -
+        // and on this surface the failures are most of the screen logic. 404 on /me/profile is
+        // "show the details form"; 404 on /me/admission is "you are not in hospital".
+        Assert.Equal(
+            new[] { "200", "400", "401", "403", "409" },
+            Responses(paths.GetProperty("/me/pre-register").GetProperty("post")));
+        Assert.Equal(
+            new[] { "200", "401", "403", "404" },
+            Responses(paths.GetProperty("/me/profile").GetProperty("get")));
+        Assert.Equal(
+            new[] { "200", "401", "403", "404" },
+            Responses(paths.GetProperty("/me/admission").GetProperty("get")));
+        Assert.Equal(
+            new[] { "200", "400", "401", "403" },
+            Responses(paths.GetProperty("/me/history").GetProperty("get")));
+        Assert.Equal(
+            new[] { "201", "400", "401", "403", "409" },
+            Responses(paths.GetProperty("/me/appointments").GetProperty("post")));
+        Assert.Equal(
+            new[] { "200", "400", "401", "403" },
+            Responses(paths.GetProperty("/me/appointments").GetProperty("get")));
+        Assert.Equal(
+            new[] { "200", "401", "403", "404", "409" },
+            Responses(paths.GetProperty("/me/appointments/{id}/cancel").GetProperty("post")));
     }
 
     [Fact]

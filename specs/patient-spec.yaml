@@ -1467,20 +1467,31 @@ paths:
   /me/pre-register:
     post:
       tags: [Patient Self-Service]
-      summary: Register your own details ahead of a planned visit
+      summary: Save your own details, and join this login to your hospital record
       description: |
         Roles: Patient.
 
-        Details only - this does not book a date. `POST /me/appointments` is the booking.
-        Use this when a patient wants their record complete ahead of an unscheduled visit,
-        or to fill in details after booking.
-
-        Neither endpoint brings in doctor calendars, time slots or availability search. That
-        is the component-sized part, and it stays out of scope.
+        Details only - this does not book a date and **does not admit you**.
+        `POST /me/appointments` is the booking; being admitted happens at the desk.
 
         Matches on NIC first. An existing record is linked to the account rather than duplicated,
         which is what stops the signup form creating the second identity that would otherwise
-        split a returning patient's history in two.
+        split a returning patient's history in two. Nothing already on a matched record is
+        overwritten - see `PreRegisterRequest.nic` for why.
+
+        Neither this nor the booking brings in doctor calendars, time slots or availability
+        search. That is the component-sized part, and it stays out of scope.
+
+        **Answers 200, not 201, and returns `MyProfile` rather than `MyAdmission`
+        (corrected 2026-09-12).** Two things were wrong with the original contract:
+
+        - It created an `Admission`, which carries `category_set_by_staff_member_id` - the
+          recorded proof that a clinician chose the care level. A patient has no staff id, so
+          building it as written meant either forging one or making the column nullable for
+          every admission in the hospital.
+        - It answered 201 while being designed never to create a second resource: called twice
+          with the same NIC it is the same record both times. Safe to call again to correct or
+          complete your details.
       operationId: preRegisterSelf
       requestBody:
         required: true
@@ -1488,19 +1499,47 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/PreRegisterRequest' }
       responses:
-        '201':
-          description: Pre-registered
+        '200':
+          description: Your details, saved and linked
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/MyAdmission' }
+              schema: { $ref: '#/components/schemas/MyProfile' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
-          description: You already have an open admission.
+          description: |
+            Those details belong to a record the hospital already holds for someone else
+            (`cl_pat_031`), or your record is registered under a different NIC (`cl_pat_032`).
+            Both are desk work - the app may not decide which human a login belongs to.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /me/profile:
+    get:
+      tags: [Patient Self-Service]
+      summary: Your details as the hospital holds them
+      description: |
+        Roles: Patient. Resolved from the JWT.
+
+        404 while this login has no record linked to it yet (`cl_pat_033`), which is the
+        ordinary state for an account that signed up last night. The app reads that as "show
+        the details form", not as an error.
+
+        **Added 2026-09-12**, because nothing else could answer the question. `GET /auth/me`
+        publishes `patient_id`, but common auth hard-codes it to null for every principal, so
+        the app has no way to tell a linked account from an unlinked one on startup.
+      operationId: getMyProfile
+      responses:
+        '200':
+          description: Your details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyProfile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /me/admission:
     get:
@@ -1517,7 +1556,9 @@ paths:
       operationId: getMyAdmission
       responses:
         '200':
-          description: Your current stay, or 404 if you have none
+          description: |
+            Your current stay. 404 when you are not in hospital (`cl_pat_034`) or when this
+            login has no record linked yet (`cl_pat_033`) - both ordinary states, not errors.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/MyAdmission' }
@@ -1584,7 +1625,10 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
-          description: You already have an open appointment, or an open admission.
+          description: |
+            You already have an open booking (`cl_pat_009`) or an open admission
+            (`cl_pat_006`), or your login has no medical record yet (`cl_pat_033`) - fill in
+            your details first.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -2263,14 +2307,20 @@ components:
       type: object
       description: |
         What a patient may see about their own booking. A separate shape, not a filtered
-        staff object - same reasoning as `MyAdmission`.
+        staff object - same reasoning as `MyAdmission`. It carries neither who took the
+        booking nor which admission it became.
+      required: [appointment_id, scheduled_at, status, status_text, can_cancel]
       properties:
         appointment_id: { type: string, format: uuid }
         scheduled_at: { type: string, format: date-time }
         status: { $ref: '#/components/schemas/AppointmentStatus' }
         status_text:
           type: string
-          description: Plain-language wording, e.g. "Booked for Tuesday 3 March, 10:00".
+          description: |
+            Plain-language wording, e.g. "Booked. You can still cancel this."
+
+            **Carries no date or time**, for the reason given on `MyAdmission.status_text`. The
+            app renders `scheduled_at` in the device's own timezone.
         reason: { type: string, nullable: true }
         can_cancel:
           type: boolean
@@ -3460,18 +3510,67 @@ components:
 
     PreRegisterRequest:
       type: object
-      required: [nic, full_name, gender, expected_arrival]
+      description: |
+        The patient's own details, typed into the app. **Details only - this creates no visit
+        and no admission.**
+
+        `expected_arrival` and `reason_for_visit` were removed on 2026-09-12 along with the
+        admission this used to create. An `Admission` carries `category_set_by_staff_member_id`,
+        the recorded proof that a clinician chose the care level, and a patient tapping a form
+        on their phone has neither a staff id nor any business choosing their own. Stating a
+        date is `POST /me/appointments`; being admitted happens at the desk.
+      required: [nic, full_name, gender]
       properties:
-        nic: { type: string }
+        nic:
+          type: string
+          maxLength: 20
+          description: |
+            Required here, unlike at the desk, because it is the only thing that can match this
+            signup to a record the hospital already holds.
+
+            **NIC alone is not proof of identity.** Nothing verifies that the person typing it
+            owns it, so linking to an existing record never overwrites what is already on that
+            record. A production system puts an OTP or a desk check in front of this.
+        full_name: { type: string, maxLength: 200 }
+        gender: { $ref: '#/components/schemas/Gender' }
+        date_of_birth: { type: string, format: date, nullable: true }
+        phone: { type: string, maxLength: 20, nullable: true }
+        address: { type: string, maxLength: 500, nullable: true }
+        emergency_contact_name: { type: string, maxLength: 200, nullable: true }
+        emergency_contact_phone: { type: string, maxLength: 20, nullable: true }
+
+    MyProfile:
+      type: object
+      description: |
+        The patient's own details, as the app shows them back. What joins a phone login to a
+        medical record.
+
+        A separate and deliberately small shape, for the same reason `MyAdmission` is one - it
+        is not `Patient` with a filter over it. **No `id`:** every patient-facing endpoint
+        resolves the record from the token, so the app never needs the internal key.
+        `patient_code` is here because it is on the wristband and staff ask for it out loud.
+      required: [patient_code, full_name, gender, details_complete, missing_fields]
+      properties:
+        patient_code:
+          type: string
+          minLength: 8
+          maxLength: 8
+          description: The short handle staff ask for out loud, e.g. P7K2X9QM.
         full_name: { type: string }
+        nic: { type: string, nullable: true }
         gender: { $ref: '#/components/schemas/Gender' }
         date_of_birth: { type: string, format: date, nullable: true }
         phone: { type: string, nullable: true }
         address: { type: string, nullable: true }
         emergency_contact_name: { type: string, nullable: true }
         emergency_contact_phone: { type: string, nullable: true }
-        expected_arrival: { type: string, format: date-time }
-        reason_for_visit: { type: string, maxLength: 300, nullable: true }
+        details_complete: { type: boolean }
+        missing_fields:
+          type: array
+          items: { type: string }
+          description: |
+            What is still blank, from the closed vocabulary of `PatientDetailField`, so the app
+            asks for exactly those. The same calculation the ward clerk's screen reads.
 
     MyAdmission:
       type: object
@@ -3479,12 +3578,19 @@ components:
         What a patient may see about their own stay. A separate shape, not a filtered staff
         object - it cannot leak staff notes, agent reasoning or other patients because it does
         not contain them.
+      required: [admission_id, status, status_text, details_complete, missing_fields]
       properties:
         admission_id: { type: string, format: uuid }
         status: { $ref: '#/components/schemas/AdmissionStatus' }
         status_text:
           type: string
-          description: Plain-language wording for the patient, e.g. "A bed is being arranged for you".
+          description: |
+            Plain-language wording for the patient, e.g. "A bed is being arranged for you".
+
+            **Carries no date or time.** Timestamps are stored UTC and this API has no notion of
+            a local timezone, so a formatted time here would read five and a half hours early on
+            a phone in Colombo. The app formats the timestamp fields itself, in the timezone the
+            device is actually in.
         ward_name: { type: string, nullable: true }
         bed_number: { type: string, nullable: true }
         admitted_at: { type: string, format: date-time, nullable: true }

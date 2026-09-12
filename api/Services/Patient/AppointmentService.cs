@@ -93,18 +93,76 @@ public sealed class AppointmentService : IAppointmentService
     public async Task<AppointmentResponse> CreateAsync(
         CreateAppointmentRequest request, CancellationToken ct = default)
     {
+        var patient = await _db.Patients.FirstOrDefaultAsync(p => p.Id == request.PatientId, ct)
+            ?? throw new NotFoundException("Patient", request.PatientId);
+
+        // Off the token, never off the body. Null here would mean the patient booked it
+        // themselves through the app, which is the one thing this path is not.
+        var appointment = await BookAsync(
+            patient, request.ScheduledAt, request.Reason, _currentUser.Id, ct);
+
+        return ToResponse(appointment);
+    }
+
+    public async Task<AppointmentEntity> BookForPatientAsync(
+        Guid patientId, BookAppointmentRequest request, CancellationToken ct = default)
+    {
+        var patient = await _db.Patients.FirstOrDefaultAsync(p => p.Id == patientId, ct)
+            ?? throw new NotFoundException("Patient", patientId);
+
+        // Null, and that is the whole difference between this and CreateAsync: an appointment
+        // with nobody recorded as having taken the booking is one the patient made themselves.
+        // It is also why the two paths stay tellable apart in a report afterwards.
+        return await BookAsync(patient, request.ScheduledAt, request.Reason, null, ct);
+    }
+
+    public async Task<AppointmentEntity> CancelForPatientAsync(
+        Guid appointmentId, Guid patientId, CancellationToken ct = default)
+    {
+        // Both ids in the one predicate on purpose. Somebody else's appointment reads as one
+        // that does not exist, so a patient guessing at ids learns nothing from the answer -
+        // a 403 would confirm the id is real, which is itself a leak.
+        var appointment = await _db.Appointments
+            .FirstOrDefaultAsync(a => a.Id == appointmentId && a.PatientId == patientId, ct)
+            ?? throw new NotFoundException("Appointment", appointmentId);
+
+        if (appointment.Status != AppointmentStatus.Scheduled)
+        {
+            // Once the desk has checked them in it is an admission, and cancelling an admission
+            // is a staff action with a bed to give back and a bill to settle.
+            throw new IllegalTransitionException(
+                "Appointment",
+                EnumWire.ToWire(appointment.Status),
+                EnumWire.ToWire(AppointmentStatus.Cancelled));
+        }
+
+        appointment.Status = AppointmentStatus.Cancelled;
+
+        await _db.SaveChangesAsync(ct);
+
+        return appointment;
+    }
+
+    /// <summary>
+    /// The booking itself, shared by the desk and the app. Every rule lives here, so the two
+    /// paths cannot drift into allowing different things.
+    /// </summary>
+    private async Task<AppointmentEntity> BookAsync(
+        PatientEntity patient,
+        DateTimeOffset? requestedAt,
+        string? reason,
+        Guid? bookedByStaffMemberId,
+        CancellationToken ct)
+    {
         // Not null: [ApiController] has already returned a 400 for a body that left it out. It
         // is nullable on the request so that omission is an error rather than the year 1.
-        var scheduledAt = request.ScheduledAt!.Value.ToUniversalTime();
+        var scheduledAt = requestedAt!.Value.ToUniversalTime();
 
         if (scheduledAt <= DateTimeOffset.UtcNow)
         {
             // Always a typo. Somebody already in the building is admitted, not booked.
             throw new BadRequestException(MessageCode.AppointmentInThePast);
         }
-
-        var patient = await _db.Patients.FirstOrDefaultAsync(p => p.Id == request.PatientId, ct)
-            ?? throw new NotFoundException("Patient", request.PatientId);
 
         await EnsureNothingOpenForAsync(patient, ct);
 
@@ -114,11 +172,8 @@ public sealed class AppointmentService : IAppointmentService
             PatientId = patient.Id,
             ScheduledAt = scheduledAt,
             Status = AppointmentStatus.Scheduled,
-            Reason = Clean(request.Reason),
-
-            // Off the token, never off the body. Null here would mean the patient booked it
-            // themselves through the app, which is the one thing this path is not.
-            BookedByStaffMemberId = _currentUser.Id
+            Reason = Clean(reason),
+            BookedByStaffMemberId = bookedByStaffMemberId
         };
 
         _db.Appointments.Add(appointment);
@@ -126,7 +181,7 @@ public sealed class AppointmentService : IAppointmentService
 
         appointment.Patient = patient;
 
-        return ToResponse(appointment);
+        return appointment;
     }
 
     public async Task<AdmissionResponse> CheckInAsync(

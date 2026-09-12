@@ -118,5 +118,15 @@ public enum MessageCode
     BedAlreadyTheirs,
 
     // H6. A children's ward, and a patient who is not a child - or whose age nobody recorded.
-    BedWardPediatricAdult
+    BedWardPediatricAdult,
+
+    // Patient self-service. The three ways the app's own "your details" form can fail, all of
+    // which are about WHICH record a login points at rather than about the details on it.
+    NicLinkedToAnotherAccount,
+
+    NicDoesNotMatchYourRecord,
+
+    AccountHasNoPatientRecord,
+
+    NoCurrentAdmission
 }

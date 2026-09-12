@@ -390,7 +390,7 @@ public sealed class BedAssignmentEndpointTests
     // ---------- who may approve which bed ----------
 
     [Fact]
-    public async Task A_nurse_may_not_put_a_patient_in_an_icu_bed()
+    public async Task A_nurse_may_put_an_icu_patient_in_an_icu_bed()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         var ward = await NewWardAsync(wardType: "icu");
@@ -399,13 +399,26 @@ public sealed class BedAssignmentEndpointTests
 
         var assigned = await nurse.PostAsJsonAsync(
             $"/api/admissions/{admissionId}/assign-bed", new { bed_id = beds[0] });
-        using var body = await ReadJsonAsync(assigned);
 
-        // "The AI cannot put somebody in intensive care on its own, and neither can a ward
-        // nurse." A 403 and not a 409 — the bed is right, the caller is not the person allowed
-        // to choose it. The rule depends on the body, so it cannot be an [Authorize] policy.
-        Assert.Equal(HttpStatusCode.Forbidden, assigned.StatusCode);
-        Assert.Equal("cl_pat_012", body.RootElement.GetProperty("code").GetString());
+        // Changed 2026-09-12: this used to be a 403. The bed matches the care level exactly, so
+        // there is no decision for anybody to make - and sending a nurse to find a duty manager
+        // held up the most urgent admission in the hospital for a signature on the obvious.
+        Assert.Equal(HttpStatusCode.OK, assigned.StatusCode);
+    }
+
+    [Fact]
+    public async Task Reception_may_put_an_icu_patient_in_an_icu_bed()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
+        var ward = await NewWardAsync(wardType: "icu");
+        var beds = await AddBedsAsync(ward, 1);
+        var admissionId = await NewAdmissionAsync(nurse, category: "icu");
+
+        var assigned = await reception.PostAsJsonAsync(
+            $"/api/admissions/{admissionId}/assign-bed", new { bed_id = beds[0] });
+
+        Assert.Equal(HttpStatusCode.OK, assigned.StatusCode);
     }
 
     [Fact]
@@ -517,11 +530,11 @@ public sealed class BedAssignmentEndpointTests
     }
 
     [Fact]
-    public async Task Reception_may_not_assign_an_icu_bed()
+    public async Task Reception_may_not_assign_a_bed_that_does_not_match_the_care_level()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
-        var ward = await NewWardAsync(wardType: "icu");
+        var ward = await NewWardAsync();
         var beds = await AddBedsAsync(ward, 1);
         var admissionId = await NewAdmissionAsync(nurse, category: "icu");
 
@@ -530,9 +543,10 @@ public sealed class BedAssignmentEndpointTests
         using var body = await ReadJsonAsync(assigned);
 
         // Reaching the route is not permission to choose any bed on it. Widening the policy
-        // widened who may place a patient, not where.
+        // widened who may place a patient, not where - and an ICU patient in a general bed is
+        // a decision about giving somebody less care than a clinician asked for.
         Assert.Equal(HttpStatusCode.Forbidden, assigned.StatusCode);
-        Assert.Equal("cl_pat_012", body.RootElement.GetProperty("code").GetString());
+        Assert.Equal("cl_pat_013", body.RootElement.GetProperty("code").GetString());
     }
 
     // ---------- the hard rules ----------
@@ -1016,7 +1030,7 @@ public sealed class BedAssignmentEndpointTests
             $"/api/admissions/{Guid.NewGuid()}/assign-bed", new { bed_id = beds[0] });
 
         // A doctor decides the care level, not which bed. Placing patients is the desk's job,
-        // and this is the AdmissionEditor policy refusing on the route rather than on the body.
+        // and this is the BedAssigner policy refusing on the route rather than on the body.
         Assert.Equal(HttpStatusCode.Forbidden, assigned.StatusCode);
     }
 

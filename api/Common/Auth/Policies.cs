@@ -89,8 +89,28 @@ public static class Policies
     /// each of these three may choose depends on the ward the chosen bed stands in, which is in
     /// the request body - so <c>BedAssignmentService.EnsureMayApprove</c> answers 403 for
     /// anything off the care level's own path, and only the duty manager gets past it.
+    ///
+    /// All three may place a patient in any ward that MATCHES the care level, intensive care
+    /// included. The duty manager's speciality is the ward that does not match.
     /// </remarks>
     public const string BedAssigner = nameof(BedAssigner);
+
+    /// <summary>
+    /// Confirms a discharge and sends a patient home: general staff, ward nurse, duty manager.
+    /// </summary>
+    /// <remarks>
+    /// Its own policy rather than <see cref="AdmissionEditor"/>, which also guards cancelling a
+    /// live visit. Reception settles the bill and hands over the paperwork, so it finishes the
+    /// discharge on the same screen rather than fetching a nurse for the last click.
+    ///
+    /// <b>There is no per-care-level narrowing here, and that is deliberate.</b> ICU and HDU
+    /// discharges were the duty manager's until 2026-09-12. The gate that protects the patient
+    /// is the checklist: both mandatory items must be ticked, and
+    /// <c>clinical_clearance</c> is a doctor's alone. Nobody goes home un-cleared whoever
+    /// presses this, and a second approval from somebody who was not at the bedside bought
+    /// delay rather than safety.
+    /// </remarks>
+    public const string DischargeConfirmer = nameof(DischargeConfirmer);
 
     /// <summary>
     /// Works the discharge checklist: ward nurse, doctor, duty manager.

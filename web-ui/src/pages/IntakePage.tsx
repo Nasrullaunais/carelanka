@@ -106,7 +106,7 @@ export function IntakePage() {
     <>
       <h1>Walk-in intake</h1>
       <p className="muted">
-        Register someone who has arrived at the desk, then admit them. Look them up first: a
+        Register a patient who has arrived at the desk, then admit them. Search first — a
         returning patient keeps one record.
       </p>
 
@@ -178,7 +178,7 @@ export function IntakePage() {
 function Steps({ current }: { current: Step }) {
   const order: Step[] = ['find', 'register', 'admit'];
   const labels: Record<Step, string> = {
-    find: '1. Find them',
+    find: '1. Search',
     register: '2. Register',
     // Correcting details is a detour off step 3, not a step of its own - so it lights up
     // "Register", which is the step whose work is being redone.
@@ -255,9 +255,9 @@ function FindStep({
   return (
     <>
       <div className="card">
-        <h2>Look them up</h2>
+        <h2>Search by NIC</h2>
         <p className="muted" style={{ marginBottom: '0.9rem' }}>
-          By NIC. This is the guard against a returning patient gaining a second identity.
+          This is what stops a returning patient being given a second record.
         </p>
 
         <form onSubmit={submit}>
@@ -281,23 +281,22 @@ function FindStep({
             type="submit"
             disabled={lookup.isPending || nic.trim().length === 0 || nicError !== null}
           >
-            {lookup.isPending ? 'Looking up...' : 'Look up'}
+            {lookup.isPending ? 'Searching...' : 'Search'}
           </button>
         </form>
       </div>
 
       {result?.found && result.patient && (
         <div className="card">
-          <h2>Already registered</h2>
+          <h2>Existing patient</h2>
           <PatientCard patient={result.patient} />
 
           {result.hasOpenAdmission ? (
             // No admit button at all. The server refuses this with cl_pat_006, and offering
             // a control that always fails is worse than not offering one.
             <p className="stub-note" style={{ marginTop: '0.9rem' }}>
-              <strong>This patient is already in the hospital.</strong> They have an open
-              admission, and one person cannot be admitted twice at once. Find their current
-              visit on the admissions worklist rather than starting a second one.
+              <strong>This patient is already admitted.</strong> A patient cannot hold two open
+              admissions. Open their current visit on the patients board instead.
             </p>
           ) : (
             <button
@@ -319,7 +318,7 @@ function FindStep({
                 className="secondary"
                 onClick={() => onEditExisting(result.patient as PatientSummary)}
               >
-                Edit their details
+                Edit patient details
               </button>
             </p>
           )}
@@ -330,8 +329,8 @@ function FindStep({
         <div className="card">
           <h2>No record for that NIC</h2>
           <p className="muted">
-            Nobody is registered under <strong>{nic.trim()}</strong>. Register them as a new
-            patient; the NIC carries over to the form.
+            No patient is registered under <strong>{nic.trim()}</strong>. Register them as a new
+            patient — the NIC carries over to the form.
           </p>
           <button
             type="button"
@@ -344,12 +343,12 @@ function FindStep({
       )}
 
       <div className="card">
-        <h2>No NIC?</h2>
+        <h2>Patient has no NIC</h2>
         <p className="muted">
           An unconscious or unidentified arrival is registered with no NIC and no phone. The
-          server allocates a temporary reference, such as <code>UNKNOWN-2026-0001</code>, so
-          they can be admitted now and identified later. Adding a NIC afterwards never clears
-          it, which is what keeps the paper trail honest.
+          system allocates a temporary reference, such as <code>UNKNOWN-2026-0001</code>, so the
+          patient can be admitted now and identified later. Adding a NIC afterwards does not
+          clear the reference, which keeps the record traceable.
         </p>
         <button
           type="button"
@@ -408,14 +407,13 @@ function RegisterStep({
 
       {unidentified ? (
         <p className="muted" style={{ marginBottom: '0.9rem' }}>
-          No NIC and no phone, so the server allocates a temporary reference. Everything below
-          except the name and gender can be filled in later.
+          No NIC and no phone, so a temporary reference is allocated. Everything except the name
+          and gender can be filled in later.
         </p>
       ) : (
         <p className="muted" style={{ marginBottom: '0.9rem' }}>
-          NIC <strong>{nic}</strong>, carried over from the lookup. Everything except the
-          emergency contact is required — the patient is here and can answer, and chasing an
-          address afterwards costs far more than asking for it now.
+          NIC <strong>{nic}</strong>, carried over from the search. Everything except the
+          emergency contact is required while the patient is here to answer.
         </p>
       )}
 
@@ -423,9 +421,8 @@ function RegisterStep({
           else, so somebody who expects it to undo the registration is in for a surprise the
           next time they look the patient up. */}
       <p className="hint" style={{ marginBottom: '0.9rem' }}>
-        Registering saves the record. If something is wrong afterwards you can still correct it
-        from the next step — but &ldquo;Start over&rdquo; only empties the boxes, it does not
-        undo a registration.
+        Registering saves the record. Anything wrong can still be corrected at the next step.
+        &ldquo;Start over&rdquo; only clears the form — it does not undo a registration.
       </p>
 
       <form
@@ -518,7 +515,7 @@ function EditStep({
   if (existing.isLoading) {
     return (
       <div className="card">
-        <p className="empty">Loading their details…</p>
+        <p className="empty">Loading patient details…</p>
       </div>
     );
   }
@@ -527,7 +524,7 @@ function EditStep({
     return (
       <div className="card">
         <div className="empty">
-          <p>Could not load their details.</p>
+          <p>Could not load the patient's details.</p>
           <button type="button" className="secondary" onClick={() => void existing.refetch()}>
             Try again
           </button>
@@ -540,7 +537,7 @@ function EditStep({
 
   return (
     <div className="card">
-      <h2>Edit their details</h2>
+      <h2>Edit patient details</h2>
       <p className="muted" style={{ marginBottom: '0.9rem' }}>
         Patient ID <code>{patient.patient_code}</code>
         {patient.nic ? (
@@ -557,8 +554,8 @@ function EditStep({
       </p>
 
       <p className="hint" style={{ marginBottom: '0.9rem' }}>
-        The NIC is not editable here. Changing who a record <em>is</em>, rather than what it
-        says, is how one person&rsquo;s history ends up on another person&rsquo;s record.
+        The NIC cannot be changed here. Changing which person a record identifies is how one
+        patient&rsquo;s history ends up on another patient&rsquo;s record.
       </p>
 
       <form
@@ -659,8 +656,8 @@ function AdmitStep({
       {/* Read this before the table, not after it. This is the last point at which a typo is
           cheap: after admitting, the name is on the wristband, the bed and the bill. */}
       <p className="muted" style={{ marginBottom: '0.6rem' }}>
-        <strong>Check this is right before you admit them.</strong> Anything wrong here follows
-        the patient onto their wristband, their bed and their bill.
+        <strong>Check these details before admitting.</strong> Anything wrong here follows the
+        patient onto their wristband, their bed and their bill.
       </p>
 
       <PatientCard patient={patient} />
@@ -671,7 +668,7 @@ function AdmitStep({
               greyed out, this read as decoration and people pressed "Start over" instead -
               which does not undo a registration and never did. */}
           <button type="button" onClick={onEdit}>
-            Edit these details
+            Edit patient details
           </button>
         </p>
       )}
@@ -692,8 +689,8 @@ function AdmitStep({
               ))}
             </select>
             <p className="hint">
-              {admissionCategoryHints[category]} You are choosing this and it is recorded
-              against your name; the bed agent reasons from it and never sets it.
+              {admissionCategoryHints[category]} This is your decision and is recorded against
+              your name. The bed agent reads it and never sets it.
             </p>
           </div>
           <div className="field">
@@ -730,7 +727,7 @@ function AdmitStep({
             {admit.isPending ? 'Admitting...' : 'Admit patient'}
           </button>
           <button type="button" className="secondary" onClick={onBack}>
-            Serve someone else
+            Start over
           </button>
         </div>
 
@@ -739,9 +736,9 @@ function AdmitStep({
             patient is registered and stays registered - there is no undo for that, which is
             why the edit button above exists. */}
         <p className="hint">
-          &ldquo;Serve someone else&rdquo; leaves this admission unfinished and goes back to the
-          lookup. <strong>It does not delete the patient</strong> — they are registered now.
-          Use <strong>Edit these details</strong> above to fix something.
+          &ldquo;Start over&rdquo; abandons this admission and returns to the search.
+          <strong> It does not delete the patient</strong> — they are already registered. Use
+          <strong> Edit patient details</strong> above to correct something.
         </p>
       </form>
     </div>
@@ -757,14 +754,14 @@ function DoneStep({ admission, onAnother }: { admission: Admission; onAnother: (
     <div className="card">
       <h2>Admitted</h2>
       <p className="muted">
-        {admission.patient?.full_name ?? 'The patient'} is admitted and waiting for a bed.
+        {admission.patient?.full_name ?? 'The patient'} is admitted and awaiting a bed.
       </p>
 
       {/* Repeated here on purpose. This is the screen the desk is looking at while writing
           the wristband, and the ID is what every other component will ask for afterwards. */}
       {admission.patient && (
         <p>
-          Patient ID <code>{admission.patient.patient_code}</code> — write this on the
+          Patient ID <code>{admission.patient.patient_code}</code> — record this on the
           wristband. Equipment and the labs identify the patient by it.
         </p>
       )}
@@ -772,7 +769,7 @@ function DoneStep({ admission, onAnother }: { admission: Admission; onAnother: (
       {admission.missing_fields.length > 0 && (
         <>
           <p style={{ marginTop: '0.9rem' }}>
-            <strong>Paperwork still outstanding:</strong>
+            <strong>Details still missing:</strong>
           </p>
           <ul>
             {admission.missing_fields.map((field) => (
@@ -780,14 +777,13 @@ function DoneStep({ admission, onAnother }: { admission: Admission; onAnother: (
             ))}
           </ul>
           <p className="muted">
-            Missing paperwork does not block the admission. A patient can be admitted with
-            details outstanding; this is a list to chase, not a gate.
+            Missing details do not block the admission. This is a list to follow up, not a gate.
           </p>
         </>
       )}
 
       <button type="button" style={{ marginTop: '0.9rem' }} onClick={onAnother}>
-        Register someone else
+        Register another patient
       </button>
     </div>
   );

@@ -179,11 +179,12 @@ public class AdmissionsController : ControllerBase
     /// may overrule the agent's ranking; nobody may put an ICU patient in a general bed without
     /// it being recorded as a downgrade.
     ///
-    /// Reception and a ward nurse may assign a bed that matches the patient's care level. Every
-    /// bed off that path - intensive care, high dependency, a step down, or a step up into a
-    /// ward more acute than the patient needs - is the duty manager's, and that depends on which
-    /// bed was chosen rather than on the route, so choosing one is a 403 from the service and
-    /// not a 401 from a policy.
+    /// Reception, a ward nurse and the duty manager may all assign a bed that matches the
+    /// patient's care level - an intensive-care bed for an ICU patient included, because that is
+    /// the right bed and not a decision anybody has to make. A bed off that path - a step down,
+    /// or a ward more acute than the patient needs - is the duty manager's alone, and that
+    /// depends on which bed was chosen rather than on the route, so choosing one is a 403 from
+    /// the service and not a 401 from a policy.
     /// </remarks>
     [Authorize(Policy = Policies.BedAssigner)]
     [HttpPost("{id:guid}/assign-bed", Name = "assignBedManually")]
@@ -208,7 +209,8 @@ public class AdmissionsController : ControllerBase
     /// night in one ward and moved to another.
     ///
     /// The same permission and the same hard rules as assigning a bed in the first place: a
-    /// ward nurse correcting a bed still cannot correct it into intensive care.
+    /// ward nurse correcting a bed still cannot correct it into a ward the patient's care level
+    /// does not point at.
     /// </remarks>
     [Authorize(Policy = Policies.BedAssigner)]
     [HttpPost("{id:guid}/correct-bed", Name = "correctBed")]

@@ -313,21 +313,24 @@ All three write a `BedAssignment` with `assigned_by` recorded. **The manual path
 
 ### 5.2 Who is allowed to approve
 
+**Rewritten 2026-09-12. The rule is now one question: does the ward give the care this patient was assessed as needing?**
+
 | Bed being approved | Approver |
 | :--- | :--- |
-| General / maternity / pediatric, category matches | Reception or Ward Nurse |
-| **ICU or HDU** | **Duty Manager only** |
+| **Any ward matching the category** — general, maternity, pediatric, **and ICU for an ICU patient** | Reception, Ward Nurse or Duty Manager |
 | **Any downgrade** (bed below requested category) | **Duty Manager only** |
 | **Any ward more acute than the category** | **Duty Manager only** |
 
-ICU beds are the scarcest resource in a hospital. "The AI cannot put someone in intensive care on its own, and neither can a ward nurse" is a rule that defends itself. This is one of the two high-impact approval gates the assignment requires.
+**What this replaced, and why.** The table used to put every `icu` and `hdu` ward in the duty manager's column outright, on the reasoning that "the AI cannot put someone in intensive care on its own, and neither can a ward nurse". That conflated two different things. Intensive care being scarce is an argument about **not spending an ICU bed on someone who does not need one** — it is not an argument about the patient a clinician has *already assessed as needing intensive care*. For that patient the ICU bed is simply the correct bed, and requiring a duty manager's signature delayed the most urgent admission in the hospital for a decision nobody had to make.
 
-**Reception was added on 2026-09-12,** and the last row with it. Two changes, one rule:
+So the gate moved to where the decision actually is: **the mismatch.** A step down gives somebody less care than a clinician asked for. A step up spends a scarcer bed than they need. Both are judgement calls somebody senior should own; a match is not.
 
-- **Reception places patients into the ward the care level calls for.** A walk-in is looked up, registered, admitted and bedded by the person standing at the desk; stopping one step short handed the final act to a ward nurse who is not there. It is `Policies.BedAssigner`, its own policy rather than a wider `AdmissionEditor` — reception bedding a walk-in does not imply reception sending somebody home.
-- **The duty manager may now place a patient into a ward *more acute* than assessed**, which H2 used to refuse for everybody. The night it is for: the general ward is full and there is an empty ICU bed. The person who carries the cost of an empty intensive-care bed is the person who should be able to spend one. It is recorded the same way a downgrade is, and the React bed picker colours the button amber so nobody takes one by accident.
+- **Reception is on the matching row** alongside the ward nurse. A walk-in is looked up, registered, admitted and bedded by the person standing at the desk; stopping one step short handed the final act to a ward nurse who is not there. It is `Policies.BedAssigner`, its own policy rather than a wider `AdmissionEditor` — reception bedding a walk-in does not imply reception sending somebody home.
+- **The duty manager's speciality is the off-path bed.** Including a ward *more acute* than assessed, which H2 used to refuse for everybody. The night it is for: the general ward is full and there is an empty ICU bed. The person who carries the cost of an empty intensive-care bed is the person who may spend one. It is recorded the same way a downgrade is, and the React bed picker colours those buttons **amber** so an off-path bed is never taken by accident.
 
-**What did not change: which bed each role may choose.** That reads the ward the chosen bed stands in, which is in the request body, so it cannot be a route policy — `BedAssignmentService.EnsureMayApprove` answers 403 (`cl_pat_012`, `cl_pat_013`). Widening the route widened *who may place a patient*, not *where*.
+**Worth saying out loud for the viva.** §5.2 used to describe the ICU rule as one of the two high-impact approval gates the assignment requires. **The AI gate is untouched** — every agent proposal still becomes an `AgentProposedChange` a human approves, and no agent places anybody. What changed is only *which human* approves a routine, correctly-matched placement. The remaining role gate is the off-path bed, which is the decision genuinely worth gating.
+
+**Which bed each role may choose is still read from the body, not the route.** It depends on the ward the chosen bed stands in, so it cannot be a route policy — `BedAssignmentService.EnsureMayApprove` answers 403 (`cl_pat_012` for a step up, `cl_pat_013` for a downgrade).
 
 ### 5.3 The hold, and why it expires
 
@@ -461,12 +464,21 @@ Our agent has exactly one job — bed assignment (§8). Keeping it to one job me
 
 ### 6.3 Confirming discharge — the second approval gate
 
+**Rewritten 2026-09-12.**
+
 | Admission category | Confirmed by |
 | :--- | :--- |
-| `outpatient`, `day_case`, `inpatient` | Ward Nurse |
-| **`icu`, `hdu`** | **Duty Manager** |
+| **Every category, `icu` and `hdu` included** | Reception, Ward Nurse or Duty Manager |
 
 Confirming discharge is high-impact: it frees the bed, ends the admission, and sends the patient home. In one transaction it sets `discharged_at`, releases the `BedAssignment` with `release_reason = discharged`, and moves the admission to `discharged`.
+
+**What this replaced, and why.** The table used to send `icu` and `hdu` discharges to the duty manager alone (`cl_pat_024`, now retired). The same mistake as the old §5.2 bed rule: it treated the *care level* as the thing needing a second signature, when the thing that actually protects a patient is the **checklist**, and the checklist cannot be completed without a doctor.
+
+**The gate did not move — it was always the checklist.** `ConfirmAsync` refuses with `cl_pat_023` unless every mandatory item is ticked, and there are two: `clinical_clearance`, which is **a doctor's and nobody else's** and which no automated process can ever set, and `billing_settled`, which only settling the bill writes. So no patient goes home un-cleared by a doctor or with an unsettled bill, whoever presses the button. A duty manager who was not at the bedside adding a third signature after the doctor had already cleared the patient was delay, not safety.
+
+**Reception is on the list** because it settles the bill and hands over the discharge document on this same screen. Fetching a nurse for the final click was the one thing it could not do.
+
+**For the viva.** This is still described as an approval gate and it still is one — the approval that matters is the doctor's clinical clearance, which is unchanged and unchangeable. What was removed is a *role* gate layered on top of it. The AI gate is likewise untouched: no agent ticks a checklist box or confirms a discharge.
 
 ### 6.4 Who confirms, in code
 
@@ -793,7 +805,7 @@ Four tools. Three read, one write, and the write can only ever create a proposal
   **not** the discharge workflow (§7): a visit with a bed is refused there with `cl_pat_020`,
   because a discharge has a checklist, a summary note, an approver and a bed to give back.
 - **H1 is split in two.** "Usable" is a property of the bed and is checked here. "Free" is a race and is not: no read can settle it, and `ux_bed_assignments_live_bed` is what does. Adding a prior read would make the index look like belt-and-braces rather than the rule.
-- **H2 refuses an upgrade too — except for the duty manager.** Ward types sit on three rungs — `icu`, `hdu`, and everything else — with `day_case` and `outpatient` on the bottom rung alongside `inpatient`, because there is no ward type below `general`. A general patient into an ICU bed is a 409 for the agent and a 403 for a nurse or reception; **since 2026-09-12 the duty manager may overrule it** (§5.2). Nobody else ever sees the 409, because every ward more acute than a patient needs is an `icu` or `hdu` ward and those are refused to them one step earlier.
+- **H2 refuses an upgrade too — except for the duty manager.** Ward types sit on three rungs — `icu`, `hdu`, and everything else — with `day_case` and `outpatient` on the bottom rung alongside `inpatient`, because there is no ward type below `general`. A general patient into an ICU bed is a 409 for the agent and a 403 (`cl_pat_012`) for a nurse or reception; **since 2026-09-12 the duty manager may overrule it** (§5.2). Note this is about the *mismatch*, not about ICU: an **ICU patient** into an ICU bed is a match and anybody who may place a patient may make it.
 - **H3 sends `other` and `unknown` to a mixed ward only.** Exactly what `Gender.Unknown` was added for: an unidentified arrival lands somewhere by rule rather than on a guess about which single-sex ward they belong in.
 - **H5 reads as "no active ward for this bed".** A retired ward is invisible to the global query filter, so a missing ward and a retired one are the same answer, and both are a 409 rather than a 404 — the bed is real, its ward just cannot take a patient.
 - **H6 is one-directional, and unknown counts as an adult.** A `pediatric` ward is closed to anybody 18 or over (`cl_pat_030`); a child is *not* confined to one, or a 6-year-old needing intensive care could not be given it. **A patient with no recorded date of birth is refused**, on the same reasoning as H3's handling of `unknown` — the narrower ward takes a recorded fact to earn, not the absence of one. Like the gender policy it is a property of the ward, so unlike H2 there is no duty-manager override. This is also why the React intake form now requires a date of birth for any patient who can give one: a blank one quietly costs a child the right ward.

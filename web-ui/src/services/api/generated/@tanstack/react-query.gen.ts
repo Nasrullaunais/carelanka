@@ -259,11 +259,12 @@ export const cancelAdmissionMutation = (options?: Partial<Options<CancelAdmissio
  * may overrule the agent's ranking; nobody may put an ICU patient in a general bed without
  * it being recorded as a downgrade.
  *
- * Reception and a ward nurse may assign a bed that matches the patient's care level. Every
- * bed off that path - intensive care, high dependency, a step down, or a step up into a
- * ward more acute than the patient needs - is the duty manager's, and that depends on which
- * bed was chosen rather than on the route, so choosing one is a 403 from the service and
- * not a 401 from a policy.
+ * Reception, a ward nurse and the duty manager may all assign a bed that matches the
+ * patient's care level - an intensive-care bed for an ICU patient included, because that is
+ * the right bed and not a decision anybody has to make. A bed off that path - a step down,
+ * or a ward more acute than the patient needs - is the duty manager's alone, and that
+ * depends on which bed was chosen rather than on the route, so choosing one is a 403 from
+ * the service and not a 401 from a policy.
  */
 export const assignBedManuallyMutation = (options?: Partial<Options<AssignBedManuallyData>>): UseMutationOptions<AssignBedManuallyResponse, AssignBedManuallyError, Options<AssignBedManuallyData>> => {
     const mutationOptions: UseMutationOptions<AssignBedManuallyResponse, AssignBedManuallyError, Options<AssignBedManuallyData>> = {
@@ -291,7 +292,8 @@ export const assignBedManuallyMutation = (options?: Partial<Options<AssignBedMan
  * night in one ward and moved to another.
  *
  * The same permission and the same hard rules as assigning a bed in the first place: a
- * ward nurse correcting a bed still cannot correct it into intensive care.
+ * ward nurse correcting a bed still cannot correct it into a ward the patient's care level
+ * does not point at.
  */
 export const correctBedMutation = (options?: Partial<Options<CorrectBedData>>): UseMutationOptions<CorrectBedResponse, CorrectBedError, Options<CorrectBedData>> => {
     const mutationOptions: UseMutationOptions<CorrectBedResponse, CorrectBedError, Options<CorrectBedData>> = {
@@ -1013,9 +1015,12 @@ export const updateDischargeChecklistMutation = (options?: Partial<Options<Updat
  * transaction it sets `discharged_at`, releases the bed assignment with
  * `release_reason: discharged`, and moves the admission to `discharged`.
  *
- * Ward Nurse for `outpatient`, `day_case` and `inpatient`; **Duty Manager for `icu` and
- * `hdu`**, which depends on the admission rather than the route and so is checked in the
- * service. Refused with 409 if any mandatory checklist item is unticked.
+ * Reception, a ward nurse or the duty manager, **at any care level** — the ICU and HDU
+ * restriction was removed on 2026-09-12. **The gate is the checklist, not the role.** Both
+ * mandatory boxes must be ticked or this is a 409, and the clinical one is a doctor's and
+ * nobody else's, so no patient goes home without a doctor having cleared them. That is the
+ * signature that means something; a second one from somebody who was not at the bedside
+ * was delay rather than safety.
  */
 export const confirmDischargeMutation = (options?: Partial<Options<ConfirmDischargeData>>): UseMutationOptions<ConfirmDischargeResponse, ConfirmDischargeError, Options<ConfirmDischargeData>> => {
     const mutationOptions: UseMutationOptions<ConfirmDischargeResponse, ConfirmDischargeError, Options<ConfirmDischargeData>> = {

@@ -480,9 +480,10 @@ public sealed class BedAssignmentService : IBedAssignmentService
     /// body - the ward the chosen bed stands in. The same shape as the check-in rule in
     /// <c>AppointmentService</c> (<c>cl_pat_011</c>), and for the same reason.
     ///
-    /// <b>This is the whole of the role split.</b> Reception and the ward nurse place patients
-    /// into the ward their care level calls for; everything off that path - intensive care,
-    /// high dependency, a step down, or a step up - is the duty manager's. Which is why
+    /// <b>This is the whole of the role split, and it is one question.</b> Does this ward give
+    /// the care this patient was assessed as needing? If it does, whoever may place a patient
+    /// may place them here - reception and the ward nurse included, intensive care included.
+    /// If it does not, in either direction, it is the duty manager's. Which is why
     /// <c>Policies.BedAssigner</c> on the route can be as wide as it is.
     ///
     /// A missing or retired ward falls through untouched. H5 in
@@ -491,31 +492,23 @@ public sealed class BedAssignmentService : IBedAssignmentService
     /// </remarks>
     private void EnsureMayApprove(AdmissionCategory category, WardEntity? ward)
     {
-        if (ward is null || IsDutyManager)
+        // The gate is one question, asked in one place. A ward matching the care level never
+        // gets past here - intensive care included, because for an ICU patient that is simply
+        // the right bed.
+        if (ward is null || IsDutyManager
+            || !BedPlacementRules.NeedsDutyManager(category, ward.WardType))
         {
             return;
         }
 
-        // Checked before the ICU/HDU rule so the message names the real objection. A downgrade
-        // into an HDU ward is both, and "this is a downgrade" is the more specific complaint.
-        if (BedPlacementRules.IsDowngrade(category, ward.WardType))
-        {
-            throw new ForbiddenException(
-                MessageCode.BedDowngradeNeedsDutyManager,
-                ward.Name,
-                EnumWire.ToWire(ward.WardType),
-                EnumWire.ToWire(category));
-        }
+        // Past the gate it is one of exactly two directions, and the message says which so the
+        // caller knows what to look for instead.
+        var code = BedPlacementRules.IsDowngrade(category, ward.WardType)
+            ? MessageCode.BedDowngradeNeedsDutyManager
+            : MessageCode.BedNeedsDutyManager;
 
-        // Covers the step *up* as well as intensive care itself, because every ward more acute
-        // than a patient needs is an icu or hdu ward. So the duty manager's H2 exception never
-        // has to be spelled out twice.
-        if (BedPlacementRules.NeedsDutyManager(category, ward.WardType)
-            || BedPlacementRules.IsMoreAcuteThanNeeded(category, ward.WardType))
-        {
-            throw new ForbiddenException(
-                MessageCode.BedNeedsDutyManager, ward.Name, EnumWire.ToWire(ward.WardType));
-        }
+        throw new ForbiddenException(
+            code, ward.Name, EnumWire.ToWire(ward.WardType), EnumWire.ToWire(category));
     }
 
     /// <summary>

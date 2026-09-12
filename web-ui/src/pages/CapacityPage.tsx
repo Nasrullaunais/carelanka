@@ -35,7 +35,7 @@ export function CapacityPage() {
     return (
       <>
         <h1>Bed capacity</h1>
-        <p className="empty">Sign in as a staff member to see bed numbers.</p>
+        <p className="empty">Sign in as a member of staff to see bed capacity.</p>
       </>
     );
   }
@@ -48,14 +48,14 @@ export function CapacityPage() {
     <>
       <h1>Bed capacity</h1>
       <p className="muted">
-        Every ward, how many beds it has, and how many of them you could put someone in this
-        minute. Numbers only — nothing here says who is in a bed.
+        Every ward, its bed count, and how many of those beds are free now. Numbers only —
+        nothing here identifies a patient.
       </p>
 
       {capacity.isError ? (
         <div className="card">
           <div className="empty">
-            <p>Could not count the beds.</p>
+            <p>Could not load bed capacity.</p>
             <button type="button" className="secondary" onClick={() => void capacity.refetch()}>
               Try again
             </button>
@@ -64,18 +64,18 @@ export function CapacityPage() {
       ) : (
         <>
           <div className="card">
-            <h2>The whole hospital</h2>
+            <h2>Hospital total</h2>
 
             <div className="stats">
-              <Stat caption="Beds in total" value={totalBeds} />
-              <Stat caption="Free right now" value={freeBeds} tone={freeBeds === 0 ? 'none' : 'free'} />
-              <Stat caption="Not free" value={totalBeds - freeBeds} />
+              <Stat caption="Total beds" value={totalBeds} />
+              <Stat caption="Free now" value={freeBeds} tone={freeBeds === 0 ? 'none' : 'free'} />
+              <Stat caption="Unavailable" value={totalBeds - freeBeds} />
             </div>
 
             <p className="hint">
-              &ldquo;Not free&rdquo; is everything else at once: someone in the bed, someone
-              holding it on their way in, or Equipment has it out for repair. Open a ward's
-              details below to see which is which.
+              &ldquo;Unavailable&rdquo; covers three cases at once: a patient in the bed, a
+              hold for a patient on their way in, and a bed Equipment has taken out of service.
+              Open a ward below for the breakdown.
               {capacity.data && (
                 <>
                   {' '}
@@ -176,8 +176,8 @@ export function CapacityPage() {
             )}
 
             <p className="hint">
-              A ward with no beds at all is not a mistake here — beds are registered by
-              Equipment, and a ward exists before anyone puts furniture in it.
+              A ward with no beds is not an error. Beds are registered by Equipment, and a ward
+              exists before any beds are added to it.
             </p>
           </div>
         </>
@@ -226,19 +226,16 @@ function WardOccupancyPanel({ ward, onClose }: { ward: WardCapacity; onClose: ()
           </div>
 
           <p className="hint">
-            &ldquo;Being held&rdquo; is a bed kept for someone on their way in. A hold lasts 30
-            minutes; once it runs out the bed is free again on its own, without anyone
-            releasing it.
+            &ldquo;Held&rdquo; is a bed kept for a patient on their way in. A hold lasts 30
+            minutes and then releases itself.
           </p>
 
           <h4 style={{ marginTop: '1.25rem', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
-            Who is in the beds
+            Patients by care level
           </h4>
           <p className="muted" style={{ marginBottom: '0.9rem' }}>
-            Fifteen ordinary inpatients and two high-dependency patients are both
-            &ldquo;seventeen patients&rdquo;, and they need very different numbers of staff on
-            the floor. This is that difference. It counts only people actually in a bed —
-            someone still on their way is in the next line down.
+            Care level drives how much staffing a ward needs, so a head count alone is not
+            enough. Counts patients in a bed only; patients on their way are on the last line.
           </p>
 
           <table>
@@ -254,7 +251,7 @@ function WardOccupancyPanel({ ward, onClose }: { ward: WardCapacity; onClose: ()
                 </tr>
               ))}
               <tr>
-                <th scope="row">On their way, next 2 hours</th>
+                <th scope="row">Expected within 2 hours</th>
                 <td>
                   <strong>{occupancy.data.incoming_next_2h}</strong>
                 </td>
@@ -263,8 +260,7 @@ function WardOccupancyPanel({ ward, onClose }: { ward: WardCapacity; onClose: ()
           </table>
 
           <p className="hint">
-            Every care level is listed even at zero, so a line does not vanish from a chart the
-            moment it empties.
+            Every care level is listed even at zero, so no line disappears when it empties.
           </p>
         </>
       )}

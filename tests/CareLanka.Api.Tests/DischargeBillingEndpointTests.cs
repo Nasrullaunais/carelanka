@@ -469,37 +469,45 @@ public sealed class DischargeBillingEndpointTests
     }
 
     [Fact]
-    public async Task An_icu_discharge_is_the_duty_managers_and_an_inpatient_one_is_not()
+    public async Task A_nurse_may_confirm_an_icu_discharge()
     {
         var icu = await ReadyToGoAsync(wardType: "icu", category: "icu");
 
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
-        var refused = await nurse.PostAsJsonAsync(
+        var confirmed = await nurse.PostAsJsonAsync(
             $"/api/discharges/{icu.AdmissionId}/confirm", new { });
 
-        using var problem = await ReadJsonAsync(refused);
-
-        Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
-        Assert.Equal("cl_pat_024", problem.RootElement.GetProperty("code").GetString());
-
-        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
-        var allowed = await manager.PostAsJsonAsync(
-            $"/api/discharges/{icu.AdmissionId}/confirm", new { });
-
-        Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+        // Changed 2026-09-12: this used to be a 403 with cl_pat_024. The care level no longer
+        // decides who may confirm, because the checklist is the gate - and getting this far
+        // means a doctor has already ticked clinical_clearance.
+        Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
     }
 
     [Fact]
-    public async Task Reception_does_not_confirm_a_discharge_even_though_they_settle_the_bill()
+    public async Task Reception_may_confirm_a_discharge()
     {
         var visit = await ReadyToGoAsync();
 
         using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
-        var refused = await reception.PostAsJsonAsync(
+        var confirmed = await reception.PostAsJsonAsync(
             $"/api/discharges/{visit.AdmissionId}/confirm", new { });
 
-        // Taking money and deciding a patient may leave are different jobs. Reception does the
-        // first; the ward does the second.
+        // Reception settles the bill and hands over the paperwork on this same screen. Fetching
+        // a nurse for the last click was the only thing it could not do.
+        Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_doctor_does_not_confirm_a_discharge()
+    {
+        var visit = await ReadyToGoAsync();
+
+        using var doctor = await ClientAsync(ApiApplication.DoctorEmail);
+        var refused = await doctor.PostAsJsonAsync(
+            $"/api/discharges/{visit.AdmissionId}/confirm", new { });
+
+        // Widening the policy did not open it to everybody. A doctor's part is the clinical
+        // clearance box; sending the patient home is desk and ward work.
         Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
     }
 

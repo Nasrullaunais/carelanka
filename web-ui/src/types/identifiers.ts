@@ -71,7 +71,7 @@ export function dateOfBirthProblem(value: string): string | null {
   const parsed = new Date(`${value}T00:00:00`);
 
   if (Number.isNaN(parsed.getTime())) {
-    return 'That is not a date.';
+    return 'Not a valid date.';
   }
 
   const today = new Date();
@@ -85,7 +85,7 @@ export function dateOfBirthProblem(value: string): string | null {
   oldest.setFullYear(oldest.getFullYear() - maxAgeYears);
 
   if (parsed < oldest) {
-    return `That is more than ${maxAgeYears} years ago. Check the year.`;
+    return `More than ${maxAgeYears} years ago. Check the year.`;
   }
 
   return null;

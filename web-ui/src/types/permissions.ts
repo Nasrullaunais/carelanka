@@ -124,9 +124,10 @@ export function canSetHighCareLevel(role: PrincipalRole | undefined): boolean {
  * desk; stopping one step short handed the last act to a nurse who is not standing there.
  *
  * Only half the rule. Which *bed* a role may choose depends on the ward it stands in, so
- * BedAssignmentService refuses ICU, HDU, downgrades and step-ups from anyone but the duty
- * manager and answers 403 at run time. `placementFor` in types/beds.ts is the UI half of that,
- * and this is only "may this person place patients at all".
+ * BedAssignmentService refuses any ward that does not match the patient's care level — a step
+ * down or a step up — from anyone but the duty manager, and answers 403 at run time. A ward
+ * that DOES match is anybody's here, intensive care included. `placementFor` in types/beds.ts
+ * is the UI half of that, and this is only "may this person place patients at all".
  */
 export function canAssignBed(role: PrincipalRole | undefined): boolean {
   return role === 'general_staff' || role === 'ward_nurse' || role === 'duty_manager';
@@ -177,26 +178,18 @@ export function canTickChecklistItem(
 }
 
 /**
- * Policies.AdmissionEditor on POST /api/discharges/{admissionId}/confirm.
+ * Policies.DischargeConfirmer on POST /api/discharges/{admissionId}/confirm.
  *
- * Only half the rule, like canAssignBed. ICU and HDU discharges are the duty manager's, which
- * depends on the admission rather than the route, so DischargeService answers 403 at run time
- * and canConfirmDischargeOf below hides the button before that can happen.
+ * The WHOLE rule now, not half of it. There used to be a `canConfirmDischargeOf` beside this
+ * one because ICU and HDU discharges were the duty manager's, which depended on the admission
+ * rather than the route. That rule was removed on 2026-09-12: the gate is the checklist, and
+ * `clinical_clearance` is a doctor's alone, so nobody goes home un-cleared whoever confirms it.
+ *
+ * Reception is here because it settles the bill and hands over the paperwork on this same
+ * screen — fetching a nurse for the last click was the only thing it could not do.
  */
 export function canConfirmDischarge(role: PrincipalRole | undefined): boolean {
-  return role === 'ward_nurse' || role === 'duty_manager';
-}
-
-/** The other half: a ward nurse confirms everything except ICU and HDU. */
-export function canConfirmDischargeOf(
-  role: PrincipalRole | undefined,
-  category: string,
-): boolean {
-  if (!canConfirmDischarge(role)) {
-    return false;
-  }
-
-  return role === 'duty_manager' || (category !== 'icu' && category !== 'hdu');
+  return role === 'general_staff' || role === 'ward_nurse' || role === 'duty_manager';
 }
 
 /**

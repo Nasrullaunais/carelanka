@@ -428,7 +428,8 @@ tr.selected {
   gap: 1rem;
 }
 
-.dialog-head h2 {
+.dialog-head h2,
+.dialog-head h3 {
   margin: 0;
 }
 

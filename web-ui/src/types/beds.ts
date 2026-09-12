@@ -149,31 +149,27 @@ export function placementFor(
 
   // H4. The flag is on the bed, not the ward — a side room is not only found in isolation.
   if (admission.is_infectious && !bed.has_isolation) {
-    return { kind: 'refused', why: 'No isolation in this bed' };
+    return { kind: 'refused', why: 'Bed has no isolation' };
   }
 
   // Does this ward give the level of care the patient was assessed at? Null means yes, and yes
   // is the only answer that is a plain choice rather than a decision somebody has to own.
   const mismatch = isDowngrade(admission.admission_category, ward.ward_type)
-    ? 'Less intensive than assessed'
+    ? 'Lower care level than assessed'
     : isMoreAcuteThanNeeded(admission.admission_category, ward.ward_type)
-      ? 'More acute than this patient needs'
+      ? 'Higher care level than assessed'
       : null;
 
-  // Mirrors BedPlacementRules.NeedsDutyManager. Note that an ICU ward is on this list even for
-  // an ICU patient: the bed matches, but intensive care is the scarcest thing in the hospital
-  // and spending one is the duty manager's call whoever it is for.
-  const seniorOnly =
-    mismatch !== null || ward.ward_type === 'icu' || ward.ward_type === 'hdu';
-
-  // Shown with its reason rather than hidden — a nurse looking at an empty ICU needs to know
-  // the beds are there and who to ask.
-  if (seniorOnly && role !== 'duty_manager') {
-    return { kind: 'refused', why: `${mismatch ?? 'Intensive care bed'} — duty manager only` };
+  // Mirrors BedPlacementRules.NeedsDutyManager, which is now the mismatch and nothing else. An
+  // ICU ward is NOT special: for an ICU patient it is simply the right bed, and a nurse may
+  // choose it. Only a ward the care level does not point at is somebody else's decision.
+  //
+  // Shown with its reason rather than hidden — a nurse looking at a bed she cannot take needs
+  // to know it is there and who to ask.
+  if (mismatch !== null && role !== 'duty_manager') {
+    return { kind: 'refused', why: `${mismatch} — duty manager only` };
   }
 
-  // Amber is for a bed the care level does not point at, NOT merely for one needing seniority.
-  // An ICU bed for an ICU patient is the right bed and reads as an ordinary choice; a general
-  // bed for that same patient is the decision worth colouring.
+  // Amber is exactly the off-path case, which is also exactly the duty manager's speciality.
   return mismatch === null ? { kind: 'ok' } : { kind: 'override', why: mismatch };
 }

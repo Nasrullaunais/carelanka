@@ -84,24 +84,36 @@ public static class BedPlacementRules
     /// </summary>
     /// <remarks>
     /// Every such ward is <c>icu</c> or <c>hdu</c>, because those are the only two ward types
-    /// above the ordinary-bed rung. So <see cref="NeedsDutyManager"/> already covers this case
-    /// and no separate role rule is needed for it.
+    /// above the ordinary-bed rung — but the rule is the mismatch, not the ward type. An ICU
+    /// ward is *not* more acute than an ICU patient needs, which is exactly why a nurse may
+    /// put that patient in it. See <see cref="NeedsDutyManager"/>.
     /// </remarks>
     public static bool IsMoreAcuteThanNeeded(AdmissionCategory category, WardType wardType)
         => Rung(wardType) < Rung(category);
 
     /// <summary>
-    /// A ward a ward nurse or reception may not place into on their own: intensive care, high
-    /// dependency, or any step down from the care the patient was assessed as needing.
+    /// A ward a ward nurse or reception may not place into on their own: one that does not give
+    /// the level of care this patient was assessed as needing, in either direction.
     /// </summary>
     /// <remarks>
-    /// patient-management-plan.md §5.2. ICU beds are the scarcest thing in a hospital, and a
-    /// downgrade is a decision about giving somebody less care than a clinician asked for.
-    /// Both are the duty manager's, and neither is a property of the route — they depend on
-    /// which bed was picked, so this is checked in the service, the same way check-in is.
+    /// patient-management-plan.md §5.2. <b>The rule is the match, and nothing else.</b> Whoever
+    /// may place a patient may place them in the ward their care level points at — an ICU bed
+    /// for an ICU patient is the right bed, and making a nurse find a duty manager for it slows
+    /// down the most urgent admission in the hospital for no decision anybody has to make.
+    ///
+    /// What is genuinely a decision is putting somebody somewhere their care level does not
+    /// point at: a step down, which gives them less care than a clinician asked for, or a step
+    /// up, which spends a scarcer bed than they need. Those are the duty manager's.
+    ///
+    /// Not a property of the route — it depends on which bed was picked, so it is checked in the
+    /// service, the same way check-in is.
+    ///
+    /// <b>Revised 2026-09-12.</b> This used to include every <c>icu</c> and <c>hdu</c> ward
+    /// regardless of the patient, which meant an ICU patient could not be bedded without a duty
+    /// manager even though the bed matched perfectly.
     /// </remarks>
     public static bool NeedsDutyManager(AdmissionCategory category, WardType wardType)
-        => wardType is WardType.Icu or WardType.Hdu || IsDowngrade(category, wardType);
+        => IsDowngrade(category, wardType) || IsMoreAcuteThanNeeded(category, wardType);
 
     /// <summary>The age from which a patient is an adult, and so no longer a pediatric case.</summary>
     public const int PediatricAgeLimit = 18;

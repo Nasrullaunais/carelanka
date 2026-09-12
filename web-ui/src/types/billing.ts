@@ -6,7 +6,7 @@ import type { BillLineSource } from '../services/api/generated';
 export const billLineSourceLabels: Record<BillLineSource, string> = {
   admission_fee: 'Admission fee',
   bed_stay: 'Bed',
-  manual: 'Added at the desk',
+  manual: 'Added manually',
 };
 
 /**
@@ -15,9 +15,9 @@ export const billLineSourceLabels: Record<BillLineSource, string> = {
  * not an answer they can give.
  */
 export const billLineSourceHints: Record<BillLineSource, string> = {
-  admission_fee: 'Worked out from the care level a clinician recorded.',
+  admission_fee: 'Worked out from the care level recorded by a clinician.',
   bed_stay: 'Worked out from the time the patient spent in that bed.',
-  manual: 'Typed in here. Nothing in the system records treatments, so these are entered by hand.',
+  manual: 'Entered by hand. Nothing in the system records treatments against an admission.',
 };
 
 /** Only a typed line can be taken off again. A generated one comes back on the next prepare. */
@@ -67,14 +67,13 @@ export const expenseLabels: Record<string, string> = {
 
 /** One line of plain English per expense, so the administrator knows what they are pricing. */
 export const expenseHints: Record<string, string> = {
-  bed_day:
-    'The only one the system fills in by itself, off the ward the patient is actually lying in.',
-  food: 'Charged per day the patient was fed, which is not always per day they were here.',
-  medicine: 'Priced off the pharmacy slip, so it is different every time.',
-  therapy: 'Physiotherapy and the like, per session attended.',
-  tests: 'X-rays, blood work, anything sent to a lab.',
-  transport: 'Only when the hospital arranges it.',
-  take_home_medicine: 'What the patient leaves with.',
+  bed_day: 'The only rate applied automatically, taken from the ward the patient is in.',
+  food: 'Charged per day the patient was fed, which is not always per day admitted.',
+  medicine: 'Priced from the pharmacy slip, so it varies every time.',
+  therapy: 'Physiotherapy and similar, per session attended.',
+  tests: 'X-rays, blood work and anything sent to a lab.',
+  transport: 'Charged only when the hospital arranges it.',
+  take_home_medicine: 'Medicine the patient leaves with.',
 };
 
 export function expenseLabel(key: string): string {
@@ -125,10 +124,9 @@ export const checklistLabels: Record<string, string> = {
 
 /** Who does it, and anything the reader needs to know before pressing the button. */
 export const checklistHints: Record<string, string> = {
-  clinical_clearance:
-    'A doctor only, and never anything automatic. Without this nobody goes home.',
+  clinical_clearance: 'Recorded by a doctor only. No discharge without it.',
   billing_settled:
-    'Ticked by settling the bill below, and by nothing else. There is no button here on purpose: the bill and this box are the same fact.',
+    'Ticked by settling the bill above, and by nothing else. There is no button here on purpose.',
 };
 
 /** Falls back to the wire value, so a third box added server-side still reads sensibly. */
@@ -168,7 +166,7 @@ export const chargeTemplates: ChargeTemplate[] = [
   {
     key: 'food',
     label: 'Meals',
-    hint: 'Food for the stay. One per day the patient was fed, which is not always one per day they were here.',
+    hint: 'One per day the patient was fed, which is not always one per day admitted.',
     unitPrice: 1200,
     quantityLabel: 'Days',
     defaultQuantity: 1,
@@ -176,7 +174,7 @@ export const chargeTemplates: ChargeTemplate[] = [
   {
     key: 'medicine',
     label: 'Medicine during the stay',
-    hint: 'What was given on the ward. Priced from the pharmacy slip — the amount varies every time, so there is no suggestion to make.',
+    hint: 'Medicine given on the ward, priced from the pharmacy slip. The amount varies every time, so no default is offered.',
     unitPrice: null,
     quantityLabel: 'Items',
     defaultQuantity: 1,
@@ -184,7 +182,7 @@ export const chargeTemplates: ChargeTemplate[] = [
   {
     key: 'therapy',
     label: 'Therapy',
-    hint: 'Physiotherapy and the like, per session attended.',
+    hint: 'Physiotherapy and similar, per session attended.',
     unitPrice: 4500,
     quantityLabel: 'Sessions',
     defaultQuantity: 1,
@@ -192,7 +190,7 @@ export const chargeTemplates: ChargeTemplate[] = [
   {
     key: 'tests',
     label: 'Tests and scans',
-    hint: 'X-rays, blood work, anything sent to a lab. Name the test in the description.',
+    hint: 'X-rays, blood work and anything sent to a lab. Name the test in the description.',
     unitPrice: 3500,
     quantityLabel: 'Tests',
     defaultQuantity: 1,
@@ -200,7 +198,7 @@ export const chargeTemplates: ChargeTemplate[] = [
   {
     key: 'transport',
     label: 'Transport home',
-    hint: 'Only when the hospital arranges it. A patient whose family collects them is not charged for it, so this is not on every bill.',
+    hint: 'Charged only when the hospital arranges it. A patient collected by family is not charged.',
     unitPrice: 3500,
     quantityLabel: 'Trips',
     defaultQuantity: 1,
@@ -208,15 +206,15 @@ export const chargeTemplates: ChargeTemplate[] = [
   {
     key: 'take_home_medicine',
     label: 'Take-home medicine',
-    hint: 'What the patient leaves with. Charging for it and handing it over used to be two separate records; now the line on the bill is the one record.',
+    hint: 'Medicine the patient leaves with. The line on the bill is the only record of it.',
     unitPrice: null,
     quantityLabel: 'Items',
     defaultQuantity: 1,
   },
   {
     key: 'other',
-    label: 'Something else',
-    hint: 'Type whatever it was. Anything that turns up on three bills running probably wants a row of its own here.',
+    label: 'Other',
+    hint: 'Anything not listed above. Describe it in full — the patient reads this line.',
     unitPrice: null,
     quantityLabel: 'How many',
     defaultQuantity: 1,

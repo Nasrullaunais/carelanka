@@ -85,11 +85,14 @@ public class DischargesController : ControllerBase
     /// transaction it sets `discharged_at`, releases the bed assignment with
     /// `release_reason: discharged`, and moves the admission to `discharged`.
     ///
-    /// Ward Nurse for `outpatient`, `day_case` and `inpatient`; **Duty Manager for `icu` and
-    /// `hdu`**, which depends on the admission rather than the route and so is checked in the
-    /// service. Refused with 409 if any mandatory checklist item is unticked.
+    /// Reception, a ward nurse or the duty manager, **at any care level** — the ICU and HDU
+    /// restriction was removed on 2026-09-12. **The gate is the checklist, not the role.** Both
+    /// mandatory boxes must be ticked or this is a 409, and the clinical one is a doctor's and
+    /// nobody else's, so no patient goes home without a doctor having cleared them. That is the
+    /// signature that means something; a second one from somebody who was not at the bedside
+    /// was delay rather than safety.
     /// </remarks>
-    [Authorize(Policy = Policies.AdmissionEditor)]
+    [Authorize(Policy = Policies.DischargeConfirmer)]
     [HttpPost("{admissionId:guid}/confirm", Name = "confirmDischarge")]
     [ProducesResponseType(typeof(DischargeResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]

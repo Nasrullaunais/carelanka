@@ -43,7 +43,7 @@ export function worklistStatusDetail(row: WorklistRow): string | null {
     case 'bed_ready':
       // Named, because the whole job this status creates is "go to that bed". And the hold
       // lapses in thirty minutes, so it is the one row on the board with a clock on it.
-      return bed ? `${bed} — held, collect them` : 'A bed is held';
+      return bed ? `${bed} — held` : 'Bed held';
 
     case 'admitted':
       // Three different situations under one badge, and the difference matters: in a bed, or

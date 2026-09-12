@@ -92,8 +92,8 @@ export function AppointmentsPage() {
     <>
       <h1>Expected visits</h1>
       <p className="muted">
-        Who has booked to come in, so the desk knows before they walk up. Checking someone in
-        turns their booking into an admission and starts the search for a bed.
+        Patients booked to come in, so the desk knows before they arrive. Checking a patient in
+        turns the appointment into an admission and starts the search for a bed.
       </p>
 
       <div className="card">
@@ -249,7 +249,7 @@ function AppointmentTable({
   if (isError) {
     return (
       <div className="empty">
-        <p>Could not load the bookings.</p>
+        <p>Could not load the appointments.</p>
         <button type="button" className="secondary" onClick={onRetry}>
           Try again
         </button>
@@ -258,7 +258,7 @@ function AppointmentTable({
   }
 
   if (appointments.length === 0) {
-    return <p className="empty">Nobody is booked in under this filter.</p>;
+    return <p className="empty">No appointments match this filter.</p>;
   }
 
   return (
@@ -395,8 +395,8 @@ function BookVisitCard() {
     <div className="card">
       <h2>Book a visit</h2>
       <p className="muted" style={{ marginBottom: '0.9rem' }}>
-        For someone on the phone or at the counter. A patient booking in the app takes the same
-        slot a different way — one open booking each, and never for someone already admitted.
+        For a patient on the phone or at the counter. A patient booking in the app uses the same
+        rules: one open appointment each, and none for a patient already admitted.
       </p>
 
       {patient === null ? (
@@ -430,8 +430,8 @@ function BookVisitCard() {
 
           {submitted !== '' && !patients.isFetching && patients.data?.items.length === 0 && (
             <p className="empty">
-              Nobody matches “{submitted}”. A patient has to be registered before a visit can be
-              booked for them — register them on the intake screen first.
+              No patient matches “{submitted}”. A patient must be registered before a visit can
+              be booked — register them on the intake screen first.
             </p>
           )}
 
@@ -456,7 +456,7 @@ function BookVisitCard() {
                           setWhen(localInputValue(new Date(Date.now() + 60 * 60 * 1000)));
                         }}
                       >
-                        Book for them
+                        Book a visit
                       </button>
                     </td>
                   </tr>
@@ -482,7 +482,7 @@ function BookVisitCard() {
 
           <div className="row">
             <div className="field">
-              <label htmlFor="book-when">When are they coming?</label>
+              <label htmlFor="book-when">Date and time</label>
               <input
                 id="book-when"
                 type="datetime-local"
@@ -493,7 +493,7 @@ function BookVisitCard() {
               />
               {when !== '' && !isFuture && (
                 <p className="hint">
-                  That time has already passed. Somebody who is here now is admitted, not
+                  That time has already passed. A patient who is here now is admitted, not
                   booked — use the intake screen instead.
                 </p>
               )}
@@ -594,8 +594,8 @@ function CheckInPanel({
       <h3>Check in {appointment.patient.full_name}</h3>
       <p className="muted" style={{ marginBottom: '0.9rem' }}>
         Booked for {localDateTime(appointment.scheduled_at)}
-        {appointment.reason ? ` — ${appointment.reason}` : ''}. From here they are an ordinary
-        admission and the bed search runs on them exactly as it would for a walk-in.
+        {appointment.reason ? ` — ${appointment.reason}` : ''}. From here this is an ordinary
+        admission, and the bed search runs exactly as it would for a walk-in.
       </p>
 
       <form onSubmit={submit}>
@@ -614,14 +614,14 @@ function CheckInPanel({
               ))}
             </select>
             <p className="hint">
-              {admissionCategoryHints[category]} You are choosing this and it is recorded
-              against your name.
+              {admissionCategoryHints[category]} This is your decision and is recorded against
+              your name.
             </p>
             {!canSetHighCare && (
               <p className="hint">
-                Intensive care and high dependency are not on this list because they are the
-                duty manager&rsquo;s call. If this patient needs either, ask them to check the
-                patient in.
+                Intensive care and high dependency are the duty manager&rsquo;s decision, so
+                they are not on this list. If the patient needs either, ask the duty manager to
+                check them in.
               </p>
             )}
           </div>
@@ -678,14 +678,14 @@ function CheckedInCard({
     <div className="card">
       <h2>Checked in</h2>
       <p className="muted">
-        {admission.patient?.full_name ?? 'The patient'} is admitted and waiting for a bed. Care
+        {admission.patient?.full_name ?? 'The patient'} is admitted and awaiting a bed. Care
         level: <strong>{admissionCategoryLabels[admission.admission_category]}</strong>.
       </p>
 
       {admission.missing_fields.length > 0 && (
         <>
           <p style={{ marginTop: '0.9rem' }}>
-            <strong>Paperwork still outstanding:</strong>
+            <strong>Details still missing:</strong>
           </p>
           <ul>
             {admission.missing_fields.map((field) => (
@@ -693,7 +693,7 @@ function CheckedInCard({
             ))}
           </ul>
           <p className="muted">
-            Missing paperwork does not block the admission. It is a list to chase, not a gate.
+            Missing details do not block the admission. This is a list to follow up, not a gate.
           </p>
         </>
       )}

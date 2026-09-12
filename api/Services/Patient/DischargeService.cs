@@ -52,10 +52,6 @@ public sealed class DischargeService : IDischargeService
             [DischargeChecklistItemType.ClinicalClearance] = PrincipalRole.Doctor
         };
 
-    /// <summary>The two care levels whose discharge is the duty manager's, from plan 6.3.</summary>
-    private static readonly AdmissionCategory[] NeedsDutyManager =
-        [AdmissionCategory.Icu, AdmissionCategory.Hdu];
-
     /// <summary>A visit still in the building. Nothing else can be a candidate.</summary>
     private static readonly AdmissionStatus[] OnTheWard =
         [AdmissionStatus.Admitted, AdmissionStatus.ReadyForDischarge];
@@ -196,8 +192,10 @@ public sealed class DischargeService : IDischargeService
 
         var admission = await LoadForWriteAsync(admissionId, ct);
 
-        EnsureMayConfirm(admission.Category);
-
+        // No role check on the care level. ICU and HDU discharges used to be the duty manager's
+        // (plan 6.3, removed 2026-09-12) - but the gate that actually protects a patient is the
+        // checklist below, and its clinical box is a doctor's and nobody else's. Requiring a
+        // second signature from somebody who was not at the bedside added delay, not safety.
         var discharge = await EnsureDischargeAsync(admission, ct);
 
         var outstanding = Outstanding(discharge);
@@ -327,22 +325,6 @@ public sealed class DischargeService : IDischargeService
 
         throw new ForbiddenException(
             MessageCode.ChecklistItemWrongRole, EnumWire.ToWire(item), EnumWire.ToWire(role));
-    }
-
-    /// <summary>
-    /// ICU and HDU discharges are the duty manager's. Everything else is the ward nurse's, and
-    /// the duty manager may do those too.
-    /// </summary>
-    private void EnsureMayConfirm(AdmissionCategory category)
-    {
-        if (_currentUser.Role == PrincipalRole.DutyManager
-            || !NeedsDutyManager.Contains(category))
-        {
-            return;
-        }
-
-        throw new ForbiddenException(
-            MessageCode.DischargeNeedsDutyManager, EnumWire.ToWire(category));
     }
 
     // ---------- loading and writing ----------

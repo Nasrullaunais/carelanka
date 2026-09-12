@@ -959,10 +959,11 @@ paths:
       tags: [Bed Assignment]
       summary: Assign a bed manually, bypassing the agent
       description: |
-        Roles: GeneralStaff and WardNurse for a bed matching the care level, DutyManager for
-        anything off that path - ICU, HDU, a downgrade, or a ward more acute than the patient
-        needs. Which bed depends on the request body rather than the route, so a caller
-        choosing one they may not is a 403 from the service.
+        Roles: GeneralStaff, WardNurse and DutyManager for any bed MATCHING the patient's
+        care level - intensive care included, because an ICU bed for an ICU patient is simply
+        the right bed. DutyManager alone for a bed off that path: a downgrade, or a ward more
+        acute than the patient needs. Which bed depends on the request body rather than the
+        route, so a caller choosing one they may not is a 403 from the service.
 
         The manual path must always work. If the only way to admit a patient were through the
         AI, the hospital would stop the moment the AI stopped. It is also what makes the human
@@ -1003,10 +1004,10 @@ paths:
       tags: [Bed Assignment]
       summary: Move a patient into a different bed because the first was a mistake
       description: |
-        Roles: GeneralStaff and WardNurse for a bed matching the care level, DutyManager for
-        anything off that path - the same permission and the same hard rules as assigning a bed
-        in the first place. Correcting a bed is not a side door to a bed this person may not
-        choose.
+        Roles: GeneralStaff, WardNurse and DutyManager for a bed matching the patient's care
+        level, DutyManager alone for anything off that path - the same permission and the same
+        hard rules as assigning a bed in the first place. Correcting a bed is not a side door
+        to a bed this person may not choose.
 
         Beds get mis-clicked. Without this the only ways out are cancelling a live visit or
         leaving a patient recorded in a bed somebody else is standing next to, and a ward board
@@ -1152,14 +1153,16 @@ paths:
       tags: [Discharge]
       summary: Confirm discharge - the second high-impact human gate
       description: |
-        Roles: WardNurse for outpatient, day_case and inpatient. DutyManager for ICU and HDU.
+        Roles: GeneralStaff, WardNurse or DutyManager, at ANY care level. The ICU and HDU
+        restriction was removed on 2026-09-12 along with its code `cl_pat_024`.
 
         High impact: it ends the admission, frees the bed for the next patient, and sends someone
         home. In one transaction it sets `discharged_at`, releases the bed assignment with
         `release_reason: discharged`, and moves the admission to `discharged`.
 
-        Refused with 409 if any mandatory checklist item is unticked - `clinical_clearance` above
-        all.
+        **The gate is the checklist, not the role.** Refused with 409 if any mandatory item is
+        unticked, and `clinical_clearance` is a doctor's alone - so no patient goes home without
+        a doctor having cleared them, whoever confirms it.
       operationId: confirmDischarge
       requestBody:
         content:

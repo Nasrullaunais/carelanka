@@ -36,6 +36,7 @@
 | 7 | Discharge checklist + confirmation | **Done.** `clinical_clearance` gated on the `doctor` role claim. **Billing came with it** — `billing_settled` cannot be an honest tick with nothing behind it |
 | 8 | Codegen gate | |
 | 9 | React: admissions dashboard, bed board, occupancy report | |
+| 9b | **The `/me/*` backend** | **Done 2026-09-12.** Seven routes: `pre-register`, `profile`, `admission`, `history`, book / list / cancel appointments. Not one takes a patient id - all scoped by the `sub` claim. `pre-register` creates no admission; see `patient-management-plan.md` §7.6 |
 | 10 | Flutter: nurse screens, then the patient's own-stay screens | Local notifications on status change is your device feature |
 | 11 | **The bed agent** | Hard rules H1–H5 in deterministic C#, soft rules rank. Re-check every hard rule under a row lock at approval time |
 | 12 | React: bed approval + downgrade approval | The two human gates |
@@ -446,8 +447,11 @@ possible demo.
 
 Two things your Flutter screens must handle:
 
-- **`principal.patient_id` is null** for someone who signed up but has never been treated
-  here. That is the ordinary state for a new account, not an error.
+- **A signup with no medical record behind it** is the ordinary state for a new account, not
+  an error. **Do not read `principal.patient_id` to detect it** — common auth hard-codes that
+  to null for everybody, so it cannot tell a linked account from an unlinked one
+  (`integration_of_functions.md` §11.7). Call `GET /api/me/profile` on startup: 200 means
+  there is a record, 404 (`cl_pat_033`) means show the details form.
 - `typ: patient` accounts see a completely different navigation tree from staff. `GET
   /auth/me` on startup is what decides which.
 

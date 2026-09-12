@@ -678,11 +678,21 @@ Creating, retiring and taking beds out of service are **Equipment's endpoints, n
 
 | Method | Route | Role | Notes |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/me/pre-register` | Patient | Creates or links a record via NIC match, sets `source = pre_registered` |
-| `GET` | `/api/me/admission` | Patient | **Narrow response.** Status, ward name, bed number, expected discharge, discharge instructions. Nothing else. |
-| `GET` | `/api/me/history` | Patient | Their own past visits, same narrow shape |
+| `POST` | `/api/me/pre-register` | Patient | **Details only.** Creates or links a record via NIC match. Creates no admission — see below. Answers 200, because called twice it is the same record both times |
+| `GET` | `/api/me/profile` | Patient | Their own details, and what is still blank. 404 while the login has no record linked |
+| `GET` | `/api/me/admission` | Patient | **Narrow response.** Status, plain-language status text, ward name, bed number, discharge instructions. Nothing else |
+| `GET` | `/api/me/history` | Patient | Their own **finished** visits, same narrow shape. The open one is `/me/admission`, so it is not listed twice |
+| `POST` | `/api/me/appointments` | Patient | Book a visit. One open booking at a time, and none while admitted |
+| `GET` | `/api/me/appointments` | Patient | Their own bookings, upcoming and past |
+| `POST` | `/api/me/appointments/{id}/cancel` | Patient | Only a `scheduled` one, and only their own — somebody else's reads as 404 |
 
 The patient response is a **different DTO**, not a filtered one. It cannot leak staff notes, agent reasoning, rejection history, or other patients, because those fields do not exist on it.
+
+**`/me/pre-register` sets no `source = pre_registered` and creates no `Admission`** *(corrected 2026-09-12, built the same day)*. It used to be written that way, and it cannot be: an `Admission` carries `category_set_by_staff_member_id`, the recorded proof that a clinician chose the care level, and a patient tapping a form on their phone has no staff id. Building it as written meant forging one or making the column nullable for every admission in the hospital. The three paths stay as they were — a booking becomes an admission with `source = pre_registered` at **check-in**, where a staff member chooses the care level. `expected_arrival` and `reason_for_visit` came off the request with the admission; stating a date is `POST /me/appointments`.
+
+**`/me/profile` was added at the same time**, because nothing else could answer "does this login have a record yet". `GET /auth/me` publishes `patient_id` and common auth hard-codes it to `null` for everybody — `integration_of_functions.md` §11.7.
+
+**Not one of these routes takes a patient id.** Every one resolves the record from the `sub` claim. A route with no id in it cannot be given somebody else's, which is the only real defence against the worst bug this component could have.
 
 ### 7.7 Care recommendations and the second agent
 

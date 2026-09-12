@@ -68,7 +68,11 @@ public static class MessageCodes
             [MessageCode.BillLineNotRemovable] = "cl_pat_027",
             [MessageCode.BedNotAssigned] = "cl_pat_028",
             [MessageCode.BedAlreadyTheirs] = "cl_pat_029",
-            [MessageCode.BedWardPediatricAdult] = "cl_pat_030"
+            [MessageCode.BedWardPediatricAdult] = "cl_pat_030",
+            [MessageCode.NicLinkedToAnotherAccount] = "cl_pat_031",
+            [MessageCode.NicDoesNotMatchYourRecord] = "cl_pat_032",
+            [MessageCode.AccountHasNoPatientRecord] = "cl_pat_033",
+            [MessageCode.NoCurrentAdmission] = "cl_pat_034"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

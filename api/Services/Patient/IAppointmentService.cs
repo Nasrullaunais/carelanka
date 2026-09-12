@@ -36,6 +36,25 @@ public interface IAppointmentService
     Task<AdmissionResponse> CheckInAsync(
         Guid id, CheckInRequest request, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Book a visit the patient made themselves in the app. Same rules as the desk booking —
+    /// future date, one open booking at a time, never for somebody already admitted.
+    /// </summary>
+    /// <remarks>
+    /// Records nobody as having taken the booking, which is what tells a self-booking apart
+    /// from a desk booking afterwards. Returns the entity rather than a DTO because the caller
+    /// is <c>MeService</c>, which publishes the patient's own narrow shape and not the staff one.
+    /// </remarks>
+    Task<AppointmentEntity> BookForPatientAsync(
+        Guid patientId, BookAppointmentRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Cancel a booking the patient made. Only a <c>scheduled</c> one can be cancelled, and only
+    /// their own — somebody else's reads as not found.
+    /// </summary>
+    Task<AppointmentEntity> CancelForPatientAsync(
+        Guid appointmentId, Guid patientId, CancellationToken cancellationToken = default);
+
     /// <summary>Null when there is no such appointment. For internal lookups — use GetByIdAsync to answer a request.</summary>
     Task<AppointmentEntity?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default);
 

@@ -259,10 +259,11 @@ export const cancelAdmissionMutation = (options?: Partial<Options<CancelAdmissio
  * may overrule the agent's ranking; nobody may put an ICU patient in a general bed without
  * it being recorded as a downgrade.
  *
- * A ward nurse may assign a bed that matches the patient's care level. ICU, high-dependency
- * and any downgrade are the duty manager's, and that depends on which bed was chosen rather
- * than on the route - so a nurse choosing one is a 403 from the service, not a 401 from a
- * policy.
+ * Reception and a ward nurse may assign a bed that matches the patient's care level. Every
+ * bed off that path - intensive care, high dependency, a step down, or a step up into a
+ * ward more acute than the patient needs - is the duty manager's, and that depends on which
+ * bed was chosen rather than on the route, so choosing one is a 403 from the service and
+ * not a 401 from a policy.
  */
 export const assignBedManuallyMutation = (options?: Partial<Options<AssignBedManuallyData>>): UseMutationOptions<AssignBedManuallyResponse, AssignBedManuallyError, Options<AssignBedManuallyData>> => {
     const mutationOptions: UseMutationOptions<AssignBedManuallyResponse, AssignBedManuallyError, Options<AssignBedManuallyData>> = {
@@ -1702,6 +1703,13 @@ export const listBedAvailabilityQueryKey = (options?: Options<ListBedAvailabilit
  * component and is not re-implemented per endpoint.
  *
  * Retired wards and retired beds are absent rather than listed as unavailable.
+ *
+ * <b>pageSize goes to 500 here, where every other paged route stops at 100.</b> This one
+ * feeds a bed picker, which is a complete candidate list and not a page anybody browses -
+ * a nurse choosing a bed has to see every bed the patient could go in. At 100 the seeded
+ * hospital's 135 beds were cut off mid-alphabet with nothing on screen saying so, and
+ * pediatric and surgical beds could not be chosen at all. The service already loads every
+ * bed to apply hold expiry and pages in memory, so the higher ceiling costs nothing new.
  */
 export const listBedAvailabilityOptions = (options?: Options<ListBedAvailabilityData>) => queryOptions<ListBedAvailabilityResponse, ListBedAvailabilityError, ListBedAvailabilityResponse, ReturnType<typeof listBedAvailabilityQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -1727,6 +1735,13 @@ export const listBedAvailabilityInfiniteQueryKey = (options?: Options<ListBedAva
  * component and is not re-implemented per endpoint.
  *
  * Retired wards and retired beds are absent rather than listed as unavailable.
+ *
+ * <b>pageSize goes to 500 here, where every other paged route stops at 100.</b> This one
+ * feeds a bed picker, which is a complete candidate list and not a page anybody browses -
+ * a nurse choosing a bed has to see every bed the patient could go in. At 100 the seeded
+ * hospital's 135 beds were cut off mid-alphabet with nothing on screen saying so, and
+ * pediatric and surgical beds could not be chosen at all. The service already loads every
+ * bed to apply hold expiry and pages in memory, so the higher ceiling costs nothing new.
  */
 export const listBedAvailabilityInfiniteOptions = (options?: Options<ListBedAvailabilityData>) => {
     const opts = infiniteQueryOptions<ListBedAvailabilityResponse, ListBedAvailabilityError, InfiniteData<ListBedAvailabilityResponse>, QueryKey<Options<ListBedAvailabilityData>>, number | Pick<QueryKey<Options<ListBedAvailabilityData>>[0], 'body' | 'headers' | 'path' | 'query'>>(

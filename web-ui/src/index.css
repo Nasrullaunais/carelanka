@@ -7,6 +7,7 @@
   --accent: #0f6f5c;
   --accent-soft: #e3f1ed;
   --danger: #a3232b;
+  --warn: #9a5b06;
   --radius: 10px;
 
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -325,6 +326,15 @@ button.danger {
 
 button.danger:not(.secondary) {
   background: var(--danger);
+  color: #fff;
+}
+
+/* An action that is allowed but off the ordinary path - a duty manager spending a bed the
+   patient's care level does not call for. Amber rather than red: it is a decision they are
+   entitled to make, not a mistake. */
+button.warn {
+  background: var(--warn);
+  border-color: var(--warn);
   color: #fff;
 }
 

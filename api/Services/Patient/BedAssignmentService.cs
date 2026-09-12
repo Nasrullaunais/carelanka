@@ -119,7 +119,13 @@ public sealed class BedAssignmentService : IBedAssignmentService
         EnsureMayApprove(admission.Category, ward);
 
         BedPlacementRules.EnsurePlaceable(
-            admission.Category, admission.Patient.Gender, admission.IsInfectious, ward, bed);
+            admission.Category,
+            admission.Patient.Gender,
+            admission.Patient.DateOfBirth,
+            admission.IsInfectious,
+            ward,
+            bed,
+            IsDutyManager);
 
         var assignment = await WriteAsync(admissionId, bed, request.OverrideReason, ct);
 
@@ -148,7 +154,13 @@ public sealed class BedAssignmentService : IBedAssignmentService
         EnsureMayApprove(admission.Category, ward);
 
         BedPlacementRules.EnsurePlaceable(
-            admission.Category, admission.Patient.Gender, admission.IsInfectious, ward, bed);
+            admission.Category,
+            admission.Patient.Gender,
+            admission.Patient.DateOfBirth,
+            admission.IsInfectious,
+            ward,
+            bed,
+            IsDutyManager);
 
         var assignment = await SwapAsync(admissionId, bed, request.Reason, ct);
 
@@ -343,7 +355,13 @@ public sealed class BedAssignmentService : IBedAssignmentService
         EnsureMayApprove(admission.Category, ward);
 
         var isDowngrade = BedPlacementRules.EnsurePlaceable(
-            admission.Category, admission.Patient.Gender, admission.IsInfectious, ward, bed);
+            admission.Category,
+            admission.Patient.Gender,
+            admission.Patient.DateOfBirth,
+            admission.IsInfectious,
+            ward,
+            bed,
+            IsDutyManager);
 
         var now = DateTimeOffset.UtcNow;
 
@@ -462,13 +480,18 @@ public sealed class BedAssignmentService : IBedAssignmentService
     /// body - the ward the chosen bed stands in. The same shape as the check-in rule in
     /// <c>AppointmentService</c> (<c>cl_pat_011</c>), and for the same reason.
     ///
+    /// <b>This is the whole of the role split.</b> Reception and the ward nurse place patients
+    /// into the ward their care level calls for; everything off that path - intensive care,
+    /// high dependency, a step down, or a step up - is the duty manager's. Which is why
+    /// <c>Policies.BedAssigner</c> on the route can be as wide as it is.
+    ///
     /// A missing or retired ward falls through untouched. H5 in
     /// <see cref="BedPlacementRules"/> refuses that as a conflict, and answering 403 here would
     /// tell the caller their role was the problem when the ward was.
     /// </remarks>
     private void EnsureMayApprove(AdmissionCategory category, WardEntity? ward)
     {
-        if (ward is null || _currentUser.Role == PrincipalRole.DutyManager)
+        if (ward is null || IsDutyManager)
         {
             return;
         }
@@ -484,12 +507,22 @@ public sealed class BedAssignmentService : IBedAssignmentService
                 EnumWire.ToWire(category));
         }
 
-        if (BedPlacementRules.NeedsDutyManager(category, ward.WardType))
+        // Covers the step *up* as well as intensive care itself, because every ward more acute
+        // than a patient needs is an icu or hdu ward. So the duty manager's H2 exception never
+        // has to be spelled out twice.
+        if (BedPlacementRules.NeedsDutyManager(category, ward.WardType)
+            || BedPlacementRules.IsMoreAcuteThanNeeded(category, ward.WardType))
         {
             throw new ForbiddenException(
                 MessageCode.BedNeedsDutyManager, ward.Name, EnumWire.ToWire(ward.WardType));
         }
     }
+
+    /// <summary>
+    /// Whether the person making this request may place a patient anywhere the ward's own
+    /// rules allow, rather than only where the care level points.
+    /// </summary>
+    private bool IsDutyManager => _currentUser.Role == PrincipalRole.DutyManager;
 
     /// <summary>
     /// The ward a bed stands in, or null when it is missing or retired. The global query filter

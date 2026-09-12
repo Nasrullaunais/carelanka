@@ -732,7 +732,18 @@ paths:
           in: query
           schema: { type: boolean }
         - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PageSize'
+        - name: pageSize
+          in: query
+          description: |
+            Up to 500, where every other paged route here stops at 100. This one feeds a bed
+            picker, which is a complete candidate list rather than a page somebody browses -
+            a nurse choosing a bed has to be shown every bed the patient could go in.
+
+            At 100 the seeded hospital's 135 beds were silently cut off mid-alphabet, so
+            pediatric and surgical beds could never be chosen at all. The service already
+            loads every bed to apply hold expiry and pages in memory, so the larger ceiling
+            costs nothing it was not already paying.
+          schema: { type: integer, minimum: 1, maximum: 500, default: 20 }
       responses:
         '200':
           description: A page of beds
@@ -948,7 +959,10 @@ paths:
       tags: [Bed Assignment]
       summary: Assign a bed manually, bypassing the agent
       description: |
-        Roles: WardNurse for matching beds, DutyManager for ICU, HDU and downgrades.
+        Roles: GeneralStaff and WardNurse for a bed matching the care level, DutyManager for
+        anything off that path - ICU, HDU, a downgrade, or a ward more acute than the patient
+        needs. Which bed depends on the request body rather than the route, so a caller
+        choosing one they may not is a 403 from the service.
 
         The manual path must always work. If the only way to admit a patient were through the
         AI, the hospital would stop the moment the AI stopped. It is also what makes the human
@@ -989,9 +1003,10 @@ paths:
       tags: [Bed Assignment]
       summary: Move a patient into a different bed because the first was a mistake
       description: |
-        Roles: WardNurse for matching beds, DutyManager for ICU, HDU and downgrades - the same
-        permission and the same hard rules as assigning a bed in the first place. Correcting a
-        bed is not a side door to a bed this person may not choose.
+        Roles: GeneralStaff and WardNurse for a bed matching the care level, DutyManager for
+        anything off that path - the same permission and the same hard rules as assigning a bed
+        in the first place. Correcting a bed is not a side door to a bed this person may not
+        choose.
 
         Beds get mis-clicked. Without this the only ways out are cancelling a live visit or
         leaving a patient recorded in a bed somebody else is standing next to, and a ward board

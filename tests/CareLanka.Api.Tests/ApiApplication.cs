@@ -23,8 +23,9 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
     public const string DoctorEmail = "doctor.tests@carelanka.invalid";
     public const string EquipmentEmail = "equipment.tests@carelanka.invalid";
 
-    // Reception. On PatientRegistrar and PatientDetails since 2026-09-11, and the only role
-    // besides the duty manager and the administrator that may settle a bill.
+    // Reception. On PatientRegistrar and PatientDetails since 2026-09-11, on BedAssigner since
+    // 2026-09-12, and the only role besides the duty manager and the administrator that may
+    // settle a bill.
     public const string ReceptionEmail = "reception.tests@carelanka.invalid";
 
     // The role that is on nothing in Patient Management. Ambulance crew came off

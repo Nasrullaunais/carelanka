@@ -384,7 +384,7 @@ function RegisterStep({
   const unidentified = nic.length === 0;
 
   const form = usePatientForm(emptyPatientForm(unidentified));
-  const problems = patientFormProblems(form.value);
+  const problems = patientFormProblems(form.value, !unidentified);
 
   const register = useMutation({
     ...createPatientMutation(),
@@ -413,8 +413,9 @@ function RegisterStep({
         </p>
       ) : (
         <p className="muted" style={{ marginBottom: '0.9rem' }}>
-          NIC <strong>{nic}</strong>, carried over from the lookup. Anything left blank shows
-          up as outstanding paperwork on the admission, named rather than counted.
+          NIC <strong>{nic}</strong>, carried over from the lookup. Everything except the
+          emergency contact is required — the patient is here and can answer, and chasing an
+          address afterwards costs far more than asking for it now.
         </p>
       )}
 
@@ -434,7 +435,12 @@ function RegisterStep({
           }),
         )}
       >
-        <PatientFields value={form.value} set={form.set} idPrefix="reg" />
+        <PatientFields
+          value={form.value}
+          set={form.set}
+          idPrefix="reg"
+          identified={!unidentified}
+        />
 
         <div className="row">
           <button type="submit" disabled={register.isPending || problems.blocked}>
@@ -475,7 +481,13 @@ function EditStep({
   const existing = useQuery(getPatientOptions({ path: { id: patientId } }));
 
   const form = usePatientForm(emptyPatientForm(false));
-  const problems = patientFormProblems(form.value);
+
+  // A record with a NIC belongs to somebody who was able to give one, so the same fields are
+  // required here as at registration. A record still on a temporary reference is an arrival
+  // nobody has identified yet, and this form is exactly where their details get filled in one
+  // at a time as they are learned - demanding all of them would shut that door.
+  const identified = (existing.data?.nic ?? null) !== null;
+  const problems = patientFormProblems(form.value, identified);
 
   // Filled in once the record arrives. Keyed off the fetched data, not a mount, because the
   // query is not resolved on the first render.
@@ -560,7 +572,12 @@ function EditStep({
           }),
         )}
       >
-        <PatientFields value={form.value} set={form.set} idPrefix="edit" />
+        <PatientFields
+          value={form.value}
+          set={form.set}
+          idPrefix="edit"
+          identified={identified}
+        />
 
         <div className="row">
           <button type="submit" disabled={save.isPending || problems.blocked}>

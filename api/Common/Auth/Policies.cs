@@ -78,6 +78,21 @@ public static class Policies
     public const string AdmissionEditor = nameof(AdmissionEditor);
 
     /// <summary>
+    /// Puts a patient in a bed: general staff, ward nurse, duty manager.
+    /// </summary>
+    /// <remarks>
+    /// Its own policy rather than <see cref="AdmissionEditor"/>, which guards confirming a
+    /// discharge and cancelling a visit. Reception needs to bed a walk-in standing at the desk;
+    /// it does not follow that they may send somebody home.
+    ///
+    /// Wide on purpose, because the narrow half of the rule cannot live on a route. WHICH bed
+    /// each of these three may choose depends on the ward the chosen bed stands in, which is in
+    /// the request body - so <c>BedAssignmentService.EnsureMayApprove</c> answers 403 for
+    /// anything off the care level's own path, and only the duty manager gets past it.
+    /// </remarks>
+    public const string BedAssigner = nameof(BedAssigner);
+
+    /// <summary>
     /// Works the discharge checklist: ward nurse, doctor, duty manager.
     /// </summary>
     /// <remarks>

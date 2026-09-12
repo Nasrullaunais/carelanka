@@ -315,11 +315,19 @@ All three write a `BedAssignment` with `assigned_by` recorded. **The manual path
 
 | Bed being approved | Approver |
 | :--- | :--- |
-| General / maternity / pediatric, category matches | Ward Nurse |
+| General / maternity / pediatric, category matches | Reception or Ward Nurse |
 | **ICU or HDU** | **Duty Manager only** |
 | **Any downgrade** (bed below requested category) | **Duty Manager only** |
+| **Any ward more acute than the category** | **Duty Manager only** |
 
 ICU beds are the scarcest resource in a hospital. "The AI cannot put someone in intensive care on its own, and neither can a ward nurse" is a rule that defends itself. This is one of the two high-impact approval gates the assignment requires.
+
+**Reception was added on 2026-09-12,** and the last row with it. Two changes, one rule:
+
+- **Reception places patients into the ward the care level calls for.** A walk-in is looked up, registered, admitted and bedded by the person standing at the desk; stopping one step short handed the final act to a ward nurse who is not there. It is `Policies.BedAssigner`, its own policy rather than a wider `AdmissionEditor` — reception bedding a walk-in does not imply reception sending somebody home.
+- **The duty manager may now place a patient into a ward *more acute* than assessed**, which H2 used to refuse for everybody. The night it is for: the general ward is full and there is an empty ICU bed. The person who carries the cost of an empty intensive-care bed is the person who should be able to spend one. It is recorded the same way a downgrade is, and the React bed picker colours the button amber so nobody takes one by accident.
+
+**What did not change: which bed each role may choose.** That reads the ward the chosen bed stands in, which is in the request body, so it cannot be a route policy — `BedAssignmentService.EnsureMayApprove` answers 403 (`cl_pat_012`, `cl_pat_013`). Widening the route widened *who may place a patient*, not *where*.
 
 ### 5.3 The hold, and why it expires
 
@@ -765,6 +773,7 @@ Four tools. Three read, one write, and the write can only ever create a proposal
 | H3 | The ward's `gender_policy` must accept this patient's gender |
 | H4 | An infectious patient must get a bed with `has_isolation = true` |
 | H5 | The ward must be `is_active` |
+| H6 | A `pediatric` ward admits only patients under 18 |
 
 **Built** (step 6), in `Services/Patient/BedPlacementRules.cs`, and the manual endpoint runs the same table the agent will — otherwise "the AI cannot do X" is only true of the AI. Four things worth knowing:
 
@@ -784,9 +793,10 @@ Four tools. Three read, one write, and the write can only ever create a proposal
   **not** the discharge workflow (§7): a visit with a bed is refused there with `cl_pat_020`,
   because a discharge has a checklist, a summary note, an approver and a bed to give back.
 - **H1 is split in two.** "Usable" is a property of the bed and is checked here. "Free" is a race and is not: no read can settle it, and `ux_bed_assignments_live_bed` is what does. Adding a prior read would make the index look like belt-and-braces rather than the rule.
-- **H2 refuses an upgrade too.** Ward types sit on three rungs — `icu`, `hdu`, and everything else — with `day_case` and `outpatient` on the bottom rung alongside `inpatient`, because there is no ward type below `general`. A general patient into an ICU bed is a 409 for anybody, duty manager included.
+- **H2 refuses an upgrade too — except for the duty manager.** Ward types sit on three rungs — `icu`, `hdu`, and everything else — with `day_case` and `outpatient` on the bottom rung alongside `inpatient`, because there is no ward type below `general`. A general patient into an ICU bed is a 409 for the agent and a 403 for a nurse or reception; **since 2026-09-12 the duty manager may overrule it** (§5.2). Nobody else ever sees the 409, because every ward more acute than a patient needs is an `icu` or `hdu` ward and those are refused to them one step earlier.
 - **H3 sends `other` and `unknown` to a mixed ward only.** Exactly what `Gender.Unknown` was added for: an unidentified arrival lands somewhere by rule rather than on a guess about which single-sex ward they belong in.
 - **H5 reads as "no active ward for this bed".** A retired ward is invisible to the global query filter, so a missing ward and a retired one are the same answer, and both are a 409 rather than a 404 — the bed is real, its ward just cannot take a patient.
+- **H6 is one-directional, and unknown counts as an adult.** A `pediatric` ward is closed to anybody 18 or over (`cl_pat_030`); a child is *not* confined to one, or a 6-year-old needing intensive care could not be given it. **A patient with no recorded date of birth is refused**, on the same reasoning as H3's handling of `unknown` — the narrower ward takes a recorded fact to earn, not the absence of one. Like the gender policy it is a property of the ward, so unlike H2 there is no duty-manager override. This is also why the React intake form now requires a date of birth for any patient who can give one: a blank one quietly costs a child the right ward.
 
 **Soft rules — the agent ranks candidates by these.** Breaking one is fine; it just makes for a worse choice.
 
@@ -824,7 +834,7 @@ If nothing on the ladder is free either, `outcome = no_bed_available`, the admis
 4. RANK      score survivors on soft rules
 5. DECIDE    pick the best; if empty, try the downgrade ladder
 6. PROPOSE   call propose_bed -> creates a reserved hold
-7. VALIDATE  <- deterministic C#, not the model. Re-check H1..H5.
+7. VALIDATE  <- deterministic C#, not the model. Re-check H1..H6.
                 A proposal failing here never reaches a human.
 8. PAUSE     admission -> awaiting_approval. Stop and wait.
 9. HUMAN     approve / reject / override in React or Flutter
@@ -1125,7 +1135,7 @@ This matches the group plan, which already states that Emergency and Staff read 
 
 | Layer | Tests |
 | :--- | :--- |
-| **Unit** | The state machine — every legal transition passes, every illegal one throws. The hard-rule validator — one test per rule H1–H5. The care-advisory validator — one test per rule CR1–CR4, plus the red-flag keyword screen. |
+| **Unit** | The state machine — every legal transition passes, every illegal one throws. The hard-rule validator — one test per rule H1–H6. The care-advisory validator — one test per rule CR1–CR4, plus the red-flag keyword screen. |
 | **Service** | Hold expiry, downgrade ladder, duplicate NIC prevention, `details_complete` recalculation |
 | **Controller** | Auth on every endpoint; a nurse gets 403 approving an ICU bed; a patient gets 403 reading someone else's admission; a non-Doctor gets 403 approving a care recommendation |
 | **Database** | Migrations run clean; `UNIQUE(ward_id, bed_number)` holds; **the concurrent-approval test** — two approvals for one bed, one wins, one gets 409 |

@@ -23,7 +23,8 @@ import {
   canReadPatientDetails,
 } from '../types/permissions';
 import { localDateTime } from '../types/datetime';
-import { whyNotPlaceable } from '../types/beds';
+import { placementFor } from '../types/beds';
+import type { Placement } from '../types/beds';
 import { genderPolicyLabels, wardTypeLabels } from '../types/wards';
 import {
   arrivalRouteLabel,
@@ -515,8 +516,12 @@ function AssignBedPanel({
   // Free only. A held or occupied bed is not a candidate, and `free` is where the thirty-minute
   // expiry is applied — a bed whose hold has lapsed is offered again with nobody having
   // released it.
+  //
+  // 500, the endpoint's ceiling, because this is a whole candidate list and not a page anybody
+  // pages through. At 100 the seeded hospital's 135 beds were cut off mid-alphabet and the
+  // pediatric ward could never be reached — silently, which is the part that makes it dangerous.
   const beds = useQuery(
-    listBedAvailabilityOptions({ query: { availability: 'free', pageSize: 100 } }),
+    listBedAvailabilityOptions({ query: { availability: 'free', pageSize: 500 } }),
   );
 
   // A walk-in is standing at the desk, so choosing their bed and saying they are in it are
@@ -529,7 +534,13 @@ function AssignBedPanel({
   // here rather than merging them server-side leaves that distinction where it belongs. If the
   // second call fails the first still stands - the patient holds the bed, the button reappears,
   // and the hold expiry is the backstop.
-  const alreadyHere = visit.data?.source === 'walk_in';
+  //
+  // Only chained for somebody who may actually mark arrival. Reception can place a patient but
+  // `/arrive` is the ward nurse's alone, on the grounds that she is the one who can see the
+  // patient is in the bed - so for reception this fired a call that was always going to 403 and
+  // put "Your role does not allow this" on top of an assignment that had just worked.
+  const alreadyHere =
+    visit.data?.source === 'walk_in' && canMarkArrived(session?.principal.role);
 
   const arrive = useMutation({
     ...markArrivedMutation(),
@@ -581,18 +592,24 @@ function AssignBedPanel({
   const candidates = (beds.data?.items ?? []).map((bed) => ({
     bed,
     ward: wardsById.get(bed.ward_id),
-    why: visit.data
-      ? whyNotPlaceable(
+    placement: visit.data
+      ? placementFor(
           bed,
           wardsById.get(bed.ward_id),
           visit.data,
-          row.patient.gender,
+          { gender: row.patient.gender, date_of_birth: row.patient.date_of_birth },
           session?.principal.role,
         )
-      : 'Loading…',
+      : ({ kind: 'refused', why: 'Loading…' } as Placement),
   }));
 
-  const usable = candidates.filter((candidate) => candidate.why === null);
+  const usable = candidates.filter((candidate) => candidate.placement.kind !== 'refused');
+  const overrides = candidates.filter((candidate) => candidate.placement.kind === 'override');
+
+  // A truncated list looks exactly like a complete one, which is how a 100-bed cut sat here
+  // unnoticed and made the pediatric ward unreachable. If the hospital ever outgrows one page,
+  // the screen says so rather than quietly offering a subset.
+  const missing = (beds.data?.total_items ?? 0) - (beds.data?.items?.length ?? 0);
   const loading = visit.isLoading || wards.isLoading || beds.isLoading;
   const failed = visit.isError || wards.isError || beds.isError;
 
@@ -619,9 +636,9 @@ function AssignBedPanel({
           </>
         ) : (
           <>
-            Choosing a bed holds it for thirty minutes. If the patient is not marked as arrived
-            by then the hold lapses on its own and the bed goes back to whoever needs it —
-            nobody has to undo anything.
+            Choosing a bed holds it for thirty minutes, and a ward nurse confirms they are in
+            it. If nobody does by then the hold lapses on its own and the bed goes back to
+            whoever needs it — nobody has to undo anything.
           </>
         )}
       </p>
@@ -661,7 +678,7 @@ function AssignBedPanel({
               </tr>
             </thead>
             <tbody>
-              {candidates.map(({ bed, ward, why }) => (
+              {candidates.map(({ bed, ward, placement }) => (
                 <tr key={bed.id}>
                   <td>
                     <strong>{bed.bed_number}</strong>
@@ -676,35 +693,55 @@ function AssignBedPanel({
                   <td>{ward ? genderPolicyLabels[ward.gender_policy] : '—'}</td>
                   <td>{bed.has_isolation ? 'Yes' : 'No'}</td>
                   <td>
-                    {why === null ? (
-                      <button
-                        type="button"
-                        disabled={writing}
-                        onClick={() =>
-                          correcting
-                            ? correct.mutate({
-                                path: { id: row.id },
-                                body: {
-                                  bed_id: bed.id,
-                                  reason: reason.trim().length > 0 ? reason.trim() : undefined,
-                                },
-                              })
-                            : assign.mutate({
-                                path: { id: row.id },
-                                body: {
-                                  bed_id: bed.id,
-                                  override_reason:
-                                    reason.trim().length > 0 ? reason.trim() : undefined,
-                                },
-                              })
-                        }
-                      >
-                        {correcting ? 'Move here' : alreadyHere ? 'Put them here' : 'Choose'}
-                      </button>
-                    ) : (
+                    {placement.kind === 'refused' ? (
                       // Listed with its reason rather than hidden. A ward nurse looking at an
                       // empty ICU needs to see that the beds are there and who to ask.
-                      <span className="muted">{why}</span>
+                      <span className="muted">{placement.why}</span>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          // Amber, not the ordinary green, because this bed is not the one the
+                          // care level points at. The colour is the whole warning - a duty
+                          // manager scanning the list must be able to see which rows are
+                          // off-path without reading every cell.
+                          className={placement.kind === 'override' ? 'warn' : undefined}
+                          disabled={writing}
+                          onClick={() =>
+                            correcting
+                              ? correct.mutate({
+                                  path: { id: row.id },
+                                  body: {
+                                    bed_id: bed.id,
+                                    reason: reason.trim().length > 0 ? reason.trim() : undefined,
+                                  },
+                                })
+                              : assign.mutate({
+                                  path: { id: row.id },
+                                  body: {
+                                    bed_id: bed.id,
+                                    override_reason:
+                                      reason.trim().length > 0 ? reason.trim() : undefined,
+                                  },
+                                })
+                          }
+                        >
+                          {placement.kind === 'override'
+                            ? correcting
+                              ? 'Move here anyway'
+                              : 'Use this anyway'
+                            : correcting
+                              ? 'Move here'
+                              : alreadyHere
+                                ? 'Put them here'
+                                : 'Choose'}
+                        </button>
+                        {placement.kind === 'override' && (
+                          <p className="hint" style={{ marginTop: '0.25rem' }}>
+                            {placement.why}
+                          </p>
+                        )}
+                      </>
                     )}
                   </td>
                 </tr>
@@ -715,6 +752,21 @@ function AssignBedPanel({
           {usable.length === 0 && (
             <p className="empty">
               Beds are free, but none of them will take this patient. The reason is on each row.
+            </p>
+          )}
+
+          {missing > 0 && (
+            <p className="field-error" style={{ marginTop: '0.6rem' }}>
+              {missing} more free {missing === 1 ? 'bed is' : 'beds are'} not shown here. This
+              list is incomplete — tell whoever maintains this screen before choosing.
+            </p>
+          )}
+
+          {overrides.length > 0 && (
+            <p className="hint" style={{ marginTop: '0.6rem' }}>
+              The amber buttons are beds the patient&rsquo;s care level does not point at. You
+              may use one because you are the duty manager; it is recorded as your decision, so
+              say why in the note.
             </p>
           )}
 

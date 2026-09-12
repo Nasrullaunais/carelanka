@@ -179,12 +179,13 @@ public class AdmissionsController : ControllerBase
     /// may overrule the agent's ranking; nobody may put an ICU patient in a general bed without
     /// it being recorded as a downgrade.
     ///
-    /// A ward nurse may assign a bed that matches the patient's care level. ICU, high-dependency
-    /// and any downgrade are the duty manager's, and that depends on which bed was chosen rather
-    /// than on the route - so a nurse choosing one is a 403 from the service, not a 401 from a
-    /// policy.
+    /// Reception and a ward nurse may assign a bed that matches the patient's care level. Every
+    /// bed off that path - intensive care, high dependency, a step down, or a step up into a
+    /// ward more acute than the patient needs - is the duty manager's, and that depends on which
+    /// bed was chosen rather than on the route, so choosing one is a 403 from the service and
+    /// not a 401 from a policy.
     /// </remarks>
-    [Authorize(Policy = Policies.AdmissionEditor)]
+    [Authorize(Policy = Policies.BedAssigner)]
     [HttpPost("{id:guid}/assign-bed", Name = "assignBedManually")]
     [ProducesResponseType(typeof(BedAssignment), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
@@ -209,7 +210,7 @@ public class AdmissionsController : ControllerBase
     /// The same permission and the same hard rules as assigning a bed in the first place: a
     /// ward nurse correcting a bed still cannot correct it into intensive care.
     /// </remarks>
-    [Authorize(Policy = Policies.AdmissionEditor)]
+    [Authorize(Policy = Policies.BedAssigner)]
     [HttpPost("{id:guid}/correct-bed", Name = "correctBed")]
     [ProducesResponseType(typeof(BedAssignment), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]

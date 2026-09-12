@@ -118,15 +118,18 @@ export function canSetHighCareLevel(role: PrincipalRole | undefined): boolean {
 }
 
 /**
- * Policies.AdmissionEditor on POST /api/admissions/{id}/assign-bed.
+ * Policies.BedAssigner on POST /api/admissions/{id}/assign-bed.
+ *
+ * Reception is here because a walk-in is registered, admitted and bedded by the person at the
+ * desk; stopping one step short handed the last act to a nurse who is not standing there.
  *
  * Only half the rule. Which *bed* a role may choose depends on the ward it stands in, so
- * BedAssignmentService refuses ICU, HDU and any downgrade from anyone but the duty manager and
- * answers 403 at run time. `whyNotPlaceable` in types/beds.ts is the UI half of that, and this
- * is only "may this person place patients at all".
+ * BedAssignmentService refuses ICU, HDU, downgrades and step-ups from anyone but the duty
+ * manager and answers 403 at run time. `placementFor` in types/beds.ts is the UI half of that,
+ * and this is only "may this person place patients at all".
  */
 export function canAssignBed(role: PrincipalRole | undefined): boolean {
-  return role === 'ward_nurse' || role === 'duty_manager';
+  return role === 'general_staff' || role === 'ward_nurse' || role === 'duty_manager';
 }
 
 /**

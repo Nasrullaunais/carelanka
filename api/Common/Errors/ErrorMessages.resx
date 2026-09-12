@@ -196,7 +196,7 @@
   </data>
   <data name="cl_pat_016" xml:space="preserve">
     <value>Bed {0} is in a ward of type {1}, which is more acute than the {2} care this patient needs.</value>
-    <comment>Hard rule H2 in the upward direction. Not generosity — it is the last ICU bed spent on somebody who does not need it.</comment>
+    <comment>Hard rule H2 in the upward direction. Not generosity — it is the last ICU bed spent on somebody who does not need it. The duty manager may overrule it; nobody else reaches this message, because a more acute ward is always icu or hdu and those are refused earlier with cl_pat_012.</comment>
   </data>
   <data name="cl_pat_017" xml:space="preserve">
     <value>Bed {0} is in a ward with a {1} gender policy, which does not admit a patient recorded as {2}.</value>
@@ -249,5 +249,9 @@
   <data name="cl_pat_029" xml:space="preserve">
     <value>The patient is already in bed {0}.</value>
     <comment>Correcting a bed to the one they are already in would release and re-take the same bed, losing the time they have been in it for no reason.</comment>
+  </data>
+  <data name="cl_pat_030" xml:space="preserve">
+    <value>Bed {0} is in a children's ward, which admits patients under {1}. Record the patient's date of birth if it is missing.</value>
+    <comment>Hard rule H6. Like the gender policy it is a property of the ward, so there is no duty-manager override. An unrecorded date of birth reads as an adult, and the message says how to fix that.</comment>
   </data>
 </root>

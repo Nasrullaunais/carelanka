@@ -17,11 +17,16 @@ public sealed class AmbulanceService : IAmbulanceService
 {
     private readonly CareLankaDbContext _db;
     private readonly ICurrentUser _currentUser;
+    private readonly IAmbulanceDistanceService _distances;
 
-    public AmbulanceService(CareLankaDbContext db, ICurrentUser currentUser)
+    public AmbulanceService(
+        CareLankaDbContext db,
+        ICurrentUser currentUser,
+        IAmbulanceDistanceService distances)
     {
         _db = db;
         _currentUser = currentUser;
+        _distances = distances;
     }
 
     public async Task<PagedResult<AmbulanceSummary>> ListAsync(
@@ -62,6 +67,16 @@ public sealed class AmbulanceService : IAmbulanceService
 
         var totalItems = await query.CountAsync(cancellationToken);
         var rows = await query.ToListAsync(cancellationToken);
+        var measuredDistances = nearToLatitude is not null && nearToLongitude is not null
+            ? await _distances.MeasureAsync(
+                rows.Select(ambulance => new AmbulanceLocation(
+                    ambulance.Id,
+                    ambulance.CurrentLatitude,
+                    ambulance.CurrentLongitude)).ToList(),
+                nearToLatitude.Value,
+                nearToLongitude.Value,
+                cancellationToken)
+            : new Dictionary<Guid, double?>();
         var activeDispatches = await _db.Dispatches
             .AsNoTracking()
             .Where(dispatch => dispatch.Status == DispatchStatus.Assigned
@@ -78,7 +93,7 @@ public sealed class AmbulanceService : IAmbulanceService
             CurrentLongitude = ambulance.CurrentLongitude,
             ActiveDispatchId = activeDispatches.GetValueOrDefault(ambulance.Id),
             IsDivertible = IsDivertible(ambulance.Status),
-            DistanceKm = DistanceFrom(ambulance, nearToLatitude, nearToLongitude)
+            DistanceKm = measuredDistances.GetValueOrDefault(ambulance.Id)
         });
 
         summaries = (sortBy, sortDir.Equals("asc", StringComparison.OrdinalIgnoreCase)) switch
@@ -295,28 +310,4 @@ public sealed class AmbulanceService : IAmbulanceService
     private static bool IsDivertible(AmbulanceStatus status)
         => status is AmbulanceStatus.Available or AmbulanceStatus.Dispatched or AmbulanceStatus.EnRoute;
 
-    private static double? DistanceFrom(
-        AmbulanceEntity ambulance,
-        decimal? latitude,
-        decimal? longitude)
-    {
-        if (latitude is null || longitude is null
-            || ambulance.CurrentLatitude is null || ambulance.CurrentLongitude is null)
-        {
-            return null;
-        }
-
-        const double earthRadiusKm = 6371.0;
-        var latitudeDelta = DegreesToRadians((double)(ambulance.CurrentLatitude.Value - latitude.Value));
-        var longitudeDelta = DegreesToRadians((double)(ambulance.CurrentLongitude.Value - longitude.Value));
-        var originLatitude = DegreesToRadians((double)latitude.Value);
-        var ambulanceLatitude = DegreesToRadians((double)ambulance.CurrentLatitude.Value);
-        var haversine = Math.Pow(Math.Sin(latitudeDelta / 2), 2)
-            + Math.Cos(originLatitude) * Math.Cos(ambulanceLatitude)
-            * Math.Pow(Math.Sin(longitudeDelta / 2), 2);
-
-        return earthRadiusKm * 2 * Math.Atan2(Math.Sqrt(haversine), Math.Sqrt(1 - haversine));
-    }
-
-    private static double DegreesToRadians(double degrees) => degrees * Math.PI / 180;
 }

@@ -68,7 +68,9 @@ public static class MessageCodes
             [MessageCode.BillLineNotRemovable] = "cl_pat_027",
             [MessageCode.BedNotAssigned] = "cl_pat_028",
             [MessageCode.BedAlreadyTheirs] = "cl_pat_029",
-            [MessageCode.BedWardPediatricAdult] = "cl_pat_030"
+            [MessageCode.BedWardPediatricAdult] = "cl_pat_030",
+            [MessageCode.AmbulanceRegistrationTaken] = "cl_emg_001",
+            [MessageCode.AmbulanceHasActiveDispatch] = "cl_emg_002"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

@@ -14,6 +14,7 @@ public static class Policies
     public const string PatientOnly = nameof(PatientOnly);
     public const string WorkflowReader = nameof(WorkflowReader);
     public const string WorkflowStarter = nameof(WorkflowStarter);
+    public const string EmergencyResponder = nameof(EmergencyResponder);
 
     // Patient Management combinations, taken from the "Roles:" line on each operation in
     // patient-spec.yaml. Named for what the holder may do rather than for the roles in them,

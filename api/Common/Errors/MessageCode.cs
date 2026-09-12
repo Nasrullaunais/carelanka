@@ -118,5 +118,9 @@ public enum MessageCode
     BedAlreadyTheirs,
 
     // H6. A children's ward, and a patient who is not a child - or whose age nobody recorded.
-    BedWardPediatricAdult
+    BedWardPediatricAdult,
+
+    AmbulanceRegistrationTaken,
+
+    AmbulanceHasActiveDispatch
 }

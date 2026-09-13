@@ -16,7 +16,9 @@ import type {
   EquipmentItemSummary,
   EquipmentStatus,
   PrincipalRole,
+  WardPatient,
 } from '../services/api/generated';
+import { WardPatientPicker } from '../components/WardPatientPicker';
 import { useSession } from '../services/auth/useSession';
 import { canManageEquipment, canReportFault } from '../types/permissions';
 import { equipmentStatusLabels, equipmentStatuses } from '../types/equipment';
@@ -365,12 +367,12 @@ function AssignDialog({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const [admissionId, setAdmissionId] = useState('');
+  const [chosen, setChosen] = useState<WardPatient | null>(null);
 
   const assign = useMutation({
     ...assignEquipmentItemMutation(),
     onSuccess: (updated) => {
-      toast.success(`${updated.name} assigned.`);
+      toast.success(`${updated.name} assigned to ${chosen?.full_name}.`);
       onChanged();
       onClose();
     },
@@ -379,29 +381,41 @@ function AssignDialog({
   return (
     <Dialog title={`Assign ${item.name}`} onClose={onClose}>
       <p className="muted">
-        An assignment points at Patient Management&rsquo;s admission by id. No patient data
-        is copied here. There is no admissions endpoint to pick from yet, so the id has to
-        be pasted in.
+        Pick the patient by ward. The assignment stores their admission id and nothing else — no
+        patient data is copied onto the equipment record.
       </p>
+
+      {/* Somebody holding no bed is hidden: a ventilator goes to a bedside. */}
+      <WardPatientPicker
+        selectedAdmissionId={chosen?.admission_id}
+        onSelect={setChosen}
+        bedOnly
+        emptyMessage="Nobody is in a bed there at the moment."
+      />
 
       <form
         onSubmit={(event: FormEvent) => {
           event.preventDefault();
-          assign.mutate({ path: { id: item.id }, body: { admission_id: admissionId.trim() } });
+
+          if (!chosen) {
+            return;
+          }
+
+          assign.mutate({
+            path: { id: item.id },
+            body: { admission_id: chosen.admission_id },
+          });
         }}
       >
-        <div className="field">
-          <label htmlFor="admission-id">Admission id</label>
-          <input
-            id="admission-id"
-            value={admissionId}
-            placeholder="00000000-0000-0000-0000-000000000000"
-            onChange={(event) => setAdmissionId(event.target.value)}
-            required
-          />
-        </div>
+        {chosen && (
+          <p>
+            Assigning to <strong>{chosen.full_name}</strong> ({chosen.patient_code}) in{' '}
+            {chosen.ward_name}, bed {chosen.bed_number ?? '—'}.
+          </p>
+        )}
+
         <div className="actions">
-          <button type="submit" disabled={assign.isPending || admissionId.trim().length === 0}>
+          <button type="submit" disabled={assign.isPending || chosen === null}>
             {assign.isPending ? 'Assigning…' : 'Assign'}
           </button>
           <button type="button" className="secondary" onClick={onClose}>

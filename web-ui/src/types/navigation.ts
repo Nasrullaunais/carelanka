@@ -3,6 +3,7 @@ import {
   canReadPatientDetails,
   canReadCapacity,
   canReadEquipment,
+  canReadLabReports,
   canReadWards,
   canRegisterPatient,
   canWorkAppointmentDesk,
@@ -73,6 +74,12 @@ export const destinations: Destination[] = [
     label: 'Maintenance unit',
     description: 'Machines waiting to be fixed. Confirm a repair and the item goes back into service.',
     canAccess: canReadEquipment,
+  },
+  {
+    to: '/laboratory',
+    label: 'Laboratory',
+    description: 'File a blood or lab result against a patient, and read what has been filed already.',
+    canAccess: canReadLabReports,
   },
   {
     to: '/pharmacy',

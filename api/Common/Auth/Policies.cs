@@ -35,4 +35,17 @@ public static class Policies
     public const string BillingDesk = nameof(BillingDesk);
 
     public const string AppointmentDesk = nameof(AppointmentDesk);
+
+    // The laboratory stands on equipment_manager in both of these, because StaffRole has no
+    // laboratory value. Adding one changes staff-spec.yaml and common-spec.yaml together, which
+    // is M2's and the common owner's call - Open Decision 11. These two lines are all that
+    // changes when it happens.
+    public const string LabReportReader = nameof(LabReportReader);
+
+    public const string LabReportAuthor = nameof(LabReportAuthor);
+
+    // The same four roles as LabReportReader today, and deliberately a separate name: knowing
+    // which ward somebody is in is what the laboratory and the equipment register both need to
+    // offer a patient to pick, and neither of those is reading a test result.
+    public const string PatientLocationReader = nameof(PatientLocationReader);
 }

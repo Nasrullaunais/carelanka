@@ -132,6 +132,18 @@
     <value>This maintenance task is already {0} and cannot be completed again.</value>
     <comment>Overdue is not a blocker: it is stored as scheduled and only reads as overdue.</comment>
   </data>
+  <data name="cl_equ_014" xml:space="preserve">
+    <value>That file is empty. Check the scan saved properly and upload it again.</value>
+    <comment>An empty upload is almost always a scanner that did not finish, so the message says where to look.</comment>
+  </data>
+  <data name="cl_equ_015" xml:space="preserve">
+    <value>That file is too large. A report may be up to {0} MB.</value>
+    <comment>States the limit, because "too large" without a number cannot be acted on.</comment>
+  </data>
+  <data name="cl_equ_016" xml:space="preserve">
+    <value>A report has to be a PDF or a photograph (JPEG or PNG). This one is {0}.</value>
+    <comment>Names what is allowed and what arrived. An allow-list: the question is whether a ward can open it.</comment>
+  </data>
   <data name="cl_equ_013" xml:space="preserve">
     <value>{0} is with the maintenance unit. It comes back into service when they complete the repair, not by editing its status.</value>
     <comment>Says where the item is and who releases it, because the caller's next move is to go and look at the repair queue.</comment>

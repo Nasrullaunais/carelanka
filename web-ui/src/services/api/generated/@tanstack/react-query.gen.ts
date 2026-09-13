@@ -3,8 +3,8 @@
 import { type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addBillCharge, assignBedManually, assignEquipmentItem, cancelAdmission, checkInAppointment, completeAdmissionDetails, completeMaintenanceSchedule, completeVisit, confirmDischarge, correctBed, createAdmission, createAppointment, createBed, createEquipmentCategory, createEquipmentItem, createMaintenanceSchedule, createPatient, createPharmacyCategory, createPharmacyItem, createWard, getAdmission, getAdmissionBill, getBedOccupancy, getBillingRates, getCurrentUser, getEquipmentItem, getEquipmentItemByTag, getHealth, getPatient, getPharmacyItem, getWardCapacity, getWardOccupancy, linkPatientAccount, listAdmissions, listAppointments, listBedAvailability, listBeds, listDischargeCandidates, listEquipmentCategories, listEquipmentItems, listMaintenanceSchedules, listOutstandingBills, listPatients, listPatientWorklist, listPharmacyCategories, listPharmacyItems, listPharmacyTransactions, listWards, login, loginPatient, logout, lookupPatient, markArrived, type Options, prepareAdmissionBill, recordPharmacyTransaction, refreshToken, registerPatientAccount, releaseEquipmentItem, removeBillCharge, reportEquipmentFault, retireBed, settleBill, updateBed, updateBillingRates, updateDischargeChecklist, updateEquipmentItem, updatePatient } from '../sdk.gen';
-import type { AddBillChargeData, AddBillChargeError, AddBillChargeResponse, AssignBedManuallyData, AssignBedManuallyError, AssignBedManuallyResponse, AssignEquipmentItemData, AssignEquipmentItemError, AssignEquipmentItemResponse, CancelAdmissionData, CancelAdmissionError, CancelAdmissionResponse, CheckInAppointmentData, CheckInAppointmentError, CheckInAppointmentResponse, CompleteAdmissionDetailsData, CompleteAdmissionDetailsError, CompleteAdmissionDetailsResponse, CompleteMaintenanceScheduleData, CompleteMaintenanceScheduleError, CompleteMaintenanceScheduleResponse, CompleteVisitData, CompleteVisitError, CompleteVisitResponse, ConfirmDischargeData, ConfirmDischargeError, ConfirmDischargeResponse, CorrectBedData, CorrectBedError, CorrectBedResponse, CreateAdmissionData, CreateAdmissionError, CreateAdmissionResponse, CreateAppointmentData, CreateAppointmentError, CreateAppointmentResponse, CreateBedData, CreateBedError, CreateBedResponse, CreateEquipmentCategoryData, CreateEquipmentCategoryError, CreateEquipmentCategoryResponse, CreateEquipmentItemData, CreateEquipmentItemError, CreateEquipmentItemResponse, CreateMaintenanceScheduleData, CreateMaintenanceScheduleError, CreateMaintenanceScheduleResponse, CreatePatientData, CreatePatientError, CreatePatientResponse, CreatePharmacyCategoryData, CreatePharmacyCategoryError, CreatePharmacyCategoryResponse, CreatePharmacyItemData, CreatePharmacyItemError, CreatePharmacyItemResponse, CreateWardData, CreateWardError, CreateWardResponse, GetAdmissionBillData, GetAdmissionBillError, GetAdmissionBillResponse, GetAdmissionData, GetAdmissionError, GetAdmissionResponse, GetBedOccupancyData, GetBedOccupancyError, GetBedOccupancyResponse, GetBillingRatesData, GetBillingRatesError, GetBillingRatesResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetEquipmentItemByTagData, GetEquipmentItemByTagError, GetEquipmentItemByTagResponse, GetEquipmentItemData, GetEquipmentItemError, GetEquipmentItemResponse, GetHealthData, GetHealthError, GetHealthResponse, GetPatientData, GetPatientError, GetPatientResponse, GetPharmacyItemData, GetPharmacyItemError, GetPharmacyItemResponse, GetWardCapacityData, GetWardCapacityError, GetWardCapacityResponse, GetWardOccupancyData, GetWardOccupancyError, GetWardOccupancyResponse, LinkPatientAccountData, LinkPatientAccountError, LinkPatientAccountResponse, ListAdmissionsData, ListAdmissionsError, ListAdmissionsResponse, ListAppointmentsData, ListAppointmentsError, ListAppointmentsResponse, ListBedAvailabilityData, ListBedAvailabilityError, ListBedAvailabilityResponse, ListBedsData, ListBedsError, ListBedsResponse, ListDischargeCandidatesData, ListDischargeCandidatesError, ListDischargeCandidatesResponse, ListEquipmentCategoriesData, ListEquipmentCategoriesError, ListEquipmentCategoriesResponse, ListEquipmentItemsData, ListEquipmentItemsError, ListEquipmentItemsResponse, ListMaintenanceSchedulesData, ListMaintenanceSchedulesError, ListMaintenanceSchedulesResponse, ListOutstandingBillsData, ListOutstandingBillsError, ListOutstandingBillsResponse, ListPatientsData, ListPatientsError, ListPatientsResponse, ListPatientWorklistData, ListPatientWorklistError, ListPatientWorklistResponse, ListPharmacyCategoriesData, ListPharmacyCategoriesError, ListPharmacyCategoriesResponse, ListPharmacyItemsData, ListPharmacyItemsError, ListPharmacyItemsResponse, ListPharmacyTransactionsData, ListPharmacyTransactionsError, ListPharmacyTransactionsResponse, ListWardsData, ListWardsError, ListWardsResponse, LoginData, LoginError, LoginPatientData, LoginPatientError, LoginPatientResponse, LoginResponse, LogoutData, LogoutError, LogoutResponse, LookupPatientData, LookupPatientError, LookupPatientResponse, MarkArrivedData, MarkArrivedError, MarkArrivedResponse, PrepareAdmissionBillData, PrepareAdmissionBillError, PrepareAdmissionBillResponse, RecordPharmacyTransactionData, RecordPharmacyTransactionError, RecordPharmacyTransactionResponse, RefreshTokenData, RefreshTokenError, RefreshTokenResponse, RegisterPatientAccountData, RegisterPatientAccountError, RegisterPatientAccountResponse, ReleaseEquipmentItemData, ReleaseEquipmentItemError, ReleaseEquipmentItemResponse, RemoveBillChargeData, RemoveBillChargeError, RemoveBillChargeResponse, ReportEquipmentFaultData, ReportEquipmentFaultError, ReportEquipmentFaultResponse, RetireBedData, RetireBedError, RetireBedResponse, SettleBillData, SettleBillError, SettleBillResponse, UpdateBedData, UpdateBedError, UpdateBedResponse, UpdateBillingRatesData, UpdateBillingRatesError, UpdateBillingRatesResponse, UpdateDischargeChecklistData, UpdateDischargeChecklistError, UpdateDischargeChecklistResponse, UpdateEquipmentItemData, UpdateEquipmentItemError, UpdateEquipmentItemResponse, UpdatePatientData, UpdatePatientError, UpdatePatientResponse } from '../types.gen';
+import { addBillCharge, assignBedManually, assignEquipmentItem, bookMyAppointment, cancelAdmission, cancelMyAppointment, checkInAppointment, completeAdmissionDetails, completeMaintenanceSchedule, completeVisit, confirmDischarge, correctBed, createAdmission, createAmbulance, createAppointment, createBed, createEquipmentCategory, createEquipmentItem, createMaintenanceSchedule, createPatient, createPharmacyCategory, createPharmacyItem, createWard, downloadLabReport, getAdmission, getAdmissionBill, getAmbulance, getBedOccupancy, getBillingRates, getCurrentUser, getEquipmentItem, getEquipmentItemByTag, getHealth, getMyAdmission, getMyHistory, getMyProfile, getPatient, getPharmacyItem, getWardCapacity, getWardOccupancy, linkPatientAccount, listAdmissions, listAmbulances, listAppointments, listBedAvailability, listBeds, listDischargeCandidates, listEquipmentCategories, listEquipmentItems, listLabReports, listMaintenanceSchedules, listMyAppointments, listOutstandingBills, listPatients, listPatientWorklist, listPharmacyCategories, listPharmacyItems, listPharmacyTransactions, listWardPatients, listWards, login, loginPatient, logout, lookupPatient, markArrived, type Options, prepareAdmissionBill, preRegisterSelf, recordPharmacyTransaction, refreshToken, registerPatientAccount, reinstateAmbulance, releaseEquipmentItem, removeBillCharge, reportEquipmentFault, retireAmbulance, retireBed, settleBill, updateAmbulance, updateBed, updateBillingRates, updateDischargeChecklist, updateEquipmentItem, updatePatient, uploadLabReport } from '../sdk.gen';
+import type { AddBillChargeData, AddBillChargeError, AddBillChargeResponse, AssignBedManuallyData, AssignBedManuallyError, AssignBedManuallyResponse, AssignEquipmentItemData, AssignEquipmentItemError, AssignEquipmentItemResponse, BookMyAppointmentData, BookMyAppointmentError, BookMyAppointmentResponse, CancelAdmissionData, CancelAdmissionError, CancelAdmissionResponse, CancelMyAppointmentData, CancelMyAppointmentError, CancelMyAppointmentResponse, CheckInAppointmentData, CheckInAppointmentError, CheckInAppointmentResponse, CompleteAdmissionDetailsData, CompleteAdmissionDetailsError, CompleteAdmissionDetailsResponse, CompleteMaintenanceScheduleData, CompleteMaintenanceScheduleError, CompleteMaintenanceScheduleResponse, CompleteVisitData, CompleteVisitError, CompleteVisitResponse, ConfirmDischargeData, ConfirmDischargeError, ConfirmDischargeResponse, CorrectBedData, CorrectBedError, CorrectBedResponse, CreateAdmissionData, CreateAdmissionError, CreateAdmissionResponse, CreateAmbulanceData, CreateAmbulanceError, CreateAmbulanceResponse, CreateAppointmentData, CreateAppointmentError, CreateAppointmentResponse, CreateBedData, CreateBedError, CreateBedResponse, CreateEquipmentCategoryData, CreateEquipmentCategoryError, CreateEquipmentCategoryResponse, CreateEquipmentItemData, CreateEquipmentItemError, CreateEquipmentItemResponse, CreateMaintenanceScheduleData, CreateMaintenanceScheduleError, CreateMaintenanceScheduleResponse, CreatePatientData, CreatePatientError, CreatePatientResponse, CreatePharmacyCategoryData, CreatePharmacyCategoryError, CreatePharmacyCategoryResponse, CreatePharmacyItemData, CreatePharmacyItemError, CreatePharmacyItemResponse, CreateWardData, CreateWardError, CreateWardResponse, DownloadLabReportData, DownloadLabReportError, DownloadLabReportResponse, GetAdmissionBillData, GetAdmissionBillError, GetAdmissionBillResponse, GetAdmissionData, GetAdmissionError, GetAdmissionResponse, GetAmbulanceData, GetAmbulanceError, GetAmbulanceResponse, GetBedOccupancyData, GetBedOccupancyError, GetBedOccupancyResponse, GetBillingRatesData, GetBillingRatesError, GetBillingRatesResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetEquipmentItemByTagData, GetEquipmentItemByTagError, GetEquipmentItemByTagResponse, GetEquipmentItemData, GetEquipmentItemError, GetEquipmentItemResponse, GetHealthData, GetHealthError, GetHealthResponse, GetMyAdmissionData, GetMyAdmissionError, GetMyAdmissionResponse, GetMyHistoryData, GetMyHistoryError, GetMyHistoryResponse, GetMyProfileData, GetMyProfileError, GetMyProfileResponse, GetPatientData, GetPatientError, GetPatientResponse, GetPharmacyItemData, GetPharmacyItemError, GetPharmacyItemResponse, GetWardCapacityData, GetWardCapacityError, GetWardCapacityResponse, GetWardOccupancyData, GetWardOccupancyError, GetWardOccupancyResponse, LinkPatientAccountData, LinkPatientAccountError, LinkPatientAccountResponse, ListAdmissionsData, ListAdmissionsError, ListAdmissionsResponse, ListAmbulancesData, ListAmbulancesError, ListAmbulancesResponse, ListAppointmentsData, ListAppointmentsError, ListAppointmentsResponse, ListBedAvailabilityData, ListBedAvailabilityError, ListBedAvailabilityResponse, ListBedsData, ListBedsError, ListBedsResponse, ListDischargeCandidatesData, ListDischargeCandidatesError, ListDischargeCandidatesResponse, ListEquipmentCategoriesData, ListEquipmentCategoriesError, ListEquipmentCategoriesResponse, ListEquipmentItemsData, ListEquipmentItemsError, ListEquipmentItemsResponse, ListLabReportsData, ListLabReportsError, ListLabReportsResponse, ListMaintenanceSchedulesData, ListMaintenanceSchedulesError, ListMaintenanceSchedulesResponse, ListMyAppointmentsData, ListMyAppointmentsError, ListMyAppointmentsResponse, ListOutstandingBillsData, ListOutstandingBillsError, ListOutstandingBillsResponse, ListPatientsData, ListPatientsError, ListPatientsResponse, ListPatientWorklistData, ListPatientWorklistError, ListPatientWorklistResponse, ListPharmacyCategoriesData, ListPharmacyCategoriesError, ListPharmacyCategoriesResponse, ListPharmacyItemsData, ListPharmacyItemsError, ListPharmacyItemsResponse, ListPharmacyTransactionsData, ListPharmacyTransactionsError, ListPharmacyTransactionsResponse, ListWardPatientsData, ListWardPatientsError, ListWardPatientsResponse, ListWardsData, ListWardsError, ListWardsResponse, LoginData, LoginError, LoginPatientData, LoginPatientError, LoginPatientResponse, LoginResponse, LogoutData, LogoutError, LogoutResponse, LookupPatientData, LookupPatientError, LookupPatientResponse, MarkArrivedData, MarkArrivedError, MarkArrivedResponse, PrepareAdmissionBillData, PrepareAdmissionBillError, PrepareAdmissionBillResponse, PreRegisterSelfData, PreRegisterSelfError, PreRegisterSelfResponse, RecordPharmacyTransactionData, RecordPharmacyTransactionError, RecordPharmacyTransactionResponse, RefreshTokenData, RefreshTokenError, RefreshTokenResponse, RegisterPatientAccountData, RegisterPatientAccountError, RegisterPatientAccountResponse, ReinstateAmbulanceData, ReinstateAmbulanceError, ReinstateAmbulanceResponse, ReleaseEquipmentItemData, ReleaseEquipmentItemError, ReleaseEquipmentItemResponse, RemoveBillChargeData, RemoveBillChargeError, RemoveBillChargeResponse, ReportEquipmentFaultData, ReportEquipmentFaultError, ReportEquipmentFaultResponse, RetireAmbulanceData, RetireAmbulanceError, RetireAmbulanceResponse, RetireBedData, RetireBedError, RetireBedResponse, SettleBillData, SettleBillError, SettleBillResponse, UpdateAmbulanceData, UpdateAmbulanceError, UpdateAmbulanceResponse, UpdateBedData, UpdateBedError, UpdateBedResponse, UpdateBillingRatesData, UpdateBillingRatesError, UpdateBillingRatesResponse, UpdateDischargeChecklistData, UpdateDischargeChecklistError, UpdateDischargeChecklistResponse, UpdateEquipmentItemData, UpdateEquipmentItemError, UpdateEquipmentItemResponse, UpdatePatientData, UpdatePatientError, UpdatePatientResponse, UploadLabReportData, UploadLabReportError, UploadLabReportResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -41,10 +41,6 @@ const createQueryKey = <TOptions extends Options>(id: string, options?: TOptions
 
 export const listAdmissionsQueryKey = (options?: Options<ListAdmissionsData>) => createQueryKey('listAdmissions', options);
 
-/**
- * List admissions. With no `status` the answer is the live worklist, not the archive.
- * `search` matches the patient's code, name or NIC.
- */
 export const listAdmissionsOptions = (options?: Options<ListAdmissionsData>) => queryOptions<ListAdmissionsResponse, ListAdmissionsError, ListAdmissionsResponse, ReturnType<typeof listAdmissionsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await listAdmissions({
@@ -89,10 +85,6 @@ const createInfiniteParams = <K extends Pick<QueryKey<Options>[0], 'body' | 'hea
 
 export const listAdmissionsInfiniteQueryKey = (options?: Options<ListAdmissionsData>): QueryKey<Options<ListAdmissionsData>> => createQueryKey('listAdmissions', options, true);
 
-/**
- * List admissions. With no `status` the answer is the live worklist, not the archive.
- * `search` matches the patient's code, name or NIC.
- */
 export const listAdmissionsInfiniteOptions = (options?: Options<ListAdmissionsData>) => {
     const opts = infiniteQueryOptions<ListAdmissionsResponse, ListAdmissionsError, InfiniteData<ListAdmissionsResponse>, QueryKey<Options<ListAdmissionsData>>, number | Pick<QueryKey<Options<ListAdmissionsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
     // @ts-ignore
@@ -118,10 +110,6 @@ export const listAdmissionsInfiniteOptions = (options?: Options<ListAdmissionsDa
     return opts as Omit<typeof opts, 'initialData'>;
 };
 
-/**
- * Start an admission. Creates a visit in status `awaiting_bed`. The care level and the
- * clinician who chose it are both required — that pair is the proof a human decided it.
- */
 export const createAdmissionMutation = (options?: Partial<Options<CreateAdmissionData>>): UseMutationOptions<CreateAdmissionResponse, CreateAdmissionError, Options<CreateAdmissionData>> => {
     const mutationOptions: UseMutationOptions<CreateAdmissionResponse, CreateAdmissionError, Options<CreateAdmissionData>> = {
         mutationFn: async (fnOptions) => {
@@ -138,10 +126,6 @@ export const createAdmissionMutation = (options?: Partial<Options<CreateAdmissio
 
 export const getAdmissionQueryKey = (options: Options<GetAdmissionData>) => createQueryKey('getAdmission', options);
 
-/**
- * Get one admission with its bed history. Nothing is deleted or overwritten, so rejected
- * and expired assignments stay on the list — this is the audit trail.
- */
 export const getAdmissionOptions = (options: Options<GetAdmissionData>) => queryOptions<GetAdmissionResponse, GetAdmissionError, GetAdmissionResponse, ReturnType<typeof getAdmissionQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await getAdmission({
@@ -155,13 +139,6 @@ export const getAdmissionOptions = (options: Options<GetAdmissionData>) => query
     queryKey: getAdmissionQueryKey(options)
 });
 
-/**
- * Fill in details that were missing at registration. A field left out is left alone, and
- * completeness is recalculated here rather than trusted from the caller.
- *
- * Completeness is deliberately not part of `status`: a patient can be admitted and still
- * have paperwork outstanding, and one field cannot express both without ambiguity.
- */
 export const completeAdmissionDetailsMutation = (options?: Partial<Options<CompleteAdmissionDetailsData>>): UseMutationOptions<CompleteAdmissionDetailsResponse, CompleteAdmissionDetailsError, Options<CompleteAdmissionDetailsData>> => {
     const mutationOptions: UseMutationOptions<CompleteAdmissionDetailsResponse, CompleteAdmissionDetailsError, Options<CompleteAdmissionDetailsData>> = {
         mutationFn: async (fnOptions) => {
@@ -176,15 +153,6 @@ export const completeAdmissionDetailsMutation = (options?: Partial<Options<Compl
     return mutationOptions;
 };
 
-/**
- * Mark the patient as physically present in the bed. Moves `bed_reserved` to `admitted`,
- * sets `admitted_at`, and turns the hold on the bed into an occupancy so it can no longer
- * expire.
- *
- * Rejected with 409 from any other status: a patient cannot arrive into a bed that was
- * never approved. The ward nurse is at the bedside, which is why this is theirs and not
- * the duty manager's.
- */
 export const markArrivedMutation = (options?: Partial<Options<MarkArrivedData>>): UseMutationOptions<MarkArrivedResponse, MarkArrivedError, Options<MarkArrivedData>> => {
     const mutationOptions: UseMutationOptions<MarkArrivedResponse, MarkArrivedError, Options<MarkArrivedData>> = {
         mutationFn: async (fnOptions) => {
@@ -199,18 +167,6 @@ export const markArrivedMutation = (options?: Partial<Options<MarkArrivedData>>)
     return mutationOptions;
 };
 
-/**
- * Finish a visit that never needed a bed - the scan or test is done and the patient has
- * gone home. Moves `admitted` to `discharged`.
- *
- * **Only for a visit that needs no bed** - an `outpatient`. A visit at any other care
- * level is refused with 409 and `cl_pat_020`: that is a discharge, and a discharge has a
- * checklist, a summary note, an approver and a bed to give back. This endpoint does none
- * of those, so it says so rather than half-doing it.
- *
- * The ward nurse or doctor who did the test is the one who knows it is finished, which is
- * why this is theirs and not the duty manager's.
- */
 export const completeVisitMutation = (options?: Partial<Options<CompleteVisitData>>): UseMutationOptions<CompleteVisitResponse, CompleteVisitError, Options<CompleteVisitData>> => {
     const mutationOptions: UseMutationOptions<CompleteVisitResponse, CompleteVisitError, Options<CompleteVisitData>> = {
         mutationFn: async (fnOptions) => {
@@ -225,14 +181,6 @@ export const completeVisitMutation = (options?: Partial<Options<CompleteVisitDat
     return mutationOptions;
 };
 
-/**
- * Cancel an admission, with a reason, and release any bed it was holding.
- *
- * Always a human act, never automatic, which is why the reason is mandatory and why this
- * is the duty manager's. A hold expiring frees a bed by itself because that is cheap and
- * reversible; declaring that a patient is not coming is neither. Refused with 409 once
- * they are `admitted` - discharge them instead.
- */
 export const cancelAdmissionMutation = (options?: Partial<Options<CancelAdmissionData>>): UseMutationOptions<CancelAdmissionResponse, CancelAdmissionError, Options<CancelAdmissionData>> => {
     const mutationOptions: UseMutationOptions<CancelAdmissionResponse, CancelAdmissionError, Options<CancelAdmissionData>> = {
         mutationFn: async (fnOptions) => {
@@ -247,25 +195,6 @@ export const cancelAdmissionMutation = (options?: Partial<Options<CancelAdmissio
     return mutationOptions;
 };
 
-/**
- * Assign a bed by hand, bypassing the agent. Places a 30-minute hold and moves the
- * admission to `bed_reserved`.
- *
- * **The manual path must always work.** If the only way to admit a patient were through
- * the AI, the hospital would stop the moment the AI stopped - and it is what makes a human
- * genuinely in control rather than only able to say yes or no.
- *
- * The same hard rules and the same row-locked re-check as the agent's own path. A human
- * may overrule the agent's ranking; nobody may put an ICU patient in a general bed without
- * it being recorded as a downgrade.
- *
- * Reception, a ward nurse and the duty manager may all assign a bed that matches the
- * patient's care level - an intensive-care bed for an ICU patient included, because that is
- * the right bed and not a decision anybody has to make. A bed off that path - a step down,
- * or a ward more acute than the patient needs - is the duty manager's alone, and that
- * depends on which bed was chosen rather than on the route, so choosing one is a 403 from
- * the service and not a 401 from a policy.
- */
 export const assignBedManuallyMutation = (options?: Partial<Options<AssignBedManuallyData>>): UseMutationOptions<AssignBedManuallyResponse, AssignBedManuallyError, Options<AssignBedManuallyData>> => {
     const mutationOptions: UseMutationOptions<AssignBedManuallyResponse, AssignBedManuallyError, Options<AssignBedManuallyData>> = {
         mutationFn: async (fnOptions) => {
@@ -280,21 +209,6 @@ export const assignBedManuallyMutation = (options?: Partial<Options<AssignBedMan
     return mutationOptions;
 };
 
-/**
- * Move a patient into a different bed because the first one was a mistake.
- *
- * Beds get mis-clicked. Without this the only ways out are cancelling a live visit or
- * leaving a patient recorded in a bed somebody else is standing next to, and a ward board
- * that is known to be wrong stops being read at all.
- *
- * <b>A correction, not a transfer.</b> The bed it replaces is written off and charged for
- * nothing, which is right for a mis-click and wrong for a patient who genuinely spent a
- * night in one ward and moved to another.
- *
- * The same permission and the same hard rules as assigning a bed in the first place: a
- * ward nurse correcting a bed still cannot correct it into a ward the patient's care level
- * does not point at.
- */
 export const correctBedMutation = (options?: Partial<Options<CorrectBedData>>): UseMutationOptions<CorrectBedResponse, CorrectBedError, Options<CorrectBedData>> => {
     const mutationOptions: UseMutationOptions<CorrectBedResponse, CorrectBedError, Options<CorrectBedData>> = {
         mutationFn: async (fnOptions) => {
@@ -311,15 +225,6 @@ export const correctBedMutation = (options?: Partial<Options<CorrectBedData>>): 
 
 export const listAppointmentsQueryKey = (options?: Options<ListAppointmentsData>) => createQueryKey('listAppointments', options);
 
-/**
- * The expected-visits worklist: who is coming in, so the desk knows before they walk up.
- *
- * The patient's own view of the same booking is `GET /me/appointments`, and the two are
- * deliberately different shapes — this one carries who booked it and which admission it
- * became, neither of which is the patient's business.
- *
- * `date` filters on whole UTC days, which is what the column stores.
- */
 export const listAppointmentsOptions = (options?: Options<ListAppointmentsData>) => queryOptions<ListAppointmentsResponse, ListAppointmentsError, ListAppointmentsResponse, ReturnType<typeof listAppointmentsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await listAppointments({
@@ -335,15 +240,6 @@ export const listAppointmentsOptions = (options?: Options<ListAppointmentsData>)
 
 export const listAppointmentsInfiniteQueryKey = (options?: Options<ListAppointmentsData>): QueryKey<Options<ListAppointmentsData>> => createQueryKey('listAppointments', options, true);
 
-/**
- * The expected-visits worklist: who is coming in, so the desk knows before they walk up.
- *
- * The patient's own view of the same booking is `GET /me/appointments`, and the two are
- * deliberately different shapes — this one carries who booked it and which admission it
- * became, neither of which is the patient's business.
- *
- * `date` filters on whole UTC days, which is what the column stores.
- */
 export const listAppointmentsInfiniteOptions = (options?: Options<ListAppointmentsData>) => {
     const opts = infiniteQueryOptions<ListAppointmentsResponse, ListAppointmentsError, InfiniteData<ListAppointmentsResponse>, QueryKey<Options<ListAppointmentsData>>, number | Pick<QueryKey<Options<ListAppointmentsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
     // @ts-ignore
@@ -369,15 +265,6 @@ export const listAppointmentsInfiniteOptions = (options?: Options<ListAppointmen
     return opts as Omit<typeof opts, 'initialData'>;
 };
 
-/**
- * Book a visit on a patient's behalf — the desk equivalent of the patient booking it in
- * the app themselves.
- *
- * Records who took the booking, off the token. That field is null for a self-booking,
- * which is how the two paths stay tellable apart afterwards.
- *
- * One open booking at a time, and never a booking for somebody already admitted.
- */
 export const createAppointmentMutation = (options?: Partial<Options<CreateAppointmentData>>): UseMutationOptions<CreateAppointmentResponse, CreateAppointmentError, Options<CreateAppointmentData>> => {
     const mutationOptions: UseMutationOptions<CreateAppointmentResponse, CreateAppointmentError, Options<CreateAppointmentData>> = {
         mutationFn: async (fnOptions) => {
@@ -392,21 +279,6 @@ export const createAppointmentMutation = (options?: Partial<Options<CreateAppoin
     return mutationOptions;
 };
 
-/**
- * Check an expected patient in. Turns the booking into an admission with
- * `source = pre_registered`, in one transaction.
- *
- * The care level is chosen here, by the staff member at the desk — not by the patient
- * when they booked, and not by an agent. `category_set_by_staff_id` records who chose it.
- *
- * A ward nurse may check somebody in as outpatient, day_case or inpatient. `icu` and
- * `hdu` are the duty manager's, so a nurse asking for either is a 403 — the rule depends
- * on the body rather than the route, which is why it is not a policy.
- *
- * From here the admission behaves like any other: it needs a bed, so the bed agent runs
- * on it exactly as it would for a walk-in. Returns the admission, not the appointment,
- * because the admission is what the desk works from next.
- */
 export const checkInAppointmentMutation = (options?: Partial<Options<CheckInAppointmentData>>): UseMutationOptions<CheckInAppointmentResponse, CheckInAppointmentError, Options<CheckInAppointmentData>> => {
     const mutationOptions: UseMutationOptions<CheckInAppointmentResponse, CheckInAppointmentError, Options<CheckInAppointmentData>> = {
         mutationFn: async (fnOptions) => {
@@ -423,26 +295,6 @@ export const checkInAppointmentMutation = (options?: Partial<Options<CheckInAppo
 
 export const listPatientWorklistQueryKey = (options?: Options<ListPatientWorklistData>) => createQueryKey('listPatientWorklist', options);
 
-/**
- * One page of the ward board, newest first. `search` matches the patient's code, name or NIC.
- *
- * **Two tables, one list.** A row is either a booking nobody has checked in yet -
- * `kind = booking`, `status = not_arrived` - or a visit that has started, `kind = visit`.
- * A booking that has been checked in appears once, as its visit, never twice.
- *
- * This exists because `GET /admissions` cannot answer the question. An admission is
- * created by arriving, so a list of admissions can never say "not arrived" about anybody,
- * and the patient booked in for a scan at eleven was invisible until she walked in.
- *
- * **Read-only, and derived.** `status` is a reading of `AppointmentStatus` or
- * `AdmissionStatus`, not a fourth stored status. Nothing transitions between its values;
- * every write still goes to `/appointments/{id}/check-in`, `/admissions/{id}/assign-bed`
- * and the rest. So there is no `PATCH` here and there never will be.
- *
- * No `sortBy`. It is a worklist read top to bottom, not a report - and one sort key over a
- * union of two tables whose time columns mean different things would order it by a column
- * nobody asked for.
- */
 export const listPatientWorklistOptions = (options?: Options<ListPatientWorklistData>) => queryOptions<ListPatientWorklistResponse, ListPatientWorklistError, ListPatientWorklistResponse, ReturnType<typeof listPatientWorklistQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await listPatientWorklist({
@@ -458,26 +310,6 @@ export const listPatientWorklistOptions = (options?: Options<ListPatientWorklist
 
 export const listPatientWorklistInfiniteQueryKey = (options?: Options<ListPatientWorklistData>): QueryKey<Options<ListPatientWorklistData>> => createQueryKey('listPatientWorklist', options, true);
 
-/**
- * One page of the ward board, newest first. `search` matches the patient's code, name or NIC.
- *
- * **Two tables, one list.** A row is either a booking nobody has checked in yet -
- * `kind = booking`, `status = not_arrived` - or a visit that has started, `kind = visit`.
- * A booking that has been checked in appears once, as its visit, never twice.
- *
- * This exists because `GET /admissions` cannot answer the question. An admission is
- * created by arriving, so a list of admissions can never say "not arrived" about anybody,
- * and the patient booked in for a scan at eleven was invisible until she walked in.
- *
- * **Read-only, and derived.** `status` is a reading of `AppointmentStatus` or
- * `AdmissionStatus`, not a fourth stored status. Nothing transitions between its values;
- * every write still goes to `/appointments/{id}/check-in`, `/admissions/{id}/assign-bed`
- * and the rest. So there is no `PATCH` here and there never will be.
- *
- * No `sortBy`. It is a worklist read top to bottom, not a report - and one sort key over a
- * union of two tables whose time columns mean different things would order it by a column
- * nobody asked for.
- */
 export const listPatientWorklistInfiniteOptions = (options?: Options<ListPatientWorklistData>) => {
     const opts = infiniteQueryOptions<ListPatientWorklistResponse, ListPatientWorklistError, InfiniteData<ListPatientWorklistResponse>, QueryKey<Options<ListPatientWorklistData>>, number | Pick<QueryKey<Options<ListPatientWorklistData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
     // @ts-ignore
@@ -503,9 +335,119 @@ export const listPatientWorklistInfiniteOptions = (options?: Options<ListPatient
     return opts as Omit<typeof opts, 'initialData'>;
 };
 
-/**
- * Staff login. The same 401 for a wrong password, an unknown email and a deactivated account, so the endpoint cannot be used to discover which emails exist.
- */
+export const listAmbulancesQueryKey = (options?: Options<ListAmbulancesData>) => createQueryKey('listAmbulances', options);
+
+export const listAmbulancesOptions = (options?: Options<ListAmbulancesData>) => queryOptions<ListAmbulancesResponse, ListAmbulancesError, ListAmbulancesResponse, ReturnType<typeof listAmbulancesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listAmbulances({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listAmbulancesQueryKey(options)
+});
+
+export const listAmbulancesInfiniteQueryKey = (options?: Options<ListAmbulancesData>): QueryKey<Options<ListAmbulancesData>> => createQueryKey('listAmbulances', options, true);
+
+export const listAmbulancesInfiniteOptions = (options?: Options<ListAmbulancesData>) => {
+    const opts = infiniteQueryOptions<ListAmbulancesResponse, ListAmbulancesError, InfiniteData<ListAmbulancesResponse>, QueryKey<Options<ListAmbulancesData>>, number | Pick<QueryKey<Options<ListAmbulancesData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListAmbulancesData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listAmbulances({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listAmbulancesInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+export const createAmbulanceMutation = (options?: Partial<Options<CreateAmbulanceData>>): UseMutationOptions<CreateAmbulanceResponse, CreateAmbulanceError, Options<CreateAmbulanceData>> => {
+    const mutationOptions: UseMutationOptions<CreateAmbulanceResponse, CreateAmbulanceError, Options<CreateAmbulanceData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createAmbulance({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getAmbulanceQueryKey = (options: Options<GetAmbulanceData>) => createQueryKey('getAmbulance', options);
+
+export const getAmbulanceOptions = (options: Options<GetAmbulanceData>) => queryOptions<GetAmbulanceResponse, GetAmbulanceError, GetAmbulanceResponse, ReturnType<typeof getAmbulanceQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getAmbulance({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getAmbulanceQueryKey(options)
+});
+
+export const updateAmbulanceMutation = (options?: Partial<Options<UpdateAmbulanceData>>): UseMutationOptions<UpdateAmbulanceResponse, UpdateAmbulanceError, Options<UpdateAmbulanceData>> => {
+    const mutationOptions: UseMutationOptions<UpdateAmbulanceResponse, UpdateAmbulanceError, Options<UpdateAmbulanceData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await updateAmbulance({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const retireAmbulanceMutation = (options?: Partial<Options<RetireAmbulanceData>>): UseMutationOptions<RetireAmbulanceResponse, RetireAmbulanceError, Options<RetireAmbulanceData>> => {
+    const mutationOptions: UseMutationOptions<RetireAmbulanceResponse, RetireAmbulanceError, Options<RetireAmbulanceData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await retireAmbulance({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const reinstateAmbulanceMutation = (options?: Partial<Options<ReinstateAmbulanceData>>): UseMutationOptions<ReinstateAmbulanceResponse, ReinstateAmbulanceError, Options<ReinstateAmbulanceData>> => {
+    const mutationOptions: UseMutationOptions<ReinstateAmbulanceResponse, ReinstateAmbulanceError, Options<ReinstateAmbulanceData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await reinstateAmbulance({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
 export const loginMutation = (options?: Partial<Options<LoginData>>): UseMutationOptions<LoginResponse, LoginError, Options<LoginData>> => {
     const mutationOptions: UseMutationOptions<LoginResponse, LoginError, Options<LoginData>> = {
         mutationFn: async (fnOptions) => {
@@ -520,9 +462,6 @@ export const loginMutation = (options?: Partial<Options<LoginData>>): UseMutatio
     return mutationOptions;
 };
 
-/**
- * Patient self-registration. Creates a login, not a medical record: no Patient row is created and none is linked. 409 when the phone number already has an active account.
- */
 export const registerPatientAccountMutation = (options?: Partial<Options<RegisterPatientAccountData>>): UseMutationOptions<RegisterPatientAccountResponse, RegisterPatientAccountError, Options<RegisterPatientAccountData>> => {
     const mutationOptions: UseMutationOptions<RegisterPatientAccountResponse, RegisterPatientAccountError, Options<RegisterPatientAccountData>> = {
         mutationFn: async (fnOptions) => {
@@ -537,9 +476,6 @@ export const registerPatientAccountMutation = (options?: Partial<Options<Registe
     return mutationOptions;
 };
 
-/**
- * Patient login, by phone number. Same indistinguishable 401 as staff login.
- */
 export const loginPatientMutation = (options?: Partial<Options<LoginPatientData>>): UseMutationOptions<LoginPatientResponse, LoginPatientError, Options<LoginPatientData>> => {
     const mutationOptions: UseMutationOptions<LoginPatientResponse, LoginPatientError, Options<LoginPatientData>> = {
         mutationFn: async (fnOptions) => {
@@ -554,9 +490,6 @@ export const loginPatientMutation = (options?: Partial<Options<LoginPatientData>
     return mutationOptions;
 };
 
-/**
- * Exchange a refresh token for a new access token. Rotating, so the presented token is single-use; presenting an already-revoked one revokes the whole chain and returns 401.
- */
 export const refreshTokenMutation = (options?: Partial<Options<RefreshTokenData>>): UseMutationOptions<RefreshTokenResponse, RefreshTokenError, Options<RefreshTokenData>> => {
     const mutationOptions: UseMutationOptions<RefreshTokenResponse, RefreshTokenError, Options<RefreshTokenData>> = {
         mutationFn: async (fnOptions) => {
@@ -571,9 +504,6 @@ export const refreshTokenMutation = (options?: Partial<Options<RefreshTokenData>
     return mutationOptions;
 };
 
-/**
- * End the session by revoking the presented refresh token. Idempotent — logging out twice is a 204.
- */
 export const logoutMutation = (options?: Partial<Options<LogoutData>>): UseMutationOptions<LogoutResponse, LogoutError, Options<LogoutData>> => {
     const mutationOptions: UseMutationOptions<LogoutResponse, LogoutError, Options<LogoutData>> = {
         mutationFn: async (fnOptions) => {
@@ -590,9 +520,6 @@ export const logoutMutation = (options?: Partial<Options<LogoutData>>): UseMutat
 
 export const getCurrentUserQueryKey = (options?: Options<GetCurrentUserData>) => createQueryKey('getCurrentUser', options);
 
-/**
- * Who this token belongs to. Resolved from the sub claim, so there is no id parameter to change.
- */
 export const getCurrentUserOptions = (options?: Options<GetCurrentUserData>) => queryOptions<GetCurrentUserResponse, GetCurrentUserError, GetCurrentUserResponse, ReturnType<typeof getCurrentUserQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await getCurrentUser({
@@ -608,9 +535,6 @@ export const getCurrentUserOptions = (options?: Options<GetCurrentUserData>) => 
 
 export const listBedsQueryKey = (options?: Options<ListBedsData>) => createQueryKey('listBeds', options);
 
-/**
- * List beds. Also read by Patient Management, which joins this register with its own BedAssignment rows to build its bed agent's candidate list.
- */
 export const listBedsOptions = (options?: Options<ListBedsData>) => queryOptions<ListBedsResponse, ListBedsError, ListBedsResponse, ReturnType<typeof listBedsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await listBeds({
@@ -626,9 +550,6 @@ export const listBedsOptions = (options?: Options<ListBedsData>) => queryOptions
 
 export const listBedsInfiniteQueryKey = (options?: Options<ListBedsData>): QueryKey<Options<ListBedsData>> => createQueryKey('listBeds', options, true);
 
-/**
- * List beds. Also read by Patient Management, which joins this register with its own BedAssignment rows to build its bed agent's candidate list.
- */
 export const listBedsInfiniteOptions = (options?: Options<ListBedsData>) => {
     const opts = infiniteQueryOptions<ListBedsResponse, ListBedsError, InfiniteData<ListBedsResponse>, QueryKey<Options<ListBedsData>>, number | Pick<QueryKey<Options<ListBedsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
     // @ts-ignore
@@ -654,9 +575,6 @@ export const listBedsInfiniteOptions = (options?: Options<ListBedsData>) => {
     return opts as Omit<typeof opts, 'initialData'>;
 };
 
-/**
- * Create a bed. ward_id references Patient Management's Ward table; we store the reference and never write that table.
- */
 export const createBedMutation = (options?: Partial<Options<CreateBedData>>): UseMutationOptions<CreateBedResponse, CreateBedError, Options<CreateBedData>> => {
     const mutationOptions: UseMutationOptions<CreateBedResponse, CreateBedError, Options<CreateBedData>> = {
         mutationFn: async (fnOptions) => {
@@ -671,9 +589,6 @@ export const createBedMutation = (options?: Partial<Options<CreateBedData>>): Us
     return mutationOptions;
 };
 
-/**
- * Update a bed's condition or details. Moving to out_of_service is refused with 409 while Patient Management reports the bed occupied or held, checked inside this request every time.
- */
 export const updateBedMutation = (options?: Partial<Options<UpdateBedData>>): UseMutationOptions<UpdateBedResponse, UpdateBedError, Options<UpdateBedData>> => {
     const mutationOptions: UseMutationOptions<UpdateBedResponse, UpdateBedError, Options<UpdateBedData>> = {
         mutationFn: async (fnOptions) => {
@@ -688,9 +603,6 @@ export const updateBedMutation = (options?: Partial<Options<UpdateBedData>>): Us
     return mutationOptions;
 };
 
-/**
- * Retire a bed permanently. Same occupancy check as an update that withdraws it, and there is no un-retire — a dedicated endpoint so the one-way nature is visible in the API surface.
- */
 export const retireBedMutation = (options?: Partial<Options<RetireBedData>>): UseMutationOptions<RetireBedResponse, RetireBedError, Options<RetireBedData>> => {
     const mutationOptions: UseMutationOptions<RetireBedResponse, RetireBedError, Options<RetireBedData>> = {
         mutationFn: async (fnOptions) => {
@@ -707,10 +619,6 @@ export const retireBedMutation = (options?: Partial<Options<RetireBedData>>): Us
 
 export const getAdmissionBillQueryKey = (options: Options<GetAdmissionBillData>) => createQueryKey('getAdmissionBill', options);
 
-/**
- * The bill for a visit. 404 until somebody prepares one — a bill is written the first time
- * it is asked for, because a stay that has not happened yet cannot be priced.
- */
 export const getAdmissionBillOptions = (options: Options<GetAdmissionBillData>) => queryOptions<GetAdmissionBillResponse, GetAdmissionBillError, GetAdmissionBillResponse, ReturnType<typeof getAdmissionBillQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await getAdmissionBill({
@@ -724,15 +632,6 @@ export const getAdmissionBillOptions = (options: Options<GetAdmissionBillData>) 
     queryKey: getAdmissionBillQueryKey(options)
 });
 
-/**
- * Work the bill out from the stay, and open one if this visit has none.
- *
- * Every generated line is replaced — one admission fee, and one line per bed the patient
- * has actually been in, at that ward's day rate. Typed charges are left exactly as they
- * are, so preparing again a day later updates the bed days and keeps the X-ray.
- *
- * Refused with 409 once the bill is settled: that is the paper the patient was handed.
- */
 export const prepareAdmissionBillMutation = (options?: Partial<Options<PrepareAdmissionBillData>>): UseMutationOptions<PrepareAdmissionBillResponse, PrepareAdmissionBillError, Options<PrepareAdmissionBillData>> => {
     const mutationOptions: UseMutationOptions<PrepareAdmissionBillResponse, PrepareAdmissionBillError, Options<PrepareAdmissionBillData>> = {
         mutationFn: async (fnOptions) => {
@@ -747,13 +646,6 @@ export const prepareAdmissionBillMutation = (options?: Partial<Options<PrepareAd
     return mutationOptions;
 };
 
-/**
- * Add a charge reception types in — an X-ray, a dressing pack, a consultant's fee.
- *
- * Typed rather than generated because no table in this component records a treatment
- * against an admission. Asking a human to type what happened is honest; inventing line
- * items from tables that do not exist is not.
- */
 export const addBillChargeMutation = (options?: Partial<Options<AddBillChargeData>>): UseMutationOptions<AddBillChargeResponse, AddBillChargeError, Options<AddBillChargeData>> => {
     const mutationOptions: UseMutationOptions<AddBillChargeResponse, AddBillChargeError, Options<AddBillChargeData>> = {
         mutationFn: async (fnOptions) => {
@@ -768,10 +660,6 @@ export const addBillChargeMutation = (options?: Partial<Options<AddBillChargeDat
     return mutationOptions;
 };
 
-/**
- * Take a typed charge off again. A generated line is refused with 409 — it would come
- * straight back the next time anyone prepared the bill.
- */
 export const removeBillChargeMutation = (options?: Partial<Options<RemoveBillChargeData>>): UseMutationOptions<RemoveBillChargeResponse, RemoveBillChargeError, Options<RemoveBillChargeData>> => {
     const mutationOptions: UseMutationOptions<RemoveBillChargeResponse, RemoveBillChargeError, Options<RemoveBillChargeData>> = {
         mutationFn: async (fnOptions) => {
@@ -786,16 +674,6 @@ export const removeBillChargeMutation = (options?: Partial<Options<RemoveBillCha
     return mutationOptions;
 };
 
-/**
- * The money is in. Freezes the bill and ticks `billing_settled` on the discharge checklist,
- * in one transaction.
- *
- * That tick has no other way of being written — `PATCH /discharges/{id}/checklist` refuses
- * the key. So the bill and the checklist cannot disagree about whether a patient has paid.
- *
- * Settling a visit nobody prepared a bill for works the bill out first, so a visit with no
- * bill can never deadlock a discharge.
- */
 export const settleBillMutation = (options?: Partial<Options<SettleBillData>>): UseMutationOptions<SettleBillResponse, SettleBillError, Options<SettleBillData>> => {
     const mutationOptions: UseMutationOptions<SettleBillResponse, SettleBillError, Options<SettleBillData>> = {
         mutationFn: async (fnOptions) => {
@@ -812,17 +690,6 @@ export const settleBillMutation = (options?: Partial<Options<SettleBillData>>): 
 
 export const listOutstandingBillsQueryKey = (options?: Options<ListOutstandingBillsData>) => createQueryKey('listOutstandingBills', options);
 
-/**
- * Reception's worklist: visits in the building whose money has not been taken yet.
- *
- * Includes visits with no bill row at all, which is most of them. A list of bills would
- * have shown an empty screen and left the work invisible.
- *
- * A discharged visit is never on the default list: confirming a discharge needs
- * `billing_settled`, and only settling writes that. `includeSettled=true` is how you reach
- * one anyway — it widens the list to every visit that has a bill, in any status, which is
- * what a patient asking for another copy of their bill at the counter needs.
- */
 export const listOutstandingBillsOptions = (options?: Options<ListOutstandingBillsData>) => queryOptions<ListOutstandingBillsResponse, ListOutstandingBillsError, ListOutstandingBillsResponse, ReturnType<typeof listOutstandingBillsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await listOutstandingBills({
@@ -838,17 +705,6 @@ export const listOutstandingBillsOptions = (options?: Options<ListOutstandingBil
 
 export const listOutstandingBillsInfiniteQueryKey = (options?: Options<ListOutstandingBillsData>): QueryKey<Options<ListOutstandingBillsData>> => createQueryKey('listOutstandingBills', options, true);
 
-/**
- * Reception's worklist: visits in the building whose money has not been taken yet.
- *
- * Includes visits with no bill row at all, which is most of them. A list of bills would
- * have shown an empty screen and left the work invisible.
- *
- * A discharged visit is never on the default list: confirming a discharge needs
- * `billing_settled`, and only settling writes that. `includeSettled=true` is how you reach
- * one anyway — it widens the list to every visit that has a bill, in any status, which is
- * what a patient asking for another copy of their bill at the counter needs.
- */
 export const listOutstandingBillsInfiniteOptions = (options?: Options<ListOutstandingBillsData>) => {
     const opts = infiniteQueryOptions<ListOutstandingBillsResponse, ListOutstandingBillsError, InfiniteData<ListOutstandingBillsResponse>, QueryKey<Options<ListOutstandingBillsData>>, number | Pick<QueryKey<Options<ListOutstandingBillsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
     // @ts-ignore
@@ -876,9 +732,6 @@ export const listOutstandingBillsInfiniteOptions = (options?: Options<ListOutsta
 
 export const getBillingRatesQueryKey = (options?: Options<GetBillingRatesData>) => createQueryKey('getBillingRates', options);
 
-/**
- * The whole price grid: every expense, in every kind of ward, plus the admission fees.
- */
 export const getBillingRatesOptions = (options?: Options<GetBillingRatesData>) => queryOptions<GetBillingRatesResponse, GetBillingRatesError, GetBillingRatesResponse, ReturnType<typeof getBillingRatesQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await getBillingRates({
@@ -892,13 +745,6 @@ export const getBillingRatesOptions = (options?: Options<GetBillingRatesData>) =
     queryKey: getBillingRatesQueryKey(options)
 });
 
-/**
- * Change prices. Only the cells that changed need to be sent.
- *
- * <b>This never alters a bill already raised.</b> The price is copied onto the line when
- * the line is written, so a change here prices tomorrow's bills and leaves every piece of
- * paper a patient has already been handed exactly as it was.
- */
 export const updateBillingRatesMutation = (options?: Partial<Options<UpdateBillingRatesData>>): UseMutationOptions<UpdateBillingRatesResponse, UpdateBillingRatesError, Options<UpdateBillingRatesData>> => {
     const mutationOptions: UseMutationOptions<UpdateBillingRatesResponse, UpdateBillingRatesError, Options<UpdateBillingRatesData>> = {
         mutationFn: async (fnOptions) => {
@@ -915,18 +761,6 @@ export const updateBillingRatesMutation = (options?: Partial<Options<UpdateBilli
 
 export const listDischargeCandidatesQueryKey = (options?: Options<ListDischargeCandidatesData>) => createQueryKey('listDischargeCandidates', options);
 
-/**
- * Patients whose checklist says they could go home, and the ones with a box or two left.
- * A plain rule over the checklist rows, not an agent — checking whether three boxes are
- * ticked is a `WHERE` clause.
- *
- * The list is advisory. Being on it changes nothing until a human confirms.
- *
- * `includeDischarged` adds the visits that are already over, as records. They sort below
- * everyone still in the building, carry `is_discharged` and `discharged_at`, and are never
- * candidates for anything — without them this screen forgets every patient the moment the
- * work on them is finished.
- */
 export const listDischargeCandidatesOptions = (options?: Options<ListDischargeCandidatesData>) => queryOptions<ListDischargeCandidatesResponse, ListDischargeCandidatesError, ListDischargeCandidatesResponse, ReturnType<typeof listDischargeCandidatesQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await listDischargeCandidates({
@@ -942,18 +776,6 @@ export const listDischargeCandidatesOptions = (options?: Options<ListDischargeCa
 
 export const listDischargeCandidatesInfiniteQueryKey = (options?: Options<ListDischargeCandidatesData>): QueryKey<Options<ListDischargeCandidatesData>> => createQueryKey('listDischargeCandidates', options, true);
 
-/**
- * Patients whose checklist says they could go home, and the ones with a box or two left.
- * A plain rule over the checklist rows, not an agent — checking whether three boxes are
- * ticked is a `WHERE` clause.
- *
- * The list is advisory. Being on it changes nothing until a human confirms.
- *
- * `includeDischarged` adds the visits that are already over, as records. They sort below
- * everyone still in the building, carry `is_discharged` and `discharged_at`, and are never
- * candidates for anything — without them this screen forgets every patient the moment the
- * work on them is finished.
- */
 export const listDischargeCandidatesInfiniteOptions = (options?: Options<ListDischargeCandidatesData>) => {
     const opts = infiniteQueryOptions<ListDischargeCandidatesResponse, ListDischargeCandidatesError, InfiniteData<ListDischargeCandidatesResponse>, QueryKey<Options<ListDischargeCandidatesData>>, number | Pick<QueryKey<Options<ListDischargeCandidatesData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
     // @ts-ignore
@@ -979,21 +801,6 @@ export const listDischargeCandidatesInfiniteOptions = (options?: Options<ListDis
     return opts as Omit<typeof opts, 'initialData'>;
 };
 
-/**
- * Tick discharge checklist items. Any subset; a key left out is not touched.
- *
- * Each item is gated by role, not just by login:
- *
- * - `clinical_clearance` — **Doctor only.** This is the wall. Without it nothing flags and
- * nothing discharges, and no automated process can ever set it.
- * - `medication_issued`, `follow_up_recorded`, `transport_arranged` — Ward Nurse.
- * - `billing_settled` — **refused here.** Settle the bill instead
- * (`POST /api/admissions/{id}/bill/settle`), which is what writes it. One fact, one
- * place: a paid bill and an unticked box cannot happen.
- *
- * Ticking the last mandatory box moves the admission to `ready_for_discharge`; unticking
- * one moves it back to `admitted`.
- */
 export const updateDischargeChecklistMutation = (options?: Partial<Options<UpdateDischargeChecklistData>>): UseMutationOptions<UpdateDischargeChecklistResponse, UpdateDischargeChecklistError, Options<UpdateDischargeChecklistData>> => {
     const mutationOptions: UseMutationOptions<UpdateDischargeChecklistResponse, UpdateDischargeChecklistError, Options<UpdateDischargeChecklistData>> = {
         mutationFn: async (fnOptions) => {
@@ -1008,20 +815,6 @@ export const updateDischargeChecklistMutation = (options?: Partial<Options<Updat
     return mutationOptions;
 };
 
-/**
- * Confirm the discharge — the second high-impact human gate in this component.
- *
- * It ends the admission, frees the bed for the next patient, and sends someone home. In one
- * transaction it sets `discharged_at`, releases the bed assignment with
- * `release_reason: discharged`, and moves the admission to `discharged`.
- *
- * Reception, a ward nurse or the duty manager, **at any care level** — the ICU and HDU
- * restriction was removed on 2026-09-12. **The gate is the checklist, not the role.** Both
- * mandatory boxes must be ticked or this is a 409, and the clinical one is a doctor's and
- * nobody else's, so no patient goes home without a doctor having cleared them. That is the
- * signature that means something; a second one from somebody who was not at the bedside
- * was delay rather than safety.
- */
 export const confirmDischargeMutation = (options?: Partial<Options<ConfirmDischargeData>>): UseMutationOptions<ConfirmDischargeResponse, ConfirmDischargeError, Options<ConfirmDischargeData>> => {
     const mutationOptions: UseMutationOptions<ConfirmDischargeResponse, ConfirmDischargeError, Options<ConfirmDischargeData>> = {
         mutationFn: async (fnOptions) => {
@@ -1038,9 +831,6 @@ export const confirmDischargeMutation = (options?: Partial<Options<ConfirmDischa
 
 export const listEquipmentCategoriesQueryKey = (options?: Options<ListEquipmentCategoriesData>) => createQueryKey('listEquipmentCategories', options);
 
-/**
- * List the equipment categories. Any staff member may read them, because anyone browsing equipment needs them.
- */
 export const listEquipmentCategoriesOptions = (options?: Options<ListEquipmentCategoriesData>) => queryOptions<ListEquipmentCategoriesResponse, ListEquipmentCategoriesError, ListEquipmentCategoriesResponse, ReturnType<typeof listEquipmentCategoriesQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await listEquipmentCategories({
@@ -1054,9 +844,6 @@ export const listEquipmentCategoriesOptions = (options?: Options<ListEquipmentCa
     queryKey: listEquipmentCategoriesQueryKey(options)
 });
 
-/**
- * Add a category. Names are compared without case, so "Surgical Gear" and "surgical gear" cannot both exist.
- */
 export const createEquipmentCategoryMutation = (options?: Partial<Options<CreateEquipmentCategoryData>>): UseMutationOptions<CreateEquipmentCategoryResponse, CreateEquipmentCategoryError, Options<CreateEquipmentCategoryData>> => {
     const mutationOptions: UseMutationOptions<CreateEquipmentCategoryResponse, CreateEquipmentCategoryError, Options<CreateEquipmentCategoryData>> = {
         mutationFn: async (fnOptions) => {
@@ -1073,9 +860,6 @@ export const createEquipmentCategoryMutation = (options?: Partial<Options<Create
 
 export const listEquipmentItemsQueryKey = (options?: Options<ListEquipmentItemsData>) => createQueryKey('listEquipmentItems', options);
 
-/**
- * Search equipment. Open to any staff member, because "do we have a working X" is a question anyone in the hospital may need to ask.
- */
 export const listEquipmentItemsOptions = (options?: Options<ListEquipmentItemsData>) => queryOptions<ListEquipmentItemsResponse, ListEquipmentItemsError, ListEquipmentItemsResponse, ReturnType<typeof listEquipmentItemsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await listEquipmentItems({
@@ -1091,9 +875,6 @@ export const listEquipmentItemsOptions = (options?: Options<ListEquipmentItemsDa
 
 export const listEquipmentItemsInfiniteQueryKey = (options?: Options<ListEquipmentItemsData>): QueryKey<Options<ListEquipmentItemsData>> => createQueryKey('listEquipmentItems', options, true);
 
-/**
- * Search equipment. Open to any staff member, because "do we have a working X" is a question anyone in the hospital may need to ask.
- */
 export const listEquipmentItemsInfiniteOptions = (options?: Options<ListEquipmentItemsData>) => {
     const opts = infiniteQueryOptions<ListEquipmentItemsResponse, ListEquipmentItemsError, InfiniteData<ListEquipmentItemsResponse>, QueryKey<Options<ListEquipmentItemsData>>, number | Pick<QueryKey<Options<ListEquipmentItemsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
     // @ts-ignore
@@ -1119,9 +900,6 @@ export const listEquipmentItemsInfiniteOptions = (options?: Options<ListEquipmen
     return opts as Omit<typeof opts, 'initialData'>;
 };
 
-/**
- * Register a physical item. It starts available, and 409s if the asset tag or serial number is already in use.
- */
 export const createEquipmentItemMutation = (options?: Partial<Options<CreateEquipmentItemData>>): UseMutationOptions<CreateEquipmentItemResponse, CreateEquipmentItemError, Options<CreateEquipmentItemData>> => {
     const mutationOptions: UseMutationOptions<CreateEquipmentItemResponse, CreateEquipmentItemError, Options<CreateEquipmentItemData>> = {
         mutationFn: async (fnOptions) => {
@@ -1138,9 +916,6 @@ export const createEquipmentItemMutation = (options?: Partial<Options<CreateEqui
 
 export const getEquipmentItemQueryKey = (options: Options<GetEquipmentItemData>) => createQueryKey('getEquipmentItem', options);
 
-/**
- * One item with its servicing history and any warnings still open.
- */
 export const getEquipmentItemOptions = (options: Options<GetEquipmentItemData>) => queryOptions<GetEquipmentItemResponse, GetEquipmentItemError, GetEquipmentItemResponse, ReturnType<typeof getEquipmentItemQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await getEquipmentItem({
@@ -1154,9 +929,6 @@ export const getEquipmentItemOptions = (options: Options<GetEquipmentItemData>) 
     queryKey: getEquipmentItemQueryKey(options)
 });
 
-/**
- * Update an item. A status change here is checked against the lifecycle, so retired stays terminal and assigned cannot be jumped into.
- */
 export const updateEquipmentItemMutation = (options?: Partial<Options<UpdateEquipmentItemData>>): UseMutationOptions<UpdateEquipmentItemResponse, UpdateEquipmentItemError, Options<UpdateEquipmentItemData>> => {
     const mutationOptions: UseMutationOptions<UpdateEquipmentItemResponse, UpdateEquipmentItemError, Options<UpdateEquipmentItemData>> = {
         mutationFn: async (fnOptions) => {
@@ -1173,9 +945,6 @@ export const updateEquipmentItemMutation = (options?: Partial<Options<UpdateEqui
 
 export const getEquipmentItemByTagQueryKey = (options: Options<GetEquipmentItemByTagData>) => createQueryKey('getEquipmentItemByTag', options);
 
-/**
- * What a scanned QR tag resolves to. This is the call the Flutter scan screen makes the instant a technician scans a label.
- */
 export const getEquipmentItemByTagOptions = (options: Options<GetEquipmentItemByTagData>) => queryOptions<GetEquipmentItemByTagResponse, GetEquipmentItemByTagError, GetEquipmentItemByTagResponse, ReturnType<typeof getEquipmentItemByTagQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await getEquipmentItemByTag({
@@ -1189,9 +958,6 @@ export const getEquipmentItemByTagOptions = (options: Options<GetEquipmentItemBy
     queryKey: getEquipmentItemByTagQueryKey(options)
 });
 
-/**
- * Assign an item to an admission. Only an available item can be assigned, so a ventilator cannot be given to two patients.
- */
 export const assignEquipmentItemMutation = (options?: Partial<Options<AssignEquipmentItemData>>): UseMutationOptions<AssignEquipmentItemResponse, AssignEquipmentItemError, Options<AssignEquipmentItemData>> => {
     const mutationOptions: UseMutationOptions<AssignEquipmentItemResponse, AssignEquipmentItemError, Options<AssignEquipmentItemData>> = {
         mutationFn: async (fnOptions) => {
@@ -1206,9 +972,6 @@ export const assignEquipmentItemMutation = (options?: Partial<Options<AssignEqui
     return mutationOptions;
 };
 
-/**
- * Release an assigned item back to available. No assignment history is kept past this point, which the plan calls a deliberate simplification.
- */
 export const releaseEquipmentItemMutation = (options?: Partial<Options<ReleaseEquipmentItemData>>): UseMutationOptions<ReleaseEquipmentItemResponse, ReleaseEquipmentItemError, Options<ReleaseEquipmentItemData>> => {
     const mutationOptions: UseMutationOptions<ReleaseEquipmentItemResponse, ReleaseEquipmentItemError, Options<ReleaseEquipmentItemData>> = {
         mutationFn: async (fnOptions) => {
@@ -1223,9 +986,6 @@ export const releaseEquipmentItemMutation = (options?: Partial<Options<ReleaseEq
     return mutationOptions;
 };
 
-/**
- * Report a fault. Any staff member may, and the item moves to maintenance immediately rather than waiting for the next sweep.
- */
 export const reportEquipmentFaultMutation = (options?: Partial<Options<ReportEquipmentFaultData>>): UseMutationOptions<ReportEquipmentFaultResponse, ReportEquipmentFaultError, Options<ReportEquipmentFaultData>> => {
     const mutationOptions: UseMutationOptions<ReportEquipmentFaultResponse, ReportEquipmentFaultError, Options<ReportEquipmentFaultData>> = {
         mutationFn: async (fnOptions) => {
@@ -1242,9 +1002,6 @@ export const reportEquipmentFaultMutation = (options?: Partial<Options<ReportEqu
 
 export const getHealthQueryKey = (options?: Options<GetHealthData>) => createQueryKey('getHealth', options);
 
-/**
- * Liveness and database connectivity. An API that answers "up" while PostgreSQL is unreachable is worse than one that says nothing, because it stops anyone from looking.
- */
 export const getHealthOptions = (options?: Options<GetHealthData>) => queryOptions<GetHealthResponse, GetHealthError, GetHealthResponse, ReturnType<typeof getHealthQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await getHealth({
@@ -1260,16 +1017,6 @@ export const getHealthOptions = (options?: Options<GetHealthData>) => queryOptio
 
 export const getWardCapacityQueryKey = (options?: Options<GetWardCapacityData>) => createQueryKey('getWardCapacity', options);
 
-/**
- * Free bed counts across all wards. Consumed by Emergency Service's dispatch and routing
- * agent to choose where to send an ambulance.
- *
- * `free_beds` counts beds that are usable, unoccupied, and not under a live hold. A hold
- * past its `reserved_until` counts as free, and that expiry rule lives in this service so
- * no other component re-implements it differently.
- *
- * Counts only. No patient data crosses this boundary.
- */
 export const getWardCapacityOptions = (options?: Options<GetWardCapacityData>) => queryOptions<GetWardCapacityResponse, GetWardCapacityError, GetWardCapacityResponse, ReturnType<typeof getWardCapacityQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await getWardCapacity({
@@ -1283,13 +1030,121 @@ export const getWardCapacityOptions = (options?: Options<GetWardCapacityData>) =
     queryKey: getWardCapacityQueryKey(options)
 });
 
+export const listLabReportsQueryKey = (options: Options<ListLabReportsData>) => createQueryKey('listLabReports', options);
+
+export const listLabReportsOptions = (options: Options<ListLabReportsData>) => queryOptions<ListLabReportsResponse, ListLabReportsError, ListLabReportsResponse, ReturnType<typeof listLabReportsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listLabReports({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listLabReportsQueryKey(options)
+});
+
+export const listLabReportsInfiniteQueryKey = (options: Options<ListLabReportsData>): QueryKey<Options<ListLabReportsData>> => createQueryKey('listLabReports', options, true);
+
+export const listLabReportsInfiniteOptions = (options: Options<ListLabReportsData>) => {
+    const opts = infiniteQueryOptions<ListLabReportsResponse, ListLabReportsError, InfiniteData<ListLabReportsResponse>, QueryKey<Options<ListLabReportsData>>, number | Pick<QueryKey<Options<ListLabReportsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListLabReportsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listLabReports({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listLabReportsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+export const uploadLabReportMutation = (options?: Partial<Options<UploadLabReportData>>): UseMutationOptions<UploadLabReportResponse, UploadLabReportError, Options<UploadLabReportData>> => {
+    const mutationOptions: UseMutationOptions<UploadLabReportResponse, UploadLabReportError, Options<UploadLabReportData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await uploadLabReport({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const downloadLabReportQueryKey = (options: Options<DownloadLabReportData>) => createQueryKey('downloadLabReport', options);
+
+export const downloadLabReportOptions = (options: Options<DownloadLabReportData>) => queryOptions<DownloadLabReportResponse, DownloadLabReportError, DownloadLabReportResponse, ReturnType<typeof downloadLabReportQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await downloadLabReport({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: downloadLabReportQueryKey(options)
+});
+
+export const listWardPatientsQueryKey = (options?: Options<ListWardPatientsData>) => createQueryKey('listWardPatients', options);
+
+export const listWardPatientsOptions = (options?: Options<ListWardPatientsData>) => queryOptions<ListWardPatientsResponse, ListWardPatientsError, ListWardPatientsResponse, ReturnType<typeof listWardPatientsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listWardPatients({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listWardPatientsQueryKey(options)
+});
+
+export const listWardPatientsInfiniteQueryKey = (options?: Options<ListWardPatientsData>): QueryKey<Options<ListWardPatientsData>> => createQueryKey('listWardPatients', options, true);
+
+export const listWardPatientsInfiniteOptions = (options?: Options<ListWardPatientsData>) => {
+    const opts = infiniteQueryOptions<ListWardPatientsResponse, ListWardPatientsError, InfiniteData<ListWardPatientsResponse>, QueryKey<Options<ListWardPatientsData>>, number | Pick<QueryKey<Options<ListWardPatientsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListWardPatientsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listWardPatients({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listWardPatientsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
 export const listMaintenanceSchedulesQueryKey = (options?: Options<ListMaintenanceSchedulesData>) => createQueryKey('listMaintenanceSchedules', options);
 
-/**
- * The work list, soonest first. `overdue=true` returns tasks still scheduled whose date
- * has passed, worked out when you ask rather than stored, so nothing has to sweep the
- * table at midnight to keep it honest.
- */
 export const listMaintenanceSchedulesOptions = (options?: Options<ListMaintenanceSchedulesData>) => queryOptions<ListMaintenanceSchedulesResponse, ListMaintenanceSchedulesError, ListMaintenanceSchedulesResponse, ReturnType<typeof listMaintenanceSchedulesQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await listMaintenanceSchedules({
@@ -1305,11 +1160,6 @@ export const listMaintenanceSchedulesOptions = (options?: Options<ListMaintenanc
 
 export const listMaintenanceSchedulesInfiniteQueryKey = (options?: Options<ListMaintenanceSchedulesData>): QueryKey<Options<ListMaintenanceSchedulesData>> => createQueryKey('listMaintenanceSchedules', options, true);
 
-/**
- * The work list, soonest first. `overdue=true` returns tasks still scheduled whose date
- * has passed, worked out when you ask rather than stored, so nothing has to sweep the
- * table at midnight to keep it honest.
- */
 export const listMaintenanceSchedulesInfiniteOptions = (options?: Options<ListMaintenanceSchedulesData>) => {
     const opts = infiniteQueryOptions<ListMaintenanceSchedulesResponse, ListMaintenanceSchedulesError, InfiniteData<ListMaintenanceSchedulesResponse>, QueryKey<Options<ListMaintenanceSchedulesData>>, number | Pick<QueryKey<Options<ListMaintenanceSchedulesData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
     // @ts-ignore
@@ -1335,11 +1185,6 @@ export const listMaintenanceSchedulesInfiniteOptions = (options?: Options<ListMa
     return opts as Omit<typeof opts, 'initialData'>;
 };
 
-/**
- * Book a service by hand, with no agent involved. This path has to keep working: if the
- * only way to schedule maintenance were through the agent, the hospital would stop the
- * day the agent did. Booking against an occupied bed is refused with a 409.
- */
 export const createMaintenanceScheduleMutation = (options?: Partial<Options<CreateMaintenanceScheduleData>>): UseMutationOptions<CreateMaintenanceScheduleResponse, CreateMaintenanceScheduleError, Options<CreateMaintenanceScheduleData>> => {
     const mutationOptions: UseMutationOptions<CreateMaintenanceScheduleResponse, CreateMaintenanceScheduleError, Options<CreateMaintenanceScheduleData>> = {
         mutationFn: async (fnOptions) => {
@@ -1354,11 +1199,6 @@ export const createMaintenanceScheduleMutation = (options?: Partial<Options<Crea
     return mutationOptions;
 };
 
-/**
- * Mark the work done. The asset goes back into service, its next service is booked
- * forward, and any warning that led here closes, all in one transaction. Who did the
- * work comes from the token, never the body.
- */
 export const completeMaintenanceScheduleMutation = (options?: Partial<Options<CompleteMaintenanceScheduleData>>): UseMutationOptions<CompleteMaintenanceScheduleResponse, CompleteMaintenanceScheduleError, Options<CompleteMaintenanceScheduleData>> => {
     const mutationOptions: UseMutationOptions<CompleteMaintenanceScheduleResponse, CompleteMaintenanceScheduleError, Options<CompleteMaintenanceScheduleData>> = {
         mutationFn: async (fnOptions) => {
@@ -1373,12 +1213,164 @@ export const completeMaintenanceScheduleMutation = (options?: Partial<Options<Co
     return mutationOptions;
 };
 
+export const preRegisterSelfMutation = (options?: Partial<Options<PreRegisterSelfData>>): UseMutationOptions<PreRegisterSelfResponse, PreRegisterSelfError, Options<PreRegisterSelfData>> => {
+    const mutationOptions: UseMutationOptions<PreRegisterSelfResponse, PreRegisterSelfError, Options<PreRegisterSelfData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await preRegisterSelf({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getMyProfileQueryKey = (options?: Options<GetMyProfileData>) => createQueryKey('getMyProfile', options);
+
+export const getMyProfileOptions = (options?: Options<GetMyProfileData>) => queryOptions<GetMyProfileResponse, GetMyProfileError, GetMyProfileResponse, ReturnType<typeof getMyProfileQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getMyProfile({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getMyProfileQueryKey(options)
+});
+
+export const getMyAdmissionQueryKey = (options?: Options<GetMyAdmissionData>) => createQueryKey('getMyAdmission', options);
+
+export const getMyAdmissionOptions = (options?: Options<GetMyAdmissionData>) => queryOptions<GetMyAdmissionResponse, GetMyAdmissionError, GetMyAdmissionResponse, ReturnType<typeof getMyAdmissionQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getMyAdmission({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getMyAdmissionQueryKey(options)
+});
+
+export const getMyHistoryQueryKey = (options?: Options<GetMyHistoryData>) => createQueryKey('getMyHistory', options);
+
+export const getMyHistoryOptions = (options?: Options<GetMyHistoryData>) => queryOptions<GetMyHistoryResponse, GetMyHistoryError, GetMyHistoryResponse, ReturnType<typeof getMyHistoryQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getMyHistory({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getMyHistoryQueryKey(options)
+});
+
+export const getMyHistoryInfiniteQueryKey = (options?: Options<GetMyHistoryData>): QueryKey<Options<GetMyHistoryData>> => createQueryKey('getMyHistory', options, true);
+
+export const getMyHistoryInfiniteOptions = (options?: Options<GetMyHistoryData>) => {
+    const opts = infiniteQueryOptions<GetMyHistoryResponse, GetMyHistoryError, InfiniteData<GetMyHistoryResponse>, QueryKey<Options<GetMyHistoryData>>, number | Pick<QueryKey<Options<GetMyHistoryData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<GetMyHistoryData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await getMyHistory({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: getMyHistoryInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+export const listMyAppointmentsQueryKey = (options?: Options<ListMyAppointmentsData>) => createQueryKey('listMyAppointments', options);
+
+export const listMyAppointmentsOptions = (options?: Options<ListMyAppointmentsData>) => queryOptions<ListMyAppointmentsResponse, ListMyAppointmentsError, ListMyAppointmentsResponse, ReturnType<typeof listMyAppointmentsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listMyAppointments({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listMyAppointmentsQueryKey(options)
+});
+
+export const listMyAppointmentsInfiniteQueryKey = (options?: Options<ListMyAppointmentsData>): QueryKey<Options<ListMyAppointmentsData>> => createQueryKey('listMyAppointments', options, true);
+
+export const listMyAppointmentsInfiniteOptions = (options?: Options<ListMyAppointmentsData>) => {
+    const opts = infiniteQueryOptions<ListMyAppointmentsResponse, ListMyAppointmentsError, InfiniteData<ListMyAppointmentsResponse>, QueryKey<Options<ListMyAppointmentsData>>, number | Pick<QueryKey<Options<ListMyAppointmentsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListMyAppointmentsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listMyAppointments({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listMyAppointmentsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+export const bookMyAppointmentMutation = (options?: Partial<Options<BookMyAppointmentData>>): UseMutationOptions<BookMyAppointmentResponse, BookMyAppointmentError, Options<BookMyAppointmentData>> => {
+    const mutationOptions: UseMutationOptions<BookMyAppointmentResponse, BookMyAppointmentError, Options<BookMyAppointmentData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await bookMyAppointment({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const cancelMyAppointmentMutation = (options?: Partial<Options<CancelMyAppointmentData>>): UseMutationOptions<CancelMyAppointmentResponse, CancelMyAppointmentError, Options<CancelMyAppointmentData>> => {
+    const mutationOptions: UseMutationOptions<CancelMyAppointmentResponse, CancelMyAppointmentError, Options<CancelMyAppointmentData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await cancelMyAppointment({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
 export const listPatientsQueryKey = (options?: Options<ListPatientsData>) => createQueryKey('listPatients', options);
 
-/**
- * Search patients. `search` matches patient code, full name, NIC, phone or temporary
- * reference. Equipment Management reads this to find a patient's code.
- */
 export const listPatientsOptions = (options?: Options<ListPatientsData>) => queryOptions<ListPatientsResponse, ListPatientsError, ListPatientsResponse, ReturnType<typeof listPatientsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await listPatients({
@@ -1394,10 +1386,6 @@ export const listPatientsOptions = (options?: Options<ListPatientsData>) => quer
 
 export const listPatientsInfiniteQueryKey = (options?: Options<ListPatientsData>): QueryKey<Options<ListPatientsData>> => createQueryKey('listPatients', options, true);
 
-/**
- * Search patients. `search` matches patient code, full name, NIC, phone or temporary
- * reference. Equipment Management reads this to find a patient's code.
- */
 export const listPatientsInfiniteOptions = (options?: Options<ListPatientsData>) => {
     const opts = infiniteQueryOptions<ListPatientsResponse, ListPatientsError, InfiniteData<ListPatientsResponse>, QueryKey<Options<ListPatientsData>>, number | Pick<QueryKey<Options<ListPatientsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
     // @ts-ignore
@@ -1423,10 +1411,6 @@ export const listPatientsInfiniteOptions = (options?: Options<ListPatientsData>)
     return opts as Omit<typeof opts, 'initialData'>;
 };
 
-/**
- * Register a patient. Call lookup first when an NIC is available — a returning patient must
- * keep one record with many admissions, not gain a second identity.
- */
 export const createPatientMutation = (options?: Partial<Options<CreatePatientData>>): UseMutationOptions<CreatePatientResponse, CreatePatientError, Options<CreatePatientData>> => {
     const mutationOptions: UseMutationOptions<CreatePatientResponse, CreatePatientError, Options<CreatePatientData>> = {
         mutationFn: async (fnOptions) => {
@@ -1443,9 +1427,6 @@ export const createPatientMutation = (options?: Partial<Options<CreatePatientDat
 
 export const getPatientQueryKey = (options: Options<GetPatientData>) => createQueryKey('getPatient', options);
 
-/**
- * Get one patient with their visit history. One patient, many admissions.
- */
 export const getPatientOptions = (options: Options<GetPatientData>) => queryOptions<GetPatientResponse, GetPatientError, GetPatientResponse, ReturnType<typeof getPatientQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await getPatient({
@@ -1459,9 +1440,6 @@ export const getPatientOptions = (options: Options<GetPatientData>) => queryOpti
     queryKey: getPatientQueryKey(options)
 });
 
-/**
- * Update a patient record. A full replace — a field left out is cleared.
- */
 export const updatePatientMutation = (options?: Partial<Options<UpdatePatientData>>): UseMutationOptions<UpdatePatientResponse, UpdatePatientError, Options<UpdatePatientData>> => {
     const mutationOptions: UseMutationOptions<UpdatePatientResponse, UpdatePatientError, Options<UpdatePatientData>> = {
         mutationFn: async (fnOptions) => {
@@ -1476,10 +1454,6 @@ export const updatePatientMutation = (options?: Partial<Options<UpdatePatientDat
     return mutationOptions;
 };
 
-/**
- * Find an existing patient by NIC before registering a new one. A miss is a 200 with
- * found = false; not knowing someone is the normal answer at a registration desk.
- */
 export const lookupPatientMutation = (options?: Partial<Options<LookupPatientData>>): UseMutationOptions<LookupPatientResponse, LookupPatientError, Options<LookupPatientData>> => {
     const mutationOptions: UseMutationOptions<LookupPatientResponse, LookupPatientError, Options<LookupPatientData>> = {
         mutationFn: async (fnOptions) => {
@@ -1494,10 +1468,6 @@ export const lookupPatientMutation = (options?: Partial<Options<LookupPatientDat
     return mutationOptions;
 };
 
-/**
- * Attach a patient login to an existing record. A record and an account are different
- * things — staff link them deliberately, after checking identity.
- */
 export const linkPatientAccountMutation = (options?: Partial<Options<LinkPatientAccountData>>): UseMutationOptions<LinkPatientAccountResponse, LinkPatientAccountError, Options<LinkPatientAccountData>> => {
     const mutationOptions: UseMutationOptions<LinkPatientAccountResponse, LinkPatientAccountError, Options<LinkPatientAccountData>> = {
         mutationFn: async (fnOptions) => {
@@ -1514,9 +1484,6 @@ export const linkPatientAccountMutation = (options?: Partial<Options<LinkPatient
 
 export const listPharmacyCategoriesQueryKey = (options?: Options<ListPharmacyCategoriesData>) => createQueryKey('listPharmacyCategories', options);
 
-/**
- * List the pharmacy categories. Any staff member may read them, because anyone searching for a medicine needs them.
- */
 export const listPharmacyCategoriesOptions = (options?: Options<ListPharmacyCategoriesData>) => queryOptions<ListPharmacyCategoriesResponse, ListPharmacyCategoriesError, ListPharmacyCategoriesResponse, ReturnType<typeof listPharmacyCategoriesQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await listPharmacyCategories({
@@ -1530,9 +1497,6 @@ export const listPharmacyCategoriesOptions = (options?: Options<ListPharmacyCate
     queryKey: listPharmacyCategoriesQueryKey(options)
 });
 
-/**
- * Add a category. Names are compared without case, so one category cannot exist twice under different capitalisation.
- */
 export const createPharmacyCategoryMutation = (options?: Partial<Options<CreatePharmacyCategoryData>>): UseMutationOptions<CreatePharmacyCategoryResponse, CreatePharmacyCategoryError, Options<CreatePharmacyCategoryData>> => {
     const mutationOptions: UseMutationOptions<CreatePharmacyCategoryResponse, CreatePharmacyCategoryError, Options<CreatePharmacyCategoryData>> = {
         mutationFn: async (fnOptions) => {
@@ -1549,9 +1513,6 @@ export const createPharmacyCategoryMutation = (options?: Partial<Options<CreateP
 
 export const listPharmacyItemsQueryKey = (options?: Options<ListPharmacyItemsData>) => createQueryKey('listPharmacyItems', options);
 
-/**
- * Search the pharmacy and check availability. Open to any staff member: "do we have this medicine" is a question anyone in the hospital may need to ask.
- */
 export const listPharmacyItemsOptions = (options?: Options<ListPharmacyItemsData>) => queryOptions<ListPharmacyItemsResponse, ListPharmacyItemsError, ListPharmacyItemsResponse, ReturnType<typeof listPharmacyItemsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await listPharmacyItems({
@@ -1567,9 +1528,6 @@ export const listPharmacyItemsOptions = (options?: Options<ListPharmacyItemsData
 
 export const listPharmacyItemsInfiniteQueryKey = (options?: Options<ListPharmacyItemsData>): QueryKey<Options<ListPharmacyItemsData>> => createQueryKey('listPharmacyItems', options, true);
 
-/**
- * Search the pharmacy and check availability. Open to any staff member: "do we have this medicine" is a question anyone in the hospital may need to ask.
- */
 export const listPharmacyItemsInfiniteOptions = (options?: Options<ListPharmacyItemsData>) => {
     const opts = infiniteQueryOptions<ListPharmacyItemsResponse, ListPharmacyItemsError, InfiniteData<ListPharmacyItemsResponse>, QueryKey<Options<ListPharmacyItemsData>>, number | Pick<QueryKey<Options<ListPharmacyItemsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
     // @ts-ignore
@@ -1595,9 +1553,6 @@ export const listPharmacyItemsInfiniteOptions = (options?: Options<ListPharmacyI
     return opts as Omit<typeof opts, 'initialData'>;
 };
 
-/**
- * Add a medicine or supply to the catalog. Opening stock is set here; everything after is a transaction.
- */
 export const createPharmacyItemMutation = (options?: Partial<Options<CreatePharmacyItemData>>): UseMutationOptions<CreatePharmacyItemResponse, CreatePharmacyItemError, Options<CreatePharmacyItemData>> => {
     const mutationOptions: UseMutationOptions<CreatePharmacyItemResponse, CreatePharmacyItemError, Options<CreatePharmacyItemData>> = {
         mutationFn: async (fnOptions) => {
@@ -1614,9 +1569,6 @@ export const createPharmacyItemMutation = (options?: Partial<Options<CreatePharm
 
 export const getPharmacyItemQueryKey = (options: Options<GetPharmacyItemData>) => createQueryKey('getPharmacyItem', options);
 
-/**
- * One catalog entry with its current quantity.
- */
 export const getPharmacyItemOptions = (options: Options<GetPharmacyItemData>) => queryOptions<GetPharmacyItemResponse, GetPharmacyItemError, GetPharmacyItemResponse, ReturnType<typeof getPharmacyItemQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await getPharmacyItem({
@@ -1632,9 +1584,6 @@ export const getPharmacyItemOptions = (options: Options<GetPharmacyItemData>) =>
 
 export const listPharmacyTransactionsQueryKey = (options: Options<ListPharmacyTransactionsData>) => createQueryKey('listPharmacyTransactions', options);
 
-/**
- * One item's movement history, newest first. This is the audit trail, so nothing here is ever edited or removed.
- */
 export const listPharmacyTransactionsOptions = (options: Options<ListPharmacyTransactionsData>) => queryOptions<ListPharmacyTransactionsResponse, ListPharmacyTransactionsError, ListPharmacyTransactionsResponse, ReturnType<typeof listPharmacyTransactionsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await listPharmacyTransactions({
@@ -1650,9 +1599,6 @@ export const listPharmacyTransactionsOptions = (options: Options<ListPharmacyTra
 
 export const listPharmacyTransactionsInfiniteQueryKey = (options: Options<ListPharmacyTransactionsData>): QueryKey<Options<ListPharmacyTransactionsData>> => createQueryKey('listPharmacyTransactions', options, true);
 
-/**
- * One item's movement history, newest first. This is the audit trail, so nothing here is ever edited or removed.
- */
 export const listPharmacyTransactionsInfiniteOptions = (options: Options<ListPharmacyTransactionsData>) => {
     const opts = infiniteQueryOptions<ListPharmacyTransactionsResponse, ListPharmacyTransactionsError, InfiniteData<ListPharmacyTransactionsResponse>, QueryKey<Options<ListPharmacyTransactionsData>>, number | Pick<QueryKey<Options<ListPharmacyTransactionsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
     // @ts-ignore
@@ -1678,11 +1624,6 @@ export const listPharmacyTransactionsInfiniteOptions = (options: Options<ListPha
     return opts as Omit<typeof opts, 'initialData'>;
 };
 
-/**
- * Record a stock movement. Quantity on hand is never edited directly: every change is a
- * transaction, applied as one conditional update, so stock cannot go negative and two
- * people dispensing the last box at once cannot both succeed.
- */
 export const recordPharmacyTransactionMutation = (options?: Partial<Options<RecordPharmacyTransactionData>>): UseMutationOptions<RecordPharmacyTransactionResponse, RecordPharmacyTransactionError, Options<RecordPharmacyTransactionData>> => {
     const mutationOptions: UseMutationOptions<RecordPharmacyTransactionResponse, RecordPharmacyTransactionError, Options<RecordPharmacyTransactionData>> = {
         mutationFn: async (fnOptions) => {
@@ -1699,23 +1640,6 @@ export const recordPharmacyTransactionMutation = (options?: Partial<Options<Reco
 
 export const listBedAvailabilityQueryKey = (options?: Options<ListBedAvailabilityData>) => createQueryKey('listBedAvailability', options);
 
-/**
- * List beds with their availability. This is the candidate list the bed agent will work
- * from, and the one a nurse picks from by hand today.
- *
- * `free` applies hold expiry, so a bed whose 30-minute reservation has lapsed is reported
- * free with nobody having released it. That expiry rule lives in one place in this
- * component and is not re-implemented per endpoint.
- *
- * Retired wards and retired beds are absent rather than listed as unavailable.
- *
- * <b>pageSize goes to 500 here, where every other paged route stops at 100.</b> This one
- * feeds a bed picker, which is a complete candidate list and not a page anybody browses -
- * a nurse choosing a bed has to see every bed the patient could go in. At 100 the seeded
- * hospital's 135 beds were cut off mid-alphabet with nothing on screen saying so, and
- * pediatric and surgical beds could not be chosen at all. The service already loads every
- * bed to apply hold expiry and pages in memory, so the higher ceiling costs nothing new.
- */
 export const listBedAvailabilityOptions = (options?: Options<ListBedAvailabilityData>) => queryOptions<ListBedAvailabilityResponse, ListBedAvailabilityError, ListBedAvailabilityResponse, ReturnType<typeof listBedAvailabilityQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await listBedAvailability({
@@ -1731,23 +1655,6 @@ export const listBedAvailabilityOptions = (options?: Options<ListBedAvailability
 
 export const listBedAvailabilityInfiniteQueryKey = (options?: Options<ListBedAvailabilityData>): QueryKey<Options<ListBedAvailabilityData>> => createQueryKey('listBedAvailability', options, true);
 
-/**
- * List beds with their availability. This is the candidate list the bed agent will work
- * from, and the one a nurse picks from by hand today.
- *
- * `free` applies hold expiry, so a bed whose 30-minute reservation has lapsed is reported
- * free with nobody having released it. That expiry rule lives in one place in this
- * component and is not re-implemented per endpoint.
- *
- * Retired wards and retired beds are absent rather than listed as unavailable.
- *
- * <b>pageSize goes to 500 here, where every other paged route stops at 100.</b> This one
- * feeds a bed picker, which is a complete candidate list and not a page anybody browses -
- * a nurse choosing a bed has to see every bed the patient could go in. At 100 the seeded
- * hospital's 135 beds were cut off mid-alphabet with nothing on screen saying so, and
- * pediatric and surgical beds could not be chosen at all. The service already loads every
- * bed to apply hold expiry and pages in memory, so the higher ceiling costs nothing new.
- */
 export const listBedAvailabilityInfiniteOptions = (options?: Options<ListBedAvailabilityData>) => {
     const opts = infiniteQueryOptions<ListBedAvailabilityResponse, ListBedAvailabilityError, InfiniteData<ListBedAvailabilityResponse>, QueryKey<Options<ListBedAvailabilityData>>, number | Pick<QueryKey<Options<ListBedAvailabilityData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
     // @ts-ignore
@@ -1775,19 +1682,6 @@ export const listBedAvailabilityInfiniteOptions = (options?: Options<ListBedAvai
 
 export const getBedOccupancyQueryKey = (options: Options<GetBedOccupancyData>) => createQueryKey('getBedOccupancy', options);
 
-/**
- * Is anyone in this bed?
- *
- * Equipment Management calls this **before** taking a bed out of service for repair or
- * maintenance. Servicing a bed is their operation on their own table, but a bed with a
- * patient in it must not be withdrawn, and only we know whether it is occupied.
- *
- * `occupied` is true when a live assignment exists: status `occupied`, or `reserved` with
- * a `reserved_until` still in the future. A lapsed hold does not block servicing.
- *
- * The hard rule this exists to enforce: **maintenance never evicts a patient.** If the
- * answer is occupied, Equipment waits for discharge.
- */
 export const getBedOccupancyOptions = (options: Options<GetBedOccupancyData>) => queryOptions<GetBedOccupancyResponse, GetBedOccupancyError, GetBedOccupancyResponse, ReturnType<typeof getBedOccupancyQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await getBedOccupancy({
@@ -1803,9 +1697,6 @@ export const getBedOccupancyOptions = (options: Options<GetBedOccupancyData>) =>
 
 export const listWardsQueryKey = (options?: Options<ListWardsData>) => createQueryKey('listWards', options);
 
-/**
- * List wards. Also read by Equipment Management for allocation and by Staff Management for staffing demand.
- */
 export const listWardsOptions = (options?: Options<ListWardsData>) => queryOptions<ListWardsResponse, ListWardsError, ListWardsResponse, ReturnType<typeof listWardsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await listWards({
@@ -1819,9 +1710,6 @@ export const listWardsOptions = (options?: Options<ListWardsData>) => queryOptio
     queryKey: listWardsQueryKey(options)
 });
 
-/**
- * Create a ward. The gender policy is a property of the ward, not a rule the bed agent bends under pressure.
- */
 export const createWardMutation = (options?: Partial<Options<CreateWardData>>): UseMutationOptions<CreateWardResponse, CreateWardError, Options<CreateWardData>> => {
     const mutationOptions: UseMutationOptions<CreateWardResponse, CreateWardError, Options<CreateWardData>> = {
         mutationFn: async (fnOptions) => {
@@ -1838,17 +1726,6 @@ export const createWardMutation = (options?: Partial<Options<CreateWardData>>): 
 
 export const getWardOccupancyQueryKey = (options: Options<GetWardOccupancyData>) => createQueryKey('getWardOccupancy', options);
 
-/**
- * Occupancy and care mix for one ward. Consumed by Staff Management to work out staffing
- * demand.
- *
- * `patients_by_category` is the useful part: fifteen routine inpatients and two
- * high-dependency patients need very different staffing, even though both are "seventeen
- * patients". `incoming_next_2h` is what lets the staff allocation agent staff AHEAD of a
- * rush instead of reacting to one.
- *
- * Counts only. No patient identities cross this boundary.
- */
 export const getWardOccupancyOptions = (options: Options<GetWardOccupancyData>) => queryOptions<GetWardOccupancyResponse, GetWardOccupancyError, GetWardOccupancyResponse, ReturnType<typeof getWardOccupancyQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await getWardOccupancy({

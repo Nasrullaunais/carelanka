@@ -214,6 +214,23 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.AppointmentDesk, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
+
+    // Narrower than AnyStaff on purpose: a result is clinical information about a named person,
+    // so ambulance crew and general staff are off it even though they hold a staff login.
+    options.AddPolicy(Policies.LabReportReader, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.Doctor),
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager),
+        EnumWire.ToWire(StaffRole.EquipmentManager)));
+
+    options.AddPolicy(Policies.LabReportAuthor, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.EquipmentManager)));
+
+    options.AddPolicy(Policies.PatientLocationReader, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.Doctor),
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager),
+        EnumWire.ToWire(StaffRole.EquipmentManager)));
 });
 
 var authRequestsPerMinute = builder.Configuration.GetValue("RateLimits:AuthPerMinute", 20);
@@ -265,6 +282,7 @@ builder.Services.AddScoped<IEquipmentItemService, EquipmentItemService>();
 builder.Services.AddScoped<IPharmacyCategoryService, PharmacyCategoryService>();
 builder.Services.AddScoped<IPharmacyItemService, PharmacyItemService>();
 builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();
+builder.Services.AddScoped<ILabReportService, LabReportService>();
 builder.Services.AddScoped<IWardService, WardService>();
 builder.Services.AddScoped<IPatientService, PatientService>();
 builder.Services.AddScoped<IAdmissionService, AdmissionService>();
@@ -283,6 +301,12 @@ builder.Services.AddScoped<IBedRegistryService, BedRegistryService>();
 builder.Services.AddSingleton<IWardDirectory, StubWardDirectory>();
 
 builder.Services.AddScoped<IBedOccupancyPort, BedOccupancyAdapter>();
+
+// Both read Patient Management through their own services rather than their tables. Scoped for
+// the same reason as the occupancy adapter above: they reach a DbContext through what they
+// delegate to, and a singleton would capture one for the life of the app.
+builder.Services.AddScoped<IPatientDirectory, PatientDirectoryAdapter>();
+builder.Services.AddScoped<IWardPatientService, WardPatientService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>

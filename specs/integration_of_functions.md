@@ -116,6 +116,7 @@ The second version keeps working when hold expiry, out-of-service beds or a new 
 | `StaffMember`, `Shift`, `Allocation`, `LeaveRequest` | **Staff (M2)** | All — everyone stores staff IDs | Staff only |
 | `EquipmentItem`, `EquipmentCategory`, `PharmacyItem`, `PharmacyCategory`, `PharmacyTransaction`, `MaintenanceSchedule`, `Warning`, `ActionRequest` | **Equipment (M3)** | Patient (ward equipment readiness); any staff (search/availability) | Equipment only |
 | **`Bed`** — exists, number, condition, repairs | **Equipment (M3)** | Patient (to find candidates) | Equipment only |
+| **`LabReport`** — a finished laboratory result and the file itself | **Equipment (M3)** — *claimed 2026-09-13, see §11.14* | Doctor, ward nurse, duty manager | Equipment only (the laboratory) |
 | `Patient`, `Admission`, `Discharge`, `DischargeChecklistItem` | **Patient (M4)** | Emergency, Staff (aggregates only) | Patient only |
 | **`Bill`, `BillLineItem`** — what a visit costs and whether it is paid | **Patient (M4)** — *claimed 2026-09-11, see §11.10* | Nobody yet | Patient only |
 | **`BillingRate`, `AdmissionFeeRate`** — what the hospital charges | **Patient (M4)** — *added 2026-09-11, see §11.13* | Nobody yet | Read: any staff. Write: administrator only |
@@ -856,6 +857,61 @@ every other paged route. The seeded hospital has 135 beds, so the picker silentl
 mid-alphabet and pediatric and surgical beds could never be chosen at all. That one endpoint now
 allows up to 500 — it feeds a complete candidate list, not a page anybody browses — and the
 screen says so if the list is ever incomplete again.
+
+**11.15 (OPEN — announced by M3 on 2026-09-13) — Equipment Management has claimed laboratory
+reports.**
+
+Not a question, and not a request. It is here for the same reason §11.10 is: claiming an unowned
+area silently is exactly what this section exists to prevent.
+
+**What was built.** `LabReport`, migration `Equipment_AddLabReports`, three endpoints under
+`/lab-reports`, and a React screen. Design is `equipment-management-plan.md` §6.6; the contract
+is `equipment-spec.yaml`.
+
+**Why here rather than in Patient Management.** A result is produced by a hospital service unit,
+which is what this component is about, and the row stores nothing clinical about the person: a
+`patient_id` and a file, exactly the read-only reference `EquipmentItem.assigned_to_admission_id`
+already is. Nothing in Patient Management changes, and nothing here copies a name, a NIC or a
+ward.
+
+**Why it exists at all.** A ward currently waits for paper to be carried up from the basement. A
+result that is filed the moment the lab issues it is readable at the nursing station straight
+away, and the specimen's own journey does not change.
+
+**Two things other people should know.**
+
+**1. `Policies.LabReportReader`, `Policies.LabReportAuthor` and
+`Policies.PatientLocationReader` are new entries in the group-owned `Policies.cs`.** Reader is
+doctor, ward nurse, duty manager and the laboratory. Author is the laboratory alone.
+`PatientLocationReader` gates `GET /ward-patients` and holds the same four roles as Reader today,
+under a separate name because knowing which ward somebody is in is not reading a test result. The administrator is on neither, for the same reason they are
+not on `AdmissionReader`: reading one patient's blood result is clinical work.
+
+**2. The laboratory rides on `equipment_manager`, and it should not forever.** `StaffRole` has
+no laboratory value, and adding one is a change to `staff-spec.yaml` and `common-spec.yaml`
+together — M2's and the common owner's call, the same conversation as Open Decision 11. Until
+then those two policies are where a `laboratory` role would be added, and nothing else changes.
+
+**3. Two screens browse by ward, and they read it through M4's service rather than their tables.**
+`GET /ward-patients` lists who is in the hospital now, optionally filtered to one ward. The
+laboratory uses it to file a result against the right person, and the equipment register uses it
+to assign an item to a bedside - **that screen used to take a pasted admission id**. The row
+carries both ids, because an assignment points at the visit and a result points at the person.
+Searching by code, name or NIC is still there as the lab's second way in, for an outpatient who is
+in no ward at all.
+
+**Nothing of M4's changed for it, and nothing new is disclosed.** It calls
+`IAdmissionService.ListAsync`, the same shape as the bed-occupancy adapter. Every
+field it publishes — name, code, ward, bed, visit status — is already visible to these roles
+through `GET /patients/{id}`, which carries a patient's admissions with the ward on them. This
+saves opening one patient at a time; it does not widen who can see what. **M4's admissions list
+endpoint and its read policy are untouched.**
+
+**One thing M3 would still like, and is not blocked on.** The filter matches on **ward name**,
+because `AdmissionSummary` publishes `ward_name` and not a ward id, and the rows are filtered in
+Equipment after the read. That is honest at a few hundred beds and wrong at ten thousand. When M4
+publishes the `wardId` filter on `GET /admissions` that `STUBS.md` already calls unblocked,
+`WardPatientService` collapses to one delegating call. Recorded in `STUBS.md`.
 
 ---
 

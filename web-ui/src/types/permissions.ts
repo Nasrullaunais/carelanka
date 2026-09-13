@@ -34,6 +34,21 @@ export function canReportFault(role: PrincipalRole | undefined): boolean {
   return isStaff(role);
 }
 
+export function canReadLabReports(role: PrincipalRole | undefined): boolean {
+  return (
+    role === 'doctor' ||
+    role === 'ward_nurse' ||
+    role === 'duty_manager' ||
+    role === 'equipment_manager'
+  );
+}
+
+// Narrower than canReadLabReports on purpose: a nurse reads a result and acts on it, and must
+// not be able to file one nobody ran.
+export function canFileLabReport(role: PrincipalRole | undefined): boolean {
+  return role === 'equipment_manager';
+}
+
 export function canRegisterPatient(role: PrincipalRole | undefined): boolean {
   return role === 'general_staff' || role === 'ward_nurse' || role === 'duty_manager';
 }

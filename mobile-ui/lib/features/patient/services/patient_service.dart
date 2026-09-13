@@ -1,6 +1,10 @@
 import '../../../core/network/api.dart';
 import '../../../services/api_client/care_lanka_api.dart';
+import '../../../services/api_client/models/book_appointment_request.dart';
 import '../../../services/api_client/models/my_admission.dart';
+import '../../../services/api_client/models/my_admission_paged_result.dart';
+import '../../../services/api_client/models/my_appointment.dart';
+import '../../../services/api_client/models/my_appointment_paged_result.dart';
 import '../../../services/api_client/models/my_profile.dart';
 import '../../../services/api_client/models/pre_register_request.dart';
 import '../../../services/api_client/models/worklist_row_paged_result.dart';
@@ -15,10 +19,44 @@ class PatientService {
 
   final CareLankaApi _api;
 
-  /// `cl_pat_033` — the signed-in account has no hospital record behind it yet.
-  /// It comes back from every `/me/*` route, and means "show the details form",
-  /// not "nothing found".
+  /// The signed-in account has no hospital record behind it yet. It arrives as
+  /// a 404 from `/me/profile` and `/me/admission`, and as a 409 from booking a
+  /// visit, so branch on this code rather than on the status.
   static const notLinkedCode = 'cl_pat_033';
+
+  /// Linked, but not admitted right now. Also a 404, and not the same thing.
+  static const noCurrentStayCode = 'cl_pat_034';
+
+  Future<MyProfile> loadMyProfile() {
+    return callApi(_api.patientSelfService.getMyProfile);
+  }
+
+  Future<MyProfile> saveMyDetails(PreRegisterRequest request) {
+    return callApi(() => _api.patientSelfService.preRegisterSelf(body: request));
+  }
+
+  Future<MyAdmission> loadMyAdmission() {
+    return callApi(_api.patientSelfService.getMyAdmission);
+  }
+
+  Future<MyAdmissionPagedResult> loadMyHistory({int page = 1, int pageSize = 20}) {
+    return callApi(() => _api.patientSelfService.getMyHistory(page: page, pageSize: pageSize));
+  }
+
+  Future<MyAppointmentPagedResult> loadMyAppointments({int page = 1, int pageSize = 50}) {
+    return callApi(
+        () => _api.patientSelfService.listMyAppointments(page: page, pageSize: pageSize));
+  }
+
+  Future<MyAppointment> bookAppointment({required DateTime scheduledAt, String? reason}) {
+    return callApi(() => _api.patientSelfService.bookMyAppointment(
+          body: BookAppointmentRequest(scheduledAt: scheduledAt.toUtc(), reason: reason),
+        ));
+  }
+
+  Future<MyAppointment> cancelAppointment(String appointmentId) {
+    return callApi(() => _api.patientSelfService.cancelMyAppointment(id: appointmentId));
+  }
 
   Future<WorklistRowPagedResult> loadWorklist({
     String? search,
@@ -32,13 +70,5 @@ class PatientService {
           page: page,
           pageSize: pageSize,
         ));
-  }
-
-  Future<MyAdmission> loadMyAdmission() {
-    return callApi(_api.patientSelfService.getMyAdmission);
-  }
-
-  Future<MyProfile> preRegister(PreRegisterRequest request) {
-    return callApi(() => _api.patientSelfService.preRegisterSelf(body: request));
   }
 }

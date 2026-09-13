@@ -4,6 +4,7 @@ import '../../services/api_client/care_lanka_api.dart';
 import '../../services/api_client/models/auth_tokens.dart';
 import '../../services/api_client/models/current_principal.dart';
 import '../../services/api_client/models/patient_login_request.dart';
+import '../../services/api_client/models/patient_register_request.dart';
 import '../../services/api_client/models/principal_type.dart';
 import '../../services/api_client/models/refresh_token_request.dart';
 import '../../services/api_client/models/staff_login_request.dart';
@@ -68,6 +69,22 @@ class AuthController extends ChangeNotifier {
   Future<bool> signInAsPatient({required String phoneNumber, required String password}) {
     return _signIn(() => _api.auth.loginPatient(
           body: PatientLoginRequest(phoneNumber: phoneNumber, password: password),
+        ));
+  }
+
+  /// Creates the login itself. The account has no medical record behind it
+  /// until the patient fills in their details, which is a separate step.
+  Future<bool> registerAsPatient({
+    required String fullName,
+    required String phoneNumber,
+    required String password,
+  }) {
+    return _signIn(() => _api.auth.registerPatientAccount(
+          body: PatientRegisterRequest(
+            fullName: fullName,
+            phoneNumber: phoneNumber,
+            password: password,
+          ),
         ));
   }
 

@@ -44,10 +44,12 @@ class MyStayController extends ChangeNotifier {
     try {
       _state = AsyncData.ready(MyStayCurrent(await _service.loadMyAdmission()));
     } on ApiException catch (error) {
-      _state = switch (error) {
-        ApiException(code: PatientService.notLinkedCode) =>
-          const AsyncData.ready(MyStayNotLinked()),
-        ApiException(isNotFound: true) => const AsyncData.ready(MyStayNoAdmission()),
+      // Both of these arrive as 404 and mean completely different things, so
+      // the code decides and the status never does.
+      _state = switch (error.code) {
+        PatientService.notLinkedCode => const AsyncData.ready(MyStayNotLinked()),
+        PatientService.noCurrentStayCode => const AsyncData.ready(MyStayNoAdmission()),
+        _ when error.isNotFound => const AsyncData.ready(MyStayNoAdmission()),
         _ => AsyncData.failed(error),
       };
     }

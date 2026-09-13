@@ -132,6 +132,10 @@
     <value>This maintenance task is already {0} and cannot be completed again.</value>
     <comment>Overdue is not a blocker: it is stored as scheduled and only reads as overdue.</comment>
   </data>
+  <data name="cl_equ_013" xml:space="preserve">
+    <value>{0} is with the maintenance unit. It comes back into service when they complete the repair, not by editing its status.</value>
+    <comment>Says where the item is and who releases it, because the caller's next move is to go and look at the repair queue.</comment>
+  </data>
   <data name="cl_equ_011" xml:space="preserve">
     <value>A stock adjustment needs a note saying why.</value>
     <comment>Plan section 5.1: adjustments are stocktake corrections, and an unexplained one is unauditable.</comment>

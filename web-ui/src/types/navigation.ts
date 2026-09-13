@@ -77,6 +77,12 @@ export const destinations: Destination[] = [
     canAccess: canReadEquipment,
   },
   {
+    to: '/maintenance-unit',
+    label: 'Maintenance unit',
+    description: 'Machines waiting to be fixed. Confirm a repair and the item goes back into service.',
+    canAccess: canReadEquipment,
+  },
+  {
     to: '/pharmacy',
     label: 'Pharmacy',
     description: 'Search medicines and supplies, see what is on the shelf, record what moves.',

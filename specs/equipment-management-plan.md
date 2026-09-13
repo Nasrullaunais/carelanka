@@ -278,7 +278,7 @@ WHERE id = :id AND quantity_on_hand >= :qty;
 
 ```
 available ──> assigned ──> available     (returned after use)
-available ──> maintenance ──> available  (repaired, back in service)
+available ──> maintenance ──> available  (repair completed by the maintenance unit)
 available ──> maintenance ──> retired    (beyond repair)
 available ──> retired                     (planned decommission, rare)
 ```
@@ -288,6 +288,10 @@ available ──> retired                     (planned decommission, rare)
 **Assigning an item** (`available -> assigned`) requires `assigned_to_admission_id`. **Releasing it** (`assigned -> available`) clears that field. Unlike Patient Management's `BedAssignment`, this component does not keep a full assignment history table — only the current assignment is stored, which is a deliberate simplification flagged in §15.
 
 **Marking maintenance** (`available -> maintenance`) can happen two ways: the Administrator does it manually, or a Technician's fault report (§7.1) does it automatically — a broken defibrillator changes status the moment it's reported, not on the next scheduled sweep.
+
+**Coming back out of maintenance is the maintenance unit's move, not the Administrator's.** *(Rev 2, 2026-09-13.)* A fault report opens a `MaintenanceSchedule` of type `repair` alongside the warning, and that work order is the only route back to `available` — `POST /maintenance-schedules/{id}/complete` returns the item to service, records who did the work, and closes the fault in one transaction. Editing `status` back to `available` through `PUT /equipment-items/{id}` answers 409 instead.
+
+The reason is the same one behind the bed-occupancy check: a rule that only holds when everybody remembers it is not a rule. Without this, a reported fault is a status a busy Administrator can undo from a dropdown without anybody looking at the machine, and the fault warning stays open behind it. `retired` remains reachable from `maintenance`, because *beyond repair* is the other honest ending — and retiring cancels the open work order and closes the warning, so the unit's queue never lists a machine that no longer exists.
 
 ### 4.2 Bed condition
 
@@ -533,6 +537,7 @@ Per the assignment: workflow id, objective, plan, completed steps, tool calls wi
 | **Equipment detail** | Item info, maintenance history, current warnings, assign/release |
 | **Pharmacy inventory** | Search, filter by category, below-threshold and expiring-soon highlighted |
 | **Maintenance calendar** | Scheduled and overdue, by asset type |
+| **Maintenance unit** | *(Rev 2, 2026-09-13.)* The repair queue: every machine out of service and what was reported against it. Confirm the repair and the item returns to service; mark it beyond repair and it is retired. The only screen that can bring an item back from `maintenance` — see §4.1 |
 | **Bed register admin** | Create beds, mark out of service, retire — occupancy block surfaced as a clear error |
 | **Warnings & recommendations queue** | Everything open, recommended action, urgency, cost. Approve / Reject / auto-approved badge. **This is the demo screen.** |
 | **Reports** | Pharmacy consumption, maintenance compliance, utilization, agent performance |

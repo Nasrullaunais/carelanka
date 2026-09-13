@@ -42,6 +42,8 @@ public enum MessageCode
 
     EquipmentNotAssigned,
 
+    EquipmentAwaitingRepair,
+
     PharmacyCategoryNameTaken,
 
     PharmacyItemNameTaken,

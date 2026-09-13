@@ -1,0 +1,36 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'appointment.dart';
+
+// **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+
+Appointment _$AppointmentFromJson(Map<String, dynamic> json) => Appointment(
+  id: json['id'] as String,
+  patient: PatientSummary.fromJson(json['patient'] as Map<String, dynamic>),
+  scheduledAt: DateTime.parse(json['scheduled_at'] as String),
+  status: AppointmentStatus.fromJson(json['status'] as String),
+  reason: json['reason'] as String?,
+  bookedByStaffId: json['booked_by_staff_id'] as String?,
+  admissionId: json['admission_id'] as String?,
+  createdAt: json['created_at'] == null
+      ? null
+      : DateTime.parse(json['created_at'] as String),
+  updatedAt: json['updated_at'] == null
+      ? null
+      : DateTime.parse(json['updated_at'] as String),
+);
+
+Map<String, dynamic> _$AppointmentToJson(Appointment instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'patient': instance.patient,
+      'scheduled_at': instance.scheduledAt.toIso8601String(),
+      'status': instance.status,
+      'reason': instance.reason,
+      'booked_by_staff_id': instance.bookedByStaffId,
+      'admission_id': instance.admissionId,
+      'created_at': instance.createdAt?.toIso8601String(),
+      'updated_at': instance.updatedAt?.toIso8601String(),
+    };

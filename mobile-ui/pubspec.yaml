@@ -4,7 +4,7 @@ publish_to: 'none'
 version: 0.1.0+1
 
 environment:
-  sdk: '>=3.3.0 <4.0.0'
+  sdk: '>=3.8.0 <4.0.0'
 
 # Packages are listed here as the agreed baseline for the whole team.
 # Add a package only if your feature needs it, and tell the group — this file
@@ -13,7 +13,11 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # HTTP + API access (core/network)
+  # HTTP + API access (core/network). swagger_parser generates a Retrofit
+  # client, so dio is the transport and `http` is no longer used by anything.
+  dio: ^5.7.0
+  retrofit: ^4.4.1
+  json_annotation: ^4.12.0
   http: ^1.2.0
 
   # Routing (core/routing)
@@ -29,6 +33,13 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+
+  # Generates lib/services/api_client/ from the API's OpenAPI document.
+  # Never hand-write an HTTP call for a CareLanka endpoint — see CLAUDE.md.
+  swagger_parser: ^1.44.3
+  build_runner: ^2.4.13
+  retrofit_generator: ^10.2.11
+  json_serializable: ^6.8.0
 
 flutter:
   uses-material-design: true

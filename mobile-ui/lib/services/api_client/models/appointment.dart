@@ -1,0 +1,44 @@
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint, unused_import, invalid_annotation_target, unnecessary_import
+
+import 'package:json_annotation/json_annotation.dart';
+
+import 'appointment_status.dart';
+import 'patient_summary.dart';
+
+part 'appointment.g.dart';
+
+@JsonSerializable()
+class Appointment {
+  const Appointment({
+    required this.id,
+    required this.patient,
+    required this.scheduledAt,
+    required this.status,
+    this.reason,
+    this.bookedByStaffId,
+    this.admissionId,
+    this.createdAt,
+    this.updatedAt,
+  });
+  
+  factory Appointment.fromJson(Map<String, Object?> json) => _$AppointmentFromJson(json);
+  
+  final String id;
+  final PatientSummary patient;
+  @JsonKey(name: 'scheduled_at')
+  final DateTime scheduledAt;
+  final AppointmentStatus status;
+  final String? reason;
+  @JsonKey(name: 'booked_by_staff_id')
+  final String? bookedByStaffId;
+  @JsonKey(name: 'admission_id')
+  final String? admissionId;
+  @JsonKey(name: 'created_at')
+  final DateTime? createdAt;
+  @JsonKey(name: 'updated_at')
+  final DateTime? updatedAt;
+
+  Map<String, Object?> toJson() => _$AppointmentToJson(this);
+}

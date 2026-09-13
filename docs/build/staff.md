@@ -6,6 +6,7 @@
 **Contract:** `specs/staff-spec.yaml` (32 paths) · **Design:** no plan document yet — see below
 **Boundaries:** `specs/integration_of_functions.md` §17–§21
 
+
 > **`StaffMember` itself is common, not yours.** The table, login and JWT are built in
 > `docs/build/common.md` §2 because every component depends on the role claim. You own
 > everything *about* a staff member's work — skills, shifts, allocations, leave — and you

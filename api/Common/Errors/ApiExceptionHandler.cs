@@ -13,33 +13,42 @@ public sealed class ApiExceptionHandler : IExceptionHandler
     public async ValueTask<bool> TryHandleAsync(
         HttpContext context, Exception exception, CancellationToken cancellationToken)
     {
-        ProblemDetails problem;
-
-        if (exception is ApiException apiException)
+        switch (exception)
         {
-            _logger.LogInformation(
-                "{Status} {Code} on {Method} {Path}: {Message}",
-                apiException.Status, apiException.Code.ToWire(),
-                context.Request.Method, context.Request.Path, apiException.Message);
+            case IllegalTransitionException illegalTransitionException:
+                await HandleApiExceptionAsync(context, illegalTransitionException, cancellationToken);
+                return true;
 
-            problem = apiException.ToProblemDetails(context);
+            case ApiException apiException:
+                await HandleApiExceptionAsync(context, apiException, cancellationToken);
+                return true;
+
+            default:
+                _logger.LogError(
+                    exception, "Unhandled exception on {Method} {Path}",
+                    context.Request.Method, context.Request.Path);
+
+                var problem = new ProblemDetails
+                {
+                    Status = StatusCodes.Status500InternalServerError,
+                    Title = "Internal Server Error",
+                    Detail = MessageCode.Unexpected.ToText()
+                }.WithCareLankaExtensions(context, MessageCode.Unexpected);
+
+                await ProblemResponseWriter.WriteAsync(context, problem, cancellationToken);
+                return true;
         }
-        else
-        {
-            _logger.LogError(
-                exception, "Unhandled exception on {Method} {Path}",
-                context.Request.Method, context.Request.Path);
+    }
 
-            problem = new ProblemDetails
-            {
-                Status = StatusCodes.Status500InternalServerError,
-                Title = "Internal Server Error",
-                Detail = MessageCode.Unexpected.ToText()
-            }.WithCareLankaExtensions(context, MessageCode.Unexpected);
-        }
+    private async Task HandleApiExceptionAsync(
+        HttpContext context, ApiException exception, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation(
+            "{Status} {Code} on {Method} {Path}: {Message}",
+            exception.Status, exception.Code.ToWire(),
+            context.Request.Method, context.Request.Path, exception.Message);
 
-        await ProblemResponseWriter.WriteAsync(context, problem, cancellationToken);
-
-        return true;
+        await ProblemResponseWriter.WriteAsync(
+            context, exception.ToProblemDetails(context), cancellationToken);
     }
 }

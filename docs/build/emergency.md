@@ -1,6 +1,6 @@
 # Build Track 1 — Emergency / Ambulance
 
-**Owner: Kaveesha (Member 1)** · **Index:** `docs/BUILD_PLAN.md`
+**Owner: Nasrulla Unais (Member 1)** · **Index:** `docs/BUILD_PLAN.md`
 
 **Owns:** `EmergencyCall`, `Ambulance`, `Dispatch`, `DispatchCrew`, `RouteLog`
 **Contract:** `specs/emergency-spec.yaml` (33 paths) · **Design:** `specs/emergency-management-plan.md`

@@ -224,6 +224,369 @@ namespace CareLanka.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.Ambulance", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<decimal?>("CurrentLatitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)")
+                        .HasColumnName("current_latitude");
+
+                    b.Property<decimal?>("CurrentLongitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)")
+                        .HasColumnName("current_longitude");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("OutOfServiceReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("out_of_service_reason");
+
+                    b.Property<string>("RegistrationNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("registration_number");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ambulances");
+
+                    b.HasIndex("RegistrationNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ux_ambulances_registration_number")
+                        .HasFilter("is_active");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_ambulances_status");
+
+                    b.ToTable("ambulances", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_ambulances_latitude", "current_latitude IS NULL OR current_latitude BETWEEN -90 AND 90");
+
+                            t.HasCheckConstraint("ck_ambulances_longitude", "current_longitude IS NULL OR current_longitude BETWEEN -180 AND 180");
+
+                            t.HasCheckConstraint("ck_ambulances_status", "status IN ('available', 'dispatched', 'en_route', 'at_scene', 'transporting', 'out_of_service')");
+                        });
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.Dispatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AmbulanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ambulance_id");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("DestinationWardId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("destination_ward_id");
+
+                    b.Property<DateTimeOffset>("DispatchedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dispatched_at");
+
+                    b.Property<Guid>("EmergencyCallId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("emergency_call_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid?>("SupersededByDispatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("superseded_by_dispatch_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dispatches");
+
+                    b.HasIndex("AmbulanceId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_dispatches_active_ambulance")
+                        .HasFilter("status IN ('assigned', 'en_route')");
+
+                    b.HasIndex("DestinationWardId")
+                        .HasDatabaseName("ix_dispatches_destination_ward_id");
+
+                    b.HasIndex("EmergencyCallId")
+                        .HasDatabaseName("ix_dispatches_emergency_call_id");
+
+                    b.HasIndex("SupersededByDispatchId")
+                        .HasDatabaseName("ix_dispatches_superseded_by_dispatch_id");
+
+                    b.HasIndex("Status", "DispatchedAt")
+                        .HasDatabaseName("ix_dispatches_status_dispatched_at");
+
+                    b.ToTable("dispatches", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_dispatches_status", "status IN ('assigned', 'en_route', 'completed', 'cancelled', 'reassigned')");
+                        });
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.DispatchCrew", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("DispatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dispatch_id");
+
+                    b.Property<Guid>("StaffMemberId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("staff_member_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dispatch_crew");
+
+                    b.HasIndex("StaffMemberId")
+                        .HasDatabaseName("ix_dispatch_crew_staff_member_id");
+
+                    b.HasIndex("DispatchId", "StaffMemberId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_dispatch_crew_dispatch_id_staff_member_id");
+
+                    b.ToTable("dispatch_crew", (string)null);
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.EmergencyCall", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AddressLabel")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("address_label");
+
+                    b.Property<string>("CallerName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("caller_name");
+
+                    b.Property<string>("CallerPhone")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("caller_phone");
+
+                    b.Property<Guid?>("CallerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("caller_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Details")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("details");
+
+                    b.Property<decimal>("Latitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)")
+                        .HasColumnName("latitude");
+
+                    b.Property<decimal>("Longitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)")
+                        .HasColumnName("longitude");
+
+                    b.Property<string>("Outcome")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("outcome");
+
+                    b.Property<Guid?>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<bool>("PatientIsCaller")
+                        .HasColumnType("boolean")
+                        .HasColumnName("patient_is_caller");
+
+                    b.Property<string>("Priority")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("priority");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<bool?>("Transported")
+                        .HasColumnType("boolean")
+                        .HasColumnName("transported");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_emergency_calls");
+
+                    b.HasIndex("CallerUserId")
+                        .HasDatabaseName("ix_emergency_calls_caller_user_id");
+
+                    b.HasIndex("PatientId")
+                        .HasDatabaseName("ix_emergency_calls_patient_id");
+
+                    b.HasIndex("Priority", "CreatedAt")
+                        .HasDatabaseName("ix_emergency_calls_priority_created_at");
+
+                    b.HasIndex("Status", "CreatedAt")
+                        .HasDatabaseName("ix_emergency_calls_status_created_at");
+
+                    b.ToTable("emergency_calls", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_emergency_calls_latitude", "latitude BETWEEN -90 AND 90");
+
+                            t.HasCheckConstraint("ck_emergency_calls_longitude", "longitude BETWEEN -180 AND 180");
+
+                            t.HasCheckConstraint("ck_emergency_calls_priority", "priority IN ('critical', 'high', 'medium', 'low')");
+
+                            t.HasCheckConstraint("ck_emergency_calls_status", "status IN ('received', 'dispatched', 'en_route', 'completed', 'cancelled')");
+                        });
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.RouteLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ArrivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("arrived_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DepartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("departed_at");
+
+                    b.Property<decimal>("DestinationLatitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)")
+                        .HasColumnName("destination_latitude");
+
+                    b.Property<decimal>("DestinationLongitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)")
+                        .HasColumnName("destination_longitude");
+
+                    b.Property<Guid>("DispatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dispatch_id");
+
+                    b.Property<string>("MapsApiReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("maps_api_reference");
+
+                    b.Property<decimal>("OriginLatitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)")
+                        .HasColumnName("origin_latitude");
+
+                    b.Property<decimal>("OriginLongitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)")
+                        .HasColumnName("origin_longitude");
+
+                    b.Property<decimal>("PlannedDistanceKm")
+                        .HasPrecision(7, 2)
+                        .HasColumnType("numeric(7,2)")
+                        .HasColumnName("planned_distance_km");
+
+                    b.Property<int>("PlannedDurationMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("planned_duration_minutes");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_route_logs");
+
+                    b.HasIndex("DispatchId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_route_logs_dispatch_id");
+
+                    b.ToTable("route_logs", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_route_logs_destination_latitude", "destination_latitude BETWEEN -90 AND 90");
+
+                            t.HasCheckConstraint("ck_route_logs_destination_longitude", "destination_longitude BETWEEN -180 AND 180");
+
+                            t.HasCheckConstraint("ck_route_logs_distance", "planned_distance_km >= 0");
+
+                            t.HasCheckConstraint("ck_route_logs_duration", "planned_duration_minutes >= 0");
+
+                            t.HasCheckConstraint("ck_route_logs_origin_latitude", "origin_latitude BETWEEN -90 AND 90");
+
+                            t.HasCheckConstraint("ck_route_logs_origin_longitude", "origin_longitude BETWEEN -180 AND 180");
+                        });
+                });
+
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Equipment.Bed", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1718,6 +2081,87 @@ namespace CareLanka.Api.Data.Migrations
                     b.Navigation("StaffMember");
                 });
 
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.Dispatch", b =>
+                {
+                    b.HasOne("CareLanka.Api.Data.Entities.Emergency.Ambulance", "Ambulance")
+                        .WithMany("Dispatches")
+                        .HasForeignKey("AmbulanceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_dispatches_ambulances_ambulance_id");
+
+                    b.HasOne("CareLanka.Api.Data.Entities.Patient.Ward", null)
+                        .WithMany()
+                        .HasForeignKey("DestinationWardId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_dispatches_wards_destination_ward_id");
+
+                    b.HasOne("CareLanka.Api.Data.Entities.Emergency.EmergencyCall", "EmergencyCall")
+                        .WithMany("Dispatches")
+                        .HasForeignKey("EmergencyCallId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_dispatches_emergency_calls_emergency_call_id");
+
+                    b.HasOne("CareLanka.Api.Data.Entities.Emergency.Dispatch", "SupersededByDispatch")
+                        .WithMany()
+                        .HasForeignKey("SupersededByDispatchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_dispatches_dispatches_superseded_by_dispatch_id");
+
+                    b.Navigation("Ambulance");
+
+                    b.Navigation("EmergencyCall");
+
+                    b.Navigation("SupersededByDispatch");
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.DispatchCrew", b =>
+                {
+                    b.HasOne("CareLanka.Api.Data.Entities.Emergency.Dispatch", "Dispatch")
+                        .WithMany("Crew")
+                        .HasForeignKey("DispatchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_dispatch_crew_dispatches_dispatch_id");
+
+                    b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", null)
+                        .WithMany()
+                        .HasForeignKey("StaffMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_dispatch_crew_staff_members_staff_member_id");
+
+                    b.Navigation("Dispatch");
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.EmergencyCall", b =>
+                {
+                    b.HasOne("CareLanka.Api.Data.Entities.Common.PatientAccount", null)
+                        .WithMany()
+                        .HasForeignKey("CallerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_emergency_calls_patient_accounts_caller_user_id");
+
+                    b.HasOne("CareLanka.Api.Data.Entities.Patient.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_emergency_calls_patients_patient_id");
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.RouteLog", b =>
+                {
+                    b.HasOne("CareLanka.Api.Data.Entities.Emergency.Dispatch", "Dispatch")
+                        .WithOne("RouteLog")
+                        .HasForeignKey("CareLanka.Api.Data.Entities.Emergency.RouteLog", "DispatchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_route_logs_dispatches_dispatch_id");
+
+                    b.Navigation("Dispatch");
+                });
+
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Equipment.EquipmentItem", b =>
                 {
                     b.HasOne("CareLanka.Api.Data.Entities.Equipment.EquipmentCategory", "Category")
@@ -1904,6 +2348,23 @@ namespace CareLanka.Api.Data.Migrations
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Common.StaffMember", b =>
                 {
                     b.Navigation("RefreshTokens");
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.Ambulance", b =>
+                {
+                    b.Navigation("Dispatches");
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.Dispatch", b =>
+                {
+                    b.Navigation("Crew");
+
+                    b.Navigation("RouteLog");
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.EmergencyCall", b =>
+                {
+                    b.Navigation("Dispatches");
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Equipment.EquipmentCategory", b =>

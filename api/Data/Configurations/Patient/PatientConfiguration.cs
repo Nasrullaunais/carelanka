@@ -6,13 +6,10 @@ using PatientEntity = CareLanka.Api.Data.Entities.Patient.Patient;
 
 namespace CareLanka.Api.Data.Configurations.Patient;
 
-// The alias is not decoration: this namespace ends in "Patient", so the bare name Patient
-// resolves to the namespace, not the class, and the file will not compile without it.
 public class PatientConfiguration : IEntityTypeConfiguration<PatientEntity>
 {
     public const string PatientCodeUniqueIndex = "ux_patients_patient_code";
 
-    /// <summary>How long a patient code is. Short enough to read out over a ward phone.</summary>
     public const int PatientCodeLength = 8;
 
     public const string NicUniqueIndex = "ux_patients_nic";
@@ -25,9 +22,6 @@ public class PatientConfiguration : IEntityTypeConfiguration<PatientEntity>
         {
             t.HasCheckConstraint("ck_patients_gender", EnumWire.CheckConstraint<Gender>("gender"));
 
-            // Every patient row carries at least one identifier. Without this, three
-            // unidentified arrivals in one evening are three rows differing only by id and
-            // staff have no handle to say which one they mean.
             t.HasCheckConstraint(
                 "ck_patients_identifier",
                 "nic IS NOT NULL OR phone IS NOT NULL OR temp_reference IS NOT NULL");
@@ -49,17 +43,10 @@ public class PatientConfiguration : IEntityTypeConfiguration<PatientEntity>
             .HasMaxLength(20)
             .IsRequired();
 
-        // The one unique index here NOT scoped to is_active, and deliberately so. The repo rule
-        // scopes them because a human re-enters a code after a merge or a deactivation — a ward
-        // called ICU-1 has to be creatable again. Nobody ever types a patient code in to create
-        // one; the server picks it. Handing a new person a deactivated record's code would make
-        // one wristband resolve to two people, so the database refuses it outright.
         builder.HasIndex(p => p.PatientCode)
             .HasDatabaseName(PatientCodeUniqueIndex)
             .IsUnique();
 
-        // Unique only where the value exists — most patients have a NIC, unidentified
-        // arrivals have none, and a plain UNIQUE would allow exactly one of the latter.
         builder.HasIndex(p => p.Nic)
             .HasDatabaseName(NicUniqueIndex)
             .IsUnique()
@@ -75,9 +62,6 @@ public class PatientConfiguration : IEntityTypeConfiguration<PatientEntity>
             .IsUnique()
             .HasFilter("user_account_id IS NOT NULL AND is_active");
 
-        // A foreign key with no navigation. The constraint is real; the join is not offered,
-        // because patient_accounts belongs to common auth and this component only needs to
-        // know whether the link exists.
         builder.HasOne<Entities.Common.PatientAccount>()
             .WithMany()
             .HasForeignKey(p => p.UserAccountId)

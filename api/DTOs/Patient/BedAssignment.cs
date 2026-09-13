@@ -3,10 +3,6 @@ using CareLanka.Api.Data.Enums;
 
 namespace CareLanka.Api.DTOs.Patient;
 
-/// <summary>
-/// One bed held or occupied for an admission. A row walks reserved → occupied → released, and
-/// several rows per admission cover mid-stay transfers.
-/// </summary>
 public class BedAssignment
 {
     [Required]
@@ -18,7 +14,6 @@ public class BedAssignment
     [Required]
     public Guid BedId { get; set; }
 
-    /// <summary>From Equipment Management's register. Empty while their bed lookup is stubbed — see STUBS.md row 1.</summary>
     [Required]
     public string WardName { get; set; } = string.Empty;
 
@@ -28,7 +23,6 @@ public class BedAssignment
     [Required]
     public AssignmentStatus Status { get; set; }
 
-    /// <summary>The expiring hold. Past this instant the bed is free again, with no human action.</summary>
     public DateTimeOffset? ReservedUntil { get; set; }
 
     [Required]
@@ -36,13 +30,11 @@ public class BedAssignment
 
     public Guid? WorkflowId { get; set; }
 
-    /// <summary>True when the bed is below the requested category. Always needs Duty Manager approval.</summary>
     [Required]
     public bool IsDowngrade { get; set; }
 
     public Guid? ApprovedByStaffId { get; set; }
 
-    /// <summary>Their name, for a screen. Sent beside the id, never instead of it.</summary>
     public string? ApprovedByStaffName { get; set; }
 
     public DateTimeOffset? ApprovedAt { get; set; }

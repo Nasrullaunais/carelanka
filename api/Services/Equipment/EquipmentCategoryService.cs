@@ -37,8 +37,6 @@ public sealed class EquipmentCategoryService : IEquipmentCategoryService
             throw new BadRequestException(MessageCode.ValidationFailed);
         }
 
-        // Case-insensitive: "Surgical Gear" and "surgical gear" are the same category to a
-        // person, and two rows that look identical on screen are worse than a 409.
         var taken = await _db.EquipmentCategories
             .AnyAsync(c => c.Name.ToLower() == name.ToLower(), cancellationToken);
 

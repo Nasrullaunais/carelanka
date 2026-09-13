@@ -11,22 +11,12 @@ using Xunit;
 
 namespace CareLanka.Api.Tests;
 
-/// <summary>
-/// GET /api/capacity/wards and GET /api/wards/{id}/occupancy — the two reads Emergency and
-/// Staff Management have been blocked on. Both answer counts and nothing else.
-/// </summary>
-/// <remarks>
-/// The fixture's database is shared by the whole collection, so every test here creates its
-/// own ward and asserts on that ward's row rather than on the shape of the whole list.
-/// </remarks>
 [Collection(ApiCollection.Name)]
 public sealed class CapacityEndpointTests
 {
     private readonly ApiApplication _application;
 
     public CapacityEndpointTests(ApiApplication application) => _application = application;
-
-    // ---------- free bed counting ----------
 
     [Fact]
     public async Task A_ward_with_no_beds_reports_zero_free_rather_than_being_left_out()
@@ -36,9 +26,6 @@ public sealed class CapacityEndpointTests
 
         var row = await CapacityRowAsync(client, ward);
 
-        // Equipment's register leaves a ward with no beds out of its result entirely. A ward
-        // missing from the capacity list reads as "no such ward" to a dispatcher, which is a
-        // different thing from "no beds here".
         Assert.Equal(0, row.GetProperty("total_beds").GetInt32());
         Assert.Equal(0, row.GetProperty("free_beds").GetInt32());
     }
@@ -66,9 +53,6 @@ public sealed class CapacityEndpointTests
 
         var row = await CapacityRowAsync(client, ward);
 
-        // Total is every frame standing in the ward. Free is the ones a patient could go in.
-        // Dropping a withdrawn bed out of the total would make the ward look permanently
-        // smaller than it is and hide how much of it is broken.
         Assert.Equal(3, row.GetProperty("total_beds").GetInt32());
         Assert.Equal(2, row.GetProperty("free_beds").GetInt32());
     }
@@ -99,9 +83,6 @@ public sealed class CapacityEndpointTests
         Assert.Equal(1, row.GetProperty("free_beds").GetInt32());
     }
 
-    // The promise this endpoint exists to keep: "A reservation past its reserved_until counts
-    // as free. That expiry logic lives here, in the owning service, so no other component
-    // re-implements it differently."
     [Fact]
     public async Task A_hold_past_its_expiry_frees_the_bed_with_nobody_having_done_anything()
     {
@@ -112,8 +93,6 @@ public sealed class CapacityEndpointTests
 
         var row = await CapacityRowAsync(client, ward);
 
-        // The row is still sitting in bed_assignments, untouched. Nothing swept it and no
-        // human released it — it simply stopped counting the moment the clock passed it.
         Assert.Equal(2, row.GetProperty("free_beds").GetInt32());
     }
 
@@ -138,7 +117,6 @@ public sealed class CapacityEndpointTests
 
         using var body = await ReadJsonAsync(await client.GetAsync("/api/capacity/wards"));
 
-        // Sending an ambulance to a ward nobody admits to is sending it to a closed door.
         Assert.DoesNotContain(
             body.RootElement.GetProperty("wards").EnumerateArray(),
             row => row.GetProperty("ward_id").GetString() == ward.Id);
@@ -153,8 +131,6 @@ public sealed class CapacityEndpointTests
 
         var row = await CapacityRowAsync(client, ward);
 
-        // Two free beds in a female-only ward are no use to a male patient, and a dispatcher
-        // has to be able to see that without a second request.
         Assert.Equal("maternity", row.GetProperty("ward_type").GetString());
         Assert.Equal("female", row.GetProperty("gender_policy").GetString());
     }
@@ -170,8 +146,6 @@ public sealed class CapacityEndpointTests
 
         Assert.InRange(generated, before, DateTimeOffset.UtcNow.AddSeconds(5));
     }
-
-    // ---------- one ward's occupancy ----------
 
     [Fact]
     public async Task Occupancy_splits_the_beds_into_occupied_held_and_out_of_service()
@@ -206,8 +180,6 @@ public sealed class CapacityEndpointTests
 
         using var body = await ReadJsonAsync(await client.GetAsync($"/api/wards/{ward.Id}/occupancy"));
 
-        // The same rule as the capacity summary, from the same helper. Two endpoints reading
-        // expiry differently is exactly what putting it in one service is meant to prevent.
         Assert.Equal(0, body.RootElement.GetProperty("reserved_beds").GetInt32());
     }
 
@@ -225,8 +197,6 @@ public sealed class CapacityEndpointTests
         using var body = await ReadJsonAsync(await client.GetAsync($"/api/wards/{ward.Id}/occupancy"));
         var mix = body.RootElement.GetProperty("patients_by_category");
 
-        // Two routine inpatients and one high-dependency patient is three patients and two
-        // very different staffing answers. This split is the whole point of the endpoint.
         Assert.Equal(2, mix.GetProperty("inpatient").GetInt32());
         Assert.Equal(1, mix.GetProperty("hdu").GetInt32());
     }
@@ -240,9 +210,6 @@ public sealed class CapacityEndpointTests
         using var body = await ReadJsonAsync(await client.GetAsync($"/api/wards/{ward.Id}/occupancy"));
         var mix = body.RootElement.GetProperty("patients_by_category");
 
-        // A key that disappears when it hits zero drops off a chart instead of falling to the
-        // floor of it, and makes every reader write the same `?? 0`. day_case is the one that
-        // proves the wire values are not just the C# names lowercased.
         Assert.Equal(
             new[] { "day_case", "hdu", "icu", "inpatient", "outpatient" },
             mix.EnumerateObject().Select(property => property.Name).Order().ToArray());
@@ -261,8 +228,6 @@ public sealed class CapacityEndpointTests
 
         using var body = await ReadJsonAsync(await client.GetAsync($"/api/wards/{ward.Id}/occupancy"));
 
-        // Counting the held bed here would tell a shift lead to staff for a patient who is not
-        // in the building. They are reported as incoming instead, which is the honest answer.
         Assert.Equal(1, body.RootElement.GetProperty("patients_by_category").GetProperty("icu").GetInt32());
         Assert.Equal(1, body.RootElement.GetProperty("incoming_next_2h").GetInt32());
     }
@@ -280,9 +245,6 @@ public sealed class CapacityEndpointTests
 
         using var body = await ReadJsonAsync(await client.GetAsync($"/api/wards/{ward.Id}/occupancy"));
 
-        // Three held beds, two of them incoming. The one due tomorrow is somebody else's shift.
-        // The one with no stated arrival counts: its hold lapses in thirty minutes, so it is
-        // arriving sooner than two hours or losing the bed.
         Assert.Equal(3, body.RootElement.GetProperty("reserved_beds").GetInt32());
         Assert.Equal(2, body.RootElement.GetProperty("incoming_next_2h").GetInt32());
     }
@@ -298,7 +260,6 @@ public sealed class CapacityEndpointTests
 
         using var body = await ReadJsonAsync(await client.GetAsync($"/api/wards/{ward.Id}/occupancy"));
 
-        // Somebody late is still expected, and still needs staffing for.
         Assert.Equal(1, body.RootElement.GetProperty("incoming_next_2h").GetInt32());
     }
 
@@ -312,8 +273,6 @@ public sealed class CapacityEndpointTests
 
         using var body = await ReadJsonAsync(await client.GetAsync($"/api/wards/{ward.Id}/occupancy"));
 
-        // Incoming is read off the admission's status, not off the assignment's. Somebody who
-        // has arrived is in patients_by_category and nowhere else.
         Assert.Equal(0, body.RootElement.GetProperty("incoming_next_2h").GetInt32());
     }
 
@@ -336,11 +295,8 @@ public sealed class CapacityEndpointTests
 
         var response = await client.GetAsync($"/api/wards/{ward.Id}/occupancy");
 
-        // Zero beds and zero patients would read as a real, empty ward. It is a closed one.
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
-
-    // ---------- the boundary itself ----------
 
     [Fact]
     public async Task Neither_read_lets_a_patient_identity_across_the_boundary()
@@ -354,9 +310,6 @@ public sealed class CapacityEndpointTests
         var summary = await client.GetStringAsync("/api/capacity/wards");
         var occupancy = await client.GetStringAsync($"/api/wards/{ward.Id}/occupancy");
 
-        // Both endpoints are consumed by other components. "Counts only, no patient
-        // identities" is the promise integration_of_functions.md 9 makes on our behalf, and a
-        // name arriving in an aggregate is a section 16.1 failure, not a cosmetic one.
         Assert.DoesNotContain(name, summary, StringComparison.Ordinal);
         Assert.DoesNotContain(name, occupancy, StringComparison.Ordinal);
     }
@@ -388,8 +341,6 @@ public sealed class CapacityEndpointTests
             (await anonymous.GetAsync($"/api/wards/{Guid.NewGuid()}/occupancy")).StatusCode);
     }
 
-    // ---------- helpers ----------
-
     private sealed record TestWard(string Id, string Name);
 
     private static async Task<TestWard> NewWardAsync(
@@ -414,7 +365,6 @@ public sealed class CapacityEndpointTests
         return new TestWard(body.RootElement.GetProperty("id").GetString()!, name);
     }
 
-    /// <summary>Registers real beds through Equipment Management's own endpoint. Their table, their write.</summary>
     private async Task<IReadOnlyList<Guid>> AddBedsAsync(TestWard ward, int count)
     {
         using var equipment = await ClientAsync(ApiApplication.EquipmentEmail);
@@ -438,13 +388,6 @@ public sealed class CapacityEndpointTests
         return ids;
     }
 
-    /// <summary>Withdraws a bed by writing the column rather than through PATCH /api/beds/{id}.</summary>
-    /// <remarks>
-    /// The endpoint works now — step 6 made GET /beds/{id}/occupancy real and retired the stub
-    /// that used to refuse every withdrawal. It is still written directly here, so a test about
-    /// capacity counting cannot fail for a reason belonging to Equipment Management's rules.
-    /// <c>BedAssignmentEndpointTests</c> exercises the endpoint itself.
-    /// </remarks>
     private async Task SetConditionAsync(Guid bedId, BedCondition condition)
     {
         using var scope = _application.Services.CreateScope();
@@ -471,17 +414,6 @@ public sealed class CapacityEndpointTests
         => AssignAsync(bedId, AssignmentStatus.Reserved, DateTimeOffset.UtcNow + expiresIn,
             AdmissionStatus.BedReserved, category, expectedArrival);
 
-    /// <summary>
-    /// Puts a real patient and a real admission behind a bed, then writes the assignment row
-    /// straight to the database.
-    /// </summary>
-    /// <remarks>
-    /// Written directly rather than through POST /assign-bed, which step 6 has now built. These
-    /// tests set up states that endpoint deliberately refuses — a lapsed hold, a bed in a
-    /// male-only ward, an ICU patient a nurse may not place — so going through it would mean
-    /// every capacity test also depended on every placement rule. The rows are the same ones it
-    /// writes.
-    /// </remarks>
     private async Task AssignAsync(
         Guid bedId,
         AssignmentStatus status,
@@ -560,7 +492,6 @@ public sealed class CapacityEndpointTests
         _ => "outpatient"
     };
 
-    /// <summary>This ward's row in the capacity summary. The list is every ward the collection ever made.</summary>
     private static async Task<JsonElement> CapacityRowAsync(HttpClient client, TestWard ward)
     {
         var response = await client.GetAsync("/api/capacity/wards");
@@ -568,15 +499,11 @@ public sealed class CapacityEndpointTests
 
         using var body = await ReadJsonAsync(response);
 
-        // Cloned: the JsonDocument is disposed at the end of this method and every JsonElement
-        // taken from it dies with it, which reads as an ObjectDisposedException in the caller.
         return body.RootElement.GetProperty("wards").EnumerateArray()
             .Single(row => row.GetProperty("ward_id").GetString() == ward.Id)
             .Clone();
     }
 
-    // One token per account for the whole class, and one lookup of the nurse's own id.
-    // /api/auth/login is rate limited per IP and every test class shares that budget.
     private static readonly SemaphoreSlim TokenLock = new(1, 1);
     private static readonly Dictionary<string, string> Tokens = new();
     private static string? _nurseId;

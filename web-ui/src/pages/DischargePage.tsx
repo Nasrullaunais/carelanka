@@ -24,27 +24,6 @@ import {
   mandatoryChecklistItems,
 } from '../types/billing';
 
-// Discharging a patient. Two tables — current admissions, and discharged ones — and one detail
-// drawer that opens under the row it belongs to.
-//
-// Three things on this screen are worth knowing before reading the code:
-//
-//   The list is not the decision. A patient with every box ticked is only *offered*; a human
-//   presses the button, and that is the whole point of the gate.
-//
-//   Only the boxes THIS role may tick render as buttons. A ward nurse never sees a control for
-//   "Cleared by a doctor" — offering it and answering 403 is a worse screen than not offering
-//   it, because the nurse cannot tell a permission from a bug.
-//
-//   "Bill settled" has no button for anybody. It is written by settling the bill — which now
-//   happens on THIS page, in the middle of the flow — and nowhere else, so the money and the
-//   tick are one fact rather than two that can drift apart.
-//
-// The order down the drawer is the order the job is done in: a doctor clears the patient, the
-// bill is raised and paid, then somebody confirms the discharge. The drawer used to be a card
-// at the foot of the page, which meant scrolling past everyone else to read about one person.
-// It is a row of the table now, like the patients board.
-
 export function DischargePage() {
   const session = useSession();
   const role = session?.principal.role;
@@ -52,11 +31,6 @@ export function DischargePage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // The hook cannot go behind an early return, so it is switched off instead. Nobody who
-  // cannot work the checklist should be asking the server at all.
-  // includeDischarged on purpose. Without it this screen empties itself the moment the work is
-  // done: you confirm a discharge, the row vanishes, and there is nowhere left to look up what
-  // just happened. The finished ones come back sorted below everybody still in the building.
   const candidates = useQuery({
     ...listDischargeCandidatesOptions({ query: { includeDischarged: true, pageSize: 50 } }),
     enabled: canWork,
@@ -76,9 +50,6 @@ export function DischargePage() {
 
   const all = candidates.data?.items ?? [];
 
-  // Two lists out of one call, because they are two different things to look at. The top one
-  // is work to do; the bottom one is a record of work finished, and mixing them puts a patient
-  // who left last Tuesday in among the ones a nurse is trying to discharge today.
   const rows = all.filter((row) => !row.is_discharged);
   const finished = all.filter((row) => row.is_discharged);
   const ready = rows.filter((row) => row.outstanding_items.length === 0);
@@ -231,8 +202,6 @@ function CandidateRow({
         <td>{row.days_in_bed}</td>
         <td>
           {row.is_discharged ? (
-            // Nothing is outstanding on a finished visit by definition - it could not have been
-            // confirmed otherwise - so the column carries the useful fact instead.
             <span className="small">
               {row.discharged_at ? new Date(row.discharged_at).toLocaleString() : 'Discharged'}
             </span>
@@ -249,11 +218,6 @@ function CandidateRow({
         </td>
       </tr>
 
-      {/*
-        The detail as a row of this table, under the patient it describes, rather than a card at
-        the foot of the page. colSpan has to match the header above or the drawer stops short of
-        the last column and the table looks torn.
-      */}
       {selected && (
         <tr className="drawer">
           <td colSpan={6}>
@@ -268,10 +232,6 @@ function CandidateRow({
     </Fragment>
   );
 }
-
-// ---------------------------------------------------------------------------
-// One patient's checklist
-// ---------------------------------------------------------------------------
 
 function DischargeDetail({
   admissionId,
@@ -290,8 +250,6 @@ function DischargeDetail({
 
   const admission = useQuery(getAdmissionOptions({ path: { id: admissionId } }));
 
-  // Every write here changes the admission, the candidate list, or both — a tick can move the
-  // status to ready_for_discharge, and a confirm takes the row off the board entirely.
   const refreshAll = () =>
     queryClient.invalidateQueries({
       predicate: (query) => {
@@ -348,8 +306,6 @@ function DischargeDetail({
   const visit = admission.data;
   const checklist = visit.discharge?.checklist ?? {};
 
-  // Fall back to the published vocabulary when no checklist row exists yet, so the boxes are
-  // on screen before anybody has touched them. The server creates the rows on first tick.
   const items = checklistOrder.map((key) => ({
     key,
     item: checklist[key] as ChecklistItem | undefined,
@@ -364,10 +320,6 @@ function DischargeDetail({
   const isDischarged = visit.status === 'discharged';
 
   return (
-    // The whole drawer prints, not just the charges table. A discharge document IS the bill:
-    // who was cleared by which doctor, what it cost, who took the payment, who confirmed the
-    // discharge and what the patient was told. Printing the charges alone produced a piece of
-    // paper that proved a number and nothing else.
     <div className="drawer-body printable">
       <div className="print-only print-head">
         <h2>CareLanka Hospital</h2>
@@ -389,7 +341,6 @@ function DischargeDetail({
         </div>
       </div>
 
-      {/* The same heading again for the printed copy, without the buttons. */}
       <h3 className="print-only">
         {visit.patient?.full_name}
         {visit.patient?.patient_code ? ` · ${visit.patient.patient_code}` : ''}
@@ -449,18 +400,9 @@ function DischargeDetail({
         </div>
       </dl>
 
-      {/* ---------- the bill ---------- */}
-
       <h4>Charges</h4>
 
       <BillPanel admissionId={admissionId} canSettle={maySettle && !isDischarged} showPrint={false} />
-
-      {/* ---------- who signed what ---------- */}
-      {/*
-        Below the bill and part of the same document, because that is what a discharge paper
-        is. Three names and three times: the doctor who cleared the patient, the person who
-        took the payment, and the person who confirmed the discharge.
-      */}
 
       <h4>Sign-off</h4>
 
@@ -497,8 +439,6 @@ function DischargeDetail({
           </div>
         )}
       </dl>
-
-      {/* ---------- the act itself ---------- */}
 
       <div className="no-print">
         {isDischarged ? (
@@ -550,14 +490,6 @@ function DischargeDetail({
   );
 }
 
-/**
- * One line of the checklist: what it is, whether it is done, and a button only if this person
- * is the one who does it.
- *
- * Hidden rather than disabled. A control the user cannot use reads as a broken screen; an
- * absent one reads as somebody else's job. `billing_settled` passes `mayTick: false` from every
- * role, because settling the bill is what writes it and there is no second way.
- */
 function ChecklistRow({
   item,
   itemKey,

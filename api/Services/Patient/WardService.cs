@@ -25,8 +25,6 @@ public sealed class WardService : IWardService
     public async Task<IReadOnlyList<WardResponse>> ListAsync(
         WardType? wardType, bool isActive, CancellationToken ct = default)
     {
-        // IgnoreQueryFilters, then filter by hand: the global filter only ever shows active
-        // rows, so without this isActive=false silently returns nothing at all.
         var query = _db.Wards.IgnoreQueryFilters().Where(w => w.IsActive == isActive);
 
         if (wardType is not null)
@@ -50,9 +48,6 @@ public sealed class WardService : IWardService
             Id = Guid.NewGuid(),
             Name = request.Name.Trim(),
 
-            // Not null: [ApiController] has already returned a 400 for a body that left either
-            // out. They are nullable on the request so that omission is an error rather than a
-            // silent default - see CreateWardRequest.
             WardType = request.WardType!.Value,
             GenderPolicy = request.GenderPolicy!.Value,
             IsActive = request.IsActive
@@ -66,8 +61,6 @@ public sealed class WardService : IWardService
         }
         catch (DbUpdateException exception) when (IsDuplicateName(exception))
         {
-            // The index is the guarantee, not a prior read: two administrators creating
-            // "ICU-1" at the same moment both pass any check we could do beforehand.
             throw new ConflictException(MessageCode.WardNameTaken, ward.Name);
         }
 

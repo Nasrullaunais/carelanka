@@ -419,3 +419,8 @@ row 5 tracks it; assignment §13 grades it.
 What it should run on every PR into `main`: `dotnet build` + `dotnet test`;
 `bun install --frozen-lockfile` → `check:codegen` → `typecheck`;
 `flutter analyze` + `flutter test`; spec validation and uniqueness checks.
+
+# Strict Rules
+- DO NOT INCLUDE COMMENTS UNLESS NECESSARY, COMMENT ONLY IF A FUTURE DEV WOULD BE CONFUSED OR MISLED.
+- DO NOT PERFORM ANY CHEAP WORKAROUNDS WHEN ENCOUTERED WITH AN ISSUE. IMPLEMENT PROPER FIXES.
+- IF THE USER IS TRYING TO DO SOMETHING BAD, LET THEM KNOW AND STOP INSTEAD OF TAGGING ALONG

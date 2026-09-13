@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace CareLanka.Api.Controllers.Patient;
 
-/// <summary>The ward register. Owned by Patient Management and read by all four components.</summary>
 [ApiController]
 [Route("api/wards")]
 [Tags("Wards and Beds")]
@@ -22,7 +21,6 @@ public class WardsController : ControllerBase
         _capacity = capacity;
     }
 
-    /// <summary>List wards. Also read by Equipment Management for allocation and by Staff Management for staffing demand.</summary>
     [Authorize(Policy = Policies.AnyStaff)]
     [HttpGet(Name = "listWards")]
     [ProducesResponseType(typeof(IReadOnlyList<Ward>), StatusCodes.Status200OK)]
@@ -35,7 +33,6 @@ public class WardsController : ControllerBase
         CancellationToken ct = default)
         => Ok(await _wards.ListAsync(wardType, isActive, ct));
 
-    /// <summary>Create a ward. The gender policy is a property of the ward, not a rule the bed agent bends under pressure.</summary>
     [Authorize(Policy = Policies.HospitalAdministrator)]
     [HttpPost(Name = "createWard")]
     [ProducesResponseType(typeof(Ward), StatusCodes.Status201Created)]
@@ -48,23 +45,9 @@ public class WardsController : ControllerBase
     {
         var ward = await _wards.CreateAsync(request, ct);
 
-        // No Location: there is no GET /wards/{id}. A ward is read through the list, or
-        // through its occupancy, and inventing a route here would put one in the spec.
         return Created((string?)null, ward);
     }
 
-    /// <summary>
-    /// Occupancy and care mix for one ward. Consumed by Staff Management to work out staffing
-    /// demand.
-    /// </summary>
-    /// <remarks>
-    /// `patients_by_category` is the useful part: fifteen routine inpatients and two
-    /// high-dependency patients need very different staffing, even though both are "seventeen
-    /// patients". `incoming_next_2h` is what lets the staff allocation agent staff AHEAD of a
-    /// rush instead of reacting to one.
-    ///
-    /// Counts only. No patient identities cross this boundary.
-    /// </remarks>
     [Authorize(Policy = Policies.AnyStaff)]
     [HttpGet("{id:guid}/occupancy", Name = "getWardOccupancy")]
     [ProducesResponseType(typeof(WardOccupancy), StatusCodes.Status200OK)]

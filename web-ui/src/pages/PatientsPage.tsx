@@ -41,16 +41,6 @@ import {
   patientIdentifier,
 } from '../types/patients';
 
-// The ward board: who the hospital is dealing with, and what is happening with them.
-//
-// One row per person's business, from two tables. A booking nobody has checked in is a row
-// reading "Not arrived"; once they are checked in the same person is one row reading
-// "Admitted", because the booking is finished with and its visit stands for it.
-//
-// This used to list admissions only, and an admission is created by *arriving* — so the board
-// could never say "not arrived" about anybody, and the woman booked in for a scan at eleven
-// was invisible until she walked through the door.
-
 const PAGE_SIZE = 20;
 
 export function PatientsPage() {
@@ -64,12 +54,8 @@ export function PatientsPage() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
 
-  // Which job the bed drawer is doing. Same panel, same rules, two different endpoints behind
-  // it: picking a first bed, or swapping one that was chosen by mistake.
   const [bedMode, setBedMode] = useState<'assign' | 'correct'>('assign');
 
-  // Gated rather than skipped: the hook cannot go behind the early return, and without this
-  // an administrator opening the URL fires a request that 403s and toasts red.
   const canRead = canReadPatientDetails(role);
 
   const board = useQuery({
@@ -106,8 +92,6 @@ export function PatientsPage() {
 
   const rows = board.data?.items ?? [];
 
-  // One drawer at a time. Both open at once would stack two panels under one person and push
-  // the next patient a screen and a half down — the exact thing the drawer is here to stop.
   function openDetails(id: string) {
     setAssigningId(null);
     setOpenId((current) => (current === id ? null : id));
@@ -191,8 +175,6 @@ export function PatientsPage() {
         {board.isLoading ? (
           <p className="empty">Loading…</p>
         ) : board.isError ? (
-          // The toast already fired. "Try again" rather than an empty table, which would read
-          // as an empty hospital when it is really a broken request.
           <div className="empty">
             <p>Could not load the patients board.</p>
             <button type="button" className="secondary" onClick={() => void board.refetch()}>
@@ -210,14 +192,10 @@ export function PatientsPage() {
             <thead>
               <tr>
                 <th>Patient</th>
-                {/* Renamed from "Came in". It answers how they got here, which is not the same
-                    question as what they are here for — that is the care level. */}
+
                 <th>Arrived by</th>
                 <th>Care level</th>
-                {/* One column, not two. Status and Bed used to sit side by side and between
-                    them say almost nothing: "Awaiting bed" appeared against a patient in for a
-                    blood test who was never going to be given one, and Bed was blank for
-                    everybody without one yet. The bed now explains the status instead. */}
+
                 <th>Status</th>
                 <th />
               </tr>
@@ -231,18 +209,14 @@ export function PatientsPage() {
                     <td>
                       <strong>{row.patient.full_name}</strong>
                       <br />
-                      {/* The patient ID first, because it is the one thing about this person
-                          that every other part of the hospital asks for — Equipment's screen
-                          wants it before it will hand out a drip stand. */}
+
                       <code>{row.patient.patient_code}</code>
                       <br />
                       <span className="muted">
                         {patientIdentifier(row.patient) ?? 'No NIC on record'}
                       </span>
                     </td>
-                    {/* Always one of three routes, a booking included — making an
-                        appointment is the route. Whether they have turned up is the Status
-                        column's job, and it used to be answered here too, as "Not yet". */}
+
                     <td>{arrivalRouteLabel(row)}</td>
                     <td>
                       {row.admission_category ? (
@@ -254,9 +228,6 @@ export function PatientsPage() {
                           </span>
                         </>
                       ) : (
-                        // Genuinely unknown, not empty: the care level is chosen by staff at
-                        // check-in, never by the patient at booking time. The reason they gave
-                        // is the one thing anybody does know, so it goes here.
                         <span className="muted">
                           Set at check-in
                           {row.reason ? (
@@ -291,11 +262,6 @@ export function PatientsPage() {
                     </td>
                   </tr>
 
-                  {/*
-                    The detail as a row of this table, under the person it describes, rather
-                    than a card at the foot of the page. colSpan has to match the header above
-                    or the drawer stops short of the last column and the table looks torn.
-                  */}
                   {assigningId === row.id && (
                     <tr className="drawer">
                       <td colSpan={5}>
@@ -352,11 +318,6 @@ export function PatientsPage() {
   );
 }
 
-/**
- * Invalidates every list a write to one visit can change. A mutation invalidates what it
- * changed, not only what is on screen — the board, the admissions list, the bed availability
- * list and both capacity reads all move when one patient gets or gives up a bed.
- */
 function useBoardInvalidation() {
   const queryClient = useQueryClient();
 
@@ -378,18 +339,6 @@ function useBoardInvalidation() {
     });
 }
 
-// ---------------------------------------------------------------------------
-// What you can do to one row
-// ---------------------------------------------------------------------------
-
-/**
- * Every control is hidden rather than disabled when it does not apply, and what applies is
- * read off the row rather than guessed.
- *
- * The one that used to be wrong: "Assign bed" appeared for anybody in `awaiting_bed`, which
- * was everybody, including the patient here for a blood test. `requires_bed` is now published
- * by the API precisely so this decision is not a second copy of the rule.
- */
 function RowActions({
   row,
   role,
@@ -427,9 +376,7 @@ function RowActions({
 
   return (
     <>
-      {/* Not arrived: the act that moves this row is check-in, and check-in is the bookings
-          desk's screen — it needs a care level, an urgency and an isolation answer, which is a
-          form and not a button. Sent there rather than half-built here. */}
+
       {row.status === 'not_arrived' && (
         <Link to="/appointments" className="muted" style={{ fontSize: '0.82rem' }}>
           Check in at the desk
@@ -442,9 +389,6 @@ function RowActions({
         </button>
       )}
 
-      {/* Beds get mis-clicked, and the alternative to fixing one is a ward board that is known
-          to be wrong - which is a board people stop reading. Offered from the moment they hold
-          a bed right up until they leave. */}
       {(row.status === 'bed_ready' || row.status === 'admitted') &&
         row.requires_bed &&
         canAssignBed(role) && (
@@ -453,7 +397,6 @@ function RowActions({
           </button>
         )}
 
-      {/* The hold lapses in thirty minutes, so this is the row with a clock on it. */}
       {row.status === 'bed_ready' && canMarkArrived(role) && (
         <button
           type="button"
@@ -464,9 +407,6 @@ function RowActions({
         </button>
       )}
 
-      {/* Only a visit that never needed a bed. Finishing one that has a bed is a discharge —
-          checklist, summary note, approver, and the bed given back — and the server refuses it
-          here with cl_pat_020. Hidden rather than offered and refused. */}
       {row.status === 'admitted' && !row.requires_bed && canCompleteVisit(role) && (
         <button
           type="button"
@@ -483,19 +423,6 @@ function RowActions({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Picking a bed by hand
-// ---------------------------------------------------------------------------
-
-/**
- * The manual path, and it must always work: if the only way to admit a patient were through
- * the AI, the hospital would stop the moment the AI stopped.
- *
- * Three reads, because "which bed can this patient go in" is not one table. `bed-availability`
- * is Equipment's register joined with our assignments; `listWards` says what kind of ward each
- * bed stands in, which is what hard rules H2 and H3 turn on; and the admission detail carries
- * `is_infectious`, which the board row does not.
- */
 function AssignBedPanel({
   row,
   onDone,
@@ -503,7 +430,7 @@ function AssignBedPanel({
 }: {
   row: WorklistRow;
   onDone: () => void;
-  /** `correct` swaps the bed they are already in for one that was chosen by mistake. */
+
   mode?: 'assign' | 'correct';
 }) {
   const session = useSession();
@@ -514,32 +441,10 @@ function AssignBedPanel({
   const visit = useQuery(getAdmissionOptions({ path: { id: row.id } }));
   const wards = useQuery(listWardsOptions({}));
 
-  // Free only. A held or occupied bed is not a candidate, and `free` is where the thirty-minute
-  // expiry is applied — a bed whose hold has lapsed is offered again with nobody having
-  // released it.
-  //
-  // 500, the endpoint's ceiling, because this is a whole candidate list and not a page anybody
-  // pages through. At 100 the seeded hospital's 135 beds were cut off mid-alphabet and the
-  // pediatric ward could never be reached — silently, which is the part that makes it dangerous.
   const beds = useQuery(
     listBedAvailabilityOptions({ query: { availability: 'free', pageSize: 500 } }),
   );
 
-  // A walk-in is standing at the desk, so choosing their bed and saying they are in it are
-  // the same act to the person doing it. Two buttons for it was one button too many - and until
-  // the second was pressed the thirty-minute hold could take the bed back from a patient lying
-  // in it.
-  //
-  // Two calls and not one, because the API keeps them separate on purpose: somebody expected
-  // later gets a bed kept EMPTY for them, and /arrive is what says they turned up. Chaining
-  // here rather than merging them server-side leaves that distinction where it belongs. If the
-  // second call fails the first still stands - the patient holds the bed, the button reappears,
-  // and the hold expiry is the backstop.
-  //
-  // Only chained for somebody who may actually mark arrival. Reception can place a patient but
-  // `/arrive` is the ward nurse's alone, on the grounds that she is the one who can see the
-  // patient is in the bed - so for reception this fired a call that was always going to 403 and
-  // put "Your role does not allow this" on top of an assignment that had just worked.
   const alreadyHere =
     visit.data?.source === 'walk_in' && canMarkArrived(session?.principal.role);
 
@@ -607,9 +512,6 @@ function AssignBedPanel({
   const usable = candidates.filter((candidate) => candidate.placement.kind !== 'refused');
   const overrides = candidates.filter((candidate) => candidate.placement.kind === 'override');
 
-  // A truncated list looks exactly like a complete one, which is how a 100-bed cut sat here
-  // unnoticed and made the pediatric ward unreachable. If the hospital ever outgrows one page,
-  // the screen says so rather than quietly offering a subset.
   const missing = (beds.data?.total_items ?? 0) - (beds.data?.items?.length ?? 0);
   const loading = visit.isLoading || wards.isLoading || beds.isLoading;
   const failed = visit.isError || wards.isError || beds.isError;
@@ -692,17 +594,11 @@ function AssignBedPanel({
                   <td>{bed.has_isolation ? 'Yes' : 'No'}</td>
                   <td>
                     {placement.kind === 'refused' ? (
-                      // Listed with its reason rather than hidden. A ward nurse looking at an
-                      // empty ICU needs to see that the beds are there and who to ask.
                       <span className="muted">{placement.why}</span>
                     ) : (
                       <>
                         <button
                           type="button"
-                          // Amber, not the ordinary green, because this bed is not the one the
-                          // care level points at. The colour is the whole warning - a duty
-                          // manager scanning the list must be able to see which rows are
-                          // off-path without reading every cell.
                           className={placement.kind === 'override' ? 'warn' : undefined}
                           disabled={writing}
                           onClick={() =>
@@ -796,16 +692,7 @@ function AssignBedPanel({
   );
 }
 
-// ---------------------------------------------------------------------------
-// One person, in full
-// ---------------------------------------------------------------------------
-
 function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void }) {
-  // Two calls because they are two different records. The patient is who they are and does
-  // not change between visits; the admission is this visit, and it carries the times.
-  //
-  // A booking has no admission to fetch — the visit has not started — so the second call is
-  // skipped rather than fired at an id that belongs to an appointment and would 404.
   const patient = useQuery(getPatientOptions({ path: { id: row.patient.id } }));
 
   const visit = useQuery({
@@ -813,8 +700,6 @@ function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void 
     enabled: row.kind === 'visit',
   });
 
-  // The assignment they are in now. Released rows are kept as history, so "who put them here"
-  // is the first one that is NOT released, not simply the first one in the list.
   const liveBed = visit.data?.bed_assignments?.find(
     (assignment) => assignment.status !== 'released',
   );
@@ -948,11 +833,6 @@ function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void 
   );
 }
 
-/**
- * One row of a detail table. Anything null says so in words rather than leaving a blank cell,
- * because a blank reads as a rendering bug. `empty` overrides the wording where "not recorded"
- * would be wrong — a bed nobody has assigned yet is not a missing field.
- */
 function Field({
   label,
   empty = 'Not recorded',

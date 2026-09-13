@@ -29,8 +29,6 @@ public class StaffMemberConfiguration : IEntityTypeConfiguration<StaffMember>
 
         builder.Ignore(s => s.FullName);
 
-        // Scoped WHERE is_active. A plain UNIQUE means a deactivated member's email can never
-        // be reused, and the query filter hides the blocking row so SaveChanges throws instead.
         builder.HasIndex(s => s.Email)
             .HasDatabaseName("ux_staff_members_email")
             .IsUnique()

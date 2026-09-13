@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace CareLanka.Api.Controllers.Equipment;
 
-/// <summary>Equipment categories. A table rather than an enum, so a sixth can be added without a migration.</summary>
 [ApiController]
 [Route("api/equipment-categories")]
 [Tags("Equipment")]
@@ -17,7 +16,6 @@ public class EquipmentCategoriesController : ControllerBase
     public EquipmentCategoriesController(IEquipmentCategoryService categories)
         => _categories = categories;
 
-    /// <summary>List the equipment categories. Any staff member may read them, because anyone browsing equipment needs them.</summary>
     [Authorize(Policy = Policies.AnyStaff)]
     [HttpGet(Name = "listEquipmentCategories")]
     [ProducesResponseType(typeof(IReadOnlyList<EquipmentCategory>), StatusCodes.Status200OK)]
@@ -26,7 +24,6 @@ public class EquipmentCategoriesController : ControllerBase
         CancellationToken ct)
         => Ok(await _categories.ListAsync(ct));
 
-    /// <summary>Add a category. Names are compared without case, so "Surgical Gear" and "surgical gear" cannot both exist.</summary>
     [Authorize(Policy = Policies.EquipmentManager)]
     [HttpPost(Name = "createEquipmentCategory")]
     [ProducesResponseType(typeof(EquipmentCategory), StatusCodes.Status201Created)]
@@ -39,7 +36,6 @@ public class EquipmentCategoriesController : ControllerBase
     {
         var category = await _categories.CreateAsync(request, ct);
 
-        // No Location header: the contract publishes no endpoint that reads one category.
         return Created((string?)null, category);
     }
 }

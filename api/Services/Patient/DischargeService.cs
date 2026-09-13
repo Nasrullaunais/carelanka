@@ -17,17 +17,6 @@ namespace CareLanka.Api.Services.Patient;
 
 public sealed class DischargeService : IDischargeService
 {
-    /// <summary>
-    /// The boxes, and which of them stop a discharge. Written once here rather than scattered
-    /// through the methods below, because "is this patient ready" is a question three endpoints
-    /// ask and they must all mean the same thing by it.
-    /// </summary>
-    /// <remarks>
-    /// Both are mandatory, so the shape looks redundant. It stays a map because the three
-    /// optional boxes removed on 2026-09-11 proved the useful thing about it: whether a box
-    /// holds up a discharge is data, and changing it should not mean editing
-    /// <see cref="Outstanding"/> as well.
-    /// </remarks>
     private static readonly IReadOnlyDictionary<DischargeChecklistItemType, bool> Mandatory =
         new Dictionary<DischargeChecklistItemType, bool>
         {
@@ -35,35 +24,15 @@ public sealed class DischargeService : IDischargeService
             [DischargeChecklistItemType.BillingSettled] = true
         };
 
-    /// <summary>
-    /// Who may tick what. The role gate is here and not on the route, because which boxes you
-    /// are allowed to touch depends on which boxes are in the body.
-    /// </summary>
-    /// <remarks>
-    /// <c>ClinicalClearance</c> is the wall: a doctor, a human, always. No automated process can
-    /// ever set it, which is why the agent has no tool that reaches this method.
-    ///
-    /// <c>BillingSettled</c> is absent on purpose. It is not ticked by a role at all - settling
-    /// the bill writes it, through <see cref="MarkBillingSettledAsync"/>.
-    /// </remarks>
     private static readonly IReadOnlyDictionary<DischargeChecklistItemType, PrincipalRole> TickedBy =
         new Dictionary<DischargeChecklistItemType, PrincipalRole>
         {
             [DischargeChecklistItemType.ClinicalClearance] = PrincipalRole.Doctor
         };
 
-    /// <summary>A visit still in the building. Nothing else can be a candidate.</summary>
     private static readonly AdmissionStatus[] OnTheWard =
         [AdmissionStatus.Admitted, AdmissionStatus.ReadyForDischarge];
 
-    /// <summary>
-    /// The same list plus the ones already gone, for <c>includeDischarged</c>.
-    /// </summary>
-    /// <remarks>
-    /// A discharged visit is not a candidate and never becomes one again. It is on this list
-    /// only so the screen can show what has happened — the alternative was a discharge page
-    /// that empties itself the moment the work is done and keeps no record of any of it.
-    /// </remarks>
     private static readonly AdmissionStatus[] OnTheWardOrGone =
         [AdmissionStatus.Admitted, AdmissionStatus.ReadyForDischarge, AdmissionStatus.Discharged];
 
@@ -96,8 +65,6 @@ public sealed class DischargeService : IDischargeService
 
         if (wardId is { } onlyWard)
         {
-            // Which ward a patient is in is not a column of ours: it is Equipment's bed, joined
-            // to our live assignment. So the filter is "in one of that ward's beds".
             var bedIds = (await _beds.ListBedsInWardsAsync([onlyWard], ct))
                 .Select(bed => bed.Id)
                 .ToList();
@@ -109,32 +76,20 @@ public sealed class DischargeService : IDischargeService
 
         var admissions = await query.ToListAsync(ct);
 
-        // CurrentOrLast, not Live. With includeDischarged this list carries finished visits,
-        // and a discharge releases the bed - so the live lookup answered "No bed" about a
-        // patient who had just spent three days in GEN-02.
         var labels = await BedLabels.CurrentOrLastByAdmissionAsync(
             _db, _beds, admissions.Select(admission => admission.Id).ToList(), now, ct);
 
         var candidates = admissions
             .Select(admission => ToCandidate(admission, labels, now))
 
-            // Everyone still here first, whatever their state - a finished visit is a record,
-            // and a record must never push live work down the page. Then: ready first, then
-            // whoever has least left to do, then longest stay. A ward nurse works down this
-            // list, so the order is the order the work gets done in.
             .OrderBy(candidate => candidate.IsDischarged)
             .ThenBy(candidate => candidate.OutstandingItems.Count)
 
-            // Among the finished ones, most recently discharged first: the one somebody is
-            // looking up is almost always the one that just happened.
             .ThenByDescending(candidate => candidate.DischargedAt ?? DateTimeOffset.MinValue)
             .ThenByDescending(candidate => candidate.DaysInBed)
             .ThenBy(candidate => candidate.Patient.FullName)
             .ToList();
 
-        // Paged in memory, for the same reason the bed candidate list is: readiness is not a
-        // column anywhere. It is a count over the checklist rows, so the rows have to exist
-        // before they can be ordered or counted. A ward holds tens of patients, not millions.
         return PagedResult<DischargeCandidate>.From(
             candidates.Skip((page - 1) * pageSize).Take(pageSize).ToList(),
             page,
@@ -145,8 +100,6 @@ public sealed class DischargeService : IDischargeService
     public async Task<DischargeResponse> UpdateChecklistAsync(
         Guid admissionId, ChecklistUpdateRequest request, CancellationToken ct = default)
     {
-        // Refused before anything is loaded, because it is a complaint about the request and
-        // not about this admission. Settling the bill writes this box; nothing else does.
         if (request.BillingSettled is not null)
         {
             throw new ConflictException(MessageCode.BillingTickedBySettlingOnly);
@@ -174,37 +127,22 @@ public sealed class DischargeService : IDischargeService
         return await ToResponseAsync(discharge, ct);
     }
 
-    /// <remarks>
-    /// The row lock is the same one <c>/arrive</c>, <c>/cancel</c> and <c>assign-bed</c> take,
-    /// for the same reason: a nurse confirming a discharge and a manager cancelling the visit
-    /// both read a legal status, both pass, and the later write wins. Nothing about either row
-    /// is illegal on its own, so no index can catch it.
-    /// </remarks>
     public async Task<DischargeResponse> ConfirmAsync(
         Guid admissionId, ConfirmDischargeRequest request, CancellationToken ct = default)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
 
-        // Takes the lock and nothing else. Locking and loading in one composed query puts
-        // FOR UPDATE inside a join and locks rows nobody asked about.
         await _db.Database.ExecuteSqlAsync(
             $"SELECT id FROM admissions WHERE id = {admissionId} FOR UPDATE", ct);
 
         var admission = await LoadForWriteAsync(admissionId, ct);
 
-        // No role check on the care level. ICU and HDU discharges used to be the duty manager's
-        // (plan 6.3, removed 2026-09-12) - but the gate that actually protects a patient is the
-        // checklist below, and its clinical box is a doctor's and nobody else's. Requiring a
-        // second signature from somebody who was not at the bedside added delay, not safety.
         var discharge = await EnsureDischargeAsync(admission, ct);
 
         var outstanding = Outstanding(discharge);
 
         if (outstanding.Count > 0)
         {
-            // Belt and braces: the status check below would refuse this too, because nothing
-            // reaches ready_for_discharge with a box outstanding. This one names what is
-            // missing, which is the answer a nurse can act on.
             throw new ConflictException(
                 MessageCode.DischargeChecklistIncomplete, string.Join(", ", outstanding));
         }
@@ -221,9 +159,6 @@ public sealed class DischargeService : IDischargeService
         discharge.ConfirmedAt = now;
         discharge.SummaryNote = Clean(request.SummaryNote);
 
-        // The bed goes back in the same transaction. Leave it behind and the ward reports a
-        // bed nobody is in as occupied, and ux_bed_assignments_live_bed then refuses the next
-        // patient who needs it.
         foreach (var live in admission.BedAssignments
             .Where(assignment => assignment.Status != AssignmentStatus.Released))
         {
@@ -260,25 +195,8 @@ public sealed class DischargeService : IDischargeService
 
         ApplyFlag(admission, discharge);
 
-        // No SaveChanges. This runs inside BillingService's transaction, so the money and the
-        // tick commit together or neither does.
     }
 
-    // ---------- the rules ----------
-
-    /// <summary>
-    /// Moves the admission onto or off the candidate list, which is what ticking the last
-    /// mandatory box actually does.
-    /// </summary>
-    /// <remarks>
-    /// Both directions, because unticking has to undo it. <c>ready_for_discharge</c> to
-    /// <c>admitted</c> is a published edge precisely for this - a nurse who realises the
-    /// medication was not issued after all.
-    ///
-    /// <c>FlaggedAt</c> is restamped when the flag fires. On a row that has only just been
-    /// created it is the moment the checklist was opened, which is the honest reading of a
-    /// discharge nobody has flagged yet.
-    /// </remarks>
     private static void ApplyFlag(AdmissionEntity admission, DischargeEntity discharge)
     {
         var ready = Outstanding(discharge).Count == 0;
@@ -290,8 +208,6 @@ public sealed class DischargeService : IDischargeService
 
             admission.Status = AdmissionStatus.ReadyForDischarge;
 
-            // A rule flagged it, not the agent - plan 6.2. Checking whether three boxes are
-            // ticked is a WHERE clause, and a language model in front of it would buy nothing.
             discharge.FlaggedBy = AssignedBy.User;
             discharge.FlaggedAt = DateTimeOffset.UtcNow;
 
@@ -307,7 +223,6 @@ public sealed class DischargeService : IDischargeService
         }
     }
 
-    /// <summary>The mandatory boxes still unticked, by their wire name. Empty means ready.</summary>
     private static IReadOnlyList<string> Outstanding(DischargeEntity discharge)
         => discharge.ChecklistItems
             .Where(item => item.IsMandatory && item.TickedAt is null)
@@ -315,7 +230,6 @@ public sealed class DischargeService : IDischargeService
             .OrderBy(name => name)
             .ToList();
 
-    /// <summary>A 403 and not a 409: the box is fine, the caller is not the person who ticks it.</summary>
     private void EnsureMayTick(DischargeChecklistItemType item)
     {
         if (!TickedBy.TryGetValue(item, out var role) || _currentUser.Role == role)
@@ -327,8 +241,6 @@ public sealed class DischargeService : IDischargeService
             MessageCode.ChecklistItemWrongRole, EnumWire.ToWire(item), EnumWire.ToWire(role));
     }
 
-    // ---------- loading and writing ----------
-
     private async Task<AdmissionEntity> LoadForWriteAsync(Guid admissionId, CancellationToken ct)
         => await _db.Admissions
             .Include(admission => admission.Patient)
@@ -338,15 +250,6 @@ public sealed class DischargeService : IDischargeService
             .FirstOrDefaultAsync(admission => admission.Id == admissionId, ct)
             ?? throw new NotFoundException("Admission", admissionId);
 
-    /// <summary>
-    /// The discharge record for this admission, created with its boxes if it has none.
-    /// </summary>
-    /// <remarks>
-    /// Created on first touch rather than alongside the admission. Every visit already on the
-    /// system when this step landed gets one the moment somebody needs it, so there was no
-    /// backfill and no migration for the rows - and a visit nobody ever discharges never grows
-    /// five rows it does not need.
-    /// </remarks>
     private Task<DischargeEntity> EnsureDischargeAsync(
         AdmissionEntity admission, CancellationToken ct)
     {
@@ -362,8 +265,6 @@ public sealed class DischargeService : IDischargeService
             Id = Guid.NewGuid(),
             AdmissionId = admission.Id,
 
-            // A human opened this checklist. The agent has no tool that reaches here, and
-            // AssignedBy.Agent on a discharge would be a claim nothing in this component makes.
             FlaggedBy = AssignedBy.User,
             FlaggedAt = DateTimeOffset.UtcNow
         };
@@ -376,17 +277,6 @@ public sealed class DischargeService : IDischargeService
         return Task.FromResult(discharge);
     }
 
-    /// <summary>
-    /// Adds any box this discharge row is missing, so adding a sixth item later is a change to
-    /// <see cref="Mandatory"/> and nothing else. On an existing row it normally does nothing.
-    /// </summary>
-    /// <remarks>
-    /// The explicit <c>_db.DischargeChecklistItems.Add</c> is not belt and braces. We allocate
-    /// the key ourselves, and change tracking decides Added-versus-Modified for an entity it
-    /// meets through a navigation by looking at the key: a non-default one means "this row
-    /// already exists", so a new box would be saved as an UPDATE that matches no row and the
-    /// request would die with a concurrency exception.
-    /// </remarks>
     private void BackfillMissingItems(DischargeEntity discharge)
     {
         foreach (var (item, mandatory) in Mandatory)
@@ -409,10 +299,6 @@ public sealed class DischargeService : IDischargeService
         }
     }
 
-    /// <summary>
-    /// Ticking is writing a timestamp and a staff id; unticking is clearing both. One nullable
-    /// timestamp rather than a bool beside it, so the two can never contradict each other.
-    /// </summary>
     private static void Tick(
         DischargeEntity discharge, DischargeChecklistItemType item, bool ticked, Guid staffId)
     {
@@ -420,8 +306,6 @@ public sealed class DischargeService : IDischargeService
 
         if (ticked == row.TickedAt is not null)
         {
-            // Already in the state asked for. Rewriting it would move the stamp to whoever
-            // pressed the button second, which is not who did the work.
             return;
         }
 
@@ -429,7 +313,6 @@ public sealed class DischargeService : IDischargeService
         row.TickedByStaffMemberId = ticked ? staffId : null;
     }
 
-    /// <summary>The keys actually present in the body. A key left out is not touched.</summary>
     private static IReadOnlyList<(DischargeChecklistItemType Item, bool Ticked)> Requested(
         ChecklistUpdateRequest request)
     {
@@ -448,8 +331,6 @@ public sealed class DischargeService : IDischargeService
         }
     }
 
-    // ---------- mapping ----------
-
     private static DischargeCandidate ToCandidate(
         AdmissionEntity admission,
         IReadOnlyDictionary<Guid, BedLabel> labels,
@@ -460,8 +341,6 @@ public sealed class DischargeService : IDischargeService
         var outstanding = admission.Discharge is { } discharge
             ? Outstanding(discharge)
 
-            // No checklist row yet, so everything mandatory is outstanding. Listed rather than
-            // hidden: this patient is exactly who a nurse is looking for.
             : Mandatory.Where(entry => entry.Value)
                 .Select(entry => EnumWire.ToWire(entry.Key))
                 .OrderBy(name => name)
@@ -477,8 +356,6 @@ public sealed class DischargeService : IDischargeService
             AdmittedAt = admission.AdmittedAt,
             DaysInBed = admission.AdmittedAt is { } admitted
 
-                // Counted to when they LEFT, not to now, or a stay that ended last week would
-                // grow by a day every day it sat in the records list.
                 ? BillingRates.BillableDays(admitted, admission.Discharge?.ConfirmedAt ?? now)
                 : 0,
             OutstandingItems = outstanding,
@@ -487,13 +364,6 @@ public sealed class DischargeService : IDischargeService
         };
     }
 
-    /// <summary>
-    /// The wire shape, with every staff id on it resolved to a name in one query.
-    /// </summary>
-    /// <remarks>
-    /// One round trip for the whole record rather than one per ticked box: a discharge carries
-    /// a handful of ids and they are usually the same two or three people.
-    /// </remarks>
     private async Task<DischargeResponse> ToResponseAsync(
         DischargeEntity discharge, CancellationToken ct)
     {

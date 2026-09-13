@@ -3,8 +3,6 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace CareLanka.Api.Common.OpenApi;
 
-// Moves /api out of every path and into servers, which is how specs/*.yaml publish it.
-// Leave it in the paths and web-ui's relative base URL makes every call /api/api/... at runtime.
 public sealed class ApiPrefixAsServerFilter : IDocumentFilter
 {
     private const string Prefix = "/api";

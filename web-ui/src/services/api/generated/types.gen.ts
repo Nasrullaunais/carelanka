@@ -4,22 +4,12 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}/api` | (string & {});
 };
 
-/**
- * A charge reception types in - an X-ray, a dressing pack, a consultant's fee.
- */
 export type AddBillChargeRequest = {
     description: string;
-    /**
-     * Nullable so that leaving it out is a 400 rather than a silent zero - the same trap as
-     * every required value type in this component.
-     */
     quantity: number;
     unit_price: number;
 };
 
-/**
- * One hospital visit, in full. The spec builds this from AdmissionSummary + AuditFields, so this inherits rather than repeating the summary fields.
- */
 export type Admission = {
     id: string;
     patient?: PatientSummary;
@@ -28,104 +18,48 @@ export type Admission = {
     urgency: AdmissionUrgency;
     status: AdmissionStatus;
     details_complete: boolean;
-    /**
-     * Whether this visit needs a bed at all. False for an `outpatient` — a scan or a
-     * blood test is seen and sent home.
-     */
     requires_bed: boolean;
-    /**
-     * From the live bed assignment, if there is one. Null before a bed is held and after discharge.
-     */
     ward_name?: string | null;
     bed_number?: string | null;
     expected_arrival?: string | null;
     admitted_at?: string | null;
-    /**
-     * Emergency Service's own reference, carried as their string. Not a foreign key — dispatches are their table.
-     */
     dispatch_id?: string | null;
-    /**
-     * The clinician who chose the care level. Recorded proof a human decided it, never an agent.
-     */
     category_set_by_staff_id: string;
-    /**
-     * Who admitted this patient and chose their care level. For a walk-in that is whoever was
-     * on the desk, which is the closest thing this component stores to "who did the intake" -
-     * there are no created_by columns anywhere, by group convention.
-     */
     category_set_by_staff_name?: string | null;
     category_set_at: string;
     is_infectious: boolean;
-    /**
-     * A PatientAccount id — the app user who raised the emergency call when they are not the
-     * patient. Never a Patient id: a bystander who calls for a stranger has a login, not a
-     * medical record. Null for a walk-in or a booking.
-     */
     reported_by_user_id?: string | null;
-    /**
-     * What paperwork is still outstanding, named rather than counted. "Incomplete" does not
-     * tell a ward clerk what to chase; "nic, date_of_birth" does.
-     */
     missing_fields: Array<string>;
-    /**
-     * When the patient left. Null while the visit is still running.
-     */
     discharged_at?: string | null;
     cancel_reason?: CancelReason;
-    /**
-     * The free-text half of a cancellation, which the enum cannot carry. Null unless the
-     * status is `cancelled`, and often null even then.
-     */
     cancel_note?: string | null;
     created_at?: string;
     updated_at?: string;
 };
 
-/**
- * A bed as this component sees it: Equipment Management's frame, with our answer to whether
- * anyone is in it.
- */
 export type AdmissionBed = {
     id: string;
     ward_id: string;
     ward_name: string;
     bed_number: string;
-    /**
-     * Side room or curtained isolation. Hard rule H4: an infectious patient needs one.
-     */
     has_isolation: boolean;
     condition: BedCondition;
     availability: BedAvailability;
-    /**
-     * The visit holding or occupying this bed, and null when nothing is. Set for a hold as
-     * well as an occupancy: a bed board needs to show who is coming, not only who is here,
-     * and `availability` already says which of the two this is.
-     */
     occupied_by_admission_id?: string | null;
     created_at?: string;
     updated_at?: string;
 };
 
-/**
- * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
- */
 export type AdmissionBedPagedResult = {
     items: Array<AdmissionBed>;
     page: number;
     page_size: number;
     total_items: number;
-    /**
-     * Always at least 1, so an empty list does not render as "page 1 of 0".
-     */
     total_pages: number;
 };
 
 export type AdmissionCategory = 'icu' | 'hdu' | 'inpatient' | 'day_case' | 'outpatient';
 
-/**
- * One admission with its bed history. Nothing is deleted or overwritten, so a rejected or
- * expired assignment stays on the list — this is the audit trail, not the current state.
- */
 export type AdmissionDetail = {
     id: string;
     patient?: PatientSummary;
@@ -134,60 +68,23 @@ export type AdmissionDetail = {
     urgency: AdmissionUrgency;
     status: AdmissionStatus;
     details_complete: boolean;
-    /**
-     * Whether this visit needs a bed at all. False for an `outpatient` — a scan or a
-     * blood test is seen and sent home.
-     */
     requires_bed: boolean;
-    /**
-     * From the live bed assignment, if there is one. Null before a bed is held and after discharge.
-     */
     ward_name?: string | null;
     bed_number?: string | null;
     expected_arrival?: string | null;
     admitted_at?: string | null;
-    /**
-     * Emergency Service's own reference, carried as their string. Not a foreign key — dispatches are their table.
-     */
     dispatch_id?: string | null;
-    /**
-     * The clinician who chose the care level. Recorded proof a human decided it, never an agent.
-     */
     category_set_by_staff_id: string;
-    /**
-     * Who admitted this patient and chose their care level. For a walk-in that is whoever was
-     * on the desk, which is the closest thing this component stores to "who did the intake" -
-     * there are no created_by columns anywhere, by group convention.
-     */
     category_set_by_staff_name?: string | null;
     category_set_at: string;
     is_infectious: boolean;
-    /**
-     * A PatientAccount id — the app user who raised the emergency call when they are not the
-     * patient. Never a Patient id: a bystander who calls for a stranger has a login, not a
-     * medical record. Null for a walk-in or a booking.
-     */
     reported_by_user_id?: string | null;
-    /**
-     * What paperwork is still outstanding, named rather than counted. "Incomplete" does not
-     * tell a ward clerk what to chase; "nic, date_of_birth" does.
-     */
     missing_fields: Array<string>;
-    /**
-     * When the patient left. Null while the visit is still running.
-     */
     discharged_at?: string | null;
     cancel_reason?: CancelReason;
-    /**
-     * The free-text half of a cancellation, which the enum cannot carry. Null unless the
-     * status is `cancelled`, and often null even then.
-     */
     cancel_note?: string | null;
     created_at?: string;
     updated_at?: string;
-    /**
-     * Every assignment ever made, including rejected and expired ones.
-     */
     bed_assignments: Array<BedAssignment>;
     discharge?: Discharge;
     bill?: Bill;
@@ -203,18 +100,12 @@ export type AdmissionFeeUpdate = {
     amount: number;
 };
 
-/**
- * What GET /api/admissions sorts on. Four fields, because those are the four the spec publishes.
- */
 export type AdmissionSortField = 'created_at' | 'expected_arrival' | 'admitted_at' | 'urgency';
 
 export type AdmissionSource = 'emergency' | 'walk_in' | 'pre_registered';
 
 export type AdmissionStatus = 'awaiting_bed' | 'awaiting_approval' | 'bed_reserved' | 'admitted' | 'ready_for_discharge' | 'discharged' | 'cancelled';
 
-/**
- * One visit, in list form. Appears on a patient's history and, later, on the admissions list.
- */
 export type AdmissionSummary = {
     id: string;
     patient?: PatientSummary;
@@ -223,73 +114,90 @@ export type AdmissionSummary = {
     urgency: AdmissionUrgency;
     status: AdmissionStatus;
     details_complete: boolean;
-    /**
-     * Whether this visit needs a bed at all. False for an `outpatient` — a scan or a
-     * blood test is seen and sent home.
-     */
     requires_bed: boolean;
-    /**
-     * From the live bed assignment, if there is one. Null before a bed is held and after discharge.
-     */
     ward_name?: string | null;
     bed_number?: string | null;
     expected_arrival?: string | null;
     admitted_at?: string | null;
 };
 
-/**
- * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
- */
 export type AdmissionSummaryPagedResult = {
     items: Array<AdmissionSummary>;
     page: number;
     page_size: number;
     total_items: number;
-    /**
-     * Always at least 1, so an empty list does not render as "page 1 of 0".
-     */
     total_pages: number;
 };
 
 export type AdmissionUrgency = 'routine' | 'urgent' | 'emergency';
 
-/**
- * A booked visit, as staff see it. The patient's own view of the same booking is MyAppointment.
- */
+export type Ambulance = {
+    id: string;
+    registration_number: string;
+    current_latitude?: number | null;
+    current_longitude?: number | null;
+    status: AmbulanceStatus;
+    out_of_service_reason?: string | null;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
+export type AmbulanceDetail = {
+    id: string;
+    registration_number: string;
+    current_latitude?: number | null;
+    current_longitude?: number | null;
+    status: AmbulanceStatus;
+    out_of_service_reason?: string | null;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+    active_dispatch?: DispatchSummary;
+    is_divertible?: boolean;
+    runs_today?: number;
+};
+
+export type AmbulanceSortField = 'registration_number' | 'status' | 'distance';
+
+export type AmbulanceStatus = 'available' | 'dispatched' | 'en_route' | 'at_scene' | 'transporting' | 'out_of_service';
+
+export type AmbulanceSummary = {
+    id: string;
+    registration_number: string;
+    status: AmbulanceStatus;
+    current_latitude?: number | null;
+    current_longitude?: number | null;
+    active_dispatch_id?: string | null;
+    is_divertible: boolean;
+    distance_km?: number | null;
+};
+
+export type AmbulanceSummaryPagedResult = {
+    items: Array<AmbulanceSummary>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
 export type Appointment = {
     id: string;
     patient: PatientSummary;
     scheduled_at: string;
     status: AppointmentStatus;
-    /**
-     * Free text, written by whoever booked. Displayed to staff and never read by the bed
-     * agent — free text stays data, never instructions.
-     */
     reason?: string | null;
-    /**
-     * Who took the booking. Null for a self-booking from the patient app, which is how the
-     * two paths stay tellable apart afterwards.
-     */
     booked_by_staff_id?: string | null;
-    /**
-     * Set once checked in. Until then there is no admission to point at.
-     */
     admission_id?: string | null;
     created_at?: string;
     updated_at?: string;
 };
 
-/**
- * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
- */
 export type AppointmentPagedResult = {
     items: Array<Appointment>;
     page: number;
     page_size: number;
     total_items: number;
-    /**
-     * Always at least 1, so an empty list does not render as "page 1 of 0".
-     */
     total_pages: number;
 };
 
@@ -297,29 +205,12 @@ export type AppointmentStatus = 'scheduled' | 'checked_in' | 'completed' | 'canc
 
 export type AssetType = 'equipment_item' | 'bed';
 
-/**
- * Pick a bed for an admission by hand, without the agent.
- */
 export type AssignBedRequest = {
-    /**
-     * Equipment Management's bed id, from `GET /api/bed-availability`.
-     */
     bed_id: string;
-    /**
-     * Why a human ignored what the agent proposed. Optional, and nothing requires it yet:
-     * there are no proposals to override until the agent lands at step 11, and this endpoint
-     * is also the ordinary path when nobody asked the agent at all.
-     */
     override_reason?: string | null;
 };
 
-/**
- * Body of POST /api/equipment-items/{id}/assign.
- */
 export type AssignEquipmentItemRequest = {
-    /**
-     * Patient Management's admission. Stored as an id; no patient data is copied here.
-     */
     admission_id: string;
 };
 
@@ -327,41 +218,20 @@ export type AssignedBy = 'agent' | 'user';
 
 export type AssignmentStatus = 'reserved' | 'occupied' | 'released';
 
-/**
- * What every successful sign-in returns.
- */
 export type AuthTokens = {
     access_token: string;
     token_type: string;
-    /**
-     * Access token lifetime in seconds.
-     */
     expires_in: number;
-    /**
-     * Single-use — the next refresh replaces it. Keep it in secure storage, never in localStorage or plain preferences.
-     */
     refresh_token: string;
     principal: CurrentPrincipal;
 };
 
-/**
- * A bed frame as Equipment Management publishes it. The writable source of truth Patient Management reads and never writes.
- */
 export type Bed = {
     id: string;
-    /**
-     * Patient Management's Ward.
-     */
     ward_id: string;
-    /**
-     * Read from Patient Management, not stored here. Stubbed until GET /wards exists — see STUBS.md row 2.
-     */
     ward_name: string;
     bed_number: string;
     has_isolation: boolean;
-    /**
-     * 1 is closest to the nurse station.
-     */
     nurse_station_distance: number;
     condition: BedCondition;
     asset_tag?: string | null;
@@ -369,34 +239,18 @@ export type Bed = {
     updated_at: string;
 };
 
-/**
- * One bed held or occupied for an admission. A row walks reserved → occupied → released, and
- * several rows per admission cover mid-stay transfers.
- */
 export type BedAssignment = {
     id: string;
     admission_id: string;
     bed_id: string;
-    /**
-     * From Equipment Management's register. Empty while their bed lookup is stubbed — see STUBS.md row 1.
-     */
     ward_name: string;
     bed_number: string;
     status: AssignmentStatus;
-    /**
-     * The expiring hold. Past this instant the bed is free again, with no human action.
-     */
     reserved_until?: string | null;
     assigned_by: AssignedBy;
     workflow_id?: string | null;
-    /**
-     * True when the bed is below the requested category. Always needs Duty Manager approval.
-     */
     is_downgrade: boolean;
     approved_by_staff_id?: string | null;
-    /**
-     * Their name, for a screen. Sent beside the id, never instead of it.
-     */
     approved_by_staff_name?: string | null;
     approved_at?: string | null;
     override_reason?: string | null;
@@ -406,95 +260,40 @@ export type BedAssignment = {
     updated_at?: string;
 };
 
-/**
- * Whether a bed can be used right now. Computed from Equipment's condition and our own
- * assignment rows — never stored, because two sources of truth for "is bed 12 free" drift.
- */
 export type BedAvailability = 'free' | 'reserved' | 'occupied' | 'out_of_service';
 
-/**
- * What `GET /api/bed-availability` filters on: the four states a bed can be in, plus
- * `all`, which is the default.
- */
 export type BedAvailabilityFilter = 'free' | 'reserved' | 'occupied' | 'out_of_service' | 'all';
 
 export type BedCondition = 'usable' | 'out_of_service';
 
-/**
- * The answer to "may this bed be taken out of service?", read by Equipment Management before
- * they withdraw a bed for repair.
- */
 export type BedOccupancyStatus = {
     bed_id: string;
-    /**
-     * True while a live assignment exists. A hold past its expiry does not count.
-     */
     occupied: boolean;
     assignment_status?: AssignmentStatus;
-    /**
-     * When the hold lapses, if the bed is held rather than lived in.
-     */
     reserved_until?: string | null;
-    /**
-     * The direct answer, so Equipment does not have to re-derive it. False while a patient is
-     * in the bed or a live hold stands.
-     */
     may_take_out_of_service: boolean;
 };
 
-/**
- * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
- */
 export type BedPagedResult = {
     items: Array<Bed>;
     page: number;
     page_size: number;
     total_items: number;
-    /**
-     * Always at least 1, so an empty list does not render as "page 1 of 0".
-     */
     total_pages: number;
 };
 
-/**
- * What a visit costs. Bed days and an admission fee are generated from what the hospital
- * actually recorded; everything else is a line somebody at the desk typed.
- */
 export type Bill = {
     id: string;
     admission_id: string;
-    /**
-     * The handle a patient quotes at the counter.
-     */
     bill_number: string;
-    /**
-     * Sri Lankan rupees. Fixed - this component does not do currency conversion.
-     */
     currency: string;
     lines: Array<BillLine>;
-    /**
-     * The sum of the lines. Not stored, so it cannot disagree with them.
-     */
     total: number;
-    /**
-     * True once the money is in. This is the same fact as the `billing_settled` checklist
-     * item, written once - settling is what ticks the box, and the box cannot be ticked any
-     * other way.
-     */
     settled: boolean;
-    /**
-     * Who issued it. Printed on the bill, so it is a name on a document, not audit data.
-     */
     raised_by_staff_id?: string | null;
-    /**
-     * Their name, for a screen. Sent beside the id, never instead of it.
-     */
     raised_by_staff_name?: string | null;
     settled_at?: string | null;
     settled_by_staff_id?: string | null;
-    /**
-     * Their name, for a screen. Sent beside the id, never instead of it.
-     */
     settled_by_staff_name?: string | null;
     settlement_note?: string | null;
     patient: PatientSummary;
@@ -502,112 +301,57 @@ export type Bill = {
     updated_at: string;
 };
 
-/**
- * One line on a bill.
- */
 export type BillLine = {
     id: string;
     source: BillLineSource;
     description: string;
     quantity: number;
     unit_price: number;
-    /**
-     * Quantity x unit price. Computed, never stored.
-     */
     line_total: number;
 };
 
 export type BillLineSource = 'admission_fee' | 'bed_stay' | 'manual';
 
-/**
- * The whole price grid, as GET /api/billing/rates returns it.
- */
 export type BillingRateBook = {
-    /**
-     * One entry per kind of ward, in the order the settings screen shows them.
-     */
     wards: Array<WardRates>;
-    /**
-     * The one-off charge for opening a visit, by care level.
-     */
     admission_fees: Array<AdmissionFee>;
-    /**
-     * Fixed. This component does not convert currency and does not pretend to.
-     */
     currency: string;
 };
 
-/**
- * Why a visit was called off. Always a human's claim, which is why the reason is mandatory:
- * a computer cannot know whether the ambulance was diverted, the patient died, or it is
- * simply stuck in traffic.
- */
+export type BookAppointmentRequest = {
+    scheduled_at: string;
+    reason?: string | null;
+};
+
+export type CallPriority = 'critical' | 'high' | 'medium' | 'low';
+
 export type CancelAdmissionRequest = {
     reason: CancelReason;
-    /**
-     * The part no enum can carry - "diverted to Kandy, family informed". Optional, because
-     * forcing a sentence out of a nurse in a hurry produces "n/a" and nothing else.
-     */
     note?: string | null;
 };
 
 export type CancelReason = 'diverted_to_other_hospital' | 'false_alarm' | 'died_en_route' | 'patient_refused' | 'no_show';
 
-/**
- * Body of POST /api/appointments/{id}/check-in.
- */
 export type CheckInRequest = {
     admission_category: AdmissionCategory;
-    /**
-     * The staff member who chose the care level at the desk. Recorded proof a human decided it.
-     */
     category_set_by_staff_id: string;
     urgency: AdmissionUrgency;
-    /**
-     * Set by staff. Forces an isolation-capable bed once the bed agent runs.
-     */
     is_infectious?: boolean;
 };
 
-/**
- * One tickable box on the discharge checklist.
- */
 export type ChecklistItem = {
-    /**
-     * Derived from `ticked_at`, never stored separately, so the two cannot disagree.
-     */
     ticked: boolean;
     ticked_by_staff_id?: string | null;
-    /**
-     * Their name, for a screen. Sent beside the id, never instead of it.
-     */
     ticked_by_staff_name?: string | null;
     ticked_at?: string | null;
-    /**
-     * A non-mandatory item can stay unticked without blocking the discharge.
-     */
     mandatory: boolean;
 };
 
-/**
- * Any subset of the checklist. A key left out is not touched; a key set to `false` is
- * unticked.
- */
 export type ChecklistUpdateRequest = {
-    /**
-     * Doctor only. The wall: without it nothing flags and nothing discharges.
-     */
     clinical_clearance?: boolean | null;
-    /**
-     * Refused here. Settle the bill instead - `POST /api/admissions/{id}/bill/settle`.
-     */
     billing_settled?: boolean | null;
 };
 
-/**
- * Body of PATCH /api/admissions/{id}/details. Any subset of the fields that were missing —
- * a key left out is left alone, which is what makes this different from the PUT on a patient.
- */
 export type CompleteDetailsRequest = {
     nic?: string | null;
     full_name?: string | null;
@@ -618,171 +362,90 @@ export type CompleteDetailsRequest = {
     emergency_contact_phone?: string | null;
 };
 
-/**
- * Body of POST /api/maintenance-schedules/{id}/complete. Who did the work comes from the token, never the body.
- */
 export type CompleteMaintenanceScheduleRequest = {
     notes?: string | null;
 };
 
-/**
- * What a nurse writes on the way out.
- */
 export type ConfirmDischargeRequest = {
-    /**
-     * Instructions the patient can read on their own phone afterwards.
-     */
     summary_note?: string | null;
 };
 
-/**
- * Move a patient out of the bed they were put in by mistake and into the right one.
- */
 export type CorrectBedRequest = {
-    /**
-     * The bed they should have been given, from `GET /api/bed-availability`.
-     */
     bed_id: string;
-    /**
-     * What went wrong, for whoever reads the trail later.
-     */
     reason?: string | null;
 };
 
-/**
- * Body of POST /api/admissions. Creates a visit in status `awaiting_bed`.
- */
 export type CreateAdmissionRequest = {
     patient_id: string;
     source: AdmissionSource;
-    /**
-     * Emergency Service's reference. Required when source is `emergency`.
-     */
     dispatch_id?: string | null;
     admission_category: AdmissionCategory;
-    /**
-     * The clinician who chose the category. Required on purpose: it is the recorded proof that
-     * a human chose the care level, and there is no code path in this API that lets an agent
-     * supply it.
-     */
     category_set_by_staff_id: string;
     urgency: AdmissionUrgency;
-    /**
-     * Set by staff. Forces an isolation-capable bed when the bed agent runs.
-     */
     is_infectious?: boolean;
     expected_arrival?: string | null;
 };
 
-/**
- * Body of POST /api/appointments — the desk booking a visit for someone who phoned in or
- * walked up without the app.
- */
+export type CreateAmbulanceRequest = {
+    registration_number: string;
+    current_latitude?: number | null;
+    current_longitude?: number | null;
+};
+
 export type CreateAppointmentRequest = {
     patient_id: string;
-    /**
-     * When the patient intends to come in. Must be in the future — booking a visit for a
-     * time that has passed is always a typo, and somebody already here is admitted, not
-     * booked.
-     */
     scheduled_at: string;
-    /**
-     * Optional free text, for the desk to read. Never read by the agent.
-     */
     reason?: string | null;
 };
 
-/**
- * Body of POST /api/beds.
- */
 export type CreateBedRequest = {
-    /**
-     * References Patient Management's Ward table. We store the reference and never write that table.
-     */
     ward_id: string;
     bed_number: string;
     has_isolation?: boolean;
-    /**
-     * 1 is closest to the nurse station.
-     */
     nurse_station_distance?: number;
     asset_tag?: string | null;
 };
 
-/**
- * Body of POST /api/equipment-categories.
- */
 export type CreateEquipmentCategoryRequest = {
     name: string;
 };
 
-/**
- * Body of POST /api/equipment-items. The item starts available.
- */
 export type CreateEquipmentItemRequest = {
     name: string;
     category_id: string;
     model: string;
     manufacturer: string;
     purchase_date: string;
-    /**
-     * Printed as a QR code on the physical item.
-     */
     asset_tag: string;
     serial_number?: string | null;
-    /**
-     * Null means the central store. References Patient Management's ward.
-     */
     ward_id?: string | null;
     next_maintenance_due?: string | null;
 };
 
-/**
- * Body of POST /api/maintenance-schedules. The manual path, with no agent involved.
- */
 export type CreateMaintenanceScheduleRequest = {
     asset_type: AssetType;
-    /**
-     * The equipment item or bed being serviced. Polymorphic, so it carries no foreign key.
-     */
     asset_id: string;
     schedule_type: MaintenanceType;
     scheduled_date: string;
     notes?: string | null;
 };
 
-/**
- * Body of POST /api/patients. Registration is done BY staff ABOUT a person — the patient does
- * not sign up for it and may never have an account.
- */
 export type CreatePatientRequest = {
     full_name: string;
-    /**
-     * Omit for an unidentified arrival; the server then generates a temp_reference.
-     */
     nic?: string | null;
     gender: Gender;
     date_of_birth?: string | null;
     phone?: string | null;
     address?: string | null;
-    /**
-     * The name of the person to ring, not the relationship and not the number.
-     */
     emergency_contact_name?: string | null;
     emergency_contact_phone?: string | null;
 };
 
-/**
- * Body of POST /api/pharmacy-categories.
- */
 export type CreatePharmacyCategoryRequest = {
     name: string;
     requires_prescription?: boolean;
 };
 
-/**
- * Body of POST /api/pharmacy-items.
- */
 export type CreatePharmacyItemRequest = {
     name: string;
     category_id: string;
@@ -790,32 +453,17 @@ export type CreatePharmacyItemRequest = {
     batch_number?: string | null;
     expiry_date?: string | null;
     unit: string;
-    /**
-     * Opening stock. Every later change is a transaction, never a direct edit.
-     */
     quantity_on_hand?: number;
     reorder_threshold?: number;
     unit_price?: number | null;
 };
 
-/**
- * Body of POST /api/pharmacy-items/{id}/transactions.
- */
 export type CreatePharmacyTransactionRequest = {
     type: PharmacyTransactionType;
-    /**
-     * Always positive. Type decides whether stock goes up or down.
-     */
     quantity: number;
-    /**
-     * Mandatory for an adjustment. A stocktake correction nobody explained is unauditable.
-     */
     note?: string | null;
 };
 
-/**
- * Body of POST /api/wards.
- */
 export type CreateWardRequest = {
     name: string;
     ward_type: WardType;
@@ -823,53 +471,26 @@ export type CreateWardRequest = {
     is_active?: boolean;
 };
 
-/**
- * Who the caller is. Returned by GET /api/auth/me and embedded in every sign-in response.
- */
 export type CurrentPrincipal = {
-    /**
-     * A StaffMember.Id or a PatientAccount.Id, per PrincipalType.
-     */
     id: string;
     principal_type: PrincipalType;
     role: PrincipalRole;
     display_name: string;
-    /**
-     * Staff only. Null for a patient account.
-     */
     email?: string | null;
-    /**
-     * Patient accounts only. Null for staff.
-     */
     phone_number?: string | null;
-    /**
-     * The linked medical record, if staff have linked one. Null is the ordinary state, not an error — null for every staff member, and for a patient never treated here.
-     */
     patient_id?: string | null;
 };
 
-/**
- * The discharge record for one admission - its checklist, and who signed it off.
- */
 export type Discharge = {
     id: string;
     admission_id: string;
     flagged_by: AssignedBy;
     flagged_at: string;
-    /**
-     * Keyed by the item name - `clinical_clearance`, `billing_settled` and so on.
-     */
     checklist: {
         [key: string]: ChecklistItem;
     };
-    /**
-     * What the candidate list is a query for, and what confirming a discharge needs.
-     */
     all_mandatory_ticked: boolean;
     confirmed_by_staff_id?: string | null;
-    /**
-     * Their name, for a screen. Sent beside the id, never instead of it.
-     */
     confirmed_by_staff_name?: string | null;
     confirmed_at?: string | null;
     summary_note?: string | null;
@@ -877,53 +498,41 @@ export type Discharge = {
     updated_at: string;
 };
 
-/**
- * A patient who could go home. Produced by a plain rule - every mandatory box ticked - and not
- * by the agent: checking whether three boxes are ticked is a WHERE clause.
- */
 export type DischargeCandidate = {
     admission_id: string;
     patient: PatientSummary;
-    /**
-     * Empty when the patient holds no bed.
-     */
     ward_name: string;
     bed_number: string;
     admission_category: AdmissionCategory;
     admitted_at?: string | null;
     days_in_bed: number;
-    /**
-     * Empty for a true candidate. Populated rows are shown as "nearly ready".
-     */
     outstanding_items: Array<string>;
-    /**
-     * True when this patient has already gone home. Only ever set on rows returned because
-     * `includeDischarged` was asked for.
-     */
     is_discharged: boolean;
-    /**
-     * When they actually left. Null while they are still in the building.
-     */
     discharged_at?: string | null;
 };
 
-/**
- * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
- */
 export type DischargeCandidatePagedResult = {
     items: Array<DischargeCandidate>;
     page: number;
     page_size: number;
     total_items: number;
-    /**
-     * Always at least 1, so an empty list does not render as "page 1 of 0".
-     */
     total_pages: number;
 };
 
-/**
- * One of the equipment categories. A table, not an enum, so a sixth can be added without a migration.
- */
+export type DispatchStatus = 'assigned' | 'en_route' | 'completed' | 'cancelled' | 'reassigned';
+
+export type DispatchSummary = {
+    id?: string;
+    emergency_call_id?: string;
+    ambulance_registration?: string | null;
+    call_priority?: CallPriority;
+    status?: DispatchStatus;
+    destination_ward_name?: string | null;
+    crew_count?: number;
+    dispatched_at?: string;
+    completed_at?: string | null;
+};
+
 export type EquipmentCategory = {
     id: string;
     name: string;
@@ -931,9 +540,6 @@ export type EquipmentCategory = {
     updated_at: string;
 };
 
-/**
- * A full equipment item. Extends the list row with the fields a detail view needs.
- */
 export type EquipmentItem = {
     id: string;
     name: string;
@@ -942,29 +548,17 @@ export type EquipmentItem = {
     model: string;
     manufacturer: string;
     asset_tag: string;
-    /**
-     * Null means the central store rather than a ward.
-     */
     ward_id?: string | null;
-    /**
-     * Read from Patient Management. Null when the item is in the central store.
-     */
     ward_name?: string | null;
     status: EquipmentStatus;
     next_maintenance_due?: string | null;
     purchase_date: string;
     serial_number?: string | null;
-    /**
-     * Set while the status is assigned. Patient Management's admission, id only.
-     */
     assigned_to_admission_id?: string | null;
     created_at: string;
     updated_at: string;
 };
 
-/**
- * An equipment item with everything servicing and monitoring know about it.
- */
 export type EquipmentItemDetail = {
     id: string;
     name: string;
@@ -973,34 +567,19 @@ export type EquipmentItemDetail = {
     model: string;
     manufacturer: string;
     asset_tag: string;
-    /**
-     * Null means the central store rather than a ward.
-     */
     ward_id?: string | null;
-    /**
-     * Read from Patient Management. Null when the item is in the central store.
-     */
     ward_name?: string | null;
     status: EquipmentStatus;
     next_maintenance_due?: string | null;
     purchase_date: string;
     serial_number?: string | null;
-    /**
-     * Set while the status is assigned. Patient Management's admission, id only.
-     */
     assigned_to_admission_id?: string | null;
     created_at: string;
     updated_at: string;
     maintenance_history: Array<MaintenanceSchedule>;
-    /**
-     * Only warnings still open. Acknowledged and dismissed ones are history, not a to-do list.
-     */
     open_warnings: Array<Warning>;
 };
 
-/**
- * An equipment item as a list row.
- */
 export type EquipmentItemSummary = {
     id: string;
     name: string;
@@ -1009,45 +588,24 @@ export type EquipmentItemSummary = {
     model: string;
     manufacturer: string;
     asset_tag: string;
-    /**
-     * Null means the central store rather than a ward.
-     */
     ward_id?: string | null;
-    /**
-     * Read from Patient Management. Null when the item is in the central store.
-     */
     ward_name?: string | null;
     status: EquipmentStatus;
     next_maintenance_due?: string | null;
 };
 
-/**
- * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
- */
 export type EquipmentItemSummaryPagedResult = {
     items: Array<EquipmentItemSummary>;
     page: number;
     page_size: number;
     total_items: number;
-    /**
-     * Always at least 1, so an empty list does not render as "page 1 of 0".
-     */
     total_pages: number;
 };
 
 export type EquipmentStatus = 'available' | 'assigned' | 'maintenance' | 'retired';
 
-/**
- * One cell of the grid.
- */
 export type ExpenseRate = {
-    /**
-     * Stable key — `bed_day`, `food`, `therapy`. What the client matches on.
-     */
     expense_key: string;
-    /**
-     * Rupees. Zero means there is no suggested price, not that it is free.
-     */
     amount: number;
 };
 
@@ -1055,116 +613,58 @@ export type Gender = 'male' | 'female' | 'other' | 'unknown';
 
 export type GenderPolicy = 'male' | 'female' | 'mixed';
 
-/**
- * What GET /api/health reports.
- */
 export type HealthStatus = {
-    /**
-     * `healthy` or `degraded`.
-     */
     status?: string | null;
-    /**
-     * `up` or `down`.
-     */
     database?: string | null;
     version?: string | null;
     checked_at?: string;
 };
 
-/**
- * One patient the laboratory can file a result against, as the lab needs to see them: by where
- * they are, not by an identifier somebody has to type.
- */
 export type LabPatient = {
     patient_id: string;
     patient_code: string;
     full_name: string;
-    /**
-     * Null for a visit holding no bed - an outpatient in for a blood test is still a patient the lab files against.
-     */
     ward_name?: string | null;
     bed_number?: string | null;
     admission_status: AdmissionStatus;
 };
 
-/**
- * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
- */
 export type LabPatientPagedResult = {
     items: Array<LabPatient>;
     page: number;
     page_size: number;
     total_items: number;
-    /**
-     * Always at least 1, so an empty list does not render as "page 1 of 0".
-     */
     total_pages: number;
 };
 
-/**
- * One finished laboratory result. Metadata only: the file itself is a separate request, so a list of thirty reports does not carry thirty PDFs.
- */
 export type LabReport = {
     id: string;
-    /**
-     * Patient Management owns the patient; this is the id and nothing more.
-     */
     patient_id: string;
     test_name: string;
     summary?: string | null;
     file_name: string;
     content_type: string;
-    /**
-     * So a ward sees how big it is before opening it on ward wifi.
-     */
     byte_size: number;
-    /**
-     * Staff Management owns the person; this is the id and nothing more.
-     */
     uploaded_by_staff_id: string;
-    /**
-     * When the lab filed it. A report is never edited, so there is no updated_at.
-     */
     created_at: string;
 };
 
-/**
- * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
- */
 export type LabReportPagedResult = {
     items: Array<LabReport>;
     page: number;
     page_size: number;
     total_items: number;
-    /**
-     * Always at least 1, so an empty list does not render as "page 1 of 0".
-     */
     total_pages: number;
 };
 
-/**
- * Body of POST /api/patients/{id}/link-account. A patient RECORD and a patient ACCOUNT are
- * different things; this attaches an optional login to a record staff already created.
- */
 export type LinkPatientAccountRequest = {
-    /**
-     * A PatientAccount.Id. Staff link it deliberately, after checking identity — never inferred
-     * from a matching phone number, because two people share a phone far more often than a
-     * hospital would like.
-     */
     user_account_id: string;
 };
 
-/**
- * One servicing event against an equipment item or a bed.
- */
 export type MaintenanceSchedule = {
     id: string;
     asset_type: AssetType;
     asset_id: string;
-    /**
-     * Human-readable, so a task list does not read as a column of GUIDs. Built from whichever asset the row points at.
-     */
     asset_label: string;
     schedule_type: MaintenanceType;
     scheduled_date: string;
@@ -1177,17 +677,11 @@ export type MaintenanceSchedule = {
     updated_at: string;
 };
 
-/**
- * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
- */
 export type MaintenanceSchedulePagedResult = {
     items: Array<MaintenanceSchedule>;
     page: number;
     page_size: number;
     total_items: number;
-    /**
-     * Always at least 1, so an empty list does not render as "page 1 of 0".
-     */
     total_pages: number;
 };
 
@@ -1195,9 +689,59 @@ export type MaintenanceStatus = 'scheduled' | 'in_progress' | 'completed' | 'ove
 
 export type MaintenanceType = 'routine_service' | 'calibration' | 'repair';
 
-/**
- * One row on reception's worklist: a visit whose money has not been taken yet.
- */
+export type MyAdmission = {
+    admission_id: string;
+    status: AdmissionStatus;
+    status_text: string;
+    ward_name?: string | null;
+    bed_number?: string | null;
+    admitted_at?: string | null;
+    expected_arrival?: string | null;
+    discharged_at?: string | null;
+    discharge_instructions?: string | null;
+    details_complete: boolean;
+    missing_fields: Array<string>;
+};
+
+export type MyAdmissionPagedResult = {
+    items: Array<MyAdmission>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
+export type MyAppointment = {
+    appointment_id: string;
+    scheduled_at: string;
+    status: AppointmentStatus;
+    status_text: string;
+    reason?: string | null;
+    can_cancel: boolean;
+};
+
+export type MyAppointmentPagedResult = {
+    items: Array<MyAppointment>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
+export type MyProfile = {
+    patient_code: string;
+    full_name: string;
+    nic?: string | null;
+    gender: Gender;
+    date_of_birth?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    emergency_contact_name?: string | null;
+    emergency_contact_phone?: string | null;
+    details_complete: boolean;
+    missing_fields: Array<string>;
+};
+
 export type OutstandingBill = {
     admission_id: string;
     patient: PatientSummary;
@@ -1206,57 +750,26 @@ export type OutstandingBill = {
     ward_name: string;
     bed_number: string;
     admitted_at?: string | null;
-    /**
-     * Null when nobody has prepared a bill for this visit yet.
-     */
     bill_number?: string | null;
-    /**
-     * Always false on the default list, and the reason `includeSettled` exists: a patient
-     * who asks for their bill again at the counter has already paid.
-     */
     settled: boolean;
     settled_at?: string | null;
-    /**
-     * What the bill comes to as it stands - the prepared total, or what preparing it now would
-     * produce. Advisory: the bill screen is what actually writes the lines.
-     */
     estimated_total: number;
     currency: string;
 };
 
-/**
- * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
- */
 export type OutstandingBillPagedResult = {
     items: Array<OutstandingBill>;
     page: number;
     page_size: number;
     total_items: number;
-    /**
-     * Always at least 1, so an empty list does not render as "page 1 of 0".
-     */
     total_pages: number;
 };
 
-/**
- * A patient record as the API publishes it. The spec builds this from PatientSummary + AuditFields, so this inherits rather than repeating the identity fields.
- */
 export type Patient = {
     id: string;
-    /**
-     * The short handle staff use out loud and type into a form: `P7K2X9QM`. Eight
-     * characters, generated once at registration and never changed. Other components identify
-     * a patient by this; `id` stays the key every stored reference uses.
-     */
     patient_code: string;
     full_name: string;
-    /**
-     * Null for an unidentified arrival; that row carries a TempReference instead.
-     */
     nic?: string | null;
-    /**
-     * Present only for a patient registered with no NIC and no phone, e.g. UNKNOWN-2026-0142.
-     */
     temp_reference?: string | null;
     gender: Gender;
     date_of_birth?: string | null;
@@ -1264,35 +777,16 @@ export type Patient = {
     address?: string | null;
     emergency_contact_name?: string | null;
     emergency_contact_phone?: string | null;
-    /**
-     * Whether an optional patient login is linked. Most records never have one — a walk-in is
-     * a medical record, not a user. The account id itself is not published: it belongs to
-     * common auth, and no screen in this component has a use for it.
-     */
     has_account: boolean;
     created_at?: string;
     updated_at?: string;
 };
 
-/**
- * One patient with every visit they have ever had. One patient, many admissions — never a second row for a returning person.
- */
 export type PatientDetail = {
     id: string;
-    /**
-     * The short handle staff use out loud and type into a form: `P7K2X9QM`. Eight
-     * characters, generated once at registration and never changed. Other components identify
-     * a patient by this; `id` stays the key every stored reference uses.
-     */
     patient_code: string;
     full_name: string;
-    /**
-     * Null for an unidentified arrival; that row carries a TempReference instead.
-     */
     nic?: string | null;
-    /**
-     * Present only for a patient registered with no NIC and no phone, e.g. UNKNOWN-2026-0142.
-     */
     temp_reference?: string | null;
     gender: Gender;
     date_of_birth?: string | null;
@@ -1300,201 +794,117 @@ export type PatientDetail = {
     address?: string | null;
     emergency_contact_name?: string | null;
     emergency_contact_phone?: string | null;
-    /**
-     * Whether an optional patient login is linked. Most records never have one — a walk-in is
-     * a medical record, not a user. The account id itself is not published: it belongs to
-     * common auth, and no screen in this component has a use for it.
-     */
     has_account: boolean;
     created_at?: string;
     updated_at?: string;
-    /**
-     * Every visit, newest first. Empty for someone registered but not yet admitted — an empty list, never absent.
-     */
     admissions: Array<AdmissionSummary>;
 };
 
-/**
- * Body of POST /api/auth/patient/login.
- */
 export type PatientLoginRequest = {
-    /**
-     * The login identifier for a patient account, e.g. `+94771234567`.
-     */
     phone_number: string;
     password: string;
 };
 
-/**
- * Body of POST /api/patients/lookup.
- */
 export type PatientLookupRequest = {
     nic: string;
 };
 
-/**
- * The answer to "have we seen this NIC before?". A miss is a 200 with found = false, not a
- * 404 — not finding someone is the normal outcome at a registration desk, not an error.
- */
 export type PatientLookupResult = {
     found: boolean;
     patient?: PatientSummary;
-    /**
-     * True when this patient is already in the hospital. Registering a second concurrent
-     * admission is almost always a mistake, so the desk is told before it happens rather than
-     * blocked afterwards.
-     */
     has_open_admission: boolean;
 };
 
-/**
- * Body of POST /api/auth/patient/register. Creates a login, not a medical record — there is deliberately no clinical field here.
- */
 export type PatientRegisterRequest = {
     phone_number: string;
     password: string;
     full_name: string;
 };
 
-/**
- * What GET /api/patients sorts on. Two fields, because those are the two the spec publishes.
- */
 export type PatientSortField = 'full_name' | 'created_at';
 
-/**
- * The short view of a patient — enough to identify one row in a list or a lookup result,
- * and nothing more. Contact details and the account link are on CareLanka.Api.DTOs.Patient.Patient.
- */
 export type PatientSummary = {
     id: string;
-    /**
-     * The short handle staff use out loud and type into a form: `P7K2X9QM`. Eight
-     * characters, generated once at registration and never changed. Other components identify
-     * a patient by this; `id` stays the key every stored reference uses.
-     */
     patient_code: string;
     full_name: string;
-    /**
-     * Null for an unidentified arrival; that row carries a TempReference instead.
-     */
     nic?: string | null;
-    /**
-     * Present only for a patient registered with no NIC and no phone, e.g. UNKNOWN-2026-0142.
-     */
     temp_reference?: string | null;
     gender: Gender;
     date_of_birth?: string | null;
 };
 
-/**
- * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
- */
 export type PatientSummaryPagedResult = {
     items: Array<PatientSummary>;
     page: number;
     page_size: number;
     total_items: number;
-    /**
-     * Always at least 1, so an empty list does not render as "page 1 of 0".
-     */
     total_pages: number;
 };
 
-/**
- * One of the pharmacy categories. Seeded with the five from the component plan.
- */
 export type PharmacyCategory = {
     id: string;
     name: string;
-    /**
-     * Whether dispensing anything in this category needs a doctor's prescription. Recorded here; the clinical decision is not ours.
-     */
     requires_prescription: boolean;
     created_at: string;
     updated_at: string;
 };
 
-/**
- * A catalog entry and how much of it is on the shelf.
- */
 export type PharmacyItem = {
     id: string;
     name: string;
     category_id: string;
     category_name: string;
     manufacturer?: string | null;
-    /**
-     * Medicines are tracked by batch, which is also how a recall is issued.
-     */
     batch_number?: string | null;
-    /**
-     * Null for things that do not expire. Drives the medicine_expiring warning.
-     */
     expiry_date?: string | null;
     unit: string;
     quantity_on_hand: number;
     reorder_threshold: number;
     unit_price?: number | null;
-    /**
-     * Computed as quantity_on_hand > 0, never stored, so it cannot drift out of step with the quantity.
-     */
     is_available: boolean;
-    /**
-     * Computed the same way. What the low-stock sweep keys off.
-     */
     below_threshold: boolean;
     created_at: string;
     updated_at: string;
 };
 
-/**
- * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
- */
 export type PharmacyItemPagedResult = {
     items: Array<PharmacyItem>;
     page: number;
     page_size: number;
     total_items: number;
-    /**
-     * Always at least 1, so an empty list does not render as "page 1 of 0".
-     */
     total_pages: number;
 };
 
-/**
- * One movement of stock. Immutable once written, which is why there is no updated_at.
- */
 export type PharmacyTransaction = {
     id: string;
     pharmacy_item_id: string;
     type: PharmacyTransactionType;
-    /**
-     * Always positive. The type is what gives it a sign.
-     */
     quantity: number;
-    /**
-     * Staff Management owns the person; this is the id and nothing more.
-     */
     performed_by_staff_id: string;
     note?: string | null;
     created_at: string;
 };
 
-/**
- * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
- */
 export type PharmacyTransactionPagedResult = {
     items: Array<PharmacyTransaction>;
     page: number;
     page_size: number;
     total_items: number;
-    /**
-     * Always at least 1, so an empty list does not render as "page 1 of 0".
-     */
     total_pages: number;
 };
 
 export type PharmacyTransactionType = 'received' | 'dispensed' | 'adjusted' | 'expired_removed';
+
+export type PreRegisterRequest = {
+    nic: string;
+    full_name: string;
+    gender: Gender;
+    date_of_birth?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    emergency_contact_name?: string | null;
+    emergency_contact_phone?: string | null;
+};
 
 export type PrincipalRole = 'ward_nurse' | 'doctor' | 'ambulance_crew' | 'general_staff' | 'duty_manager' | 'hospital_administrator' | 'equipment_manager' | 'patient';
 
@@ -1511,9 +921,6 @@ export type ProblemDetails = {
 
 export type RaisedBy = 'agent' | 'user';
 
-/**
- * Body of POST /api/auth/refresh and POST /api/auth/logout.
- */
 export type RefreshTokenRequest = {
     refresh_token: string;
 };
@@ -1522,63 +929,43 @@ export type RelatedEntityType = 'pharmacy_item' | 'equipment_item' | 'bed';
 
 export type ReleaseReason = 'discharged' | 'hold_expired' | 'cancelled' | 'transferred' | 'rejected' | 'corrected';
 
-/**
- * Body of POST /api/equipment-items/{id}/report-fault.
- */
 export type ReportFaultRequest = {
     description: string;
 };
 
-/**
- * Taking the money.
- */
+export type RetireAmbulanceRequest = {
+    reason: string;
+};
+
 export type SettleBillRequest = {
-    /**
-     * How it was paid, in whatever words reception uses - "cash", "card ending 4417",
-     * "insurance, claim 88231". Free text on purpose: a payment-method enum is the first step
-     * of a payments system, and this component is not building one.
-     */
     settlement_note?: string | null;
 };
 
-/**
- * Ascending or descending. The group-owned SortDir parameter in all five specs, so the name is
- * not this component's to change — it moves to DTOs/Common the moment a second component pages.
- */
 export type SortDirection = 'asc' | 'desc';
 
-/**
- * Body of POST /api/auth/login.
- */
 export type StaffLoginRequest = {
     email: string;
     password: string;
 };
 
-/**
- * Body of PATCH /api/beds/{id}. Every field is optional; an absent field is left alone.
- */
+export type UpdateAmbulanceRequest = {
+    status?: AmbulanceStatus;
+    registration_number?: string | null;
+    out_of_service_reason?: string | null;
+};
+
 export type UpdateBedRequest = {
     has_isolation?: boolean | null;
-    /**
-     * 1 is closest to the nurse station.
-     */
     nurse_station_distance?: number | null;
     condition?: BedCondition;
     asset_tag?: string | null;
 };
 
-/**
- * Body of PUT /api/billing/rates. Only the cells that changed need to be sent.
- */
 export type UpdateBillingRatesRequest = {
     expenses?: Array<WardExpenseRateUpdate> | null;
     admission_fees?: Array<AdmissionFeeUpdate> | null;
 };
 
-/**
- * Body of PUT /api/equipment-items/{id}. Every field is optional; an absent field is left alone.
- */
 export type UpdateEquipmentItemRequest = {
     name?: string | null;
     model?: string | null;
@@ -1588,23 +975,13 @@ export type UpdateEquipmentItemRequest = {
     next_maintenance_due?: string | null;
 };
 
-/**
- * Body of PUT /api/patients/{id}. The spec defines this as CreatePatientRequest with nothing
- * added, so it inherits rather than repeating eight properties that would then drift apart.
- */
 export type UpdatePatientRequest = {
     full_name: string;
-    /**
-     * Omit for an unidentified arrival; the server then generates a temp_reference.
-     */
     nic?: string | null;
     gender: Gender;
     date_of_birth?: string | null;
     phone?: string | null;
     address?: string | null;
-    /**
-     * The name of the person to ring, not the relationship and not the number.
-     */
     emergency_contact_name?: string | null;
     emergency_contact_phone?: string | null;
 };
@@ -1621,50 +998,27 @@ export type ValidationProblemDetails = {
     [key: string]: unknown;
 };
 
-/**
- * A ward as the API publishes it. Every member is always present, so the generated clients type none of them as nullable.
- */
 export type Ward = {
     id: string;
     name: string;
     ward_type: WardType;
     gender_policy: GenderPolicy;
     is_active: boolean;
-    /**
-     * Counted from the bed register, never stored. Two sources of truth would drift.
-     */
     total_beds: number;
     created_at?: string;
     updated_at?: string;
 };
 
-/**
- * One ward's line in the capacity summary. Gender policy is on it because a male-only ward
- * with two free beds is no use to a female patient, and the caller has to be able to see that.
- */
 export type WardCapacity = {
     ward_id: string;
     name: string;
     ward_type: WardType;
     gender_policy: GenderPolicy;
     total_beds: number;
-    /**
-     * Usable, unoccupied, and not under a live hold. A hold past its expiry counts as free.
-     * That expiry rule lives here, in the owning service, so no other component
-     * re-implements it differently.
-     */
     free_beds: number;
 };
 
-/**
- * Free bed counts across every ward. Read by Emergency Service (Member 1) to choose a
- * destination — counts only, no patient data.
- */
 export type WardCapacitySummary = {
-    /**
-     * When this was counted. On the wire because free beds go stale in seconds: a dispatcher
-     * acting on a number needs to know how old it is.
-     */
     generated_at: string;
     wards: Array<WardCapacity>;
 };
@@ -1672,54 +1026,23 @@ export type WardCapacitySummary = {
 export type WardExpenseRateUpdate = {
     ward_type: WardType;
     expense_key: string;
-    /**
-     * A negative price is not a discount, it is a typo that pays the patient.
-     */
     amount: number;
 };
 
-/**
- * How full one ward is and what kind of care the people in it need. Read by Staff
- * Management (Member 2) to work out staffing demand — counts only, no patient identities.
- */
 export type WardOccupancy = {
     ward_id: string;
     name: string;
     ward_type: WardType;
-    /**
-     * Every bed standing in the ward today, counted from Equipment's register.
-     */
     total_beds: number;
-    /**
-     * Beds with a patient actually in them.
-     */
     occupied_beds: number;
-    /**
-     * Beds under a hold that has not lapsed. A hold past its expiry is not counted here.
-     */
     reserved_beds: number;
-    /**
-     * Beds Equipment has withdrawn for repair or servicing.
-     */
     out_of_service_beds: number;
-    /**
-     * The care mix, keyed by the wire value of AdmissionCategory. Fifteen routine inpatients
-     * and two high-dependency patients need very different staffing, even though both are
-     * "seventeen patients".
-     */
     patients_by_category: {
         [key: string]: number;
     };
-    /**
-     * People holding a bed here who have not walked in yet, so Staff can staff ahead of a
-     * rush instead of reacting to one.
-     */
     incoming_next_2h: number;
 };
 
-/**
- * Every expense priced for one kind of ward.
- */
 export type WardRates = {
     ward_type: WardType;
     expenses: Array<ExpenseRate>;
@@ -1727,9 +1050,6 @@ export type WardRates = {
 
 export type WardType = 'icu' | 'hdu' | 'general' | 'maternity' | 'pediatric' | 'isolation' | 'surgical' | 'emergency' | 'mental_health';
 
-/**
- * A problem the threshold sweep found, or a fault a person reported.
- */
 export type Warning = {
     id: string;
     type: WarningType;
@@ -1756,52 +1076,26 @@ export type WarningType = 'low_stock' | 'medicine_expiring' | 'maintenance_overd
 
 export type WorklistKind = 'booking' | 'visit';
 
-/**
- * One line of the ward board: one patient, and what is happening with them right now.
- */
 export type WorklistRow = {
-    /**
-     * The appointment id or the admission id, depending on `kind`.
-     */
     id: string;
     kind: WorklistKind;
     patient: PatientSummary;
     status: WorklistStatus;
-    /**
-     * Whether this visit needs a bed at all. False for an outpatient scan or blood test, and
-     * false for a booking, because nobody has chosen a care level for it yet.
-     */
     requires_bed: boolean;
     source?: AdmissionSource;
     admission_category?: AdmissionCategory;
     urgency?: AdmissionUrgency;
-    /**
-     * Where they are, from the live bed assignment. Null when no bed is held.
-     */
     ward_name?: string | null;
     bed_number?: string | null;
-    /**
-     * The one time that matters for this row: when a booking is due, or when a visit started.
-     */
     when: string;
-    /**
-     * Why they are coming, as the desk or the patient typed it - "Scan", "Blood test". Null on
-     * a visit: the reason is not carried onto the admission.
-     */
     reason?: string | null;
 };
 
-/**
- * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
- */
 export type WorklistRowPagedResult = {
     items: Array<WorklistRow>;
     page: number;
     page_size: number;
     total_items: number;
-    /**
-     * Always at least 1, so an empty list does not render as "page 1 of 0".
-     */
     total_pages: number;
 };
 
@@ -2335,6 +1629,246 @@ export type ListPatientWorklistResponses = {
 };
 
 export type ListPatientWorklistResponse = ListPatientWorklistResponses[keyof ListPatientWorklistResponses];
+
+export type ListAmbulancesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: AmbulanceStatus;
+        search?: string;
+        nearToLatitude?: number;
+        nearToLongitude?: number;
+        includeRetired?: boolean;
+        page?: number;
+        pageSize?: number;
+        sortBy?: AmbulanceSortField;
+        sortDir?: string;
+    };
+    url: '/ambulances';
+};
+
+export type ListAmbulancesErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListAmbulancesError = ListAmbulancesErrors[keyof ListAmbulancesErrors];
+
+export type ListAmbulancesResponses = {
+    /**
+     * OK
+     */
+    200: AmbulanceSummaryPagedResult;
+};
+
+export type ListAmbulancesResponse = ListAmbulancesResponses[keyof ListAmbulancesResponses];
+
+export type CreateAmbulanceData = {
+    body?: CreateAmbulanceRequest;
+    path?: never;
+    query?: never;
+    url: '/ambulances';
+};
+
+export type CreateAmbulanceErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CreateAmbulanceError = CreateAmbulanceErrors[keyof CreateAmbulanceErrors];
+
+export type CreateAmbulanceResponses = {
+    /**
+     * Created
+     */
+    201: Ambulance;
+};
+
+export type CreateAmbulanceResponse = CreateAmbulanceResponses[keyof CreateAmbulanceResponses];
+
+export type GetAmbulanceData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/ambulances/{id}';
+};
+
+export type GetAmbulanceErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetAmbulanceError = GetAmbulanceErrors[keyof GetAmbulanceErrors];
+
+export type GetAmbulanceResponses = {
+    /**
+     * OK
+     */
+    200: AmbulanceDetail;
+};
+
+export type GetAmbulanceResponse = GetAmbulanceResponses[keyof GetAmbulanceResponses];
+
+export type UpdateAmbulanceData = {
+    body?: UpdateAmbulanceRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/ambulances/{id}';
+};
+
+export type UpdateAmbulanceErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type UpdateAmbulanceError = UpdateAmbulanceErrors[keyof UpdateAmbulanceErrors];
+
+export type UpdateAmbulanceResponses = {
+    /**
+     * OK
+     */
+    200: Ambulance;
+};
+
+export type UpdateAmbulanceResponse = UpdateAmbulanceResponses[keyof UpdateAmbulanceResponses];
+
+export type RetireAmbulanceData = {
+    body?: RetireAmbulanceRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/ambulances/{id}/retire';
+};
+
+export type RetireAmbulanceErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RetireAmbulanceError = RetireAmbulanceErrors[keyof RetireAmbulanceErrors];
+
+export type RetireAmbulanceResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type RetireAmbulanceResponse = RetireAmbulanceResponses[keyof RetireAmbulanceResponses];
+
+export type ReinstateAmbulanceData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/ambulances/{id}/reinstate';
+};
+
+export type ReinstateAmbulanceErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ReinstateAmbulanceError = ReinstateAmbulanceErrors[keyof ReinstateAmbulanceErrors];
+
+export type ReinstateAmbulanceResponses = {
+    /**
+     * OK
+     */
+    200: Ambulance;
+};
+
+export type ReinstateAmbulanceResponse = ReinstateAmbulanceResponses[keyof ReinstateAmbulanceResponses];
 
 export type LoginData = {
     body?: StaffLoginRequest;
@@ -3555,21 +3089,9 @@ export type ListLabReportsResponse = ListLabReportsResponses[keyof ListLabReport
 
 export type UploadLabReportData = {
     body?: {
-        /**
-         * Which patient the result belongs to. Looked up by code, name or NIC on the lab's screen.
-         */
         PatientId: string;
-        /**
-         * What was tested, in the lab's own words.
-         */
         TestName: string;
-        /**
-         * The lab's short summary, if they wrote one. Never a substitute for the file.
-         */
         Summary?: string;
-        /**
-         * The report. A PDF or a photograph of one, at most 10 MB.
-         */
         File: Blob | File;
     };
     path?: never;
@@ -3801,6 +3323,257 @@ export type CompleteMaintenanceScheduleResponses = {
 };
 
 export type CompleteMaintenanceScheduleResponse = CompleteMaintenanceScheduleResponses[keyof CompleteMaintenanceScheduleResponses];
+
+export type PreRegisterSelfData = {
+    body?: PreRegisterRequest;
+    path?: never;
+    query?: never;
+    url: '/me/pre-register';
+};
+
+export type PreRegisterSelfErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type PreRegisterSelfError = PreRegisterSelfErrors[keyof PreRegisterSelfErrors];
+
+export type PreRegisterSelfResponses = {
+    /**
+     * OK
+     */
+    200: MyProfile;
+};
+
+export type PreRegisterSelfResponse = PreRegisterSelfResponses[keyof PreRegisterSelfResponses];
+
+export type GetMyProfileData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/me/profile';
+};
+
+export type GetMyProfileErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetMyProfileError = GetMyProfileErrors[keyof GetMyProfileErrors];
+
+export type GetMyProfileResponses = {
+    /**
+     * OK
+     */
+    200: MyProfile;
+};
+
+export type GetMyProfileResponse = GetMyProfileResponses[keyof GetMyProfileResponses];
+
+export type GetMyAdmissionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/me/admission';
+};
+
+export type GetMyAdmissionErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetMyAdmissionError = GetMyAdmissionErrors[keyof GetMyAdmissionErrors];
+
+export type GetMyAdmissionResponses = {
+    /**
+     * OK
+     */
+    200: MyAdmission;
+};
+
+export type GetMyAdmissionResponse = GetMyAdmissionResponses[keyof GetMyAdmissionResponses];
+
+export type GetMyHistoryData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/me/history';
+};
+
+export type GetMyHistoryErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type GetMyHistoryError = GetMyHistoryErrors[keyof GetMyHistoryErrors];
+
+export type GetMyHistoryResponses = {
+    /**
+     * OK
+     */
+    200: MyAdmissionPagedResult;
+};
+
+export type GetMyHistoryResponse = GetMyHistoryResponses[keyof GetMyHistoryResponses];
+
+export type ListMyAppointmentsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/me/appointments';
+};
+
+export type ListMyAppointmentsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListMyAppointmentsError = ListMyAppointmentsErrors[keyof ListMyAppointmentsErrors];
+
+export type ListMyAppointmentsResponses = {
+    /**
+     * OK
+     */
+    200: MyAppointmentPagedResult;
+};
+
+export type ListMyAppointmentsResponse = ListMyAppointmentsResponses[keyof ListMyAppointmentsResponses];
+
+export type BookMyAppointmentData = {
+    body?: BookAppointmentRequest;
+    path?: never;
+    query?: never;
+    url: '/me/appointments';
+};
+
+export type BookMyAppointmentErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type BookMyAppointmentError = BookMyAppointmentErrors[keyof BookMyAppointmentErrors];
+
+export type BookMyAppointmentResponses = {
+    /**
+     * Created
+     */
+    201: MyAppointment;
+};
+
+export type BookMyAppointmentResponse = BookMyAppointmentResponses[keyof BookMyAppointmentResponses];
+
+export type CancelMyAppointmentData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/appointments/{id}/cancel';
+};
+
+export type CancelMyAppointmentErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CancelMyAppointmentError = CancelMyAppointmentErrors[keyof CancelMyAppointmentErrors];
+
+export type CancelMyAppointmentResponses = {
+    /**
+     * OK
+     */
+    200: MyAppointment;
+};
+
+export type CancelMyAppointmentResponse = CancelMyAppointmentResponses[keyof CancelMyAppointmentResponses];
 
 export type ListPatientsData = {
     body?: never;

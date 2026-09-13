@@ -1,6 +1,6 @@
 # Build Track 2 — Staff Management
 
-**Owner: Nasrullah (Member 2)** · **Index:** `docs/BUILD_PLAN.md`
+**Owner: Kaveesha (Member 2)** · **Index:** `docs/BUILD_PLAN.md`
 
 **Owns:** `Skill`, `StaffMemberSkill`, `Shift`, `Allocation`, `LeaveRequest`, `WardStaffingRule`
 **Contract:** `specs/staff-spec.yaml` (32 paths) · **Design:** no plan document yet — see below

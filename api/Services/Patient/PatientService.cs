@@ -16,15 +16,12 @@ namespace CareLanka.Api.Services.Patient;
 
 public sealed class PatientService : IPatientService
 {
-    // A visit that has not ended. Anything else means the person is not in the hospital now.
     private static readonly AdmissionStatus[] ClosedStatuses =
     [
         AdmissionStatus.Discharged,
         AdmissionStatus.Cancelled
     ];
 
-    // How many times a save is retried when a generated value — a temp reference or a patient
-    // code — turns out to be somebody else's already.
     private const int SaveAttempts = 5;
 
     private readonly CareLankaDbContext _db;
@@ -45,8 +42,6 @@ public sealed class PatientService : IPatientService
         {
             var pattern = $"%{search.Trim()}%";
 
-            // ILIKE, not ToLower().Contains(): case-insensitive in Postgres without disabling
-            // any index, and a nurse typing "silva" finds "De Silva".
             query = query.Where(p =>
                 EF.Functions.ILike(p.FullName, pattern)
                 || EF.Functions.ILike(p.PatientCode, pattern)
@@ -65,9 +60,6 @@ public sealed class PatientService : IPatientService
             _ => query.OrderByDescending(p => p.CreatedAt)
         };
 
-        // Id as the tiebreaker: two patients registered in the same millisecond otherwise land
-        // in an arbitrary order that can differ between page 1 and page 2, so a row is shown
-        // twice and another never at all.
         var patients = await sorted
             .ThenBy(p => p.Id)
             .Skip((page - 1) * pageSize)
@@ -103,8 +95,6 @@ public sealed class PatientService : IPatientService
         var nic = Clean(request.Nic);
         var phone = Clean(request.Phone);
 
-        // Read first so the ordinary duplicate gets a message naming the existing record. The
-        // index below is still the guarantee — this read only makes the common case helpful.
         if (nic is not null)
         {
             var existingId = await _db.Patients
@@ -122,15 +112,10 @@ public sealed class PatientService : IPatientService
         {
             Id = Guid.NewGuid(),
 
-            // A candidate, not a guarantee. The unique index decides, and SaveWithIdentifierAsync
-            // draws another one if this one is already somebody's.
             PatientCode = PatientCodes.Next(),
             FullName = request.FullName.Trim(),
             Nic = nic,
 
-            // Not null: [ApiController] has already returned a 400 for a body with no gender.
-            // It is nullable on the request so that omission is an error rather than a silent
-            // `male` — see CreatePatientRequest.
             Gender = request.Gender!.Value,
             DateOfBirth = request.DateOfBirth,
             Phone = phone,
@@ -176,9 +161,6 @@ public sealed class PatientService : IPatientService
         patient.EmergencyContactName = Clean(request.EmergencyContactName);
         patient.EmergencyContactPhone = Clean(request.EmergencyContactPhone);
 
-        // TempReference is deliberately not touched. Once an unidentified arrival has been given
-        // one it is never cleared, because the wristband and the verbal handover from that
-        // period still have to resolve to this person.
         await SaveWithIdentifierAsync(patient, nic, ct);
 
         return Fill(new PatientResponse(), patient);
@@ -214,7 +196,6 @@ public sealed class PatientService : IPatientService
 
         if (patient.UserAccountId == userAccountId)
         {
-            // Already exactly what was asked for. Linking twice is not a failure.
             return;
         }
 
@@ -250,11 +231,6 @@ public sealed class PatientService : IPatientService
     public async Task<PatientEntity> GetByIdAsync(Guid id, CancellationToken ct = default)
         => await FindByIdAsync(id, ct) ?? throw new NotFoundException("Patient", id);
 
-    /// <summary>
-    /// Saves, giving the row a generated temp reference when it would otherwise have no
-    /// identifier at all. The database check constraint requires one of NIC, phone or temp
-    /// reference, so without this an unidentified arrival is a 500 rather than a patient.
-    /// </summary>
     private async Task SaveWithIdentifierAsync(
         PatientEntity patient, string? nic, CancellationToken ct)
     {
@@ -276,8 +252,6 @@ public sealed class PatientService : IPatientService
             catch (DbUpdateException exception)
                 when (IsUniqueViolation(exception, PatientConfiguration.NicUniqueIndex))
             {
-                // Two desks registering the same NIC in the same instant both pass the read
-                // above. The index is what actually prevents the duplicate record.
                 throw new ConflictException(MessageCode.PatientNicTaken, nic, "another record");
             }
             catch (DbUpdateException exception)
@@ -285,32 +259,21 @@ public sealed class PatientService : IPatientService
                       && attempt < SaveAttempts
                       && IsUniqueViolation(exception, PatientConfiguration.TempReferenceUniqueIndex))
             {
-                // Someone else took the number between reading the highest one and inserting.
-                // Re-read and try again rather than handing the desk an error it cannot act on.
             }
             catch (DbUpdateException exception)
                 when (attempt < SaveAttempts
                       && IsUniqueViolation(exception, PatientConfiguration.PatientCodeUniqueIndex))
             {
-                // Two random codes landed on the same eight characters. One in twenty-seven
-                // billion, so this is here to be correct rather than because it will happen —
-                // draw another and save again. Nothing else about the row changes.
                 patient.PatientCode = PatientCodes.Next();
             }
         }
     }
 
-    /// <summary>
-    /// The next UNKNOWN-2026-0142 for this year. Numbered per year so the reference stays short
-    /// enough to read out loud over a handover, which is the whole point of having one.
-    /// </summary>
     private async Task<string> NextTempReferenceAsync(CancellationToken ct)
     {
         var year = DateTimeOffset.UtcNow.Year;
         var prefix = $"UNKNOWN-{year}-";
 
-        // IgnoreQueryFilters: a deactivated row still holds its number, and reusing it would
-        // point two different people at the same reference in the same year's records.
         var used = await _db.Patients
             .IgnoreQueryFilters()
             .Where(p => p.TempReference != null && p.TempReference.StartsWith(prefix))
@@ -352,13 +315,8 @@ public sealed class PatientService : IPatientService
             Status = admission.Status,
             DetailsComplete = admission.DetailsComplete,
 
-            // Patient is left null on purpose: this summary is already nested under the patient
-            // it belongs to, so repeating their name on every row of their own history is noise.
             Patient = null,
 
-            // Ward and bed stay null until step 6 puts a BedAssignment behind them. Nothing can
-            // hold a bed yet, so there is no case where null is the wrong answer today — and
-            // reading the ward name needs Equipment's register, which is still STUBS.md row 1.
             WardName = null,
             BedNumber = null,
 
@@ -387,7 +345,6 @@ public sealed class PatientService : IPatientService
         return response;
     }
 
-    /// <summary>Empty and whitespace both mean "not given" — storing "" would satisfy the identifier check constraint without identifying anyone.</summary>
     private static string? Clean(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 

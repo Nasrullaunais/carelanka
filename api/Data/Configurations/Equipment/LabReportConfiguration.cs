@@ -11,8 +11,6 @@ public class LabReportConfiguration : IEntityTypeConfiguration<LabReport>
     public void Configure(EntityTypeBuilder<LabReport> builder)
     {
         builder.ToTable("lab_reports", t =>
-            // An empty file is a row that looks like a result and opens as nothing. The upload
-            // path rejects it first; this is the guarantee that outlives that code path.
             t.HasCheckConstraint("ck_lab_reports_byte_size", "byte_size > 0"));
 
         builder.HasKey(r => r.Id);
@@ -25,18 +23,15 @@ public class LabReportConfiguration : IEntityTypeConfiguration<LabReport>
         builder.Property(r => r.ByteSize).IsRequired();
         builder.Property(r => r.UploadedByStaffId).IsRequired();
 
-        // No foreign key to Patient, deliberately, and no navigation. Patient Management owns
-        // that table; a constraint from here would mean Equipment's migrations decide whether
-        // one of their rows can be deleted. The same reasoning as
-        // EquipmentItem.AssignedToAdmissionId, which is also an id with no constraint behind it.
+        // No foreign key on PatientId and no navigation, deliberately. Patient Management owns
+        // that table, and a constraint from here would mean Equipment's migrations decide whether
+        // one of their rows can be deleted. Same reasoning as EquipmentItem.AssignedToAdmissionId.
 
-        // Newest first, per patient. That is the only way this table is ever read: a ward opens
-        // one patient and wants the latest result at the top.
         builder.HasIndex(r => new { r.PatientId, r.CreatedAt })
             .HasDatabaseName(PatientHistoryIndex)
             .IsDescending(false, true);
 
-        // No query filter and no soft delete. A result that can be made to disappear is not a
-        // medical record, and a correction is a new row rather than an edit.
+        // No query filter and no soft delete: a result that can be made to disappear is not a
+        // medical record.
     }
 }

@@ -16,22 +16,13 @@ import { canFileLabReport } from '../types/permissions';
 
 const PAGE_SIZE = 10;
 
-/** 10 MB, the same number the API enforces. Checked here so a slow upload is not how you find out. */
+// The same number the API enforces, checked here so a slow upload is not how you find out.
 const MAX_BYTES = 10 * 1024 * 1024;
 
 const ACCEPTED = 'application/pdf,image/jpeg,image/png';
 
-/** What the lab selected, however they found it. A report is filed against a patient, not a visit. */
 type Chosen = { id: string; patientCode: string; fullName: string; whereabouts?: string };
 
-/**
- * The laboratory desk. Pick a ward, read down it, and file a result against whoever the specimen
- * came from.
- *
- * The ward list is the way in because that is how a lab works: a rack of specimens arrives from
- * one ward and gets worked through in order. Search by code, name or NIC stays as the second way
- * in, for an outpatient in for a blood test who is in no ward at all.
- */
 export function LaboratoryPage() {
   const session = useSession();
   const mayFile = canFileLabReport(session?.principal.role);
@@ -66,7 +57,6 @@ function WardBrowser({
   selected: Chosen | null;
   onSelect: (patient: Chosen) => void;
 }) {
-  // Empty means every ward, which is also the answer for an outpatient holding no bed at all.
   const [wardName, setWardName] = useState('');
   const [page, setPage] = useState(1);
 
@@ -183,10 +173,6 @@ function WardBrowser({
   );
 }
 
-/**
- * The second way in, for somebody who is not on a ward list: an outpatient in for a blood test,
- * or a visit that has already ended. Nothing is fetched until two characters are typed.
- */
 function PatientSearch({
   selected,
   onSelect,
@@ -274,7 +260,6 @@ function toChosen(patient: LabPatient): Chosen {
   };
 }
 
-/** Plain words for where the visit has got to. "awaiting_bed" is not a thing anybody says. */
 function admissionStatusLabel(patient: LabPatient): string {
   switch (patient.admission_status) {
     case 'admitted':
@@ -380,11 +365,8 @@ function ReportList({ patient }: { patient: Chosen }) {
   );
 }
 
-/**
- * Opening a report is a fetch, not a link. The file needs the bearer token, and an anchor
- * cannot carry a header — a plain href would answer 401. So the bytes come back through the
- * generated client and the browser is handed an object URL for them.
- */
+// A fetch rather than a link: the file needs the bearer token, and an anchor cannot carry a
+// header, so a plain href would answer 401.
 function OpenReportButton({ report }: { report: LabReport }) {
   const [opening, setOpening] = useState(false);
 
@@ -399,7 +381,6 @@ function OpenReportButton({ report }: { report: LabReport }) {
         try {
           const { data, error } = await downloadLabReport({ path: { id: report.id } });
 
-          // The transport interceptor has already toasted whatever went wrong.
           if (error || !data) {
             return;
           }
@@ -407,8 +388,8 @@ function OpenReportButton({ report }: { report: LabReport }) {
           const url = URL.createObjectURL(data as Blob);
           window.open(url, '_blank', 'noopener');
 
-          // The tab has the bytes now. Held briefly rather than revoked immediately, because
-          // revoking before the new tab has read it gives a blank viewer.
+          // Held briefly rather than revoked immediately: revoking before the new tab has read
+          // it gives a blank viewer.
           setTimeout(() => URL.revokeObjectURL(url), 60_000);
         } finally {
           setOpening(false);

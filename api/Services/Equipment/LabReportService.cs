@@ -11,13 +11,9 @@ namespace CareLanka.Api.Services.Equipment;
 
 public sealed class LabReportService : ILabReportService
 {
-    /// <summary>10 MB. A scanned report is a few hundred kilobytes; this is generous and still keeps one upload from filling a page of the database.</summary>
     public const int MaxBytes = 10 * 1024 * 1024;
 
-    /// <summary>
-    /// What a report is allowed to be. An allow-list rather than a block-list: the question is
-    /// "can a ward open this?", and the answer is only yes for things we know they can.
-    /// </summary>
+    // An allow-list rather than a block-list: the question is whether a ward can open it.
     private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         "application/pdf",
@@ -47,9 +43,7 @@ public sealed class LabReportService : ILabReportService
     {
         var everyone = await _inHospital.ListAsync(wardName, cancellationToken);
 
-        // Paged here rather than by the directory. The ward filter is applied to the whole set
-        // before this point, so paging afterwards is what keeps a page full - paging first and
-        // filtering second drops rows off the end of every page.
+        // Paged after the ward filter, not before, or rows drop off the end of every page.
         var rows = everyone.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
         return PagedResult<LabPatient>.From(rows, page, pageSize, everyone.Count);
@@ -62,9 +56,8 @@ public sealed class LabReportService : ILabReportService
 
         var totalItems = await reports.CountAsync(cancellationToken);
 
-        // Newest first, and the projection deliberately leaves Content out. Selecting the
-        // whole entity here would read every stored PDF out of the database to render a table
-        // of filenames.
+        // The projection leaves Content out deliberately. Selecting the whole entity would read
+        // every stored PDF out of the database to render a table of filenames.
         var rows = await reports
             .OrderByDescending(r => r.CreatedAt)
             .Skip((page - 1) * pageSize)
@@ -89,9 +82,9 @@ public sealed class LabReportService : ILabReportService
     public async Task<LabReport> UploadAsync(
         UploadLabReportRequest request, CancellationToken cancellationToken = default)
     {
-        // Asked first, before anything is read or written. A report filed against a patient
-        // who does not exist is worse than a rejected upload: nothing errors, and the ward
-        // waits for a result that is sitting under a mistyped id.
+        // Asked before anything is read or written. A report filed against a patient who does not
+        // exist is worse than a rejected upload: nothing errors, and the ward waits for a result
+        // sitting under a mistyped id.
         if (!await _patients.ExistsAsync(request.PatientId, cancellationToken))
         {
             throw new NotFoundException("Patient", request.PatientId);
@@ -126,9 +119,8 @@ public sealed class LabReportService : ILabReportService
             PatientId = request.PatientId,
             TestName = request.TestName.Trim(),
             Summary = string.IsNullOrWhiteSpace(request.Summary) ? null : request.Summary.Trim(),
-            // Only the name, never a path. A browser sends whatever the client machine had,
-            // and a stored "C:\Users\..\report.pdf" is both useless and somebody's directory
-            // layout.
+            // The name only. A browser sends whatever the client machine had, and a stored
+            // "C:\Users\..\report.pdf" is both useless and somebody's directory layout.
             FileName = Path.GetFileName(file.FileName),
             ContentType = contentType,
             Content = buffer.ToArray(),

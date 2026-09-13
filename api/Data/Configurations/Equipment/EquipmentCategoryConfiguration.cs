@@ -16,8 +16,6 @@ public class EquipmentCategoryConfiguration : IEntityTypeConfiguration<Equipment
 
         builder.Property(c => c.Name).HasMaxLength(150).IsRequired();
 
-        // Scoped WHERE is_active for the same reason as beds: retiring a category must not
-        // make its name unusable forever, and the query filter would hide the clashing row.
         builder.HasIndex(c => c.Name)
             .HasDatabaseName(NameUniqueIndex)
             .IsUnique()

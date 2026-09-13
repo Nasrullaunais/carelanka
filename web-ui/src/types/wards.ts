@@ -1,11 +1,5 @@
 import type { GenderPolicy, WardType } from '../services/api/generated';
 
-// UI-only concerns, keyed off the generated enums. Record<WardType, string> means adding a
-// ward type to the API is a TypeScript error here rather than a blank cell in the table.
-
-// Written for whoever is at the desk, not for a clinician. "Pediatric" and "HDU" are the
-// words on the ward door, but they are not the words a receptionist reasons with, and this
-// dropdown is where a patient gets put in the wrong kind of ward.
 export const wardTypeLabels: Record<WardType, string> = {
   icu: 'ICU - intensive care',
   hdu: 'HDU - high dependency',
@@ -18,7 +12,6 @@ export const wardTypeLabels: Record<WardType, string> = {
   mental_health: 'Mental health ward',
 };
 
-/** One line of plain English per ward type, shown under the picker rather than in it. */
 export const wardTypeHints: Record<WardType, string> = {
   icu: 'The sickest patients. Constant monitoring, one nurse to one or two beds.',
   hdu: 'A step down from ICU. Closer watching than a general ward, short of intensive care.',

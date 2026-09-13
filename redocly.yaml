@@ -1,0 +1,9 @@
+extends:
+  - recommended
+rules:
+  nullable-type-sibling: off
+  info-license: off
+  operation-4xx-response: off
+  no-unused-components: off
+  no-illogical-composition-keywords: off
+  no-ambiguous-paths: off

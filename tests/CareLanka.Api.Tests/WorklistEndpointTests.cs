@@ -10,14 +10,6 @@ using Xunit;
 
 namespace CareLanka.Api.Tests;
 
-/// <summary>
-/// A visit that needs no bed, and the ward board that shows it:
-/// <c>GET /api/patient-worklist</c> and <c>POST /api/admissions/{id}/complete</c>.
-/// </summary>
-/// <remarks>
-/// The fixture's database is shared by the whole collection, so every test makes its own
-/// patient and searches the board for that one name rather than asserting on the whole list.
-/// </remarks>
 [Collection(ApiCollection.Name)]
 public sealed class WorklistEndpointTests
 {
@@ -25,17 +17,12 @@ public sealed class WorklistEndpointTests
 
     public WorklistEndpointTests(ApiApplication application) => _application = application;
 
-    // ---------- H0: an outpatient needs no bed ----------
-
     [Fact]
     public async Task An_outpatient_visit_is_admitted_from_the_start_and_never_awaits_a_bed()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         var visit = await NewVisitAsync(nurse, category: "outpatient");
 
-        // The bug this is here for: every admission used to start at awaiting_bed, and the only
-        // edge into `admitted` runs through a bed being assigned. So somebody in for a scan sat
-        // on the bed board forever and could not be finished with.
         Assert.Equal("admitted", visit.GetProperty("status").GetString());
         Assert.False(visit.GetProperty("requires_bed").GetBoolean());
         Assert.NotEqual(JsonValueKind.Null, visit.GetProperty("admitted_at").ValueKind);
@@ -58,8 +45,6 @@ public sealed class WorklistEndpointTests
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         var visit = await NewVisitAsync(nurse, category: "day_case");
 
-        // On the bed side of the line on purpose. A day case is minor surgery or dialysis: they
-        // are on a real bed for hours, and it is a bed nobody else can have.
         Assert.True(visit.GetProperty("requires_bed").GetBoolean());
         Assert.Equal("awaiting_bed", visit.GetProperty("status").GetString());
     }
@@ -72,8 +57,6 @@ public sealed class WorklistEndpointTests
         var visit = await NewVisitAsync(
             nurse, category: "outpatient", expectedArrival: DateTimeOffset.UtcNow.AddHours(2));
 
-        // Dropped, not kept: the patient is standing at the desk, and carrying the time forward
-        // would put somebody already here into the next two hours' incoming count.
         Assert.Equal(JsonValueKind.Null, visit.GetProperty("expected_arrival").ValueKind);
     }
 
@@ -93,12 +76,8 @@ public sealed class WorklistEndpointTests
 
         using var body = await ReadJsonAsync(refused);
 
-        // The transition check alone would refuse this as "cannot move from admitted to
-        // awaiting_approval", which tells a nurse nothing. cl_pat_021 says why.
         Assert.Equal("cl_pat_021", body.RootElement.GetProperty("code").GetString());
     }
-
-    // ---------- finishing a visit that had no bed ----------
 
     [Fact]
     public async Task Completing_an_outpatient_visit_ends_it()
@@ -130,8 +109,6 @@ public sealed class WorklistEndpointTests
 
         var again = await nurse.PostAsync($"/api/admissions/{id}/complete", null);
 
-        // discharged is terminal. Re-running it would rewrite the discharge time and let a
-        // second open admission past ux_admissions_open_patient.
         Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
     }
 
@@ -148,8 +125,6 @@ public sealed class WorklistEndpointTests
 
         using var body = await ReadJsonAsync(refused);
 
-        // Narrow on purpose. This endpoint does not know how to run a discharge checklist or
-        // give a bed back, so it refuses rather than half-doing a discharge.
         Assert.Equal("cl_pat_020", body.RootElement.GetProperty("code").GetString());
     }
 
@@ -163,8 +138,6 @@ public sealed class WorklistEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
     }
 
-    // ---------- the board ----------
-
     [Fact]
     public async Task A_booking_nobody_has_checked_in_reads_as_not_arrived()
     {
@@ -174,8 +147,6 @@ public sealed class WorklistEndpointTests
 
         var row = await BoardRowAsync(nurse, patient.Name);
 
-        // The whole reason this endpoint exists. An admission is created by arriving, so a list
-        // of admissions could never say this about anybody.
         Assert.Equal("booking", row.GetProperty("kind").GetString());
         Assert.Equal("not_arrived", row.GetProperty("status").GetString());
         Assert.Equal(JsonValueKind.Null, row.GetProperty("admission_category").ValueKind);
@@ -215,12 +186,9 @@ public sealed class WorklistEndpointTests
 
         var rows = await BoardRowsAsync(nurse, patient.Name);
 
-        // Exactly one. The appointment is terminal at checked_in and is left out of the board,
-        // or every checked-in patient would appear beside their own past.
         Assert.Single(rows);
         Assert.Equal("visit", rows[0].GetProperty("kind").GetString());
 
-        // Checked in as an outpatient, so straight to admitted with no bed in between.
         Assert.Equal("admitted", rows[0].GetProperty("status").GetString());
         Assert.False(rows[0].GetProperty("requires_bed").GetBoolean());
     }
@@ -256,8 +224,6 @@ public sealed class WorklistEndpointTests
 
         var row = await BoardRowAsync(nurse, patient.Name);
 
-        // Its own status, not folded into awaiting_bed: the hold lapses in thirty minutes, so
-        // "a bed is waiting, go and collect them" is a different job from "find them a bed".
         Assert.Equal("bed_ready", row.GetProperty("status").GetString());
         Assert.Equal(ward.Name, row.GetProperty("ward_name").GetString());
         Assert.Equal("B1", row.GetProperty("bed_number").GetString());
@@ -277,9 +243,6 @@ public sealed class WorklistEndpointTests
 
         var row = await BoardRowAsync(nurse, patient.Name);
 
-        // The stored status still says bed_reserved, and the board still says bed_ready — that
-        // is honest, because nobody has released anything. What must not happen is the board
-        // naming a bed the patient no longer has any claim on.
         Assert.Equal(JsonValueKind.Null, row.GetProperty("bed_number").ValueKind);
     }
 
@@ -305,7 +268,6 @@ public sealed class WorklistEndpointTests
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
 
-        // Three of each, sharing one searchable surname so the page is exactly these six.
         var surname = $"Union{Guid.NewGuid():N}"[..14];
 
         for (var i = 0; i < 3; i++)
@@ -322,9 +284,6 @@ public sealed class WorklistEndpointTests
 
         var ids = Ids(first).Concat(Ids(second)).ToList();
 
-        // The reason the union is paged in one query rather than stitched from two: paging each
-        // table separately puts the combined page boundary in the middle of neither, and a row
-        // gets shown twice while another is never shown at all.
         Assert.Equal(6, ids.Count);
         Assert.Equal(6, ids.Distinct().Count());
     }
@@ -332,17 +291,12 @@ public sealed class WorklistEndpointTests
     [Fact]
     public async Task A_role_that_cannot_read_admissions_cannot_read_the_board_either()
     {
-        // Ambulance crew, not equipment management. The equipment manager gained this list on
-        // 2026-09-11 when PatientReader and AdmissionReader became one PatientDetails policy;
-        // the crew is now the only staff role on neither.
         using var ambulance = await ClientAsync(ApiApplication.AmbulanceEmail);
 
         var refused = await ambulance.GetAsync("/api/patient-worklist");
 
         Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
     }
-
-    // ---------- helpers ----------
 
     private sealed record TestWard(Guid Id, string Name);
 
@@ -367,7 +321,6 @@ public sealed class WorklistEndpointTests
         return new TestWard(Guid.Parse(body.RootElement.GetProperty("id").GetString()!), name);
     }
 
-    /// <summary>Registers real beds through Equipment Management's own endpoint. Their table, their write.</summary>
     private async Task<IReadOnlyList<Guid>> AddBedsAsync(TestWard ward, int count)
     {
         using var equipment = await ClientAsync(ApiApplication.EquipmentEmail);
@@ -391,7 +344,6 @@ public sealed class WorklistEndpointTests
         return ids;
     }
 
-    /// <summary>Pushes a live hold past its expiry, which no endpoint offers and no test can wait for.</summary>
     private async Task ExpireHoldAsync(Guid bedId)
     {
         using var scope = _application.Services.CreateScope();
@@ -425,7 +377,6 @@ public sealed class WorklistEndpointTests
         return new TestPatient(body.RootElement.GetProperty("id").GetString()!, name);
     }
 
-    /// <summary>Opens a visit for a brand-new patient and answers the whole admission body.</summary>
     private async Task<JsonElement> NewVisitAsync(
         HttpClient nurse, string category, DateTimeOffset? expectedArrival = null)
     {
@@ -448,7 +399,6 @@ public sealed class WorklistEndpointTests
         return body.RootElement.Clone();
     }
 
-    /// <summary>Opens a visit for an existing patient and answers its id.</summary>
     private async Task<string> AdmitAsync(HttpClient nurse, string patientId, string category)
     {
         var created = await nurse.PostAsJsonAsync("/api/admissions", new
@@ -483,7 +433,6 @@ public sealed class WorklistEndpointTests
         return body.RootElement.GetProperty("id").GetString()!;
     }
 
-    /// <summary>The board's one row for this patient. Fails loudly when there is not exactly one.</summary>
     private static async Task<JsonElement> BoardRowAsync(HttpClient client, string name)
         => Assert.Single(await BoardRowsAsync(client, name));
 
@@ -493,8 +442,6 @@ public sealed class WorklistEndpointTests
         using var body = await BoardPageAsync(client, name, 1, 50, includeFinished);
 
         return body.RootElement.GetProperty("items").EnumerateArray()
-            // Cloned: the JsonDocument dies with this method and every element taken from it
-            // dies with it, which reads as an ObjectDisposedException in the caller.
             .Select(row => row.Clone())
             .ToList();
     }
@@ -516,8 +463,6 @@ public sealed class WorklistEndpointTests
             .Select(row => row.GetProperty("id").GetString()!)
             .ToList();
 
-    // One token per account for the whole class. /api/auth/login is rate limited per IP and
-    // every test class in the collection shares that budget.
     private static readonly SemaphoreSlim TokenLock = new(1, 1);
     private static readonly Dictionary<string, string> Tokens = new();
     private static string? _nurseId;

@@ -37,8 +37,6 @@ public sealed class WardEndpointTests
             w => w.GetProperty("name").GetString() == name);
     }
 
-    // hdu is the one wire value that is not the C# member name lowercased, so it is the one
-    // that silently becomes high_dependency if the enum is ever renamed for readability.
     [Theory]
     [InlineData("icu")]
     [InlineData("hdu")]
@@ -81,7 +79,6 @@ public sealed class WardEndpointTests
         await CreateWardAsync(client, name, "general", "male", isActive: false);
         var reused = await CreateWardAsync(client, name, "general", "male");
 
-        // The unique index is scoped WHERE is_active, so this is allowed on purpose.
         Assert.Equal(HttpStatusCode.Created, reused.StatusCode);
 
         using var active = await ReadJsonAsync(await client.GetAsync("/api/wards?isActive=true"));
@@ -115,8 +112,6 @@ public sealed class WardEndpointTests
         var created = await CreateWardAsync(client, NewWardName(), "general", "male");
         using var body = await ReadJsonAsync(created);
 
-        // Equipment's register leaves a ward with no beds out of its result entirely, so this
-        // is the case where "absent" has to become 0 rather than a missing property.
         Assert.Equal(0, body.RootElement.GetProperty("total_beds").GetInt32());
     }
 
@@ -130,7 +125,6 @@ public sealed class WardEndpointTests
         using var ward = await ReadJsonAsync(await CreateWardAsync(administrator, name, "icu", "mixed"));
         var wardId = ward.RootElement.GetProperty("id").GetString()!;
 
-        // Beds are Equipment Management's table. We only ever read the count back.
         for (var number = 1; number <= 3; number++)
         {
             var bed = await equipment.PostAsJsonAsync("/api/beds", new
@@ -148,8 +142,6 @@ public sealed class WardEndpointTests
             .Single(w => w.GetProperty("name").GetString() == name)
             .GetProperty("total_beds").GetInt32();
 
-        // Counted on every read, never stored on the ward row: two sources of truth would drift
-        // the moment Equipment retires a bed.
         Assert.Equal(3, counted);
     }
 
@@ -187,10 +179,6 @@ public sealed class WardEndpointTests
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 
-    // A missing enum is an error, not a default. [Required] on a plain C# enum always passes,
-    // because the model binder has already turned an absent key into the first declared member.
-    // Every other test in this class sends a full body, which is why neither of these was caught.
-
     [Fact]
     public async Task A_ward_with_no_type_is_refused_rather_than_created_as_an_icu()
     {
@@ -199,9 +187,6 @@ public sealed class WardEndpointTests
         var created = await client.PostAsJsonAsync(
             "/api/wards", new { name = NewWardName(), gender_policy = "mixed" });
 
-        // icu is declared first, so the old default built the most expensive kind of ward in the
-        // hospital out of a typo - and Ward's schema is frozen and depended on by three other
-        // components, so a wrong ward_type is not a local mistake.
         Assert.Equal(HttpStatusCode.BadRequest, created.StatusCode);
         Assert.Equal("application/problem+json", created.Content.Headers.ContentType?.MediaType);
     }
@@ -214,14 +199,9 @@ public sealed class WardEndpointTests
         var created = await client.PostAsJsonAsync(
             "/api/wards", new { name = NewWardName(), ward_type = "general" });
 
-        // male is declared first, so the old default quietly halved the ward's usable beds: the
-        // policy is an input to hard rule H3, and a male-only ward takes no female patients.
         Assert.Equal(HttpStatusCode.BadRequest, created.StatusCode);
     }
 
-    // /api/auth/login is rate limited to 20 requests a minute per IP, and this class shares
-    // that budget with AuthFlowTests. Logging in once per test spent it and every test here
-    // failed on a 429 that looked like a missing access_token. One token per account, reused.
     private static readonly SemaphoreSlim TokenLock = new(1, 1);
     private static readonly Dictionary<string, string> Tokens = new();
 
@@ -249,8 +229,6 @@ public sealed class WardEndpointTests
             var login = await client.PostAsJsonAsync(
                 "/api/auth/login", new { email, password = ApiApplication.Password });
 
-            // Asserted, not assumed: reading access_token off a 429 threw KeyNotFound and
-            // pointed at the wrong problem in every test in this class at once.
             Assert.Equal(HttpStatusCode.OK, login.StatusCode);
 
             using var body = await ReadJsonAsync(login);
@@ -282,6 +260,5 @@ public sealed class WardEndpointTests
         => wards.RootElement.EnumerateArray()
             .Count(w => w.GetProperty("name").GetString() == name);
 
-    // Unique per test: the fixture's database is shared across the whole collection.
     private static string NewWardName() => $"Test-Ward-{Guid.NewGuid():N}"[..24];
 }

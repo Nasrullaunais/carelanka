@@ -1,4 +1,5 @@
 using CareLanka.Api.Data.Entities.Common;
+using CareLanka.Api.Data.Entities.Emergency;
 using CareLanka.Api.Data.Entities.Equipment;
 using CareLanka.Api.Data.Entities.Patient;
 using Microsoft.EntityFrameworkCore;
@@ -16,7 +17,12 @@ public class CareLankaDbContext : DbContext
     public DbSet<PatientAccount> PatientAccounts => Set<PatientAccount>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
-    // Equipment Management
+    public DbSet<EmergencyCall> EmergencyCalls => Set<EmergencyCall>();
+    public DbSet<Ambulance> Ambulances => Set<Ambulance>();
+    public DbSet<Dispatch> Dispatches => Set<Dispatch>();
+    public DbSet<DispatchCrew> DispatchCrew => Set<DispatchCrew>();
+    public DbSet<RouteLog> RouteLogs => Set<RouteLog>();
+
     public DbSet<Bed> Beds => Set<Bed>();
     public DbSet<EquipmentCategory> EquipmentCategories => Set<EquipmentCategory>();
     public DbSet<EquipmentItem> EquipmentItems => Set<EquipmentItem>();
@@ -27,7 +33,6 @@ public class CareLankaDbContext : DbContext
     public DbSet<PharmacyTransaction> PharmacyTransactions => Set<PharmacyTransaction>();
     public DbSet<LabReport> LabReports => Set<LabReport>();
 
-    // Patient Management
     public DbSet<Ward> Wards => Set<Ward>();
     public DbSet<PatientEntity> Patients => Set<PatientEntity>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
@@ -40,8 +45,6 @@ public class CareLankaDbContext : DbContext
     public DbSet<BillingRate> BillingRates => Set<BillingRate>();
     public DbSet<AdmissionFeeRate> AdmissionFeeRates => Set<AdmissionFeeRate>();
 
-    // Never add configuration here. Write Data/Configurations/{Component}/ instead,
-    // or all four of us conflict on this method every migration.
     protected override void OnModelCreating(ModelBuilder modelBuilder)
         => modelBuilder.ApplyConfigurationsFromAssembly(typeof(CareLankaDbContext).Assembly);
 }

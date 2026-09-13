@@ -31,9 +31,6 @@ public sealed class PharmacyCategoryService : IPharmacyCategoryService
             throw new BadRequestException(MessageCode.ValidationFailed);
         }
 
-        // Case-insensitive, like equipment categories: "Chronic Medicines" and "chronic
-        // medicines" are one category to a person, and two rows that look identical on a
-        // dispensing screen are worse than a 409.
         var taken = await _db.PharmacyCategories
             .AnyAsync(c => c.Name.ToLower() == name.ToLower(), cancellationToken);
 

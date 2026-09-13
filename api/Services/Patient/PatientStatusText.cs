@@ -1,0 +1,52 @@
+using CareLanka.Api.Data.Enums;
+
+namespace CareLanka.Api.Services.Patient;
+
+public static class PatientStatusText
+{
+    public static string For(AdmissionStatus status) => status switch
+    {
+        AdmissionStatus.AwaitingBed =>
+            "A bed is being arranged for you.",
+
+        AdmissionStatus.AwaitingApproval =>
+            "A bed has been found for you and is waiting for a nurse to approve it.",
+
+        AdmissionStatus.BedReserved =>
+            "A bed is being held for you.",
+
+        AdmissionStatus.Admitted =>
+            "You have been admitted.",
+
+        AdmissionStatus.ReadyForDischarge =>
+            "You are ready to go home. The ward is finishing your paperwork.",
+
+        AdmissionStatus.Discharged =>
+            "You have been discharged.",
+
+        AdmissionStatus.Cancelled =>
+            "This visit was cancelled.",
+
+        _ => "Ask at the ward for an update."
+    };
+
+    public static string For(AppointmentStatus status) => status switch
+    {
+        AppointmentStatus.Scheduled =>
+            "Booked. You can still cancel this.",
+
+        AppointmentStatus.CheckedIn =>
+            "You have been checked in.",
+
+        AppointmentStatus.Completed =>
+            "This visit is finished.",
+
+        AppointmentStatus.Cancelled =>
+            "You cancelled this visit.",
+
+        AppointmentStatus.NoShow =>
+            "You did not attend this visit.",
+
+        _ => "Ask at the desk for an update."
+    };
+}

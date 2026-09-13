@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddBillChargeData, AddBillChargeErrors, AddBillChargeResponses, AssignBedManuallyData, AssignBedManuallyErrors, AssignBedManuallyResponses, AssignEquipmentItemData, AssignEquipmentItemErrors, AssignEquipmentItemResponses, CancelAdmissionData, CancelAdmissionErrors, CancelAdmissionResponses, CheckInAppointmentData, CheckInAppointmentErrors, CheckInAppointmentResponses, CompleteAdmissionDetailsData, CompleteAdmissionDetailsErrors, CompleteAdmissionDetailsResponses, CompleteMaintenanceScheduleData, CompleteMaintenanceScheduleErrors, CompleteMaintenanceScheduleResponses, CompleteVisitData, CompleteVisitErrors, CompleteVisitResponses, ConfirmDischargeData, ConfirmDischargeErrors, ConfirmDischargeResponses, CorrectBedData, CorrectBedErrors, CorrectBedResponses, CreateAdmissionData, CreateAdmissionErrors, CreateAdmissionResponses, CreateAppointmentData, CreateAppointmentErrors, CreateAppointmentResponses, CreateBedData, CreateBedErrors, CreateBedResponses, CreateEquipmentCategoryData, CreateEquipmentCategoryErrors, CreateEquipmentCategoryResponses, CreateEquipmentItemData, CreateEquipmentItemErrors, CreateEquipmentItemResponses, CreateMaintenanceScheduleData, CreateMaintenanceScheduleErrors, CreateMaintenanceScheduleResponses, CreatePatientData, CreatePatientErrors, CreatePatientResponses, CreatePharmacyCategoryData, CreatePharmacyCategoryErrors, CreatePharmacyCategoryResponses, CreatePharmacyItemData, CreatePharmacyItemErrors, CreatePharmacyItemResponses, CreateWardData, CreateWardErrors, CreateWardResponses, DownloadLabReportData, DownloadLabReportErrors, DownloadLabReportResponses, GetAdmissionBillData, GetAdmissionBillErrors, GetAdmissionBillResponses, GetAdmissionData, GetAdmissionErrors, GetAdmissionResponses, GetBedOccupancyData, GetBedOccupancyErrors, GetBedOccupancyResponses, GetBillingRatesData, GetBillingRatesErrors, GetBillingRatesResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetEquipmentItemByTagData, GetEquipmentItemByTagErrors, GetEquipmentItemByTagResponses, GetEquipmentItemData, GetEquipmentItemErrors, GetEquipmentItemResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetPatientData, GetPatientErrors, GetPatientResponses, GetPharmacyItemData, GetPharmacyItemErrors, GetPharmacyItemResponses, GetWardCapacityData, GetWardCapacityErrors, GetWardCapacityResponses, GetWardOccupancyData, GetWardOccupancyErrors, GetWardOccupancyResponses, LinkPatientAccountData, LinkPatientAccountErrors, LinkPatientAccountResponses, ListAdmissionsData, ListAdmissionsErrors, ListAdmissionsResponses, ListAppointmentsData, ListAppointmentsErrors, ListAppointmentsResponses, ListBedAvailabilityData, ListBedAvailabilityErrors, ListBedAvailabilityResponses, ListBedsData, ListBedsErrors, ListBedsResponses, ListDischargeCandidatesData, ListDischargeCandidatesErrors, ListDischargeCandidatesResponses, ListEquipmentCategoriesData, ListEquipmentCategoriesErrors, ListEquipmentCategoriesResponses, ListEquipmentItemsData, ListEquipmentItemsErrors, ListEquipmentItemsResponses, ListLabPatientsData, ListLabPatientsErrors, ListLabPatientsResponses, ListLabReportsData, ListLabReportsErrors, ListLabReportsResponses, ListMaintenanceSchedulesData, ListMaintenanceSchedulesErrors, ListMaintenanceSchedulesResponses, ListOutstandingBillsData, ListOutstandingBillsErrors, ListOutstandingBillsResponses, ListPatientsData, ListPatientsErrors, ListPatientsResponses, ListPatientWorklistData, ListPatientWorklistErrors, ListPatientWorklistResponses, ListPharmacyCategoriesData, ListPharmacyCategoriesErrors, ListPharmacyCategoriesResponses, ListPharmacyItemsData, ListPharmacyItemsErrors, ListPharmacyItemsResponses, ListPharmacyTransactionsData, ListPharmacyTransactionsErrors, ListPharmacyTransactionsResponses, ListWardsData, ListWardsErrors, ListWardsResponses, LoginData, LoginErrors, LoginPatientData, LoginPatientErrors, LoginPatientResponses, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, LookupPatientData, LookupPatientErrors, LookupPatientResponses, MarkArrivedData, MarkArrivedErrors, MarkArrivedResponses, PrepareAdmissionBillData, PrepareAdmissionBillErrors, PrepareAdmissionBillResponses, RecordPharmacyTransactionData, RecordPharmacyTransactionErrors, RecordPharmacyTransactionResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RegisterPatientAccountData, RegisterPatientAccountErrors, RegisterPatientAccountResponses, ReleaseEquipmentItemData, ReleaseEquipmentItemErrors, ReleaseEquipmentItemResponses, RemoveBillChargeData, RemoveBillChargeErrors, RemoveBillChargeResponses, ReportEquipmentFaultData, ReportEquipmentFaultErrors, ReportEquipmentFaultResponses, RetireBedData, RetireBedErrors, RetireBedResponses, SettleBillData, SettleBillErrors, SettleBillResponses, UpdateBedData, UpdateBedErrors, UpdateBedResponses, UpdateBillingRatesData, UpdateBillingRatesErrors, UpdateBillingRatesResponses, UpdateDischargeChecklistData, UpdateDischargeChecklistErrors, UpdateDischargeChecklistResponses, UpdateEquipmentItemData, UpdateEquipmentItemErrors, UpdateEquipmentItemResponses, UpdatePatientData, UpdatePatientErrors, UpdatePatientResponses, UploadLabReportData, UploadLabReportErrors, UploadLabReportResponses } from './types.gen';
+import type { AddBillChargeData, AddBillChargeErrors, AddBillChargeResponses, AssignBedManuallyData, AssignBedManuallyErrors, AssignBedManuallyResponses, AssignEquipmentItemData, AssignEquipmentItemErrors, AssignEquipmentItemResponses, BookMyAppointmentData, BookMyAppointmentErrors, BookMyAppointmentResponses, CancelAdmissionData, CancelAdmissionErrors, CancelAdmissionResponses, CancelMyAppointmentData, CancelMyAppointmentErrors, CancelMyAppointmentResponses, CheckInAppointmentData, CheckInAppointmentErrors, CheckInAppointmentResponses, CompleteAdmissionDetailsData, CompleteAdmissionDetailsErrors, CompleteAdmissionDetailsResponses, CompleteMaintenanceScheduleData, CompleteMaintenanceScheduleErrors, CompleteMaintenanceScheduleResponses, CompleteVisitData, CompleteVisitErrors, CompleteVisitResponses, ConfirmDischargeData, ConfirmDischargeErrors, ConfirmDischargeResponses, CorrectBedData, CorrectBedErrors, CorrectBedResponses, CreateAdmissionData, CreateAdmissionErrors, CreateAdmissionResponses, CreateAmbulanceData, CreateAmbulanceErrors, CreateAmbulanceResponses, CreateAppointmentData, CreateAppointmentErrors, CreateAppointmentResponses, CreateBedData, CreateBedErrors, CreateBedResponses, CreateEquipmentCategoryData, CreateEquipmentCategoryErrors, CreateEquipmentCategoryResponses, CreateEquipmentItemData, CreateEquipmentItemErrors, CreateEquipmentItemResponses, CreateMaintenanceScheduleData, CreateMaintenanceScheduleErrors, CreateMaintenanceScheduleResponses, CreatePatientData, CreatePatientErrors, CreatePatientResponses, CreatePharmacyCategoryData, CreatePharmacyCategoryErrors, CreatePharmacyCategoryResponses, CreatePharmacyItemData, CreatePharmacyItemErrors, CreatePharmacyItemResponses, CreateWardData, CreateWardErrors, CreateWardResponses, DownloadLabReportData, DownloadLabReportErrors, DownloadLabReportResponses, GetAdmissionBillData, GetAdmissionBillErrors, GetAdmissionBillResponses, GetAdmissionData, GetAdmissionErrors, GetAdmissionResponses, GetAmbulanceData, GetAmbulanceErrors, GetAmbulanceResponses, GetBedOccupancyData, GetBedOccupancyErrors, GetBedOccupancyResponses, GetBillingRatesData, GetBillingRatesErrors, GetBillingRatesResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetEquipmentItemByTagData, GetEquipmentItemByTagErrors, GetEquipmentItemByTagResponses, GetEquipmentItemData, GetEquipmentItemErrors, GetEquipmentItemResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetMyAdmissionData, GetMyAdmissionErrors, GetMyAdmissionResponses, GetMyHistoryData, GetMyHistoryErrors, GetMyHistoryResponses, GetMyProfileData, GetMyProfileErrors, GetMyProfileResponses, GetPatientData, GetPatientErrors, GetPatientResponses, GetPharmacyItemData, GetPharmacyItemErrors, GetPharmacyItemResponses, GetWardCapacityData, GetWardCapacityErrors, GetWardCapacityResponses, GetWardOccupancyData, GetWardOccupancyErrors, GetWardOccupancyResponses, LinkPatientAccountData, LinkPatientAccountErrors, LinkPatientAccountResponses, ListAdmissionsData, ListAdmissionsErrors, ListAdmissionsResponses, ListAmbulancesData, ListAmbulancesErrors, ListAmbulancesResponses, ListAppointmentsData, ListAppointmentsErrors, ListAppointmentsResponses, ListBedAvailabilityData, ListBedAvailabilityErrors, ListBedAvailabilityResponses, ListBedsData, ListBedsErrors, ListBedsResponses, ListDischargeCandidatesData, ListDischargeCandidatesErrors, ListDischargeCandidatesResponses, ListEquipmentCategoriesData, ListEquipmentCategoriesErrors, ListEquipmentCategoriesResponses, ListEquipmentItemsData, ListEquipmentItemsErrors, ListEquipmentItemsResponses, ListLabPatientsData, ListLabPatientsErrors, ListLabPatientsResponses, ListLabReportsData, ListLabReportsErrors, ListLabReportsResponses, ListMaintenanceSchedulesData, ListMaintenanceSchedulesErrors, ListMaintenanceSchedulesResponses, ListMyAppointmentsData, ListMyAppointmentsErrors, ListMyAppointmentsResponses, ListOutstandingBillsData, ListOutstandingBillsErrors, ListOutstandingBillsResponses, ListPatientsData, ListPatientsErrors, ListPatientsResponses, ListPatientWorklistData, ListPatientWorklistErrors, ListPatientWorklistResponses, ListPharmacyCategoriesData, ListPharmacyCategoriesErrors, ListPharmacyCategoriesResponses, ListPharmacyItemsData, ListPharmacyItemsErrors, ListPharmacyItemsResponses, ListPharmacyTransactionsData, ListPharmacyTransactionsErrors, ListPharmacyTransactionsResponses, ListWardsData, ListWardsErrors, ListWardsResponses, LoginData, LoginErrors, LoginPatientData, LoginPatientErrors, LoginPatientResponses, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, LookupPatientData, LookupPatientErrors, LookupPatientResponses, MarkArrivedData, MarkArrivedErrors, MarkArrivedResponses, PrepareAdmissionBillData, PrepareAdmissionBillErrors, PrepareAdmissionBillResponses, PreRegisterSelfData, PreRegisterSelfErrors, PreRegisterSelfResponses, RecordPharmacyTransactionData, RecordPharmacyTransactionErrors, RecordPharmacyTransactionResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RegisterPatientAccountData, RegisterPatientAccountErrors, RegisterPatientAccountResponses, ReinstateAmbulanceData, ReinstateAmbulanceErrors, ReinstateAmbulanceResponses, ReleaseEquipmentItemData, ReleaseEquipmentItemErrors, ReleaseEquipmentItemResponses, RemoveBillChargeData, RemoveBillChargeErrors, RemoveBillChargeResponses, ReportEquipmentFaultData, ReportEquipmentFaultErrors, ReportEquipmentFaultResponses, RetireAmbulanceData, RetireAmbulanceErrors, RetireAmbulanceResponses, RetireBedData, RetireBedErrors, RetireBedResponses, SettleBillData, SettleBillErrors, SettleBillResponses, UpdateAmbulanceData, UpdateAmbulanceErrors, UpdateAmbulanceResponses, UpdateBedData, UpdateBedErrors, UpdateBedResponses, UpdateBillingRatesData, UpdateBillingRatesErrors, UpdateBillingRatesResponses, UpdateDischargeChecklistData, UpdateDischargeChecklistErrors, UpdateDischargeChecklistResponses, UpdateEquipmentItemData, UpdateEquipmentItemErrors, UpdateEquipmentItemResponses, UpdatePatientData, UpdatePatientErrors, UpdatePatientResponses, UploadLabReportData, UploadLabReportErrors, UploadLabReportResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -18,20 +18,12 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
     meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
 
-/**
- * List admissions. With no `status` the answer is the live worklist, not the archive.
- * `search` matches the patient's code, name or NIC.
- */
 export const listAdmissions = <ThrowOnError extends boolean = false>(options?: Options<ListAdmissionsData, ThrowOnError>): RequestResult<ListAdmissionsResponses, ListAdmissionsErrors, ThrowOnError> => (options?.client ?? client).get<ListAdmissionsResponses, ListAdmissionsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admissions',
     ...options
 });
 
-/**
- * Start an admission. Creates a visit in status `awaiting_bed`. The care level and the
- * clinician who chose it are both required — that pair is the proof a human decided it.
- */
 export const createAdmission = <ThrowOnError extends boolean = false>(options?: Options<CreateAdmissionData, ThrowOnError>): RequestResult<CreateAdmissionResponses, CreateAdmissionErrors, ThrowOnError> => (options?.client ?? client).post<CreateAdmissionResponses, CreateAdmissionErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admissions',
@@ -42,23 +34,12 @@ export const createAdmission = <ThrowOnError extends boolean = false>(options?: 
     }
 });
 
-/**
- * Get one admission with its bed history. Nothing is deleted or overwritten, so rejected
- * and expired assignments stay on the list — this is the audit trail.
- */
 export const getAdmission = <ThrowOnError extends boolean = false>(options: Options<GetAdmissionData, ThrowOnError>): RequestResult<GetAdmissionResponses, GetAdmissionErrors, ThrowOnError> => (options.client ?? client).get<GetAdmissionResponses, GetAdmissionErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admissions/{id}',
     ...options
 });
 
-/**
- * Fill in details that were missing at registration. A field left out is left alone, and
- * completeness is recalculated here rather than trusted from the caller.
- *
- * Completeness is deliberately not part of `status`: a patient can be admitted and still
- * have paperwork outstanding, and one field cannot express both without ambiguity.
- */
 export const completeAdmissionDetails = <ThrowOnError extends boolean = false>(options: Options<CompleteAdmissionDetailsData, ThrowOnError>): RequestResult<CompleteAdmissionDetailsResponses, CompleteAdmissionDetailsErrors, ThrowOnError> => (options.client ?? client).patch<CompleteAdmissionDetailsResponses, CompleteAdmissionDetailsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admissions/{id}/details',
@@ -69,47 +50,18 @@ export const completeAdmissionDetails = <ThrowOnError extends boolean = false>(o
     }
 });
 
-/**
- * Mark the patient as physically present in the bed. Moves `bed_reserved` to `admitted`,
- * sets `admitted_at`, and turns the hold on the bed into an occupancy so it can no longer
- * expire.
- *
- * Rejected with 409 from any other status: a patient cannot arrive into a bed that was
- * never approved. The ward nurse is at the bedside, which is why this is theirs and not
- * the duty manager's.
- */
 export const markArrived = <ThrowOnError extends boolean = false>(options: Options<MarkArrivedData, ThrowOnError>): RequestResult<MarkArrivedResponses, MarkArrivedErrors, ThrowOnError> => (options.client ?? client).post<MarkArrivedResponses, MarkArrivedErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admissions/{id}/arrive',
     ...options
 });
 
-/**
- * Finish a visit that never needed a bed - the scan or test is done and the patient has
- * gone home. Moves `admitted` to `discharged`.
- *
- * **Only for a visit that needs no bed** - an `outpatient`. A visit at any other care
- * level is refused with 409 and `cl_pat_020`: that is a discharge, and a discharge has a
- * checklist, a summary note, an approver and a bed to give back. This endpoint does none
- * of those, so it says so rather than half-doing it.
- *
- * The ward nurse or doctor who did the test is the one who knows it is finished, which is
- * why this is theirs and not the duty manager's.
- */
 export const completeVisit = <ThrowOnError extends boolean = false>(options: Options<CompleteVisitData, ThrowOnError>): RequestResult<CompleteVisitResponses, CompleteVisitErrors, ThrowOnError> => (options.client ?? client).post<CompleteVisitResponses, CompleteVisitErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admissions/{id}/complete',
     ...options
 });
 
-/**
- * Cancel an admission, with a reason, and release any bed it was holding.
- *
- * Always a human act, never automatic, which is why the reason is mandatory and why this
- * is the duty manager's. A hold expiring frees a bed by itself because that is cheap and
- * reversible; declaring that a patient is not coming is neither. Refused with 409 once
- * they are `admitted` - discharge them instead.
- */
 export const cancelAdmission = <ThrowOnError extends boolean = false>(options: Options<CancelAdmissionData, ThrowOnError>): RequestResult<CancelAdmissionResponses, CancelAdmissionErrors, ThrowOnError> => (options.client ?? client).post<CancelAdmissionResponses, CancelAdmissionErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admissions/{id}/cancel',
@@ -120,25 +72,6 @@ export const cancelAdmission = <ThrowOnError extends boolean = false>(options: O
     }
 });
 
-/**
- * Assign a bed by hand, bypassing the agent. Places a 30-minute hold and moves the
- * admission to `bed_reserved`.
- *
- * **The manual path must always work.** If the only way to admit a patient were through
- * the AI, the hospital would stop the moment the AI stopped - and it is what makes a human
- * genuinely in control rather than only able to say yes or no.
- *
- * The same hard rules and the same row-locked re-check as the agent's own path. A human
- * may overrule the agent's ranking; nobody may put an ICU patient in a general bed without
- * it being recorded as a downgrade.
- *
- * Reception, a ward nurse and the duty manager may all assign a bed that matches the
- * patient's care level - an intensive-care bed for an ICU patient included, because that is
- * the right bed and not a decision anybody has to make. A bed off that path - a step down,
- * or a ward more acute than the patient needs - is the duty manager's alone, and that
- * depends on which bed was chosen rather than on the route, so choosing one is a 403 from
- * the service and not a 401 from a policy.
- */
 export const assignBedManually = <ThrowOnError extends boolean = false>(options: Options<AssignBedManuallyData, ThrowOnError>): RequestResult<AssignBedManuallyResponses, AssignBedManuallyErrors, ThrowOnError> => (options.client ?? client).post<AssignBedManuallyResponses, AssignBedManuallyErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admissions/{id}/assign-bed',
@@ -149,21 +82,6 @@ export const assignBedManually = <ThrowOnError extends boolean = false>(options:
     }
 });
 
-/**
- * Move a patient into a different bed because the first one was a mistake.
- *
- * Beds get mis-clicked. Without this the only ways out are cancelling a live visit or
- * leaving a patient recorded in a bed somebody else is standing next to, and a ward board
- * that is known to be wrong stops being read at all.
- *
- * <b>A correction, not a transfer.</b> The bed it replaces is written off and charged for
- * nothing, which is right for a mis-click and wrong for a patient who genuinely spent a
- * night in one ward and moved to another.
- *
- * The same permission and the same hard rules as assigning a bed in the first place: a
- * ward nurse correcting a bed still cannot correct it into a ward the patient's care level
- * does not point at.
- */
 export const correctBed = <ThrowOnError extends boolean = false>(options: Options<CorrectBedData, ThrowOnError>): RequestResult<CorrectBedResponses, CorrectBedErrors, ThrowOnError> => (options.client ?? client).post<CorrectBedResponses, CorrectBedErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admissions/{id}/correct-bed',
@@ -174,30 +92,12 @@ export const correctBed = <ThrowOnError extends boolean = false>(options: Option
     }
 });
 
-/**
- * The expected-visits worklist: who is coming in, so the desk knows before they walk up.
- *
- * The patient's own view of the same booking is `GET /me/appointments`, and the two are
- * deliberately different shapes — this one carries who booked it and which admission it
- * became, neither of which is the patient's business.
- *
- * `date` filters on whole UTC days, which is what the column stores.
- */
 export const listAppointments = <ThrowOnError extends boolean = false>(options?: Options<ListAppointmentsData, ThrowOnError>): RequestResult<ListAppointmentsResponses, ListAppointmentsErrors, ThrowOnError> => (options?.client ?? client).get<ListAppointmentsResponses, ListAppointmentsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/appointments',
     ...options
 });
 
-/**
- * Book a visit on a patient's behalf — the desk equivalent of the patient booking it in
- * the app themselves.
- *
- * Records who took the booking, off the token. That field is null for a self-booking,
- * which is how the two paths stay tellable apart afterwards.
- *
- * One open booking at a time, and never a booking for somebody already admitted.
- */
 export const createAppointment = <ThrowOnError extends boolean = false>(options?: Options<CreateAppointmentData, ThrowOnError>): RequestResult<CreateAppointmentResponses, CreateAppointmentErrors, ThrowOnError> => (options?.client ?? client).post<CreateAppointmentResponses, CreateAppointmentErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/appointments',
@@ -208,21 +108,6 @@ export const createAppointment = <ThrowOnError extends boolean = false>(options?
     }
 });
 
-/**
- * Check an expected patient in. Turns the booking into an admission with
- * `source = pre_registered`, in one transaction.
- *
- * The care level is chosen here, by the staff member at the desk — not by the patient
- * when they booked, and not by an agent. `category_set_by_staff_id` records who chose it.
- *
- * A ward nurse may check somebody in as outpatient, day_case or inpatient. `icu` and
- * `hdu` are the duty manager's, so a nurse asking for either is a 403 — the rule depends
- * on the body rather than the route, which is why it is not a policy.
- *
- * From here the admission behaves like any other: it needs a bed, so the bed agent runs
- * on it exactly as it would for a walk-in. Returns the admission, not the appointment,
- * because the admission is what the desk works from next.
- */
 export const checkInAppointment = <ThrowOnError extends boolean = false>(options: Options<CheckInAppointmentData, ThrowOnError>): RequestResult<CheckInAppointmentResponses, CheckInAppointmentErrors, ThrowOnError> => (options.client ?? client).post<CheckInAppointmentResponses, CheckInAppointmentErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/appointments/{id}/check-in',
@@ -233,35 +118,60 @@ export const checkInAppointment = <ThrowOnError extends boolean = false>(options
     }
 });
 
-/**
- * One page of the ward board, newest first. `search` matches the patient's code, name or NIC.
- *
- * **Two tables, one list.** A row is either a booking nobody has checked in yet -
- * `kind = booking`, `status = not_arrived` - or a visit that has started, `kind = visit`.
- * A booking that has been checked in appears once, as its visit, never twice.
- *
- * This exists because `GET /admissions` cannot answer the question. An admission is
- * created by arriving, so a list of admissions can never say "not arrived" about anybody,
- * and the patient booked in for a scan at eleven was invisible until she walked in.
- *
- * **Read-only, and derived.** `status` is a reading of `AppointmentStatus` or
- * `AdmissionStatus`, not a fourth stored status. Nothing transitions between its values;
- * every write still goes to `/appointments/{id}/check-in`, `/admissions/{id}/assign-bed`
- * and the rest. So there is no `PATCH` here and there never will be.
- *
- * No `sortBy`. It is a worklist read top to bottom, not a report - and one sort key over a
- * union of two tables whose time columns mean different things would order it by a column
- * nobody asked for.
- */
 export const listPatientWorklist = <ThrowOnError extends boolean = false>(options?: Options<ListPatientWorklistData, ThrowOnError>): RequestResult<ListPatientWorklistResponses, ListPatientWorklistErrors, ThrowOnError> => (options?.client ?? client).get<ListPatientWorklistResponses, ListPatientWorklistErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/patient-worklist',
     ...options
 });
 
-/**
- * Staff login. The same 401 for a wrong password, an unknown email and a deactivated account, so the endpoint cannot be used to discover which emails exist.
- */
+export const listAmbulances = <ThrowOnError extends boolean = false>(options?: Options<ListAmbulancesData, ThrowOnError>): RequestResult<ListAmbulancesResponses, ListAmbulancesErrors, ThrowOnError> => (options?.client ?? client).get<ListAmbulancesResponses, ListAmbulancesErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/ambulances',
+    ...options
+});
+
+export const createAmbulance = <ThrowOnError extends boolean = false>(options?: Options<CreateAmbulanceData, ThrowOnError>): RequestResult<CreateAmbulanceResponses, CreateAmbulanceErrors, ThrowOnError> => (options?.client ?? client).post<CreateAmbulanceResponses, CreateAmbulanceErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/ambulances',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
+
+export const getAmbulance = <ThrowOnError extends boolean = false>(options: Options<GetAmbulanceData, ThrowOnError>): RequestResult<GetAmbulanceResponses, GetAmbulanceErrors, ThrowOnError> => (options.client ?? client).get<GetAmbulanceResponses, GetAmbulanceErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/ambulances/{id}',
+    ...options
+});
+
+export const updateAmbulance = <ThrowOnError extends boolean = false>(options: Options<UpdateAmbulanceData, ThrowOnError>): RequestResult<UpdateAmbulanceResponses, UpdateAmbulanceErrors, ThrowOnError> => (options.client ?? client).patch<UpdateAmbulanceResponses, UpdateAmbulanceErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/ambulances/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const retireAmbulance = <ThrowOnError extends boolean = false>(options: Options<RetireAmbulanceData, ThrowOnError>): RequestResult<RetireAmbulanceResponses, RetireAmbulanceErrors, ThrowOnError> => (options.client ?? client).post<RetireAmbulanceResponses, RetireAmbulanceErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/ambulances/{id}/retire',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const reinstateAmbulance = <ThrowOnError extends boolean = false>(options: Options<ReinstateAmbulanceData, ThrowOnError>): RequestResult<ReinstateAmbulanceResponses, ReinstateAmbulanceErrors, ThrowOnError> => (options.client ?? client).post<ReinstateAmbulanceResponses, ReinstateAmbulanceErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/ambulances/{id}/reinstate',
+    ...options
+});
+
 export const login = <ThrowOnError extends boolean = false>(options?: Options<LoginData, ThrowOnError>): RequestResult<LoginResponses, LoginErrors, ThrowOnError> => (options?.client ?? client).post<LoginResponses, LoginErrors, ThrowOnError>({
     url: '/auth/login',
     ...options,
@@ -271,9 +181,6 @@ export const login = <ThrowOnError extends boolean = false>(options?: Options<Lo
     }
 });
 
-/**
- * Patient self-registration. Creates a login, not a medical record: no Patient row is created and none is linked. 409 when the phone number already has an active account.
- */
 export const registerPatientAccount = <ThrowOnError extends boolean = false>(options?: Options<RegisterPatientAccountData, ThrowOnError>): RequestResult<RegisterPatientAccountResponses, RegisterPatientAccountErrors, ThrowOnError> => (options?.client ?? client).post<RegisterPatientAccountResponses, RegisterPatientAccountErrors, ThrowOnError>({
     url: '/auth/patient/register',
     ...options,
@@ -283,9 +190,6 @@ export const registerPatientAccount = <ThrowOnError extends boolean = false>(opt
     }
 });
 
-/**
- * Patient login, by phone number. Same indistinguishable 401 as staff login.
- */
 export const loginPatient = <ThrowOnError extends boolean = false>(options?: Options<LoginPatientData, ThrowOnError>): RequestResult<LoginPatientResponses, LoginPatientErrors, ThrowOnError> => (options?.client ?? client).post<LoginPatientResponses, LoginPatientErrors, ThrowOnError>({
     url: '/auth/patient/login',
     ...options,
@@ -295,9 +199,6 @@ export const loginPatient = <ThrowOnError extends boolean = false>(options?: Opt
     }
 });
 
-/**
- * Exchange a refresh token for a new access token. Rotating, so the presented token is single-use; presenting an already-revoked one revokes the whole chain and returns 401.
- */
 export const refreshToken = <ThrowOnError extends boolean = false>(options?: Options<RefreshTokenData, ThrowOnError>): RequestResult<RefreshTokenResponses, RefreshTokenErrors, ThrowOnError> => (options?.client ?? client).post<RefreshTokenResponses, RefreshTokenErrors, ThrowOnError>({
     url: '/auth/refresh',
     ...options,
@@ -307,9 +208,6 @@ export const refreshToken = <ThrowOnError extends boolean = false>(options?: Opt
     }
 });
 
-/**
- * End the session by revoking the presented refresh token. Idempotent — logging out twice is a 204.
- */
 export const logout = <ThrowOnError extends boolean = false>(options?: Options<LogoutData, ThrowOnError>): RequestResult<LogoutResponses, LogoutErrors, ThrowOnError> => (options?.client ?? client).post<LogoutResponses, LogoutErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/auth/logout',
@@ -320,27 +218,18 @@ export const logout = <ThrowOnError extends boolean = false>(options?: Options<L
     }
 });
 
-/**
- * Who this token belongs to. Resolved from the sub claim, so there is no id parameter to change.
- */
 export const getCurrentUser = <ThrowOnError extends boolean = false>(options?: Options<GetCurrentUserData, ThrowOnError>): RequestResult<GetCurrentUserResponses, GetCurrentUserErrors, ThrowOnError> => (options?.client ?? client).get<GetCurrentUserResponses, GetCurrentUserErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/auth/me',
     ...options
 });
 
-/**
- * List beds. Also read by Patient Management, which joins this register with its own BedAssignment rows to build its bed agent's candidate list.
- */
 export const listBeds = <ThrowOnError extends boolean = false>(options?: Options<ListBedsData, ThrowOnError>): RequestResult<ListBedsResponses, ListBedsErrors, ThrowOnError> => (options?.client ?? client).get<ListBedsResponses, ListBedsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/beds',
     ...options
 });
 
-/**
- * Create a bed. ward_id references Patient Management's Ward table; we store the reference and never write that table.
- */
 export const createBed = <ThrowOnError extends boolean = false>(options?: Options<CreateBedData, ThrowOnError>): RequestResult<CreateBedResponses, CreateBedErrors, ThrowOnError> => (options?.client ?? client).post<CreateBedResponses, CreateBedErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/beds',
@@ -351,9 +240,6 @@ export const createBed = <ThrowOnError extends boolean = false>(options?: Option
     }
 });
 
-/**
- * Update a bed's condition or details. Moving to out_of_service is refused with 409 while Patient Management reports the bed occupied or held, checked inside this request every time.
- */
 export const updateBed = <ThrowOnError extends boolean = false>(options: Options<UpdateBedData, ThrowOnError>): RequestResult<UpdateBedResponses, UpdateBedErrors, ThrowOnError> => (options.client ?? client).patch<UpdateBedResponses, UpdateBedErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/beds/{id}',
@@ -364,47 +250,24 @@ export const updateBed = <ThrowOnError extends boolean = false>(options: Options
     }
 });
 
-/**
- * Retire a bed permanently. Same occupancy check as an update that withdraws it, and there is no un-retire — a dedicated endpoint so the one-way nature is visible in the API surface.
- */
 export const retireBed = <ThrowOnError extends boolean = false>(options: Options<RetireBedData, ThrowOnError>): RequestResult<RetireBedResponses, RetireBedErrors, ThrowOnError> => (options.client ?? client).post<RetireBedResponses, RetireBedErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/beds/{id}/retire',
     ...options
 });
 
-/**
- * The bill for a visit. 404 until somebody prepares one — a bill is written the first time
- * it is asked for, because a stay that has not happened yet cannot be priced.
- */
 export const getAdmissionBill = <ThrowOnError extends boolean = false>(options: Options<GetAdmissionBillData, ThrowOnError>): RequestResult<GetAdmissionBillResponses, GetAdmissionBillErrors, ThrowOnError> => (options.client ?? client).get<GetAdmissionBillResponses, GetAdmissionBillErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admissions/{admissionId}/bill',
     ...options
 });
 
-/**
- * Work the bill out from the stay, and open one if this visit has none.
- *
- * Every generated line is replaced — one admission fee, and one line per bed the patient
- * has actually been in, at that ward's day rate. Typed charges are left exactly as they
- * are, so preparing again a day later updates the bed days and keeps the X-ray.
- *
- * Refused with 409 once the bill is settled: that is the paper the patient was handed.
- */
 export const prepareAdmissionBill = <ThrowOnError extends boolean = false>(options: Options<PrepareAdmissionBillData, ThrowOnError>): RequestResult<PrepareAdmissionBillResponses, PrepareAdmissionBillErrors, ThrowOnError> => (options.client ?? client).post<PrepareAdmissionBillResponses, PrepareAdmissionBillErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admissions/{admissionId}/bill',
     ...options
 });
 
-/**
- * Add a charge reception types in — an X-ray, a dressing pack, a consultant's fee.
- *
- * Typed rather than generated because no table in this component records a treatment
- * against an admission. Asking a human to type what happened is honest; inventing line
- * items from tables that do not exist is not.
- */
 export const addBillCharge = <ThrowOnError extends boolean = false>(options: Options<AddBillChargeData, ThrowOnError>): RequestResult<AddBillChargeResponses, AddBillChargeErrors, ThrowOnError> => (options.client ?? client).post<AddBillChargeResponses, AddBillChargeErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admissions/{admissionId}/bill/charges',
@@ -415,26 +278,12 @@ export const addBillCharge = <ThrowOnError extends boolean = false>(options: Opt
     }
 });
 
-/**
- * Take a typed charge off again. A generated line is refused with 409 — it would come
- * straight back the next time anyone prepared the bill.
- */
 export const removeBillCharge = <ThrowOnError extends boolean = false>(options: Options<RemoveBillChargeData, ThrowOnError>): RequestResult<RemoveBillChargeResponses, RemoveBillChargeErrors, ThrowOnError> => (options.client ?? client).delete<RemoveBillChargeResponses, RemoveBillChargeErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admissions/{admissionId}/bill/charges/{lineId}',
     ...options
 });
 
-/**
- * The money is in. Freezes the bill and ticks `billing_settled` on the discharge checklist,
- * in one transaction.
- *
- * That tick has no other way of being written — `PATCH /discharges/{id}/checklist` refuses
- * the key. So the bill and the checklist cannot disagree about whether a patient has paid.
- *
- * Settling a visit nobody prepared a bill for works the bill out first, so a visit with no
- * bill can never deadlock a discharge.
- */
 export const settleBill = <ThrowOnError extends boolean = false>(options: Options<SettleBillData, ThrowOnError>): RequestResult<SettleBillResponses, SettleBillErrors, ThrowOnError> => (options.client ?? client).post<SettleBillResponses, SettleBillErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admissions/{admissionId}/bill/settle',
@@ -445,39 +294,18 @@ export const settleBill = <ThrowOnError extends boolean = false>(options: Option
     }
 });
 
-/**
- * Reception's worklist: visits in the building whose money has not been taken yet.
- *
- * Includes visits with no bill row at all, which is most of them. A list of bills would
- * have shown an empty screen and left the work invisible.
- *
- * A discharged visit is never on the default list: confirming a discharge needs
- * `billing_settled`, and only settling writes that. `includeSettled=true` is how you reach
- * one anyway — it widens the list to every visit that has a bill, in any status, which is
- * what a patient asking for another copy of their bill at the counter needs.
- */
 export const listOutstandingBills = <ThrowOnError extends boolean = false>(options?: Options<ListOutstandingBillsData, ThrowOnError>): RequestResult<ListOutstandingBillsResponses, ListOutstandingBillsErrors, ThrowOnError> => (options?.client ?? client).get<ListOutstandingBillsResponses, ListOutstandingBillsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/billing/outstanding',
     ...options
 });
 
-/**
- * The whole price grid: every expense, in every kind of ward, plus the admission fees.
- */
 export const getBillingRates = <ThrowOnError extends boolean = false>(options?: Options<GetBillingRatesData, ThrowOnError>): RequestResult<GetBillingRatesResponses, GetBillingRatesErrors, ThrowOnError> => (options?.client ?? client).get<GetBillingRatesResponses, GetBillingRatesErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/billing/rates',
     ...options
 });
 
-/**
- * Change prices. Only the cells that changed need to be sent.
- *
- * <b>This never alters a bill already raised.</b> The price is copied onto the line when
- * the line is written, so a change here prices tomorrow's bills and leaves every piece of
- * paper a patient has already been handed exactly as it was.
- */
 export const updateBillingRates = <ThrowOnError extends boolean = false>(options?: Options<UpdateBillingRatesData, ThrowOnError>): RequestResult<UpdateBillingRatesResponses, UpdateBillingRatesErrors, ThrowOnError> => (options?.client ?? client).put<UpdateBillingRatesResponses, UpdateBillingRatesErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/billing/rates',
@@ -488,39 +316,12 @@ export const updateBillingRates = <ThrowOnError extends boolean = false>(options
     }
 });
 
-/**
- * Patients whose checklist says they could go home, and the ones with a box or two left.
- * A plain rule over the checklist rows, not an agent — checking whether three boxes are
- * ticked is a `WHERE` clause.
- *
- * The list is advisory. Being on it changes nothing until a human confirms.
- *
- * `includeDischarged` adds the visits that are already over, as records. They sort below
- * everyone still in the building, carry `is_discharged` and `discharged_at`, and are never
- * candidates for anything — without them this screen forgets every patient the moment the
- * work on them is finished.
- */
 export const listDischargeCandidates = <ThrowOnError extends boolean = false>(options?: Options<ListDischargeCandidatesData, ThrowOnError>): RequestResult<ListDischargeCandidatesResponses, ListDischargeCandidatesErrors, ThrowOnError> => (options?.client ?? client).get<ListDischargeCandidatesResponses, ListDischargeCandidatesErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/discharges/candidates',
     ...options
 });
 
-/**
- * Tick discharge checklist items. Any subset; a key left out is not touched.
- *
- * Each item is gated by role, not just by login:
- *
- * - `clinical_clearance` — **Doctor only.** This is the wall. Without it nothing flags and
- * nothing discharges, and no automated process can ever set it.
- * - `medication_issued`, `follow_up_recorded`, `transport_arranged` — Ward Nurse.
- * - `billing_settled` — **refused here.** Settle the bill instead
- * (`POST /api/admissions/{id}/bill/settle`), which is what writes it. One fact, one
- * place: a paid bill and an unticked box cannot happen.
- *
- * Ticking the last mandatory box moves the admission to `ready_for_discharge`; unticking
- * one moves it back to `admitted`.
- */
 export const updateDischargeChecklist = <ThrowOnError extends boolean = false>(options: Options<UpdateDischargeChecklistData, ThrowOnError>): RequestResult<UpdateDischargeChecklistResponses, UpdateDischargeChecklistErrors, ThrowOnError> => (options.client ?? client).patch<UpdateDischargeChecklistResponses, UpdateDischargeChecklistErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/discharges/{admissionId}/checklist',
@@ -531,20 +332,6 @@ export const updateDischargeChecklist = <ThrowOnError extends boolean = false>(o
     }
 });
 
-/**
- * Confirm the discharge — the second high-impact human gate in this component.
- *
- * It ends the admission, frees the bed for the next patient, and sends someone home. In one
- * transaction it sets `discharged_at`, releases the bed assignment with
- * `release_reason: discharged`, and moves the admission to `discharged`.
- *
- * Reception, a ward nurse or the duty manager, **at any care level** — the ICU and HDU
- * restriction was removed on 2026-09-12. **The gate is the checklist, not the role.** Both
- * mandatory boxes must be ticked or this is a 409, and the clinical one is a doctor's and
- * nobody else's, so no patient goes home without a doctor having cleared them. That is the
- * signature that means something; a second one from somebody who was not at the bedside
- * was delay rather than safety.
- */
 export const confirmDischarge = <ThrowOnError extends boolean = false>(options: Options<ConfirmDischargeData, ThrowOnError>): RequestResult<ConfirmDischargeResponses, ConfirmDischargeErrors, ThrowOnError> => (options.client ?? client).post<ConfirmDischargeResponses, ConfirmDischargeErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/discharges/{admissionId}/confirm',
@@ -555,18 +342,12 @@ export const confirmDischarge = <ThrowOnError extends boolean = false>(options: 
     }
 });
 
-/**
- * List the equipment categories. Any staff member may read them, because anyone browsing equipment needs them.
- */
 export const listEquipmentCategories = <ThrowOnError extends boolean = false>(options?: Options<ListEquipmentCategoriesData, ThrowOnError>): RequestResult<ListEquipmentCategoriesResponses, ListEquipmentCategoriesErrors, ThrowOnError> => (options?.client ?? client).get<ListEquipmentCategoriesResponses, ListEquipmentCategoriesErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/equipment-categories',
     ...options
 });
 
-/**
- * Add a category. Names are compared without case, so "Surgical Gear" and "surgical gear" cannot both exist.
- */
 export const createEquipmentCategory = <ThrowOnError extends boolean = false>(options?: Options<CreateEquipmentCategoryData, ThrowOnError>): RequestResult<CreateEquipmentCategoryResponses, CreateEquipmentCategoryErrors, ThrowOnError> => (options?.client ?? client).post<CreateEquipmentCategoryResponses, CreateEquipmentCategoryErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/equipment-categories',
@@ -577,18 +358,12 @@ export const createEquipmentCategory = <ThrowOnError extends boolean = false>(op
     }
 });
 
-/**
- * Search equipment. Open to any staff member, because "do we have a working X" is a question anyone in the hospital may need to ask.
- */
 export const listEquipmentItems = <ThrowOnError extends boolean = false>(options?: Options<ListEquipmentItemsData, ThrowOnError>): RequestResult<ListEquipmentItemsResponses, ListEquipmentItemsErrors, ThrowOnError> => (options?.client ?? client).get<ListEquipmentItemsResponses, ListEquipmentItemsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/equipment-items',
     ...options
 });
 
-/**
- * Register a physical item. It starts available, and 409s if the asset tag or serial number is already in use.
- */
 export const createEquipmentItem = <ThrowOnError extends boolean = false>(options?: Options<CreateEquipmentItemData, ThrowOnError>): RequestResult<CreateEquipmentItemResponses, CreateEquipmentItemErrors, ThrowOnError> => (options?.client ?? client).post<CreateEquipmentItemResponses, CreateEquipmentItemErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/equipment-items',
@@ -599,18 +374,12 @@ export const createEquipmentItem = <ThrowOnError extends boolean = false>(option
     }
 });
 
-/**
- * One item with its servicing history and any warnings still open.
- */
 export const getEquipmentItem = <ThrowOnError extends boolean = false>(options: Options<GetEquipmentItemData, ThrowOnError>): RequestResult<GetEquipmentItemResponses, GetEquipmentItemErrors, ThrowOnError> => (options.client ?? client).get<GetEquipmentItemResponses, GetEquipmentItemErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/equipment-items/{id}',
     ...options
 });
 
-/**
- * Update an item. A status change here is checked against the lifecycle, so retired stays terminal and assigned cannot be jumped into.
- */
 export const updateEquipmentItem = <ThrowOnError extends boolean = false>(options: Options<UpdateEquipmentItemData, ThrowOnError>): RequestResult<UpdateEquipmentItemResponses, UpdateEquipmentItemErrors, ThrowOnError> => (options.client ?? client).put<UpdateEquipmentItemResponses, UpdateEquipmentItemErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/equipment-items/{id}',
@@ -621,18 +390,12 @@ export const updateEquipmentItem = <ThrowOnError extends boolean = false>(option
     }
 });
 
-/**
- * What a scanned QR tag resolves to. This is the call the Flutter scan screen makes the instant a technician scans a label.
- */
 export const getEquipmentItemByTag = <ThrowOnError extends boolean = false>(options: Options<GetEquipmentItemByTagData, ThrowOnError>): RequestResult<GetEquipmentItemByTagResponses, GetEquipmentItemByTagErrors, ThrowOnError> => (options.client ?? client).get<GetEquipmentItemByTagResponses, GetEquipmentItemByTagErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/equipment-items/by-tag/{assetTag}',
     ...options
 });
 
-/**
- * Assign an item to an admission. Only an available item can be assigned, so a ventilator cannot be given to two patients.
- */
 export const assignEquipmentItem = <ThrowOnError extends boolean = false>(options: Options<AssignEquipmentItemData, ThrowOnError>): RequestResult<AssignEquipmentItemResponses, AssignEquipmentItemErrors, ThrowOnError> => (options.client ?? client).post<AssignEquipmentItemResponses, AssignEquipmentItemErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/equipment-items/{id}/assign',
@@ -643,18 +406,12 @@ export const assignEquipmentItem = <ThrowOnError extends boolean = false>(option
     }
 });
 
-/**
- * Release an assigned item back to available. No assignment history is kept past this point, which the plan calls a deliberate simplification.
- */
 export const releaseEquipmentItem = <ThrowOnError extends boolean = false>(options: Options<ReleaseEquipmentItemData, ThrowOnError>): RequestResult<ReleaseEquipmentItemResponses, ReleaseEquipmentItemErrors, ThrowOnError> => (options.client ?? client).post<ReleaseEquipmentItemResponses, ReleaseEquipmentItemErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/equipment-items/{id}/release',
     ...options
 });
 
-/**
- * Report a fault. Any staff member may, and the item moves to maintenance immediately rather than waiting for the next sweep.
- */
 export const reportEquipmentFault = <ThrowOnError extends boolean = false>(options: Options<ReportEquipmentFaultData, ThrowOnError>): RequestResult<ReportEquipmentFaultResponses, ReportEquipmentFaultErrors, ThrowOnError> => (options.client ?? client).post<ReportEquipmentFaultResponses, ReportEquipmentFaultErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/equipment-items/{id}/report-fault',
@@ -665,41 +422,20 @@ export const reportEquipmentFault = <ThrowOnError extends boolean = false>(optio
     }
 });
 
-/**
- * Liveness and database connectivity. An API that answers "up" while PostgreSQL is unreachable is worse than one that says nothing, because it stops anyone from looking.
- */
 export const getHealth = <ThrowOnError extends boolean = false>(options?: Options<GetHealthData, ThrowOnError>): RequestResult<GetHealthResponses, GetHealthErrors, ThrowOnError> => (options?.client ?? client).get<GetHealthResponses, GetHealthErrors, ThrowOnError>({ url: '/health', ...options });
 
-/**
- * Free bed counts across all wards. Consumed by Emergency Service's dispatch and routing
- * agent to choose where to send an ambulance.
- *
- * `free_beds` counts beds that are usable, unoccupied, and not under a live hold. A hold
- * past its `reserved_until` counts as free, and that expiry rule lives in this service so
- * no other component re-implements it differently.
- *
- * Counts only. No patient data crosses this boundary.
- */
 export const getWardCapacity = <ThrowOnError extends boolean = false>(options?: Options<GetWardCapacityData, ThrowOnError>): RequestResult<GetWardCapacityResponses, GetWardCapacityErrors, ThrowOnError> => (options?.client ?? client).get<GetWardCapacityResponses, GetWardCapacityErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/capacity/wards',
     ...options
 });
 
-/**
- * One patient's results, newest first. Metadata only: each row says what the file is and
- * how big it is, and the file itself is a second request.
- */
 export const listLabReports = <ThrowOnError extends boolean = false>(options: Options<ListLabReportsData, ThrowOnError>): RequestResult<ListLabReportsResponses, ListLabReportsErrors, ThrowOnError> => (options.client ?? client).get<ListLabReportsResponses, ListLabReportsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/lab-reports',
     ...options
 });
 
-/**
- * Files a finished report. A multipart form, because it carries the scan itself: a PDF or
- * a photograph of one, up to 10 MB.
- */
 export const uploadLabReport = <ThrowOnError extends boolean = false>(options?: Options<UploadLabReportData, ThrowOnError>): RequestResult<UploadLabReportResponses, UploadLabReportErrors, ThrowOnError> => (options?.client ?? client).post<UploadLabReportResponses, UploadLabReportErrors, ThrowOnError>({
     ...formDataBodySerializer,
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -711,47 +447,24 @@ export const uploadLabReport = <ThrowOnError extends boolean = false>(options?: 
     }
 });
 
-/**
- * Who the laboratory can file against right now, ward by ward. Omit `wardName` for every
- * current visit, including outpatients holding no bed.
- *
- * This is how a lab actually works: a rack of specimens from one ward, worked down in order.
- * Everything published here is already visible to these roles through
- * `GET /patients/{id}`, which carries a patient's admissions and the ward on them - this
- * shape just saves opening one patient at a time.
- */
 export const listLabPatients = <ThrowOnError extends boolean = false>(options?: Options<ListLabPatientsData, ThrowOnError>): RequestResult<ListLabPatientsResponses, ListLabPatientsErrors, ThrowOnError> => (options?.client ?? client).get<ListLabPatientsResponses, ListLabPatientsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/lab-reports/patients',
     ...options
 });
 
-/**
- * The report itself, served as the document it is so a browser opens a PDF rather than
- * downloading unnamed bytes.
- */
 export const downloadLabReport = <ThrowOnError extends boolean = false>(options: Options<DownloadLabReportData, ThrowOnError>): RequestResult<DownloadLabReportResponses, DownloadLabReportErrors, ThrowOnError> => (options.client ?? client).get<DownloadLabReportResponses, DownloadLabReportErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/lab-reports/{id}/file',
     ...options
 });
 
-/**
- * The work list, soonest first. `overdue=true` returns tasks still scheduled whose date
- * has passed, worked out when you ask rather than stored, so nothing has to sweep the
- * table at midnight to keep it honest.
- */
 export const listMaintenanceSchedules = <ThrowOnError extends boolean = false>(options?: Options<ListMaintenanceSchedulesData, ThrowOnError>): RequestResult<ListMaintenanceSchedulesResponses, ListMaintenanceSchedulesErrors, ThrowOnError> => (options?.client ?? client).get<ListMaintenanceSchedulesResponses, ListMaintenanceSchedulesErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/maintenance-schedules',
     ...options
 });
 
-/**
- * Book a service by hand, with no agent involved. This path has to keep working: if the
- * only way to schedule maintenance were through the agent, the hospital would stop the
- * day the agent did. Booking against an occupied bed is refused with a 409.
- */
 export const createMaintenanceSchedule = <ThrowOnError extends boolean = false>(options?: Options<CreateMaintenanceScheduleData, ThrowOnError>): RequestResult<CreateMaintenanceScheduleResponses, CreateMaintenanceScheduleErrors, ThrowOnError> => (options?.client ?? client).post<CreateMaintenanceScheduleResponses, CreateMaintenanceScheduleErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/maintenance-schedules',
@@ -762,11 +475,6 @@ export const createMaintenanceSchedule = <ThrowOnError extends boolean = false>(
     }
 });
 
-/**
- * Mark the work done. The asset goes back into service, its next service is booked
- * forward, and any warning that led here closes, all in one transaction. Who did the
- * work comes from the token, never the body.
- */
 export const completeMaintenanceSchedule = <ThrowOnError extends boolean = false>(options: Options<CompleteMaintenanceScheduleData, ThrowOnError>): RequestResult<CompleteMaintenanceScheduleResponses, CompleteMaintenanceScheduleErrors, ThrowOnError> => (options.client ?? client).post<CompleteMaintenanceScheduleResponses, CompleteMaintenanceScheduleErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/maintenance-schedules/{id}/complete',
@@ -777,20 +485,62 @@ export const completeMaintenanceSchedule = <ThrowOnError extends boolean = false
     }
 });
 
-/**
- * Search patients. `search` matches patient code, full name, NIC, phone or temporary
- * reference. Equipment Management reads this to find a patient's code.
- */
+export const preRegisterSelf = <ThrowOnError extends boolean = false>(options?: Options<PreRegisterSelfData, ThrowOnError>): RequestResult<PreRegisterSelfResponses, PreRegisterSelfErrors, ThrowOnError> => (options?.client ?? client).post<PreRegisterSelfResponses, PreRegisterSelfErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/pre-register',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
+
+export const getMyProfile = <ThrowOnError extends boolean = false>(options?: Options<GetMyProfileData, ThrowOnError>): RequestResult<GetMyProfileResponses, GetMyProfileErrors, ThrowOnError> => (options?.client ?? client).get<GetMyProfileResponses, GetMyProfileErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/profile',
+    ...options
+});
+
+export const getMyAdmission = <ThrowOnError extends boolean = false>(options?: Options<GetMyAdmissionData, ThrowOnError>): RequestResult<GetMyAdmissionResponses, GetMyAdmissionErrors, ThrowOnError> => (options?.client ?? client).get<GetMyAdmissionResponses, GetMyAdmissionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/admission',
+    ...options
+});
+
+export const getMyHistory = <ThrowOnError extends boolean = false>(options?: Options<GetMyHistoryData, ThrowOnError>): RequestResult<GetMyHistoryResponses, GetMyHistoryErrors, ThrowOnError> => (options?.client ?? client).get<GetMyHistoryResponses, GetMyHistoryErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/history',
+    ...options
+});
+
+export const listMyAppointments = <ThrowOnError extends boolean = false>(options?: Options<ListMyAppointmentsData, ThrowOnError>): RequestResult<ListMyAppointmentsResponses, ListMyAppointmentsErrors, ThrowOnError> => (options?.client ?? client).get<ListMyAppointmentsResponses, ListMyAppointmentsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/appointments',
+    ...options
+});
+
+export const bookMyAppointment = <ThrowOnError extends boolean = false>(options?: Options<BookMyAppointmentData, ThrowOnError>): RequestResult<BookMyAppointmentResponses, BookMyAppointmentErrors, ThrowOnError> => (options?.client ?? client).post<BookMyAppointmentResponses, BookMyAppointmentErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/appointments',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
+
+export const cancelMyAppointment = <ThrowOnError extends boolean = false>(options: Options<CancelMyAppointmentData, ThrowOnError>): RequestResult<CancelMyAppointmentResponses, CancelMyAppointmentErrors, ThrowOnError> => (options.client ?? client).post<CancelMyAppointmentResponses, CancelMyAppointmentErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/appointments/{id}/cancel',
+    ...options
+});
+
 export const listPatients = <ThrowOnError extends boolean = false>(options?: Options<ListPatientsData, ThrowOnError>): RequestResult<ListPatientsResponses, ListPatientsErrors, ThrowOnError> => (options?.client ?? client).get<ListPatientsResponses, ListPatientsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/patients',
     ...options
 });
 
-/**
- * Register a patient. Call lookup first when an NIC is available — a returning patient must
- * keep one record with many admissions, not gain a second identity.
- */
 export const createPatient = <ThrowOnError extends boolean = false>(options?: Options<CreatePatientData, ThrowOnError>): RequestResult<CreatePatientResponses, CreatePatientErrors, ThrowOnError> => (options?.client ?? client).post<CreatePatientResponses, CreatePatientErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/patients',
@@ -801,18 +551,12 @@ export const createPatient = <ThrowOnError extends boolean = false>(options?: Op
     }
 });
 
-/**
- * Get one patient with their visit history. One patient, many admissions.
- */
 export const getPatient = <ThrowOnError extends boolean = false>(options: Options<GetPatientData, ThrowOnError>): RequestResult<GetPatientResponses, GetPatientErrors, ThrowOnError> => (options.client ?? client).get<GetPatientResponses, GetPatientErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/patients/{id}',
     ...options
 });
 
-/**
- * Update a patient record. A full replace — a field left out is cleared.
- */
 export const updatePatient = <ThrowOnError extends boolean = false>(options: Options<UpdatePatientData, ThrowOnError>): RequestResult<UpdatePatientResponses, UpdatePatientErrors, ThrowOnError> => (options.client ?? client).put<UpdatePatientResponses, UpdatePatientErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/patients/{id}',
@@ -823,10 +567,6 @@ export const updatePatient = <ThrowOnError extends boolean = false>(options: Opt
     }
 });
 
-/**
- * Find an existing patient by NIC before registering a new one. A miss is a 200 with
- * found = false; not knowing someone is the normal answer at a registration desk.
- */
 export const lookupPatient = <ThrowOnError extends boolean = false>(options?: Options<LookupPatientData, ThrowOnError>): RequestResult<LookupPatientResponses, LookupPatientErrors, ThrowOnError> => (options?.client ?? client).post<LookupPatientResponses, LookupPatientErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/patients/lookup',
@@ -837,10 +577,6 @@ export const lookupPatient = <ThrowOnError extends boolean = false>(options?: Op
     }
 });
 
-/**
- * Attach a patient login to an existing record. A record and an account are different
- * things — staff link them deliberately, after checking identity.
- */
 export const linkPatientAccount = <ThrowOnError extends boolean = false>(options: Options<LinkPatientAccountData, ThrowOnError>): RequestResult<LinkPatientAccountResponses, LinkPatientAccountErrors, ThrowOnError> => (options.client ?? client).post<LinkPatientAccountResponses, LinkPatientAccountErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/patients/{id}/link-account',
@@ -851,18 +587,12 @@ export const linkPatientAccount = <ThrowOnError extends boolean = false>(options
     }
 });
 
-/**
- * List the pharmacy categories. Any staff member may read them, because anyone searching for a medicine needs them.
- */
 export const listPharmacyCategories = <ThrowOnError extends boolean = false>(options?: Options<ListPharmacyCategoriesData, ThrowOnError>): RequestResult<ListPharmacyCategoriesResponses, ListPharmacyCategoriesErrors, ThrowOnError> => (options?.client ?? client).get<ListPharmacyCategoriesResponses, ListPharmacyCategoriesErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/pharmacy-categories',
     ...options
 });
 
-/**
- * Add a category. Names are compared without case, so one category cannot exist twice under different capitalisation.
- */
 export const createPharmacyCategory = <ThrowOnError extends boolean = false>(options?: Options<CreatePharmacyCategoryData, ThrowOnError>): RequestResult<CreatePharmacyCategoryResponses, CreatePharmacyCategoryErrors, ThrowOnError> => (options?.client ?? client).post<CreatePharmacyCategoryResponses, CreatePharmacyCategoryErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/pharmacy-categories',
@@ -873,18 +603,12 @@ export const createPharmacyCategory = <ThrowOnError extends boolean = false>(opt
     }
 });
 
-/**
- * Search the pharmacy and check availability. Open to any staff member: "do we have this medicine" is a question anyone in the hospital may need to ask.
- */
 export const listPharmacyItems = <ThrowOnError extends boolean = false>(options?: Options<ListPharmacyItemsData, ThrowOnError>): RequestResult<ListPharmacyItemsResponses, ListPharmacyItemsErrors, ThrowOnError> => (options?.client ?? client).get<ListPharmacyItemsResponses, ListPharmacyItemsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/pharmacy-items',
     ...options
 });
 
-/**
- * Add a medicine or supply to the catalog. Opening stock is set here; everything after is a transaction.
- */
 export const createPharmacyItem = <ThrowOnError extends boolean = false>(options?: Options<CreatePharmacyItemData, ThrowOnError>): RequestResult<CreatePharmacyItemResponses, CreatePharmacyItemErrors, ThrowOnError> => (options?.client ?? client).post<CreatePharmacyItemResponses, CreatePharmacyItemErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/pharmacy-items',
@@ -895,29 +619,18 @@ export const createPharmacyItem = <ThrowOnError extends boolean = false>(options
     }
 });
 
-/**
- * One catalog entry with its current quantity.
- */
 export const getPharmacyItem = <ThrowOnError extends boolean = false>(options: Options<GetPharmacyItemData, ThrowOnError>): RequestResult<GetPharmacyItemResponses, GetPharmacyItemErrors, ThrowOnError> => (options.client ?? client).get<GetPharmacyItemResponses, GetPharmacyItemErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/pharmacy-items/{id}',
     ...options
 });
 
-/**
- * One item's movement history, newest first. This is the audit trail, so nothing here is ever edited or removed.
- */
 export const listPharmacyTransactions = <ThrowOnError extends boolean = false>(options: Options<ListPharmacyTransactionsData, ThrowOnError>): RequestResult<ListPharmacyTransactionsResponses, ListPharmacyTransactionsErrors, ThrowOnError> => (options.client ?? client).get<ListPharmacyTransactionsResponses, ListPharmacyTransactionsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/pharmacy-items/{id}/transactions',
     ...options
 });
 
-/**
- * Record a stock movement. Quantity on hand is never edited directly: every change is a
- * transaction, applied as one conditional update, so stock cannot go negative and two
- * people dispensing the last box at once cannot both succeed.
- */
 export const recordPharmacyTransaction = <ThrowOnError extends boolean = false>(options: Options<RecordPharmacyTransactionData, ThrowOnError>): RequestResult<RecordPharmacyTransactionResponses, RecordPharmacyTransactionErrors, ThrowOnError> => (options.client ?? client).post<RecordPharmacyTransactionResponses, RecordPharmacyTransactionErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/pharmacy-items/{id}/transactions',
@@ -928,60 +641,24 @@ export const recordPharmacyTransaction = <ThrowOnError extends boolean = false>(
     }
 });
 
-/**
- * List beds with their availability. This is the candidate list the bed agent will work
- * from, and the one a nurse picks from by hand today.
- *
- * `free` applies hold expiry, so a bed whose 30-minute reservation has lapsed is reported
- * free with nobody having released it. That expiry rule lives in one place in this
- * component and is not re-implemented per endpoint.
- *
- * Retired wards and retired beds are absent rather than listed as unavailable.
- *
- * <b>pageSize goes to 500 here, where every other paged route stops at 100.</b> This one
- * feeds a bed picker, which is a complete candidate list and not a page anybody browses -
- * a nurse choosing a bed has to see every bed the patient could go in. At 100 the seeded
- * hospital's 135 beds were cut off mid-alphabet with nothing on screen saying so, and
- * pediatric and surgical beds could not be chosen at all. The service already loads every
- * bed to apply hold expiry and pages in memory, so the higher ceiling costs nothing new.
- */
 export const listBedAvailability = <ThrowOnError extends boolean = false>(options?: Options<ListBedAvailabilityData, ThrowOnError>): RequestResult<ListBedAvailabilityResponses, ListBedAvailabilityErrors, ThrowOnError> => (options?.client ?? client).get<ListBedAvailabilityResponses, ListBedAvailabilityErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/bed-availability',
     ...options
 });
 
-/**
- * Is anyone in this bed?
- *
- * Equipment Management calls this **before** taking a bed out of service for repair or
- * maintenance. Servicing a bed is their operation on their own table, but a bed with a
- * patient in it must not be withdrawn, and only we know whether it is occupied.
- *
- * `occupied` is true when a live assignment exists: status `occupied`, or `reserved` with
- * a `reserved_until` still in the future. A lapsed hold does not block servicing.
- *
- * The hard rule this exists to enforce: **maintenance never evicts a patient.** If the
- * answer is occupied, Equipment waits for discharge.
- */
 export const getBedOccupancy = <ThrowOnError extends boolean = false>(options: Options<GetBedOccupancyData, ThrowOnError>): RequestResult<GetBedOccupancyResponses, GetBedOccupancyErrors, ThrowOnError> => (options.client ?? client).get<GetBedOccupancyResponses, GetBedOccupancyErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/beds/{id}/occupancy',
     ...options
 });
 
-/**
- * List wards. Also read by Equipment Management for allocation and by Staff Management for staffing demand.
- */
 export const listWards = <ThrowOnError extends boolean = false>(options?: Options<ListWardsData, ThrowOnError>): RequestResult<ListWardsResponses, ListWardsErrors, ThrowOnError> => (options?.client ?? client).get<ListWardsResponses, ListWardsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/wards',
     ...options
 });
 
-/**
- * Create a ward. The gender policy is a property of the ward, not a rule the bed agent bends under pressure.
- */
 export const createWard = <ThrowOnError extends boolean = false>(options?: Options<CreateWardData, ThrowOnError>): RequestResult<CreateWardResponses, CreateWardErrors, ThrowOnError> => (options?.client ?? client).post<CreateWardResponses, CreateWardErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/wards',
@@ -992,17 +669,6 @@ export const createWard = <ThrowOnError extends boolean = false>(options?: Optio
     }
 });
 
-/**
- * Occupancy and care mix for one ward. Consumed by Staff Management to work out staffing
- * demand.
- *
- * `patients_by_category` is the useful part: fifteen routine inpatients and two
- * high-dependency patients need very different staffing, even though both are "seventeen
- * patients". `incoming_next_2h` is what lets the staff allocation agent staff AHEAD of a
- * rush instead of reacting to one.
- *
- * Counts only. No patient identities cross this boundary.
- */
 export const getWardOccupancy = <ThrowOnError extends boolean = false>(options: Options<GetWardOccupancyData, ThrowOnError>): RequestResult<GetWardOccupancyResponses, GetWardOccupancyErrors, ThrowOnError> => (options.client ?? client).get<GetWardOccupancyResponses, GetWardOccupancyErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/wards/{id}/occupancy',

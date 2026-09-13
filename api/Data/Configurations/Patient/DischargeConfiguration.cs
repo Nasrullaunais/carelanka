@@ -24,7 +24,6 @@ public class DischargeConfiguration : IEntityTypeConfiguration<Discharge>
 
         builder.Property(d => d.SummaryNote).HasMaxLength(2000);
 
-        // One discharge per admission, enforced rather than assumed.
         builder.HasOne(d => d.Admission)
             .WithOne(a => a.Discharge)
             .HasForeignKey<Discharge>(d => d.AdmissionId)

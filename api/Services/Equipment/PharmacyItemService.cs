@@ -32,8 +32,6 @@ public sealed class PharmacyItemService : IPharmacyItemService
             items = items.Where(i => i.CategoryId == category);
         }
 
-        // The availability half of the plan's search requirement. Computed from the
-        // quantity rather than read from a stored flag, so it can never be stale.
         if (query.AvailableOnly)
         {
             items = items.Where(i => i.QuantityOnHand > 0);
@@ -41,8 +39,6 @@ public sealed class PharmacyItemService : IPharmacyItemService
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            // ILIKE via EF.Functions, so a nurse typing "para" finds Paracetamol without
-            // knowing how the label was capitalised.
             var term = $"%{query.Search.Trim()}%";
 
             items = items.Where(i =>
@@ -67,8 +63,6 @@ public sealed class PharmacyItemService : IPharmacyItemService
     public async Task<PharmacyItem> CreateAsync(
         CreatePharmacyItemRequest request, CancellationToken cancellationToken = default)
     {
-        // Throws 404 rather than a foreign-key violation, so a mistyped category id reads as
-        // "no such category" instead of a 500.
         var category = await _db.PharmacyCategories
             .FirstOrDefaultAsync(c => c.Id == request.CategoryId, cancellationToken)
             ?? throw new NotFoundException("Pharmacy category", request.CategoryId);
@@ -99,8 +93,6 @@ public sealed class PharmacyItemService : IPharmacyItemService
             BatchNumber = Normalise(request.BatchNumber),
             ExpiryDate = request.ExpiryDate,
             Unit = unit,
-            // Opening stock. Every later change is a transaction, so this is the only place
-            // the column is written outside RecordTransactionAsync.
             QuantityOnHand = request.QuantityOnHand,
             ReorderThreshold = request.ReorderThreshold,
             UnitPrice = request.UnitPrice
@@ -115,23 +107,17 @@ public sealed class PharmacyItemService : IPharmacyItemService
     public async Task<PharmacyItem> RecordTransactionAsync(
         Guid id, CreatePharmacyTransactionRequest request, CancellationToken cancellationToken = default)
     {
-        // A stocktake correction nobody explained cannot be audited later, and this is the
-        // one movement with no paperwork behind it. Plan section 5.1.
         if (request.Type == PharmacyTransactionType.Adjusted
             && string.IsNullOrWhiteSpace(request.Note))
         {
             throw new BadRequestException(MessageCode.AdjustmentNeedsNote);
         }
 
-        // Read once, for the 404 and for the wording of the 409 below. This is never the
-        // stock check: the check is the WHERE clause on the update.
         var item = await ReadAsync(id, cancellationToken);
 
         var takesStock = request.Type is PharmacyTransactionType.Dispensed
             or PharmacyTransactionType.ExpiredRemoved;
 
-        // The quantity change and the row recording it must both land or neither. Without
-        // this, a failure between them leaves stock that moved with nothing saying why.
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
 
         var affected = takesStock
@@ -140,8 +126,6 @@ public sealed class PharmacyItemService : IPharmacyItemService
 
         if (affected == 0)
         {
-            // The item exists - the read above proved it - so zero rows means the guard
-            // bit. This is also what the loser of a race between two dispensers reads.
             throw new ConflictException(
                 MessageCode.InsufficientStock,
                 item.Name, item.QuantityOnHand, item.Unit, request.Quantity);
@@ -153,8 +137,6 @@ public sealed class PharmacyItemService : IPharmacyItemService
             PharmacyItemId = id,
             Type = request.Type,
             Quantity = request.Quantity,
-            // Taken from the token, never from the body. A caller cannot record a movement
-            // against somebody else's name.
             PerformedByStaffId = _currentUser.Id,
             Note = Normalise(request.Note)
         });
@@ -162,8 +144,6 @@ public sealed class PharmacyItemService : IPharmacyItemService
         await _db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        // Re-read rather than adjust the copy in hand. The conditional update went straight
-        // to the database, so the entity read earlier is already out of date.
         return ToDto(await ReadAsync(id, cancellationToken));
     }
 
@@ -202,20 +182,11 @@ public sealed class PharmacyItemService : IPharmacyItemService
     public async Task<ItemEntity> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         => await FindByIdAsync(id, cancellationToken) ?? throw new NotFoundException("Pharmacy item", id);
 
-    /// <summary>
-    /// The whole safety rule, in one statement. Postgres evaluates the WHERE and the write
-    /// under one row lock, so of two people dispensing the last box at the same moment one
-    /// updates a row and the other updates none. A SELECT followed by an UPDATE would let
-    /// both read five, both write four, and six boxes leave a shelf holding five.
-    /// </summary>
     private Task<int> TakeAsync(Guid id, int quantity, CancellationToken cancellationToken)
         => _db.PharmacyItems
             .Where(i => i.Id == id && i.QuantityOnHand >= quantity)
             .ExecuteUpdateAsync(set => set
                 .SetProperty(i => i.QuantityOnHand, i => i.QuantityOnHand - quantity)
-                // ExecuteUpdate goes straight to SQL and never passes the change tracker, so
-                // TimestampInterceptor does not see it. Set by hand or the row would claim
-                // it had not changed since the day it was created.
                 .SetProperty(i => i.UpdatedAt, DateTimeOffset.UtcNow), cancellationToken);
 
     private Task<int> AddAsync(Guid id, int quantity, CancellationToken cancellationToken)
@@ -247,7 +218,6 @@ public sealed class PharmacyItemService : IPharmacyItemService
             "created_at" => descending
                 ? items.OrderByDescending(i => i.CreatedAt)
                 : items.OrderBy(i => i.CreatedAt),
-            // Anything unrecognised sorts by name. A mistyped sort key is not worth a 400.
             _ => descending ? items.OrderByDescending(i => i.Name) : items.OrderBy(i => i.Name)
         };
     }
@@ -266,7 +236,6 @@ public sealed class PharmacyItemService : IPharmacyItemService
             QuantityOnHand = item.QuantityOnHand,
             ReorderThreshold = item.ReorderThreshold,
             UnitPrice = item.UnitPrice,
-            // Both computed here, never stored. One source of truth is the quantity.
             IsAvailable = item.QuantityOnHand > 0,
             BelowThreshold = item.QuantityOnHand <= item.ReorderThreshold,
             CreatedAt = item.CreatedAt,

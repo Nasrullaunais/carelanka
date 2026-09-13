@@ -18,14 +18,9 @@ namespace CareLanka.Api.Services.Patient;
 
 public sealed class BillingService : IBillingService
 {
-    /// <summary>
-    /// A visit whose money could still be outstanding. A discharged one cannot be: confirming a
-    /// discharge needs <c>billing_settled</c>, which only settling the bill writes.
-    /// </summary>
     private static readonly AdmissionStatus[] StillOwing =
         [AdmissionStatus.Admitted, AdmissionStatus.ReadyForDischarge];
 
-    /// <summary>How many bill numbers to draw before giving up. See <see cref="NextBillNumberAsync"/>.</summary>
     private const int NumberAttempts = 5;
 
     private readonly CareLankaDbContext _db;
@@ -75,8 +70,6 @@ public sealed class BillingService : IBillingService
         Guid admissionId, AddBillChargeRequest request, CancellationToken ct = default)
         => InTransactionAsync(admissionId, async (admission, bill) =>
         {
-            // A bill written for the first time by somebody adding a charge still gets its
-            // stay lines, so the total is never "one X-ray and no bed".
             if (bill.LineItems.Count == 0)
             {
                 await RegenerateAsync(admission, bill, ct);
@@ -89,8 +82,6 @@ public sealed class BillingService : IBillingService
                 Source = BillLineSource.Manual,
                 Description = request.Description.Trim(),
 
-                // Not null: [ApiController] has already returned a 400 for a body that left
-                // either out. Nullable on the request so omission is an error and not a zero.
                 Quantity = request.Quantity!.Value,
                 UnitPrice = request.UnitPrice!.Value
             });
@@ -105,8 +96,6 @@ public sealed class BillingService : IBillingService
 
             if (line.Source != BillLineSource.Manual)
             {
-                // A bed or fee line is worked out from the stay, so deleting it would be a
-                // number that comes back the next time anyone prepares the bill.
                 throw new ConflictException(MessageCode.BillLineNotRemovable);
             }
 
@@ -120,9 +109,6 @@ public sealed class BillingService : IBillingService
         Guid admissionId, SettleBillRequest request, CancellationToken ct = default)
         => InTransactionAsync(admissionId, async (admission, bill) =>
         {
-            // Settling a visit nobody prepared a bill for works out the bill first. Without
-            // this a visit with no bill row could never tick billing_settled, and therefore
-            // could never be discharged at all - a deadlock with no way out for the desk.
             if (bill.LineItems.Count == 0)
             {
                 await RegenerateAsync(admission, bill, ct);
@@ -132,8 +118,6 @@ public sealed class BillingService : IBillingService
             bill.SettledByStaffMemberId = _currentUser.Id;
             bill.SettlementNote = Clean(request.SettlementNote);
 
-            // The one write of billing_settled in the whole component. It joins this
-            // transaction, so a settled bill with an unticked box cannot exist.
             await _discharges.MarkBillingSettledAsync(admissionId, true, ct);
         }, ct);
 
@@ -150,10 +134,6 @@ public sealed class BillingService : IBillingService
 
         if (includeSettled)
         {
-            // Every visit that has a bill at all, in any status, discharged included. This is
-            // the reprint path: a patient who asks for their bill again at the counter has
-            // already paid and has usually already gone home, so the default list - which is
-            // about work still to do - cannot reach them.
             query = query.Where(admission =>
                 _db.Bills.Any(bill => bill.AdmissionId == admission.Id));
         }
@@ -162,9 +142,6 @@ public sealed class BillingService : IBillingService
             query = query
                 .Where(admission => StillOwing.Contains(admission.Status))
 
-                // No bill row at all is the common case - a bill is written the first time
-                // somebody asks for one - so a list of bills would have shown reception an
-                // empty screen and left the work invisible.
                 .Where(admission => !_db.Bills.Any(bill =>
                     bill.AdmissionId == admission.Id && bill.SettledAt != null));
         }
@@ -199,8 +176,6 @@ public sealed class BillingService : IBillingService
         var labels = await BedLabels.LiveByAdmissionAsync(_db, _beds, admissionIds, now, ct);
         var wardTypes = await WardTypesByBedAsync(admissions, ct);
 
-        // One snapshot for the whole page. Read per row, an administrator saving a new rate
-        // mid-request would put two different prices on one list of what people owe.
         var prices = await _rates.GetPriceListAsync(ct);
 
         var rows = new List<OutstandingBill>();
@@ -209,8 +184,6 @@ public sealed class BillingService : IBillingService
         {
             var label = labels.TryGetValue(admission.Id, out var found) ? found : BedLabel.Unknown;
 
-            // What it comes to as it stands: the prepared total if there is one, otherwise what
-            // preparing it now would produce. Advisory - the bill screen is what writes lines.
             var estimated = bills.TryGetValue(admission.Id, out var bill) && bill.LineItems.Count > 0
                 ? bill.LineItems.Sum(line => line.LineTotal)
                 : GenerateLines(admission, Guid.Empty, wardTypes, labels: null, prices, now)
@@ -236,18 +209,6 @@ public sealed class BillingService : IBillingService
         return PagedResult<OutstandingBill>.From(rows, page, pageSize, totalItems);
     }
 
-    // ---------- the write path ----------
-
-    /// <summary>
-    /// Every write goes through here: lock the admission, find or open its bill, refuse if it
-    /// is settled, do the work, save and commit.
-    /// </summary>
-    /// <remarks>
-    /// The row lock is the same one <c>/arrive</c>, <c>/cancel</c>, <c>assign-bed</c> and
-    /// <c>confirm</c> take. It matters most on settle: settling and confirming a discharge both
-    /// read the same admission, and without the lock a discharge could be confirmed between the
-    /// bill being settled and the checklist tick landing.
-    /// </remarks>
     private async Task<BillResponse> InTransactionAsync(
         Guid admissionId,
         Func<AdmissionEntity, BillEntity, Task> work,
@@ -268,8 +229,6 @@ public sealed class BillingService : IBillingService
 
         if (bill.IsSettled)
         {
-            // Frozen. A settled bill is what the patient was handed at the counter, and a line
-            // added afterwards would make the paper and the database disagree.
             throw new ConflictException(MessageCode.BillAlreadySettled, bill.BillNumber);
         }
 
@@ -298,8 +257,6 @@ public sealed class BillingService : IBillingService
             AdmissionId = admission.Id,
             BillNumber = await NextBillNumberAsync(ct),
 
-            // Whoever opened it. Printed on the bill, because a document handed across a
-            // counter names the person who issued it.
             RaisedByStaffMemberId = _currentUser.Id
         };
 
@@ -308,11 +265,6 @@ public sealed class BillingService : IBillingService
         return bill;
     }
 
-    /// <summary>
-    /// Replaces every line this component worked out for itself, and leaves every typed one
-    /// alone. Preparing the bill again a day later therefore updates the bed days and keeps the
-    /// X-ray reception entered.
-    /// </summary>
     private async Task RegenerateAsync(AdmissionEntity admission, BillEntity bill, CancellationToken ct)
     {
         var stale = bill.LineItems.Where(line => line.Source != BillLineSource.Manual).ToList();
@@ -340,41 +292,12 @@ public sealed class BillingService : IBillingService
         }
     }
 
-    /// <summary>
-    /// Puts a new line on a bill, telling EF in both directions that it is new.
-    /// </summary>
-    /// <remarks>
-    /// The explicit <c>_db.BillLineItems.Add</c> is not belt and braces. We allocate the key
-    /// ourselves, and change tracking decides Added-versus-Modified for an entity it meets
-    /// through a navigation by looking at the key: a non-default one means "this row already
-    /// exists", so the line is saved as an UPDATE that matches no row and the request dies with
-    /// a concurrency exception. Adding it to its <c>DbSet</c> says outright that it is new.
-    /// </remarks>
     private void Add(BillEntity bill, BillLineEntity line)
     {
         bill.LineItems.Add(line);
         _db.BillLineItems.Add(line);
     }
 
-    /// <summary>
-    /// The whole pricing rule, in one method, priced entirely from facts this component stores.
-    /// </summary>
-    /// <remarks>
-    /// Two kinds of line and no others:
-    ///
-    /// **The admission fee**, from <c>Admission.Category</c> - the care level a named clinician
-    /// chose and signed for.
-    ///
-    /// **A bed, per day, per assignment.** One line for each bed the patient has actually been
-    /// in, so a transfer mid-stay bills each ward at its own rate. A bed that was only ever held
-    /// and never slept in is not billed: nobody was in it.
-    ///
-    /// There is no third kind, and inventing one would mean inventing data. Nothing in this
-    /// schema records a treatment, a procedure, a scan or a drug against an admission -
-    /// Equipment's <c>PharmacyTransaction</c> has no admission column and its stock movements
-    /// are not attributable to a patient. That is why reception types the rest by hand, and why
-    /// patient-management-plan.md says so out loud rather than faking it.
-    /// </remarks>
     private static IReadOnlyList<BillLineEntity> GenerateLines(
         AdmissionEntity admission,
         Guid billId,
@@ -430,18 +353,6 @@ public sealed class BillingService : IBillingService
         return lines;
     }
 
-    /// <summary>
-    /// Was the patient ever actually in this bed? A hold that lapsed or was cancelled is not a
-    /// stay, and billing one would charge somebody for a bed they never saw.
-    /// </summary>
-    /// <remarks>
-    /// <c>Corrected</c> is tested first and on its own. A bed chosen by mistake and swapped for
-    /// the right one keeps its <c>OccupiedAt</c>, and the replacement inherits the same
-    /// instant - that is deliberate, so the stay is priced from when the patient actually got
-    /// into a bed rather than from when the paperwork was fixed. The cost of it is that both
-    /// rows look slept-in to every other test in this method, and every stay bills a minimum of
-    /// one day, so a mis-click corrected within a minute would charge two nights for one.
-    /// </remarks>
     private static bool WasSleptIn(BedAssignmentEntity assignment)
         => assignment.ReleaseReason != ReleaseReason.Corrected
            && (assignment.OccupiedAt is not null
@@ -449,11 +360,6 @@ public sealed class BillingService : IBillingService
                || (assignment.Status == AssignmentStatus.Released
                    && assignment.ReleaseReason is ReleaseReason.Discharged or ReleaseReason.Transferred));
 
-    /// <summary>
-    /// When the stay started. <c>OccupiedAt</c> is the honest answer; <c>CreatedAt</c> is the
-    /// fallback for rows written before that column existed, and is at most the length of a
-    /// hold out.
-    /// </summary>
     private static DateTimeOffset StartOf(BedAssignmentEntity assignment)
         => assignment.OccupiedAt ?? assignment.CreatedAt;
 
@@ -461,8 +367,6 @@ public sealed class BillingService : IBillingService
     {
         if (string.IsNullOrEmpty(label.BedNumber))
         {
-            // The bed has been retired from Equipment's register since the stay. The stay is
-            // still real and still billable; we just cannot name the bed any more.
             return "Bed stay";
         }
 
@@ -473,15 +377,6 @@ public sealed class BillingService : IBillingService
             : $"Bed {label.BedNumber}, {ward}";
     }
 
-    /// <summary>
-    /// The ward type behind each bed these admissions have used, for the day rate.
-    /// </summary>
-    /// <remarks>
-    /// <c>IgnoreQueryFilters</c> on purpose, which is rare in this component. A ward retired
-    /// last month still has to price a stay that happened while it was open - the global filter
-    /// would hide it, the rate would fall back to general, and a patient who was in intensive
-    /// care would be undercharged by nineteen thousand rupees a day.
-    /// </remarks>
     private async Task<IReadOnlyDictionary<Guid, WardType>> WardTypesByBedAsync(
         IReadOnlyCollection<AdmissionEntity> admissions, CancellationToken ct)
     {
@@ -519,15 +414,6 @@ public sealed class BillingService : IBillingService
         return result;
     }
 
-    /// <summary>
-    /// A bill number nothing else is using.
-    /// </summary>
-    /// <remarks>
-    /// Checked with a read rather than by catching the unique index, because the insert happens
-    /// inside a transaction and a failed <c>SaveChanges</c> there aborts the whole thing - there
-    /// would be nothing left to retry into. At 31^7 candidates a collision is not something that
-    /// happens; the index is still the guarantee, this loop is only politeness.
-    /// </remarks>
     private async Task<string> NextBillNumberAsync(CancellationToken ct)
     {
         for (var attempt = 1; attempt <= NumberAttempts; attempt++)
@@ -546,8 +432,6 @@ public sealed class BillingService : IBillingService
 
         throw new ConflictException(MessageCode.Conflict);
     }
-
-    // ---------- mapping ----------
 
     private async Task<BillResponse> ToResponseAsync(
         BillEntity bill, PatientEntity patient, CancellationToken ct)
@@ -584,8 +468,6 @@ public sealed class BillingService : IBillingService
             Currency = BillingRates.Currency,
             Lines = lines,
 
-            // The sum of what is printed, worked out from the same list the patient is looking
-            // at. Not a column, so it cannot drift away from the lines it came from.
             Total = decimal.Round(lines.Sum(line => line.LineTotal), 2),
             RaisedByStaffId = bill.RaisedByStaffMemberId,
             RaisedByStaffName = StaffNames.Lookup(names, bill.RaisedByStaffMemberId),

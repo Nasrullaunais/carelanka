@@ -52,9 +52,6 @@ export function EquipmentPage() {
     }),
   );
 
-  // Any lifecycle move can change which page an item belongs to, so the whole list is
-  // refetched rather than the row patched. Matches the generated key's _id, which is a
-  // single object rather than an array prefix.
   function refreshItems() {
     queryClient.invalidateQueries({
       predicate: (query) => {
@@ -153,7 +150,6 @@ export function EquipmentPage() {
         </div>
       </div>
 
-      {/* Hidden, not disabled: a control the user's role cannot use should not be on screen. */}
       {canManageEquipment(role) && (
         <RegisterItemCard
           categories={(categories.data ?? []).map((c) => ({ id: c.id, name: c.name }))}
@@ -238,8 +234,6 @@ function ItemTable({
     return <p className="empty">Loading…</p>;
   }
 
-  // The toast already fired. A list shows "Try again" rather than an empty table that
-  // looks like a hospital with no equipment.
   if (isError) {
     return (
       <div className="empty">
@@ -345,9 +339,6 @@ function LifecycleActions({
           </button>
         )}
 
-        {/* A fault can be reported in any state but retired, including while a patient is
-            using the item. That is the documented exception in the server's guard, and the
-            reason this button does not disappear when the item is assigned. */}
         {report && item.status !== 'retired' && (
           <button type="button" className="secondary danger" onClick={() => setReporting(true)}>
             Report fault

@@ -10,26 +10,12 @@ using Xunit;
 
 namespace CareLanka.Api.Tests;
 
-/// <summary>
-/// Step 7 — the discharge checklist and confirmation — and the billing that sits behind
-/// <c>billing_settled</c>.
-/// </summary>
-/// <remarks>
-/// The two are one test class on purpose. The whole point of the design is that settling a bill
-/// and ticking that box are a single act, so a test that could pass with them apart would be
-/// testing the wrong thing.
-///
-/// Every test makes its own ward, its own beds and its own patient. The fixture's database is
-/// shared by the whole collection, so nothing here asserts on the shape of a whole list.
-/// </remarks>
 [Collection(ApiCollection.Name)]
 public sealed class DischargeBillingEndpointTests
 {
     private readonly ApiApplication _application;
 
     public DischargeBillingEndpointTests(ApiApplication application) => _application = application;
-
-    // ---------- who may tick what ----------
 
     [Fact]
     public async Task Only_a_doctor_clears_a_patient_clinically()
@@ -44,22 +30,16 @@ public sealed class DischargeBillingEndpointTests
         var byManager = await TickAsync(manager, visit.AdmissionId, new { clinical_clearance = true });
         var byDoctor = await TickAsync(doctor, visit.AdmissionId, new { clinical_clearance = true });
 
-        // This is the wall. Not "a senior person" and not "anyone on the ward" — the one role
-        // that can say a patient is medically well enough to leave.
         Assert.Equal(HttpStatusCode.Forbidden, byNurse.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, byManager.StatusCode);
         Assert.Equal(HttpStatusCode.OK, byDoctor.StatusCode);
 
-        // The code the nurse's refusal carries. It used to be asserted by a test about the
-        // ward nurse's own boxes, and there are no ward nurse boxes any more.
         using var refusal = await ReadJsonAsync(byNurse);
         Assert.Equal("cl_pat_022", refusal.RootElement.GetProperty("code").GetString());
 
         using var body = await ReadJsonAsync(byDoctor);
         Assert.True(Checklist(body, "clinical_clearance").GetProperty("ticked").GetBoolean());
 
-        // The doctor's name travels with the tick. An audit trail of bare ids is one nobody
-        // reads, and this box is the one somebody will be asked to account for.
         Assert.Equal(
             "Doctor Test",
             Checklist(body, "clinical_clearance").GetProperty("ticked_by_staff_name").GetString());
@@ -70,8 +50,6 @@ public sealed class DischargeBillingEndpointTests
     {
         var visit = await AdmittedVisitAsync();
 
-        // Every role, including the two that may actually settle the bill. The refusal is not
-        // about permission - it is that there is one way to write this fact and this is not it.
         foreach (var email in new[]
         {
             ApiApplication.NurseEmail,
@@ -89,8 +67,6 @@ public sealed class DischargeBillingEndpointTests
         }
     }
 
-    // ---------- flagging ----------
-
     [Fact]
     public async Task Ticking_the_last_mandatory_box_is_what_flags_the_patient()
     {
@@ -101,7 +77,6 @@ public sealed class DischargeBillingEndpointTests
 
         await TickAsync(doctor, visit.AdmissionId, new { clinical_clearance = true });
 
-        // One of two. Still admitted, because the bill is the other one.
         Assert.Equal("admitted", await StatusAsync(visit.AdmissionId));
 
         var settled = await reception.PostAsJsonAsync(
@@ -121,8 +96,6 @@ public sealed class DischargeBillingEndpointTests
 
         Assert.Equal(HttpStatusCode.OK, untick.StatusCode);
 
-        // ready_for_discharge -> admitted is a published edge for exactly this: a doctor who
-        // looks again and is no longer happy to let the patient go.
         Assert.Equal("admitted", await StatusAsync(visit.AdmissionId));
 
         using var body = await ReadJsonAsync(untick);
@@ -140,8 +113,6 @@ public sealed class DischargeBillingEndpointTests
 
         var row = await CandidateAsync(nurse, visit.AdmissionId);
 
-        // A patient with one box left is the person a nurse is looking for, so they are on the
-        // list with the reason attached, not filtered off it.
         Assert.Equal(
             new[] { "billing_settled" },
             row.GetProperty("outstanding_items").EnumerateArray()
@@ -149,8 +120,6 @@ public sealed class DischargeBillingEndpointTests
                 .ToArray());
         Assert.Equal(visit.BedNumber, row.GetProperty("bed_number").GetString());
     }
-
-    // ---------- the bill ----------
 
     [Fact]
     public async Task A_bill_is_the_care_level_and_the_bed_and_nothing_else_is_invented()
@@ -165,9 +134,6 @@ public sealed class DischargeBillingEndpointTests
         using var body = await ReadJsonAsync(prepared);
         var lines = body.RootElement.GetProperty("lines").EnumerateArray().ToList();
 
-        // Exactly two, and the test names both amounts rather than reading them back out of the
-        // response: an inpatient fee is 3000 and a general bed is 6000 a day, and a stay that
-        // started minutes ago is one day because part of a day counts as a day.
         Assert.Equal(2, lines.Count);
         Assert.Equal("admission_fee", lines[0].GetProperty("source").GetString());
         Assert.Equal(3000m, lines[0].GetProperty("line_total").GetDecimal());
@@ -182,9 +148,6 @@ public sealed class DischargeBillingEndpointTests
     [Fact]
     public async Task A_visit_with_no_bed_is_billed_the_fee_alone()
     {
-        // An outpatient never enters the bed board, so there is nothing to price but the visit
-        // itself. Worth its own test: the alternative - a zero bed line, or no bill at all -
-        // would both be wrong in a way nobody would notice until a patient queried it.
         var admissionId = await NewAdmissionAsync(category: "outpatient");
 
         using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
@@ -203,8 +166,6 @@ public sealed class DischargeBillingEndpointTests
     {
         var visit = await AdmittedVisitAsync();
 
-        // Backdated rather than waited for. Part of a day counts as a day and every stay counts
-        // as at least one, so 30 hours is two.
         await BackdateOccupancyAsync(visit.AdmissionId, TimeSpan.FromHours(30));
 
         using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
@@ -237,8 +198,6 @@ public sealed class DischargeBillingEndpointTests
 
         var lines = body.RootElement.GetProperty("lines").EnumerateArray().ToList();
 
-        // Three lines, not four: the bed line was replaced rather than duplicated, and the
-        // typed charge survived. That is the whole contract of "prepare again".
         Assert.Equal(3, lines.Count);
         Assert.Single(lines, line => line.GetProperty("source").GetString() == "manual");
         Assert.Equal(18500m, body.RootElement.GetProperty("total").GetDecimal());
@@ -284,8 +243,6 @@ public sealed class DischargeBillingEndpointTests
 
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
 
-        // Read: the discharge screen shows whether the bill is settled, so the nurse has to be
-        // able to see it. Write: taking money is the front desk's job and nobody else's.
         var read = await nurse.GetAsync($"/api/admissions/{visit.AdmissionId}/bill");
         var settle = await nurse.PostAsJsonAsync(
             $"/api/admissions/{visit.AdmissionId}/bill/settle", new { });
@@ -315,8 +272,6 @@ public sealed class DischargeBillingEndpointTests
 
         using var problem = await ReadJsonAsync(addAgain);
 
-        // It is the piece of paper the patient was handed. Adding to it afterwards would make
-        // the paper and the database disagree, with the patient holding the paper.
         Assert.Equal(HttpStatusCode.Conflict, addAgain.StatusCode);
         Assert.Equal("cl_pat_026", problem.RootElement.GetProperty("code").GetString());
         Assert.Equal(HttpStatusCode.Conflict, prepareAgain.StatusCode);
@@ -330,9 +285,6 @@ public sealed class DischargeBillingEndpointTests
 
         using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
 
-        // Straight to settle, with no prepare. Without this a visit nobody prepared a bill for
-        // could never tick billing_settled and therefore could never be discharged at all -
-        // a deadlock the desk would have no way out of.
         using var body = await ReadJsonAsync(await reception.PostAsJsonAsync(
             $"/api/admissions/{visit.AdmissionId}/bill/settle", new { }));
 
@@ -369,8 +321,6 @@ public sealed class DischargeBillingEndpointTests
         using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
         var before = await OutstandingRowAsync(reception, visit.AdmissionId);
 
-        // No bill row, and still on the list. A list of bills would have been empty and left
-        // the work invisible, which is the reason this endpoint reads admissions instead.
         Assert.Equal(JsonValueKind.Null, before!.Value.GetProperty("bill_number").ValueKind);
         Assert.Equal(9000m, before.Value.GetProperty("estimated_total").GetDecimal());
 
@@ -390,13 +340,8 @@ public sealed class DischargeBillingEndpointTests
 
         using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
 
-        // Gone from the work-still-to-do list, which is the whole point of that list.
         Assert.Null(await OutstandingRowAsync(reception, visit.AdmissionId));
 
-        // Still reachable, which is the whole point of includeSettled. Without it a patient who
-        // asks for another copy of their bill at the counter cannot be served at all: they have
-        // paid, so they are off the outstanding list, and they have gone home, so they are not
-        // even an open visit any more. Found by walking the screen, not by a test.
         var row = await OutstandingRowAsync(reception, visit.AdmissionId, includeSettled: true);
 
         Assert.NotNull(row);
@@ -405,15 +350,12 @@ public sealed class DischargeBillingEndpointTests
         Assert.Equal(9000m, row.Value.GetProperty("estimated_total").GetDecimal());
         Assert.NotEqual(JsonValueKind.Null, row.Value.GetProperty("bill_number").ValueKind);
 
-        // And the bill itself still reads, which is what the print view renders.
         using var bill = await ReadJsonAsync(
             await reception.GetAsync($"/api/admissions/{visit.AdmissionId}/bill"));
 
         Assert.True(bill.RootElement.GetProperty("settled").GetBoolean());
         Assert.Equal(9000m, bill.RootElement.GetProperty("total").GetDecimal());
     }
-
-    // ---------- confirming ----------
 
     [Fact]
     public async Task A_discharge_with_a_box_outstanding_is_refused()
@@ -461,7 +403,6 @@ public sealed class DischargeBillingEndpointTests
         Assert.Equal("released", assignment.GetProperty("status").GetString());
         Assert.Equal("discharged", assignment.GetProperty("release_reason").GetString());
 
-        // The bed, read the way Equipment reads it before servicing one.
         using var occupancy = await ReadJsonAsync(
             await nurse.GetAsync($"/api/beds/{visit.BedId}/occupancy"));
 
@@ -477,9 +418,6 @@ public sealed class DischargeBillingEndpointTests
         var confirmed = await nurse.PostAsJsonAsync(
             $"/api/discharges/{icu.AdmissionId}/confirm", new { });
 
-        // Changed 2026-09-12: this used to be a 403 with cl_pat_024. The care level no longer
-        // decides who may confirm, because the checklist is the gate - and getting this far
-        // means a doctor has already ticked clinical_clearance.
         Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
     }
 
@@ -492,8 +430,6 @@ public sealed class DischargeBillingEndpointTests
         var confirmed = await reception.PostAsJsonAsync(
             $"/api/discharges/{visit.AdmissionId}/confirm", new { });
 
-        // Reception settles the bill and hands over the paperwork on this same screen. Fetching
-        // a nurse for the last click was the only thing it could not do.
         Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
     }
 
@@ -506,8 +442,6 @@ public sealed class DischargeBillingEndpointTests
         var refused = await doctor.PostAsJsonAsync(
             $"/api/discharges/{visit.AdmissionId}/confirm", new { });
 
-        // Widening the policy did not open it to everybody. A doctor's part is the clinical
-        // clearance box; sending the patient home is desk and ward work.
         Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
     }
 
@@ -523,22 +457,13 @@ public sealed class DischargeBillingEndpointTests
 
         Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
 
-        // Off the work list, which is right: a patient who has gone home is not somebody a
-        // nurse is trying to get home.
         Assert.Null(await FindCandidateAsync(nurse, visit.AdmissionId, includeDischarged: false));
 
-        // But still findable, which is the point of includeDischarged. Without it the discharge
-        // screen empties itself the moment the work is done and keeps no record of any of it -
-        // you confirm a discharge, the row disappears, and there is nowhere left to look up
-        // what just happened.
         var record = await FindCandidateAsync(nurse, visit.AdmissionId, includeDischarged: true);
 
         Assert.NotNull(record);
         Assert.True(record!.Value.GetProperty("is_discharged").GetBoolean());
 
-        // The time they left is on the record. It is the one fact somebody looking this up
-        // afterwards actually wants, and "outstanding items" is empty by definition here - it
-        // could not have been confirmed otherwise.
         Assert.NotEqual(
             JsonValueKind.Null, record.Value.GetProperty("discharged_at").ValueKind);
 
@@ -550,11 +475,6 @@ public sealed class DischargeBillingEndpointTests
     {
         var visit = await AdmittedVisitAsync();
 
-        // Admitted ten days ago, then home five days ago. A record read today must say five,
-        // not ten: the stay stopped when they left.
-        //
-        // AdmittedAt and not the bed's OccupiedAt, because days_in_bed is counted from the
-        // admission - the bill is the thing counted from the bed.
         await BackdateAdmissionAsync(visit.AdmissionId, TimeSpan.FromDays(10));
 
         using var doctor = await ClientAsync(ApiApplication.DoctorEmail);
@@ -570,21 +490,13 @@ public sealed class DischargeBillingEndpointTests
 
         Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
 
-        // 5.5 rather than 5. The two backdates are taken from two UtcNow calls milliseconds
-        // apart, so an exact five-day gap lands a hair over five days - and part of a day
-        // counts as a day, which rounds it to six. Half a day of slack keeps the test about
-        // the rule rather than about the clock.
         await BackdateDischargeAsync(visit.AdmissionId, TimeSpan.FromDays(5.5));
 
         var record = await FindCandidateAsync(nurse, visit.AdmissionId, includeDischarged: true);
 
-        // Admitted ten days ago, left four and a half days later: five billable days. Counted
-        // to now instead it would be ten, and it would grow by one every day nobody touched
-        // it - a number on a record that changes while nothing happens is worse than none.
         Assert.Equal(5, record!.Value.GetProperty("days_in_bed").GetInt32());
     }
 
-    /// <summary>Moves the start of a visit into the past, which no endpoint offers.</summary>
     private async Task BackdateAdmissionAsync(string admissionId, TimeSpan by)
     {
         using var scope = _application.Services.CreateScope();
@@ -598,10 +510,6 @@ public sealed class DischargeBillingEndpointTests
         await db.SaveChangesAsync();
     }
 
-    /// <summary>
-    /// Moves a confirmed discharge into the past. No endpoint offers this and no clock in a
-    /// test can wait for it.
-    /// </summary>
     private async Task BackdateDischargeAsync(string admissionId, TimeSpan by)
     {
         using var scope = _application.Services.CreateScope();
@@ -648,10 +556,6 @@ public sealed class DischargeBillingEndpointTests
 
         await nurse.PostAsJsonAsync($"/api/discharges/{visit.AdmissionId}/confirm", new { });
 
-        // Discharging RELEASES the bed assignment, so a live-only lookup finds nothing and the
-        // screen said "No bed" about somebody who had just spent three days in GEN-02. That is
-        // not a missing value, it is the wrong answer to the question a record asks - "where
-        // were they?", not "where are they now?".
         var after = await FindCandidateAsync(nurse, visit.AdmissionId, includeDischarged: true);
 
         Assert.Equal(visit.BedNumber, after!.Value.GetProperty("bed_number").GetString());
@@ -670,20 +574,13 @@ public sealed class DischargeBillingEndpointTests
 
         using var body = await ReadJsonAsync(prepared);
 
-        // A bill is a document handed across a counter, and "who do I ask about this charge?"
-        // is the first question at the desk. Recorded when the bill is opened, not when it is
-        // paid - those can be two different people and often are.
-        // The seeded reception account is FirstName = the role, LastName = "Test".
         Assert.Equal(
             "GeneralStaff Test",
             body.RootElement.GetProperty("raised_by_staff_name").GetString());
     }
 
-    // ---------- helpers ----------
-
     private sealed record TestVisit(string AdmissionId, Guid BedId, string BedNumber);
 
-    /// <summary>A patient in a bed on a ward of this test's own, ready for a checklist.</summary>
     private async Task<TestVisit> AdmittedVisitAsync(
         string wardType = "general", string category = "inpatient")
     {
@@ -692,9 +589,6 @@ public sealed class DischargeBillingEndpointTests
 
         var admissionId = await NewAdmissionAsync(category);
 
-        // An ICU or HDU bed is the duty manager's to give, and arrival is the ward nurse's to
-        // record. Two different people, which is the point of the split, so the helper uses
-        // two different tokens rather than quietly picking one that works everywhere.
         using var placer = await ClientAsync(
             wardType is "icu" or "hdu" ? ApiApplication.ManagerEmail : ApiApplication.NurseEmail);
 
@@ -709,7 +603,6 @@ public sealed class DischargeBillingEndpointTests
         return new TestVisit(admissionId, bedId, bedNumber);
     }
 
-    /// <summary>Every mandatory box ticked, by the roles that actually tick them.</summary>
     private async Task<TestVisit> ReadyToGoAsync(
         string wardType = "general", string category = "inpatient")
     {
@@ -749,8 +642,6 @@ public sealed class DischargeBillingEndpointTests
 
         using var body = await ReadJsonAsync(response);
 
-        // Cloned: the JsonDocument dies at the end of this method and every JsonElement taken
-        // from it dies with it, which reads as an ObjectDisposedException in the caller.
         return body.RootElement.GetProperty("items").EnumerateArray()
             .Single(row => row.GetProperty("admission_id").GetString() == admissionId)
             .Clone();
@@ -776,10 +667,6 @@ public sealed class DischargeBillingEndpointTests
         return null;
     }
 
-    /// <summary>
-    /// Pushes the start of a stay backwards, which no endpoint offers and no clock in a test can
-    /// wait for. The only way to bill a second day without sleeping for thirty hours.
-    /// </summary>
     private async Task BackdateOccupancyAsync(string admissionId, TimeSpan by)
     {
         using var scope = _application.Services.CreateScope();
@@ -817,7 +704,6 @@ public sealed class DischargeBillingEndpointTests
         return new TestWard(Guid.Parse(body.RootElement.GetProperty("id").GetString()!), name);
     }
 
-    /// <summary>Registers a real bed through Equipment Management's own endpoint. Their table, their write.</summary>
     private async Task<(Guid Id, string Number)> AddBedAsync(TestWard ward)
     {
         using var equipment = await ClientAsync(ApiApplication.EquipmentEmail);
@@ -867,8 +753,6 @@ public sealed class DischargeBillingEndpointTests
         return body.RootElement.GetProperty("id").GetString()!;
     }
 
-    // One token per account for the whole class, and one lookup of the nurse's own id.
-    // /api/auth/login is rate limited per IP and every test class shares that budget.
     private static readonly SemaphoreSlim TokenLock = new(1, 1);
     private static readonly Dictionary<string, string> Tokens = new();
     private static string? _nurseId;

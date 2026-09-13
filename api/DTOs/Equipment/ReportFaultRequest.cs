@@ -2,7 +2,6 @@ using System.ComponentModel.DataAnnotations;
 
 namespace CareLanka.Api.DTOs.Equipment;
 
-/// <summary>Body of POST /api/equipment-items/{id}/report-fault.</summary>
 public class ReportFaultRequest
 {
     [Required]

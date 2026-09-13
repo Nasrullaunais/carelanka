@@ -16,12 +16,16 @@ export const equipmentStatuses = Object.keys(equipmentStatusLabels) as Equipment
 // That move is legal, but only the assign endpoint can make it, because assignment needs
 // an admission id the edit form has no field for. Offering it here would earn a 400.
 //
+// Maintenance -> available is missing for the same kind of reason. The move is legal, but
+// only the maintenance unit makes it, by confirming the repair is done on their own screen.
+// Editing the status instead would earn a 409.
+//
 // The server is what enforces all of this. This exists so the UI offers only the moves
 // that will succeed, rather than letting the user discover the rule from a 409.
 export const editableTransitions: Record<EquipmentStatus, EquipmentStatus[]> = {
   available: ['maintenance', 'retired'],
   assigned: ['available'],
-  maintenance: ['available', 'retired'],
+  maintenance: ['retired'],
   retired: [],
 };
 

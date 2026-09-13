@@ -40,8 +40,6 @@ export function StockDialog({
   const takes = takesStock[type];
   const noteRequired = needsNote[type];
 
-  // Shown before the request, but it is not the check. The server decides with one
-  // conditional update, which is also what stops two people taking the last box at once.
   const wouldOverdraw = takes && amount > item.quantity_on_hand;
 
   const after = takes

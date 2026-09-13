@@ -64,8 +64,6 @@ public class AdmissionConfiguration : IEntityTypeConfiguration<Admission>
             .HasDefaultValueSql("'{}'::text[]")
             .IsRequired();
 
-        // Stored generated column. The one place a computed value is right here: unlike
-        // Status it has no transition rules to enforce, so it cannot drift by construction.
         builder.Property(a => a.DetailsComplete)
             .HasComputedColumnSql("cardinality(missing_fields) = 0", stored: true);
 
@@ -74,10 +72,6 @@ public class AdmissionConfiguration : IEntityTypeConfiguration<Admission>
             .HasForeignKey(a => a.PatientId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Foreign keys with no navigation, per integration_of_functions.md §5.1: the id is
-        // the fact, the name is Staff's to serve. Leaving the navigation off is also what
-        // keeps a deactivated clinician from taking every admission they ever categorised
-        // out of the results — StaffMember is soft-deletable and this end is required.
         builder.HasOne<Entities.Common.StaffMember>()
             .WithMany()
             .HasForeignKey(a => a.CategorySetByStaffMemberId)
@@ -88,17 +82,9 @@ public class AdmissionConfiguration : IEntityTypeConfiguration<Admission>
             .HasForeignKey(a => a.ReportedByUserId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Named overload plus HasDatabaseName on both, and both are needed. EF keys an index
-        // by its property set, so two plain HasIndex(a => a.PatientId) calls are one index and
-        // the second silently replaces the first - which quietly dropped this one, the one
-        // that serves a patient's visit history across every status. The name in the overload
-        // is the model name; without HasDatabaseName as well the second index reaches the
-        // database as ix_admissions_patient_id1.
         builder.HasIndex(a => a.PatientId, "ix_admissions_patient_id")
             .HasDatabaseName("ix_admissions_patient_id");
 
-        // Drives the admissions worklist and incoming_next_2h, which Staff reads to staff
-        // ahead of a rush rather than react to one.
         builder.HasIndex(a => new { a.Status, a.ExpectedArrivalAt })
             .HasDatabaseName("ix_admissions_status_expected_arrival_at");
 
@@ -106,12 +92,6 @@ public class AdmissionConfiguration : IEntityTypeConfiguration<Admission>
             .HasDatabaseName("ix_admissions_dispatch_id")
             .HasFilter("dispatch_id IS NOT NULL");
 
-        // One person, one open stay. Scoped to the statuses that are still running, so a
-        // patient can be admitted again after they are discharged or the visit is cancelled.
-        //
-        // This is the guarantee, not the service-layer read that precedes it: two desks
-        // admitting the same person in the same instant both see "no open admission" and both
-        // insert. Same reasoning as ux_patients_nic and ux_wards_name.
         builder.HasIndex(a => a.PatientId, OpenAdmissionUniqueIndex)
             .HasDatabaseName(OpenAdmissionUniqueIndex)
             .IsUnique()

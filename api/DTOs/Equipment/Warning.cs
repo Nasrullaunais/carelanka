@@ -3,7 +3,6 @@ using CareLanka.Api.Data.Enums;
 
 namespace CareLanka.Api.DTOs.Equipment;
 
-/// <summary>A problem the threshold sweep found, or a fault a person reported.</summary>
 public class Warning
 {
     [Required]

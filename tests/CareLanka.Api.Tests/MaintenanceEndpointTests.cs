@@ -13,10 +13,6 @@ using Xunit;
 
 namespace CareLanka.Api.Tests;
 
-/// <summary>
-/// Servicing, and the two rules around it: overdue is worked out when you ask rather than
-/// stored, and maintenance never evicts a patient.
-/// </summary>
 [Collection(ApiCollection.Name)]
 public sealed class MaintenanceEndpointTests
 {
@@ -37,13 +33,10 @@ public sealed class MaintenanceEndpointTests
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.Equal("scheduled", schedule.GetProperty("status").GetString());
 
-        // A task list of GUIDs is unusable on a phone, which is where this is read.
         Assert.Equal(
             $"{item.Name} (asset tag {item.AssetTag})",
             schedule.GetProperty("asset_label").GetString());
 
-        // A person booked it, not the sweep. The agent-performance report is exactly that
-        // question, so it is recorded rather than assumed.
         Assert.Equal("user", schedule.GetProperty("created_by").GetString());
     }
 
@@ -56,8 +49,6 @@ public sealed class MaintenanceEndpointTests
         using var body = await ReadJsonAsync(
             await ScheduleAsync(client, item.Id, DateTime.UtcNow.AddDays(-3)));
 
-        // Written as scheduled, read back as overdue. Nothing swept the table to make that
-        // true, which is the point: there is no nightly job to forget to run.
         Assert.Equal("overdue", body.RootElement.GetProperty("status").GetString());
     }
 
@@ -74,7 +65,6 @@ public sealed class MaintenanceEndpointTests
         Assert.Contains(id, await ScheduleIdsAsync(client, "?overdue=true&pageSize=100"));
         Assert.DoesNotContain(id, await ScheduleIdsAsync(client, "?overdue=false&pageSize=100"));
 
-        // Asking by status is the same question in different words, so it has to agree.
         Assert.Contains(id, await ScheduleIdsAsync(client, "?status=overdue&pageSize=100"));
     }
 
@@ -84,7 +74,6 @@ public sealed class MaintenanceEndpointTests
         using var client = await EquipmentClientAsync();
         var item = await NewItemAsync(client);
 
-        // Reporting a fault is what puts an item into maintenance in the first place.
         await client.PostAsJsonAsync(
             $"/api/equipment-items/{item.Id}/report-fault", new { description = "Rattling fan." });
 
@@ -100,16 +89,13 @@ public sealed class MaintenanceEndpointTests
         Assert.Equal("completed", done.RootElement.GetProperty("status").GetString());
         Assert.Equal("Fan replaced.", done.RootElement.GetProperty("notes").GetString());
 
-        // Who did the work comes from the token. There is no field in the body for it.
         Assert.NotEqual(
             Guid.Empty, done.RootElement.GetProperty("performed_by_staff_id").GetGuid());
 
-        // An item left in maintenance after its service is finished is invisible stock.
         using var detail = await ReadJsonAsync(
             await client.GetAsync($"/api/equipment-items/{item.Id}"));
         Assert.Equal("available", detail.RootElement.GetProperty("status").GetString());
 
-        // The warning that led here is answered by the work, not by someone remembering.
         Assert.Empty(detail.RootElement.GetProperty("open_warnings").EnumerateArray());
     }
 
@@ -137,13 +123,10 @@ public sealed class MaintenanceEndpointTests
         using var repairedDetail = await ReadJsonAsync(
             await client.GetAsync($"/api/equipment-items/{repaired.Id}"));
 
-        // A routine service restarts the clock.
         Assert.Equal(
             JsonValueKind.String,
             servicedDetail.RootElement.GetProperty("next_maintenance_due").ValueKind);
 
-        // A repair is unplanned work and deliberately does not. An item repaired in March is
-        // still due its routine service in June.
         Assert.Equal(
             JsonValueKind.Null,
             repairedDetail.RootElement.GetProperty("next_maintenance_due").ValueKind);
@@ -192,7 +175,6 @@ public sealed class MaintenanceEndpointTests
         });
         using var body = await ReadJsonAsync(response);
 
-        // Maintenance never evicts a patient, and the check happens before anything is written.
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal("cl_equ_003", body.RootElement.GetProperty("code").GetString());
 
@@ -208,8 +190,6 @@ public sealed class MaintenanceEndpointTests
 
         var response = await ScheduleAsync(client, Guid.NewGuid(), DateTime.UtcNow);
 
-        // The reference is polymorphic, so there is no foreign key to catch this for us.
-        // Without the check the row would point at nothing and read as "Unknown asset".
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -220,24 +200,9 @@ public sealed class MaintenanceEndpointTests
 
         var read = await nurse.GetAsync("/api/maintenance-schedules");
 
-        // Reporting a fault is open to any staff member, because the nurse at the bedside is
-        // who finds it. Scheduling and closing the work is not.
         Assert.Equal(HttpStatusCode.Forbidden, read.StatusCode);
     }
 
-    /// <summary>
-    /// Puts a live assignment on this bed, so Patient Management answers "occupied".
-    /// </summary>
-    /// <remarks>
-    /// This test needed no setup while the occupancy port was StubBedOccupancyPort, which
-    /// answered "occupied" for every bed ever created. BedOccupancyAdapter answers truthfully,
-    /// so an empty bed is now free and the booking is correctly allowed. Occupying the bed is
-    /// what the test always meant to assert.
-    ///
-    /// Written straight to Patient Management's table rather than through POST /assign-bed,
-    /// because this bed belongs to a random ward id these tests never registered and their
-    /// placement rules would rightly refuse it. What matters here is only that a live row exists.
-    /// </remarks>
     private async Task OccupyAsync(Guid bedId)
     {
         using var scope = _application.Services.CreateScope();
@@ -247,8 +212,6 @@ public sealed class MaintenanceEndpointTests
         {
             Id = Guid.NewGuid(),
 
-            // Written straight to the table, so nothing assigns this for us. PatientService
-            // stamps it on every patient it creates and the column is NOT NULL.
             PatientCode = PatientCodes.Next(),
             FullName = "Bed Occupant",
             Nic = $"M{Guid.NewGuid():N}"[..12],

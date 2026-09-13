@@ -14,8 +14,6 @@ export function ItemHistoryCard({ id, onClose }: { id: string; onClose: () => vo
 
   const item = useQuery(getPharmacyItemOptions({ path: { id } }));
 
-  // The history endpoint is equipment-only, so a nurse who opened this card would otherwise
-  // trigger a 403 toast just by clicking a name. Hidden rather than attempted.
   const history = useQuery({
     ...listPharmacyTransactionsOptions({ path: { id }, query: { pageSize: 20 } }),
     enabled: mayReadHistory,
@@ -104,9 +102,7 @@ export function ItemHistoryCard({ id, onClose }: { id: string; onClose: () => vo
                   </td>
                   <td>{transactionTypeLabels[row.type]}</td>
                   <td>
-                    {/* Quantity is always positive on the wire; the type is what gives it a
-                        sign. Showing it unsigned would make a delivery and a dispense look
-                        identical in this column. */}
+
                     <strong>
                       {takesStock[row.type] ? '−' : '+'}
                       {row.quantity}

@@ -10,23 +10,10 @@ import { canReadCapacity } from '../types/permissions';
 import { admissionCategoryLabels } from '../types/patients';
 import { genderPolicyLabels, wardTypeLabels } from '../types/wards';
 
-// How full the hospital is, ward by ward. Counts only — no names, no records, nothing about
-// any individual patient — which is why every staff role can open it.
-//
-// Two endpoints, and they answer different questions on purpose:
-//
-//   GET /capacity/wards        how many beds are free right now, everywhere
-//   GET /wards/{id}/occupancy  where the people in ONE ward's beds are up to
-//
-// A free bed is one that is usable, empty, and not under a live hold. A hold that has run out
-// counts as free again, and that rule lives in one service so nothing re-invents it.
-
 export function CapacityPage() {
   const session = useSession();
   const [selected, setSelected] = useState<WardCapacity | null>(null);
 
-  // Same reason as the appointments desk: the hook cannot go behind the early return, so it
-  // is switched off instead. Nobody without a staff role should be asking the server at all.
   const isStaffMember = canReadCapacity(session?.principal.role);
 
   const capacity = useQuery({ ...getWardCapacityOptions(), enabled: isStaffMember });
@@ -131,8 +118,7 @@ export function CapacityPage() {
                         </td>
                         <td>{wardTypeLabels[ward.ward_type]}</td>
                         <td>
-                          {/* On the table because a male-only ward with two free beds is no use
-                              to a female patient, and the reader has to be able to see that. */}
+
                           {genderPolicyLabels[ward.gender_policy]}
                         </td>
                         <td>{ward.total_beds}</td>
@@ -159,9 +145,6 @@ export function CapacityPage() {
                         </td>
                       </tr>
 
-                      {/* Under the ward it belongs to, not at the foot of the page. With ten
-                          wards on screen, a card down there is a card you have to scroll to and
-                          then scroll back from, having lost track of which row you opened. */}
                       {selected?.ward_id === ward.ward_id && (
                         <tr className="drawer">
                           <td colSpan={7}>
@@ -185,10 +168,6 @@ export function CapacityPage() {
     </>
   );
 }
-
-// ---------------------------------------------------------------------------
-// One ward, broken down
-// ---------------------------------------------------------------------------
 
 function WardOccupancyPanel({ ward, onClose }: { ward: WardCapacity; onClose: () => void }) {
   const occupancy = useQuery(getWardOccupancyOptions({ path: { id: ward.ward_id } }));
@@ -215,9 +194,7 @@ function WardOccupancyPanel({ ward, onClose }: { ward: WardCapacity; onClose: ()
             <Stat caption="Patient in it" value={occupancy.data.occupied_beds} />
             <Stat caption="Being held" value={occupancy.data.reserved_beds} />
             <Stat caption="Out for repair" value={occupancy.data.out_of_service_beds} />
-            {/* Free comes from the capacity count, not from subtracting the four numbers above.
-                One service owns what "free" means; working it out a second way here is how two
-                screens end up disagreeing by one bed. */}
+
             <Stat
               caption="Free right now"
               value={ward.free_beds}
@@ -277,10 +254,6 @@ function WardOccupancyPanel({ ward, onClose }: { ward: WardCapacity; onClose: ()
   );
 }
 
-// ---------------------------------------------------------------------------
-// Small pieces
-// ---------------------------------------------------------------------------
-
 function Stat({
   caption,
   value,
@@ -298,7 +271,6 @@ function Stat({
   );
 }
 
-/** A bar the length of the ward, shaded for the part of it that is not free. */
 function Meter({ total, free }: { total: number; free: number }) {
   if (total === 0) {
     return <span className="muted">No beds</span>;

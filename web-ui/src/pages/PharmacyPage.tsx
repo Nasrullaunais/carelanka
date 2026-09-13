@@ -42,8 +42,6 @@ export function PharmacyPage() {
     }),
   );
 
-  // A movement changes the quantity, which changes availability, which changes which page
-  // an item belongs to. So the list is refetched rather than the row patched.
   function refresh() {
     queryClient.invalidateQueries({
       predicate: (query) => {
@@ -128,7 +126,6 @@ export function PharmacyPage() {
         </p>
       </div>
 
-      {/* Hidden, not disabled: a control the user's role cannot use should not be on screen. */}
       {canManageEquipment(role) && (
         <AddItemCard
           categories={(categories.data ?? []).map((c) => ({ id: c.id, name: c.name }))}
@@ -212,8 +209,6 @@ function ItemTable({
     return <p className="empty">Loading…</p>;
   }
 
-  // The toast already fired. A list shows "Try again" rather than an empty table that looks
-  // like a pharmacy with nothing in it.
   if (isError) {
     return (
       <div className="empty">
@@ -276,8 +271,6 @@ function ItemTable({
   );
 }
 
-// Three states, not two. "Low" is the reorder threshold the sweep will key off, and it is
-// worth seeing before the shelf is actually empty.
 function StockBadge({ item }: { item: PharmacyItem }) {
   if (!item.is_available) {
     return <span className="badge severity-high">Out of stock</span>;
@@ -297,8 +290,6 @@ function Expiry({ date }: { date: string | null | undefined }) {
 
   const days = Math.ceil((new Date(date).getTime() - Date.now()) / 86_400_000);
 
-  // 30 days is the window the plan gives the medicine_expiring warning, so the screen and
-  // the sweep agree on what "expiring" means.
   if (days < 0) {
     return <span className="badge severity-high">Expired</span>;
   }

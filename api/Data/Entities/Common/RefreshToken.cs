@@ -2,8 +2,6 @@ using CareLanka.Api.Data.Enums;
 
 namespace CareLanka.Api.Data.Entities.Common;
 
-// Deviates from entity_diagram.md (recorded there in Rev 2.7): two nullable foreign keys plus
-// PrincipalType, because common-spec.yaml says refresh works for staff and patients alike.
 public class RefreshToken : Entity
 {
     public PrincipalType PrincipalType { get; set; }

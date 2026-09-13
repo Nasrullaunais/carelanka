@@ -9,7 +9,6 @@ using DischargeResponse = CareLanka.Api.DTOs.Patient.Discharge;
 
 namespace CareLanka.Api.Controllers.Patient;
 
-/// <summary>Sending a patient home: the checklist that has to be finished first, and the sign-off.</summary>
 [ApiController]
 [Route("api/discharges")]
 [Tags("Discharge")]
@@ -22,19 +21,6 @@ public class DischargesController : ControllerBase
         _discharges = discharges;
     }
 
-    /// <summary>
-    /// Patients whose checklist says they could go home, and the ones with a box or two left.
-    /// A plain rule over the checklist rows, not an agent — checking whether three boxes are
-    /// ticked is a `WHERE` clause.
-    /// </summary>
-    /// <remarks>
-    /// The list is advisory. Being on it changes nothing until a human confirms.
-    ///
-    /// `includeDischarged` adds the visits that are already over, as records. They sort below
-    /// everyone still in the building, carry `is_discharged` and `discharged_at`, and are never
-    /// candidates for anything — without them this screen forgets every patient the moment the
-    /// work on them is finished.
-    /// </remarks>
     [Authorize(Policy = Policies.DischargeBoard)]
     [HttpGet("candidates", Name = "listDischargeCandidates")]
     [ProducesResponseType(typeof(PagedResult<DischargeCandidate>), StatusCodes.Status200OK)]
@@ -49,22 +35,6 @@ public class DischargesController : ControllerBase
         CancellationToken ct = default)
         => Ok(await _discharges.ListCandidatesAsync(wardId, includeDischarged, page, pageSize, ct));
 
-    /// <summary>
-    /// Tick discharge checklist items. Any subset; a key left out is not touched.
-    /// </summary>
-    /// <remarks>
-    /// Each item is gated by role, not just by login:
-    ///
-    /// - `clinical_clearance` — **Doctor only.** This is the wall. Without it nothing flags and
-    ///   nothing discharges, and no automated process can ever set it.
-    /// - `medication_issued`, `follow_up_recorded`, `transport_arranged` — Ward Nurse.
-    /// - `billing_settled` — **refused here.** Settle the bill instead
-    ///   (`POST /api/admissions/{id}/bill/settle`), which is what writes it. One fact, one
-    ///   place: a paid bill and an unticked box cannot happen.
-    ///
-    /// Ticking the last mandatory box moves the admission to `ready_for_discharge`; unticking
-    /// one moves it back to `admitted`.
-    /// </remarks>
     [Authorize(Policy = Policies.DischargeChecklist)]
     [HttpPatch("{admissionId:guid}/checklist", Name = "updateDischargeChecklist")]
     [ProducesResponseType(typeof(DischargeResponse), StatusCodes.Status200OK)]
@@ -77,21 +47,6 @@ public class DischargesController : ControllerBase
         Guid admissionId, [FromBody] ChecklistUpdateRequest request, CancellationToken ct)
         => Ok(await _discharges.UpdateChecklistAsync(admissionId, request, ct));
 
-    /// <summary>
-    /// Confirm the discharge — the second high-impact human gate in this component.
-    /// </summary>
-    /// <remarks>
-    /// It ends the admission, frees the bed for the next patient, and sends someone home. In one
-    /// transaction it sets `discharged_at`, releases the bed assignment with
-    /// `release_reason: discharged`, and moves the admission to `discharged`.
-    ///
-    /// Reception, a ward nurse or the duty manager, **at any care level** — the ICU and HDU
-    /// restriction was removed on 2026-09-12. **The gate is the checklist, not the role.** Both
-    /// mandatory boxes must be ticked or this is a 409, and the clinical one is a doctor's and
-    /// nobody else's, so no patient goes home without a doctor having cleared them. That is the
-    /// signature that means something; a second one from somebody who was not at the bedside
-    /// was delay rather than safety.
-    /// </remarks>
     [Authorize(Policy = Policies.DischargeConfirmer)]
     [HttpPost("{admissionId:guid}/confirm", Name = "confirmDischarge")]
     [ProducesResponseType(typeof(DischargeResponse), StatusCodes.Status200OK)]

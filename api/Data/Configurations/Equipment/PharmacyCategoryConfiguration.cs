@@ -17,9 +17,6 @@ public class PharmacyCategoryConfiguration : IEntityTypeConfiguration<PharmacyCa
         builder.Property(c => c.Name).HasMaxLength(150).IsRequired();
         builder.Property(c => c.RequiresPrescription).IsRequired();
 
-        // Scoped WHERE is_active, like every other unique index in this codebase: retiring
-        // a category must not make its name unusable forever, and the query filter would
-        // hide the clashing row from the service-layer check.
         builder.HasIndex(c => c.Name)
             .HasDatabaseName(NameUniqueIndex)
             .IsUnique()

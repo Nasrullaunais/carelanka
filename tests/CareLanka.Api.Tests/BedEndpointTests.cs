@@ -37,7 +37,6 @@ public sealed class BedEndpointTests
         Assert.True(bed.GetProperty("has_isolation").GetBoolean());
         Assert.Equal(3, bed.GetProperty("nurse_station_distance").GetInt32());
 
-        // A new bed is usable. There is no way to create one already out of service.
         Assert.Equal("usable", bed.GetProperty("condition").GetString());
     }
 
@@ -48,7 +47,6 @@ public sealed class BedEndpointTests
 
         using var body = await ReadJsonAsync(await CreateBedAsync(client, Guid.NewGuid(), "1"));
 
-        // STUBS.md row 2. If this ever reads like a real ward, the fake has become invisible.
         Assert.StartsWith("Stub ward ", body.RootElement.GetProperty("ward_name").GetString());
     }
 
@@ -97,8 +95,6 @@ public sealed class BedEndpointTests
     {
         using var client = await EquipmentClientAsync();
 
-        // Blank and absent both mean "no tag". Storing "" would make the unique index treat
-        // it as a real value and the second untagged bed would 409.
         await CreateBedAsync(client, Guid.NewGuid(), "1", assetTag: null);
         var second = await CreateBedAsync(client, Guid.NewGuid(), "2", assetTag: "   ");
 
@@ -137,11 +133,6 @@ public sealed class BedEndpointTests
         Assert.Equal(1, body.RootElement.GetProperty("total_pages").GetInt32());
     }
 
-    // These four used to be two, and both asserted a 409 for an *empty* bed. That was
-    // STUBS.md row 3 answering "occupied" for everything, which was deliberate and fail-safe:
-    // a stub answering "free" would have let maintenance be booked on a bed with a patient in
-    // it. The comment there said the assertion changes to 200 the day M4 lands
-    // GET /beds/{id}/occupancy. It has, so it did.
     [Fact]
     public async Task Taking_an_empty_bed_out_of_service_is_allowed()
     {
@@ -167,8 +158,6 @@ public sealed class BedEndpointTests
             $"/api/beds/{id}", new { condition = "out_of_service" });
         using var body = await ReadJsonAsync(response);
 
-        // Maintenance never evicts a patient. Not our rule to bend: only Patient Management
-        // knows whether the bed is occupied, and this is their answer being respected.
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal("cl_equ_003", body.RootElement.GetProperty("code").GetString());
     }
@@ -194,7 +183,6 @@ public sealed class BedEndpointTests
         var response = await client.PostAsync($"/api/beds/{id}/retire", null);
         using var body = await ReadJsonAsync(response);
 
-        // Retiring is irreversible, so it asks the same question an out-of-service edit does.
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal("cl_equ_003", body.RootElement.GetProperty("code").GetString());
     }
@@ -252,8 +240,6 @@ public sealed class BedEndpointTests
         var read = await nurse.GetAsync("/api/beds");
         var write = await CreateBedAsync(nurse, Guid.NewGuid(), "1");
 
-        // Patient Management reads this register to build its bed agent's candidate list,
-        // so any staff member may list. Only Equipment may change it.
         Assert.Equal(HttpStatusCode.OK, read.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, write.StatusCode);
     }
@@ -280,20 +266,10 @@ public sealed class BedEndpointTests
         var beds = scope.ServiceProvider.GetRequiredService<IBedService>();
         var counts = await beds.CountBedsByWardAsync(new[] { stocked, empty });
 
-        // This is the shape Patient Management's IBedRegistryService publishes. A zero here
-        // instead of an absent key would quietly change the meaning of their Ward.total_beds.
         Assert.Equal(2, counts[stocked]);
         Assert.DoesNotContain(empty, counts.Keys);
     }
 
-    /// <summary>
-    /// Puts a live assignment on this bed, so Patient Management answers "occupied".
-    /// </summary>
-    /// <remarks>
-    /// Written straight to their table rather than through POST /assign-bed, because this bed
-    /// belongs to a random ward id these tests never registered and their placement rules would
-    /// rightly refuse it. What matters here is only that a live row exists.
-    /// </remarks>
     private async Task OccupyAsync(Guid bedId)
     {
         using var scope = _application.Services.CreateScope();
@@ -303,8 +279,6 @@ public sealed class BedEndpointTests
         {
             Id = Guid.NewGuid(),
 
-            // Written straight to the table, so nothing assigns this for us. PatientService
-            // stamps it on every patient it creates and the column is NOT NULL.
             PatientCode = PatientCodes.Next(),
             FullName = "Bed Occupant",
             Nic = $"E{Guid.NewGuid():N}"[..12],

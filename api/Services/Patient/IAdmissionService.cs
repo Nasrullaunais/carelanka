@@ -6,12 +6,6 @@ using AdmissionResponse = CareLanka.Api.DTOs.Patient.Admission;
 
 namespace CareLanka.Api.Services.Patient;
 
-/// <summary>
-/// One row per hospital visit. For an emergency the row exists before the patient arrives,
-/// which is why a visit needing a bed starts at <c>awaiting_bed</c> with no arrival time.
-/// A visit needing no bed — an outpatient scan or blood test — starts at <c>admitted</c>
-/// instead, because opening the record is the arrival. See BedPlacementRules.RequiresBed.
-/// </summary>
 public interface IAdmissionService
 {
     Task<PagedResult<AdmissionSummary>> ListAsync(
@@ -26,44 +20,22 @@ public interface IAdmissionService
         SortDirection sortDir,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Throws NotFoundException when there is no such admission.</summary>
     Task<AdmissionDetail> GetDetailAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<AdmissionResponse> CreateAsync(
         CreateAdmissionRequest request, CancellationToken cancellationToken = default);
 
-    /// <summary>Fills in what was missing at registration and recalculates completeness server-side.</summary>
     Task<AdmissionResponse> CompleteDetailsAsync(
         Guid id, CompleteDetailsRequest request, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// The patient is physically in the bed. Moves <c>bed_reserved</c> to <c>admitted</c> and
-    /// turns the hold on the bed into an occupancy, so it can no longer expire underneath them.
-    /// Throws IllegalTransitionException from any other status.
-    /// </summary>
     Task<AdmissionResponse> MarkArrivedAsync(Guid id, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// The scan or test is done and the patient has gone home. Only for a visit that never
-    /// needed a bed, and only from <c>admitted</c>.
-    /// </summary>
-    /// <remarks>
-    /// Throws ConflictException carrying <c>cl_pat_020</c> for a visit that does need a bed:
-    /// that is a discharge, it has a checklist and a bed to release, and this endpoint knows
-    /// how to do neither.
-    /// </remarks>
     Task<AdmissionResponse> CompleteAsync(Guid id, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// The visit is called off and any held bed goes back to the pool. Not permitted once the
-    /// patient is <c>admitted</c> — they are discharged instead, not cancelled.
-    /// </summary>
     Task<AdmissionResponse> CancelAsync(
         Guid id, CancelAdmissionRequest request, CancellationToken cancellationToken = default);
 
-    /// <summary>Null when there is no such admission. For internal lookups — use GetByIdAsync to answer a request.</summary>
     Task<AdmissionEntity?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
-    /// <summary>Throws NotFoundException when there is no such admission.</summary>
     Task<AdmissionEntity> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 }

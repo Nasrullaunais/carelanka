@@ -2,7 +2,6 @@ using System.ComponentModel.DataAnnotations;
 
 namespace CareLanka.Api.DTOs.Equipment;
 
-/// <summary>One of the equipment categories. A table, not an enum, so a sixth can be added without a migration.</summary>
 public class EquipmentCategory
 {
     [Required]

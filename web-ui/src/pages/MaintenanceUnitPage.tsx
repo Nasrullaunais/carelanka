@@ -15,15 +15,6 @@ import { Dialog } from './EquipmentPage';
 
 const PAGE_SIZE = 10;
 
-/**
- * The repair queue. Reporting a fault takes an item out of service and opens a job here, and
- * the item only goes back into service when this screen says the work is done.
- *
- * Nothing on this page is a new endpoint. A fault report writes an ordinary maintenance job,
- * so the queue is the existing job list filtered to work that is still outstanding, and
- * confirming a repair is the existing complete-the-work endpoint. That endpoint already
- * returns the item to available and closes its fault warning in one transaction.
- */
 export function MaintenanceUnitPage() {
   const session = useSession();
   const role = session?.principal.role;
@@ -33,8 +24,6 @@ export function MaintenanceUnitPage() {
   const [confirming, setConfirming] = useState<MaintenanceSchedule | null>(null);
   const [scrapping, setScrapping] = useState<MaintenanceSchedule | null>(null);
 
-  // Scheduled only. In-progress work would belong here too, but nothing moves a job into that
-  // state yet, so asking for it would add a filter the API cannot vary the answer to.
   const queue = useQuery(
     listMaintenanceSchedulesOptions({
       query: { status: 'scheduled', page, pageSize: PAGE_SIZE },
@@ -95,8 +84,7 @@ export function MaintenanceUnitPage() {
                       <button type="button" onClick={() => setConfirming(job)}>
                         Confirm repaired
                       </button>{' '}
-                      {/* Beyond repair is only offered for equipment. A bed is retired
-                          through its own endpoint, which this screen does not carry. */}
+
                       {job.asset_type === 'equipment_item' && (
                         <button
                           type="button"
@@ -162,7 +150,6 @@ function ConfirmRepairDialog({
     ...completeMaintenanceScheduleMutation(),
     onSuccess: () => {
       toast.success(`${job.asset_label} is back in service.`);
-      // Both lists move: this job leaves the queue and the item changes status.
       queryClient.invalidateQueries();
       onClose();
     },

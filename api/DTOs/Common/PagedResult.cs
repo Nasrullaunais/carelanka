@@ -2,7 +2,6 @@ using System.ComponentModel.DataAnnotations;
 
 namespace CareLanka.Api.DTOs.Common;
 
-/// <summary>One page of a list endpoint. Group-owned: the shape is the same in all five specs.</summary>
 public class PagedResult<T>
 {
     [Required]
@@ -17,7 +16,6 @@ public class PagedResult<T>
     [Required]
     public int TotalItems { get; set; }
 
-    /// <summary>Always at least 1, so an empty list does not render as "page 1 of 0".</summary>
     [Required]
     public int TotalPages { get; set; }
 

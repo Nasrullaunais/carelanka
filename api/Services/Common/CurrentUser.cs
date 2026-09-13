@@ -27,7 +27,6 @@ public sealed class CurrentUser : ICurrentUser
     {
         var value = _accessor.HttpContext?.User.FindFirst(type)?.Value;
 
-        // A validated token missing one of its four claims is a token we should not have issued.
         return string.IsNullOrEmpty(value)
             ? throw new UnauthorizedException(MessageCode.NotAuthenticated)
             : value;

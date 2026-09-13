@@ -2,7 +2,6 @@ using System.ComponentModel.DataAnnotations;
 
 namespace CareLanka.Api.DTOs.Equipment;
 
-/// <summary>Body of POST /api/pharmacy-items.</summary>
 public class CreatePharmacyItemRequest
 {
     [Required]
@@ -25,7 +24,6 @@ public class CreatePharmacyItemRequest
     [MaxLength(20)]
     public string Unit { get; set; } = string.Empty;
 
-    /// <summary>Opening stock. Every later change is a transaction, never a direct edit.</summary>
     [Range(0, int.MaxValue)]
     public int QuantityOnHand { get; set; }
 

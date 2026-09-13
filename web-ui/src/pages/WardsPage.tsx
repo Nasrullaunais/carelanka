@@ -33,9 +33,6 @@ export function WardsPage() {
     onSuccess: (ward) => {
       toast.success(`Ward ${ward.name} created.`);
 
-      // Invalidate every listWards query, not just the one currently on screen — the new
-      // ward may belong to a filter the user has not selected yet. The generated key is a
-      // single object, so this matches on its _id rather than on an array prefix.
       queryClient.invalidateQueries({
         predicate: (query) =>
           (query.queryKey[0] as { _id?: string } | undefined)?._id === 'listWards',
@@ -82,7 +79,6 @@ export function WardsPage() {
         </div>
       </div>
 
-      {/* Hidden, not disabled: a control the user's role cannot use should not be on screen. */}
       {canCreateWard(session?.principal.role) && (
         <CreateWardCard
           isPending={create.isPending}
@@ -209,8 +205,6 @@ function WardTable({
     return <p className="empty">Loading…</p>;
   }
 
-  // The toast already fired. A list shows "Try again" rather than an empty table that looks
-  // like a hospital with no wards.
   if (isError) {
     return (
       <div className="empty">

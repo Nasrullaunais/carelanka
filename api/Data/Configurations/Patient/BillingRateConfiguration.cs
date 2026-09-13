@@ -17,7 +17,6 @@ public class BillingRateConfiguration : IEntityTypeConfiguration<BillingRate>
             t.HasCheckConstraint(
                 "ck_billing_rates_ward_type", EnumWire.CheckConstraint<WardType>("ward_type"));
 
-            // A negative price is not a discount, it is a typo that pays the patient.
             t.HasCheckConstraint("ck_billing_rates_amount", "amount >= 0");
         });
 
@@ -32,8 +31,6 @@ public class BillingRateConfiguration : IEntityTypeConfiguration<BillingRate>
 
         builder.Property(r => r.Amount).HasPrecision(12, 2).IsRequired();
 
-        // One price per cell of the grid. Scoped WHERE is_active for the usual reason: a
-        // retired row must not make its own cell unpriceable forever.
         builder.HasIndex(r => new { r.WardType, r.ExpenseKey })
             .HasDatabaseName(CellUniqueIndex)
             .IsUnique()

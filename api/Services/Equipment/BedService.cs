@@ -11,8 +11,6 @@ namespace CareLanka.Api.Services.Equipment;
 
 public sealed class BedService : IBedService
 {
-    // Shown when Patient Management cannot name a ward we hold beds for. Not expected in
-    // normal running: it means a bed points at a ward that no longer exists.
     private const string UnknownWardName = "Unknown ward";
 
     private readonly CareLankaDbContext _db;
@@ -44,8 +42,6 @@ public sealed class BedService : IBedService
 
         var totalItems = await query.CountAsync(cancellationToken);
 
-        // Id breaks ties. Without it two beds sharing a number across wards can swap places
-        // between pages, and one of them is then never returned at all.
         var rows = await query
             .OrderBy(b => b.WardId)
             .ThenBy(b => b.BedNumber)
@@ -66,8 +62,6 @@ public sealed class BedService : IBedService
         var assetTag = Normalise(request.AssetTag);
         var bedNumber = request.BedNumber.Trim();
 
-        // [Required] rejects null and "", but not "   ", and trimming that leaves a bed with
-        // no number at all sitting in the register.
         if (bedNumber.Length == 0)
         {
             throw new BadRequestException(MessageCode.ValidationFailed);
@@ -98,8 +92,6 @@ public sealed class BedService : IBedService
     {
         var bed = await GetByIdAsync(id, cancellationToken);
 
-        // Only a change that actually withdraws the bed asks Patient Management. Re-sending
-        // out_of_service on a bed already out of service is not an eviction and must not 409.
         if (request.Condition is BedCondition.OutOfService && bed.Condition != BedCondition.OutOfService)
         {
             await EnsureMayWithdrawAsync(bed, cancellationToken);
@@ -162,8 +154,6 @@ public sealed class BedService : IBedService
 
         var ids = wardIds.Distinct().ToList();
 
-        // Grouping is what leaves a ward with no beds out of the result rather than at zero,
-        // which is the contract Patient Management's port publishes.
         return await _db.Beds
             .AsNoTracking()
             .Where(b => ids.Contains(b.WardId))
@@ -174,8 +164,6 @@ public sealed class BedService : IBedService
 
     private async Task EnsureMayWithdrawAsync(BedEntity bed, CancellationToken cancellationToken)
     {
-        // Asked inside this request, before anything is written. Maintenance never evicts a
-        // patient, and only Patient Management knows whether anyone is in the bed.
         var occupancy = await _occupancy.GetOccupancyAsync(bed.Id, cancellationToken);
 
         if (!occupancy.MayTakeOutOfService)
@@ -238,8 +226,6 @@ public sealed class BedService : IBedService
             UpdatedAt = bed.UpdatedAt
         };
 
-    // An asset tag of "" and one of "   " are both "no tag". Storing either would make the
-    // unique index treat it as a real value that the next untagged bed then collides with.
     private static string? Normalise(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

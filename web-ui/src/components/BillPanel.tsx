@@ -19,32 +19,13 @@ import {
   quantity,
 } from '../types/billing';
 
-// One bill, everywhere a bill is shown.
-//
-// It lives in components/ rather than in a page because it started out on a billing screen of
-// its own. That screen is gone (2026-09-12): "where does the billing happen?" was a fair
-// question to ask of a discharge checklist that had a `Bill settled` box, no bill on the page
-// and no way to reach one — and the answer, a second screen, meant walking the same visit
-// twice while neither page could see what the other had done. There is one screen now and this
-// is the part of it that is the bill.
-//
-// Two things it deliberately does NOT do:
-//
-//   It does not decide who may settle. `canSettle` is passed in, because the billing desk and
-//   the discharge checklist are different permissions and only the duty manager holds both.
-//   A ward nurse sees the bill and reads the total; they do not take money.
-//
-//   It does not invent a charge. The fee and the bed are worked out from the visit; everything
-//   else is typed by a person, because no table in this project ties a treatment, a meal or a
-//   drug to an admission. A fake charge is a number handed to a patient on paper.
-
 export function BillPanel({
   admissionId,
   canSettle,
   showPrint = true,
 }: {
   admissionId: string;
-  /** Whether this viewer may add charges and take money — Policies.BillingDesk. */
+
   canSettle: boolean;
   showPrint?: boolean;
 }) {
@@ -58,7 +39,6 @@ export function BillPanel({
 
   const template = chargeTemplate(templateKey);
 
-  /** Picking a row refills the three boxes under it; the typist can still overwrite any of them. */
   function chooseTemplate(key: string) {
     const chosen = chargeTemplate(key);
 
@@ -71,13 +51,9 @@ export function BillPanel({
   const bill = useQuery({
     ...getAdmissionBillOptions({ path: { admissionId } }),
 
-    // A 404 here means "nobody has opened a bill yet", which is the ordinary state and not a
-    // failure. Retrying would just ask again and toast again.
     retry: false,
   });
 
-  // Settling moves the discharge checklist and can move the admission's status, so the ward
-  // screens have to hear about it too.
   const refreshAll = () =>
     queryClient.invalidateQueries({
       predicate: (query) => {
@@ -130,8 +106,6 @@ export function BillPanel({
     return <p className="empty">Loading the bill…</p>;
   }
 
-  // No bill row yet. Not an error state — say what is missing and offer the one button that
-  // fixes it, to whoever is allowed to press it.
   if (!bill.data) {
     return (
       <>
@@ -173,13 +147,8 @@ export function BillPanel({
         </div>
       )}
 
-      {/* The printable half. Everything outside it is hidden by the print stylesheet, so what
-          comes out of the printer is a bill and not a screenshot of an app. */}
       <BillPrintout bill={data} standalone={showPrint} />
 
-      {/* Everything below is a control, not the document. The discharge card prints as a
-          whole, so the charge form and the settle form have to say so themselves - otherwise
-          the patient's copy of their bill comes out with an empty "Add a charge" form on it. */}
       <div className="no-print">
       {frozen ? (
         <p className="hint">
@@ -359,25 +328,12 @@ export function BillPanel({
   );
 }
 
-/**
- * The bill itself, and the only part of the page that reaches a printer.
- *
- * A browser print view rather than a generated PDF: it is one stylesheet against a stack that
- * already renders the numbers, it saves to PDF from the print dialog anyway, and it does not
- * put a document-generation dependency into a project that needs one screen of it.
- */
 export function BillPrintout({
   bill,
   standalone = true,
 }: {
   bill: Bill;
-  /**
-   * Whether this is the whole printed document or a section of a bigger one.
-   *
-   * On the discharge screen it is a section: the card around it owns the hospital heading, the
-   * patient block and the `printable` class, and repeating all three inside would print the
-   * patient's name twice under two different headings.
-   */
+
   standalone?: boolean;
 }) {
   return (
@@ -389,8 +345,6 @@ export function BillPrintout({
         </div>
       )}
 
-      {/* Each label and value wrapped, so the grid cannot split a pair across rows and leave
-          every label sitting above somebody else's value. */}
       <dl className="detail-grid">
         {standalone && (
           <div>
@@ -412,8 +366,7 @@ export function BillPrintout({
           <dt>Raised on</dt>
           <dd>
             {new Date(bill.created_at).toLocaleString()}
-            {/* Who issued it. A bill handed across a counter names the person who wrote it,
-                and "who do I ask about this charge?" is the first question at the desk. */}
+
             {bill.raised_by_staff_name && (
               <div className="small muted">by {bill.raised_by_staff_name}</div>
             )}

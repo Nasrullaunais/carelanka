@@ -34,14 +34,6 @@ import {
   patientIdentifier,
 } from '../types/patients';
 
-// The expected-visits desk. Three jobs on one screen, in the order the day runs:
-//
-//   who is coming  ->  book someone in  ->  check them in when they walk up
-//
-// Check-in is the one that matters: it turns a booking into a real admission, and the care
-// level is chosen HERE by the person at the desk. Not by the patient when they booked, and
-// not by an agent.
-
 const PAGE_SIZE = 20;
 
 export function AppointmentsPage() {
@@ -54,9 +46,6 @@ export function AppointmentsPage() {
   const [checkingIn, setCheckingIn] = useState<Appointment | null>(null);
   const [admitted, setAdmitted] = useState<Admission | null>(null);
 
-  // Gated rather than skipped: hooks cannot go behind the early return below, and without
-  // this a doctor opening the URL fires a request that comes back 403 and toasts red — on a
-  // page that is already explaining, calmly, that it is not theirs.
   const isDesk = canWorkAppointmentDesk(role);
 
   const appointments = useQuery({
@@ -137,8 +126,6 @@ export function AppointmentsPage() {
           </div>
         </div>
 
-        {/* Worth saying once, plainly: the day here is not quite the day outside the window.
-            Only when a day is actually chosen — with the filter off it explains nothing. */}
         {date !== '' && (
           <p className="hint">
             A day runs midnight to midnight <strong>UTC</strong>, because that is what the
@@ -169,8 +156,6 @@ export function AppointmentsPage() {
           }}
           showDate={date === ''}
           openId={checkingIn?.id ?? null}
-          // A render prop rather than the form itself, so the table stays a table and does not
-          // grow a staff id, a permission check and two callbacks it has no other use for.
           renderDrawer={(appointment) => (
             <CheckInPanel
               appointment={appointment}
@@ -217,10 +202,6 @@ export function AppointmentsPage() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// The worklist
-// ---------------------------------------------------------------------------
-
 function AppointmentTable({
   appointments,
   isLoading,
@@ -244,8 +225,6 @@ function AppointmentTable({
     return <p className="empty">Loading…</p>;
   }
 
-  // The toast already fired. "Try again" rather than an empty table, which would read as a
-  // quiet day at the desk when it is really a broken request.
   if (isError) {
     return (
       <div className="empty">
@@ -293,7 +272,7 @@ function AppointmentTable({
               </td>
               <td>{appointment.reason ?? <span className="muted">Not given</span>}</td>
               <td>
-                {/* A raw staff id tells nobody anything. Which of the two paths it came down does. */}
+
                 {appointment.booked_by_staff_id ? 'At the desk' : 'In the app'}
               </td>
               <td>
@@ -304,8 +283,7 @@ function AppointmentTable({
                 </span>
               </td>
               <td>
-                {/* Only a scheduled booking can be checked in. Every other status is finished
-                    with, and offering a button that always 409s is worse than no button. */}
+
                 {appointment.status === 'scheduled' && (
                   <button type="button" onClick={() => onCheckIn(appointment)}>
                     {openId === appointment.id ? 'Cancel' : 'Check in'}
@@ -314,9 +292,6 @@ function AppointmentTable({
               </td>
             </tr>
 
-            {/* The form opens under the booking it is about. As a card elsewhere on the page it
-                was a card you had to go and find, with nothing on screen tying it to the row you
-                clicked — and on a busy morning that is how the wrong person gets checked in. */}
             {openId === appointment.id && (
               <tr className="drawer">
                 <td colSpan={6}>{renderDrawer(appointment)}</td>
@@ -328,10 +303,6 @@ function AppointmentTable({
     </table>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Book a visit
-// ---------------------------------------------------------------------------
 
 function BookVisitCard() {
   const queryClient = useQueryClient();
@@ -354,9 +325,6 @@ function BookVisitCard() {
         `${appointment.patient.full_name} booked for ${localDateTime(appointment.scheduled_at)}.`,
       );
 
-      // Every listAppointments query, not just the filter on screen: the new booking may well
-      // be for a day the user is not looking at, and a stale "today" is the one they will
-      // come back to. The patients board too — a new booking is a new "not arrived" row on it.
       queryClient.invalidateQueries({
         predicate: (query) => {
           const id = (query.queryKey[0] as { _id?: string } | undefined)?._id;
@@ -372,8 +340,6 @@ function BookVisitCard() {
     },
   });
 
-  // The server refuses a time in the past with cl_pat_009, and it is always a typo. Catching
-  // it here means the desk sees it before the round trip, not as a red toast afterwards.
   const isFuture = when !== '' && new Date(when).getTime() > Date.now();
 
   function submit(event: FormEvent) {
@@ -383,8 +349,6 @@ function BookVisitCard() {
     book.mutate({
       body: {
         patient_id: patient.id,
-        // The input is local wall-clock; the wire is UTC. Date does the conversion, and this
-        // is the one place in the app where those two are allowed to differ silently.
         scheduled_at: new Date(when).toISOString(),
         reason: reason.trim().length > 0 ? reason.trim() : null,
       },
@@ -523,10 +487,6 @@ function BookVisitCard() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Check in
-// ---------------------------------------------------------------------------
-
 function CheckInPanel({
   appointment,
   staffId,
@@ -542,9 +502,6 @@ function CheckInPanel({
 }) {
   const queryClient = useQueryClient();
 
-  // A nurse is offered three levels, the duty manager five. Hidden rather than disabled: the
-  // server refuses icu and hdu from a nurse with cl_pat_011, and a picker that offers a choice
-  // it knows will be refused is just a slower way of saying no.
   const levels = canSetHighCare ? dutyManagerCareLevels : deskCareLevels;
 
   const [category, setCategory] = useState<AdmissionCategory>('outpatient');
@@ -556,9 +513,6 @@ function CheckInPanel({
     onSuccess: (admission) => {
       toast.success(`${appointment.patient.full_name} checked in.`);
 
-      // Three lists change: the booking is no longer expected, there is a new admission on
-      // the worklist, and the patients board turns one "Not arrived" row into a visit. A
-      // mutation invalidates everything it changed, not just what is on screen.
       queryClient.invalidateQueries({
         predicate: (query) => {
           const id = (query.queryKey[0] as { _id?: string } | undefined)?._id;
@@ -580,8 +534,6 @@ function CheckInPanel({
       path: { id: appointment.id },
       body: {
         admission_category: category,
-        // Recorded proof a human chose the care level. It is you, because you are the one
-        // filling this in — no code path lets an agent supply it.
         category_set_by_staff_id: staffId,
         urgency,
         is_infectious: isInfectious,

@@ -1,15 +1,4 @@
 #!/usr/bin/env node
-// Spec gate. The five specs describe ONE ASP.NET application, so routes,
-// operationIds and schema names are global, not per-component.
-//
-//   - a duplicate route throws AmbiguousMatchException at startup, for everybody
-//   - a duplicate operationId or schema name collides silently in the generated
-//     clients, and whichever generates second wins
-//
-// Run: bun run check:specs   (or npm run check:specs)
-//
-// Note: `npx @apidevtools/swagger-parser` does not work - that package ships a
-// library, not a CLI. Hence this script.
 
 import { createRequire } from 'module';
 import { readFileSync, readdirSync } from 'fs';
@@ -28,7 +17,6 @@ const fail = (msg) => { console.error('  FAIL ' + msg); failures++; };
 
 console.log(`Checking ${files.length} specs in specs/\n`);
 
-// ---------- 1. every spec is valid OpenAPI ----------
 const docs = {};
 for (const f of files) {
   try {
@@ -45,7 +33,6 @@ for (const f of files) {
   }
 }
 
-// ---------- 2. collect the three global namespaces ----------
 const routes = {};
 const operationIds = {};
 const schemas = {};
@@ -67,7 +54,6 @@ for (const [file, doc] of Object.entries(docs)) {
   }
 }
 
-// ---------- 3. routes and operationIds must be globally unique ----------
 console.log('');
 for (const [route, owners] of Object.entries(routes)) {
   if (owners.length > 1) fail(`duplicate route  ${route}  in ${owners.join(', ')}`);
@@ -76,9 +62,6 @@ for (const [id, owners] of Object.entries(operationIds)) {
   if (owners.length > 1) fail(`duplicate operationId  ${id}  in ${owners.join(', ')}`);
 }
 
-// ---------- 4. a shared schema name is fine ONLY if byte-identical ----------
-// Two components needing different views of one thing give them different names
-// (EquipmentBed / AdmissionBed), not one name and two shapes.
 const shared = [];
 for (const [name, defs] of Object.entries(schemas)) {
   if (defs.length < 2) continue;
@@ -91,7 +74,6 @@ for (const [name, defs] of Object.entries(schemas)) {
   }
 }
 
-// ---------- 5. report ----------
 const pathCount = Object.keys(routes).length;
 console.log(`  ${files.length} specs, ${pathCount} operations, ` +
             `${Object.keys(schemas).length} schema names`);

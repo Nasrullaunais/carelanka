@@ -9,6 +9,83 @@ namespace CareLanka.Api.Tests;
 public sealed class EmergencyOpenApiContractTests
 {
     [Theory]
+    [InlineData("/ambulances/{id}/crew", "get", "getCurrentAmbulanceCrew")]
+    [InlineData("/ambulances/{id}/crew", "post", "assignCurrentAmbulanceCrew")]
+    [InlineData("/ambulances/{ambulanceId}/crew/{staffMemberId}", "delete", "unassignCurrentAmbulanceCrew")]
+    [InlineData("/emergency-calls/{id}/dispatch", "post", "dispatchEmergencyCall")]
+    [InlineData("/me/dispatches/{id}/acknowledge", "post", "acknowledgeMyDispatch")]
+    [InlineData("/me/dispatches/{id}/decline", "post", "declineMyDispatch")]
+    [InlineData("/me/emergency-calls/{id}/cancel", "post", "cancelMyEmergencyCall")]
+    [InlineData("/me/emergency-calls/{id}/cancellation-request", "post", "requestMyEmergencyCallCancellation")]
+    [InlineData("/emergency-cancellation-requests", "get", "listEmergencyCancellationRequests")]
+    [InlineData("/emergency-calls/{id}/cancellation-request/approve", "post", "approveEmergencyCancellationRequest")]
+    [InlineData("/emergency-calls/{id}/cancellation-request/reject", "post", "rejectEmergencyCancellationRequest")]
+    public void Phase_zero_operations_are_published(
+        string path,
+        string method,
+        string operationId)
+    {
+        var contract = LoadContract();
+        Assert.Equal(operationId, Scalar(contract, "paths", path, method, "operationId"));
+    }
+
+    [Fact]
+    public void Dispatch_status_values_match_the_aligned_state_machine()
+    {
+        var contract = LoadContract();
+        var actual = Sequence(contract, "components", "schemas", "DispatchStatus", "enum")
+            .Children.Cast<YamlScalarNode>().Select(value => value.Value!).ToArray();
+        var expected = new[]
+        {
+            "assigned",
+            "acknowledged",
+            "en_route_to_scene",
+            "at_scene",
+            "transporting_to_hospital",
+            "handed_over",
+            "declined",
+            "cancelled",
+            "reassigned"
+        };
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void Responding_crew_is_read_only_and_navigation_launches_google_maps()
+    {
+        var contract = LoadContract();
+        var dispatchCrew = Map(contract, "paths", "/dispatches/{id}/crew");
+        var navigation = Map(contract, "components", "schemas", "NavigationTarget", "properties");
+
+        Assert.True(dispatchCrew.Children.ContainsKey(new YamlScalarNode("get")));
+        Assert.False(dispatchCrew.Children.ContainsKey(new YamlScalarNode("post")));
+        Assert.False(Map(contract, "paths").Children.ContainsKey(
+            new YamlScalarNode("/dispatches/{dispatchId}/crew/{staffMemberId}")));
+        Assert.True(navigation.Children.ContainsKey(new YamlScalarNode("google_maps_url")));
+        Assert.False(navigation.Children.ContainsKey(new YamlScalarNode("steps")));
+        Assert.False(navigation.Children.ContainsKey(new YamlScalarNode("encoded_polyline")));
+    }
+
+    [Fact]
+    public void Eligibility_and_patient_tracking_shapes_preserve_the_phase_zero_boundaries()
+    {
+        var contract = LoadContract();
+        var ambulance = Map(contract, "components", "schemas", "AmbulanceSummary", "properties");
+        var tracking = Map(contract, "components", "schemas", "MyCallTracking", "properties");
+        var dispatch = Map(contract, "components", "schemas", "Dispatch", "properties");
+
+        Assert.True(ambulance.Children.ContainsKey(new YamlScalarNode("current_crew_count")));
+        Assert.True(ambulance.Children.ContainsKey(new YamlScalarNode("required_crew_count")));
+        Assert.True(ambulance.Children.ContainsKey(new YamlScalarNode("eligibility_block_reasons")));
+        Assert.True(tracking.Children.ContainsKey(new YamlScalarNode("cancellation_request_status")));
+        Assert.False(tracking.Children.ContainsKey(new YamlScalarNode("crew")));
+        Assert.False(tracking.Children.ContainsKey(new YamlScalarNode("details")));
+        Assert.False(tracking.Children.ContainsKey(new YamlScalarNode("rationale")));
+        Assert.False(dispatch.Children.ContainsKey(new YamlScalarNode("destination_ward_id")));
+    }
+
+    [Theory]
     [InlineData("/ambulances", "get", "listAmbulances")]
     [InlineData("/ambulances", "post", "createAmbulance")]
     [InlineData("/ambulances/{id}", "get", "getAmbulance")]
@@ -95,6 +172,9 @@ public sealed class EmergencyOpenApiContractTests
 
     private static YamlSequenceNode Sequence(YamlMappingNode root, params string[] path)
         => (YamlSequenceNode)Follow(root, path);
+
+    private static string Scalar(YamlMappingNode root, params string[] path)
+        => ((YamlScalarNode)Follow(root, path)).Value!;
 
     private static YamlNode Follow(YamlNode root, IEnumerable<string> path)
     {

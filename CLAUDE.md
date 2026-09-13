@@ -81,6 +81,7 @@ here is the order of authority.
 | `docs/CareLanka_Component_Plan.md` | The four components, who owns which, the seven roles, why React and Flutter differ. Read first. | Group |
 | `docs/BUILD_PLAN.md` | **The build index.** Build order, the five tracks, who is waiting on whom, integration checkpoints. Read before writing code. | Group |
 | `docs/build/{common,emergency,staff,equipment,patient}.md` | **What your member builds, step by step.** Read your own in full; read `build/common.md` §7 whoever you are — four things about auth that change how you build. | That track's owner |
+| `docs/build/emergency-agent-prompts.md` | **Copyable prompts for handing one Emergency phase to a fresh agent.** Use only when starting or handing off an Emergency implementation phase. | Emergency owner |
 | `TEST_ACCOUNTS.md` | **Who to log in as.** The seeded accounts, their roles and passwords, and how to use a token in Swagger or curl. Required by assignment §15. | Common (group-owned) |
 | `STUBS.md` | **Every fake standing in for someone else's unbuilt work.** Read the rows where `Owner` is your member — somebody is already depending on those. | Everyone, constantly |
 | `docs/entity_diagram.md` | Every table, field and enum, with the reasoning. | Group; each member edits only their own entities |
@@ -340,6 +341,82 @@ get it wrong and "not found" means two different things at two layers again.
   decide → propose → deterministic validation → pause for approval.
   `patient-management-plan.md` §8.7 is the template. Chaining the four together
   is `ai-orchestration-workflow.md`, and comes after.
+
+## API validation and controller standards
+
+Apply these rules to every new API request surface and every request surface deliberately
+refactored as part of the current task. Existing DataAnnotations elsewhere are migration
+work, not permission to copy the old pattern and not an invitation to widen an unrelated
+change across the repository.
+
+### Automated controller validation
+
+- `[ApiController]` and the ASP.NET validation pipeline reject invalid input before the
+  action runs. Controller actions bind, delegate and return.
+- Treat an action's request object as already validated. Do not add request null checks,
+  `ModelState.IsValid` branches, or property-by-property validation to controllers.
+- Keep business invariants in services. Missing related records, illegal state changes,
+  concurrency conflicts and authorization based on persisted state use the existing typed
+  exception flow; they are not request-shape validation.
+
+### FluentValidation is the request-validation mechanism
+
+- Use FluentValidation exclusively for API request validation. Request DTOs and
+  action-bound query models carry no `System.ComponentModel.DataAnnotations` attributes.
+- Give every request DTO its own `AbstractValidator<T>` class. Co-locate its complete
+  request-shape rules there, including cross-property rules such as paired coordinates.
+- Bind a query with validation rules into a query request model and validate it through
+  the same pipeline. Do not put `[Range]`, `[RegularExpression]` or similar attributes on
+  controller parameters.
+- Register FluentValidation automatic MVC validation and validator discovery once in the
+  API composition root. Configure MVC to suppress its implicit non-nullable-reference
+  `Required` rule so FluentValidation remains the single source of request rules.
+- Preserve the existing invalid-model response factory: validation failures return the
+  published `application/problem+json` `ValidationProblemDetails` shape and stable
+  `MessageCode.ValidationFailed` extension.
+- Integration-test that invalid bodies and query models return 400 without entering the
+  action or service.
+
+### Nullable request contracts
+
+- Nullable reference types stay enabled.
+- A required request property uses a non-nullable type; an optional request property uses
+  a nullable type.
+- Express required content explicitly in its validator, for example `.NotEmpty()` for a
+  required string. Apply optional rules with `When`, `Unless`, or a nullable-aware rule so
+  omission remains valid.
+- Keep DTOs as serialization shapes only. They contain properties and, only when the wire
+  format cannot express itself otherwise, serialization attributes; they contain no
+  validation or business logic.
+
+Expected shape:
+
+```csharp
+public sealed class CreateThingRequest
+{
+    public string Name { get; set; } = string.Empty;
+    public string? Notes { get; set; }
+}
+
+public sealed class CreateThingRequestValidator : AbstractValidator<CreateThingRequest>
+{
+    public CreateThingRequestValidator()
+    {
+        RuleFor(request => request.Name).NotEmpty().MaximumLength(200);
+        RuleFor(request => request.Notes).MaximumLength(500);
+    }
+}
+
+[ApiController]
+public sealed class ThingsController : ControllerBase
+{
+    [HttpPost]
+    public async Task<ActionResult<Thing>> Create(
+        [FromBody] CreateThingRequest request,
+        CancellationToken cancellationToken)
+        => Created((string?)null, await _things.CreateAsync(request, cancellationToken));
+}
+```
 
 ## Data conventions
 

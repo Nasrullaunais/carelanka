@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace CareLanka.Api.Controllers.Equipment;
 
-/// <summary>The bed register. Equipment Management owns the frame; Patient Management owns whoever is in it.</summary>
 [ApiController]
 [Route("api/beds")]
 [Tags("Beds")]
@@ -19,7 +18,6 @@ public class BedsController : ControllerBase
 
     public BedsController(IBedService beds) => _beds = beds;
 
-    /// <summary>List beds. Also read by Patient Management, which joins this register with its own BedAssignment rows to build its bed agent's candidate list.</summary>
     [Authorize(Policy = Policies.AnyStaff)]
     [HttpGet(Name = "listBeds")]
     [ProducesResponseType(typeof(PagedResult<Bed>), StatusCodes.Status200OK)]
@@ -33,7 +31,6 @@ public class BedsController : ControllerBase
         CancellationToken ct = default)
         => Ok(await _beds.ListAsync(wardId, condition, page, pageSize, ct));
 
-    /// <summary>Create a bed. ward_id references Patient Management's Ward table; we store the reference and never write that table.</summary>
     [Authorize(Policy = Policies.EquipmentManager)]
     [HttpPost(Name = "createBed")]
     [ProducesResponseType(typeof(Bed), StatusCodes.Status201Created)]
@@ -46,11 +43,9 @@ public class BedsController : ControllerBase
     {
         var bed = await _beds.CreateAsync(request, ct);
 
-        // No Location header: the contract publishes no GET /beds/{id} to point at.
         return Created((string?)null, bed);
     }
 
-    /// <summary>Update a bed's condition or details. Moving to out_of_service is refused with 409 while Patient Management reports the bed occupied or held, checked inside this request every time.</summary>
     [Authorize(Policy = Policies.EquipmentManager)]
     [HttpPatch("{id:guid}", Name = "updateBed")]
     [ProducesResponseType(typeof(Bed), StatusCodes.Status200OK)]
@@ -63,7 +58,6 @@ public class BedsController : ControllerBase
         Guid id, [FromBody] UpdateBedRequest request, CancellationToken ct)
         => Ok(await _beds.UpdateAsync(id, request, ct));
 
-    /// <summary>Retire a bed permanently. Same occupancy check as an update that withdraws it, and there is no un-retire — a dedicated endpoint so the one-way nature is visible in the API surface.</summary>
     [Authorize(Policy = Policies.EquipmentManager)]
     [HttpPost("{id:guid}/retire", Name = "retireBed")]
     [ProducesResponseType(typeof(Bed), StatusCodes.Status200OK)]

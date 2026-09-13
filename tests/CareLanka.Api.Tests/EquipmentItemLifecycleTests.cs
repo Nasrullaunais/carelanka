@@ -10,10 +10,6 @@ using Xunit;
 
 namespace CareLanka.Api.Tests;
 
-/// <summary>
-/// The status machine, exercised through every endpoint that can move an item. One guard
-/// decides what is legal, so these are the tests that say what "legal" means.
-/// </summary>
 [Collection(ApiCollection.Name)]
 public sealed class EquipmentItemLifecycleTests
 {
@@ -32,10 +28,6 @@ public sealed class EquipmentItemLifecycleTests
         using var body = await ReadJsonAsync(response);
         var item = body.RootElement;
 
-        // The one documented exemption from the transition table. Assigned -> maintenance is
-        // refused everywhere else, but a person saying the machine is broken outranks the
-        // table: the alternative is a known-faulty item still reading as usable. Detaching
-        // the patient is the intended consequence, which is why it is asserted here.
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("maintenance", item.GetProperty("status").GetString());
         Assert.Equal(JsonValueKind.Null, item.GetProperty("assigned_to_admission_id").ValueKind);
@@ -55,8 +47,6 @@ public sealed class EquipmentItemLifecycleTests
         var warning = await db.Warnings.AsNoTracking()
             .SingleAsync(w => w.RelatedEntityId == id);
 
-        // Status and warning are one SaveChanges. If the exemption above ever stops writing
-        // the warning, the item goes quiet in maintenance with nobody told why.
         Assert.Equal(WarningType.EquipmentFaulty, warning.Type);
         Assert.Equal(WarningSeverity.High, warning.Severity);
         Assert.Equal(WarningStatus.Open, warning.Status);
@@ -74,8 +64,6 @@ public sealed class EquipmentItemLifecycleTests
             $"/api/equipment-items/{id}", new { status = "maintenance" });
         using var body = await ReadJsonAsync(response);
 
-        // The exemption belongs to report-fault alone. Editing an assigned item straight into
-        // maintenance would drop a patient's equipment with no fault recorded anywhere.
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal("cl_err_409_transition", body.RootElement.GetProperty("code").GetString());
     }
@@ -90,8 +78,6 @@ public sealed class EquipmentItemLifecycleTests
         var response = await ReportFaultAsync(client, id, "Found in the corridor.");
         using var body = await ReadJsonAsync(response);
 
-        // Retired stays terminal even for a fault. A scrapped item has nothing left to report,
-        // and a replacement is a new row.
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal("cl_equ_006", body.RootElement.GetProperty("code").GetString());
     }
@@ -106,8 +92,6 @@ public sealed class EquipmentItemLifecycleTests
         var response = await AssignAsync(client, id, Guid.NewGuid());
         using var body = await ReadJsonAsync(response);
 
-        // Routed through the same guard as everything else, but the caller still reads the
-        // specific code. "Not available" tells a technician more than the transition wording.
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal("cl_equ_006", body.RootElement.GetProperty("code").GetString());
     }
@@ -150,8 +134,6 @@ public sealed class EquipmentItemLifecycleTests
         var response = await client.PutAsJsonAsync(
             $"/api/equipment-items/{id}", new { status = "assigned" });
 
-        // Available -> assigned is a legal move, but only the assign endpoint carries the
-        // admission id. Allowing it here would leave an item assigned to nobody.
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
@@ -170,13 +152,8 @@ public sealed class EquipmentItemLifecycleTests
         var gone = await client.PutAsJsonAsync(
             $"/api/equipment-items/{scrapped}", new { status = "retired" });
 
-        // A status edit is not how a repair ends. The unit completes the work, which is the
-        // only path back to available - otherwise a faulty machine returns to the floor
-        // because somebody changed a dropdown.
         Assert.Equal(HttpStatusCode.Conflict, back.StatusCode);
 
-        // Scrapping is still allowed from maintenance. It is the other real outcome of a
-        // fault, and it is terminal rather than a quiet unlock.
         Assert.Equal(HttpStatusCode.OK, gone.StatusCode);
     }
 
@@ -191,8 +168,6 @@ public sealed class EquipmentItemLifecycleTests
 
         var jobs = await OpenRepairJobsAsync(id);
 
-        // A second fault on a machine already waiting is more detail on the same repair. Two
-        // rows would read as two machines to fix.
         var job = Assert.Single(jobs);
         Assert.Equal(MaintenanceType.Repair, job.ScheduleType);
         Assert.Equal("Sparking at the plug.", job.Notes);
@@ -214,8 +189,6 @@ public sealed class EquipmentItemLifecycleTests
         Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
         Assert.Equal("available", body.RootElement.GetProperty("status").GetString());
 
-        // The fault does not stay open behind the repair, or the warning queue fills with
-        // problems somebody already fixed.
         Assert.Empty(await OpenFaultWarningsAsync(id));
     }
 
@@ -231,8 +204,6 @@ public sealed class EquipmentItemLifecycleTests
 
         Assert.Equal(HttpStatusCode.OK, retired.StatusCode);
 
-        // Nothing is left to fix on a scrapped machine, so its work order and its fault close
-        // with it rather than sitting in the queue against something that no longer exists.
         Assert.Empty(await OpenRepairJobsAsync(id));
         Assert.Empty(await OpenFaultWarningsAsync(id));
     }
@@ -272,8 +243,6 @@ public sealed class EquipmentItemLifecycleTests
         var reported = await ReportFaultAsync(nurse, id, "Sparking at the plug.");
         var assigned = await AssignAsync(nurse, id, Guid.NewGuid());
 
-        // A nurse at the bedside is the person who finds the fault, so the report is open to
-        // any staff. Moving stock around the hospital is not.
         Assert.Equal(HttpStatusCode.OK, reported.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, assigned.StatusCode);
     }

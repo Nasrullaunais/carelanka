@@ -23,11 +23,8 @@ public class BillConfiguration : IEntityTypeConfiguration<Bill>
 
         builder.Property(b => b.SettlementNote).HasMaxLength(300);
 
-        // IsSettled is Settled At read a different way, not a column. EF would try to map it
-        // otherwise and the migration would carry a field that can disagree with the timestamp.
         builder.Ignore(b => b.IsSettled);
 
-        // One bill per visit, enforced rather than assumed - the same shape as Discharge.
         builder.HasOne(b => b.Admission)
             .WithOne()
             .HasForeignKey<Bill>(b => b.AdmissionId)
@@ -37,8 +34,6 @@ public class BillConfiguration : IEntityTypeConfiguration<Bill>
             .HasDatabaseName(AdmissionUniqueIndex)
             .IsUnique();
 
-        // Not scoped WHERE is_active: a bill number is quoted by a patient holding a piece of
-        // paper, so it has to stay unique for good. Bills are not soft-deletable anyway.
         builder.HasIndex(b => b.BillNumber)
             .HasDatabaseName(BillNumberUniqueIndex)
             .IsUnique();

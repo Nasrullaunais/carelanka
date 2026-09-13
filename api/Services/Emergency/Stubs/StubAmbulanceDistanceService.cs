@@ -1,6 +1,6 @@
 namespace CareLanka.Api.Services.Emergency.Stubs;
 
-// STUB - straight-line fallback until the maps provider is integrated. See STUBS.md row 4.
+// STUB: replace with the maps provider integration (STUBS.md row 4).
 public sealed class StubAmbulanceDistanceService : IAmbulanceDistanceService
 {
     public Task<IReadOnlyDictionary<Guid, double?>> MeasureAsync(

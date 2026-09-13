@@ -27,7 +27,6 @@ public class DischargeChecklistItemConfiguration : IEntityTypeConfiguration<Disc
 
         builder.Property(i => i.Notes).HasMaxLength(500);
 
-        // Cascade, not Restrict: a checklist item has no meaning without its discharge.
         builder.HasOne(i => i.Discharge)
             .WithMany(d => d.ChecklistItems)
             .HasForeignKey(i => i.DischargeId)
@@ -40,8 +39,6 @@ public class DischargeChecklistItemConfiguration : IEntityTypeConfiguration<Disc
 
         builder.HasQueryFilter(i => i.Discharge.Admission.Patient.IsActive);
 
-        // One row per box. Without this, "tick clinical clearance" twice is two rows and
-        // "is it ticked?" has two answers.
         builder.HasIndex(i => new { i.DischargeId, i.ItemType })
             .HasDatabaseName(DischargeItemTypeUniqueIndex)
             .IsUnique();

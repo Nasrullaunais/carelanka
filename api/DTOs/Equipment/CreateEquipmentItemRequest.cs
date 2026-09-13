@@ -2,7 +2,6 @@ using System.ComponentModel.DataAnnotations;
 
 namespace CareLanka.Api.DTOs.Equipment;
 
-/// <summary>Body of POST /api/equipment-items. The item starts available.</summary>
 public class CreateEquipmentItemRequest
 {
     [Required]
@@ -24,7 +23,6 @@ public class CreateEquipmentItemRequest
     [Required]
     public DateOnly PurchaseDate { get; set; }
 
-    /// <summary>Printed as a QR code on the physical item.</summary>
     [Required]
     [MaxLength(50)]
     public string AssetTag { get; set; } = string.Empty;
@@ -32,7 +30,6 @@ public class CreateEquipmentItemRequest
     [MaxLength(100)]
     public string? SerialNumber { get; set; }
 
-    /// <summary>Null means the central store. References Patient Management's ward.</summary>
     public Guid? WardId { get; set; }
 
     public DateOnly? NextMaintenanceDue { get; set; }

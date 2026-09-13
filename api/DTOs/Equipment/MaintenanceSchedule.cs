@@ -3,7 +3,6 @@ using CareLanka.Api.Data.Enums;
 
 namespace CareLanka.Api.DTOs.Equipment;
 
-/// <summary>One servicing event against an equipment item or a bed.</summary>
 public class MaintenanceSchedule
 {
     [Required]
@@ -15,7 +14,6 @@ public class MaintenanceSchedule
     [Required]
     public Guid AssetId { get; set; }
 
-    /// <summary>Human-readable, so a task list does not read as a column of GUIDs. Built from whichever asset the row points at.</summary>
     [Required]
     public string AssetLabel { get; set; } = string.Empty;
 
@@ -25,7 +23,6 @@ public class MaintenanceSchedule
     [Required]
     public DateOnly ScheduledDate { get; set; }
 
-    /// <summary>Overdue is computed here at read time, never stored.</summary>
     [Required]
     public MaintenanceStatus Status { get; set; }
 

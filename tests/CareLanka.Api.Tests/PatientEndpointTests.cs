@@ -13,8 +13,6 @@ public sealed class PatientEndpointTests
 
     public PatientEndpointTests(ApiApplication application) => _application = application;
 
-    // ---------- registering ----------
-
     [Fact]
     public async Task A_nurse_registers_a_patient_and_finds_them_again_by_searching_their_nic()
     {
@@ -29,7 +27,6 @@ public sealed class PatientEndpointTests
         Assert.Equal(nic, body.RootElement.GetProperty("nic").GetString());
         Assert.False(body.RootElement.GetProperty("has_account").GetBoolean());
 
-        // No account is linked, so no temp reference either — the NIC is the identifier.
         Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("temp_reference").ValueKind);
 
         using var found = await ReadJsonAsync(await client.GetAsync($"/api/patients?search={nic}"));
@@ -48,9 +45,6 @@ public sealed class PatientEndpointTests
         using var body = await ReadJsonAsync(await CreateAsync(client, "Coded Patient", nic: NewNic()));
         var code = body.RootElement.GetProperty("patient_code").GetString();
 
-        // P then seven characters, with no 0/O and no 1/I/L in the alphabet. Somebody reads
-        // this off a wristband and somebody else types it into another component's form, and
-        // those are the characters they get wrong.
         Assert.Matches("^P[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{7}$", code);
     }
 
@@ -75,8 +69,6 @@ public sealed class PatientEndpointTests
         using var created = await ReadJsonAsync(await CreateAsync(client, "Findable By Code", nic: NewNic()));
         var code = created.RootElement.GetProperty("patient_code").GetString();
 
-        // The whole point of the code: Equipment's screen is handed eight characters by a
-        // nurse and has to turn them into this person. Searching is how.
         using var found = await ReadJsonAsync(await client.GetAsync($"/api/patients?search={code}"));
 
         Assert.Equal(1, found.RootElement.GetProperty("total_items").GetInt32());
@@ -114,7 +106,6 @@ public sealed class PatientEndpointTests
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         Assert.StartsWith($"UNKNOWN-{DateTimeOffset.UtcNow.Year}-", reference);
 
-        // Four digits, so it is short enough to read out loud over a handover.
         Assert.Matches(@"^UNKNOWN-\d{4}-\d{4}$", reference);
     }
 
@@ -139,8 +130,6 @@ public sealed class PatientEndpointTests
         var created = await CreateAsync(client, "Nimal Silva", phone: NewPhone());
         using var body = await ReadJsonAsync(created);
 
-        // The phone is already an identifier. Generating a reference as well would give one
-        // person two handles that staff then have to know are the same person.
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("temp_reference").ValueKind);
     }
@@ -157,8 +146,6 @@ public sealed class PatientEndpointTests
         var duplicate = await CreateAsync(client, "Sunil Fernando", nic: nic);
         using var body = await ReadJsonAsync(duplicate);
 
-        // A returning patient must keep one record with many admissions, not gain a second
-        // identity — so the desk is told which record to use instead.
         Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
         Assert.Equal("application/problem+json", duplicate.Content.Headers.ContentType?.MediaType);
         Assert.Equal("cl_pat_002", body.RootElement.GetProperty("code").GetString());
@@ -193,8 +180,6 @@ public sealed class PatientEndpointTests
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 
-    // ---------- reading ----------
-
     [Fact]
     public async Task Getting_a_patient_returns_an_empty_admission_list_rather_than_omitting_it()
     {
@@ -204,7 +189,6 @@ public sealed class PatientEndpointTests
         using var body = await ReadJsonAsync(await client.GetAsync($"/api/patients/{id}"));
         var admissions = body.RootElement.GetProperty("admissions");
 
-        // A missing key and an empty list are different things to a generated client.
         Assert.Equal(JsonValueKind.Array, admissions.ValueKind);
         Assert.Empty(admissions.EnumerateArray());
     }
@@ -252,9 +236,6 @@ public sealed class PatientEndpointTests
         using var body = await ReadJsonAsync(
             await client.GetAsync($"/api/patients?search=NoSuchPatient{Guid.NewGuid():N}"));
 
-        // Equipment Management shipped `PagedResult` to `main` first and rounds an empty list up
-        // to one page, so a UI renders "page 1 of 1" over an empty table rather than "of 0".
-        // Patient Management adopted that rather than shipping a second, differing copy.
         Assert.Equal(0, body.RootElement.GetProperty("total_items").GetInt32());
         Assert.Equal(1, body.RootElement.GetProperty("total_pages").GetInt32());
         Assert.Empty(body.RootElement.GetProperty("items").EnumerateArray());
@@ -269,8 +250,6 @@ public sealed class PatientEndpointTests
         await CreateAsync(client, $"{marker} Zoysa", nic: NewNic());
         await CreateAsync(client, $"{marker} Abeywardena", nic: NewNic());
 
-        // sortBy=full_name is the first query parameter in the API whose enum value is not one
-        // word. Without a type converter the model binder rejects it and this 400s.
         var response = await client.GetAsync(
             $"/api/patients?search={marker}&sortBy=full_name&sortDir=asc");
         using var body = await ReadJsonAsync(response);
@@ -286,8 +265,6 @@ public sealed class PatientEndpointTests
     {
         using var client = await ClientAsync(ApiApplication.NurseEmail);
 
-        // Sorting by something else than what was asked for is worse than refusing: the caller
-        // believes the order means something.
         var response = await client.GetAsync("/api/patients?sortBy=date_of_birth");
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -302,8 +279,6 @@ public sealed class PatientEndpointTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
-
-    // ---------- looking up before registering ----------
 
     [Fact]
     public async Task A_lookup_miss_is_a_200_with_found_false_because_not_knowing_someone_is_normal()
@@ -330,12 +305,8 @@ public sealed class PatientEndpointTests
         Assert.True(body.RootElement.GetProperty("found").GetBoolean());
         Assert.Equal(id, body.RootElement.GetProperty("patient").GetProperty("id").GetString());
 
-        // Nothing can create an admission yet, so this is false for everyone. It becomes a real
-        // signal in the admissions half of step 3.
         Assert.False(body.RootElement.GetProperty("has_open_admission").GetBoolean());
     }
-
-    // ---------- updating ----------
 
     [Fact]
     public async Task An_update_replaces_the_fields_that_were_missing_at_intake()
@@ -371,8 +342,6 @@ public sealed class PatientEndpointTests
         using var client = await ClientAsync(ApiApplication.NurseEmail);
         var id = await CreateIdAsync(client, "Loses Their Papers", NewNic());
 
-        // The database requires one of NIC, phone or temp reference on every row. Sending an
-        // update with neither used to hit that check constraint and surface as a 500.
         var response = await client.PutAsJsonAsync(
             $"/api/patients/{id}", new { full_name = "Loses Their Papers", gender = "unknown" });
 
@@ -416,12 +385,8 @@ public sealed class PatientEndpointTests
 
         using var body = await ReadJsonAsync(response);
 
-        // The wristband and the verbal handover from the unidentified period still have to
-        // resolve to this person, so the reference is never cleared once given.
         Assert.Equal(reference, body.RootElement.GetProperty("temp_reference").GetString());
     }
-
-    // ---------- linking a login to a record ----------
 
     [Fact]
     public async Task A_duty_manager_links_an_account_and_the_record_then_reports_having_one()
@@ -447,7 +412,6 @@ public sealed class PatientEndpointTests
         var second = await LinkAsync(manager, id, await NewPatientAccountIdAsync());
         using var body = await ReadJsonAsync(second);
 
-        // One account, one record.
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
         Assert.Equal("cl_pat_003", body.RootElement.GetProperty("code").GetString());
     }
@@ -481,16 +445,12 @@ public sealed class PatientEndpointTests
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 
-    // ---------- who may do what ----------
-
     [Fact]
     public async Task Registering_a_patient_is_403_for_an_administrator_and_401_without_a_token()
     {
         using var anonymous = _application.CreateClient();
         var withoutToken = await CreateAsync(anonymous, "Anonymous", nic: NewNic());
 
-        // An administrator manages wards and runs the organisation; they do not stand at the
-        // intake desk. patient-spec.yaml lists general staff, nurse and duty manager only.
         using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
         var wrongRole = await CreateAsync(administrator, "Wrong Role", nic: NewNic());
 
@@ -501,11 +461,6 @@ public sealed class PatientEndpointTests
     [Fact]
     public async Task Reception_registers_patients_and_the_ambulance_crew_no_longer_does()
     {
-        // Changed 2026-09-11. The crew are the emergency response team and the paperwork is
-        // done at the hospital desk, so general staff went onto PatientRegistrar and ambulance
-        // crew came off it. Not a tidy-up: it decides who creates the record for an
-        // unidentified casualty, which is why integration_of_functions.md 11.9 raises it with
-        // Emergency rather than leaving it as our own detail.
         using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
         var byReception = await CreateAsync(reception, "Registered At The Desk", nic: NewNic());
 
@@ -522,8 +477,6 @@ public sealed class PatientEndpointTests
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         var id = await CreateIdAsync(nurse, "Not For The Crew", NewNic());
 
-        // PatientDetails is six of the seven staff roles. This is the seventh, and the test
-        // exists so that "six of seven" stays a decision rather than becoming an accident.
         using var ambulance = await ClientAsync(ApiApplication.AmbulanceEmail);
         var read = await ambulance.GetAsync($"/api/patients/{id}");
         var list = await ambulance.GetAsync("/api/patients");
@@ -540,8 +493,6 @@ public sealed class PatientEndpointTests
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         var id = await CreateIdAsync(nurse, "Read Only To Doctor", NewNic());
 
-        // A doctor treats the patient, so they must be able to open the record. They are not
-        // at the intake desk and they do not keep the demographics, so both writes are 403.
         using var doctor = await ClientAsync(ApiApplication.DoctorEmail);
         var read = await doctor.GetAsync($"/api/patients/{id}");
         var list = await doctor.GetAsync("/api/patients");
@@ -577,8 +528,6 @@ public sealed class PatientEndpointTests
         var nic = NewNic();
         var id = await CreateIdAsync(nurse, "Equipment Looks Me Up", nic);
 
-        // The whole reason this role was let in: their assign screen needs the eight characters,
-        // and the only way to get them is to find the patient.
         using var equipment = await ClientAsync(ApiApplication.EquipmentEmail);
         using var list = await ReadJsonAsync(await equipment.GetAsync($"/api/patients?search={nic}"));
 
@@ -587,15 +536,8 @@ public sealed class PatientEndpointTests
             "^P[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{7}$",
             list.RootElement.GetProperty("items")[0].GetProperty("patient_code").GetString());
 
-        // **The admissions board is now open to them, and it was not before.** Collapsing
-        // PatientReader and AdmissionReader into one PatientDetails policy on 2026-09-11 did
-        // that, and the honest reading is that it always was open: a PatientDetail carries the
-        // patient's admissions, so this role could already see care level, urgency and status
-        // through GET /patients/{id}. Two policies were describing one level of access.
-        // integration_of_functions.md 11.8 now says so rather than promising a closed door.
         var admissions = await equipment.GetAsync("/api/admissions");
 
-        // Writing is what actually stays shut. Registering and editing are still the desk's.
         var edit = await equipment.PutAsJsonAsync(
             $"/api/patients/{id}", new { full_name = "Renamed By Equipment", gender = "male", nic });
         var register = await CreateAsync(equipment, "Registered By Equipment", nic: NewNic());
@@ -627,13 +569,6 @@ public sealed class PatientEndpointTests
             nic = NewNic()
         });
 
-        // This one defeats something deliberate. Gender.Unknown exists precisely so hard rule H3,
-        // the ward gender-policy filter, behaves deterministically for an unidentified arrival -
-        // its own comment in the enum says so. male is declared first, so the old default
-        // recorded that patient as male: exactly the case Unknown was added to handle.
-        //
-        // Status code first. Reading the body first turns a 400 into a KeyNotFoundException and
-        // hides which of the two went wrong.
         Assert.Equal(HttpStatusCode.BadRequest, created.StatusCode);
 
         using var body = await ReadJsonAsync(created);
@@ -646,9 +581,6 @@ public sealed class PatientEndpointTests
         using var client = await ClientAsync(ApiApplication.NurseEmail);
         var id = await CreateIdAsync(client, "Gender Omitted On Update", NewNic());
 
-        // UpdatePatientRequest inherits CreatePatientRequest, so the PUT has the same hole and
-        // the same fix. It is a PUT, so an omitted key means "clear it" - which for gender would
-        // have meant "silently make them male".
         var updated = await client.PutAsJsonAsync($"/api/patients/{id}", new
         {
             full_name = "Gender Omitted On Update"
@@ -656,8 +588,6 @@ public sealed class PatientEndpointTests
 
         Assert.Equal(HttpStatusCode.BadRequest, updated.StatusCode);
     }
-
-    // ---------- what a filled-in identifier has to look like ----------
 
     [Theory]
     [InlineData("199534501V")]       // old NIC, nine digits and a V
@@ -684,9 +614,6 @@ public sealed class PatientEndpointTests
 
         var refused = await CreateAsync(client, "Mistyped Identifier", nic: nic);
 
-        // Every one of these is digits-only or punctuated, which is the whole reason the
-        // passport branch has to require a letter: without that condition a truncated NIC
-        // would be waved through as "a passport, presumably" and the check would catch nothing.
         Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
     }
 
@@ -695,11 +622,6 @@ public sealed class PatientEndpointTests
     {
         using var client = await ClientAsync(ApiApplication.NurseEmail);
 
-        // 199534501Z is an old NIC with the wrong final letter - and also a perfectly ordinary
-        // passport number in some country, which is a distinction no regular expression can
-        // make. Accepting passports at all is what buys this, and the group chose that over
-        // registering every foreign patient against a temp reference. Written down as a test
-        // rather than left to be rediscovered as a bug.
         var created = await CreateAsync(client, "Near Miss", nic: "199534501Z");
 
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
@@ -710,8 +632,6 @@ public sealed class PatientEndpointTests
     {
         using var client = await ClientAsync(ApiApplication.NurseEmail);
 
-        // The rules say what a filled-in field has to look like. None of them make it required
-        // - an unconscious arrival has nothing to give and still has to reach a ward.
         var created = await CreateAsync(client, "No Papers At All");
 
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
@@ -726,8 +646,6 @@ public sealed class PatientEndpointTests
 
         var created = await CreateAsync(client, "Reachable", nic: NewNic(), phone: phone);
 
-        // +94771234567 is the same number as 0771234567, read off a phone that has roamed.
-        // Refusing it teaches the desk to retype numbers, which is where digits get dropped.
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
     }
 
@@ -760,7 +678,6 @@ public sealed class PatientEndpointTests
             date_of_birth = tomorrow.ToString("yyyy-MM-dd")
         });
 
-        // 1097 for 1997 - the mistake this is actually aimed at, rather than demographics.
         var ancient = await client.PostAsJsonAsync("/api/patients", new
         {
             full_name = "Mistyped Year",
@@ -772,8 +689,6 @@ public sealed class PatientEndpointTests
         Assert.Equal(HttpStatusCode.BadRequest, future.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, ancient.StatusCode);
     }
-
-    // ---------- helpers ----------
 
     private static Task<HttpResponseMessage> CreateAsync(
         HttpClient client,
@@ -805,7 +720,6 @@ public sealed class PatientEndpointTests
         => client.PostAsJsonAsync(
             $"/api/patients/{id}/link-account", new { user_account_id = accountId });
 
-    /// <summary>Registers a patient login and returns its PatientAccount.Id, taken off the sign-in response.</summary>
     private async Task<Guid> NewPatientAccountIdAsync()
     {
         using var client = _application.CreateClient();
@@ -816,18 +730,12 @@ public sealed class PatientEndpointTests
             full_name = "App User"
         });
 
-        // Asserted rather than assumed: /api/auth/* is rate limited per IP and shares that
-        // budget with every other test class, so a 429 here would otherwise look like a bug
-        // in link-account.
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
         using var body = await ReadJsonAsync(response);
         return body.RootElement.GetProperty("principal").GetProperty("id").GetGuid();
     }
 
-    // One token per account for the whole class. /api/auth/login allows 20 requests a minute
-    // per IP and this class shares that budget with AuthFlowTests and WardEndpointTests —
-    // logging in per test spends it and every failure then looks like a missing access_token.
     private static readonly SemaphoreSlim TokenLock = new(1, 1);
     private static readonly Dictionary<string, string> Tokens = new();
 
@@ -876,7 +784,6 @@ public sealed class PatientEndpointTests
         => page.RootElement.GetProperty("items").EnumerateArray()
             .Select(item => item.GetProperty("id").GetString()!);
 
-    // Unique per test: the fixture's database is shared across the whole collection.
     private static string NewNic() => $"T{Guid.NewGuid():N}"[..12];
 
     private static string NewPhone() => $"07{Random.Shared.NextInt64(10000000, 99999999)}";

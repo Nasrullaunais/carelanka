@@ -3,10 +3,6 @@ import { useSession } from '../services/auth/useSession';
 import { roleLabels } from '../types/permissions';
 import { destinationsFor } from '../types/navigation';
 
-// The landing page. Seven roles can sign in and no two of them do the same job, so rather
-// than one navigation bar carrying every screen and greying out most of it, each person is
-// shown the ones they can actually open.
-
 export function DashboardPage() {
   const session = useSession();
   const role = session?.principal.role;

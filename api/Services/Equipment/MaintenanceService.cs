@@ -15,14 +15,6 @@ public sealed class MaintenanceService : IMaintenanceService
 {
     private const string UnknownWardName = "Unknown ward";
 
-    // How far ahead a completed service pushes the next one. Placeholder numbers, not a
-    // clinical decision: nothing in the plan or the spec fixes an interval, and the group
-    // has to agree one the same way it has to agree COST_THRESHOLD (plan section 16, open
-    // question 3). Changing them is this table and nothing else.
-    //
-    // A repair is deliberately absent. It is unplanned work, so finishing one does not mean
-    // the routine service clock restarts - an item repaired in March is still due its annual
-    // service in June.
     private static readonly IReadOnlyDictionary<MaintenanceType, int> IntervalMonths =
         new Dictionary<MaintenanceType, int>
         {
@@ -58,9 +50,6 @@ public sealed class MaintenanceService : IMaintenanceService
             schedules = schedules.Where(s => s.AssetType == assetType);
         }
 
-        // Overdue is derived, so it can never be matched by equality on the column. Both the
-        // flag and Status=overdue resolve to the same predicate, because they are the same
-        // question asked two ways.
         var wantsOverdue = query.Overdue == true || query.Status == MaintenanceStatus.Overdue;
 
         if (wantsOverdue)
@@ -84,7 +73,6 @@ public sealed class MaintenanceService : IMaintenanceService
 
         var totalItems = await schedules.CountAsync(cancellationToken);
 
-        // Soonest first: a task list is read to answer "what is next", not "what is newest".
         var rows = await schedules
             .OrderBy(s => s.ScheduledDate)
             .ThenBy(s => s.CreatedAt)
@@ -102,13 +90,8 @@ public sealed class MaintenanceService : IMaintenanceService
     public async Task<MaintenanceSchedule> CreateAsync(
         CreateMaintenanceScheduleRequest request, CancellationToken cancellationToken = default)
     {
-        // Throws 404 rather than leaving a row pointing at nothing. The reference is
-        // polymorphic, so there is no foreign key to catch a bad id for us.
         await EnsureAssetExistsAsync(request.AssetType, request.AssetId, cancellationToken);
 
-        // The safety rule of this component. Asked before anything is written, in this
-        // request, because only Patient Management knows whether someone is in the bed.
-        // Maintenance never evicts a patient.
         if (request.AssetType == AssetType.Bed)
         {
             await EnsureBedMayBeServicedAsync(request.AssetId, cancellationToken);
@@ -123,8 +106,6 @@ public sealed class MaintenanceService : IMaintenanceService
             ScheduledDate = request.ScheduledDate,
             Status = MaintenanceStatus.Scheduled,
             Notes = Normalise(request.Notes),
-            // A person booked this, not the sweep. The agent-performance report is exactly
-            // the question of which, so it is recorded rather than assumed.
             CreatedBy = RaisedBy.User
         };
 
@@ -139,9 +120,6 @@ public sealed class MaintenanceService : IMaintenanceService
     {
         var schedule = await GetByIdAsync(id, cancellationToken);
 
-        // Only work that is still outstanding can be finished. Overdue counts: it is stored
-        // as scheduled and only reads as overdue, so the date passing does not make a task
-        // impossible to close - which would be the worst possible reading of "overdue".
         if (schedule.Status != MaintenanceStatus.Scheduled)
         {
             throw new ConflictException(
@@ -152,7 +130,6 @@ public sealed class MaintenanceService : IMaintenanceService
 
         schedule.Status = MaintenanceStatus.Completed;
         schedule.CompletedAt = now;
-        // From the token, never the body: a caller cannot record work against someone else.
         schedule.PerformedByStaffId = _currentUser.Id;
 
         if (Normalise(notes) is { } written)
@@ -163,8 +140,6 @@ public sealed class MaintenanceService : IMaintenanceService
         await PutBackInServiceAsync(schedule, cancellationToken);
         await CloseWarningsAsync(schedule, now, cancellationToken);
 
-        // One SaveChanges for the whole thing. A failure part-way through must not leave a
-        // task marked done against an item still sitting in maintenance.
         await _db.SaveChangesAsync(cancellationToken);
 
         return await ToDtoAsync(schedule, cancellationToken);
@@ -177,11 +152,6 @@ public sealed class MaintenanceService : IMaintenanceService
         => await FindByIdAsync(id, cancellationToken)
            ?? throw new NotFoundException("Maintenance schedule", id);
 
-    /// <summary>
-    /// The asset goes back to work, and its next service is booked forward. Both belong to
-    /// completing the task rather than to a separate call, because an item left in
-    /// maintenance after its service is finished is invisible stock.
-    /// </summary>
     private async Task PutBackInServiceAsync(
         ScheduleEntity schedule, CancellationToken cancellationToken)
     {
@@ -195,8 +165,6 @@ public sealed class MaintenanceService : IMaintenanceService
                 return;
             }
 
-            // Retired is terminal, so servicing does not revive it. Anything else that was
-            // out for this work comes back available.
             if (item.Status == EquipmentStatus.Maintenance)
             {
                 item.Status = EquipmentStatus.Available;
@@ -204,8 +172,6 @@ public sealed class MaintenanceService : IMaintenanceService
 
             if (IntervalMonths.TryGetValue(schedule.ScheduleType, out var months))
             {
-                // Measured from the work being done, not from the date it was booked for:
-                // a service done three weeks late still buys a full interval.
                 item.NextMaintenanceDue = DateOnly.FromDateTime(
                     DateTimeOffset.UtcNow.UtcDateTime).AddMonths(months);
             }
@@ -215,19 +181,12 @@ public sealed class MaintenanceService : IMaintenanceService
 
         var bed = await _db.Beds.FirstOrDefaultAsync(b => b.Id == schedule.AssetId, cancellationToken);
 
-        // Beds are not in the spec's wording for this endpoint, which names equipment only.
-        // Left out, a serviced bed stays out of service forever, so it is restored on the
-        // same reasoning. Only a bed actually withdrawn for the work is touched.
         if (bed is { Condition: BedCondition.OutOfService })
         {
             bed.Condition = BedCondition.Usable;
         }
     }
 
-    /// <summary>
-    /// A warning that led to this work is answered by the work, not by someone remembering
-    /// to tick it off. Anything still open against this asset moves to action_taken.
-    /// </summary>
     private async Task CloseWarningsAsync(
         ScheduleEntity schedule, DateTimeOffset now, CancellationToken cancellationToken)
     {
@@ -283,10 +242,6 @@ public sealed class MaintenanceService : IMaintenanceService
         return ToDto(schedule, labels, Today());
     }
 
-    /// <summary>
-    /// One pass for the whole page rather than a lookup per row, and one ward call rather
-    /// than one per bed. A task list of GUIDs is unusable on a phone.
-    /// </summary>
     private async Task<IReadOnlyDictionary<Guid, string>> LabelsAsync(
         IReadOnlyCollection<ScheduleEntity> schedules, CancellationToken cancellationToken)
     {
@@ -340,14 +295,11 @@ public sealed class MaintenanceService : IMaintenanceService
             Id = schedule.Id,
             AssetType = schedule.AssetType,
             AssetId = schedule.AssetId,
-            // An asset deleted out from under a schedule still has to render as something.
             AssetLabel = labels.TryGetValue(schedule.AssetId, out var label)
                 ? label
                 : "Unknown asset",
             ScheduleType = schedule.ScheduleType,
             ScheduledDate = schedule.ScheduledDate,
-            // Derived here rather than stored, so nothing has to sweep the table at midnight
-            // to keep it honest.
             Status = schedule.Status == MaintenanceStatus.Scheduled && schedule.ScheduledDate < today
                 ? MaintenanceStatus.Overdue
                 : schedule.Status,

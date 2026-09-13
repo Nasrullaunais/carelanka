@@ -37,13 +37,10 @@ builder.Services
     .AddControllers()
     .AddJsonOptions(options => ConfigureJson(options.JsonSerializerOptions));
 
-// For responses written outside MVC — the exception handler and the JWT middleware both do.
 builder.Services.ConfigureHttpJsonOptions(options => ConfigureJson(options.SerializerOptions));
 
 builder.Services.Configure<MvcOptions>(options =>
 {
-    // Left alone, MVC also offers text/plain and text/json on every 200, and a generated
-    // client is free to pick the first one it sees.
     options.OutputFormatters.RemoveType<StringOutputFormatter>();
 
     foreach (var formatter in options.OutputFormatters.OfType<SystemTextJsonOutputFormatter>())
@@ -55,8 +52,6 @@ builder.Services.Configure<MvcOptions>(options =>
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 
-// MVC builds validation failures before any of our code runs, so the shared extensions have
-// to be bolted on here rather than in the exception handler.
 builder.Services.Configure<ApiBehaviorOptions>(options =>
 {
     options.InvalidModelStateResponseFactory = context =>
@@ -96,8 +91,6 @@ builder.Services
 
 var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 
-// Keep sub as sub. Without this the handler rewrites inbound claim names to long
-// WS-Federation URIs and every lookup of "sub" quietly returns nothing.
 JsonWebTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
 builder.Services
@@ -120,15 +113,12 @@ builder.Services
                     : jwt.SigningKey)),
             ValidateLifetime = true,
 
-            // The default is five minutes, which quietly makes a 15-minute access token a 20-minute one.
             ClockSkew = TimeSpan.Zero,
 
             NameClaimType = CareLankaClaims.Subject,
             RoleClaimType = CareLankaClaims.Role
         };
 
-        // Without these, a missing token returns an empty 401 body and a wrong role an empty 403 —
-        // neither of which matches the specs, and neither of which a generated client can classify.
         options.Events = new JwtBearerEvents
         {
             OnChallenge = async context =>
@@ -172,16 +162,11 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.DutyManager),
         EnumWire.ToWire(StaffRole.HospitalAdministrator)));
 
-    // Reception does the paperwork; the ambulance crew does not. Removed 2026-09-11 — see the
-    // remarks on Policies.PatientRegistrar and integration_of_functions.md §11.9.
     options.AddPolicy(Policies.PatientRegistrar, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.GeneralStaff),
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
 
-    // One policy where PatientReader and AdmissionReader used to be two. Six of the seven staff
-    // roles; ambulance crew is the one left out. See Policies.PatientDetails for why the split
-    // was never real.
     options.AddPolicy(Policies.PatientDetails, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.GeneralStaff),
         EnumWire.ToWire(StaffRole.WardNurse),
@@ -190,10 +175,6 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.Doctor),
         EnumWire.ToWire(StaffRole.EquipmentManager)));
 
-    // General staff added 2026-09-11, and it matches PatientRegistrar exactly on purpose.
-    // Reception types the record; without this the one person who can see the typo is the one
-    // person who cannot fix it, and the correction has to be chased through a ward nurse.
-    // Whoever may create a record may correct it.
     options.AddPolicy(Policies.PatientEditor, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.GeneralStaff),
         EnumWire.ToWire(StaffRole.WardNurse),
@@ -203,32 +184,21 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
 
-    // Reception added 2026-09-12. A walk-in is registered, admitted and bedded by the person at
-    // the desk, and stopping at the bed meant handing the last step to a nurse who is not
-    // standing there. The narrow half of the rule - which bed - is BedAssignmentService's, so
-    // widening this route does not widen what reception may choose.
     options.AddPolicy(Policies.BedAssigner, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.GeneralStaff),
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
 
-    // The other end of the same visit, and the same three roles. Reception settles the bill and
-    // hands over the paperwork, so it finishes the discharge rather than fetching a nurse for
-    // the last click. The care-level narrowing that used to sit in DischargeService is gone -
-    // the checklist is the gate, and its clinical box is a doctor's alone.
     options.AddPolicy(Policies.DischargeConfirmer, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.GeneralStaff),
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
 
-    // Reads the candidate list and ticks boxes. Which boxes is the service's business, not the
-    // route's - clinical_clearance is the doctor's alone and billing_settled is nobody's.
     options.AddPolicy(Policies.DischargeChecklist, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.Doctor),
         EnumWire.ToWire(StaffRole.DutyManager)));
 
-    // Reading the board only - every write on that screen keeps its own narrower policy.
     options.AddPolicy(Policies.DischargeBoard, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.Doctor),
@@ -241,18 +211,11 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.HospitalAdministrator),
         EnumWire.ToWire(StaffRole.DutyManager)));
 
-    // The same two roles as AdmissionEditor, under a name that says which job it is. Checking
-    // somebody in at icu or hdu narrows further to the duty manager alone, and that rule reads
-    // the request body, so it lives in AppointmentService rather than here.
     options.AddPolicy(Policies.AppointmentDesk, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
 });
 
-// 20 a minute per IP in production. Configurable only so the integration tests can raise it:
-// every test class shares one IP, so the whole suite spends one budget, and at 20 the next
-// test anybody adds fails on a 429 that reads like a broken login. Nothing sets this outside
-// the test fixture, and the default is what ships.
 var authRequestsPerMinute = builder.Configuration.GetValue("RateLimits:AuthPerMinute", 20);
 
 builder.Services.AddRateLimiter(options =>
@@ -315,21 +278,10 @@ builder.Services.AddScoped<IBillingService, BillingService>();
 builder.Services.AddScoped<IBillingRateService, BillingRateService>();
 builder.Services.AddScoped<IMeService, MeService>();
 
-// Real: ward bed counts now come from Equipment's register instead of a constant.
-// Scoped, not Singleton — it delegates to IBedService, which is scoped because it holds a
-// DbContext. Registering it as a singleton captures one DbContext for the life of the app.
 builder.Services.AddScoped<IBedRegistryService, BedRegistryService>();
 
-// STUB registration — Equipment still stands in for Patient Management on ward names.
-// STUBS.md row 2, swappable whenever M3 wants: IWardService is real.
 builder.Services.AddSingleton<IWardDirectory, StubWardDirectory>();
 
-// Real, as of step 6: occupancy is the presence of a live BedAssignment, and there is now a
-// service that writes those. This retires the one genuinely dangerous stub in the project —
-// the fake answered "occupied" for every bed, so no bed could be withdrawn or retired at all.
-//
-// Scoped, not Singleton like the stub it replaces. It reaches a DbContext through
-// IBedOccupancyService; a singleton would capture one DbContext for the life of the app.
 builder.Services.AddScoped<IBedOccupancyPort, BedOccupancyAdapter>();
 
 builder.Services.AddEndpointsApiExplorer();
@@ -343,8 +295,6 @@ builder.Services.AddSwaggerGen(options =>
                       + "Routes, operationIds and schema names are global, not per-component."
     });
 
-    // operationId becomes the generated client's function name, so it comes from the route name
-    // rather than from a C# method name someone may rename.
     options.CustomOperationIds(description => description.ActionDescriptor.AttributeRouteInfo?.Name);
 
     options.AddSecurityDefinition(JwtBearerDefaults.AuthenticationScheme, new OpenApiSecurityScheme
@@ -369,8 +319,6 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-// Order matters: the exception handler has to be outermost to catch anything thrown further in,
-// and authentication has to run before authorization can read a role.
 app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
@@ -391,5 +339,4 @@ app.MapControllers();
 
 app.Run();
 
-// Exposed so an integration test project can spin the real application up.
 public partial class Program;

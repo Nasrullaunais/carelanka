@@ -27,11 +27,6 @@ public class AppointmentConfiguration : IEntityTypeConfiguration<Appointment>
             .HasForeignKey(a => a.PatientId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Foreign key, no navigation. integration_of_functions.md §5.1: we store the staff
-        // id and nothing else, and resolve the name through POST /staff/lookup at read time.
-        // A navigation here would invite Include(), which is the coupling that rule forbids —
-        // and StaffMember is soft-deletable, so a retired clerk would drop their bookings out
-        // of every query.
         builder.HasOne<Entities.Common.StaffMember>()
             .WithMany()
             .HasForeignKey(a => a.BookedByStaffMemberId)
@@ -44,11 +39,8 @@ public class AppointmentConfiguration : IEntityTypeConfiguration<Appointment>
 
         builder.HasIndex(a => a.PatientId).HasDatabaseName("ix_appointments_patient_id");
 
-        // Matches the filter on Patient. Without it, deactivating a patient leaves their
-        // bookings visible in every list that does not join to the patient row.
         builder.HasQueryFilter(a => a.Patient.IsActive);
 
-        // The desk's day view: today's bookings, in time order.
         builder.HasIndex(a => new { a.ScheduledAt, a.Status })
             .HasDatabaseName("ix_appointments_scheduled_at_status");
     }

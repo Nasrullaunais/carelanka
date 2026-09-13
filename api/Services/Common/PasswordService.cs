@@ -4,7 +4,6 @@ namespace CareLanka.Api.Services.Common;
 
 public sealed class PasswordService : IPasswordService
 {
-    // The generic parameter is only a type tag; the hasher never touches the object.
     private readonly PasswordHasher<object> _hasher = new();
     private static readonly object Dummy = new();
 

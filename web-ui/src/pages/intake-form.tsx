@@ -12,14 +12,6 @@ import {
 } from '../types/identifiers';
 import { genderLabels, genders } from '../types/patients';
 
-// The patient details form, written once and used twice: to register somebody, and to correct
-// what was typed.
-//
-// It lives in its own file because the two callers are the same eight boxes with the same eight
-// rules and a different verb. Two copies is how a validation rule gets fixed on the register
-// form and left wrong on the edit form, and nobody notices until a bad phone number is already
-// in the database.
-
 export type PatientFormValue = {
   fullName: string;
   gender: Gender;
@@ -28,9 +20,6 @@ export type PatientFormValue = {
   contactName: string;
   contactPhone: string;
 
-  // Three pickers rather than one <input type="date">. The native control opens on this month,
-  // and a patient born in 1997 is a long way back from there - which is how a desk ends up
-  // leaving date of birth blank on every record.
   birthYear: number | null;
   birthMonth: number | null;
   birthDay: number | null;
@@ -50,7 +39,6 @@ export function emptyPatientForm(unidentified: boolean): PatientFormValue {
   };
 }
 
-/** An existing record, unpacked into the boxes. Used to prefill the edit form. */
 export function patientFormFrom(patient: Patient): PatientFormValue {
   const [year, month, day] = (patient.date_of_birth ?? '').split('-');
 
@@ -67,24 +55,6 @@ export function patientFormFrom(patient: Patient): PatientFormValue {
   };
 }
 
-/**
- * What is wrong with the form right now, or nothing.
- *
- * Told at the field, not on submit. The server checks all of this too - a browser is not a
- * boundary - but a form that accepts what you typed and then fails on submit makes you hunt for
- * which of eight boxes was wrong.
- *
- * `identified` is what decides whether a blank box is an error. Somebody with a NIC is standing
- * at the desk answering questions, so leaving their address out is an omission and the desk
- * should be made to fix it now rather than leave it as paperwork to chase. An unconscious
- * arrival cannot answer any of them, and a form that will not submit without a date of birth
- * for a patient nobody can name is a form that stops them being admitted at all.
- *
- * Date of birth is the one that earns this on its own: the bed board reads it to decide whether
- * a children's ward is offered, so a blank one quietly costs a child the right ward.
- *
- * The emergency contact stays optional either way. Plenty of people genuinely arrive alone.
- */
 export function patientFormProblems(value: PatientFormValue, identified = false) {
   const dateOfBirth = toIsoDate(value.birthYear, value.birthMonth, value.birthDay);
 
@@ -92,8 +62,6 @@ export function patientFormProblems(value: PatientFormValue, identified = false)
   const contactPhone = phoneProblem(value.contactPhone);
   const dateOfBirthError = dateOfBirthProblem(dateOfBirth);
 
-  // A part-filled date is not an error, it is an unfinished one. Saying "that is not a date" to
-  // somebody who has picked the year and is reaching for the month is just rude.
   const dateIncomplete =
     (value.birthYear !== null || value.birthMonth !== null || value.birthDay !== null) &&
     dateOfBirth === '';
@@ -125,12 +93,6 @@ export function patientFormProblems(value: PatientFormValue, identified = false)
   };
 }
 
-/**
- * The form as the API takes it.
- *
- * Blank optional fields go as null, not "". The server computes missing_fields off the patient
- * row, so an empty string would count as filled in and the desk would never be told to chase it.
- */
 export function patientFormBody(value: PatientFormValue, nic: string | null) {
   const orNull = (text: string) => (text.trim().length > 0 ? text.trim() : null);
 
@@ -146,7 +108,6 @@ export function patientFormBody(value: PatientFormValue, nic: string | null) {
   };
 }
 
-/** Keeps the boxes, and gives back one setter so a caller changes one field at a time. */
 export function usePatientForm(initial: PatientFormValue) {
   const [value, setValue] = useState(initial);
 
@@ -157,13 +118,6 @@ export function usePatientForm(initial: PatientFormValue) {
   return { value, set, replace: setValue };
 }
 
-/**
- * How much room is left in a field, shown only once it starts to matter.
- *
- * A counter sitting under every box from the moment the form loads is noise; one that appears
- * at three quarters full is a warning. Either way the input's own maxLength is what stops the
- * typing - this only explains why it stopped.
- */
 export function Counter({ value, limit }: { value: string; limit: number }) {
   if (value.length < limit * 0.75) {
     return null;
@@ -186,12 +140,9 @@ export function PatientFields({
 }: {
   value: PatientFormValue;
   set: <K extends keyof PatientFormValue>(key: K, next: PatientFormValue[K]) => void;
-  /** Register and edit can both be mounted in one session, so the ids must not collide. */
+
   idPrefix: string;
-  /**
-   * Whether this patient can answer questions about themselves. Everything except the emergency
-   * contact is required when they can. See {@link patientFormProblems}.
-   */
+
   identified?: boolean;
 }) {
   const problems = patientFormProblems(value, identified);
@@ -324,8 +275,7 @@ export function PatientFields({
 
       <div className="row">
         <div className="field">
-          {/* "Emergency contact" sitting next to "Emergency contact phone" reads as though the
-              first one also wants a number. Say what goes in the box. */}
+
           <label htmlFor={`${idPrefix}-contact-name`}>
             Emergency contact name {identified && <span className="muted">(optional)</span>}
           </label>
@@ -358,7 +308,6 @@ export function PatientFields({
   );
 }
 
-/** Submit handler wrapper, so neither caller has to remember preventDefault. */
 export function onSubmit(handler: () => void) {
   return (event: FormEvent) => {
     event.preventDefault();

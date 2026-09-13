@@ -11,7 +11,6 @@ public class BedAssignmentConfiguration : IEntityTypeConfiguration<BedAssignment
     public const string LiveBedUniqueIndex = "ux_bed_assignments_live_bed";
     public const string LiveAdmissionUniqueIndex = "ux_bed_assignments_live_admission";
 
-    // A hold and an occupancy both claim the bed. Released rows are history and claim nothing.
     private const string LiveFilter = "status IN ('reserved', 'occupied')";
 
     public void Configure(EntityTypeBuilder<BedAssignment> builder)
@@ -58,9 +57,6 @@ public class BedAssignmentConfiguration : IEntityTypeConfiguration<BedAssignment
             .HasForeignKey(b => b.ApprovedByStaffMemberId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // These two indexes are the concurrency guarantee. Two nurses assigning bed 12 at the
-        // same instant both pass an application-level "is it free?" check; the second INSERT
-        // is what actually fails, here.
         builder.HasIndex(b => b.BedId)
             .HasDatabaseName(LiveBedUniqueIndex)
             .IsUnique()
@@ -71,7 +67,6 @@ public class BedAssignmentConfiguration : IEntityTypeConfiguration<BedAssignment
             .IsUnique()
             .HasFilter(LiveFilter);
 
-        // The expiry sweep: holds past ReservedUntil go back to the pool.
         builder.HasIndex(b => b.ReservedUntil)
             .HasDatabaseName("ix_bed_assignments_reserved_until")
             .HasFilter("status = 'reserved'");

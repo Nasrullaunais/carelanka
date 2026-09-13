@@ -6,12 +6,6 @@ import { toast } from 'sonner';
 import { loginMutation } from '../services/api/generated/@tanstack/react-query.gen';
 import { setSession } from '../services/auth/session';
 
-// Staff only, and there is deliberately no patient tab.
-//
-// A patient never signs in here. "React decides, Flutter does" — a patient lying in a bed
-// is Flutter, and CareLanka_Component_Plan.md section 3 puts both Patient and Ward Nurse on
-// mobile. POST /auth/patient/login exists in the API and is generated in the client; this
-// app simply is not where it belongs.
 export function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -20,9 +14,7 @@ export function LoginPage() {
   const login = useMutation({
     ...loginMutation(),
     onSuccess: (tokens) => {
-      // Store before navigating, so the first request the next page makes has a token.
       setSession(tokens);
-      // Successes are the page's job — the interceptor only signals failures.
       toast.success(`Signed in as ${tokens.principal.display_name}`);
       navigate('/wards');
     },

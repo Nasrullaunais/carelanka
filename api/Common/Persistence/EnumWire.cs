@@ -35,7 +35,6 @@ public static class EnumWire
         {
             var c = name[i];
 
-            // Also breaks before the last letter of an uppercase run: HTTPServer -> http_server.
             if (char.IsUpper(c) && i > 0 && (!char.IsUpper(name[i - 1]) ||
                     (i + 1 < name.Length && char.IsLower(name[i + 1]))))
             {

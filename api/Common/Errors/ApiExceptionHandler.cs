@@ -17,7 +17,6 @@ public sealed class ApiExceptionHandler : IExceptionHandler
 
         if (exception is ApiException apiException)
         {
-            // Information, not Error: a 404 is not an incident, and logging it as one buries the real ones.
             _logger.LogInformation(
                 "{Status} {Code} on {Method} {Path}: {Message}",
                 apiException.Status, apiException.Code.ToWire(),

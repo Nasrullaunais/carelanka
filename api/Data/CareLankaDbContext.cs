@@ -23,7 +23,6 @@ public class CareLankaDbContext : DbContext
     public DbSet<DispatchCrew> DispatchCrew => Set<DispatchCrew>();
     public DbSet<RouteLog> RouteLogs => Set<RouteLog>();
 
-    // Equipment Management
     public DbSet<Bed> Beds => Set<Bed>();
     public DbSet<EquipmentCategory> EquipmentCategories => Set<EquipmentCategory>();
     public DbSet<EquipmentItem> EquipmentItems => Set<EquipmentItem>();
@@ -33,7 +32,6 @@ public class CareLankaDbContext : DbContext
     public DbSet<PharmacyItem> PharmacyItems => Set<PharmacyItem>();
     public DbSet<PharmacyTransaction> PharmacyTransactions => Set<PharmacyTransaction>();
 
-    // Patient Management
     public DbSet<Ward> Wards => Set<Ward>();
     public DbSet<PatientEntity> Patients => Set<PatientEntity>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
@@ -46,8 +44,6 @@ public class CareLankaDbContext : DbContext
     public DbSet<BillingRate> BillingRates => Set<BillingRate>();
     public DbSet<AdmissionFeeRate> AdmissionFeeRates => Set<AdmissionFeeRate>();
 
-    // Never add configuration here. Write Data/Configurations/{Component}/ instead,
-    // or all four of us conflict on this method every migration.
     protected override void OnModelCreating(ModelBuilder modelBuilder)
         => modelBuilder.ApplyConfigurationsFromAssembly(typeof(CareLankaDbContext).Assembly);
 }

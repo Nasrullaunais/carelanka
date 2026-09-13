@@ -38,13 +38,9 @@ public class WarningConfiguration : IEntityTypeConfiguration<Warning>
         builder.Property(w => w.RaisedBy)
             .HasConversion(new SnakeCaseEnumConverter<RaisedBy>()).HasMaxLength(10).IsRequired();
 
-        // Every dashboard filters on open warnings.
         builder.HasIndex(w => w.Status);
 
-        // The item detail page asks for one subject's warnings.
         builder.HasIndex(w => new { w.RelatedEntityType, w.RelatedEntityId });
 
-        // No soft delete and no query filter: a warning is closed by moving its status, never
-        // by disappearing. The agent-performance report reads dismissed rows.
     }
 }

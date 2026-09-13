@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace CareLanka.Api.Controllers.Equipment;
 
-/// <summary>Servicing, calibration and repairs, for equipment items and beds alike.</summary>
 [ApiController]
 [Route("api/maintenance-schedules")]
 [Tags("Maintenance")]
@@ -20,11 +19,6 @@ public class MaintenanceSchedulesController : ControllerBase
     public MaintenanceSchedulesController(IMaintenanceService maintenance)
         => _maintenance = maintenance;
 
-    /// <summary>
-    /// The work list, soonest first. `overdue=true` returns tasks still scheduled whose date
-    /// has passed, worked out when you ask rather than stored, so nothing has to sweep the
-    /// table at midnight to keep it honest.
-    /// </summary>
     [Authorize(Policy = Policies.EquipmentManager)]
     [HttpGet(Name = "listMaintenanceSchedules")]
     [ProducesResponseType(typeof(PagedResult<MaintenanceSchedule>), StatusCodes.Status200OK)]
@@ -41,11 +35,6 @@ public class MaintenanceSchedulesController : ControllerBase
         => Ok(await _maintenance.ListAsync(
             new MaintenanceQuery(status, assetType, overdue, page, pageSize), ct));
 
-    /// <summary>
-    /// Book a service by hand, with no agent involved. This path has to keep working: if the
-    /// only way to schedule maintenance were through the agent, the hospital would stop the
-    /// day the agent did. Booking against an occupied bed is refused with a 409.
-    /// </summary>
     [Authorize(Policy = Policies.EquipmentManager)]
     [HttpPost(Name = "createMaintenanceSchedule")]
     [ProducesResponseType(typeof(MaintenanceSchedule), StatusCodes.Status201Created)]
@@ -59,15 +48,9 @@ public class MaintenanceSchedulesController : ControllerBase
     {
         var schedule = await _maintenance.CreateAsync(request, ct);
 
-        // No Location header: the contract publishes no endpoint that reads one schedule.
         return Created((string?)null, schedule);
     }
 
-    /// <summary>
-    /// Mark the work done. The asset goes back into service, its next service is booked
-    /// forward, and any warning that led here closes, all in one transaction. Who did the
-    /// work comes from the token, never the body.
-    /// </summary>
     [Authorize(Policy = Policies.EquipmentManager)]
     [HttpPost("{id:guid}/complete", Name = "completeMaintenanceSchedule")]
     [ProducesResponseType(typeof(MaintenanceSchedule), StatusCodes.Status200OK)]

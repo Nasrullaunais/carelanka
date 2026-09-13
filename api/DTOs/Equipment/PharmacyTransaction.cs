@@ -3,7 +3,6 @@ using CareLanka.Api.Data.Enums;
 
 namespace CareLanka.Api.DTOs.Equipment;
 
-/// <summary>One movement of stock. Immutable once written, which is why there is no updated_at.</summary>
 public class PharmacyTransaction
 {
     [Required]
@@ -15,11 +14,9 @@ public class PharmacyTransaction
     [Required]
     public PharmacyTransactionType Type { get; set; }
 
-    /// <summary>Always positive. The type is what gives it a sign.</summary>
     [Required]
     public int Quantity { get; set; }
 
-    /// <summary>Staff Management owns the person; this is the id and nothing more.</summary>
     [Required]
     public Guid PerformedByStaffId { get; set; }
 

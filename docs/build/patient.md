@@ -34,10 +34,10 @@
 | 6 | **Manual bed assignment, no AI** | **Done.** Pick a bed by hand, with the 30-minute hold. The concurrency guarantee lives in the partial unique index, not in code |
 | 6b | **Visits that need no bed (H0) + the patients board** | **Done.** An `outpatient` never enters `awaiting_bed`. `GET /api/patient-worklist` unions bookings and visits so the board can say "not arrived". **No migration** |
 | 7 | Discharge checklist + confirmation | **Done.** `clinical_clearance` gated on the `doctor` role claim. **Billing came with it** — `billing_settled` cannot be an honest tick with nothing behind it |
-| 8 | Codegen gate | |
-| 9 | React: admissions dashboard, bed board, occupancy report | |
+| 8 | Codegen gate | **Done.** `bun run check:codegen` in `web-ui/` regenerates and fails on any diff under `src/services/api/generated`. Reads the document off a **running** API on `:5231` |
+| 9 | React: admissions dashboard, bed board, occupancy report | **Done.** `DashboardPage`, `PatientsPage` (the board, with assign / correct bed on the row), `IntakePage`, `AppointmentsPage`, `CapacityPage`, `DischargePage`, `WardsPage`, `BillingSettingsPage` |
 | 9b | **The `/me/*` backend** | **Done 2026-09-12.** Seven routes: `pre-register`, `profile`, `admission`, `history`, book / list / cancel appointments. Not one takes a patient id - all scoped by the `sub` claim. `pre-register` creates no admission; see `patient-management-plan.md` §7.6 |
-| 10 | Flutter: nurse screens, then the patient's own-stay screens | Local notifications on status change is your device feature |
+| 10 | Flutter: nurse screens, then the patient's own-stay screens | **Next.** Backend is step 9b, done. `mobile-ui/` is still a skeleton and Flutter is not installed on Lochana's machine. Local notifications on status change is your device feature |
 | 11 | **The bed agent** | Hard rules H1–H5 in deterministic C#, soft rules rank. Re-check every hard rule under a row lock at approval time |
 | 12 | React: bed approval + downgrade approval | The two human gates |
 | 13 | `CareRecommendation` entity + configuration + migration | Independent of the bed workflow — no dependency on steps 1–12 beyond `Patient` and `Admission` existing |
@@ -55,7 +55,7 @@ diagram. The one worth knowing before step 6: **`BedReservation` no longer exist
 which is what the spec has always published.
 
 **Step 5 is complete, and appointments with it.** `GET /api/capacity/wards` and
-`GET /api/wards/{id}/occupancy` are live for every staff role, so Kaveesha and Nasrullah are
+`GET /api/wards/{id}/occupancy` are live for every staff role, so Emergency and Staff are
 no longer waiting. Channeling followed: `GET /api/appointments`, `POST /api/appointments` and
 `POST /api/appointments/{id}/check-in`. **No migration** — every table and column those five
 endpoints read was already on `main`. Four things settled while building them:
@@ -82,7 +82,7 @@ endpoints read was already on `main`. Four things settled while building them:
 `POST /patients/{id}/link-account`. Admissions half: `POST /admissions`, `GET /admissions`,
 `GET /admissions/{id}`, `PATCH /admissions/{id}/details`, and from step 4
 `POST /admissions/{id}/arrive` and `POST /admissions/{id}/cancel`. **Step 5, the capacity
-endpoints Kaveesha and Nasrullah are both blocked on, is next.** Things settled while building
+endpoints Emergency and Staff are both blocked on, is next.** Things settled while building
 step 3:
 
 - **`temp_reference` is generated, not requested.** Register with no NIC and no phone and
@@ -278,8 +278,8 @@ body too:
 - **`PatientRegistrar` = general staff, ward nurse, duty manager.** Ambulance crew removed — the
   crew are the response team, the paperwork is done at the desk. **This one reaches into
   Emergency**, because their spec is written around ambulance crew and duty manager and
-  `GeneralStaff` does not appear in it. Raised as §11.9 for Nasrulla Unais; `emergency-spec.yaml` is
-  hers and has not been touched.
+  `GeneralStaff` does not appear in it. Raised as §11.9 for Emergency; `emergency-spec.yaml` is
+  theirs and has not been touched.
 - **Two new policies**, `DischargeChecklist` (nurse, doctor, manager) and `BillingDesk` (general
   staff, administrator, duty manager). Confirming a discharge reuses `AdmissionEditor`.
   **Superseded 2026-09-12** — confirming is now its own `DischargeConfirmer` (general staff,
@@ -475,7 +475,7 @@ Two things your Flutter screens must handle:
 ~~`GET /wards/{id}/occupancy` (M2)~~ **built 2026-09-11**,
 ~~`GET /beds/{id}/occupancy` (M3)~~ **built 2026-09-11**, `POST /admissions/pre-admit` (M1).
 
-**So `POST /admissions/pre-admit` for Nasrulla Unais is the only thing anybody is still waiting on
+**So `POST /admissions/pre-admit` for Emergency is the only thing anybody is still waiting on
 us for** — and after the policy rework on 2026-09-11 its `Roles:` line and `Policies.cs`
 disagree about `AmbulanceCrew`. Nothing is broken today because the endpoint does not exist, but
 that has to be settled before it does. `integration_of_functions.md` §11.9.

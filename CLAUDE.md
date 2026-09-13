@@ -35,35 +35,38 @@ Say the same thing again with simpler words and fewer of them.
 
 ## Current state
 
-**Common auth is built and on `main`. Patient Management (M4) has started; the
-other three components have not.** *(Auth: PR #11, merged 2026-09-08.)*
+**All four components have started.** *(Re-swept 2026-09-13 against the tree, not from
+memory — 509 tests pass, 5/5 specs valid, 0 collisions.)*
 
-`api/` now really runs: `CareLankaDbContext`, the three base entity classes,
-`StaffMember` / `PatientAccount` / `RefreshToken`, the `Common_AddIdentity`
-migration, the six `/api/auth` endpoints, `/api/health`, the policies, and the
-central exception handler. `tests/CareLanka.Api.Tests` covers all of it — 35 tests
-against a disposable PostgreSQL. Seeded logins are in `TEST_ACCOUNTS.md`.
+**Common auth is built** (PR #11): `CareLankaDbContext`, the three base entity classes,
+`StaffMember` / `PatientAccount` / `RefreshToken`, the six `/api/auth` endpoints,
+`/api/health`, the policies and the central exception handler. **So auth is not a thing to
+stub or wait for.** Write `[Authorize(Policy = Policies.X)]` against the real thing. Seeded
+logins are in `TEST_ACCOUNTS.md`.
 
-**So auth is no longer a thing to stub or wait for.** Write
-`[Authorize(Policy = Policies.X)]` against the real thing.
+| Component | Where it is |
+| :--- | :--- |
+| **Patient** (Lochana) | 12 controllers, 43 routes. Wards, patients, admissions and the 7-state machine, capacity, bed assignment, the worklist, discharge, billing, and the seven `/api/me/*` patient routes. React screens for all of it. Left: the two AI agents (steps 11–16), the reports, and `POST /admissions/pre-admit` |
+| **Equipment** (Sethmin) | 8 controllers. Beds, equipment items and categories, pharmacy, maintenance, and the laboratory (`/lab-reports`, `/ward-patients`) |
+| **Emergency** (Nasrulla Unais) | `EmergencyCall`, `Ambulance`, `Dispatch`, `DispatchCrew`, `RouteLog` and their migration; `AmbulancesController` is the first endpoint |
+| **Staff** (Kaveesha) | Not started — no entities, no controllers, and no `staff-management-plan.md` |
 
-**Patient has its tables and its ward endpoints.** `Ward`, `Patient`,
-`Admission`, `Appointment`, `BedAssignment`, `Discharge` and
-`DischargeChecklistItem`, their configurations, and the `Patient_AddWard` /
-`Patient_AddAdmission` migrations. Live endpoints are `GET /api/wards` and
-`POST /api/wards` — **`GET /wards` is real; do not stub it.** The rest of
-Patient is tables only, with no services or controllers yet.
+**Emergency and Staff swapped owners on 2026-09-12** (commit `4f60832`). Nasrulla Unais has
+Emergency, Kaveesha has Staff. `BUILD_PLAN.md` is the authority if this line goes stale.
 
-`web-ui/` is a Vite project now, not a lone `.gitkeep`: login, an app shell, a
-wards page, and the generated client under `src/services/api/generated/`.
+`web-ui/` is a full Vite app — login, app shell, and screens for Patient, Equipment and the
+laboratory, with the generated client under `src/services/api/generated/`.
 
-Still not built: the audit interceptor, `AgentWorkflow` / `AgentProposedChange`,
-CI (there is no `.github/`), and every table Emergency, Staff and Equipment own.
-`mobile-ui/` has `lib/` and `pubspec.yaml` but no `android/` or `ios/`.
+**`mobile-ui/` is still a skeleton.** Every folder under `lib/` is a `.gitkeep`, `app.dart`
+renders one line of text, and there is no `android/` or `ios/` — nobody has run
+`flutter create .` yet.
 
-So most of this file is still prescriptive. **Where a committed contract in
-`specs/` already answers a question, that contract wins over anything written
-here.**
+Still not built anywhere: the audit interceptor, `AgentWorkflow` / `AgentProposedChange`, any
+AI agent, and CI (there is no `.github/`).
+
+**Where a committed contract in `specs/` already answers a question, that contract wins over
+anything written here.** This section goes stale fastest of anything in this file — check the
+tree before trusting it.
 
 ## Which document answers what
 

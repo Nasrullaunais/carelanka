@@ -190,6 +190,57 @@ Two reads, zero shared writes. See `integration_of_functions.md` §6.1.
 | `summary_note` | text, nullable | Instructions the patient can read in Flutter |
 | `created_at` / `updated_at` | timestamptz | |
 
+**Bill** — one per admission, written the first time somebody asks for it. See §6.
+
+| Field | Type | Notes |
+| :--- | :--- | :--- |
+| `id` | uuid, PK | |
+| `admission_id` | uuid, FK → Admission, unique | One bill per visit |
+| `bill_number` | text(8), unique | `B7K2X9Q` — what a patient quotes at the counter |
+| `raised_by_staff_id` | uuid, FK, nullable | Who first prepared it |
+| `settled_at` | timestamptz, nullable | Settled is a timestamp, not a bool beside one |
+| `settled_by_staff_id` | uuid, FK, nullable | |
+| `settlement_note` | text(300), nullable | |
+| `created_at` / `updated_at` | timestamptz | |
+
+No `total` and no `is_settled` column: both are derived, so neither can disagree with the rows.
+
+**BillLineItem** — one row per charge.
+
+| Field | Type | Notes |
+| :--- | :--- | :--- |
+| `id` | uuid, PK | |
+| `bill_id` | uuid, FK → Bill | |
+| `source` | enum | `admission_fee` `bed_stay` `manual` — generated vs. typed |
+| `description` | text(200) | |
+| `quantity` | numeric(10,2) | CHECK >= 0 |
+| `unit_price` | numeric(12,2) | CHECK >= 0. **Copied at write time**, never looked up at read time |
+| `bed_assignment_id` | uuid, FK, nullable | One line per bed, so a patient moved mid-stay pays each ward its own rate |
+| `created_at` / `updated_at` | timestamptz | |
+
+**BillingRate** — the editable price grid. Soft-deletable.
+
+| Field | Type | Notes |
+| :--- | :--- | :--- |
+| `id` | uuid, PK | |
+| `ward_type` | enum | |
+| `expense_key` | text(40) | `bed_day` `food` `medicine` `therapy` `tests` `transport` `take_home_medicine` |
+| `amount` | numeric(12,2) | CHECK >= 0 |
+
+UNIQUE(`ward_type`, `expense_key`) **WHERE `is_active`** — scoped, like every soft-deletable
+unique in this component, so retiring a rate does not block ever creating another.
+
+**AdmissionFeeRate** — the one-off fee for opening a visit. Soft-deletable.
+
+| Field | Type | Notes |
+| :--- | :--- | :--- |
+| `id` | uuid, PK | |
+| `category` | enum | `icu` `hdu` `inpatient` `day_case` `outpatient` |
+| `amount` | numeric(12,2) | CHECK >= 0 |
+
+UNIQUE(`category`) **WHERE `is_active`**. Separate from `BillingRate` because it is keyed by
+care level, not by ward — an outpatient pays a fee and occupies no ward at all.
+
 **CareRecommendation** — one row per symptom or concern a patient raises. See §8.10.
 
 | Field | Type | Notes |
@@ -222,6 +273,11 @@ Two reads, zero shared writes. See `integration_of_functions.md` §6.1.
 | `bed_assignment(admission_id)` | Assignment history for one admission |
 | `care_recommendation(patient_id, reported_at desc)` | "Show me this patient's past reports" — also what the agent reads for history context, §8.11 |
 | `care_recommendation(status)` | The doctor's review queue filters on `pending_review` |
+| `bill(admission_id)` **UNIQUE** | One bill per visit, at the database level and not only in the service |
+| `bill(bill_number)` **UNIQUE** | The code a patient quotes at the counter has to resolve to one bill |
+| `bill_line_item(bill_id)` | Every read of a bill fetches its lines |
+| `billing_rate(ward_type, expense_key) WHERE is_active` **UNIQUE** partial | One live price per cell. Partial, so retiring a rate does not block replacing it |
+| `admission_fee_rate(category) WHERE is_active` **UNIQUE** partial | Same, one live fee per care level |
 
 ### 3.3 Transactions and concurrency
 
@@ -558,9 +614,31 @@ real price list was given to us, and the file says so rather than looking author
 | `outpatient` | 1,500 | | `pediatric` | 8,000 |
 | | | | `general` | 6,000 |
 
-A static table in C#, not a `billing_rates` table. Nothing in this project changes a price, and
-a table would be a migration, a role, a screen and a set of tests for a number a real hospital
-edits once a year. If the group wants it editable later, the seam is one file.
+**Superseded on 2026-09-11 — the rates are editable rows now.** This section used to say a
+static table in C# was enough, because "nothing in this project changes a price, and a table
+would be a migration, a role, a screen and a set of tests for a number a real hospital edits
+once a year". All four were built the same week. The reasoning was not wrong about the cost; it
+was wrong that nobody wanted it.
+
+Two tables, `billing_rates` and `admission_fee_rates`, migration `Patient_AddBillingRates`:
+
+- **`admission_fee_rates`** — one amount per care level, UNIQUE(category) WHERE `is_active`.
+- **`billing_rates`** — one amount per ward type per expense, UNIQUE(ward_type, expense_key)
+  WHERE `is_active`. The expense keys are a closed list in `BillingRateDefaults.ExpenseKeys`:
+  `bed_day`, `food`, `medicine`, `therapy`, `tests`, `transport`, `take_home_medicine`. So the
+  grid is wider than bed days alone — a stay can be priced for meals and tests as well.
+- **`GET /billing/rates`** for any staff member, **`PUT /billing/rates`** for the hospital
+  administrator alone. The screen is `BillingSettingsPage.tsx`.
+
+**The numbers above are still the defaults**, and `BillingRates.cs` still holds them. They seed
+the two tables through `BillingRateDefaults`, and `PriceList.Defaults` falls back to them when a
+row is missing — so a fresh database prices a bill correctly before anybody opens the settings
+screen. `BillingRates.BillableDays` and `BillingRates.Currency` were never rates and did not
+move.
+
+**Editing a price never changes a bill already raised.** The unit price is copied onto the line
+when the line is written, so the rate table is read at write time and never at read time. That
+was already true when the rates were a constant; it is what made them safe to make editable.
 
 **Days: part of a day counts as a day, and every stay counts as at least one.** So a three-hour
 day case pays for one day and a stay of twenty-five hours pays for two. It is the only rule
@@ -599,10 +677,12 @@ confirming a discharge needs `billing_settled` and only settling writes it.
 
 #### What we are still not building
 
-Payment gateways, card processing, insurance claims, part payments, refunds, tax, discounts and
-anything with a `billing_rates` table behind it. A discount is a decision, and this component
-has nobody authorised to make one — the check constraint on `bill_line_items` refuses a
-negative quantity or price outright.
+Payment gateways, card processing, insurance claims, part payments, refunds, tax and discounts.
+A discount is a decision, and this component has nobody authorised to make one — the check
+constraint on `bill_line_items` refuses a negative quantity or price outright.
+
+*(A `billing_rates` table was on this list until 2026-09-11 and is now built — see "The rates"
+above. Everything else here still stands.)*
 
 ---
 

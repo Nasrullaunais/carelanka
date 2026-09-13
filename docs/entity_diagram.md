@@ -5,6 +5,19 @@ single hospital / multiple wards, unified staff identity, generic agent-workflow
 audit-log schemas). PKs are `Guid` (PostgreSQL `uuid`, `default: gen_random_uuid()`)
 throughout.
 
+**Revision 2.12** — the billing tables are written down at last. Four tables that landed on
+2026-09-11 with step 7 and were never added here: `bills`, `bill_line_items`, `billing_rates`
+and `admission_fee_rates`, in the `Patient_AddBilling`, `Patient_AddBillingRates` and
+`Patient_AddBillRaisedBy` migrations. No schema changed to write this revision — the diagram
+was simply behind the database. Changes marked *(Rev 2.12)*.
+
+- **Prices are editable rows now, not a constant in C#.** `patient-management-plan.md` §6 said
+  a `billing_rates` table would be "a migration, a role, a screen and a set of tests for a
+  number a real hospital edits once a year", and then all four were built anyway. The plan has
+  been corrected to match; `BillingRates.cs` survives as the seed defaults and the fallback.
+- **Nothing about a bill is stored twice.** No `total`, no `line_total`, no `is_settled` — each
+  is derived, so no two columns can disagree about what a patient owes.
+
 **Revision 2.11** — patients got a short identifier of their own. One new column, in the
 `Patient_AddPatientCode` migration. Changes marked *(Rev 2.11)*.
 
@@ -1175,6 +1188,98 @@ clearance, medicine, bill settled) → all ticked → shows on a 'ready to go' l
 A single readiness enum could not represent independently tickable items or record
 who ticked each one. Rows are seeded alongside the `Discharge` row at admission time.
 
+#### Bill extends AuditedEntity *(Rev 2.12 — new)*
+```
++ AdmissionId: Guid (non-null) FK → Admission.Id
++ BillNumber: string(8) (non-null)
++ RaisedByStaffMemberId: Guid (nullable) FK → StaffMember.Id
++ SettledAt: DateTimeOffset (nullable)
++ SettledByStaffMemberId: Guid (nullable) FK → StaffMember.Id
++ SettlementNote: string(300) (nullable)
+```
+**Table:** `bills` — **built.** `Patient_AddBilling`, `Patient_AddBillRaisedBy`.
+**Constraints:** UNIQUE(AdmissionId) `ux_bills_admission_id` · UNIQUE(BillNumber) `ux_bills_bill_number`
+
+**No `total` column.** The total is the sum of the lines, so the two cannot disagree — the same
+reasoning as `all_mandatory_ticked` being a query over the checklist rows rather than a column.
+
+**No `is_settled` column either.** `SettledAt IS NOT NULL` is the answer, so a boolean and a
+timestamp can never contradict each other. It is a computed property in C# and `Ignore`d by the
+configuration.
+
+`BillNumber` is a short code a patient quotes at the counter — `B7K2X9Q`, same alphabet and
+reasoning as `Patient.PatientCode`. Random rather than a running invoice number: a sequence
+publishes how much business the hospital does, and two desks preparing a bill at once would
+fight over the next one.
+
+The query filter is `Admission.Patient.IsActive`, so a bill follows the patient's soft delete
+rather than carrying its own flag.
+
+#### BillLineItem extends AuditedEntity *(Rev 2.12 — new)*
+```
++ BillId: Guid (non-null) FK → Bill.Id
++ Source: BillLineSource (non-null)
++ Description: string(200) (non-null)
++ Quantity: decimal(10,2) (non-null)
++ UnitPrice: decimal(12,2) (non-null)
++ BedAssignmentId: Guid (nullable) FK → BedAssignment.Id
+```
+**Table:** `bill_line_items` — **built.** `Patient_AddBilling`.
+**Constraint:** CHECK quantity >= 0 AND unit_price >= 0 · INDEX(BillId)
+
+**No `line_total` column.** It is quantity × unit price, computed in C#.
+
+**The unit price is copied onto the line when the line is written**, never looked up when the
+bill is read. Change a rate next month and every bill already raised stays exactly as the
+patient was charged. That is the whole reason the price is a column here rather than a join to
+`BillingRate`, and it is what makes the rates editable safely.
+
+`Source` separates what the system worked out from what a human typed. Preparing a bill again
+replaces every `AdmissionFee` and `BedStay` line and leaves every `Manual` one alone, so the bed
+days update overnight and the X-ray somebody typed survives. Only a `Manual` line can be removed
+(`cl_pat_027`) — deleting a generated one would just bring it back on the next prepare.
+
+`BedAssignmentId` is what makes one line per bed assignment possible, so a patient moved
+mid-stay is billed each ward at its own rate. A bed only ever *held* and never slept in is not
+billed, which is what `BedAssignment.OccupiedAt` exists to answer.
+
+#### BillingRate extends SoftDeletableEntity *(Rev 2.12 — new)*
+```
++ WardType: WardType (non-null)
++ ExpenseKey: string(40) (non-null)
++ Amount: decimal(12,2) (non-null)
+```
+**Table:** `billing_rates` — **built.** `Patient_AddBillingRates`.
+**Constraint:** UNIQUE(WardType, ExpenseKey) WHERE is_active · CHECK amount >= 0
+
+One editable price per ward type per expense. `ExpenseKey` is a closed vocabulary held in
+`BillingRateDefaults.ExpenseKeys`: `bed_day`, `food`, `medicine`, `therapy`, `tests`,
+`transport`, `take_home_medicine`. A string rather than an enum because a hospital adding a
+charge line is a data change, not a deployment — and unlike a status, nothing branches on it.
+
+**The unique index is scoped `WHERE is_active`**, like every other soft-deletable table here.
+A plain UNIQUE would mean retiring the ICU bed-day rate made it impossible to ever create
+another, and the global query filter would hide the conflicting row so the service-layer check
+would pass and `SaveChanges` would throw.
+
+#### AdmissionFeeRate extends SoftDeletableEntity *(Rev 2.12 — new)*
+```
++ Category: AdmissionCategory (non-null)
++ Amount: decimal(12,2) (non-null)
+```
+**Table:** `admission_fee_rates` — **built.** `Patient_AddBillingRates`.
+**Constraint:** UNIQUE(Category) WHERE is_active · CHECK amount >= 0
+
+The one-off fee for opening a visit at each care level. A separate table from `BillingRate`
+because it is keyed by care level and not by ward — an outpatient pays an admission fee and
+occupies no ward at all, so forcing both into one grid would need a null ward type that means
+something different from every other row.
+
+**Both rate tables are seeded from `BillingRateDefaults`, not from a migration.** The numbers
+are invented — no real price list was given to us — and `BillingRates.cs` still holds them as
+the fallback `PriceList.Defaults` reads when a row is missing. So a fresh database prices a
+bill correctly before anybody has opened the settings screen.
+
 #### CareRecommendation extends AuditedEntity *(Rev 2.6 — new)*
 ```
 + PatientId: Guid (non-null) FK → Patient.Id
@@ -1538,6 +1643,17 @@ Routine, Urgent, Critical
 ```
 Serialized as `routine`, `urgent`, `critical`. Feeds the deterministic approval threshold:
 `Urgent` or `Critical` always requires a human.
+
+### BillLineSource *(Rev 2.12 — new)*
+```
+AdmissionFee, BedStay, Manual
+```
+Serialized as `admission_fee`, `bed_stay`, `manual`.
+
+What separates a line the system worked out from a line a human typed. Preparing a bill again
+replaces every `AdmissionFee` and `BedStay` line and leaves every `Manual` one alone, and only
+a `Manual` line can be deleted (`cl_pat_027`). Without this column, re-preparing a bill would
+either wipe the charges reception typed or duplicate the bed days.
 
 ### AdmissionCategory *(Rev 2 — changed; Rev 2.2 — wire values pinned)*
 ```

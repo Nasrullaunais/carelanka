@@ -50,3 +50,8 @@ app.*.map.json
 # Downloaded by swagger_parser from the running API. The API is the source of
 # truth for the contract, so this copy is a build artifact, not a checked-in spec.
 swagger.json
+
+# The generated API client is committed whole, .g.dart parts included: without
+# them a fresh clone will not compile until someone runs build_runner. The
+# repo-wide `mobile-ui/**/*.g.dart` rule still stands for hand-written code.
+!lib/services/api_client/**/*.g.dart

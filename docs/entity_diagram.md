@@ -701,6 +701,35 @@ makes an `Include` silently drop history rows once an item is retired — the tr
 outlive the thing it describes. An `adjusted` row requires a `Note`; a stocktake correction
 nobody explained cannot be audited later.
 
+#### LabReport extends Entity *(Rev 4 — new, 2026-09-13)*
+```
++ PatientId: Guid (non-null) -- Patient Management's row, id only, NO FK
++ TestName: string (non-null, max 120)
++ Summary: string (nullable, max 1000)
++ FileName: string (non-null, max 255) -- the name only, never a path
++ ContentType: string (non-null, max 100) -- application/pdf | image/jpeg | image/png
++ Content: byte[] (non-null) -- bytea; the report itself
++ ByteSize: int (non-null)
++ UploadedByStaffId: Guid (non-null) -- Staff Management's row, id only
+```
+**Table:** `lab_reports`
+**Constraints:** CHECK(byte_size > 0)
+**Index:** `(PatientId, CreatedAt DESC)` — the only way the table is read: one patient, latest
+result first
+**Note:** `Entity`, not `AuditedEntity`, and **no soft delete**, for the same reason as
+`PharmacyTransaction`: a report is issued once and never edited, so there is no `UpdatedAt`, and
+a result that can be made to disappear is not a medical record. A corrected result is a **new
+row**, so a ward can see that a correction happened rather than finding a value has quietly
+changed.
+
+**No foreign key on `PatientId`, deliberately, and no navigation.** Patient Management owns that
+table; a constraint from here would mean Equipment's migrations decide whether one of their rows
+can be deleted. The same shape as `EquipmentItem.AssignedToAdmissionId`. Nothing clinical about
+the person is stored — no name, no NIC, no ward — so there is no copy here to go stale.
+
+**Ownership:** claimed by Equipment (M3) on 2026-09-13. See `integration_of_functions.md` §11.15
+for why a laboratory result lives in this component and not in Patient Management.
+
 #### MaintenanceSchedule extends AuditedEntity *(Rev 3 — now polymorphic)*
 ```
 + AssetType: AssetType (non-null) -- equipment_item | bed

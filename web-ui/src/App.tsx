@@ -7,6 +7,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { DischargePage } from './pages/DischargePage';
 import { EquipmentPage } from './pages/EquipmentPage';
 import { IntakePage } from './pages/IntakePage';
+import { LaboratoryPage } from './pages/LaboratoryPage';
 import { LoginPage } from './pages/LoginPage';
 import { MaintenanceUnitPage } from './pages/MaintenanceUnitPage';
 import { PatientsPage } from './pages/PatientsPage';
@@ -64,6 +65,7 @@ export function App() {
         <Route path="/wards" element={<WardsPage />} />
         <Route path="/equipment" element={<EquipmentPage />} />
         <Route path="/maintenance-unit" element={<MaintenanceUnitPage />} />
+        <Route path="/laboratory" element={<LaboratoryPage />} />
         <Route path="/pharmacy" element={<PharmacyPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

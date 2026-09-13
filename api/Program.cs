@@ -241,6 +241,20 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.AppointmentDesk, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
+
+    // The people treating the patient, plus the laboratory that produced the result. A blood
+    // result is clinical information about a named person, so ambulance crew and general staff
+    // are off it even though they hold a staff login.
+    options.AddPolicy(Policies.LabReportReader, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.Doctor),
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager),
+        EnumWire.ToWire(StaffRole.EquipmentManager)));
+
+    // Issuing a result is the laboratory's job alone. Standing in on equipment_manager until
+    // StaffRole has a laboratory value - see the remarks on Policies.LabReportAuthor.
+    options.AddPolicy(Policies.LabReportAuthor, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.EquipmentManager)));
 });
 
 // 20 a minute per IP in production. Configurable only so the integration tests can raise it:
@@ -294,6 +308,7 @@ builder.Services.AddScoped<IEquipmentItemService, EquipmentItemService>();
 builder.Services.AddScoped<IPharmacyCategoryService, PharmacyCategoryService>();
 builder.Services.AddScoped<IPharmacyItemService, PharmacyItemService>();
 builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();
+builder.Services.AddScoped<ILabReportService, LabReportService>();
 builder.Services.AddScoped<IWardService, WardService>();
 builder.Services.AddScoped<IPatientService, PatientService>();
 builder.Services.AddScoped<IAdmissionService, AdmissionService>();
@@ -322,6 +337,15 @@ builder.Services.AddSingleton<IWardDirectory, StubWardDirectory>();
 // Scoped, not Singleton like the stub it replaces. It reaches a DbContext through
 // IBedOccupancyService; a singleton would capture one DbContext for the life of the app.
 builder.Services.AddScoped<IBedOccupancyPort, BedOccupancyAdapter>();
+
+// Real from the start, never stubbed: the lab has to know whether a patient id exists before
+// filing a result against it, and IPatientService is on main. Scoped for the same reason as the
+// occupancy adapter above - it reaches a DbContext through the service it delegates to.
+builder.Services.AddScoped<IPatientDirectory, PatientDirectoryAdapter>();
+
+// Also real, and also a read through their service rather than their tables: the laboratory
+// screen lists who is in each ward so a lab does not have to type an identifier per specimen.
+builder.Services.AddScoped<IInHospitalPatientDirectory, InHospitalPatientDirectory>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>

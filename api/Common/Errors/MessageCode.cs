@@ -44,6 +44,12 @@ public enum MessageCode
 
     EquipmentAwaitingRepair,
 
+    LabReportFileEmpty,
+
+    LabReportFileTooLarge,
+
+    LabReportFileType,
+
     PharmacyCategoryNameTaken,
 
     PharmacyItemNameTaken,

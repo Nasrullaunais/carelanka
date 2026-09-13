@@ -173,4 +173,36 @@ public static class Policies
     /// <c>AppointmentService</c> where the body is.
     /// </remarks>
     public const string AppointmentDesk = nameof(AppointmentDesk);
+
+    /// <summary>
+    /// Reads a patient's laboratory results: doctor, ward nurse, duty manager, and the
+    /// laboratory itself (<c>equipment_manager</c> for now).
+    /// </summary>
+    /// <remarks>
+    /// A blood result is clinical information about a named person, so this is deliberately
+    /// narrower than <see cref="AnyStaff"/>: ambulance crew and general staff are not on it.
+    /// It is also deliberately not <see cref="AdmissionReader"/>, which excludes the
+    /// laboratory - the people who produced a result have to be able to see it.
+    ///
+    /// The hospital administrator is absent for the same reason they are absent from
+    /// <see cref="AdmissionReader"/>: reading one patient's test results is clinical work, not
+    /// administration.
+    ///
+    /// The laboratory rides on <c>equipment_manager</c> because <c>StaffRole</c> has no
+    /// laboratory value. Adding one is a change to <c>staff-spec.yaml</c> and
+    /// <c>common-spec.yaml</c> together, which is M2's and the common owner's call - see
+    /// Open Decision 11. When it happens, this policy and <see cref="LabReportAuthor"/> are
+    /// the two lines that change.
+    /// </remarks>
+    public const string LabReportReader = nameof(LabReportReader);
+
+    /// <summary>
+    /// Files a laboratory result: the laboratory alone (<c>equipment_manager</c> for now).
+    /// </summary>
+    /// <remarks>
+    /// Separate from <see cref="LabReportReader"/> on purpose. A ward nurse reads a result and
+    /// acts on it; issuing one is the laboratory's work, and a policy covering both would hand
+    /// every nurse the ability to file a blood result nobody ran.
+    /// </remarks>
+    public const string LabReportAuthor = nameof(LabReportAuthor);
 }

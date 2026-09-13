@@ -51,6 +51,33 @@ export function canReportFault(role: PrincipalRole | undefined): boolean {
 }
 
 /**
+ * Policies.LabReportReader on GET /api/lab-reports and the file behind it.
+ *
+ * Narrower than isStaff on purpose: a blood result is clinical information about a named
+ * person, so ambulance crew and general staff are off it even though they hold a staff login.
+ * The hospital administrator is off it for the same reason they cannot read admissions.
+ */
+export function canReadLabReports(role: PrincipalRole | undefined): boolean {
+  return (
+    role === 'doctor' ||
+    role === 'ward_nurse' ||
+    role === 'duty_manager' ||
+    role === 'equipment_manager'
+  );
+}
+
+/**
+ * Policies.LabReportAuthor on POST /api/lab-reports.
+ *
+ * Issuing a result is the laboratory's work, standing on equipment_manager until StaffRole has
+ * a laboratory value. Deliberately narrower than canReadLabReports: a nurse reads a result and
+ * acts on it, and must not be able to file one nobody ran.
+ */
+export function canFileLabReport(role: PrincipalRole | undefined): boolean {
+  return role === 'equipment_manager';
+}
+
+/**
  * Policies.PatientRegistrar on POST /api/patients, POST /api/patients/lookup and
  * POST /api/admissions. Registering someone and admitting them are the same permission:
  * both are intake, and splitting them would let a role start a job it cannot finish.

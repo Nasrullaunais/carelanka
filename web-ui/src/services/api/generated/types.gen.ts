@@ -1072,6 +1072,77 @@ export type HealthStatus = {
 };
 
 /**
+ * One patient the laboratory can file a result against, as the lab needs to see them: by where
+ * they are, not by an identifier somebody has to type.
+ */
+export type LabPatient = {
+    patient_id: string;
+    patient_code: string;
+    full_name: string;
+    /**
+     * Null for a visit holding no bed - an outpatient in for a blood test is still a patient the lab files against.
+     */
+    ward_name?: string | null;
+    bed_number?: string | null;
+    admission_status: AdmissionStatus;
+};
+
+/**
+ * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
+ */
+export type LabPatientPagedResult = {
+    items: Array<LabPatient>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    /**
+     * Always at least 1, so an empty list does not render as "page 1 of 0".
+     */
+    total_pages: number;
+};
+
+/**
+ * One finished laboratory result. Metadata only: the file itself is a separate request, so a list of thirty reports does not carry thirty PDFs.
+ */
+export type LabReport = {
+    id: string;
+    /**
+     * Patient Management owns the patient; this is the id and nothing more.
+     */
+    patient_id: string;
+    test_name: string;
+    summary?: string | null;
+    file_name: string;
+    content_type: string;
+    /**
+     * So a ward sees how big it is before opening it on ward wifi.
+     */
+    byte_size: number;
+    /**
+     * Staff Management owns the person; this is the id and nothing more.
+     */
+    uploaded_by_staff_id: string;
+    /**
+     * When the lab filed it. A report is never edited, so there is no updated_at.
+     */
+    created_at: string;
+};
+
+/**
+ * One page of a list endpoint. Group-owned: the shape is the same in all five specs.
+ */
+export type LabReportPagedResult = {
+    items: Array<LabReport>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    /**
+     * Always at least 1, so an empty list does not render as "page 1 of 0".
+     */
+    total_pages: number;
+};
+
+/**
  * Body of POST /api/patients/{id}/link-account. A patient RECORD and a patient ACCOUNT are
  * different things; this attaches an optional login to a record staff already created.
  */
@@ -3444,6 +3515,169 @@ export type GetWardCapacityResponses = {
 };
 
 export type GetWardCapacityResponse = GetWardCapacityResponses[keyof GetWardCapacityResponses];
+
+export type ListLabReportsData = {
+    body?: never;
+    path?: never;
+    query: {
+        patientId: string;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/lab-reports';
+};
+
+export type ListLabReportsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListLabReportsError = ListLabReportsErrors[keyof ListLabReportsErrors];
+
+export type ListLabReportsResponses = {
+    /**
+     * OK
+     */
+    200: LabReportPagedResult;
+};
+
+export type ListLabReportsResponse = ListLabReportsResponses[keyof ListLabReportsResponses];
+
+export type UploadLabReportData = {
+    body?: {
+        /**
+         * Which patient the result belongs to. Looked up by code, name or NIC on the lab's screen.
+         */
+        PatientId: string;
+        /**
+         * What was tested, in the lab's own words.
+         */
+        TestName: string;
+        /**
+         * The lab's short summary, if they wrote one. Never a substitute for the file.
+         */
+        Summary?: string;
+        /**
+         * The report. A PDF or a photograph of one, at most 10 MB.
+         */
+        File: Blob | File;
+    };
+    path?: never;
+    query?: never;
+    url: '/lab-reports';
+};
+
+export type UploadLabReportErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type UploadLabReportError = UploadLabReportErrors[keyof UploadLabReportErrors];
+
+export type UploadLabReportResponses = {
+    /**
+     * Created
+     */
+    201: LabReport;
+};
+
+export type UploadLabReportResponse = UploadLabReportResponses[keyof UploadLabReportResponses];
+
+export type ListLabPatientsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        wardName?: string;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/lab-reports/patients';
+};
+
+export type ListLabPatientsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListLabPatientsError = ListLabPatientsErrors[keyof ListLabPatientsErrors];
+
+export type ListLabPatientsResponses = {
+    /**
+     * OK
+     */
+    200: LabPatientPagedResult;
+};
+
+export type ListLabPatientsResponse = ListLabPatientsResponses[keyof ListLabPatientsResponses];
+
+export type DownloadLabReportData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/lab-reports/{id}/file';
+};
+
+export type DownloadLabReportErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type DownloadLabReportError = DownloadLabReportErrors[keyof DownloadLabReportErrors];
+
+export type DownloadLabReportResponses = {
+    /**
+     * OK
+     */
+    200: Blob | File;
+};
+
+export type DownloadLabReportResponse = DownloadLabReportResponses[keyof DownloadLabReportResponses];
 
 export type ListMaintenanceSchedulesData = {
     body?: never;

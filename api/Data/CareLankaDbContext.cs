@@ -25,6 +25,7 @@ public class CareLankaDbContext : DbContext
     public DbSet<PharmacyCategory> PharmacyCategories => Set<PharmacyCategory>();
     public DbSet<PharmacyItem> PharmacyItems => Set<PharmacyItem>();
     public DbSet<PharmacyTransaction> PharmacyTransactions => Set<PharmacyTransaction>();
+    public DbSet<LabReport> LabReports => Set<LabReport>();
 
     // Patient Management
     public DbSet<Ward> Wards => Set<Ward>();

@@ -1,4 +1,5 @@
 using CareLanka.Api.Data.Entities.Common;
+using CareLanka.Api.Data.Entities.Emergency;
 using CareLanka.Api.Data.Entities.Equipment;
 using CareLanka.Api.Data.Entities.Patient;
 using Microsoft.EntityFrameworkCore;
@@ -15,6 +16,12 @@ public class CareLankaDbContext : DbContext
     public DbSet<StaffMember> StaffMembers => Set<StaffMember>();
     public DbSet<PatientAccount> PatientAccounts => Set<PatientAccount>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
+    public DbSet<EmergencyCall> EmergencyCalls => Set<EmergencyCall>();
+    public DbSet<Ambulance> Ambulances => Set<Ambulance>();
+    public DbSet<Dispatch> Dispatches => Set<Dispatch>();
+    public DbSet<DispatchCrew> DispatchCrew => Set<DispatchCrew>();
+    public DbSet<RouteLog> RouteLogs => Set<RouteLog>();
 
     // Equipment Management
     public DbSet<Bed> Beds => Set<Bed>();

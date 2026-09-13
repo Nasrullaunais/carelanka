@@ -278,7 +278,7 @@ body too:
 - **`PatientRegistrar` = general staff, ward nurse, duty manager.** Ambulance crew removed — the
   crew are the response team, the paperwork is done at the desk. **This one reaches into
   Emergency**, because their spec is written around ambulance crew and duty manager and
-  `GeneralStaff` does not appear in it. Raised as §11.9 for Kaveesha; `emergency-spec.yaml` is
+  `GeneralStaff` does not appear in it. Raised as §11.9 for Nasrulla Unais; `emergency-spec.yaml` is
   hers and has not been touched.
 - **Two new policies**, `DischargeChecklist` (nurse, doctor, manager) and `BillingDesk` (general
   staff, administrator, duty manager). Confirming a discharge reuses `AdmissionEditor`.
@@ -475,7 +475,7 @@ Two things your Flutter screens must handle:
 ~~`GET /wards/{id}/occupancy` (M2)~~ **built 2026-09-11**,
 ~~`GET /beds/{id}/occupancy` (M3)~~ **built 2026-09-11**, `POST /admissions/pre-admit` (M1).
 
-**So `POST /admissions/pre-admit` for Kaveesha is the only thing anybody is still waiting on
+**So `POST /admissions/pre-admit` for Nasrulla Unais is the only thing anybody is still waiting on
 us for** — and after the policy rework on 2026-09-11 its `Roles:` line and `Policies.cs`
 disagree about `AmbulanceCrew`. Nothing is broken today because the endpoint does not exist, but
 that has to be settled before it does. `integration_of_functions.md` §11.9.

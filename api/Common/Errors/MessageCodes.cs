@@ -70,6 +70,8 @@ public static class MessageCodes
             [MessageCode.BedNotAssigned] = "cl_pat_028",
             [MessageCode.BedAlreadyTheirs] = "cl_pat_029",
             [MessageCode.BedWardPediatricAdult] = "cl_pat_030",
+            [MessageCode.AmbulanceRegistrationTaken] = "cl_emg_001",
+            [MessageCode.AmbulanceHasActiveDispatch] = "cl_emg_002",
             [MessageCode.NicLinkedToAnotherAccount] = "cl_pat_031",
             [MessageCode.NicDoesNotMatchYourRecord] = "cl_pat_032",
             [MessageCode.AccountHasNoPatientRecord] = "cl_pat_033",

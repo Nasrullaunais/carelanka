@@ -11,6 +11,8 @@ using CareLanka.Api.Data.Enums;
 using CareLanka.Api.Services.Common;
 using CareLanka.Api.Services.Equipment;
 using CareLanka.Api.Services.Equipment.Stubs;
+using CareLanka.Api.Services.Emergency;
+using CareLanka.Api.Services.Emergency.Stubs;
 using CareLanka.Api.Services.Patient;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
@@ -156,6 +158,10 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.PatientOnly,
         policy => policy.RequireRole(EnumWire.ToWire(PrincipalRole.Patient)));
 
+    options.AddPolicy(Policies.EmergencyResponder, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.DutyManager),
+        EnumWire.ToWire(StaffRole.AmbulanceCrew)));
+
     options.AddPolicy(Policies.WorkflowReader, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.DutyManager),
         EnumWire.ToWire(StaffRole.HospitalAdministrator),
@@ -287,6 +293,8 @@ builder.Services.AddSingleton<ILoginThrottle, LoginThrottle>();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IHealthService, HealthService>();
+builder.Services.AddScoped<IAmbulanceService, AmbulanceService>();
+builder.Services.AddSingleton<IAmbulanceDistanceService, StubAmbulanceDistanceService>();
 
 builder.Services.AddScoped<IBedService, BedService>();
 builder.Services.AddScoped<IEquipmentCategoryService, EquipmentCategoryService>();

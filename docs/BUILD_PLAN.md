@@ -19,8 +19,8 @@ files. What moved out is the detail, which nobody was reading in full anyway.
 | Track | File | Owner |
 | :--- | :--- | :--- |
 | **0 · Common** | `docs/build/common.md` | Common (group-owned) |
-| 1 · Emergency / Ambulance | `docs/build/emergency.md` | Kaveesha |
-| 2 · Staff Management | `docs/build/staff.md` | Nasrullah |
+| 1 · Emergency / Ambulance | `docs/build/emergency.md` | Nasrulla Unais |
+| 2 · Staff Management | `docs/build/staff.md` | Kaveesha |
 | 3 · Health Equipment | `docs/build/equipment.md` | Sethmin |
 | 4 · Patient Management | `docs/build/patient.md` | Lochana |
 
@@ -220,7 +220,7 @@ rather than discovering at the demo.
 | 10 | `*.g.dart` — committed or CI-built? | with #8 | Open. `.gitignore` currently ignores it |
 | 11 | **Deployment target** | **group** | Open — ADR 8, the last unmade decision |
 | 12 | Equipment entities in `entity_diagram.md` | Sethmin | Stale — Open Decision 12. Graded artefact |
-| 13 | `staff-management-plan.md` | Nasrullah | Does not exist; the other three components have one |
+| 13 | `staff-management-plan.md` | Kaveesha | Does not exist; the other three components have one |
 
 ---
 

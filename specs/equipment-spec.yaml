@@ -801,23 +801,29 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
-  /lab-reports/patients:
+  /ward-patients:
     get:
       tags: [Laboratory]
-      summary: Who the laboratory can file against right now, ward by ward
+      summary: Who is in the hospital right now, ward by ward
       description: |
         Roles: Doctor, WardNurse, DutyManager, and the laboratory itself.
 
-        How a laboratory actually works: a rack of specimens arrives from one ward and gets
-        worked down in order. Omit `wardName` for every current visit, including outpatients
-        holding no bed at all.
+        Two screens pick a patient rather than make somebody type an id, and this is what both
+        read: the laboratory filing a result, and the equipment register assigning an item. A lab
+        works from a rack of specimens that arrived from one ward; an assignment goes to a
+        bedside. Omit `wardName` for every current visit, including outpatients holding no bed at
+        all - the assign screen hides those, since equipment goes to a bed.
+
+        Carries both ids. `admission_id` is what an equipment assignment points at;
+        `patient_id` is what a lab report points at, because a result belongs to the person and
+        not to the visit.
 
         A visit counts as current while it is `awaiting_bed`, `awaiting_approval`,
         `bed_reserved`, `admitted` or `ready_for_discharge`. Awaiting-bed is in deliberately: a
         specimen is often taken before anybody has found a bed. Discharged and cancelled are out.
 
-        One row per patient, not per visit - a report is filed against the patient, so somebody
-        readmitted the same day must not appear twice.
+        One row per current visit. Somebody readmitted the same day has two, which is right for
+        an assignment and harmless for a report.
 
         **Read through Patient Management's admission service, never their tables.** Everything
         published here is already visible to these roles through `GET /patients/{id}`, which
@@ -828,7 +834,7 @@ paths:
         screen takes the name from `GET /wards`, which carries both. When M4 publishes the
         `wardId` filter on `GET /admissions` that `STUBS.md` already calls unblocked, this
         parameter becomes an id.
-      operationId: listLabPatients
+      operationId: listWardPatients
       parameters:
         - name: wardName
           in: query
@@ -848,7 +854,7 @@ paths:
                     properties:
                       items:
                         type: array
-                        items: { $ref: '#/components/schemas/LabPatient' }
+                        items: { $ref: '#/components/schemas/WardPatient' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -1771,15 +1777,22 @@ components:
           format: date-time
           description: When the lab filed it.
 
-    LabPatient:
+    WardPatient:
       type: object
       description: |
-        One patient the laboratory can file against, as a lab needs to see them: by where they
-        are, not by an identifier somebody has to type.
+        One current hospital visit, as the two screens that pick a patient need to see it: by
+        where they are lying, not by an identifier somebody has to type.
 
         No clinical detail and no contact details - a name, a code, and where they are lying.
       properties:
-        patient_id: { type: string, format: uuid }
+        admission_id:
+          type: string
+          format: uuid
+          description: What an equipment assignment points at.
+        patient_id:
+          type: string
+          format: uuid
+          description: What a lab report points at. A result belongs to the person, not the visit.
         patient_code: { type: string }
         full_name: { type: string }
         ward_name:
@@ -1792,7 +1805,7 @@ components:
 
     # M4 owns this enum. Byte-identical to patient-spec.yaml, deliberately, because the spec
     # checker compares shared schemas across all five contracts and a paraphrase is a conflict.
-    # Republished here only because LabPatient carries it; this contract never writes it.
+    # Republished here only because WardPatient carries it; this contract never writes it.
     AdmissionStatus:
       type: string
       description: |

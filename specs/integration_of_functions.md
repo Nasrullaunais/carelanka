@@ -880,9 +880,11 @@ away, and the specimen's own journey does not change.
 
 **Two things other people should know.**
 
-**1. `Policies.LabReportReader` and `Policies.LabReportAuthor` are new entries in the
-group-owned `Policies.cs`.** Reader is doctor, ward nurse, duty manager and the laboratory.
-Author is the laboratory alone. The administrator is on neither, for the same reason they are
+**1. `Policies.LabReportReader`, `Policies.LabReportAuthor` and
+`Policies.PatientLocationReader` are new entries in the group-owned `Policies.cs`.** Reader is
+doctor, ward nurse, duty manager and the laboratory. Author is the laboratory alone.
+`PatientLocationReader` gates `GET /ward-patients` and holds the same four roles as Reader today,
+under a separate name because knowing which ward somebody is in is not reading a test result. The administrator is on neither, for the same reason they are
 not on `AdmissionReader`: reading one patient's blood result is clinical work.
 
 **2. The laboratory rides on `equipment_manager`, and it should not forever.** `StaffRole` has
@@ -890,14 +892,16 @@ no laboratory value, and adding one is a change to `staff-spec.yaml` and `common
 together — M2's and the common owner's call, the same conversation as Open Decision 11. Until
 then those two policies are where a `laboratory` role would be added, and nothing else changes.
 
-**3. The lab browses by ward, and it reads that through M4's service rather than their tables.**
-`GET /lab-reports/patients` lists who is in the hospital now, optionally filtered to one ward,
-because that is how a laboratory works: a rack of specimens arrives from one ward and gets worked
-down in order. Searching by code, name or NIC is still there as the second way in, for an
-outpatient who is in no ward at all.
+**3. Two screens browse by ward, and they read it through M4's service rather than their tables.**
+`GET /ward-patients` lists who is in the hospital now, optionally filtered to one ward. The
+laboratory uses it to file a result against the right person, and the equipment register uses it
+to assign an item to a bedside - **that screen used to take a pasted admission id**. The row
+carries both ids, because an assignment points at the visit and a result points at the person.
+Searching by code, name or NIC is still there as the lab's second way in, for an outpatient who is
+in no ward at all.
 
 **Nothing of M4's changed for it, and nothing new is disclosed.** It calls
-`IAdmissionService.ListAsync` through a port, the same shape as the bed-occupancy adapter. Every
+`IAdmissionService.ListAsync`, the same shape as the bed-occupancy adapter. Every
 field it publishes — name, code, ward, bed, visit status — is already visible to these roles
 through `GET /patients/{id}`, which carries a patient's admissions with the ward on them. This
 saves opening one patient at a time; it does not widen who can see what. **M4's admissions list
@@ -907,7 +911,7 @@ endpoint and its read policy are untouched.**
 because `AdmissionSummary` publishes `ward_name` and not a ward id, and the rows are filtered in
 Equipment after the read. That is honest at a few hundred beds and wrong at ten thousand. When M4
 publishes the `wardId` filter on `GET /admissions` that `STUBS.md` already calls unblocked,
-`InHospitalPatientDirectory` collapses to one delegating call. Recorded in `STUBS.md`.
+`WardPatientService` collapses to one delegating call. Recorded in `STUBS.md`.
 
 ---
 

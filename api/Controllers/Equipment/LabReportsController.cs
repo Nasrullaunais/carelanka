@@ -31,19 +31,6 @@ public class LabReportsController : ControllerBase
         CancellationToken ct = default)
         => Ok(await _reports.ListForPatientAsync(patientId, page, pageSize, ct));
 
-    [Authorize(Policy = Policies.LabReportReader)]
-    [HttpGet("patients", Name = "listLabPatients")]
-    [ProducesResponseType(typeof(PagedResult<LabPatient>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
-    public async Task<ActionResult<PagedResult<LabPatient>>> ListLabPatients(
-        [FromQuery] string? wardName,
-        [FromQuery][Range(1, int.MaxValue)] int page = 1,
-        [FromQuery][Range(1, 100)] int pageSize = 20,
-        CancellationToken ct = default)
-        => Ok(await _reports.ListPatientsAsync(wardName, page, pageSize, ct));
-
     [Authorize(Policy = Policies.LabReportAuthor)]
     [HttpPost(Name = "uploadLabReport")]
     [Consumes("multipart/form-data")]

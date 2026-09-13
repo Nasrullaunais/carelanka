@@ -23,30 +23,16 @@ public sealed class LabReportService : ILabReportService
 
     private readonly CareLankaDbContext _db;
     private readonly IPatientDirectory _patients;
-    private readonly IInHospitalPatientDirectory _inHospital;
     private readonly ICurrentUser _currentUser;
 
     public LabReportService(
         CareLankaDbContext db,
         IPatientDirectory patients,
-        IInHospitalPatientDirectory inHospital,
         ICurrentUser currentUser)
     {
         _db = db;
         _patients = patients;
-        _inHospital = inHospital;
         _currentUser = currentUser;
-    }
-
-    public async Task<PagedResult<LabPatient>> ListPatientsAsync(
-        string? wardName, int page, int pageSize, CancellationToken cancellationToken = default)
-    {
-        var everyone = await _inHospital.ListAsync(wardName, cancellationToken);
-
-        // Paged after the ward filter, not before, or rows drop off the end of every page.
-        var rows = everyone.Skip((page - 1) * pageSize).Take(pageSize).ToList();
-
-        return PagedResult<LabPatient>.From(rows, page, pageSize, everyone.Count);
     }
 
     public async Task<PagedResult<LabReport>> ListForPatientAsync(

@@ -416,7 +416,7 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 
 | Method | Route | Role | Notes |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/api/lab-reports/patients?wardName=` | Doctor, Ward Nurse, Duty Manager, Laboratory | Who is in the hospital now, ward by ward. How the lab finds somebody without typing an identifier. Read through M4's admission service, never their tables |
+| `GET` | `/api/ward-patients?wardName=` | Doctor, Ward Nurse, Duty Manager, Laboratory | Who is in the hospital now, ward by ward. The picker behind two screens — filing a result and assigning an item. Carries both `admission_id` and `patient_id`. Read through M4's admission service, never their tables |
 | `GET` | `/api/lab-reports?patientId=` | Doctor, Ward Nurse, Duty Manager, Laboratory | One patient's results, newest first. Metadata only |
 | `POST` | `/api/lab-reports` | Laboratory | **Business op.** The only multipart request in this contract. PDF or photo, up to 10 MB. 404 on an unknown patient |
 | `GET` | `/api/lab-reports/{id}/file` | Doctor, Ward Nurse, Duty Manager, Laboratory | The file, served `inline` so a ward reads it on screen |
@@ -564,7 +564,7 @@ Per the assignment: workflow id, objective, plan, completed steps, tool calls wi
 | Screen | Contents |
 | :--- | :--- |
 | **Equipment inventory** | Search, filter by category/ward/status, sort, paginate |
-| **Equipment detail** | Item info, maintenance history, current warnings, assign/release |
+| **Equipment detail** | Item info, maintenance history, current warnings, assign/release. *(Rev 2, 2026-09-13.)* Assigning picks the patient by ward rather than taking a pasted admission id |
 | **Pharmacy inventory** | Search, filter by category, below-threshold and expiring-soon highlighted |
 | **Maintenance calendar** | Scheduled and overdue, by asset type |
 | **Maintenance unit** | *(Rev 2, 2026-09-13.)* The repair queue: every machine out of service and what was reported against it. Confirm the repair and the item returns to service; mark it beyond repair and it is retired. The only screen that can bring an item back from `maintenance` — see §4.1 |

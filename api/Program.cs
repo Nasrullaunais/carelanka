@@ -225,6 +225,12 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy(Policies.LabReportAuthor, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.EquipmentManager)));
+
+    options.AddPolicy(Policies.PatientLocationReader, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.Doctor),
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager),
+        EnumWire.ToWire(StaffRole.EquipmentManager)));
 });
 
 var authRequestsPerMinute = builder.Configuration.GetValue("RateLimits:AuthPerMinute", 20);
@@ -300,7 +306,7 @@ builder.Services.AddScoped<IBedOccupancyPort, BedOccupancyAdapter>();
 // the same reason as the occupancy adapter above: they reach a DbContext through what they
 // delegate to, and a singleton would capture one for the life of the app.
 builder.Services.AddScoped<IPatientDirectory, PatientDirectoryAdapter>();
-builder.Services.AddScoped<IInHospitalPatientDirectory, InHospitalPatientDirectory>();
+builder.Services.AddScoped<IWardPatientService, WardPatientService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>

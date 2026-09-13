@@ -3,14 +3,13 @@ import type { ChangeEvent, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  listLabPatientsOptions,
   listLabReportsOptions,
   listPatientsOptions,
-  listWardsOptions,
   uploadLabReportMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
 import { downloadLabReport } from '../services/api/generated';
-import type { LabPatient, LabReport } from '../services/api/generated';
+import type { LabReport, WardPatient } from '../services/api/generated';
+import { WardPatientPicker } from '../components/WardPatientPicker';
 import { useSession } from '../services/auth/useSession';
 import { canFileLabReport } from '../types/permissions';
 
@@ -21,7 +20,13 @@ const MAX_BYTES = 10 * 1024 * 1024;
 
 const ACCEPTED = 'application/pdf,image/jpeg,image/png';
 
-type Chosen = { id: string; patientCode: string; fullName: string; whereabouts?: string };
+type Chosen = {
+  id: string;
+  admissionId?: string;
+  patientCode: string;
+  fullName: string;
+  whereabouts?: string;
+};
 
 export function LaboratoryPage() {
   const session = useSession();
@@ -57,118 +62,13 @@ function WardBrowser({
   selected: Chosen | null;
   onSelect: (patient: Chosen) => void;
 }) {
-  const [wardName, setWardName] = useState('');
-  const [page, setPage] = useState(1);
-
-  const wards = useQuery(listWardsOptions({ query: { isActive: true } }));
-
-  const patients = useQuery(
-    listLabPatientsOptions({
-      query: {
-        ...(wardName.length > 0 ? { wardName } : {}),
-        page,
-        pageSize: PAGE_SIZE,
-      },
-    }),
-  );
-
-  const rows = patients.data?.items ?? [];
-  const totalPages = patients.data?.total_pages ?? 1;
-
   return (
     <div className="card">
       <h2>Patients in the hospital now</h2>
-
-      <label htmlFor="lab-ward">Ward</label>
-      <select
-        id="lab-ward"
-        value={wardName}
-        onChange={(event) => {
-          setWardName(event.target.value);
-          setPage(1);
-        }}
-      >
-        <option value="">Every ward</option>
-        {(wards.data ?? []).map((ward) => (
-          <option key={ward.id} value={ward.name}>
-            {ward.name}
-          </option>
-        ))}
-      </select>
-
-      {patients.isPending && <p className="muted">Loading patients…</p>}
-
-      {patients.isError && (
-        <p className="empty">
-          Could not load the ward list.{' '}
-          <button type="button" className="secondary" onClick={() => void patients.refetch()}>
-            Try again
-          </button>
-        </p>
-      )}
-
-      {patients.isSuccess && rows.length === 0 && (
-        <p className="empty">
-          {wardName.length > 0
-            ? `Nobody is in ${wardName} at the moment.`
-            : 'Nobody is currently admitted.'}
-        </p>
-      )}
-
-      {rows.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>Ward</th>
-              <th>Bed</th>
-              <th>Code</th>
-              <th>Name</th>
-              <th>Visit</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((patient) => (
-              <tr key={patient.patient_id}>
-                <td>{patient.ward_name ?? <span className="muted">No bed</span>}</td>
-                <td>{patient.bed_number ?? <span className="muted">—</span>}</td>
-                <td>{patient.patient_code}</td>
-                <td>{patient.full_name}</td>
-                <td>{admissionStatusLabel(patient)}</td>
-                <td>
-                  <button type="button" onClick={() => onSelect(toChosen(patient))}>
-                    {selected?.id === patient.patient_id ? 'Selected' : 'Open'}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      {totalPages > 1 && (
-        <div className="pager">
-          <button
-            type="button"
-            className="secondary"
-            disabled={page <= 1}
-            onClick={() => setPage((current) => current - 1)}
-          >
-            Previous
-          </button>
-          <span className="muted">
-            Page {page} of {totalPages}
-          </span>
-          <button
-            type="button"
-            className="secondary"
-            disabled={page >= totalPages}
-            onClick={() => setPage((current) => current + 1)}
-          >
-            Next
-          </button>
-        </div>
-      )}
+      <WardPatientPicker
+        selectedAdmissionId={selected?.admissionId}
+        onSelect={(patient) => onSelect(toChosen(patient))}
+      />
     </div>
   );
 }
@@ -248,9 +148,10 @@ function PatientSearch({
   );
 }
 
-function toChosen(patient: LabPatient): Chosen {
+function toChosen(patient: WardPatient): Chosen {
   return {
     id: patient.patient_id,
+    admissionId: patient.admission_id,
     patientCode: patient.patient_code,
     fullName: patient.full_name,
     whereabouts:
@@ -260,22 +161,6 @@ function toChosen(patient: LabPatient): Chosen {
   };
 }
 
-function admissionStatusLabel(patient: LabPatient): string {
-  switch (patient.admission_status) {
-    case 'admitted':
-      return 'In a bed';
-    case 'awaiting_bed':
-      return 'Waiting for a bed';
-    case 'awaiting_approval':
-      return 'Bed awaiting approval';
-    case 'bed_reserved':
-      return 'Bed held';
-    case 'ready_for_discharge':
-      return 'Going home';
-    default:
-      return patient.admission_status;
-  }
-}
 
 function ReportList({ patient }: { patient: Chosen }) {
   const [page, setPage] = useState(1);

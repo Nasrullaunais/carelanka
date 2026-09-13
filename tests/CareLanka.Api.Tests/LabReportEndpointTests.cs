@@ -168,87 +168,6 @@ public sealed class LabReportEndpointTests
         Assert.Equal(labStaffId, filed.RootElement.GetProperty("uploaded_by_staff_id").GetGuid());
     }
 
-    [Fact]
-    public async Task The_list_is_how_the_lab_finds_a_patient_without_typing_an_identifier()
-    {
-        using var lab = await ClientAsync(ApiApplication.EquipmentEmail);
-        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
-
-        // An outpatient in for a blood test: no bed, admitted the moment the record opens. The
-        // cheapest current visit to make, and exactly the case the ward filter must not hide.
-        var patientId = await NewPatientAsync(nurse, "Lab Ward Listing");
-        await NewOutpatientVisitAsync(nurse, patientId);
-
-        using var everyone = await ReadJsonAsync(
-            await lab.GetAsync("/api/lab-reports/patients?pageSize=100"));
-        var rows = everyone.RootElement.GetProperty("items").EnumerateArray().ToList();
-        var mine = rows.Single(row => row.GetProperty("patient_id").GetString() == patientId);
-
-        // What a lab needs to work down a rack of specimens: who, and where they are.
-        Assert.Equal("Lab Ward Listing", mine.GetProperty("full_name").GetString());
-        Assert.False(string.IsNullOrWhiteSpace(mine.GetProperty("patient_code").GetString()));
-        Assert.Equal("admitted", mine.GetProperty("admission_status").GetString());
-
-        // Null rather than absent. The column renders "No bed" instead of going blank.
-        Assert.Equal(JsonValueKind.Null, mine.GetProperty("ward_name").ValueKind);
-    }
-
-    [Fact]
-    public async Task Asking_for_one_ward_leaves_out_everybody_who_is_not_in_it()
-    {
-        using var lab = await ClientAsync(ApiApplication.EquipmentEmail);
-        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
-
-        var patientId = await NewPatientAsync(nurse, "Lab Ward Filter");
-        await NewOutpatientVisitAsync(nurse, patientId);
-
-        using var everyone = await ReadJsonAsync(
-            await lab.GetAsync("/api/lab-reports/patients?pageSize=100"));
-        using var inWard = await ReadJsonAsync(
-            await lab.GetAsync("/api/lab-reports/patients?wardName=General-A&pageSize=100"));
-
-        // Present when nobody asked for a ward, gone when they did. Somebody holding no bed at
-        // all must not leak into a ward's list.
-        Assert.Contains(
-            patientId,
-            everyone.RootElement.GetProperty("items").EnumerateArray()
-                .Select(row => row.GetProperty("patient_id").GetString()));
-
-        var wardRows = inWard.RootElement.GetProperty("items").EnumerateArray().ToList();
-        Assert.DoesNotContain(
-            patientId, wardRows.Select(row => row.GetProperty("patient_id").GetString()));
-        Assert.All(wardRows, row => Assert.Equal("General-A", row.GetProperty("ward_name").GetString()));
-    }
-
-    [Fact]
-    public async Task A_ward_nobody_is_in_is_an_empty_list_not_an_error()
-    {
-        using var lab = await ClientAsync(ApiApplication.EquipmentEmail);
-
-        var response = await lab.GetAsync("/api/lab-reports/patients?wardName=No+Such+Ward");
-        using var body = await ReadJsonAsync(response);
-
-        // An empty ward is an ordinary answer. A 404 here would put a red box over a screen
-        // that is working correctly.
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Empty(body.RootElement.GetProperty("items").EnumerateArray());
-        Assert.Equal(1, body.RootElement.GetProperty("total_pages").GetInt32());
-    }
-
-    [Theory]
-    [InlineData(ApiApplication.NurseEmail, HttpStatusCode.OK)]
-    [InlineData(ApiApplication.EquipmentEmail, HttpStatusCode.OK)]
-    [InlineData(ApiApplication.AdministratorEmail, HttpStatusCode.Forbidden)]
-    public async Task The_ward_list_is_gated_the_same_way_as_the_results(
-        string email, HttpStatusCode expected)
-    {
-        using var client = await ClientAsync(email);
-
-        var response = await client.GetAsync("/api/lab-reports/patients");
-
-        Assert.Equal(expected, response.StatusCode);
-    }
-
     private static async Task<HttpResponseMessage> UploadAsync(
         HttpClient client, string patientId, string testName, byte[] bytes, string contentType)
     {
@@ -261,30 +180,6 @@ public sealed class LabReportEndpointTests
         form.Add(file, "File", "report.pdf");
 
         return await client.PostAsync("/api/lab-reports", form);
-    }
-
-    /// <summary>
-    /// A visit that needs no bed, so it opens straight at `admitted` with no ward. The cheapest
-    /// current visit there is: no ward, no bed, no assignment.
-    /// </summary>
-    private static async Task<string> NewOutpatientVisitAsync(HttpClient nurse, string patientId)
-    {
-        using var me = await ReadJsonAsync(await nurse.GetAsync("/api/auth/me"));
-
-        var created = await nurse.PostAsJsonAsync("/api/admissions", new
-        {
-            patient_id = patientId,
-            source = "walk_in",
-            admission_category = "outpatient",
-            category_set_by_staff_id = me.RootElement.GetProperty("id").GetString(),
-            urgency = "routine",
-            is_infectious = false
-        });
-
-        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
-
-        using var body = await ReadJsonAsync(created);
-        return body.RootElement.GetProperty("id").GetString()!;
     }
 
     private static async Task<string> NewPatientAsync(HttpClient client, string fullName)

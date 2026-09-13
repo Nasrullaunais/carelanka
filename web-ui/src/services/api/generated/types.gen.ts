@@ -620,23 +620,6 @@ export type HealthStatus = {
     checked_at?: string;
 };
 
-export type LabPatient = {
-    patient_id: string;
-    patient_code: string;
-    full_name: string;
-    ward_name?: string | null;
-    bed_number?: string | null;
-    admission_status: AdmissionStatus;
-};
-
-export type LabPatientPagedResult = {
-    items: Array<LabPatient>;
-    page: number;
-    page_size: number;
-    total_items: number;
-    total_pages: number;
-};
-
 export type LabReport = {
     id: string;
     patient_id: string;
@@ -1041,6 +1024,24 @@ export type WardOccupancy = {
         [key: string]: number;
     };
     incoming_next_2h: number;
+};
+
+export type WardPatient = {
+    admission_id: string;
+    patient_id: string;
+    patient_code: string;
+    full_name: string;
+    ward_name?: string | null;
+    bed_number?: string | null;
+    admission_status: AdmissionStatus;
+};
+
+export type WardPatientPagedResult = {
+    items: Array<WardPatient>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
 };
 
 export type WardRates = {
@@ -3129,43 +3130,6 @@ export type UploadLabReportResponses = {
 
 export type UploadLabReportResponse = UploadLabReportResponses[keyof UploadLabReportResponses];
 
-export type ListLabPatientsData = {
-    body?: never;
-    path?: never;
-    query?: {
-        wardName?: string;
-        page?: number;
-        pageSize?: number;
-    };
-    url: '/lab-reports/patients';
-};
-
-export type ListLabPatientsErrors = {
-    /**
-     * Bad Request
-     */
-    400: ValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: ProblemDetails;
-    /**
-     * Forbidden
-     */
-    403: ProblemDetails;
-};
-
-export type ListLabPatientsError = ListLabPatientsErrors[keyof ListLabPatientsErrors];
-
-export type ListLabPatientsResponses = {
-    /**
-     * OK
-     */
-    200: LabPatientPagedResult;
-};
-
-export type ListLabPatientsResponse = ListLabPatientsResponses[keyof ListLabPatientsResponses];
-
 export type DownloadLabReportData = {
     body?: never;
     path: {
@@ -3200,6 +3164,43 @@ export type DownloadLabReportResponses = {
 };
 
 export type DownloadLabReportResponse = DownloadLabReportResponses[keyof DownloadLabReportResponses];
+
+export type ListWardPatientsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        wardName?: string;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/ward-patients';
+};
+
+export type ListWardPatientsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListWardPatientsError = ListWardPatientsErrors[keyof ListWardPatientsErrors];
+
+export type ListWardPatientsResponses = {
+    /**
+     * OK
+     */
+    200: WardPatientPagedResult;
+};
+
+export type ListWardPatientsResponse = ListWardPatientsResponses[keyof ListWardPatientsResponses];
 
 export type ListMaintenanceSchedulesData = {
     body?: never;

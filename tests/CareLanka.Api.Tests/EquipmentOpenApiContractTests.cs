@@ -26,7 +26,7 @@ public sealed class EquipmentOpenApiContractTests
     [InlineData("/lab-reports", "get", "listLabReports")]
     [InlineData("/lab-reports", "post", "uploadLabReport")]
     [InlineData("/lab-reports/{id}/file", "get", "downloadLabReport")]
-    [InlineData("/lab-reports/patients", "get", "listLabPatients")]
+    [InlineData("/ward-patients", "get", "listWardPatients")]
     public async Task Bed_operation_ids_match_the_contract(string path, string method, string operationId)
     {
         using var document = await GenerateAsync();
@@ -54,7 +54,7 @@ public sealed class EquipmentOpenApiContractTests
     [InlineData("/lab-reports", "get")]
     [InlineData("/lab-reports", "post")]
     [InlineData("/lab-reports/{id}/file", "get")]
-    [InlineData("/lab-reports/patients", "get")]
+    [InlineData("/ward-patients", "get")]
     public async Task Every_outcome_the_contract_publishes_is_declared_by_the_code(string path, string method)
     {
         using var document = await GenerateAsync();

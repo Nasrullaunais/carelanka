@@ -43,4 +43,9 @@ public static class Policies
     public const string LabReportReader = nameof(LabReportReader);
 
     public const string LabReportAuthor = nameof(LabReportAuthor);
+
+    // The same four roles as LabReportReader today, and deliberately a separate name: knowing
+    // which ward somebody is in is what the laboratory and the equipment register both need to
+    // offer a patient to pick, and neither of those is reading a test result.
+    public const string PatientLocationReader = nameof(PatientLocationReader);
 }

@@ -208,7 +208,14 @@ paths:
     put:
       tags: [Equipment]
       summary: Update an equipment item
-      description: 'Roles: InventoryAdministrator.'
+      description: |
+        Roles: InventoryAdministrator.
+
+        A `status` of `maintenance` cannot be edited back to `available` here. The item is with
+        the maintenance unit and returns to service only when they complete the repair, so this
+        answers 409. `retired` is still reachable from `maintenance`: scrapping a machine nobody
+        can fix is the other real outcome of a fault, and it closes that item's open work order
+        and fault warning with it.
       operationId: updateEquipmentItem
       requestBody:
         required: true
@@ -226,7 +233,9 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: That status change is not a legal move in the equipment lifecycle.
+          description: >-
+            That status change is not a legal move in the equipment lifecycle, or the item is
+            with the maintenance unit and only they can return it to service.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -338,6 +347,12 @@ paths:
         Business operation beyond CRUD. Sets `status = maintenance` immediately and raises a
         `Warning` with `raised_by = user` - a broken defibrillator does not wait for the next
         agent sweep.
+
+        It also opens a `MaintenanceSchedule` of type `repair`, dated today, carrying the
+        description as its notes. That row is the maintenance unit's work order: the item comes
+        back into service through `POST /maintenance-schedules/{id}/complete` and no other way.
+        An item already waiting on an open job does not get a second one - a further fault on
+        the same machine is more detail on the same repair.
       operationId: reportEquipmentFault
       requestBody:
         required: true

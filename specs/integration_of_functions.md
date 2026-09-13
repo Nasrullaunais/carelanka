@@ -599,6 +599,17 @@ The read is one line — `Patients.Where(p => p.UserAccountId == account.Id)` �
 `AuthService` is **common**, not M4's, so M4 has not written it. Whoever owns common picks
 it up, or the group agrees M4 may. Until then the link is written and never read.
 
+*(Update, 2026-09-12.)* **Still open, and no longer blocking.** M4 added
+`GET /api/me/profile`, which answers the same question from inside Patient Management — 200
+with the patient's own details, 404 (`cl_pat_033`) while the login has no record linked. The
+Flutter app calls that on startup instead of reading `principal.patient_id`.
+
+That is a work-around, not the fix. `CurrentPrincipal.PatientId` is still published, still
+documented as the linked record, and still always `null`, so **anything that trusts it is
+wrong today** — including any screen in Emergency or Staff that reaches for it. Either
+common populates it or it comes off the schema; publishing a field that is always null is
+the worst of the three options.
+
 **11.8 (RESOLVED 2026-09-11) — an Equipment token can now read the patient register.**
 *(Raised and closed by M4 on 2026-09-11, while adding `patient_code` — §6.4.)*
 

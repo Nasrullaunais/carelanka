@@ -7,6 +7,7 @@ using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Equipment;
 using Microsoft.EntityFrameworkCore;
 using ItemEntity = CareLanka.Api.Data.Entities.Equipment.EquipmentItem;
+using ScheduleEntity = CareLanka.Api.Data.Entities.Equipment.MaintenanceSchedule;
 using WarningEntity = CareLanka.Api.Data.Entities.Equipment.Warning;
 
 namespace CareLanka.Api.Services.Equipment;
@@ -155,6 +156,14 @@ public sealed class EquipmentItemService : IEquipmentItemService
             }
 
             item.Status = status;
+
+            // Beyond repair is the other way a fault ends. A scrapped machine has nothing left
+            // to fix, so its work order and its fault warning close with it rather than sitting
+            // in the unit's queue forever against something that no longer exists.
+            if (status == EquipmentStatus.Retired)
+            {
+                await CloseOpenRepairWorkAsync(item.Id, cancellationToken);
+            }
         }
 
         if (request.Name is { } name)
@@ -251,9 +260,82 @@ public sealed class EquipmentItemService : IEquipmentItemService
             RaisedBy = RaisedBy.User
         });
 
+        await OpenRepairJobAsync(item, description.Trim(), cancellationToken);
+
         await _db.SaveChangesAsync(cancellationToken);
 
         return await ToItemAsync(item, cancellationToken);
+    }
+
+    // Cancelled, not completed. Nobody serviced this machine, so recording the work as done
+    // would put a repair that never happened into the compliance report.
+    private async Task CloseOpenRepairWorkAsync(Guid itemId, CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+
+        var jobs = await _db.MaintenanceSchedules
+            .Where(s => s.AssetType == AssetType.EquipmentItem
+                        && s.AssetId == itemId
+                        && (s.Status == MaintenanceStatus.Scheduled
+                            || s.Status == MaintenanceStatus.InProgress))
+            .ToListAsync(cancellationToken);
+
+        foreach (var job in jobs)
+        {
+            job.Status = MaintenanceStatus.Cancelled;
+        }
+
+        var warnings = await _db.Warnings
+            .Where(w => w.RelatedEntityType == RelatedEntityType.EquipmentItem
+                        && w.RelatedEntityId == itemId
+                        && w.Status == WarningStatus.Open)
+            .ToListAsync(cancellationToken);
+
+        foreach (var warning in warnings)
+        {
+            // Action taken, the same word the servicing path uses. Retiring the machine is a
+            // real answer to "this is broken", not a decision to ignore the warning.
+            warning.Status = WarningStatus.ActionTaken;
+            warning.ResolvedAt = now;
+        }
+    }
+
+    // The report is the maintenance unit's work order, not just a note on a screen. Without a
+    // row here the fault would sit in the warning queue with nothing to complete, and the item
+    // would have to be talked back into service by hand - which is the door this closes.
+    //
+    // Repair is the one maintenance type outside the interval table, so completing it returns
+    // the item to service without also pretending its next routine service has been done.
+    private async Task OpenRepairJobAsync(
+        ItemEntity item, string description, CancellationToken cancellationToken)
+    {
+        var alreadyOpen = await _db.MaintenanceSchedules.AnyAsync(
+            s => s.AssetType == AssetType.EquipmentItem
+                 && s.AssetId == item.Id
+                 && (s.Status == MaintenanceStatus.Scheduled
+                     || s.Status == MaintenanceStatus.InProgress),
+            cancellationToken);
+
+        // A second fault on an item already waiting for the unit is more detail on the same
+        // repair, not a second repair. One job per item keeps the queue a list of machines to
+        // fix rather than a list of times somebody complained.
+        if (alreadyOpen)
+        {
+            return;
+        }
+
+        _db.MaintenanceSchedules.Add(new ScheduleEntity
+        {
+            Id = Guid.NewGuid(),
+            AssetType = AssetType.EquipmentItem,
+            AssetId = item.Id,
+            ScheduleType = MaintenanceType.Repair,
+            // Today, not a date somebody picks. A broken machine is due now by definition.
+            ScheduledDate = DateOnly.FromDateTime(DateTimeOffset.UtcNow.UtcDateTime),
+            Status = MaintenanceStatus.Scheduled,
+            Notes = description,
+            CreatedBy = RaisedBy.User
+        });
     }
 
     public Task<ItemEntity?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default)
@@ -290,6 +372,18 @@ public sealed class EquipmentItemService : IEquipmentItemService
         if (reason == TransitionReason.Fault && item.Status != EquipmentStatus.Retired)
         {
             return;
+        }
+
+        // Maintenance -> available is a legal move, but not this caller's move to make. An item
+        // is with the maintenance unit, and it comes back when they complete the repair, so a
+        // plain status edit is refused here even though the transition itself is fine.
+        // Retiring is still allowed: scrapping a machine nobody can fix is the other real
+        // outcome of a repair, and it is explicit and irreversible rather than a quiet unlock.
+        if (reason == TransitionReason.Update
+            && item.Status == EquipmentStatus.Maintenance
+            && to == EquipmentStatus.Available)
+        {
+            throw new ConflictException(MessageCode.EquipmentAwaitingRepair, item.Name);
         }
 
         var allowed = item.Status switch

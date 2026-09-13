@@ -156,7 +156,7 @@ public sealed class EquipmentItemLifecycleTests
     }
 
     [Fact]
-    public async Task An_item_in_maintenance_can_go_back_into_service_or_be_retired()
+    public async Task An_item_with_the_maintenance_unit_cannot_be_talked_back_into_service()
     {
         using var client = await EquipmentClientAsync();
         var repaired = await NewItemIdAsync(client);
@@ -170,8 +170,96 @@ public sealed class EquipmentItemLifecycleTests
         var gone = await client.PutAsJsonAsync(
             $"/api/equipment-items/{scrapped}", new { status = "retired" });
 
-        Assert.Equal(HttpStatusCode.OK, back.StatusCode);
+        // A status edit is not how a repair ends. The unit completes the work, which is the
+        // only path back to available - otherwise a faulty machine returns to the floor
+        // because somebody changed a dropdown.
+        Assert.Equal(HttpStatusCode.Conflict, back.StatusCode);
+
+        // Scrapping is still allowed from maintenance. It is the other real outcome of a
+        // fault, and it is terminal rather than a quiet unlock.
         Assert.Equal(HttpStatusCode.OK, gone.StatusCode);
+    }
+
+    [Fact]
+    public async Task Reporting_a_fault_opens_one_repair_job_for_the_maintenance_unit()
+    {
+        using var client = await EquipmentClientAsync();
+        var id = await NewItemIdAsync(client);
+
+        await ReportFaultAsync(client, id, "Sparking at the plug.");
+        await ReportFaultAsync(client, id, "Also rattling.");
+
+        var jobs = await OpenRepairJobsAsync(id);
+
+        // A second fault on a machine already waiting is more detail on the same repair. Two
+        // rows would read as two machines to fix.
+        var job = Assert.Single(jobs);
+        Assert.Equal(MaintenanceType.Repair, job.ScheduleType);
+        Assert.Equal("Sparking at the plug.", job.Notes);
+    }
+
+    [Fact]
+    public async Task Completing_the_repair_is_what_returns_the_item_to_service()
+    {
+        using var client = await EquipmentClientAsync();
+        var id = await NewItemIdAsync(client);
+        await ReportFaultAsync(client, id, "Screen flickering.");
+
+        var job = Assert.Single(await OpenRepairJobsAsync(id));
+        var completed = await client.PostAsJsonAsync(
+            $"/api/maintenance-schedules/{job.Id}/complete", new { notes = "New backlight." });
+
+        using var body = await ReadJsonAsync(await client.GetAsync($"/api/equipment-items/{id}"));
+
+        Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
+        Assert.Equal("available", body.RootElement.GetProperty("status").GetString());
+
+        // The fault does not stay open behind the repair, or the warning queue fills with
+        // problems somebody already fixed.
+        Assert.Empty(await OpenFaultWarningsAsync(id));
+    }
+
+    [Fact]
+    public async Task Retiring_a_faulty_item_clears_it_out_of_the_unit_queue()
+    {
+        using var client = await EquipmentClientAsync();
+        var id = await NewItemIdAsync(client);
+        await ReportFaultAsync(client, id, "Cracked housing, not worth repairing.");
+
+        var retired = await client.PutAsJsonAsync(
+            $"/api/equipment-items/{id}", new { status = "retired" });
+
+        Assert.Equal(HttpStatusCode.OK, retired.StatusCode);
+
+        // Nothing is left to fix on a scrapped machine, so its work order and its fault close
+        // with it rather than sitting in the queue against something that no longer exists.
+        Assert.Empty(await OpenRepairJobsAsync(id));
+        Assert.Empty(await OpenFaultWarningsAsync(id));
+    }
+
+    private async Task<List<Data.Entities.Equipment.MaintenanceSchedule>> OpenRepairJobsAsync(Guid itemId)
+    {
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        return await db.MaintenanceSchedules
+            .Where(s => s.AssetType == AssetType.EquipmentItem
+                        && s.AssetId == itemId
+                        && (s.Status == MaintenanceStatus.Scheduled
+                            || s.Status == MaintenanceStatus.InProgress))
+            .ToListAsync();
+    }
+
+    private async Task<List<Data.Entities.Equipment.Warning>> OpenFaultWarningsAsync(Guid itemId)
+    {
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        return await db.Warnings
+            .Where(w => w.RelatedEntityType == RelatedEntityType.EquipmentItem
+                        && w.RelatedEntityId == itemId
+                        && w.Status == WarningStatus.Open)
+            .ToListAsync();
     }
 
     [Fact]

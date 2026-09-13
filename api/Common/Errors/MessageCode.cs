@@ -42,6 +42,8 @@ public enum MessageCode
 
     EquipmentNotAssigned,
 
+    EquipmentAwaitingRepair,
+
     PharmacyCategoryNameTaken,
 
     PharmacyItemNameTaken,
@@ -122,5 +124,15 @@ public enum MessageCode
 
     AmbulanceRegistrationTaken,
 
-    AmbulanceHasActiveDispatch
+    AmbulanceHasActiveDispatch,
+
+    // Patient self-service. The three ways the app's own "your details" form can fail, all of
+    // which are about WHICH record a login points at rather than about the details on it.
+    NicLinkedToAnotherAccount,
+
+    NicDoesNotMatchYourRecord,
+
+    AccountHasNoPatientRecord,
+
+    NoCurrentAdmission
 }

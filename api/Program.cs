@@ -305,6 +305,7 @@ builder.Services.AddScoped<IWorklistService, WorklistService>();
 builder.Services.AddScoped<IDischargeService, DischargeService>();
 builder.Services.AddScoped<IBillingService, BillingService>();
 builder.Services.AddScoped<IBillingRateService, BillingRateService>();
+builder.Services.AddScoped<IMeService, MeService>();
 
 // Real: ward bed counts now come from Equipment's register instead of a constant.
 // Scoped, not Singleton — it delegates to IBedService, which is scoped because it holds a

@@ -201,7 +201,7 @@ public sealed class AdmissionService : IAdmissionService
             DispatchId = string.IsNullOrWhiteSpace(request.DispatchId) ? null : request.DispatchId.Trim(),
             ExpectedArrivalAt = NewVisitExpectedArrival(request),
             AdmittedAt = NewVisitAdmittedAt(request.AdmissionCategory!.Value),
-            MissingFields = MissingFieldsFor(patient)
+            MissingFields = PatientDetailChecklist.MissingFor(patient)
         };
 
         _db.Admissions.Add(admission);
@@ -265,7 +265,7 @@ public sealed class AdmissionService : IAdmissionService
 
         // Recalculated here rather than trusted from the caller: completeness is a fact about
         // the record, and a client that computed it wrong would hide outstanding paperwork.
-        admission.MissingFields = MissingFieldsFor(patient);
+        admission.MissingFields = PatientDetailChecklist.MissingFor(patient);
 
         try
         {
@@ -493,38 +493,6 @@ public sealed class AdmissionService : IAdmissionService
                 ? query.OrderBy(a => a.CreatedAt)
                 : query.OrderByDescending(a => a.CreatedAt)
         };
-    }
-
-    /// <summary>
-    /// What paperwork is outstanding, as the closed vocabulary of <see cref="PatientDetailField"/>.
-    /// Field names rather than a count, because "two things missing" does not tell a ward clerk
-    /// what to chase.
-    /// </summary>
-    private static List<string> MissingFieldsFor(PatientEntity patient)
-    {
-        var missing = new List<string>();
-
-        void Require(PatientDetailField field, string? value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                missing.Add(EnumWire.ToWire(field));
-            }
-        }
-
-        Require(PatientDetailField.Nic, patient.Nic);
-        Require(PatientDetailField.FullName, patient.FullName);
-        Require(PatientDetailField.Phone, patient.Phone);
-        Require(PatientDetailField.Address, patient.Address);
-        Require(PatientDetailField.EmergencyContactName, patient.EmergencyContactName);
-        Require(PatientDetailField.EmergencyContactPhone, patient.EmergencyContactPhone);
-
-        if (patient.DateOfBirth is null)
-        {
-            missing.Add(EnumWire.ToWire(PatientDetailField.DateOfBirth));
-        }
-
-        return missing;
     }
 
     private static AdmissionSummary ToSummary(

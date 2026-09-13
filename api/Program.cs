@@ -290,9 +290,7 @@ builder.Services.AddSwaggerGen(options =>
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "CareLanka API",
-        Version = "v1",
-        Description = "One ASP.NET Core application behind all four components. "
-                      + "Routes, operationIds and schema names are global, not per-component."
+        Version = "v1"
     });
 
     options.CustomOperationIds(description => description.ActionDescriptor.AttributeRouteInfo?.Name);
@@ -302,19 +300,12 @@ builder.Services.AddSwaggerGen(options =>
         Type = SecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT",
-        In = ParameterLocation.Header,
-        Description = "Paste the access_token from POST /api/auth/login. No \"Bearer \" prefix."
+        In = ParameterLocation.Header
     });
 
     options.DocumentFilter<ApiPrefixAsServerFilter>();
     options.OperationFilter<AnonymousOperationFilter>();
 
-    var xmlPath = Path.Combine(AppContext.BaseDirectory, "CareLanka.Api.xml");
-
-    if (File.Exists(xmlPath))
-    {
-        options.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
-    }
 });
 
 var app = builder.Build();

@@ -1258,14 +1258,12 @@ paths:
       operationId: getMyActiveDispatch
       responses:
         '200':
-          description: My active run, or null when off a job
+          description: My active run
           content:
             application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/DispatchDetail'
-                nullable: true
+              schema: { $ref: '#/components/schemas/DispatchDetail' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /me/dispatches/history:
     get:

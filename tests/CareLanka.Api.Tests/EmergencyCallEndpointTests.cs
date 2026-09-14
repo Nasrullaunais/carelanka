@@ -58,11 +58,12 @@ public sealed class EmergencyCallEndpointTests
     {
         using var patient = await PatientClientAsync();
         using var manager = await StaffClientAsync(ApiApplication.ManagerEmail);
-        using var crew = await StaffClientAsync(ApiApplication.AmbulanceEmail);
         using var callResponse = await patient.PostAsJsonAsync("/api/emergency-calls", Request(Guid.NewGuid(), true));
         using var callBody = JsonDocument.Parse(await callResponse.Content.ReadAsStringAsync());
         var callId = callBody.RootElement.GetProperty("id").GetGuid();
-        var ambulanceId = await CreateReadyAmbulanceAsync(manager);
+        var ready = await CreateReadyAmbulanceAsync(manager);
+        using var crew = await StaffClientAsync(ready.FirstCrewEmail);
+        var ambulanceId = ready.AmbulanceId;
 
         using var dispatched = await manager.PostAsJsonAsync($"/api/emergency-calls/{callId}/dispatch", new { ambulance_id = ambulanceId });
         Assert.Equal(HttpStatusCode.Created, dispatched.StatusCode);
@@ -87,7 +88,7 @@ public sealed class EmergencyCallEndpointTests
         using var firstPatient = await PatientClientAsync();
         using var secondPatient = await PatientClientAsync();
         using var manager = await StaffClientAsync(ApiApplication.ManagerEmail);
-        var ambulanceId = await CreateReadyAmbulanceAsync(manager);
+        var ambulanceId = (await CreateReadyAmbulanceAsync(manager)).AmbulanceId;
         var firstCall = await CreatePatientCallAsync(firstPatient);
         var secondCall = await CreatePatientCallAsync(secondPatient);
 
@@ -105,9 +106,10 @@ public sealed class EmergencyCallEndpointTests
         using var patient = await PatientClientAsync();
         using var otherPatient = await PatientClientAsync();
         using var manager = await StaffClientAsync(ApiApplication.ManagerEmail);
-        using var crew = await StaffClientAsync(ApiApplication.AmbulanceEmail);
         var callId = await CreatePatientCallAsync(patient);
-        var ambulanceId = await CreateReadyAmbulanceAsync(manager);
+        var ready = await CreateReadyAmbulanceAsync(manager);
+        using var crew = await StaffClientAsync(ready.FirstCrewEmail);
+        var ambulanceId = ready.AmbulanceId;
         using var dispatched = await manager.PostAsJsonAsync($"/api/emergency-calls/{callId}/dispatch", new { ambulance_id = ambulanceId });
         dispatched.EnsureSuccessStatusCode();
 
@@ -124,6 +126,45 @@ public sealed class EmergencyCallEndpointTests
     }
 
     [Fact]
+    public async Task Location_reporting_rejects_invalid_coordinates_and_crew_outside_the_response_unit()
+    {
+        using var patient = await PatientClientAsync();
+        using var manager = await StaffClientAsync(ApiApplication.ManagerEmail);
+        using var unrelatedCrew = await StaffClientAsync(ApiApplication.AmbulanceEmail);
+        var callId = await CreatePatientCallAsync(patient);
+        var ready = await CreateReadyAmbulanceAsync(manager);
+        using var respondingCrew = await StaffClientAsync(ready.FirstCrewEmail);
+        using var dispatched = await manager.PostAsJsonAsync($"/api/emergency-calls/{callId}/dispatch", new { ambulance_id = ready.AmbulanceId });
+        dispatched.EnsureSuccessStatusCode();
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await respondingCrew.PostAsJsonAsync($"/api/ambulances/{ready.AmbulanceId}/location", new { latitude = 91, longitude = 79.861244 })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await unrelatedCrew.PostAsJsonAsync($"/api/ambulances/{ready.AmbulanceId}/location", new { latitude = 6.927079, longitude = 79.861244 })).StatusCode);
+    }
+
+    [Fact]
+    public async Task Tracking_marks_an_old_ambulance_position_as_stale()
+    {
+        using var patient = await PatientClientAsync();
+        using var manager = await StaffClientAsync(ApiApplication.ManagerEmail);
+        var callId = await CreatePatientCallAsync(patient);
+        var ready = await CreateReadyAmbulanceAsync(manager);
+        using var dispatched = await manager.PostAsJsonAsync($"/api/emergency-calls/{callId}/dispatch", new { ambulance_id = ready.AmbulanceId });
+        dispatched.EnsureSuccessStatusCode();
+        using (var scope = _application.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+            var ambulance = await db.Ambulances.SingleAsync(item => item.Id == ready.AmbulanceId);
+            ambulance.LocationUpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-6);
+            await db.SaveChangesAsync();
+        }
+
+        using var tracking = await patient.GetAsync($"/api/me/emergency-calls/{callId}/tracking");
+        tracking.EnsureSuccessStatusCode();
+        using var body = JsonDocument.Parse(await tracking.Content.ReadAsStringAsync());
+        Assert.True(body.RootElement.GetProperty("ambulance_location_is_stale").GetBoolean());
+    }
+
+    [Fact]
     public async Task Caller_can_cancel_before_any_dispatch()
     {
         using var patient = await PatientClientAsync();
@@ -132,6 +173,54 @@ public sealed class EmergencyCallEndpointTests
         Assert.Equal(HttpStatusCode.OK, cancelled.StatusCode);
         using var body = JsonDocument.Parse(await cancelled.Content.ReadAsStringAsync());
         Assert.Equal("cancelled", body.RootElement.GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task Duty_manager_can_approve_a_pending_pre_arrival_cancellation_request()
+    {
+        using var patient = await PatientClientAsync();
+        using var manager = await StaffClientAsync(ApiApplication.ManagerEmail);
+        var callId = await CreatePatientCallAsync(patient);
+        var ambulanceId = (await CreateReadyAmbulanceAsync(manager)).AmbulanceId;
+        using var dispatched = await manager.PostAsJsonAsync($"/api/emergency-calls/{callId}/dispatch", new { ambulance_id = ambulanceId });
+        dispatched.EnsureSuccessStatusCode();
+        using var requested = await patient.PostAsJsonAsync($"/api/me/emergency-calls/{callId}/cancellation-request", new { reason = "No longer needed" });
+        Assert.Equal(HttpStatusCode.Created, requested.StatusCode);
+
+        using var pending = await manager.GetAsync("/api/emergency-cancellation-requests?status=pending");
+        pending.EnsureSuccessStatusCode();
+        using var pendingBody = JsonDocument.Parse(await pending.Content.ReadAsStringAsync());
+        Assert.Contains(pendingBody.RootElement.GetProperty("items").EnumerateArray(), item => item.GetProperty("emergency_call_id").GetGuid() == callId);
+
+        using var approved = await manager.PostAsJsonAsync($"/api/emergency-calls/{callId}/cancellation-request/approve", new { notes = "Caller confirmed" });
+        Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
+        using var body = JsonDocument.Parse(await approved.Content.ReadAsStringAsync());
+        Assert.Equal("approved", body.RootElement.GetProperty("status").GetString());
+        Assert.Equal("Caller confirmed", body.RootElement.GetProperty("review_notes").GetString());
+
+        using var tracking = await patient.GetAsync($"/api/me/emergency-calls/{callId}/tracking");
+        Assert.Equal(HttpStatusCode.NotFound, tracking.StatusCode);
+    }
+
+    [Fact]
+    public async Task Duty_manager_cannot_approve_cancellation_after_the_crew_is_at_scene()
+    {
+        using var patient = await PatientClientAsync();
+        using var manager = await StaffClientAsync(ApiApplication.ManagerEmail);
+        var callId = await CreatePatientCallAsync(patient);
+        var ready = await CreateReadyAmbulanceAsync(manager);
+        using var crew = await StaffClientAsync(ready.FirstCrewEmail);
+        var ambulanceId = ready.AmbulanceId;
+        using var dispatched = await manager.PostAsJsonAsync($"/api/emergency-calls/{callId}/dispatch", new { ambulance_id = ambulanceId });
+        using var dispatchBody = JsonDocument.Parse(await dispatched.Content.ReadAsStringAsync());
+        var dispatchId = dispatchBody.RootElement.GetProperty("id").GetGuid();
+        Assert.Equal(HttpStatusCode.OK, (await crew.PostAsync($"/api/me/dispatches/{dispatchId}/acknowledge", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status = "en_route_to_scene" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status = "at_scene" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await patient.PostAsJsonAsync($"/api/me/emergency-calls/{callId}/cancellation-request", new { reason = "No longer needed" })).StatusCode);
+
+        using var approved = await manager.PostAsJsonAsync($"/api/emergency-calls/{callId}/cancellation-request/approve", new { });
+        Assert.Equal(HttpStatusCode.Conflict, approved.StatusCode);
     }
 
     [Theory]
@@ -457,7 +546,7 @@ public sealed class EmergencyCallEndpointTests
         return body.RootElement.GetProperty("id").GetGuid();
     }
 
-    private async Task<Guid> CreateReadyAmbulanceAsync(HttpClient manager)
+    private async Task<ReadyAmbulance> CreateReadyAmbulanceAsync(HttpClient manager)
     {
         using var created = await manager.PostAsJsonAsync("/api/ambulances", new
         {
@@ -467,29 +556,26 @@ public sealed class EmergencyCallEndpointTests
         created.EnsureSuccessStatusCode();
         using var body = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
         var ambulanceId = body.RootElement.GetProperty("id").GetGuid();
+        Guid firstCrewId;
         Guid secondCrewId;
+        var firstCrewEmail = $"crew-{Guid.NewGuid():N}@carelanka.invalid";
         using (var scope = _application.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+            var passwords = scope.ServiceProvider.GetRequiredService<CareLanka.Api.Services.Common.IPasswordService>();
+            firstCrewId = Guid.NewGuid();
             secondCrewId = Guid.NewGuid();
-            db.StaffMembers.Add(new StaffMember { Id = secondCrewId, Email = $"crew-{secondCrewId:N}@carelanka.invalid", PasswordHash = "test", FirstName = "Second", LastName = "Crew", Role = StaffRole.AmbulanceCrew, IsActive = true });
+            db.StaffMembers.Add(new StaffMember { Id = firstCrewId, Email = firstCrewEmail, PasswordHash = passwords.Hash(ApiApplication.Password), FirstName = "First", LastName = "Crew", Role = StaffRole.AmbulanceCrew, IsActive = true });
+            db.StaffMembers.Add(new StaffMember { Id = secondCrewId, Email = $"crew-{secondCrewId:N}@carelanka.invalid", PasswordHash = passwords.Hash(ApiApplication.Password), FirstName = "Second", LastName = "Crew", Role = StaffRole.AmbulanceCrew, IsActive = true });
             await db.SaveChangesAsync();
         }
-        using var me = await manager.GetAsync("/api/auth/me");
-        using var meBody = JsonDocument.Parse(await me.Content.ReadAsStringAsync());
-        var firstCrewId = await StaffIdAsync(ApiApplication.AmbulanceEmail);
         foreach (var crewId in new[] { firstCrewId, secondCrewId })
         {
             using var assigned = await manager.PostAsJsonAsync($"/api/ambulances/{ambulanceId}/crew", new { staff_member_id = crewId });
             assigned.EnsureSuccessStatusCode();
         }
-        return ambulanceId;
+        return new ReadyAmbulance(ambulanceId, firstCrewEmail);
     }
 
-    private async Task<Guid> StaffIdAsync(string email)
-    {
-        using var scope = _application.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
-        return await db.StaffMembers.Where(x => x.Email == email).Select(x => x.Id).SingleAsync();
-    }
+    private sealed record ReadyAmbulance(Guid AmbulanceId, string FirstCrewEmail);
 }

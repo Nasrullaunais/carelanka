@@ -40,6 +40,19 @@ public sealed class DispatchService : IDispatchService
         }
     }
 
+    public async Task<DispatchDetail> GetMyActiveAsync(CancellationToken ct = default)
+    {
+        var dispatch = await _db.Dispatches
+            .Include(x => x.Crew)
+            .Include(x => x.Ambulance)
+            .Include(x => x.EmergencyCall)
+            .Where(x => DispatchStatusExtensions.LiveStatuses.Contains(x.Status)
+                && x.Crew.Any(crew => crew.StaffMemberId == _currentUser.Id))
+            .OrderByDescending(x => x.DispatchedAt)
+            .FirstOrDefaultAsync(ct);
+        return dispatch is null ? throw new NotFoundException("Live dispatch", _currentUser.Id) : ToDetail(dispatch);
+    }
+
     public async Task<DispatchDetail> AcknowledgeAsync(Guid id, CancellationToken ct = default)
     {
         var dispatch = await OwnedAsync(id, ct);
@@ -99,13 +112,20 @@ public sealed class DispatchService : IDispatchService
     public async Task<DispatchDetail> CancelAsync(Guid id, CancelDispatchRequest request, CancellationToken ct = default)
     {
         var dispatch = await LoadAsync(id, ct);
-        RequirePrePickup(dispatch, DispatchStatus.Cancelled);
-        dispatch.Status = DispatchStatus.Cancelled;
-        dispatch.CompletedAt = _clock.GetUtcNow();
-        dispatch.Ambulance.Status = AmbulanceStatus.Available;
-        dispatch.EmergencyCall.Status = CallStatus.Received;
+        CancelCore(dispatch);
         await _db.SaveChangesAsync(ct);
         return ToDetail(dispatch);
+    }
+
+    public async Task CancelForApprovedCancellationRequestAsync(Guid emergencyCallId, CancellationToken ct = default)
+    {
+        var dispatch = await _db.Dispatches
+            .Include(x => x.Ambulance)
+            .Include(x => x.EmergencyCall)
+            .SingleOrDefaultAsync(x => x.EmergencyCallId == emergencyCallId && DispatchStatusExtensions.LiveStatuses.Contains(x.Status), ct)
+            ?? throw new ConflictException(MessageCode.IllegalTransition);
+        CancelCore(dispatch);
+        await _db.SaveChangesAsync(ct);
     }
 
     public async Task<DispatchDetail> ReassignAsync(Guid id, ReassignDispatchRequest request, CancellationToken ct = default)
@@ -185,6 +205,15 @@ public sealed class DispatchService : IDispatchService
     private static void RequirePrePickup(Dispatch dispatch, DispatchStatus target)
     {
         if (!dispatch.Status.IsPrePickup()) throw new IllegalTransitionException("Dispatch", dispatch.Status.ToString(), target.ToString());
+    }
+
+    private void CancelCore(Dispatch dispatch)
+    {
+        RequirePrePickup(dispatch, DispatchStatus.Cancelled);
+        dispatch.Status = DispatchStatus.Cancelled;
+        dispatch.CompletedAt = _clock.GetUtcNow();
+        dispatch.Ambulance.Status = AmbulanceStatus.Available;
+        dispatch.EmergencyCall.Status = CallStatus.Received;
     }
 
     private static void Move(Dispatch dispatch, DispatchStatus target)

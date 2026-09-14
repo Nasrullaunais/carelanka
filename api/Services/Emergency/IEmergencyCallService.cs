@@ -29,4 +29,7 @@ public interface IEmergencyCallService
     Task<MyCallTracking> TrackMineAsync(Guid id, CancellationToken cancellationToken = default);
     Task<MyEmergencyCallSummary> CancelMineAsync(Guid id, RequestCancellationRequest request, CancellationToken cancellationToken = default);
     Task<EmergencyCancellationRequest> RequestCancellationAsync(Guid id, RequestCancellationRequest request, CancellationToken cancellationToken = default);
+    Task<PagedResult<EmergencyCancellationRequest>> ListCancellationRequestsAsync(CancellationRequestListRequest request, CancellationToken cancellationToken = default);
+    Task<EmergencyCancellationRequest> ApproveCancellationRequestAsync(Guid id, ReviewCancellationRequest request, CancellationToken cancellationToken = default);
+    Task<EmergencyCancellationRequest> RejectCancellationRequestAsync(Guid id, ReviewCancellationRequest request, CancellationToken cancellationToken = default);
 }

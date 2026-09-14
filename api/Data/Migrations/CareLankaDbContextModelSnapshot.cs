@@ -512,6 +512,19 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("cancellation_requested_at");
 
+                    b.Property<string>("CancellationReviewNotes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("cancellation_review_notes");
+
+                    b.Property<DateTimeOffset?>("CancellationReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cancellation_reviewed_at");
+
+                    b.Property<Guid?>("CancellationReviewedByStaffId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cancellation_reviewed_by_staff_id");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -582,6 +595,9 @@ namespace CareLanka.Api.Data.Migrations
 
                     b.HasIndex("CallerUserId")
                         .HasDatabaseName("ix_emergency_calls_caller_user_id");
+
+                    b.HasIndex("CancellationReviewedByStaffId")
+                        .HasDatabaseName("ix_emergency_calls_cancellation_reviewed_by_staff_id");
 
                     b.HasIndex("IdempotencyKey")
                         .IsUnique()
@@ -2279,6 +2295,12 @@ namespace CareLanka.Api.Data.Migrations
                         .HasForeignKey("CallerUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_emergency_calls_patient_accounts_caller_user_id");
+
+                    b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", null)
+                        .WithMany()
+                        .HasForeignKey("CancellationReviewedByStaffId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_emergency_calls_staff_members_cancellation_reviewed_by_staf");
 
                     b.HasOne("CareLanka.Api.Data.Entities.Patient.Patient", null)
                         .WithMany()

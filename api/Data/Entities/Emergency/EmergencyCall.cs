@@ -23,5 +23,8 @@ public class EmergencyCall : AuditedEntity
     public CancellationRequestStatus? CancellationRequestStatus { get; set; }
     public string? CancellationRequestReason { get; set; }
     public DateTimeOffset? CancellationRequestedAt { get; set; }
+    public DateTimeOffset? CancellationReviewedAt { get; set; }
+    public Guid? CancellationReviewedByStaffId { get; set; }
+    public string? CancellationReviewNotes { get; set; }
     public ICollection<Dispatch> Dispatches { get; set; } = new List<Dispatch>();
 }

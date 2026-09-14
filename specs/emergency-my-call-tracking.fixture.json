@@ -1,0 +1,11 @@
+{
+  "emergency_call_id": "916a4b10-2d44-4d03-8961-96486a8bf259",
+  "call_status": "en_route",
+  "ambulance_is_on_the_way": true,
+  "ambulance_latitude": 6.927079,
+  "ambulance_longitude": 79.861244,
+  "ambulance_location_is_stale": false,
+  "estimated_minutes_to_arrival": null,
+  "cancellation_request_status": "pending",
+  "updated_at": "2026-09-14T12:00:00Z"
+}

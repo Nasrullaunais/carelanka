@@ -2,7 +2,7 @@
 
 **Owner:** Nasrulla Unais (Member 1)
 
-**Status:** Phases 0–1 complete 2026-09-13; Phase 2 is next
+**Status:** Phases 0–2 complete 2026-09-14; Phase 3 is next
 
 **Contract:** `specs/emergency-spec.yaml`
 
@@ -267,7 +267,7 @@ Tests:
 **Exit criteria met:** the fleet list explains why every ambulance is eligible or blocked,
 and PostgreSQL rejects concurrent current assignments through the two partial unique indexes.
 
-### Phase 2 — Patient emergency intake
+### Phase 2 — Patient emergency intake — **COMPLETE 2026-09-14**
 
 **Goal:** persist a safe, simple emergency request without depending on AI or Maps.
 
@@ -297,9 +297,10 @@ Backend work:
 Tests cover invalid coordinates, caller identity, bystander reporting, duplicate
 submission, role restrictions and cross-patient access.
 
-**Exit criteria:** the Emergency endpoint accepts one correctly scoped submission and a
-dispatcher can see the received call. The end-to-end patient screen is demonstrated at
-the integration checkpoint with Patient Management.
+**Exit criteria met:** one correctly scoped patient submission is stored once under its
+JWT caller and idempotency key, and the Duty Manager sees the received call through the
+tested call-board API. Patient Management's screen handoff is documented in
+`patient-emergency-intake.md`; the screen remains M4's integration-checkpoint work.
 
 ### Phase 3 — Manual dispatch and the state machine
 
@@ -575,14 +576,15 @@ Already present:
 - A straight-line `IAmbulanceDistanceService` stub.
 - A documented `IStaffLookupService` stub until Staff Management publishes its implementation.
 - Emergency OpenAPI and ambulance endpoint tests.
+- Emergency-call create, caller-scoped list, Duty Manager board/detail/update endpoints,
+  generated web client, and Patient Management's intake handoff example.
 
 Not yet present:
 
-- Emergency-call services/controllers.
 - Manual or agent-assisted dispatch.
 - Crew acknowledgement and progress transitions.
 - Emergency React or Flutter screens.
 - Real Maps, live tracking, Firebase delivery, pre-admission or reports.
 
-With the fleet now truthful, Phase 2 call intake is next rather than dispatch creation,
-the AI agent or mobile UI.
+With call intake now truthful and caller-scoped, Phase 3 manual dispatch is next rather
+than the AI agent or mobile UI.

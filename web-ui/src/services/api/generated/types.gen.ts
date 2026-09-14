@@ -350,12 +350,16 @@ export type BookAppointmentRequest = {
 
 export type CallPriority = 'critical' | 'high' | 'medium' | 'low';
 
+export type CallStatus = 'received' | 'dispatched' | 'en_route' | 'completed' | 'cancelled';
+
 export type CancelAdmissionRequest = {
     reason: CancelReason;
     note?: string | null;
 };
 
 export type CancelReason = 'diverted_to_other_hospital' | 'false_alarm' | 'died_en_route' | 'patient_refused' | 'no_show';
+
+export type CancellationRequestStatus = 'pending' | 'approved' | 'rejected';
 
 export type CheckInRequest = {
     admission_category: AdmissionCategory;
@@ -429,6 +433,20 @@ export type CreateBedRequest = {
     has_isolation?: boolean;
     nurse_station_distance?: number;
     asset_tag?: string | null;
+};
+
+export type CreateEmergencyCallRequest = {
+    patient_is_caller: boolean;
+    patient_id?: string | null;
+    caller_name?: string | null;
+    caller_phone?: string | null;
+    latitude: number;
+    longitude: number;
+    location_accuracy_metres: number;
+    location_captured_at: string;
+    idempotency_key: string;
+    details?: string | null;
+    priority?: CallPriority;
 };
 
 export type CreateEquipmentCategoryRequest = {
@@ -556,6 +574,55 @@ export type DispatchSummary = {
     crew_count?: number;
     dispatched_at?: string;
     completed_at?: string | null;
+};
+
+export type EmergencyCallDetail = {
+    id?: string;
+    patient_id?: string | null;
+    caller_user_id?: string | null;
+    patient_is_caller?: boolean;
+    caller_name?: string | null;
+    caller_phone?: string | null;
+    latitude?: number;
+    longitude?: number;
+    location_accuracy_metres?: number;
+    location_captured_at?: string;
+    idempotency_key?: string;
+    address_label?: string | null;
+    details?: string | null;
+    priority?: CallPriority;
+    status?: CallStatus;
+    outcome?: string | null;
+    transported?: boolean | null;
+    cancellation_request_status?: CancellationRequestStatus;
+    created_at?: string;
+    updated_at?: string;
+    dispatches?: Array<DispatchSummary>;
+    open_proposal_id?: string | null;
+};
+
+export type EmergencyCallSortField = 'priority' | 'created_at' | 'status';
+
+export type EmergencyCallSummary = {
+    id?: string;
+    priority?: CallPriority;
+    status?: CallStatus;
+    caller_name?: string | null;
+    address_label?: string | null;
+    latitude?: number;
+    longitude?: number;
+    active_dispatch_id?: string | null;
+    open_proposal_id?: string | null;
+    waiting_minutes?: number;
+    created_at?: string;
+};
+
+export type EmergencyCallSummaryPagedResult = {
+    items: Array<EmergencyCallSummary>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
 };
 
 export type EquipmentCategory = {
@@ -730,6 +797,23 @@ export type MyAppointment = {
 
 export type MyAppointmentPagedResult = {
     items: Array<MyAppointment>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
+export type MyEmergencyCallSummary = {
+    id?: string;
+    patient_is_caller?: boolean;
+    priority?: CallPriority;
+    status?: CallStatus;
+    cancellation_request_status?: CancellationRequestStatus;
+    created_at?: string;
+};
+
+export type MyEmergencyCallSummaryPagedResult = {
+    items: Array<MyEmergencyCallSummary>;
     page: number;
     page_size: number;
     total_items: number;
@@ -972,6 +1056,15 @@ export type UpdateBedRequest = {
 export type UpdateBillingRatesRequest = {
     expenses?: Array<WardExpenseRateUpdate> | null;
     admission_fees?: Array<AdmissionFeeUpdate> | null;
+};
+
+export type UpdateEmergencyCallRequest = {
+    priority?: CallPriority;
+    details?: string;
+    caller_name?: string;
+    caller_phone?: string;
+    latitude?: number;
+    longitude?: number;
 };
 
 export type UpdateEquipmentItemRequest = {
@@ -2654,6 +2747,157 @@ export type UpdateBillingRatesResponses = {
 
 export type UpdateBillingRatesResponse = UpdateBillingRatesResponses[keyof UpdateBillingRatesResponses];
 
+export type ListEmergencyCallsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: CallStatus;
+        priority?: CallPriority;
+        search?: string;
+        from?: string;
+        to?: string;
+        unassignedOnly?: boolean;
+        page?: number;
+        pageSize?: number;
+        sortBy?: EmergencyCallSortField;
+        sortDir?: 'asc' | 'desc';
+    };
+    url: '/emergency-calls';
+};
+
+export type ListEmergencyCallsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListEmergencyCallsError = ListEmergencyCallsErrors[keyof ListEmergencyCallsErrors];
+
+export type ListEmergencyCallsResponses = {
+    /**
+     * OK
+     */
+    200: EmergencyCallSummaryPagedResult;
+};
+
+export type ListEmergencyCallsResponse = ListEmergencyCallsResponses[keyof ListEmergencyCallsResponses];
+
+export type CreateEmergencyCallData = {
+    body: CreateEmergencyCallRequest;
+    path?: never;
+    query?: never;
+    url: '/emergency-calls';
+};
+
+export type CreateEmergencyCallErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+};
+
+export type CreateEmergencyCallError = CreateEmergencyCallErrors[keyof CreateEmergencyCallErrors];
+
+export type CreateEmergencyCallResponses = {
+    /**
+     * Created
+     */
+    201: EmergencyCallDetail;
+};
+
+export type CreateEmergencyCallResponse = CreateEmergencyCallResponses[keyof CreateEmergencyCallResponses];
+
+export type GetEmergencyCallData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/emergency-calls/{id}';
+};
+
+export type GetEmergencyCallErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetEmergencyCallError = GetEmergencyCallErrors[keyof GetEmergencyCallErrors];
+
+export type GetEmergencyCallResponses = {
+    /**
+     * OK
+     */
+    200: EmergencyCallDetail;
+};
+
+export type GetEmergencyCallResponse = GetEmergencyCallResponses[keyof GetEmergencyCallResponses];
+
+export type UpdateEmergencyCallData = {
+    body: UpdateEmergencyCallRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/emergency-calls/{id}';
+};
+
+export type UpdateEmergencyCallErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type UpdateEmergencyCallError = UpdateEmergencyCallErrors[keyof UpdateEmergencyCallErrors];
+
+export type UpdateEmergencyCallResponses = {
+    /**
+     * OK
+     */
+    200: EmergencyCallDetail;
+};
+
+export type UpdateEmergencyCallResponse = UpdateEmergencyCallResponses[keyof UpdateEmergencyCallResponses];
+
 export type ListDischargeCandidatesData = {
     body?: never;
     path?: never;
@@ -3468,6 +3712,39 @@ export type CompleteMaintenanceScheduleResponses = {
 };
 
 export type CompleteMaintenanceScheduleResponse = CompleteMaintenanceScheduleResponses[keyof CompleteMaintenanceScheduleResponses];
+
+export type GetMyEmergencyCallsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: CallStatus;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/me/emergency-calls';
+};
+
+export type GetMyEmergencyCallsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+};
+
+export type GetMyEmergencyCallsError = GetMyEmergencyCallsErrors[keyof GetMyEmergencyCallsErrors];
+
+export type GetMyEmergencyCallsResponses = {
+    /**
+     * OK
+     */
+    200: MyEmergencyCallSummaryPagedResult;
+};
+
+export type GetMyEmergencyCallsResponse = GetMyEmergencyCallsResponses[keyof GetMyEmergencyCallsResponses];
 
 export type PreRegisterSelfData = {
     body?: PreRegisterRequest;

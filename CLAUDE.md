@@ -35,8 +35,8 @@ Say the same thing again with simpler words and fewer of them.
 
 ## Current state
 
-**All four components have started.** *(Re-swept 2026-09-13 against the tree, not from
-memory — 509 tests pass, 5/5 specs valid, 0 collisions.)*
+**All four components have started.** *(Re-swept 2026-09-14 against the tree, not from
+memory — 570 tests pass, 5/5 specs valid, 0 collisions.)*
 
 **Common auth is built** (PR #11): `CareLankaDbContext`, the three base entity classes,
 `StaffMember` / `PatientAccount` / `RefreshToken`, the six `/api/auth` endpoints,
@@ -48,7 +48,7 @@ logins are in `TEST_ACCOUNTS.md`.
 | :--- | :--- |
 | **Patient** (Lochana) | 12 controllers, 43 routes. Wards, patients, admissions and the 7-state machine, capacity, bed assignment, the worklist, discharge, billing, and the seven `/api/me/*` patient routes. React screens for all of it. Left: the two AI agents (steps 11–16), the reports, and `POST /admissions/pre-admit` |
 | **Equipment** (Sethmin) | 8 controllers. Beds, equipment items and categories, pharmacy, maintenance, and the laboratory (`/lab-reports`, `/ward-patients`) |
-| **Emergency** (Nasrulla Unais) | `EmergencyCall`, `Ambulance`, `Dispatch`, `DispatchCrew`, `RouteLog` and their migration; `AmbulancesController` is the first endpoint |
+| **Emergency** (Nasrulla Unais) | Phases 0–2: aligned contract, ambulance/current-crew readiness, and patient/staff emergency-call intake with caller-scoped APIs |
 | **Staff** (Kaveesha) | Not started — no entities, no controllers, and no `staff-management-plan.md` |
 
 **Emergency and Staff swapped owners on 2026-09-12** (commit `4f60832`). Nasrulla Unais has

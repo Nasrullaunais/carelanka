@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/friendly_date.dart';
 import '../../../core/widgets/async_view.dart';
+import '../../../services/api_client/models/appointment_status.dart';
 import '../../../services/api_client/models/my_appointment.dart';
+import '../hospital_contact.dart';
 import '../state/appointments_controller.dart';
 import '../state/profile_controller.dart';
 import '../widgets/panels.dart';
@@ -34,7 +36,7 @@ class AppointmentsScreenState extends State<AppointmentsScreen> {
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(error?.message ?? 'Your visit is booked.'),
+      content: Text(error?.message ?? 'Your visit has been booked.'),
     ));
   }
 
@@ -45,12 +47,12 @@ class AppointmentsScreenState extends State<AppointmentsScreen> {
         title: const Text('Cancel this visit?'),
         content: Text(
           'Your booking for ${FriendlyDate.full(appointment.scheduledAt)} will '
-          'be called off. You can book another afterwards.',
+          'be cancelled. You may book another afterwards.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Keep it'),
+            child: const Text('Keep booking'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
@@ -68,7 +70,7 @@ class AppointmentsScreenState extends State<AppointmentsScreen> {
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(error?.message ?? 'Your visit is cancelled.'),
+      content: Text(error?.message ?? 'Your visit has been cancelled.'),
     ));
   }
 
@@ -100,9 +102,8 @@ class AppointmentsScreenState extends State<AppointmentsScreen> {
           if (!linked) {
             return EmptyView(
               icon: Icons.badge_outlined,
-              title: 'Finish setting up first',
-              message: 'The hospital needs your details before it can take a '
-                  'booking from you.',
+              title: 'Complete your details',
+              message: 'Add your details before booking a visit.',
               action: FilledButton(
                 onPressed: () => openMyDetails(context, context.read<ProfileController>()),
                 style: FilledButton.styleFrom(minimumSize: const Size(200, 48)),
@@ -114,9 +115,8 @@ class AppointmentsScreenState extends State<AppointmentsScreen> {
           if (upcoming.isEmpty && past.isEmpty) {
             return EmptyView(
               icon: Icons.event_available_outlined,
-              title: 'No visits yet',
-              message: 'Book one and it will show up here with everything the '
-                  'hospital needs from you.',
+              title: 'No visits booked',
+              message: 'Your booked visits will appear here.',
               action: FilledButton.icon(
                 onPressed: controller.busy ? null : book,
                 icon: const Icon(Icons.add),
@@ -132,7 +132,7 @@ class AppointmentsScreenState extends State<AppointmentsScreen> {
               padding: const EdgeInsets.fromLTRB(AppTheme.gutter, 4, AppTheme.gutter, 104),
               children: [
                 if (upcoming.isNotEmpty) ...[
-                  const _SectionHeading('Coming up'),
+                  const _SectionHeading('Upcoming'),
                   for (final appointment in upcoming)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 10),
@@ -143,7 +143,7 @@ class AppointmentsScreenState extends State<AppointmentsScreen> {
                     ),
                 ],
                 if (past.isNotEmpty) ...[
-                  const _SectionHeading('Earlier'),
+                  const _SectionHeading('Past'),
                   for (final appointment in past)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 10),
@@ -238,6 +238,30 @@ class _AppointmentCard extends StatelessWidget {
                 child: Text(appointment.reason!, style: theme.textTheme.bodyMedium),
               ),
             ],
+            // The desk's own words, shown as written. It is where they name a
+            // time the clinic can see the patient instead.
+            if (appointment.cancellationReason != null) ...[
+              const SizedBox(height: 14),
+              _Notice(
+                icon: Icons.info_outline,
+                accent: scheme.error,
+                title: 'Cancelled by the hospital',
+                body: appointment.cancellationReason!,
+              ),
+            ],
+            // Staff have already acted on this booking, so the patient cannot
+            // undo it from here. Saying only "no button" would read as a bug.
+            if (appointment.status == AppointmentStatus.checkedIn) ...[
+              const SizedBox(height: 14),
+              _Notice(
+                icon: Icons.support_agent_outlined,
+                accent: scheme.onSurfaceVariant,
+                title: 'This visit can no longer be cancelled here',
+                body: 'Please contact reception on ${HospitalContact.reception}. '
+                    'A cancellation at this stage may incur a fee of 50% of the '
+                    'visit charge.',
+              ),
+            ],
             // can_cancel is the server's decision, not ours — a scheduled visit
             // stops being cancellable once the ward has checked you in.
             if (appointment.canCancel && onCancel != null) ...[
@@ -254,6 +278,54 @@ class _AppointmentCard extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A small inline panel on a card. `NoticeBanner` is the page-level version and
+/// is too heavy to sit inside a list item.
+class _Notice extends StatelessWidget {
+  const _Notice({
+    required this.icon,
+    required this.accent,
+    required this.title,
+    required this.body,
+  });
+
+  final IconData icon;
+  final Color accent;
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppTheme.radiusM),
+        border: Border.all(color: accent.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: accent),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: theme.textTheme.titleSmall),
+                const SizedBox(height: 4),
+                Text(body, style: theme.textTheme.bodySmall),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

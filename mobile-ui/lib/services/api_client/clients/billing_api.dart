@@ -54,6 +54,34 @@ abstract class BillingApi {
     @Query('search') String? search,
   });
 
+  @GET('/appointments/{appointmentId}/bill')
+  Future<Bill> getAppointmentBill({
+    @Path('appointmentId') required String appointmentId,
+  });
+
+  @POST('/appointments/{appointmentId}/bill')
+  Future<Bill> prepareAppointmentBill({
+    @Path('appointmentId') required String appointmentId,
+  });
+
+  @POST('/appointments/{appointmentId}/bill/charges')
+  Future<Bill> addAppointmentBillCharge({
+    @Path('appointmentId') required String appointmentId,
+    @Body() AddBillChargeRequest? body,
+  });
+
+  @DELETE('/appointments/{appointmentId}/bill/charges/{lineId}')
+  Future<Bill> removeAppointmentBillCharge({
+    @Path('appointmentId') required String appointmentId,
+    @Path('lineId') required String lineId,
+  });
+
+  @POST('/appointments/{appointmentId}/bill/settle')
+  Future<Bill> settleAppointmentBill({
+    @Path('appointmentId') required String appointmentId,
+    @Body() SettleBillRequest? body,
+  });
+
   @GET('/billing/rates')
   Future<BillingRateBook> getBillingRates();
 

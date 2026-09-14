@@ -47,6 +47,7 @@ void main() {
     statusText: 'Booked. You can still cancel this.',
     reason: 'Follow-up on chest pain',
     canCancel: true,
+    cancelledByHospital: false,
   );
 
   const incompleteProfile = MyProfile(

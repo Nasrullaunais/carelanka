@@ -17,6 +17,7 @@ MyAppointment _appointment({
     status: status,
     statusText: status.json ?? 'unknown',
     canCancel: status == AppointmentStatus.scheduled,
+    cancelledByHospital: false,
   );
 }
 

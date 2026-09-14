@@ -2,13 +2,22 @@ import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
+  addAppointmentBillChargeMutation,
   addBillChargeMutation,
   getAdmissionBillOptions,
+  getAppointmentBillOptions,
   prepareAdmissionBillMutation,
+  prepareAppointmentBillMutation,
+  removeAppointmentBillChargeMutation,
   removeBillChargeMutation,
+  settleAppointmentBillMutation,
   settleBillMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
-import type { Bill } from '../services/api/generated';
+import type {
+  AddBillChargeRequest,
+  Bill,
+  SettleBillRequest,
+} from '../services/api/generated';
 import {
   billLineSourceHints,
   billLineSourceLabels,
@@ -19,17 +28,26 @@ import {
   quantity,
 } from '../types/billing';
 
+/// A bill belongs to an admission or to an appointment, never both, so the
+/// panel takes exactly one of them and picks the matching endpoints. The two
+/// differ only in what the generated half of the bill prices.
+export type BillOwner =
+  | { admissionId: string; appointmentId?: never }
+  | { appointmentId: string; admissionId?: never };
+
 export function BillPanel({
-  admissionId,
   canSettle,
   showPrint = true,
-}: {
-  admissionId: string;
-
+  ...owner
+}: BillOwner & {
   canSettle: boolean;
   showPrint?: boolean;
 }) {
   const queryClient = useQueryClient();
+
+  const forAppointment = owner.appointmentId !== undefined;
+
+  const visitWord = forAppointment ? 'appointment' : 'admission';
 
   const [templateKey, setTemplateKey] = useState(chargeTemplates[0].key);
   const [description, setDescription] = useState(chargeTemplates[0].label);
@@ -48,11 +66,21 @@ export function BillPanel({
     setUnitPrice(chosen.unitPrice === null ? '' : String(chosen.unitPrice));
   }
 
-  const bill = useQuery({
-    ...getAdmissionBillOptions({ path: { admissionId } }),
-
+  // Both queries are declared because hooks cannot be called conditionally.
+  // The idle one is disabled, so its placeholder path is never requested.
+  const admissionBill = useQuery({
+    ...getAdmissionBillOptions({ path: { admissionId: owner.admissionId ?? '' } }),
+    enabled: !forAppointment,
     retry: false,
   });
+
+  const appointmentBill = useQuery({
+    ...getAppointmentBillOptions({ path: { appointmentId: owner.appointmentId ?? '' } }),
+    enabled: forAppointment,
+    retry: false,
+  });
+
+  const bill = forAppointment ? appointmentBill : admissionBill;
 
   const refreshAll = () =>
     queryClient.invalidateQueries({
@@ -61,6 +89,8 @@ export function BillPanel({
 
         return (
           id === 'getAdmissionBill' ||
+          id === 'getAppointmentBill' ||
+          id === 'listAppointments' ||
           id === 'listOutstandingBills' ||
           id === 'getAdmission' ||
           id === 'listAdmissions' ||
@@ -69,38 +99,89 @@ export function BillPanel({
       },
     });
 
-  const prepare = useMutation({
+  const onPrepared = (result: Bill) => {
+    toast.success(`Bill ${result.bill_number} prepared.`);
+    void refreshAll();
+  };
+
+  const onCharged = () => {
+    toast.success('Charge added.');
+    chooseTemplate(templateKey);
+    void refreshAll();
+  };
+
+  const onChargeRemoved = () => {
+    toast.success('Charge removed.');
+    void refreshAll();
+  };
+
+  const onSettled = (result: Bill) => {
+    toast.success(
+      forAppointment
+        ? `Bill ${result.bill_number} settled.`
+        : `Bill ${result.bill_number} settled. Bill settled is now ticked.`,
+    );
+    void refreshAll();
+  };
+
+  // Both members of each pair are declared because hooks cannot be called
+  // conditionally. Only the one matching this panel's owner is ever fired.
+  const prepareAdmission = useMutation({
     ...prepareAdmissionBillMutation(),
-    onSuccess: (result) => {
-      toast.success(`Bill ${result.bill_number} prepared.`);
-      void refreshAll();
-    },
+    onSuccess: onPrepared,
+  });
+  const prepareAppointment = useMutation({
+    ...prepareAppointmentBillMutation(),
+    onSuccess: onPrepared,
   });
 
-  const addCharge = useMutation({
-    ...addBillChargeMutation(),
-    onSuccess: () => {
-      toast.success('Charge added.');
-      chooseTemplate(templateKey);
-      void refreshAll();
-    },
+  const chargeAdmission = useMutation({ ...addBillChargeMutation(), onSuccess: onCharged });
+  const chargeAppointment = useMutation({
+    ...addAppointmentBillChargeMutation(),
+    onSuccess: onCharged,
   });
 
-  const removeCharge = useMutation({
+  const unchargeAdmission = useMutation({
     ...removeBillChargeMutation(),
-    onSuccess: () => {
-      toast.success('Charge removed.');
-      void refreshAll();
-    },
+    onSuccess: onChargeRemoved,
+  });
+  const unchargeAppointment = useMutation({
+    ...removeAppointmentBillChargeMutation(),
+    onSuccess: onChargeRemoved,
   });
 
-  const settle = useMutation({
-    ...settleBillMutation(),
-    onSuccess: (result) => {
-      toast.success(`Bill ${result.bill_number} settled. Bill settled is now ticked.`);
-      void refreshAll();
-    },
+  const settleAdmission = useMutation({ ...settleBillMutation(), onSuccess: onSettled });
+  const settleAppointment = useMutation({
+    ...settleAppointmentBillMutation(),
+    onSuccess: onSettled,
   });
+
+  const prepare = forAppointment ? prepareAppointment : prepareAdmission;
+  const addCharge = forAppointment ? chargeAppointment : chargeAdmission;
+  const removeCharge = forAppointment ? unchargeAppointment : unchargeAdmission;
+  const settle = forAppointment ? settleAppointment : settleAdmission;
+
+  const runPrepare = () =>
+    forAppointment
+      ? prepareAppointment.mutate({ path: { appointmentId: owner.appointmentId! } })
+      : prepareAdmission.mutate({ path: { admissionId: owner.admissionId! } });
+
+  const runAddCharge = (body: AddBillChargeRequest) =>
+    forAppointment
+      ? chargeAppointment.mutate({ path: { appointmentId: owner.appointmentId! }, body })
+      : chargeAdmission.mutate({ path: { admissionId: owner.admissionId! }, body });
+
+  const runRemoveCharge = (lineId: string) =>
+    forAppointment
+      ? unchargeAppointment.mutate({
+          path: { appointmentId: owner.appointmentId!, lineId },
+        })
+      : unchargeAdmission.mutate({ path: { admissionId: owner.admissionId!, lineId } });
+
+  const runSettle = (body: SettleBillRequest) =>
+    forAppointment
+      ? settleAppointment.mutate({ path: { appointmentId: owner.appointmentId! }, body })
+      : settleAdmission.mutate({ path: { admissionId: owner.admissionId! }, body });
 
   if (bill.isLoading) {
     return <p className="empty">Loading the bill…</p>;
@@ -110,7 +191,7 @@ export function BillPanel({
     return (
       <>
         <p className="empty">
-          No bill has been raised for this admission yet.
+          No bill has been raised for this {visitWord} yet.
           {canSettle && (
             <>
               <br />
@@ -118,7 +199,7 @@ export function BillPanel({
                 type="button"
                 style={{ marginTop: '0.9rem' }}
                 disabled={prepare.isPending}
-                onClick={() => prepare.mutate({ path: { admissionId } })}
+                onClick={() => runPrepare()}
               >
                 {prepare.isPending ? 'Preparing…' : 'Raise the bill'}
               </button>
@@ -127,8 +208,12 @@ export function BillPanel({
         </p>
         <p className="hint">
           {canSettle
-            ? "This reads the admission — the care level and every bed used — and adds those lines at today's rates."
-            : 'Reception raises the bill and takes payment. Nothing on the ward is held up until the discharge itself.'}
+            ? forAppointment
+              ? "This adds the consultation fee at today's rate. Nobody was admitted, so there is no admission fee and no bed charge."
+              : "This reads the admission — the care level and every bed used — and adds those lines at today's rates."
+            : forAppointment
+              ? 'Reception raises the bill and takes payment.'
+              : 'Reception raises the bill and takes payment. Nothing on the ward is held up until the discharge itself.'}
         </p>
       </>
     );
@@ -170,13 +255,10 @@ export function BillPanel({
             onSubmit={(event: FormEvent) => {
               event.preventDefault();
 
-              addCharge.mutate({
-                path: { admissionId },
-                body: {
-                  description: description.trim(),
-                  quantity: Number(chargeQuantity),
-                  unit_price: Number(unitPrice),
-                },
+              runAddCharge({
+                description: description.trim(),
+                quantity: Number(chargeQuantity),
+                unit_price: Number(unitPrice),
               });
             }}
           >
@@ -250,9 +332,19 @@ export function BillPanel({
           </p>
 
           <p className="hint">
-            Treatments, meals, tests and medicines are entered by hand — nothing in the system
-            records them against an admission. The admission fee and bed charges are worked out
-            automatically and are already listed above.
+            {forAppointment ? (
+              <>
+                Treatments, tests and medicines are entered by hand — nothing in the system
+                records them against a booking. The consultation fee is worked out
+                automatically and is already listed above.
+              </>
+            ) : (
+              <>
+                Treatments, meals, tests and medicines are entered by hand — nothing in the
+                system records them against an admission. The admission fee and bed charges are
+                worked out automatically and are already listed above.
+              </>
+            )}
           </p>
 
           <h3>Settle</h3>
@@ -275,10 +367,7 @@ export function BillPanel({
                 type="button"
                 disabled={settle.isPending}
                 onClick={() =>
-                  settle.mutate({
-                    path: { admissionId },
-                    body: { settlement_note: settlementNote.trim() || null },
-                  })
+                  runSettle({ settlement_note: settlementNote.trim() || null })
                 }
               >
                 {settle.isPending ? 'Settling…' : `Settle ${money(data.total, data.currency)}`}
@@ -287,9 +376,18 @@ export function BillPanel({
           </div>
 
           <p className="hint">
-            Settling makes the bill final and ticks <strong>Bill settled</strong> on the
-            discharge checklist. That item cannot be ticked any other way, so the payment and
-            the checklist can never disagree.
+            {forAppointment ? (
+              <>
+                Settling makes the bill final. There is no discharge checklist to tick, because
+                the patient was never admitted.
+              </>
+            ) : (
+              <>
+                Settling makes the bill final and ticks <strong>Bill settled</strong> on the
+                discharge checklist. That item cannot be ticked any other way, so the payment
+                and the checklist can never disagree.
+              </>
+            )}
           </p>
 
           <div className="actions" style={{ marginTop: '0.9rem' }}>
@@ -297,9 +395,13 @@ export function BillPanel({
               type="button"
               className="secondary"
               disabled={prepare.isPending}
-              onClick={() => prepare.mutate({ path: { admissionId } })}
+              onClick={() => runPrepare()}
             >
-              {prepare.isPending ? 'Recalculating…' : 'Recalculate bed days'}
+              {prepare.isPending
+                ? 'Recalculating…'
+                : forAppointment
+                  ? 'Recalculate consultation fee'
+                  : 'Recalculate bed days'}
             </button>
             {data.lines
               .filter((line) => isRemovableLine(line.source))
@@ -309,7 +411,7 @@ export function BillPanel({
                   type="button"
                   className="secondary small danger"
                   disabled={removeCharge.isPending}
-                  onClick={() => removeCharge.mutate({ path: { admissionId, lineId: line.id } })}
+                  onClick={() => runRemoveCharge(line.id)}
                 >
                   Remove &ldquo;{line.description}&rdquo;
                 </button>
@@ -317,9 +419,19 @@ export function BillPanel({
           </div>
 
           <p className="hint">
-            Recalculating replaces the admission fee and bed lines with today's rates and leaves
-            entered charges alone. Only an entered charge can be removed — a bed line would come
-            straight back.
+            {forAppointment ? (
+              <>
+                Recalculating replaces the consultation fee with today&apos;s rate and leaves
+                entered charges alone. Only an entered charge can be removed — the consultation
+                fee would come straight back.
+              </>
+            ) : (
+              <>
+                Recalculating replaces the admission fee and bed lines with today&apos;s rates
+                and leaves entered charges alone. Only an entered charge can be removed — a bed
+                line would come straight back.
+              </>
+            )}
           </p>
         </>
       )}

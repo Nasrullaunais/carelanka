@@ -3,12 +3,14 @@ import type { BillLineSource } from '../services/api/generated';
 export const billLineSourceLabels: Record<BillLineSource, string> = {
   admission_fee: 'Admission fee',
   bed_stay: 'Bed',
+  consultation_fee: 'Consultation fee',
   manual: 'Added manually',
 };
 
 export const billLineSourceHints: Record<BillLineSource, string> = {
   admission_fee: 'Worked out from the care level recorded by a clinician.',
   bed_stay: 'Worked out from the time the patient spent in that bed.',
+  consultation_fee: 'The standard charge for being seen at a booked appointment.',
   manual: 'Entered by hand. Nothing in the system records treatments against an admission.',
 };
 

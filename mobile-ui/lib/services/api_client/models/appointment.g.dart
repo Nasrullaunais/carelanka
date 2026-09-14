@@ -11,9 +11,13 @@ Appointment _$AppointmentFromJson(Map<String, dynamic> json) => Appointment(
   patient: PatientSummary.fromJson(json['patient'] as Map<String, dynamic>),
   scheduledAt: DateTime.parse(json['scheduled_at'] as String),
   status: AppointmentStatus.fromJson(json['status'] as String),
+  canCancel: json['can_cancel'] as bool,
+  canComplete: json['can_complete'] as bool,
   reason: json['reason'] as String?,
   bookedByStaffId: json['booked_by_staff_id'] as String?,
   admissionId: json['admission_id'] as String?,
+  cancellationReason: json['cancellation_reason'] as String?,
+  cancelledByStaffId: json['cancelled_by_staff_id'] as String?,
   createdAt: json['created_at'] == null
       ? null
       : DateTime.parse(json['created_at'] as String),
@@ -31,6 +35,10 @@ Map<String, dynamic> _$AppointmentToJson(Appointment instance) =>
       'reason': instance.reason,
       'booked_by_staff_id': instance.bookedByStaffId,
       'admission_id': instance.admissionId,
+      'cancellation_reason': instance.cancellationReason,
+      'cancelled_by_staff_id': instance.cancelledByStaffId,
+      'can_cancel': instance.canCancel,
+      'can_complete': instance.canComplete,
       'created_at': instance.createdAt?.toIso8601String(),
       'updated_at': instance.updatedAt?.toIso8601String(),
     };

@@ -22,6 +22,8 @@ public class AppointmentConfiguration : IEntityTypeConfiguration<Appointment>
 
         builder.Property(a => a.Reason).HasMaxLength(300);
 
+        builder.Property(a => a.CancellationReason).HasMaxLength(300);
+
         builder.HasOne(a => a.Patient)
             .WithMany(p => p.Appointments)
             .HasForeignKey(a => a.PatientId)
@@ -30,6 +32,11 @@ public class AppointmentConfiguration : IEntityTypeConfiguration<Appointment>
         builder.HasOne<Entities.Common.StaffMember>()
             .WithMany()
             .HasForeignKey(a => a.BookedByStaffMemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<Entities.Common.StaffMember>()
+            .WithMany()
+            .HasForeignKey(a => a.CancelledByStaffMemberId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(a => a.Admission)

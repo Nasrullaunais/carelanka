@@ -62,6 +62,7 @@ export 'models/billing_rate_book.dart';
 export 'models/book_appointment_request.dart';
 export 'models/call_priority.dart';
 export 'models/cancel_admission_request.dart';
+export 'models/cancel_appointment_request.dart';
 export 'models/cancel_reason.dart';
 export 'models/check_in_request.dart';
 export 'models/checklist_item.dart';

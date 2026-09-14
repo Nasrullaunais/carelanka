@@ -36,6 +36,14 @@ public static class Policies
 
     public const string AppointmentDesk = nameof(AppointmentDesk);
 
+    /// <summary>
+    /// Reading the bookings list. Wider than <see cref="AppointmentDesk"/>, which is who may
+    /// act on a booking, because the billing desk has to reach a finished appointment to bill
+    /// it and cannot check anyone in. Same split as
+    /// <see cref="DischargeBoard"/> against <see cref="DischargeChecklist"/>.
+    /// </summary>
+    public const string AppointmentBoard = nameof(AppointmentBoard);
+
     // The laboratory stands on equipment_manager in both of these, because StaffRole has no
     // laboratory value. Adding one changes staff-spec.yaml and common-spec.yaml together, which
     // is M2's and the common owner's call - Open Decision 11. These two lines are all that

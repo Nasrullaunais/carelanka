@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/widgets/async_data.dart';
 import '../../../core/widgets/async_view.dart';
 import '../../../core/widgets/phone_width.dart';
 import '../../../services/api_client/models/my_profile.dart';
@@ -29,6 +30,12 @@ class PatientShell extends StatefulWidget {
 
 class _PatientShellState extends State<PatientShell> {
   PatientTab _tab = PatientTab.home;
+
+  late final ProfileController _profile;
+
+  /// Null until the first profile load finishes, so a false -> true transition
+  /// can be told apart from the loading state every account starts in.
+  bool? _wasLinked;
 
   /// Home's "Book a visit" opens the sheet that Appointments owns, so the
   /// booking flow exists once. Reaching it needs that screen's state.
@@ -63,6 +70,32 @@ class _PatientShellState extends State<PatientShell> {
       context.read<MyStayController>().load();
       context.read<AppointmentsController>().load();
     });
+
+    _profile = context.read<ProfileController>();
+    _profile.addListener(_onProfileChanged);
+  }
+
+  @override
+  void dispose() {
+    _profile.removeListener(_onProfileChanged);
+    super.dispose();
+  }
+
+  /// Saving details for the first time creates the hospital record, which
+  /// changes what `/me/admission` and `/me/appointments` answer. Both were
+  /// fetched before the record existed, so without this My stay keeps saying
+  /// the account has no record until the app is restarted.
+  void _onProfileChanged() {
+    if (_profile.profile is AsyncLoading) return;
+
+    final linked = _profile.isLinked;
+    final previous = _wasLinked;
+    _wasLinked = linked;
+
+    if (previous == false && linked) {
+      context.read<MyStayController>().load();
+      context.read<AppointmentsController>().load();
+    }
   }
 
   void _openTab(PatientTab tab) => setState(() => _tab = tab);

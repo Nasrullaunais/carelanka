@@ -30,7 +30,13 @@ public static class PatientStatusText
         _ => "Ask at the ward for an update."
     };
 
-    public static string For(AppointmentStatus status) => status switch
+    /// <param name="cancelledByHospital">
+    /// Changes who the cancelled sentence blames. Telling a patient they
+    /// cancelled a visit the desk called off is the kind of wrong that gets
+    /// argued about at the counter.
+    /// </param>
+    public static string For(AppointmentStatus status, bool cancelledByHospital = false)
+        => status switch
     {
         AppointmentStatus.Scheduled =>
             "Booked. You can still cancel this.",
@@ -41,8 +47,9 @@ public static class PatientStatusText
         AppointmentStatus.Completed =>
             "This visit is finished.",
 
-        AppointmentStatus.Cancelled =>
-            "You cancelled this visit.",
+        AppointmentStatus.Cancelled => cancelledByHospital
+            ? "The hospital cancelled this visit."
+            : "You cancelled this visit.",
 
         AppointmentStatus.NoShow =>
             "You did not attend this visit.",

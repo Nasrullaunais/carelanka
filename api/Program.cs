@@ -217,6 +217,12 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
 
+    options.AddPolicy(Policies.AppointmentBoard, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager),
+        EnumWire.ToWire(StaffRole.GeneralStaff),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
     // Narrower than AnyStaff on purpose: a result is clinical information about a named person,
     // so ambulance crew and general staff are off it even though they hold a staff login.
     options.AddPolicy(Policies.LabReportReader, policy => policy.RequireRole(

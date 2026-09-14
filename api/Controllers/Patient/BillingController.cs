@@ -90,4 +90,61 @@ public class BillingController : ControllerBase
         [FromQuery][Range(1, 100)] int pageSize = 20,
         CancellationToken ct = default)
         => Ok(await _billing.ListOutstandingAsync(search, includeSettled, page, pageSize, ct));
+
+    [Authorize(Policy = Policies.PatientDetails)]
+    [HttpGet("appointments/{appointmentId:guid}/bill", Name = "getAppointmentBill")]
+    [ProducesResponseType(typeof(BillResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<ActionResult<BillResponse>> GetAppointmentBill(
+        Guid appointmentId, CancellationToken ct)
+        => Ok(await _billing.GetForAppointmentAsync(appointmentId, ct));
+
+    [Authorize(Policy = Policies.BillingDesk)]
+    [HttpPost("appointments/{appointmentId:guid}/bill", Name = "prepareAppointmentBill")]
+    [ProducesResponseType(typeof(BillResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<BillResponse>> PrepareAppointmentBill(
+        Guid appointmentId, CancellationToken ct)
+        => Ok(await _billing.PrepareForAppointmentAsync(appointmentId, ct));
+
+    [Authorize(Policy = Policies.BillingDesk)]
+    [HttpPost("appointments/{appointmentId:guid}/bill/charges", Name = "addAppointmentBillCharge")]
+    [ProducesResponseType(typeof(BillResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<BillResponse>> AddAppointmentBillCharge(
+        Guid appointmentId, [FromBody] AddBillChargeRequest request, CancellationToken ct)
+        => Ok(await _billing.AddAppointmentChargeAsync(appointmentId, request, ct));
+
+    [Authorize(Policy = Policies.BillingDesk)]
+    [HttpDelete("appointments/{appointmentId:guid}/bill/charges/{lineId:guid}", Name = "removeAppointmentBillCharge")]
+    [ProducesResponseType(typeof(BillResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<BillResponse>> RemoveAppointmentBillCharge(
+        Guid appointmentId, Guid lineId, CancellationToken ct)
+        => Ok(await _billing.RemoveAppointmentChargeAsync(appointmentId, lineId, ct));
+
+    [Authorize(Policy = Policies.BillingDesk)]
+    [HttpPost("appointments/{appointmentId:guid}/bill/settle", Name = "settleAppointmentBill")]
+    [ProducesResponseType(typeof(BillResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<BillResponse>> SettleAppointmentBill(
+        Guid appointmentId, [FromBody] SettleBillRequest? request, CancellationToken ct)
+        => Ok(await _billing.SettleAppointmentAsync(
+            appointmentId, request ?? new SettleBillRequest(), ct));
 }

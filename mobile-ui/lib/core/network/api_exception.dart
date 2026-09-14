@@ -52,12 +52,30 @@ class ApiException implements Exception {
     );
   }
 
+  /// Keys arrive in two shapes, because two different parts of ASP.NET
+  /// produce them: `full_name` from a failed `[Required]`, and
+  /// `$.date_of_birth` — a JSON path — when the body could not be
+  /// deserialised at all. A form looking up `full_name` finds nothing under
+  /// the second shape, so the field error is dropped and the reader is left
+  /// with a toast that names no field.
   static Map<String, List<String>> _readFieldErrors(Object? errors) {
     if (errors is! Map) return const {};
-    return {
-      for (final entry in errors.entries)
-        entry.key.toString(): (entry.value as List?)?.map((e) => e.toString()).toList() ?? const [],
-    };
+
+    final byField = <String, List<String>>{};
+
+    for (final entry in errors.entries) {
+      final field = entry.key.toString().replaceFirst(RegExp(r'^\$\.'), '');
+      final messages = (entry.value as List?)?.map((e) => e.toString()).toList() ?? const [];
+
+      // `request` is the whole body, not a field on the form. It always
+      // accompanies a deserialisation failure that is already reported
+      // against the field that caused it.
+      if (field.isEmpty || field == 'request') continue;
+
+      byField.putIfAbsent(field, () => []).addAll(messages);
+    }
+
+    return byField;
   }
 
   @override

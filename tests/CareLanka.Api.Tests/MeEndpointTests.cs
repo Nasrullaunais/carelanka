@@ -424,13 +424,11 @@ public sealed class MeEndpointTests
     private async Task<HttpClient> NewPatientAccountAsync()
     {
         var client = _application.CreateClient();
-        var phone = $"+9477{Random.Shared.Next(1_000_000, 9_999_999)}";
 
         var registered = await client.PostAsJsonAsync("/api/auth/patient/register", new
         {
-            phone_number = phone,
-            password = ApiApplication.Password,
-            full_name = "App Patient"
+            username = $"app.patient.{Random.Shared.Next(1_000_000, 9_999_999)}",
+            password = ApiApplication.Password
         });
 
         Assert.Equal(HttpStatusCode.Created, registered.StatusCode);

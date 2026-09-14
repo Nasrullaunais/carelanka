@@ -22,6 +22,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
+using CareLanka.Api.Common.Serialization;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -31,6 +32,7 @@ static void ConfigureJson(JsonSerializerOptions json)
     json.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
     json.DictionaryKeyPolicy = JsonNamingPolicy.SnakeCaseLower;
     json.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower));
+    json.Converters.Add(new DateOnlyJsonConverter());
 }
 
 builder.Services

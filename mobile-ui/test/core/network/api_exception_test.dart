@@ -51,6 +51,41 @@ void main() {
     expect(error.fieldErrors['nic'], ['NIC is required.']);
   });
 
+  test('a JSON-path key is keyed to the field the form knows it by', () {
+    // ASP.NET reports a body it could not deserialise against a JSON path.
+    // Left as-is, a form looking up 'date_of_birth' finds nothing and the
+    // reader gets a toast naming no field at all.
+    final error = ApiException.from(_withBody(
+      {
+        'detail': 'One or more fields are not valid.',
+        'errors': {
+          'request': ['The request field is required.'],
+          r'$.date_of_birth': ['The JSON value could not be converted.'],
+        },
+      },
+      statusCode: 400,
+    ));
+
+    expect(error.fieldErrors['date_of_birth'], ['The JSON value could not be converted.']);
+    expect(error.fieldErrors.containsKey(r'$.date_of_birth'), isFalse);
+    // Not a field on any form, so it would render against nothing.
+    expect(error.fieldErrors.containsKey('request'), isFalse);
+  });
+
+  test('both key shapes for one field end up together', () {
+    final error = ApiException.from(_withBody(
+      {
+        'errors': {
+          'nic': ['NIC is required.'],
+          r'$.nic': ['Bad value.'],
+        },
+      },
+      statusCode: 400,
+    ));
+
+    expect(error.fieldErrors['nic'], ['NIC is required.', 'Bad value.']);
+  });
+
   test('a request that never reached the server is flagged, not silently dropped', () {
     final error = ApiException.from(_withBody(null));
 

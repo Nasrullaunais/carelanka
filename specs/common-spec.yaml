@@ -134,13 +134,15 @@ paths:
       summary: Patient self-registration
       description: |
         Unauthenticated. Creates a `PatientAccount` - a **login**, not a medical record.
-        No `Patient` row is created and none is linked. Staff link the two later through
-        `POST /patients/{id}/link-account` after checking identity.
+        A username and a password are all it takes; the patient's name, NIC, gender, date
+        of birth and contact number are collected afterwards by `POST /me/pre-register`.
+        No `Patient` row is created here and none is linked. Staff link the two later
+        through `POST /patients/{id}/link-account` after checking identity.
 
         Assignment §8 requires registration, login and logout in the Flutter app; this is
         the registration half.
 
-        409 when the phone number already has an active account.
+        409 when the username already has an active account.
       operationId: registerPatientAccount
       security: []
       requestBody:
@@ -156,7 +158,7 @@ paths:
               schema: { $ref: '#/components/schemas/AuthTokens' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '409':
-          description: That phone number already has an active account
+          description: That username already has an active account
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -167,8 +169,9 @@ paths:
       tags: [Auth]
       summary: Patient login
       description: |
-        Unauthenticated. Phone number and password for a `PatientAccount`. Same
-        indistinguishable 401 as staff login, for the same reason.
+        Unauthenticated. Username and password for a `PatientAccount`. The username is
+        matched case-insensitively. Same indistinguishable 401 as staff login, for the
+        same reason.
 
         Updates `PatientAccount.LastLoginAt` on success.
       operationId: loginPatient
@@ -660,22 +663,27 @@ components:
 
     PatientLoginRequest:
       type: object
-      required: [phone_number, password]
+      required: [username, password]
       properties:
-        phone_number:
+        username:
           type: string
-          maxLength: 20
-          example: '+94771234567'
-          description: The login identifier for a patient account. Unique among active accounts.
+          maxLength: 50
+          example: chathura.w
+          description: The login identifier for a patient account. Unique among active accounts and matched case-insensitively.
         password: { type: string, format: password, minLength: 8, maxLength: 128 }
 
     PatientRegisterRequest:
       type: object
-      required: [phone_number, password, full_name]
+      required: [username, password]
       properties:
-        phone_number: { type: string, maxLength: 20, example: '+94771234567' }
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+          pattern: '^[a-zA-Z0-9._-]+$'
+          example: chathura.w
+          description: Letters, digits, dots, underscores and hyphens. Stored lower-cased.
         password: { type: string, format: password, minLength: 8, maxLength: 128 }
-        full_name: { type: string, minLength: 1, maxLength: 200 }
 
     RefreshTokenRequest:
       type: object
@@ -710,7 +718,10 @@ components:
           description: StaffMember.Id or PatientAccount.Id, depending on principal_type.
         principal_type: { type: string, enum: [staff, patient] }
         role: { $ref: '#/components/schemas/PrincipalRole' }
-        display_name: { type: string, example: Dr. Perera }
+        display_name:
+          type: string
+          example: Dr. Perera
+          description: A staff member's full name, or a patient account's username.
         email:
           type: string
           format: email
@@ -719,7 +730,9 @@ components:
         phone_number:
           type: string
           nullable: true
-          description: Patient accounts only. Null for staff.
+          description: |
+            Always null today. A patient's contact number lives on their `Patient` record,
+            not on the login, and staff accounts have never carried one.
         patient_id:
           type: string
           format: uuid

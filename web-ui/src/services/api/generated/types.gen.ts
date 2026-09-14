@@ -784,7 +784,7 @@ export type PatientDetail = {
 };
 
 export type PatientLoginRequest = {
-    phone_number: string;
+    username: string;
     password: string;
 };
 
@@ -799,9 +799,8 @@ export type PatientLookupResult = {
 };
 
 export type PatientRegisterRequest = {
-    phone_number: string;
+    username: string;
     password: string;
-    full_name: string;
 };
 
 export type PatientSortField = 'full_name' | 'created_at';

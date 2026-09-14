@@ -93,7 +93,7 @@
     <comment>Refresh token unknown, expired, or already used.</comment>
   </data>
   <data name="cl_err_002" xml:space="preserve">
-    <value>That phone number already has an account.</value>
+    <value>That username is already taken.</value>
   </data>
   <data name="cl_equ_001" xml:space="preserve">
     <value>Bed {0} already exists in that ward.</value>

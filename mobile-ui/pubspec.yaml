@@ -29,6 +29,16 @@ dependencies:
   # Secure token storage — rubric requires "secure API integration"
   flutter_secure_storage: ^9.0.0
 
+  # Dates the way a person writes them (core/utils/friendly_date.dart).
+  # Hand-rolled padLeft formatting cannot do "Fri, 18 Sep" or a locale.
+  intl: ^0.20.3
+
+  # The patient code as a scannable card, for the reception desk.
+  qr_flutter: ^4.1.0
+
+  # `tel:` links — calling the hospital or your own emergency contact.
+  url_launcher: ^6.3.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

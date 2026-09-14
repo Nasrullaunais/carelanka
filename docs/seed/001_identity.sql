@@ -64,12 +64,12 @@ WHERE NOT EXISTS (
 -- GET /auth/me returns patient_id = null for it. That is the ordinary state, not an error.
 
 INSERT INTO patient_accounts
-    (id, phone_number, password_hash, full_name, last_login_at,
+    (id, username, password_hash, last_login_at,
      created_at, updated_at, is_active, deleted_at)
 VALUES
-    (gen_random_uuid(), '+94771234567',
+    (gen_random_uuid(), 'chathura.w',
      'AQAAAAIAAYagAAAAEKv/cB2nN3X3BWOfSYbIUEmA6rjHv/NYE0wyfZJSUoMnQX0GoPnDmcPY+RxdSU2NWQ==',
-     'Chathura Wijesinghe', NULL,
+     NULL,
      now(), now(), true, NULL)
 
-ON CONFLICT (phone_number) WHERE is_active DO NOTHING;
+ON CONFLICT (username) WHERE is_active DO NOTHING;

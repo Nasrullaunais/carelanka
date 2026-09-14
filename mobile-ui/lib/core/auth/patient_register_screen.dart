@@ -15,8 +15,7 @@ class PatientRegisterScreen extends StatefulWidget {
 
 class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _fullName = TextEditingController();
-  final _phone = TextEditingController();
+  final _username = TextEditingController();
   final _password = TextEditingController();
   final _confirm = TextEditingController();
 
@@ -25,7 +24,7 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
 
   @override
   void dispose() {
-    for (final controller in [_fullName, _phone, _password, _confirm]) {
+    for (final controller in [_username, _password, _confirm]) {
       controller.dispose();
     }
     super.dispose();
@@ -37,8 +36,7 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
     setState(() => _busy = true);
     final auth = context.read<AuthController>();
     final created = await auth.registerAsPatient(
-      fullName: _fullName.text.trim(),
-      phoneNumber: _phone.text.trim(),
+      username: _username.text.trim(),
       password: _password.text,
     );
 
@@ -57,7 +55,8 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
 
     return AuthScaffold(
       title: 'Create an account',
-      subtitle: 'You will use your phone number to sign in.',
+      subtitle: 'Pick a username and a password. Your name and the rest of '
+          'your details come next.',
       children: [
         Form(
           key: _formKey,
@@ -65,21 +64,12 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               AuthTextField(
-                controller: _fullName,
-                label: 'Full name',
+                controller: _username,
+                label: 'Username',
                 enabled: !_busy,
-                keyboardType: TextInputType.name,
-                serverErrors: fieldErrors['full_name'],
-                validator: (value) =>
-                    (value == null || value.trim().isEmpty) ? 'Enter your full name' : null,
-              ),
-              AuthTextField(
-                controller: _phone,
-                label: 'Phone number',
-                enabled: !_busy,
-                keyboardType: TextInputType.phone,
-                serverErrors: fieldErrors['phone_number'],
-                validator: validatePhoneNumber,
+                keyboardType: TextInputType.text,
+                serverErrors: fieldErrors['username'],
+                validator: validateUsername,
               ),
               AuthTextField(
                 controller: _password,

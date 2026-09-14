@@ -1,26 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/friendly_date.dart';
 import '../../../core/widgets/async_view.dart';
 import '../../../services/api_client/models/my_admission.dart';
 import '../state/my_stay_controller.dart';
+import '../state/profile_controller.dart';
+import '../widgets/panels.dart';
+import '../widgets/stay_journey.dart';
+import '../widgets/status_presentation.dart';
 import 'my_details_screen.dart';
 
-class MyStayScreen extends StatefulWidget {
-  const MyStayScreen({super.key});
+/// Where the patient is up to, for someone reading it from a hospital bed.
+class MyStayScreen extends StatelessWidget {
+  const MyStayScreen({super.key, this.onBookVisit});
 
-  @override
-  State<MyStayScreen> createState() => _MyStayScreenState();
-}
-
-class _MyStayScreenState extends State<MyStayScreen> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<MyStayController>().load();
-    });
-  }
+  final VoidCallback? onBookVisit;
 
   @override
   Widget build(BuildContext context) {
@@ -31,19 +27,39 @@ class _MyStayScreenState extends State<MyStayScreen> {
       body: AsyncView<MyStay>(
         state: controller.state,
         onRetry: controller.load,
+        loading: const _StaySkeleton(),
         builder: (context, stay) => switch (stay) {
-          MyStayNotLinked() => const EmptyView(
-              icon: Icons.badge_outlined,
-              message: 'Your login is not linked to a hospital record yet.',
+          MyStayNotLinked() => EmptyView(
+            icon: Icons.badge_outlined,
+            title: 'No hospital record yet',
+            message:
+                'Your login is not joined to a hospital record, so there '
+                'is no stay to show.',
+            action: FilledButton(
+              onPressed: () => openMyDetails(context, context.read<ProfileController>()),
+              style: FilledButton.styleFrom(minimumSize: const Size(200, 48)),
+              child: const Text('Add my details'),
             ),
-          MyStayNoAdmission() => const EmptyView(
-              icon: Icons.event_available_outlined,
-              message: 'You are not admitted right now.\nBook a visit to get started.',
-            ),
+          ),
+          MyStayNoAdmission() => EmptyView(
+            icon: Icons.event_available_outlined,
+            title: 'You are not admitted',
+            message:
+                'Nothing is happening right now. Book a visit and this '
+                'screen will follow you through it.',
+            action: onBookVisit == null
+                ? null
+                : FilledButton.icon(
+                    onPressed: onBookVisit,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Book a visit'),
+                    style: FilledButton.styleFrom(minimumSize: const Size(200, 48)),
+                  ),
+          ),
           MyStayCurrent(:final admission) => _Admission(
-              admission: admission,
-              onRefresh: controller.load,
-            ),
+            admission: admission,
+            onRefresh: controller.load,
+          ),
         },
       ),
     );
@@ -59,40 +75,113 @@ class _Admission extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final journey = StayJourney.of(admission.status);
+
+    // Before a bed is found there is no ward, no bed and no date, and a card
+    // titled "Where and when" holding nothing is worse than no card.
+    final hasPlaceOrTime =
+        admission.wardName != null ||
+        admission.bedNumber != null ||
+        admission.expectedArrival != null ||
+        admission.admittedAt != null ||
+        admission.dischargedAt != null;
 
     return RefreshIndicator(
       onRefresh: onRefresh,
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(AppTheme.gutter, 4, AppTheme.gutter, 32),
         children: [
-          _StatusCard(admission: admission),
-          const SizedBox(height: 16),
-          _DetailRow(label: 'Ward', value: admission.wardName),
-          _DetailRow(label: 'Bed', value: admission.bedNumber),
-          _DetailRow(
-            label: 'Admitted',
-            value: admission.admittedAt == null ? null : formatDateTime(admission.admittedAt!),
-          ),
-          _DetailRow(
-            label: 'Expected arrival',
-            value: admission.expectedArrival == null
-                ? null
-                : formatDateTime(admission.expectedArrival!),
-          ),
-          _DetailRow(
-            label: 'Discharged',
-            value:
-                admission.dischargedAt == null ? null : formatDateTime(admission.dischargedAt!),
-          ),
+          _StatusHeadline(admission: admission),
+          const SizedBox(height: 20),
+          if (journey.cancelled)
+            NoticeBanner(
+              icon: Icons.cancel_outlined,
+              accent: scheme.error,
+              title: 'This visit was called off',
+              body:
+                  'Nothing further will happen with it. Book again when you '
+                  'need to be seen.',
+            )
+          else
+            SectionCard(
+              title: 'Your progress',
+              icon: Icons.route_outlined,
+              child: StayJourneyTracker(journey: journey),
+            ),
+          if (hasPlaceOrTime) ...[
+            const SizedBox(height: 16),
+            SectionCard(
+              title: 'Where and when',
+              icon: Icons.place_outlined,
+              child: Column(
+                children: [
+                  DetailRow(
+                    label: 'Ward',
+                    value: admission.wardName,
+                    icon: Icons.meeting_room_outlined,
+                  ),
+                  DetailRow(label: 'Bed', value: admission.bedNumber, icon: Icons.bed_outlined),
+                  DetailRow(
+                    label: 'Expected',
+                    value: admission.expectedArrival == null
+                        ? null
+                        : FriendlyDate.full(admission.expectedArrival!),
+                    icon: Icons.schedule_outlined,
+                  ),
+                  DetailRow(
+                    label: 'Admitted',
+                    value: admission.admittedAt == null
+                        ? null
+                        : FriendlyDate.full(admission.admittedAt!),
+                    icon: Icons.login_outlined,
+                  ),
+                  DetailRow(
+                    label: 'Discharged',
+                    value: admission.dischargedAt == null
+                        ? null
+                        : FriendlyDate.full(admission.dischargedAt!),
+                    icon: Icons.logout_outlined,
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (admission.dischargeInstructions != null) ...[
-            const SizedBox(height: 24),
-            Text('Discharge instructions', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(admission.dischargeInstructions!),
+            const SizedBox(height: 16),
+            SectionCard(
+              title: 'Before you go',
+              icon: Icons.assignment_outlined,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusM),
+                ),
+                child: Text(
+                  admission.dischargeInstructions!,
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ),
+            ),
           ],
           if (!admission.detailsComplete) ...[
-            const SizedBox(height: 24),
-            _MissingDetailsCard(missing: admission.missingFields),
+            const SizedBox(height: 16),
+            NoticeBanner(
+              icon: Icons.assignment_late_outlined,
+              accent: scheme.warning,
+              title: 'The ward still needs some details',
+              bullets: admission.missingFields.map(prettyFieldName).toList(),
+              action: OutlinedButton(
+                onPressed: () => openMyDetails(context, context.read<ProfileController>()),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 42),
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                ),
+                child: const Text('Add them now'),
+              ),
+            ),
           ],
         ],
       ),
@@ -100,99 +189,64 @@ class _Admission extends StatelessWidget {
   }
 }
 
-class _StatusCard extends StatelessWidget {
-  const _StatusCard({required this.admission});
+class _StatusHeadline extends StatelessWidget {
+  const _StatusHeadline({required this.admission});
 
   final MyAdmission admission;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final look = StatusLook.ofAdmission(admission.status, scheme);
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Current status',
-              style: theme.textTheme.labelMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: 6),
-            // status_text is the backend's own wording for the state machine —
-            // never re-word it here, or the app and the ward disagree.
-            Text(admission.statusText, style: theme.textTheme.headlineSmall),
-          ],
-        ),
+    // The colour is a badge behind the icon, not the whole panel. This is the
+    // first thing on the screen, and a full-bleed colour block here sets the
+    // volume for everything under it.
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(AppTheme.radiusL),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.6)),
       ),
-    );
-  }
-}
-
-class _MissingDetailsCard extends StatelessWidget {
-  const _MissingDetailsCard({required this.missing});
-
-  final List<String> missing;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
-      color: theme.colorScheme.tertiaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'The ward still needs some details',
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(color: theme.colorScheme.onTertiaryContainer),
-            ),
-            const SizedBox(height: 8),
-            ...missing.map((field) => Text(
-                  '• $field',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.colorScheme.onTertiaryContainer),
-                )),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.label, required this.value});
-
-  final String label;
-  final String? value;
-
-  @override
-  Widget build(BuildContext context) {
-    if (value == null) return const SizedBox.shrink();
-
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 140,
-            child: Text(
-              label,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: look.surface, shape: BoxShape.circle),
+            child: Icon(look.icon, size: 22, color: look.color),
+          ),
+          const SizedBox(width: 14),
+          // The server's own sentence, verbatim.
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(admission.statusText, style: theme.textTheme.titleLarge),
             ),
           ),
-          Expanded(child: Text(value!, style: theme.textTheme.bodyMedium)),
         ],
       ),
+    );
+  }
+}
+
+class _StaySkeleton extends StatelessWidget {
+  const _StaySkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(AppTheme.gutter, 4, AppTheme.gutter, 32),
+      children: const [
+        Skeleton(height: 118, radius: AppTheme.radiusL),
+        SizedBox(height: 20),
+        Skeleton(height: 230, radius: AppTheme.radiusL),
+        SizedBox(height: 16),
+        Skeleton(height: 150, radius: AppTheme.radiusL),
+      ],
     );
   }
 }

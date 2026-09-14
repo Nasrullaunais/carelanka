@@ -28,7 +28,7 @@ const _savedProfile = MyProfile(
 
 void main() {
   /// A brand-new login: the account exists, nothing is linked behind it, so the
-  /// shell shows this form full-screen.
+  /// form reads as first-time setup and asks for everything.
   Future<FakePatientService> pumpFirstRunForm(WidgetTester tester) async {
     // Tall enough that the whole form fits without scrolling. Whether it fits
     // a real phone is the layout test's job; this file is about validation.
@@ -59,7 +59,7 @@ void main() {
         ],
         child: MaterialApp(
           theme: AppTheme.light,
-          home: const MyDetailsScreen(firstTime: true),
+          home: const MyDetailsScreen(),
         ),
       ),
     );
@@ -74,8 +74,8 @@ void main() {
     await tester.enterText(find.widgetWithText(TextFormField, 'Phone'), '0771234567');
   }
 
-  Future<void> tapContinue(WidgetTester tester) async {
-    await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+  Future<void> tapSave(WidgetTester tester) async {
+    await tester.tap(find.widgetWithText(FilledButton, 'Save my details'));
     await tester.pumpAndSettle();
   }
 
@@ -97,7 +97,7 @@ void main() {
     final service = await pumpFirstRunForm(tester);
 
     await fillTextFields(tester);
-    await tapContinue(tester);
+    await tapSave(tester);
 
     expect(service.savedDetails, isNull);
     expect(find.text('Choose your gender'), findsOneWidget);
@@ -109,7 +109,7 @@ void main() {
 
     await tester.enterText(find.widgetWithText(TextFormField, 'Full name'), 'Chathura');
     await tester.enterText(find.widgetWithText(TextFormField, 'NIC'), '199012345678');
-    await tapContinue(tester);
+    await tapSave(tester);
 
     expect(service.savedDetails, isNull);
     expect(find.text('Enter your phone number'), findsOneWidget);
@@ -122,7 +122,7 @@ void main() {
 
     await chooseGender(tester, 'Female');
     await pickDateOfBirth(tester);
-    await tapContinue(tester);
+    await tapSave(tester);
 
     expect(service.savedDetails, isNotNull);
     expect(service.savedDetails!.gender, Gender.female);
@@ -143,11 +143,47 @@ void main() {
     expect(find.text('Prefer not to say'), findsNothing);
   });
 
-  testWidgets('the first run offers a way back out to sign-in', (tester) async {
-    await pumpFirstRunForm(tester);
+  testWidgets('first-time setup is a page you can leave, not a wall', (tester) async {
+    final service = FakePatientService()
+      ..profileResult =
+          const ApiException(message: 'not linked', statusCode: 404, code: 'cl_pat_033');
+    final profile = ProfileController(service);
+    await profile.load();
 
-    // Nothing sits behind this screen in the navigator, so without this the
-    // only way off a half-finished sign-up is to reinstall the app.
-    expect(find.widgetWithText(TextButton, 'Sign out'), findsOneWidget);
+    // Opened the way the tabs open it, because "can I get back out" is a
+    // property of being pushed onto something - not of the screen itself.
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: profile,
+        child: MaterialApp(
+          theme: AppTheme.light,
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: TextButton(
+                  onPressed: () => openMyDetails(context, profile),
+                  child: const Text('open'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Finish setting up'), findsOneWidget);
+    // It used to be the only screen an unlinked account could reach, with no
+    // back button and no sign-out, which stranded anyone who signed up on the
+    // wrong account.
+    expect(find.byType(BackButton), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Finish setting up'), findsNothing);
+    expect(find.text('open'), findsOneWidget);
   });
 }

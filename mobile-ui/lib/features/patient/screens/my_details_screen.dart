@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/auth/auth_controller.dart';
 import '../../../core/auth/auth_form.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/friendly_date.dart';
@@ -11,13 +10,11 @@ import '../widgets/panels.dart';
 
 /// The details the hospital needs before it can treat you.
 ///
-/// Shown full-screen the first time, because nothing else in the patient area
-/// works until the account has a record. Afterwards it is reached from Profile
-/// to correct something.
+/// Always pushed on top of something, so it always has a way back out. Whether
+/// it reads as first-time setup or as a correction comes from whether the
+/// account has a record yet, not from a flag a caller could get wrong.
 class MyDetailsScreen extends StatefulWidget {
-  const MyDetailsScreen({super.key, this.firstTime = false});
-
-  final bool firstTime;
+  const MyDetailsScreen({super.key});
 
   @override
   State<MyDetailsScreen> createState() => _MyDetailsScreenState();
@@ -25,6 +22,7 @@ class MyDetailsScreen extends StatefulWidget {
 
 class _MyDetailsScreenState extends State<MyDetailsScreen> {
   final _formKey = GlobalKey<FormState>();
+  late final bool _firstTime;
   final _nic = TextEditingController();
   final _fullName = TextEditingController();
   final _phone = TextEditingController();
@@ -42,6 +40,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
   void initState() {
     super.initState();
     final existing = context.read<ProfileController>().profile.valueOrNull;
+    _firstTime = existing == null;
     if (existing != null) {
       _nic.text = existing.nic ?? '';
       _fullName.text = existing.fullName;
@@ -91,12 +90,15 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     if (!mounted) return;
 
     if (!saved) {
-      final message = controller.saveError?.message ?? 'Could not save your details.';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      // Field errors are already rendered under the fields they belong to.
+      // Toasting "One or more fields are not valid" on top of them names
+      // nothing and hides the field that does.
+      if (controller.fieldErrors.isEmpty) {
+        final message = controller.saveError?.message ?? 'Could not save your details.';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      }
       return;
     }
-
-    if (widget.firstTime) return;
 
     Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -112,21 +114,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     final scheme = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.firstTime ? 'Finish setting up' : 'My details'),
-        automaticallyImplyLeading: !widget.firstTime,
-        actions: [
-          // The only way off this screen on first run. Without it a new account
-          // with no record is a dead end: the back button has nothing behind it
-          // and the router will not let a signed-in user reach sign-in.
-          if (widget.firstTime)
-            TextButton.icon(
-              onPressed: controller.saving ? null : context.read<AuthController>().signOut,
-              icon: const Icon(Icons.logout, size: 18),
-              label: const Text('Sign out'),
-            ),
-        ],
-      ),
+      appBar: AppBar(title: Text(_firstTime ? 'Finish setting up' : 'My details')),
       body: SafeArea(
         child: Form(
           key: _formKey,
@@ -138,7 +126,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
               32,
             ),
             children: [
-              if (widget.firstTime) ...[
+              if (_firstTime) ...[
                 NoticeBanner(
                   icon: Icons.waving_hand_outlined,
                   accent: scheme.primary,
@@ -255,7 +243,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                 child: controller.saving
                     ? const SizedBox(
                         height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                    : Text(widget.firstTime ? 'Continue' : 'Save changes'),
+                    : Text(_firstTime ? 'Save my details' : 'Save changes'),
               ),
             ],
           ),

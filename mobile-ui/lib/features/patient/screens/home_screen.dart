@@ -34,8 +34,6 @@ class HomeScreen extends StatelessWidget {
     final stay = context.watch<MyStayController>();
     final appointments = context.watch<AppointmentsController>();
 
-    if (profile == null) return const SizedBox.shrink();
-
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: () async {
@@ -52,7 +50,9 @@ class HomeScreen extends StatelessWidget {
             AppTheme.gutter,
             32,
           ),
-          children: [
+          children: profile == null
+              ? const [_NotLinkedYet()]
+              : [
             _Greeting(profile: profile),
             const SizedBox(height: 20),
             _WhatsNext(
@@ -73,6 +73,41 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Home for an account with no hospital record behind it.
+///
+/// Everything else on Home is built from that record, so there is nothing
+/// truthful to show until it exists. One thing to do, and no controls that
+/// would be refused the moment they were tapped.
+class _NotLinkedYet extends StatelessWidget {
+  const _NotLinkedYet();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(_timeOfDayGreeting(), style: theme.textTheme.headlineSmall),
+        const SizedBox(height: 20),
+        NoticeBanner(
+          icon: Icons.badge_outlined,
+          accent: theme.colorScheme.warning,
+          title: 'Finish setting up',
+          body: 'Your login works, but it is not joined to a hospital record '
+              'yet. Add your details and you can book a visit and follow a '
+              'stay from here.',
+          action: FilledButton(
+            onPressed: () => openMyDetails(context, context.read<ProfileController>()),
+            style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+            child: const Text('Add my details'),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -125,17 +160,17 @@ class _Greeting extends StatelessWidget {
     );
   }
 
-  static String _timeOfDayGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  }
-
   static String _firstName(String fullName) {
     final parts = fullName.trim().split(RegExp(r'\s+'));
     return parts.isEmpty ? fullName : parts.first;
   }
+}
+
+String _timeOfDayGreeting() {
+  final hour = DateTime.now().hour;
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
 }
 
 /// The one card that matters. A current stay outranks a booking, because

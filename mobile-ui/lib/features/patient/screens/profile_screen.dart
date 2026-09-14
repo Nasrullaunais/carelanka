@@ -18,9 +18,6 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final profileController = context.watch<ProfileController>();
     final profile = profileController.profile.valueOrNull;
-
-    if (profile == null) return const SizedBox.shrink();
-
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -28,55 +25,73 @@ class ProfileScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(AppTheme.gutter, 4, AppTheme.gutter, 32),
         children: [
-          _Header(profile: profile),
-          const SizedBox(height: 20),
-          if (!profile.detailsComplete) ...[
+          if (profile == null) ...[
+            const _AccountOnlyHeader(),
+            const SizedBox(height: 20),
             NoticeBanner(
-              icon: Icons.info_outline,
+              icon: Icons.badge_outlined,
               accent: scheme.warning,
-              title: 'Some details are still missing',
-              bullets: profile.missingFields.map(prettyFieldName).toList(),
-              action: OutlinedButton(
+              title: 'No hospital record yet',
+              body: 'Your login is not joined to a hospital record, so there '
+                  'is nothing to show here yet.',
+              action: FilledButton(
                 onPressed: () => openMyDetails(context, profileController),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(0, 42),
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                ),
-                child: const Text('Add them now'),
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+                child: const Text('Add my details'),
               ),
             ),
             const SizedBox(height: 16),
+          ] else ...[
+            _Header(profile: profile),
+            const SizedBox(height: 20),
+            if (!profile.detailsComplete) ...[
+              NoticeBanner(
+                icon: Icons.info_outline,
+                accent: scheme.warning,
+                title: 'Some details are still missing',
+                bullets: profile.missingFields.map(prettyFieldName).toList(),
+                action: OutlinedButton(
+                  onPressed: () => openMyDetails(context, profileController),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 42),
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                  ),
+                  child: const Text('Add them now'),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+            SectionCard(
+              title: 'Your details',
+              icon: Icons.badge_outlined,
+              trailing: TextButton(
+                onPressed: () => openMyDetails(context, profileController),
+                child: const Text('Edit'),
+              ),
+              child: Column(
+                children: [
+                  DetailRow(label: 'NIC', value: profile.nic, icon: Icons.pin_outlined),
+                  DetailRow(
+                    label: 'Gender',
+                    value: genderLabel(profile.gender),
+                    icon: Icons.wc_outlined,
+                  ),
+                  DetailRow(
+                    label: 'Born',
+                    value: profile.dateOfBirth == null
+                        ? null
+                        : FriendlyDate.date(profile.dateOfBirth!),
+                    icon: Icons.cake_outlined,
+                  ),
+                  DetailRow(label: 'Phone', value: profile.phone, icon: Icons.phone_outlined),
+                  DetailRow(label: 'Address', value: profile.address, icon: Icons.home_outlined),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            _EmergencyContact(profile: profile),
+            const SizedBox(height: 16),
           ],
-          SectionCard(
-            title: 'Your details',
-            icon: Icons.badge_outlined,
-            trailing: TextButton(
-              onPressed: () => openMyDetails(context, profileController),
-              child: const Text('Edit'),
-            ),
-            child: Column(
-              children: [
-                DetailRow(label: 'NIC', value: profile.nic, icon: Icons.pin_outlined),
-                DetailRow(
-                  label: 'Gender',
-                  value: genderLabel(profile.gender),
-                  icon: Icons.wc_outlined,
-                ),
-                DetailRow(
-                  label: 'Born',
-                  value: profile.dateOfBirth == null
-                      ? null
-                      : FriendlyDate.date(profile.dateOfBirth!),
-                  icon: Icons.cake_outlined,
-                ),
-                DetailRow(label: 'Phone', value: profile.phone, icon: Icons.phone_outlined),
-                DetailRow(label: 'Address', value: profile.address, icon: Icons.home_outlined),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          _EmergencyContact(profile: profile),
-          const SizedBox(height: 16),
           Card(
             child: Column(
               children: [
@@ -85,9 +100,9 @@ class ProfileScreen extends StatelessWidget {
                   title: const Text('Past visits'),
                   subtitle: const Text('Stays that have finished'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const PastVisitsScreen()),
-                  ),
+                  onTap: () => Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute(builder: (_) => const PastVisitsScreen())),
                 ),
                 const Divider(indent: 20, endIndent: 20),
                 ListTile(
@@ -100,6 +115,49 @@ class ProfileScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The header for an account with no record behind it. `display_name` is the
+/// username at this point - the account is created before any medical record
+/// exists, so there is no person's name to show.
+class _AccountOnlyHeader extends StatelessWidget {
+  const _AccountOnlyHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final username = context.watch<AuthController>().principal?.displayName ?? '';
+
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 30,
+          backgroundColor: scheme.surfaceContainerHighest,
+          child: Icon(Icons.person_outline, size: 30, color: scheme.onSurfaceVariant),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                username,
+                style: theme.textTheme.titleLarge,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Signed in',
+                style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

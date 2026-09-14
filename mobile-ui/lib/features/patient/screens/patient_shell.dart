@@ -9,15 +9,17 @@ import '../state/my_stay_controller.dart';
 import '../state/profile_controller.dart';
 import 'appointments_screen.dart';
 import 'home_screen.dart';
-import 'my_details_screen.dart';
 import 'my_stay_screen.dart';
 import 'profile_screen.dart';
 
 /// The patient area: home, appointments, stay and profile behind a bottom bar.
 ///
 /// A new account has no hospital record behind it, and without one there is no
-/// stay to show and booking a visit is refused. The record is loaded once here
-/// so each tab does not have to discover that for itself.
+/// stay to show and booking a visit is refused. The tabs still open - each one
+/// says why it is empty and offers the details form - because a blocking form
+/// with no way past it strands anyone who signed up with the wrong account.
+/// The record is loaded once here so each tab does not have to discover that
+/// for itself.
 class PatientShell extends StatefulWidget {
   const PatientShell({super.key});
 
@@ -78,15 +80,13 @@ class _PatientShellState extends State<PatientShell> {
   Widget build(BuildContext context) {
     final profile = context.watch<ProfileController>();
 
-    // Wraps everything, not just the tabs — the first-run details form and the
-    // loading state are part of the same app and should sit in the same frame.
+    // Wraps everything, not just the tabs — the loading state is part of the
+    // same app and should sit in the same frame.
     return PhoneWidth(
       child: AsyncView<MyProfile?>(
         state: profile.profile,
         onRetry: profile.load,
-        builder: (context, record) {
-          if (record == null) return const MyDetailsScreen(firstTime: true);
-
+        builder: (context, _) {
           return Scaffold(
             body: SafeArea(
               bottom: false,

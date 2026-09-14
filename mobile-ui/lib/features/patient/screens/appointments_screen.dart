@@ -6,9 +6,11 @@ import '../../../core/utils/friendly_date.dart';
 import '../../../core/widgets/async_view.dart';
 import '../../../services/api_client/models/my_appointment.dart';
 import '../state/appointments_controller.dart';
+import '../state/profile_controller.dart';
 import '../widgets/panels.dart';
 import '../widgets/status_presentation.dart';
 import 'book_appointment_sheet.dart';
+import 'my_details_screen.dart';
 
 class AppointmentsScreen extends StatefulWidget {
   const AppointmentsScreen({super.key});
@@ -73,14 +75,20 @@ class AppointmentsScreenState extends State<AppointmentsScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<AppointmentsController>();
+    // The API answers an empty page rather than an error for an unlinked
+    // account, so an empty list alone cannot tell these two apart - and
+    // offering "Book a visit" here would earn a 409 on the first tap.
+    final linked = context.watch<ProfileController>().isLinked;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Appointments')),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: controller.busy ? null : book,
-        icon: const Icon(Icons.add),
-        label: const Text('Book a visit'),
-      ),
+      floatingActionButton: linked
+          ? FloatingActionButton.extended(
+              onPressed: controller.busy ? null : book,
+              icon: const Icon(Icons.add),
+              label: const Text('Book a visit'),
+            )
+          : null,
       body: AsyncView<List<MyAppointment>>(
         state: controller.appointments,
         onRetry: controller.load,
@@ -88,6 +96,20 @@ class AppointmentsScreenState extends State<AppointmentsScreen> {
         builder: (context, _) {
           final upcoming = controller.upcoming;
           final past = controller.past;
+
+          if (!linked) {
+            return EmptyView(
+              icon: Icons.badge_outlined,
+              title: 'Finish setting up first',
+              message: 'The hospital needs your details before it can take a '
+                  'booking from you.',
+              action: FilledButton(
+                onPressed: () => openMyDetails(context, context.read<ProfileController>()),
+                style: FilledButton.styleFrom(minimumSize: const Size(200, 48)),
+                child: const Text('Add my details'),
+              ),
+            );
+          }
 
           if (upcoming.isEmpty && past.isEmpty) {
             return EmptyView(

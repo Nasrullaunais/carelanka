@@ -16,6 +16,9 @@ AmbulanceDetail _$AmbulanceDetailFromJson(Map<String, dynamic> json) =>
       updatedAt: DateTime.parse(json['updated_at'] as String),
       currentLatitude: (json['current_latitude'] as num?)?.toDouble(),
       currentLongitude: (json['current_longitude'] as num?)?.toDouble(),
+      locationUpdatedAt: json['location_updated_at'] == null
+          ? null
+          : DateTime.parse(json['location_updated_at'] as String),
       outOfServiceReason: json['out_of_service_reason'] as String?,
       activeDispatch: json['active_dispatch'] == null
           ? null
@@ -24,6 +27,11 @@ AmbulanceDetail _$AmbulanceDetailFromJson(Map<String, dynamic> json) =>
             ),
       isDivertible: json['is_divertible'] as bool?,
       runsToday: (json['runs_today'] as num?)?.toInt(),
+      currentCrew: (json['current_crew'] as List<dynamic>?)
+          ?.map(
+            (e) => AmbulanceCrewAssignment.fromJson(e as Map<String, dynamic>),
+          )
+          .toList(),
     );
 
 Map<String, dynamic> _$AmbulanceDetailToJson(AmbulanceDetail instance) =>
@@ -32,6 +40,7 @@ Map<String, dynamic> _$AmbulanceDetailToJson(AmbulanceDetail instance) =>
       'registration_number': instance.registrationNumber,
       'current_latitude': instance.currentLatitude,
       'current_longitude': instance.currentLongitude,
+      'location_updated_at': instance.locationUpdatedAt?.toIso8601String(),
       'status': instance.status,
       'out_of_service_reason': instance.outOfServiceReason,
       'is_active': instance.isActive,
@@ -40,4 +49,5 @@ Map<String, dynamic> _$AmbulanceDetailToJson(AmbulanceDetail instance) =>
       'active_dispatch': instance.activeDispatch,
       'is_divertible': instance.isDivertible,
       'runs_today': instance.runsToday,
+      'current_crew': instance.currentCrew,
     };

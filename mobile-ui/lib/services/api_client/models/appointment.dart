@@ -16,9 +16,13 @@ class Appointment {
     required this.patient,
     required this.scheduledAt,
     required this.status,
+    required this.canCancel,
+    required this.canComplete,
     this.reason,
     this.bookedByStaffId,
     this.admissionId,
+    this.cancellationReason,
+    this.cancelledByStaffId,
     this.createdAt,
     this.updatedAt,
   });
@@ -35,6 +39,14 @@ class Appointment {
   final String? bookedByStaffId;
   @JsonKey(name: 'admission_id')
   final String? admissionId;
+  @JsonKey(name: 'cancellation_reason')
+  final String? cancellationReason;
+  @JsonKey(name: 'cancelled_by_staff_id')
+  final String? cancelledByStaffId;
+  @JsonKey(name: 'can_cancel')
+  final bool canCancel;
+  @JsonKey(name: 'can_complete')
+  final bool canComplete;
   @JsonKey(name: 'created_at')
   final DateTime? createdAt;
   @JsonKey(name: 'updated_at')

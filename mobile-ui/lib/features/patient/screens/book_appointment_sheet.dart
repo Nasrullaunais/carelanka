@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/friendly_date.dart';
+import '../validation/patient_fields.dart';
 
 class BookAppointmentRequestDraft {
   const BookAppointmentRequestDraft({required this.scheduledAt, this.reason});
@@ -81,7 +82,7 @@ class _BookAppointmentSheetState extends State<_BookAppointmentSheet> {
 
     if (scheduledAt.isBefore(DateTime.now())) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pick a time in the future.')),
+        const SnackBar(content: Text('Select a date and time in the future.')),
       );
       return;
     }
@@ -116,11 +117,11 @@ class _BookAppointmentSheetState extends State<_BookAppointmentSheet> {
               Text('Book a visit', style: theme.textTheme.titleLarge),
               const SizedBox(height: 4),
               Text(
-                'You can have one open booking at a time.',
+                'Only one open booking is allowed at a time.',
                 style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
               ),
               const SizedBox(height: 22),
-              const _Label('Which day'),
+              const _Label('Date'),
               const SizedBox(height: 10),
               Wrap(
                 spacing: 8,
@@ -145,7 +146,7 @@ class _BookAppointmentSheetState extends State<_BookAppointmentSheet> {
                 ],
               ),
               const SizedBox(height: 22),
-              const _Label('What time'),
+              const _Label('Time'),
               const SizedBox(height: 10),
               Wrap(
                 spacing: 8,
@@ -168,14 +169,17 @@ class _BookAppointmentSheetState extends State<_BookAppointmentSheet> {
                 ],
               ),
               const SizedBox(height: 22),
-              const _Label('What is it about?'),
+              const _Label('Reason for visit'),
               const SizedBox(height: 10),
               TextFormField(
                 controller: _reason,
                 maxLines: 3,
+                maxLength: PatientFieldLimits.visitReason,
+                buildCounter: nearLimitCounter(),
                 textCapitalization: TextCapitalization.sentences,
+                validator: validateVisitReason,
                 decoration: const InputDecoration(
-                  hintText: 'Optional — it helps the ward prepare',
+                  hintText: 'Optional',
                   alignLabelWithHint: true,
                 ),
               ),

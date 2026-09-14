@@ -19,4 +19,14 @@ public class Appointment : AuditedEntity
     public Guid? AdmissionId { get; set; }
 
     public Admission? Admission { get; set; }
+
+    public string? CancellationReason { get; set; }
+
+    /// <summary>
+    /// Null when the patient cancelled it themselves, which is what tells the
+    /// two apart - the app says "you cancelled this" or "the hospital did".
+    /// </summary>
+    public Guid? CancelledByStaffMemberId { get; set; }
+
+    public Bill? Bill { get; set; }
 }

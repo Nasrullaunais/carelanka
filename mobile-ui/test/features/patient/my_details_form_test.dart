@@ -174,7 +174,7 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Finish setting up'), findsOneWidget);
+    expect(find.text('Add my details'), findsOneWidget);
     // It used to be the only screen an unlinked account could reach, with no
     // back button and no sign-out, which stranded anyone who signed up on the
     // wrong account.
@@ -183,7 +183,7 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    expect(find.text('Finish setting up'), findsNothing);
+    expect(find.text('Add my details'), findsNothing);
     expect(find.text('open'), findsOneWidget);
   });
 }

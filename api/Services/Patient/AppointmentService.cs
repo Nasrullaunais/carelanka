@@ -120,6 +120,57 @@ public sealed class AppointmentService : IAppointmentService
         return appointment;
     }
 
+    public async Task<AppointmentResponse> CancelAtTheDeskAsync(
+        Guid id, CancelAppointmentRequest request, CancellationToken ct = default)
+    {
+        var appointment = await _db.Appointments
+            .Include(a => a.Patient)
+            .FirstOrDefaultAsync(a => a.Id == id, ct)
+            ?? throw new NotFoundException("Appointment", id);
+
+        if (appointment.Status != AppointmentStatus.Scheduled)
+        {
+            throw new IllegalTransitionException(
+                "Appointment",
+                EnumWire.ToWire(appointment.Status),
+                EnumWire.ToWire(AppointmentStatus.Cancelled));
+        }
+
+        appointment.Status = AppointmentStatus.Cancelled;
+        appointment.CancellationReason = request.Reason.Trim();
+        appointment.CancelledByStaffMemberId = _currentUser.Id;
+
+        await _db.SaveChangesAsync(ct);
+
+        return ToResponse(appointment);
+    }
+
+    /// <summary>
+    /// The patient came in, was seen, and went home. No admission and no bed,
+    /// so the only thing left is the bill.
+    /// </summary>
+    public async Task<AppointmentResponse> CompleteAsync(Guid id, CancellationToken ct = default)
+    {
+        var appointment = await _db.Appointments
+            .Include(a => a.Patient)
+            .FirstOrDefaultAsync(a => a.Id == id, ct)
+            ?? throw new NotFoundException("Appointment", id);
+
+        if (appointment.Status != AppointmentStatus.Scheduled)
+        {
+            throw new IllegalTransitionException(
+                "Appointment",
+                EnumWire.ToWire(appointment.Status),
+                EnumWire.ToWire(AppointmentStatus.Completed));
+        }
+
+        appointment.Status = AppointmentStatus.Completed;
+
+        await _db.SaveChangesAsync(ct);
+
+        return ToResponse(appointment);
+    }
+
     private async Task<AppointmentEntity> BookAsync(
         PatientEntity patient,
         DateTimeOffset? requestedAt,
@@ -251,6 +302,10 @@ public sealed class AppointmentService : IAppointmentService
             Reason = appointment.Reason,
             BookedByStaffId = appointment.BookedByStaffMemberId,
             AdmissionId = appointment.AdmissionId,
+            CancellationReason = appointment.CancellationReason,
+            CancelledByStaffId = appointment.CancelledByStaffMemberId,
+            CanCancel = appointment.Status == AppointmentStatus.Scheduled,
+            CanComplete = appointment.Status == AppointmentStatus.Scheduled,
             CreatedAt = appointment.CreatedAt,
             UpdatedAt = appointment.UpdatedAt
         };

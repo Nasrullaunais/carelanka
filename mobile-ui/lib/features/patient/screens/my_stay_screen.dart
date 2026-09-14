@@ -6,11 +6,9 @@ import '../../../core/utils/friendly_date.dart';
 import '../../../core/widgets/async_view.dart';
 import '../../../services/api_client/models/my_admission.dart';
 import '../state/my_stay_controller.dart';
-import '../state/profile_controller.dart';
 import '../widgets/panels.dart';
 import '../widgets/stay_journey.dart';
 import '../widgets/status_presentation.dart';
-import 'my_details_screen.dart';
 
 /// Where the patient is up to, for someone reading it from a hospital bed.
 class MyStayScreen extends StatelessWidget {
@@ -29,24 +27,16 @@ class MyStayScreen extends StatelessWidget {
         onRetry: controller.load,
         loading: const _StaySkeleton(),
         builder: (context, stay) => switch (stay) {
-          MyStayNotLinked() => EmptyView(
+          MyStayNotLinked() => const EmptyView(
             icon: Icons.badge_outlined,
-            title: 'No hospital record yet',
-            message:
-                'Your login is not joined to a hospital record, so there '
-                'is no stay to show.',
-            action: FilledButton(
-              onPressed: () => openMyDetails(context, context.read<ProfileController>()),
-              style: FilledButton.styleFrom(minimumSize: const Size(200, 48)),
-              child: const Text('Add my details'),
-            ),
+            title: 'No hospital record',
+            message: 'Your account is not yet linked to a hospital record.',
           ),
           MyStayNoAdmission() => EmptyView(
             icon: Icons.event_available_outlined,
-            title: 'You are not admitted',
-            message:
-                'Nothing is happening right now. Book a visit and this '
-                'screen will follow you through it.',
+            title: 'Not currently admitted',
+            message: 'Your ward, bed and progress will appear here once '
+                'hospital staff admit you.',
             action: onBookVisit == null
                 ? null
                 : FilledButton.icon(
@@ -79,7 +69,7 @@ class _Admission extends StatelessWidget {
     final journey = StayJourney.of(admission.status);
 
     // Before a bed is found there is no ward, no bed and no date, and a card
-    // titled "Where and when" holding nothing is worse than no card.
+    // titled "Location and dates" holding nothing is worse than no card.
     final hasPlaceOrTime =
         admission.wardName != null ||
         admission.bedNumber != null ||
@@ -98,10 +88,8 @@ class _Admission extends StatelessWidget {
             NoticeBanner(
               icon: Icons.cancel_outlined,
               accent: scheme.error,
-              title: 'This visit was called off',
-              body:
-                  'Nothing further will happen with it. Book again when you '
-                  'need to be seen.',
+              title: 'Admission cancelled',
+              body: 'You may book another visit when required.',
             )
           else
             SectionCard(
@@ -112,7 +100,7 @@ class _Admission extends StatelessWidget {
           if (hasPlaceOrTime) ...[
             const SizedBox(height: 16),
             SectionCard(
-              title: 'Where and when',
+              title: 'Location and dates',
               icon: Icons.place_outlined,
               child: Column(
                 children: [
@@ -150,7 +138,7 @@ class _Admission extends StatelessWidget {
           if (admission.dischargeInstructions != null) ...[
             const SizedBox(height: 16),
             SectionCard(
-              title: 'Before you go',
+              title: 'Discharge instructions',
               icon: Icons.assignment_outlined,
               child: Container(
                 width: double.infinity,
@@ -163,23 +151,6 @@ class _Admission extends StatelessWidget {
                   admission.dischargeInstructions!,
                   style: theme.textTheme.bodyMedium,
                 ),
-              ),
-            ),
-          ],
-          if (!admission.detailsComplete) ...[
-            const SizedBox(height: 16),
-            NoticeBanner(
-              icon: Icons.assignment_late_outlined,
-              accent: scheme.warning,
-              title: 'The ward still needs some details',
-              bullets: admission.missingFields.map(prettyFieldName).toList(),
-              action: OutlinedButton(
-                onPressed: () => openMyDetails(context, context.read<ProfileController>()),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(0, 42),
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                ),
-                child: const Text('Add them now'),
               ),
             ),
           ],

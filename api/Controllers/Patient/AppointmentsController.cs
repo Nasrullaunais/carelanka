@@ -21,7 +21,7 @@ public class AppointmentsController : ControllerBase
     public AppointmentsController(IAppointmentService appointments)
         => _appointments = appointments;
 
-    [Authorize(Policy = Policies.AppointmentDesk)]
+    [Authorize(Policy = Policies.AppointmentBoard)]
     [HttpGet(Name = "listAppointments")]
     [ProducesResponseType(typeof(PagedResult<AppointmentResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
@@ -66,4 +66,27 @@ public class AppointmentsController : ControllerBase
 
         return CreatedAtRoute("getAdmission", new { id = admission.Id }, admission);
     }
+
+    [Authorize(Policy = Policies.AppointmentDesk)]
+    [HttpPost("{id:guid}/cancel", Name = "cancelAppointmentAtTheDesk")]
+    [ProducesResponseType(typeof(AppointmentResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<AppointmentResponse>> CancelAppointmentAtTheDesk(
+        Guid id, [FromBody] CancelAppointmentRequest request, CancellationToken ct)
+        => Ok(await _appointments.CancelAtTheDeskAsync(id, request, ct));
+
+    [Authorize(Policy = Policies.AppointmentDesk)]
+    [HttpPost("{id:guid}/complete", Name = "completeAppointment")]
+    [ProducesResponseType(typeof(AppointmentResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<AppointmentResponse>> CompleteAppointment(
+        Guid id, CancellationToken ct)
+        => Ok(await _appointments.CompleteAsync(id, ct));
 }

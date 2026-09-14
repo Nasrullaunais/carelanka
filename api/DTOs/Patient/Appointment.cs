@@ -23,6 +23,16 @@ public class Appointment
 
     public Guid? AdmissionId { get; set; }
 
+    public string? CancellationReason { get; set; }
+
+    public Guid? CancelledByStaffId { get; set; }
+
+    [Required]
+    public bool CanCancel { get; set; }
+
+    [Required]
+    public bool CanComplete { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
 
     public DateTimeOffset UpdatedAt { get; set; }

@@ -1521,6 +1521,15 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("booked_by_staff_member_id");
 
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("cancellation_reason");
+
+                    b.Property<Guid?>("CancelledByStaffMemberId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cancelled_by_staff_member_id");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -1556,6 +1565,9 @@ namespace CareLanka.Api.Data.Migrations
 
                     b.HasIndex("BookedByStaffMemberId")
                         .HasDatabaseName("ix_appointments_booked_by_staff_member_id");
+
+                    b.HasIndex("CancelledByStaffMemberId")
+                        .HasDatabaseName("ix_appointments_cancelled_by_staff_member_id");
 
                     b.HasIndex("PatientId")
                         .HasDatabaseName("ix_appointments_patient_id");
@@ -1681,9 +1693,13 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<Guid>("AdmissionId")
+                    b.Property<Guid?>("AdmissionId")
                         .HasColumnType("uuid")
                         .HasColumnName("admission_id");
+
+                    b.Property<Guid?>("AppointmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("appointment_id");
 
                     b.Property<string>("BillNumber")
                         .IsRequired()
@@ -1721,7 +1737,13 @@ namespace CareLanka.Api.Data.Migrations
 
                     b.HasIndex("AdmissionId")
                         .IsUnique()
-                        .HasDatabaseName("ux_bills_admission_id");
+                        .HasDatabaseName("ux_bills_admission_id")
+                        .HasFilter("admission_id IS NOT NULL");
+
+                    b.HasIndex("AppointmentId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_bills_appointment_id")
+                        .HasFilter("appointment_id IS NOT NULL");
 
                     b.HasIndex("BillNumber")
                         .IsUnique()
@@ -1730,7 +1752,10 @@ namespace CareLanka.Api.Data.Migrations
                     b.HasIndex("SettledByStaffMemberId")
                         .HasDatabaseName("ix_bills_settled_by_staff_member_id");
 
-                    b.ToTable("bills", (string)null);
+                    b.ToTable("bills", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_bills_one_owner", "(admission_id IS NULL) <> (appointment_id IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.BillLineItem", b =>
@@ -1788,7 +1813,7 @@ namespace CareLanka.Api.Data.Migrations
                         {
                             t.HasCheckConstraint("ck_bill_line_items_quantity", "quantity > 0");
 
-                            t.HasCheckConstraint("ck_bill_line_items_source", "source IN ('admission_fee', 'bed_stay', 'manual')");
+                            t.HasCheckConstraint("ck_bill_line_items_source", "source IN ('admission_fee', 'bed_stay', 'consultation_fee', 'manual')");
 
                             t.HasCheckConstraint("ck_bill_line_items_unit_price", "unit_price >= 0");
                         });
@@ -2339,6 +2364,12 @@ namespace CareLanka.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_appointments_staff_members_booked_by_staff_member_id");
 
+                    b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", null)
+                        .WithMany()
+                        .HasForeignKey("CancelledByStaffMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_appointments_staff_members_cancelled_by_staff_member_id");
+
                     b.HasOne("CareLanka.Api.Data.Entities.Patient.Patient", "Patient")
                         .WithMany("Appointments")
                         .HasForeignKey("PatientId")
@@ -2375,8 +2406,13 @@ namespace CareLanka.Api.Data.Migrations
                         .WithOne()
                         .HasForeignKey("CareLanka.Api.Data.Entities.Patient.Bill", "AdmissionId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_bills_admissions_admission_id");
+
+                    b.HasOne("CareLanka.Api.Data.Entities.Patient.Appointment", "Appointment")
+                        .WithOne("Bill")
+                        .HasForeignKey("CareLanka.Api.Data.Entities.Patient.Bill", "AppointmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_bills_appointments_appointment_id");
 
                     b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", null)
                         .WithMany()
@@ -2385,6 +2421,8 @@ namespace CareLanka.Api.Data.Migrations
                         .HasConstraintName("fk_bills_staff_members_settled_by_staff_member_id");
 
                     b.Navigation("Admission");
+
+                    b.Navigation("Appointment");
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.BillLineItem", b =>
@@ -2493,6 +2531,11 @@ namespace CareLanka.Api.Data.Migrations
                     b.Navigation("BedAssignments");
 
                     b.Navigation("Discharge");
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.Appointment", b =>
+                {
+                    b.Navigation("Bill");
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.Bill", b =>

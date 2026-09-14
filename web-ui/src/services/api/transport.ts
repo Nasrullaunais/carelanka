@@ -45,7 +45,9 @@ client.interceptors.error.use((error, response, request) => {
 
 const signInPaths = ['/auth/login', '/auth/patient/login', '/auth/patient/register'];
 
-const expected404s = [/\/admissions\/[^/]+\/bill$/];
+// "No bill raised yet" is a normal state the panel renders itself, not a
+// failure worth a toast.
+const expected404s = [/\/admissions\/[^/]+\/bill$/, /\/appointments\/[^/]+\/bill$/];
 
 function isExpected404(request: Request | undefined): boolean {
   if (request?.method !== 'GET') {

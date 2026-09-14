@@ -67,7 +67,7 @@ class HomeScreen extends StatelessWidget {
               _CompleteDetailsBanner(missing: profile.missingFields),
             ],
             const SizedBox(height: 24),
-            Text('Things you can do', style: Theme.of(context).textTheme.titleSmall),
+            Text('Quick actions', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 12),
             _QuickActions(profile: profile, onOpenTab: onOpenTab),
           ],
@@ -97,10 +97,8 @@ class _NotLinkedYet extends StatelessWidget {
         NoticeBanner(
           icon: Icons.badge_outlined,
           accent: theme.colorScheme.warning,
-          title: 'Finish setting up',
-          body: 'Your login works, but it is not joined to a hospital record '
-              'yet. Add your details and you can book a visit and follow a '
-              'stay from here.',
+          title: 'Complete your registration',
+          body: 'Add your details to book visits and view your stay.',
           action: FilledButton(
             onPressed: () => openMyDetails(context, context.read<ProfileController>()),
             style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
@@ -253,15 +251,15 @@ class _CurrentStayCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
-                'The ward still needs ${admission.missingFields.length} detail'
-                '${admission.missingFields.length == 1 ? '' : 's'}',
+                '${admission.missingFields.length} detail'
+                '${admission.missingFields.length == 1 ? '' : 's'} missing',
                 style: theme.textTheme.labelSmall?.copyWith(color: Colors.white),
               ),
             ),
           ],
           const SizedBox(height: 12),
           Text(
-            'Tap to follow your progress',
+            'View your progress',
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: Colors.white.withValues(alpha: 0.75)),
           ),
@@ -291,11 +289,10 @@ class _NextVisitOrNothing extends StatelessWidget {
             children: [
               Icon(Icons.event_available_outlined, size: 26, color: theme.colorScheme.primary),
               const SizedBox(height: 12),
-              Text('Nothing booked', style: theme.textTheme.titleMedium),
+              Text('No upcoming visits', style: theme.textTheme.titleMedium),
               const SizedBox(height: 4),
               Text(
-                'When you need to be seen, book a visit and the hospital will '
-                'have your details ready before you arrive.',
+                'Book a visit when you need to be seen.',
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
@@ -421,8 +418,8 @@ class _CompleteDetailsBanner extends StatelessWidget {
     return NoticeBanner(
       icon: Icons.info_outline,
       accent: scheme.warning,
-      title: 'Finish your details',
-      body: 'The hospital needs these before your next visit.',
+      title: 'Incomplete details',
+      body: 'The hospital requires the following before your next visit.',
       bullets: missing.map(prettyFieldName).toList(),
       action: OutlinedButton(
         onPressed: () => openMyDetails(context, controller),
@@ -457,19 +454,19 @@ class _QuickActions extends StatelessWidget {
         _ActionTile(
           icon: Icons.add_circle_outline,
           label: 'Book a visit',
-          caption: 'Pick a day and time',
+          caption: 'Choose a date and time',
           onTap: () => onOpenTab(PatientTab.appointments),
         ),
         _ActionTile(
           icon: Icons.monitor_heart_outlined,
           label: 'My stay',
-          caption: 'Where you are up to',
+          caption: 'Current admission',
           onTap: () => onOpenTab(PatientTab.myStay),
         ),
         _ActionTile(
           icon: Icons.history,
           label: 'Past visits',
-          caption: 'Stays that finished',
+          caption: 'Completed stays',
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const PastVisitsScreen()),
           ),

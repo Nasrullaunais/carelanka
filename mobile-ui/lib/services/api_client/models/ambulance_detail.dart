@@ -4,6 +4,7 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
+import 'ambulance_crew_assignment.dart';
 import 'ambulance_status.dart';
 import 'dispatch_summary.dart';
 
@@ -20,10 +21,12 @@ class AmbulanceDetail {
     required this.updatedAt,
     this.currentLatitude,
     this.currentLongitude,
+    this.locationUpdatedAt,
     this.outOfServiceReason,
     this.activeDispatch,
     this.isDivertible,
     this.runsToday,
+    this.currentCrew,
   });
   
   factory AmbulanceDetail.fromJson(Map<String, Object?> json) => _$AmbulanceDetailFromJson(json);
@@ -35,6 +38,8 @@ class AmbulanceDetail {
   final double? currentLatitude;
   @JsonKey(name: 'current_longitude')
   final double? currentLongitude;
+  @JsonKey(name: 'location_updated_at')
+  final DateTime? locationUpdatedAt;
   final AmbulanceStatus status;
   @JsonKey(name: 'out_of_service_reason')
   final String? outOfServiceReason;
@@ -50,6 +55,8 @@ class AmbulanceDetail {
   final bool? isDivertible;
   @JsonKey(name: 'runs_today')
   final int? runsToday;
+  @JsonKey(name: 'current_crew')
+  final List<AmbulanceCrewAssignment>? currentCrew;
 
   Map<String, Object?> toJson() => _$AmbulanceDetailToJson(this);
 }

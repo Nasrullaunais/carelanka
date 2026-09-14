@@ -9,12 +9,14 @@ import 'clients/ambulances_api.dart';
 import 'clients/auth_api.dart';
 import 'clients/beds_api.dart';
 import 'clients/billing_api.dart';
+import 'clients/calls_api.dart';
 import 'clients/discharge_api.dart';
 import 'clients/equipment_api.dart';
 import 'clients/health_api.dart';
 import 'clients/integration_api.dart';
 import 'clients/laboratory_api.dart';
 import 'clients/maintenance_api.dart';
+import 'clients/my_calls_api.dart';
 import 'clients/patient_self_service_api.dart';
 import 'clients/patients_api.dart';
 import 'clients/pharmacy_api.dart';
@@ -38,12 +40,14 @@ class CareLankaApi {
   AuthApi? _auth;
   BedsApi? _beds;
   BillingApi? _billing;
+  CallsApi? _calls;
   DischargeApi? _discharge;
   EquipmentApi? _equipment;
   HealthApi? _health;
   IntegrationApi? _integration;
   LaboratoryApi? _laboratory;
   MaintenanceApi? _maintenance;
+  MyCallsApi? _myCalls;
   PatientSelfServiceApi? _patientSelfService;
   PatientsApi? _patients;
   PharmacyApi? _pharmacy;
@@ -59,6 +63,8 @@ class CareLankaApi {
 
   BillingApi get billing => _billing ??= BillingApi(_dio, baseUrl: _baseUrl);
 
+  CallsApi get calls => _calls ??= CallsApi(_dio, baseUrl: _baseUrl);
+
   DischargeApi get discharge => _discharge ??= DischargeApi(_dio, baseUrl: _baseUrl);
 
   EquipmentApi get equipment => _equipment ??= EquipmentApi(_dio, baseUrl: _baseUrl);
@@ -70,6 +76,8 @@ class CareLankaApi {
   LaboratoryApi get laboratory => _laboratory ??= LaboratoryApi(_dio, baseUrl: _baseUrl);
 
   MaintenanceApi get maintenance => _maintenance ??= MaintenanceApi(_dio, baseUrl: _baseUrl);
+
+  MyCallsApi get myCalls => _myCalls ??= MyCallsApi(_dio, baseUrl: _baseUrl);
 
   PatientSelfServiceApi get patientSelfService => _patientSelfService ??= PatientSelfServiceApi(_dio, baseUrl: _baseUrl);
 

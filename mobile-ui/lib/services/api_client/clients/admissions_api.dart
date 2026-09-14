@@ -18,6 +18,7 @@ import '../models/appointment_status.dart';
 import '../models/assign_bed_request.dart';
 import '../models/bed_assignment.dart';
 import '../models/cancel_admission_request.dart';
+import '../models/cancel_appointment_request.dart';
 import '../models/check_in_request.dart';
 import '../models/complete_details_request.dart';
 import '../models/correct_bed_request.dart';
@@ -106,6 +107,17 @@ abstract class AdmissionsApi {
   Future<Admission> checkInAppointment({
     @Path('id') required String id,
     @Body() CheckInRequest? body,
+  });
+
+  @POST('/appointments/{id}/cancel')
+  Future<Appointment> cancelAppointmentAtTheDesk({
+    @Path('id') required String id,
+    @Body() CancelAppointmentRequest? body,
+  });
+
+  @POST('/appointments/{id}/complete')
+  Future<Appointment> completeAppointment({
+    @Path('id') required String id,
   });
 
   @GET('/patient-worklist')

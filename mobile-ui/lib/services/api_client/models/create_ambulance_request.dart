@@ -17,7 +17,7 @@ class CreateAmbulanceRequest {
   factory CreateAmbulanceRequest.fromJson(Map<String, Object?> json) => _$CreateAmbulanceRequestFromJson(json);
   
   @JsonKey(name: 'registration_number')
-  final String registrationNumber;
+  final String? registrationNumber;
   @JsonKey(name: 'current_latitude')
   final double? currentLatitude;
   @JsonKey(name: 'current_longitude')

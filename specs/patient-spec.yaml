@@ -1759,11 +1759,16 @@ paths:
       tags: [Admissions]
       summary: Expected visits worklist
       description: |
-        Roles: WardNurse, DutyManager.
+        Roles: WardNurse, DutyManager, GeneralStaff, HospitalAdministrator.
 
         Who is expected in, so the desk knows before they walk up. This is the React screen
         a nurse works from; the patient's own view of the same booking is
         `GET /me/appointments`, and the two are deliberately different shapes.
+
+        **Reading the list is wider than acting on a booking** (widened 2026-09-15). Checking
+        in, cancelling and completing stay on WardNurse and DutyManager, but the billing desk
+        has to reach a completed appointment to bill it and cannot check anyone in. Same split
+        as `GET /discharges/candidates` against the checklist endpoints.
       operationId: listAppointments
       parameters:
         - $ref: '#/components/parameters/Page'
@@ -1816,6 +1821,221 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
           description: That patient already has an open appointment or admission.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /appointments/{id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Admissions]
+      summary: Call off a booking from the desk
+      description: |
+        Roles: WardNurse, DutyManager, GeneralStaff.
+
+        The reason is required, because the patient reads it in their app. It is also where
+        the desk names a time the clinic can actually see them - "Clinic full at 09:00, please
+        rebook after 14:00" - which is why there is no separate propose-a-time flow. The
+        patient books again themselves.
+
+        Only a `scheduled` booking can be called off. Once it is `checked_in` the patient is
+        already in the building, and 409 says so.
+
+        **The patient's own cancel is a different route**, `POST /me/appointments/{id}/cancel`,
+        and records no reason and no staff id. That difference is what
+        `MyAppointment.cancelled_by_hospital` reports.
+      operationId: cancelAppointmentAtTheDesk
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CancelAppointmentRequest' }
+      responses:
+        '200':
+          description: The booking, now cancelled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Appointment' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
+  /appointments/{id}/complete:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Admissions]
+      summary: Record that the patient was seen and went home
+      description: |
+        Roles: WardNurse, DutyManager, GeneralStaff.
+
+        The outpatient path. The patient came in for their booking, was seen, and left without
+        being admitted - so there is no admission, no bed and no discharge. What is left is the
+        bill, raised against the appointment at `POST /appointments/{id}/bill`.
+
+        **Check in is the other path**, and the two are exclusive: checking in creates an
+        `Admission` and is for a patient who is staying. Only a `scheduled` booking can be
+        completed.
+      operationId: completeAppointment
+      responses:
+        '200':
+          description: The booking, now completed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Appointment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
+  /appointments/{appointmentId}/bill:
+    parameters:
+      - name: appointmentId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Billing]
+      summary: The bill for an appointment
+      description: |
+        Roles: GeneralStaff, WardNurse, DutyManager, HospitalAdministrator, Doctor, EquipmentManager.
+
+        404 until somebody prepares one, same as the admission bill.
+      operationId: getAppointmentBill
+      responses:
+        '200':
+          description: The bill
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bill' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Billing]
+      summary: Raise or re-price an appointment bill
+      description: |
+        Roles: GeneralStaff, HospitalAdministrator.
+
+        Writes the bill if it does not exist, then replaces its generated line with a single
+        `consultation_fee`. Typed `manual` lines are left alone. 409 once settled.
+      operationId: prepareAppointmentBill
+      responses:
+        '200':
+          description: The bill
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bill' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The bill is already settled and cannot be changed (`cl_pat_026`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /appointments/{appointmentId}/bill/charges:
+    parameters:
+      - name: appointmentId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Billing]
+      summary: Add a typed charge to an appointment bill
+      description: |
+        Roles: GeneralStaff, HospitalAdministrator. 409 once settled.
+      operationId: addAppointmentBillCharge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddBillChargeRequest' }
+      responses:
+        '200':
+          description: The bill, with the charge on it
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bill' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The bill is already settled and cannot be changed (`cl_pat_026`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /appointments/{appointmentId}/bill/charges/{lineId}:
+    parameters:
+      - name: appointmentId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: lineId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      tags: [Billing]
+      summary: Remove a typed charge from an appointment bill
+      description: |
+        Roles: GeneralStaff, HospitalAdministrator.
+
+        Only a `manual` line can be removed. Removing a generated one is 409.
+      operationId: removeAppointmentBillCharge
+      responses:
+        '200':
+          description: The bill, without that charge
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bill' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The bill is already settled and cannot be changed (`cl_pat_026`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /appointments/{appointmentId}/bill/settle:
+    parameters:
+      - name: appointmentId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Billing]
+      summary: Settle an appointment bill
+      description: |
+        Roles: GeneralStaff, HospitalAdministrator.
+
+        Freezes the bill. **Ticks no discharge checklist item**, unlike settling an admission
+        bill - nobody was admitted, so there is no discharge to tick.
+      operationId: settleAppointmentBill
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SettleBillRequest' }
+      responses:
+        '200':
+          description: The settled bill
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bill' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The bill is already settled and cannot be changed (`cl_pat_026`).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -2280,7 +2500,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/AuditFields'
         - type: object
-          required: [id, patient, scheduled_at, status]
+          required: [id, patient, scheduled_at, status, can_cancel, can_complete]
           properties:
             id: { type: string, format: uuid }
             patient: { $ref: '#/components/schemas/PatientSummary' }
@@ -2302,6 +2522,27 @@ components:
               format: uuid
               nullable: true
               description: Set once checked in.
+            cancellation_reason:
+              type: string
+              nullable: true
+              maxLength: 300
+              description: |
+                Why the desk called it off, shown to the patient word for word. It is also
+                where staff name a time the clinic can see them instead, which is why there
+                is no separate "proposed time" field to keep in step with it.
+            cancelled_by_staff_id:
+              type: string
+              format: uuid
+              nullable: true
+              description: Null when the patient cancelled it themselves from the app.
+            can_cancel:
+              type: boolean
+              description: True only while `scheduled`.
+            can_complete:
+              type: boolean
+              description: |
+                True only while `scheduled`. Completing records that the patient came, was
+                seen and went home - no admission, no bed, bill only.
 
     MyAppointment:
       type: object
@@ -2309,7 +2550,8 @@ components:
         What a patient may see about their own booking. A separate shape, not a filtered
         staff object - same reasoning as `MyAdmission`. It carries neither who took the
         booking nor which admission it became.
-      required: [appointment_id, scheduled_at, status, status_text, can_cancel]
+      required: [appointment_id, scheduled_at, status, status_text, can_cancel,
+                 cancelled_by_hospital]
       properties:
         appointment_id: { type: string, format: uuid }
         scheduled_at: { type: string, format: date-time }
@@ -2325,6 +2567,33 @@ components:
         can_cancel:
           type: boolean
           description: True only while `scheduled`. Saves the app re-implementing the rule.
+        cancellation_reason:
+          type: string
+          nullable: true
+          maxLength: 300
+          description: |
+            What the desk typed when they called it off, shown to the patient as written.
+            Null when the patient cancelled it themselves, and null while it is still on.
+        cancelled_by_hospital:
+          type: boolean
+          description: |
+            False when the patient cancelled it themselves, so the app can say which of them
+            did it rather than inferring it from whether a reason is present.
+
+    CancelAppointmentRequest:
+      type: object
+      description: |
+        Why the desk is calling a booking off. The patient reads this, so it is required - a
+        cancellation with no explanation is the thing this endpoint exists to prevent.
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 300
+          description: |
+            Shown to the patient word for word. Name a time the clinic can see them if there
+            is one, e.g. "Clinic full at 09:00, please rebook after 14:00."
 
     BookAppointmentRequest:
       type: object
@@ -3300,11 +3569,13 @@ components:
         Where a line came from, and what may be done to it.
 
         `admission_fee` and `bed_stay` are worked out from the visit and are replaced every time
-        the bill is prepared. `manual` is what somebody at the desk typed, is never touched by
-        preparing, and is the only kind that can be removed.
+        the bill is prepared. `consultation_fee` is the generated line on an appointment bill,
+        where there is no admission and no bed to price. `manual` is what somebody at the desk
+        typed, is never touched by preparing, and is the only kind that can be removed.
       enum:
         - admission_fee
         - bed_stay
+        - consultation_fee
         - manual
 
     BillLine:
@@ -3333,11 +3604,27 @@ components:
         rest. The rate is copied onto the line when the line is written, so changing a price
         later never rewrites a bill already raised.
       required:
-        [id, admission_id, bill_number, currency, lines, total, settled, patient,
+        [id, bill_number, currency, lines, total, settled, patient,
          created_at, updated_at]
       properties:
         id: { type: string, format: uuid }
-        admission_id: { type: string, format: uuid }
+        admission_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: |
+            Set when the bill belongs to an admission. **Exactly one of this and
+            `appointment_id` is set** (a database check constraint, not a convention), so a
+            reader never has to guess which visit a bill is for.
+        appointment_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: |
+            Set when the patient was seen at a booked appointment and went home without being
+            admitted. Such a bill carries a `consultation_fee` line instead of an admission
+            fee and bed nights, and settling it ticks no discharge checklist - there is no
+            discharge.
         bill_number:
           type: string
           description: The handle a patient quotes at the counter, e.g. B7K2X9Q.
@@ -3524,6 +3811,7 @@ components:
         nic:
           type: string
           maxLength: 20
+          pattern: '^(\d{9}[VvXx]|\d{12}|(?=.*[A-Za-z])[A-Za-z0-9]{6,15})$'
           description: |
             Required here, unlike at the desk, because it is the only thing that can match this
             signup to a record the hospital already holds.
@@ -3531,13 +3819,30 @@ components:
             **NIC alone is not proof of identity.** Nothing verifies that the person typing it
             owns it, so linking to an existing record never overwrites what is already on that
             record. A production system puts an OTP or a desk check in front of this.
-        full_name: { type: string, maxLength: 200 }
+
+            **Same shape as `CreatePatientRequest.nic` (tightened 2026-09-15.)** This endpoint
+            previously took any string up to 20 characters, so the app could store an NIC the
+            desk would have rejected - and `MeService` builds a `CreatePatientRequest` in code,
+            where data annotations never run.
+        full_name: { type: string, minLength: 1, maxLength: 200 }
         gender: { $ref: '#/components/schemas/Gender' }
-        date_of_birth: { type: string, format: date, nullable: true }
-        phone: { type: string, maxLength: 20, nullable: true }
-        address: { type: string, maxLength: 500, nullable: true }
+        date_of_birth:
+          type: string
+          format: date
+          nullable: true
+          description: Not in the future, and not more than 120 years ago.
+        phone:
+          type: string
+          maxLength: 20
+          nullable: true
+          pattern: '^(0\d{9}|\+94\d{9})$'
+        address: { type: string, maxLength: 300, nullable: true }
         emergency_contact_name: { type: string, maxLength: 200, nullable: true }
-        emergency_contact_phone: { type: string, maxLength: 20, nullable: true }
+        emergency_contact_phone:
+          type: string
+          maxLength: 20
+          nullable: true
+          pattern: '^(0\d{9}|\+94\d{9})$'
 
     MyProfile:
       type: object

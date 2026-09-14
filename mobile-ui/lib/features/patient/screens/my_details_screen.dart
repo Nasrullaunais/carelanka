@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/friendly_date.dart';
 import '../../../services/api_client/models/gender.dart';
 import '../state/profile_controller.dart';
+import '../validation/patient_fields.dart';
 import '../widgets/panels.dart';
 
 /// The details the hospital needs before it can treat you.
@@ -102,7 +103,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
 
     Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Your details are saved.')),
+      const SnackBar(content: Text('Your details have been saved.')),
     );
   }
 
@@ -114,7 +115,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     final scheme = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: Text(_firstTime ? 'Finish setting up' : 'My details')),
+      appBar: AppBar(title: Text(_firstTime ? 'Add my details' : 'My details')),
       body: SafeArea(
         child: Form(
           key: _formKey,
@@ -128,11 +129,10 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
             children: [
               if (_firstTime) ...[
                 NoticeBanner(
-                  icon: Icons.waving_hand_outlined,
+                  icon: Icons.assignment_ind_outlined,
                   accent: scheme.primary,
-                  title: 'Your account is ready',
-                  body: 'The hospital needs a few details before you can book a '
-                      'visit or follow a stay.',
+                  title: 'Complete your registration',
+                  body: 'These details are required before you can book a visit.',
                 ),
                 const SizedBox(height: 20),
               ],
@@ -145,16 +145,17 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                       controller: _fullName,
                       label: 'Full name',
                       enabled: !controller.saving,
+                      maxLength: PatientFieldLimits.fullName,
                       serverErrors: errors['full_name'],
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Enter your full name' : null,
+                      validator: validateFullName,
                     ),
                     _Field(
                       controller: _nic,
                       label: 'NIC',
                       enabled: !controller.saving,
+                      maxLength: PatientFieldLimits.nic,
                       serverErrors: errors['nic'],
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter your NIC' : null,
+                      validator: validateNic,
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<Gender>(
@@ -191,6 +192,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                       label: 'Phone',
                       enabled: !controller.saving,
                       keyboardType: TextInputType.phone,
+                      maxLength: PatientFieldLimits.phone,
                       serverErrors: errors['phone'],
                       validator: validatePhoneNumber,
                     ),
@@ -198,7 +200,9 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                       controller: _address,
                       label: 'Address (optional)',
                       enabled: !controller.saving,
+                      maxLength: PatientFieldLimits.address,
                       serverErrors: errors['address'],
+                      validator: validateAddress,
                     ),
                   ],
                 ),
@@ -211,8 +215,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Who the ward should call if something happens while you '
-                      'are here.',
+                      'Who the hospital should contact in an emergency.',
                       style: theme.textTheme.bodySmall
                           ?.copyWith(color: scheme.onSurfaceVariant),
                     ),
@@ -221,13 +224,16 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                       controller: _emergencyName,
                       label: 'Name (optional)',
                       enabled: !controller.saving,
+                      maxLength: PatientFieldLimits.contactName,
                       serverErrors: errors['emergency_contact_name'],
+                      validator: validateContactName,
                     ),
                     _Field(
                       controller: _emergencyPhone,
                       label: 'Phone (optional)',
                       enabled: !controller.saving,
                       keyboardType: TextInputType.phone,
+                      maxLength: PatientFieldLimits.phone,
                       serverErrors: errors['emergency_contact_phone'],
                       // Optional, but a number in the wrong shape is worse than
                       // none — nobody finds out until the ward has to call it.
@@ -356,6 +362,7 @@ class _Field extends StatelessWidget {
     required this.enabled,
     this.validator,
     this.keyboardType,
+    this.maxLength,
     this.serverErrors,
   });
 
@@ -364,6 +371,7 @@ class _Field extends StatelessWidget {
   final bool enabled;
   final String? Function(String?)? validator;
   final TextInputType? keyboardType;
+  final int? maxLength;
   final List<String>? serverErrors;
 
   @override
@@ -374,6 +382,8 @@ class _Field extends StatelessWidget {
         controller: controller,
         enabled: enabled,
         keyboardType: keyboardType,
+        maxLength: maxLength,
+        buildCounter: nearLimitCounter(),
         decoration: InputDecoration(
           labelText: label,
           errorText: _firstError(serverErrors),

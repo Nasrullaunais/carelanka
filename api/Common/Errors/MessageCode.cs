@@ -118,6 +118,10 @@ public enum MessageCode
 
     AmbulanceHasActiveDispatch,
 
+    StaffNotAmbulanceCrew,
+
+    CrewMemberAlreadyAssigned,
+
     NicLinkedToAnotherAccount,
 
     NicDoesNotMatchYourRecord,

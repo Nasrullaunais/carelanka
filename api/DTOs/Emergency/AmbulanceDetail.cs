@@ -5,4 +5,5 @@ public sealed class AmbulanceDetail : Ambulance
     public DispatchSummary? ActiveDispatch { get; set; }
     public bool IsDivertible { get; set; }
     public int RunsToday { get; set; }
+    public IReadOnlyList<AmbulanceCrewAssignment> CurrentCrew { get; set; } = [];
 }

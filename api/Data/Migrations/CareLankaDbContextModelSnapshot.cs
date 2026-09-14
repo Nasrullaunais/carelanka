@@ -247,6 +247,10 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
+                    b.Property<DateTimeOffset?>("LocationUpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("location_updated_at");
+
                     b.Property<string>("OutOfServiceReason")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -287,6 +291,63 @@ namespace CareLanka.Api.Data.Migrations
 
                             t.HasCheckConstraint("ck_ambulances_status", "status IN ('available', 'dispatched', 'en_route', 'at_scene', 'transporting', 'out_of_service')");
                         });
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.AmbulanceCrewAssignment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AmbulanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ambulance_id");
+
+                    b.Property<DateTimeOffset>("AssignedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("assigned_at");
+
+                    b.Property<Guid>("AssignedByStaffId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assigned_by_staff_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("StaffMemberId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("staff_member_id");
+
+                    b.Property<DateTimeOffset?>("UnassignedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("unassigned_at");
+
+                    b.Property<Guid?>("UnassignedByStaffId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("unassigned_by_staff_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ambulance_crew_assignments");
+
+                    b.HasIndex("AssignedByStaffId")
+                        .HasDatabaseName("ix_ambulance_crew_assignments_assigned_by_staff_id");
+
+                    b.HasIndex("StaffMemberId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_ambulance_crew_assignments_current_staff")
+                        .HasFilter("unassigned_at IS NULL");
+
+                    b.HasIndex("UnassignedByStaffId")
+                        .HasDatabaseName("ix_ambulance_crew_assignments_unassigned_by_staff_id");
+
+                    b.HasIndex("AmbulanceId", "StaffMemberId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_ambulance_crew_assignments_current_ambulance_staff")
+                        .HasFilter("unassigned_at IS NULL");
+
+                    b.ToTable("ambulance_crew_assignments", (string)null);
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.Dispatch", b =>
@@ -427,10 +488,23 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("details");
 
+                    b.Property<Guid>("IdempotencyKey")
+                        .HasColumnType("uuid")
+                        .HasColumnName("idempotency_key");
+
                     b.Property<decimal>("Latitude")
                         .HasPrecision(9, 6)
                         .HasColumnType("numeric(9,6)")
                         .HasColumnName("latitude");
+
+                    b.Property<decimal>("LocationAccuracyMetres")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("location_accuracy_metres");
+
+                    b.Property<DateTimeOffset>("LocationCapturedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("location_captured_at");
 
                     b.Property<decimal>("Longitude")
                         .HasPrecision(9, 6)
@@ -475,6 +549,10 @@ namespace CareLanka.Api.Data.Migrations
 
                     b.HasIndex("CallerUserId")
                         .HasDatabaseName("ix_emergency_calls_caller_user_id");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_emergency_calls_idempotency_key");
 
                     b.HasIndex("PatientId")
                         .HasDatabaseName("ix_emergency_calls_patient_id");
@@ -2100,6 +2178,38 @@ namespace CareLanka.Api.Data.Migrations
                     b.Navigation("StaffMember");
                 });
 
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.AmbulanceCrewAssignment", b =>
+                {
+                    b.HasOne("CareLanka.Api.Data.Entities.Emergency.Ambulance", "Ambulance")
+                        .WithMany("CrewAssignments")
+                        .HasForeignKey("AmbulanceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ambulance_crew_assignments_ambulances_ambulance_id");
+
+                    b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", null)
+                        .WithMany()
+                        .HasForeignKey("AssignedByStaffId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ambulance_crew_assignments_staff_members_assigned_by_staff_");
+
+                    b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", null)
+                        .WithMany()
+                        .HasForeignKey("StaffMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ambulance_crew_assignments_staff_members_staff_member_id");
+
+                    b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", null)
+                        .WithMany()
+                        .HasForeignKey("UnassignedByStaffId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_ambulance_crew_assignments_staff_members_unassigned_by_staf");
+
+                    b.Navigation("Ambulance");
+                });
+
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.Dispatch", b =>
                 {
                     b.HasOne("CareLanka.Api.Data.Entities.Emergency.Ambulance", "Ambulance")
@@ -2384,6 +2494,8 @@ namespace CareLanka.Api.Data.Migrations
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.Ambulance", b =>
                 {
+                    b.Navigation("CrewAssignments");
+
                     b.Navigation("Dispatches");
                 });
 

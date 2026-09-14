@@ -23,6 +23,7 @@ public sealed class AmbulanceConfiguration : IEntityTypeConfiguration<Ambulance>
         builder.Property(ambulance => ambulance.RegistrationNumber).HasMaxLength(20).IsRequired();
         builder.Property(ambulance => ambulance.CurrentLatitude).HasPrecision(9, 6);
         builder.Property(ambulance => ambulance.CurrentLongitude).HasPrecision(9, 6);
+        builder.Property(ambulance => ambulance.LocationUpdatedAt);
         builder.Property(ambulance => ambulance.Status)
             .HasConversion(new SnakeCaseEnumConverter<AmbulanceStatus>())
             .HasMaxLength(20)

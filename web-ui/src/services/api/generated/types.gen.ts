@@ -136,6 +136,7 @@ export type Ambulance = {
     registration_number: string;
     current_latitude?: number | null;
     current_longitude?: number | null;
+    location_updated_at?: string | null;
     status: AmbulanceStatus;
     out_of_service_reason?: string | null;
     is_active: boolean;
@@ -143,11 +144,23 @@ export type Ambulance = {
     updated_at: string;
 };
 
+export type AmbulanceCrewAssignment = {
+    id?: string;
+    ambulance_id?: string;
+    staff_member_id?: string;
+    full_name?: string | null;
+    assigned_at?: string;
+    assigned_by_staff_id?: string;
+    unassigned_at?: string | null;
+    unassigned_by_staff_id?: string | null;
+};
+
 export type AmbulanceDetail = {
     id: string;
     registration_number: string;
     current_latitude?: number | null;
     current_longitude?: number | null;
+    location_updated_at?: string | null;
     status: AmbulanceStatus;
     out_of_service_reason?: string | null;
     is_active: boolean;
@@ -156,7 +169,10 @@ export type AmbulanceDetail = {
     active_dispatch?: DispatchSummary;
     is_divertible?: boolean;
     runs_today?: number;
+    current_crew?: Array<AmbulanceCrewAssignment> | null;
 };
+
+export type AmbulanceEligibilityBlockReason = 'inactive' | 'out_of_service' | 'insufficient_crew' | 'active_dispatch' | 'missing_location' | 'stale_location';
 
 export type AmbulanceSortField = 'registration_number' | 'status' | 'distance';
 
@@ -168,6 +184,11 @@ export type AmbulanceSummary = {
     status: AmbulanceStatus;
     current_latitude?: number | null;
     current_longitude?: number | null;
+    location_updated_at?: string | null;
+    current_crew_count?: number;
+    required_crew_count?: number;
+    is_eligible?: boolean;
+    eligibility_block_reasons?: Array<AmbulanceEligibilityBlockReason> | null;
     active_dispatch_id?: string | null;
     is_divertible: boolean;
     distance_km?: number | null;
@@ -208,6 +229,10 @@ export type AppointmentPagedResult = {
 export type AppointmentStatus = 'scheduled' | 'checked_in' | 'completed' | 'cancelled' | 'no_show';
 
 export type AssetType = 'equipment_item' | 'bed';
+
+export type AssignAmbulanceCrewRequest = {
+    staff_member_id: string;
+};
 
 export type AssignBedRequest = {
     bed_id: string;
@@ -330,6 +355,8 @@ export type BookAppointmentRequest = {
 
 export type CallPriority = 'critical' | 'high' | 'medium' | 'low';
 
+export type CallStatus = 'received' | 'dispatched' | 'en_route' | 'completed' | 'cancelled';
+
 export type CancelAdmissionRequest = {
     reason: CancelReason;
     note?: string | null;
@@ -340,6 +367,8 @@ export type CancelAppointmentRequest = {
 };
 
 export type CancelReason = 'diverted_to_other_hospital' | 'false_alarm' | 'died_en_route' | 'patient_refused' | 'no_show';
+
+export type CancellationRequestStatus = 'pending' | 'approved' | 'rejected';
 
 export type CheckInRequest = {
     admission_category: AdmissionCategory;
@@ -396,7 +425,7 @@ export type CreateAdmissionRequest = {
 };
 
 export type CreateAmbulanceRequest = {
-    registration_number: string;
+    registration_number: string | null;
     current_latitude?: number | null;
     current_longitude?: number | null;
 };
@@ -413,6 +442,20 @@ export type CreateBedRequest = {
     has_isolation?: boolean;
     nurse_station_distance?: number;
     asset_tag?: string | null;
+};
+
+export type CreateEmergencyCallRequest = {
+    patient_is_caller: boolean;
+    patient_id?: string | null;
+    caller_name?: string | null;
+    caller_phone?: string | null;
+    latitude: number;
+    longitude: number;
+    location_accuracy_metres: number;
+    location_captured_at: string;
+    idempotency_key: string;
+    details?: string | null;
+    priority?: CallPriority;
 };
 
 export type CreateEquipmentCategoryRequest = {
@@ -540,6 +583,55 @@ export type DispatchSummary = {
     crew_count?: number;
     dispatched_at?: string;
     completed_at?: string | null;
+};
+
+export type EmergencyCallDetail = {
+    id?: string;
+    patient_id?: string | null;
+    caller_user_id?: string | null;
+    patient_is_caller?: boolean;
+    caller_name?: string | null;
+    caller_phone?: string | null;
+    latitude?: number;
+    longitude?: number;
+    location_accuracy_metres?: number;
+    location_captured_at?: string;
+    idempotency_key?: string;
+    address_label?: string | null;
+    details?: string | null;
+    priority?: CallPriority;
+    status?: CallStatus;
+    outcome?: string | null;
+    transported?: boolean | null;
+    cancellation_request_status?: CancellationRequestStatus;
+    created_at?: string;
+    updated_at?: string;
+    dispatches?: Array<DispatchSummary>;
+    open_proposal_id?: string | null;
+};
+
+export type EmergencyCallSortField = 'priority' | 'created_at' | 'status';
+
+export type EmergencyCallSummary = {
+    id?: string;
+    priority?: CallPriority;
+    status?: CallStatus;
+    caller_name?: string | null;
+    address_label?: string | null;
+    latitude?: number;
+    longitude?: number;
+    active_dispatch_id?: string | null;
+    open_proposal_id?: string | null;
+    waiting_minutes?: number;
+    created_at?: string;
+};
+
+export type EmergencyCallSummaryPagedResult = {
+    items: Array<EmergencyCallSummary>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
 };
 
 export type EquipmentCategory = {
@@ -716,6 +808,23 @@ export type MyAppointment = {
 
 export type MyAppointmentPagedResult = {
     items: Array<MyAppointment>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
+export type MyEmergencyCallSummary = {
+    id?: string;
+    patient_is_caller?: boolean;
+    priority?: CallPriority;
+    status?: CallStatus;
+    cancellation_request_status?: CancellationRequestStatus;
+    created_at?: string;
+};
+
+export type MyEmergencyCallSummaryPagedResult = {
+    items: Array<MyEmergencyCallSummary>;
     page: number;
     page_size: number;
     total_items: number;
@@ -927,7 +1036,7 @@ export type ReportFaultRequest = {
 };
 
 export type RetireAmbulanceRequest = {
-    reason: string;
+    reason: string | null;
 };
 
 export type SettleBillRequest = {
@@ -957,6 +1066,15 @@ export type UpdateBedRequest = {
 export type UpdateBillingRatesRequest = {
     expenses?: Array<WardExpenseRateUpdate> | null;
     admission_fees?: Array<AdmissionFeeUpdate> | null;
+};
+
+export type UpdateEmergencyCallRequest = {
+    priority?: CallPriority;
+    details?: string;
+    caller_name?: string;
+    caller_phone?: string;
+    latitude?: number;
+    longitude?: number;
 };
 
 export type UpdateEquipmentItemRequest = {
@@ -1723,6 +1841,124 @@ export type ListPatientWorklistResponses = {
 
 export type ListPatientWorklistResponse = ListPatientWorklistResponses[keyof ListPatientWorklistResponses];
 
+export type GetCurrentAmbulanceCrewData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/ambulances/{id}/crew';
+};
+
+export type GetCurrentAmbulanceCrewErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetCurrentAmbulanceCrewError = GetCurrentAmbulanceCrewErrors[keyof GetCurrentAmbulanceCrewErrors];
+
+export type GetCurrentAmbulanceCrewResponses = {
+    /**
+     * OK
+     */
+    200: Array<AmbulanceCrewAssignment>;
+};
+
+export type GetCurrentAmbulanceCrewResponse = GetCurrentAmbulanceCrewResponses[keyof GetCurrentAmbulanceCrewResponses];
+
+export type AssignCurrentAmbulanceCrewData = {
+    body: AssignAmbulanceCrewRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/ambulances/{id}/crew';
+};
+
+export type AssignCurrentAmbulanceCrewErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type AssignCurrentAmbulanceCrewError = AssignCurrentAmbulanceCrewErrors[keyof AssignCurrentAmbulanceCrewErrors];
+
+export type AssignCurrentAmbulanceCrewResponses = {
+    /**
+     * Created
+     */
+    201: AmbulanceCrewAssignment;
+};
+
+export type AssignCurrentAmbulanceCrewResponse = AssignCurrentAmbulanceCrewResponses[keyof AssignCurrentAmbulanceCrewResponses];
+
+export type UnassignCurrentAmbulanceCrewData = {
+    body?: never;
+    path: {
+        ambulanceId: string;
+        staffMemberId: string;
+    };
+    query?: never;
+    url: '/ambulances/{ambulanceId}/crew/{staffMemberId}';
+};
+
+export type UnassignCurrentAmbulanceCrewErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type UnassignCurrentAmbulanceCrewError = UnassignCurrentAmbulanceCrewErrors[keyof UnassignCurrentAmbulanceCrewErrors];
+
+export type UnassignCurrentAmbulanceCrewResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type UnassignCurrentAmbulanceCrewResponse = UnassignCurrentAmbulanceCrewResponses[keyof UnassignCurrentAmbulanceCrewResponses];
+
 export type ListAmbulancesData = {
     body?: never;
     path?: never;
@@ -1732,6 +1968,7 @@ export type ListAmbulancesData = {
         nearToLatitude?: number;
         nearToLongitude?: number;
         includeRetired?: boolean;
+        eligibleOnly?: boolean;
         page?: number;
         pageSize?: number;
         sortBy?: AmbulanceSortField;
@@ -2802,6 +3039,157 @@ export type UpdateBillingRatesResponses = {
 
 export type UpdateBillingRatesResponse = UpdateBillingRatesResponses[keyof UpdateBillingRatesResponses];
 
+export type ListEmergencyCallsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: CallStatus;
+        priority?: CallPriority;
+        search?: string;
+        from?: string;
+        to?: string;
+        unassignedOnly?: boolean;
+        page?: number;
+        pageSize?: number;
+        sortBy?: EmergencyCallSortField;
+        sortDir?: 'asc' | 'desc';
+    };
+    url: '/emergency-calls';
+};
+
+export type ListEmergencyCallsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListEmergencyCallsError = ListEmergencyCallsErrors[keyof ListEmergencyCallsErrors];
+
+export type ListEmergencyCallsResponses = {
+    /**
+     * OK
+     */
+    200: EmergencyCallSummaryPagedResult;
+};
+
+export type ListEmergencyCallsResponse = ListEmergencyCallsResponses[keyof ListEmergencyCallsResponses];
+
+export type CreateEmergencyCallData = {
+    body: CreateEmergencyCallRequest;
+    path?: never;
+    query?: never;
+    url: '/emergency-calls';
+};
+
+export type CreateEmergencyCallErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+};
+
+export type CreateEmergencyCallError = CreateEmergencyCallErrors[keyof CreateEmergencyCallErrors];
+
+export type CreateEmergencyCallResponses = {
+    /**
+     * Created
+     */
+    201: EmergencyCallDetail;
+};
+
+export type CreateEmergencyCallResponse = CreateEmergencyCallResponses[keyof CreateEmergencyCallResponses];
+
+export type GetEmergencyCallData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/emergency-calls/{id}';
+};
+
+export type GetEmergencyCallErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetEmergencyCallError = GetEmergencyCallErrors[keyof GetEmergencyCallErrors];
+
+export type GetEmergencyCallResponses = {
+    /**
+     * OK
+     */
+    200: EmergencyCallDetail;
+};
+
+export type GetEmergencyCallResponse = GetEmergencyCallResponses[keyof GetEmergencyCallResponses];
+
+export type UpdateEmergencyCallData = {
+    body: UpdateEmergencyCallRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/emergency-calls/{id}';
+};
+
+export type UpdateEmergencyCallErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type UpdateEmergencyCallError = UpdateEmergencyCallErrors[keyof UpdateEmergencyCallErrors];
+
+export type UpdateEmergencyCallResponses = {
+    /**
+     * OK
+     */
+    200: EmergencyCallDetail;
+};
+
+export type UpdateEmergencyCallResponse = UpdateEmergencyCallResponses[keyof UpdateEmergencyCallResponses];
+
 export type ListDischargeCandidatesData = {
     body?: never;
     path?: never;
@@ -3616,6 +4004,39 @@ export type CompleteMaintenanceScheduleResponses = {
 };
 
 export type CompleteMaintenanceScheduleResponse = CompleteMaintenanceScheduleResponses[keyof CompleteMaintenanceScheduleResponses];
+
+export type GetMyEmergencyCallsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: CallStatus;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/me/emergency-calls';
+};
+
+export type GetMyEmergencyCallsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+};
+
+export type GetMyEmergencyCallsError = GetMyEmergencyCallsErrors[keyof GetMyEmergencyCallsErrors];
+
+export type GetMyEmergencyCallsResponses = {
+    /**
+     * OK
+     */
+    200: MyEmergencyCallSummaryPagedResult;
+};
+
+export type GetMyEmergencyCallsResponse = GetMyEmergencyCallsResponses[keyof GetMyEmergencyCallsResponses];
 
 export type PreRegisterSelfData = {
     body?: PreRegisterRequest;

@@ -11,6 +11,9 @@ public class EmergencyCall : AuditedEntity
     public string? CallerPhone { get; set; }
     public decimal Latitude { get; set; }
     public decimal Longitude { get; set; }
+    public decimal LocationAccuracyMetres { get; set; }
+    public DateTimeOffset LocationCapturedAt { get; set; } = DateTimeOffset.UtcNow;
+    public Guid IdempotencyKey { get; set; } = Guid.NewGuid();
     public string? AddressLabel { get; set; }
     public string? Details { get; set; }
     public CallPriority Priority { get; set; }

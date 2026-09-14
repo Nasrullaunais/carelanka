@@ -18,6 +18,21 @@ and gains one, in the `Common_PatientUsernameLogin` migration. Changes marked *(
 - **Existing rows kept their login.** The migration backfills `username` from the digits of
   the old `phone_number` before dropping it, so the same person still reaches the same row.
 
+**Revision 3.1** — Emergency's response unit and dispatch contract were aligned before
+the next migration:
+
+- **`AmbulanceCrewAssignment` (new)** records current and historical ambulance duty.
+  One crew member has at most one row with `UnassignedAt = null`.
+- **`DispatchCrew` is an immutable snapshot**, copied from current ambulance crew when
+  the Duty Manager creates a dispatch.
+- **`DispatchStatus` is the authoritative journey state**, including acknowledgement,
+  scene arrival, transport and handover. `CallStatus` and `AmbulanceStatus` are projections.
+- **`Dispatch.DestinationWardId` is removed.** This release routes every transport to
+  CareLanka Hospital's configured emergency entrance; Patient Management owns ward and bed
+  preparation.
+- **Post-assignment cancellation review lives on `EmergencyCall`** as one current request;
+  the audit log retains its change history.
+
 **Revision 2.12** — the billing tables are written down at last. Four tables that landed on
 2026-09-11 with step 7 and were never added here: `bills`, `bill_line_items`, `billing_rates`
 and `admission_fee_rates`, in the `Patient_AddBilling`, `Patient_AddBillingRates` and
@@ -98,7 +113,7 @@ this document.
 configuration, the `Patient_AddWard` migration and `GET`/`POST /wards`), and building it
 settled two names this document and `patient-spec.yaml` disagreed on. Changes marked
 *(Rev 2.8)*. **`Ward`'s schema is now frozen** — `Shift.WardId`, `EquipmentItem.WardId` and
-`Dispatch.DestinationWardId` all point at it.
+Emergency no longer stores a ward reference on Dispatch as of Rev 3.1.
 
 - **`WardGenderPolicy` is named `GenderPolicy`.** The committed spec publishes it as
   `GenderPolicy`, and on an entity Member 4 owns the spec wins. Same values, same wire
@@ -430,12 +445,21 @@ more often than a hospital would like.
 + CallerPhone: string (nullable)
 + Latitude: decimal(9,6) (non-null)
 + Longitude: decimal(9,6) (non-null)
++ LocationAccuracyMetres: decimal(8,2) (non-null)            -- (Rev 3.1 — new)
++ LocationCapturedAt: DateTimeOffset (non-null)              -- (Rev 3.1 — new)
++ IdempotencyKey: Guid (non-null)                             -- (Rev 3.1 — new)
 + AddressLabel: string (nullable)                           -- (Rev 2.4 — new)
 + Details: string (nullable)
 + Priority: CallPriority (non-null)
 + Status: CallStatus (non-null)
 + Outcome: string (nullable)
 + Transported: bool (nullable)                              -- (Rev 2.4 — new)
++ CancellationRequestStatus: CancellationRequestStatus (nullable) -- (Rev 3.1 — new)
++ CancellationRequestReason: string (nullable)              -- (Rev 3.1 — new)
++ CancellationRequestedAt: DateTimeOffset (nullable)        -- (Rev 3.1 — new)
++ CancellationReviewedAt: DateTimeOffset (nullable)         -- (Rev 3.1 — new)
++ CancellationReviewedByStaffId: Guid (nullable) FK → StaffMember.Id
++ CancellationReviewNotes: string (nullable)                -- (Rev 3.1 — new)
 ```
 **Table:** `emergency_calls`
 **Note:** `PatientId` nullable — identity is often unknown at the scene, settable
@@ -465,6 +489,7 @@ publishes. Both fields are carried unchanged onto the dispatch notification
 + RegistrationNumber: string (unique, non-null)
 + CurrentLatitude: decimal(9,6) (nullable)
 + CurrentLongitude: decimal(9,6) (nullable)
++ LocationUpdatedAt: DateTimeOffset (nullable)               -- (Rev 3.1 — new)
 + Status: AmbulanceStatus (non-null)
 + OutOfServiceReason: string (nullable)                     -- (Rev 2.4 — new)
 ```
@@ -473,24 +498,38 @@ publishes. Both fields are carried unchanged onto the dispatch notification
 Onboard equipment is explicitly not tracked (equipment stays ward-scoped only).
 *(Decisions 9, 14)*
 
+#### AmbulanceCrewAssignment extends AuditedEntity *(Rev 3.1 — new)*
+```
++ AmbulanceId: Guid (non-null) FK → Ambulance.Id
++ StaffMemberId: Guid (non-null) FK → StaffMember.Id
++ AssignedAt: DateTimeOffset (non-null)
++ UnassignedAt: DateTimeOffset (nullable)
++ AssignedByStaffId: Guid (non-null) FK → StaffMember.Id
++ UnassignedByStaffId: Guid (nullable) FK → StaffMember.Id
+```
+**Table:** `ambulance_crew_assignments`
+**Constraints:** `UNIQUE(StaffMemberId) WHERE UnassignedAt IS NULL` and
+`UNIQUE(AmbulanceId, StaffMemberId) WHERE UnassignedAt IS NULL`.
+**Note:** Current ambulance responsibility, separate from ward `Shift`/`Allocation`.
+Only staff with the `ambulance_crew` role may be assigned. The ready-crew minimum starts
+at two and is configuration, not a database constant. Historical rows are ended, not
+deleted.
+
 #### Dispatch extends AuditedEntity
 ```
 + EmergencyCallId: Guid (non-null) FK → EmergencyCall.Id
 + AmbulanceId: Guid (non-null) FK → Ambulance.Id
-+ DestinationWardId: Guid (nullable) FK → Ward.Id       -- (Rev 2: was non-null)
 + Status: DispatchStatus (non-null)
 + SupersededByDispatchId: Guid (nullable) FK → Dispatch.Id  -- (Rev 2.4 — new)
 + DispatchedAt: DateTimeOffset (non-null)
 + CompletedAt: DateTimeOffset (nullable)
 ```
 **Table:** `dispatches`
-**Note:** Row is created either instantly (nearest-ambulance fast path) or after
-Duty Manager approval (reassignment case) — both paths are recorded uniformly via
-`AgentWorkflow` beforehand. *(Decisions 18, 20)*
-*(Rev 2)* `DestinationWardId` is now nullable: the fast path creates the `Dispatch`
-immediately, but the destination ward is only settled once the Patient Admission & Bed
-Agent runs, which is a later step in the orchestration sequence. Non-null would have
-forced a decision that has not been made yet.
+**Note:** A row is created only after a Duty Manager manually dispatches or confirms an
+agent recommendation. The same command and deterministic validation serve both paths.
+`Status` is authoritative; call and ambulance statuses are projections updated in the
+same transaction. Ward/bed selection is not stored here because it belongs to Patient
+Management.
 
 #### DispatchCrew extends Entity
 ```
@@ -499,8 +538,9 @@ forced a decision that has not been made yet.
 ```
 **Table:** `dispatch_crew`
 **Constraint:** UNIQUE(DispatchId, StaffMemberId)
-**Note:** Crew assigned directly on `Dispatch`, not through `Allocation` — ambulance
-duty is real-time, not part of the ward-based shift roster. *(Decision 30)*
+**Note:** Immutable responding-crew history. Every row is copied from the selected
+ambulance's current `AmbulanceCrewAssignment` rows in the dispatch transaction. Later
+crew changes do not alter the snapshot. *(Decision 30; Rev 3.1)*
 
 #### RouteLog extends AuditedEntity
 ```
@@ -1532,8 +1572,21 @@ Available, Dispatched, EnRoute, AtScene, Transporting, OutOfService
 
 ### DispatchStatus
 ```
-Assigned, EnRoute, Completed, Cancelled, Reassigned
+Assigned, Acknowledged, EnRouteToScene, AtScene, TransportingToHospital,
+HandedOver, Declined, Cancelled, Reassigned
 ```
+Serialized as `assigned`, `acknowledged`, `en_route_to_scene`, `at_scene`,
+`transporting_to_hospital`, `handed_over`, `declined`, `cancelled`, `reassigned`.
+The normal path follows the first six in order. `Declined` is terminal from `Assigned`;
+`Cancelled` and `Reassigned` are terminal pre-arrival alternatives. No diversion or
+reassignment is legal from `AtScene` onward.
+
+### CancellationRequestStatus *(Rev 3.1 — new)*
+```
+Pending, Approved, Rejected
+```
+Serialized as `pending`, `approved`, `rejected`. Null on `EmergencyCall` means no
+post-assignment request exists.
 
 ### AllocationStatus *(Rev 2 — new)*
 ```
@@ -1709,8 +1762,8 @@ surgical bed and an ordinary bed identically, with no way to tell them apart on 
 three sit on the same rung as `general` in `BedPlacementRules.Rung`, so no placement rule
 changed — what they buy is a price and a name, not a new level of care.
 
-`emergency-spec.yaml` publishes a separate `WardTypeHint` that still lists six. That is
-Nasrulla Unais's file and an open item, not an edit — see `integration_of_functions.md` §11.11.
+Emergency no longer mirrors this enum. It routes to the configured hospital emergency
+entrance; Patient Management uses `WardType` when it prepares a ward/bed.
 
 ### AdmissionUrgency *(Rev 2.2 — replaces AcuityLevel)*
 ```
@@ -2022,7 +2075,15 @@ CREATE UNIQUE INDEX ux_admissions_open ON admissions (patient_id)
 
 -- an ambulance cannot be on two runs
 CREATE UNIQUE INDEX ux_dispatch_ambulance ON dispatches (ambulance_id)
-    WHERE status IN ('assigned', 'en_route');
+    WHERE status IN ('assigned', 'acknowledged', 'en_route_to_scene', 'at_scene',
+                     'transporting_to_hospital');
+
+-- one crew member can have only one current ambulance, with no duplicate current row
+CREATE UNIQUE INDEX ux_ambulance_crew_current_staff
+    ON ambulance_crew_assignments (staff_member_id) WHERE unassigned_at IS NULL;
+CREATE UNIQUE INDEX ux_ambulance_crew_current_pair
+    ON ambulance_crew_assignments (ambulance_id, staff_member_id) WHERE unassigned_at IS NULL;
+CREATE UNIQUE INDEX ux_emergency_calls_idempotency_key ON emergency_calls (idempotency_key);
 
 -- no duplicate open warning per target  (otherwise every threshold tick inserts one)
 CREATE UNIQUE INDEX ux_warnings_open ON warnings (entity_type, entity_id, type)
@@ -2172,6 +2233,7 @@ CREATE INDEX ix_admissions_missing_fields ON admissions USING gin (missing_field
 | StaffMember | Skill | N:M | StaffMemberSkill |
 | StaffMember | Shift | N:M | Allocation |
 | StaffMember | Dispatch | N:M | DispatchCrew |
+| StaffMember | Ambulance | N:M over time | AmbulanceCrewAssignment |
 | StaffMember | RefreshToken | 1:N | RefreshToken.StaffMemberId |
 | StaffMember | DeviceToken | 1:N | DeviceToken.StaffMemberId |
 | StaffMember | Notification | 1:N | Notification.RecipientStaffMemberId |
@@ -2183,12 +2245,12 @@ CREATE INDEX ix_admissions_missing_fields ON admissions USING gin (missing_field
 | EmergencyCall | Dispatch | 1:N | Dispatch.EmergencyCallId |
 | Appointment | Admission | 1:N (nullable) | Admission.AppointmentId |
 | Ambulance | Dispatch | 1:N | Dispatch.AmbulanceId |
+| Ambulance | AmbulanceCrewAssignment | 1:N | AmbulanceCrewAssignment.AmbulanceId |
 | Dispatch | RouteLog | 1:1 | RouteLog.DispatchId |
 | Ward | Bed | 1:N | Bed.WardId |
 | Ward | Shift | 1:N | Shift.WardId |
 | Ward | WardStaffingRule | 1:N | WardStaffingRule.WardId |
 | Ward | EquipmentItem | 1:N | EquipmentItem.WardId |
-| Ward | Dispatch | 1:N (nullable) | Dispatch.DestinationWardId |
 | Skill | Shift | 1:N (nullable) | Shift.RequiredSkillId |
 | EquipmentCategory | EquipmentItem | 1:N | EquipmentItem.CategoryId *(Rev 3)* |
 | PharmacyCategory | PharmacyItem | 1:N | PharmacyItem.CategoryId *(Rev 3)* |
@@ -2250,6 +2312,7 @@ rows are mutated after insert; pure join/append-only tables (`DispatchCrew`,
 | DeviceToken | device_tokens | | **new** |
 | EmergencyCall | emergency_calls | | |
 | Ambulance | ambulances | ✓ | |
+| AmbulanceCrewAssignment | ambulance_crew_assignments | | **new (3.1)** |
 | Dispatch | dispatches | | changed |
 | DispatchCrew | dispatch_crew | | |
 | RouteLog | route_logs | | |
@@ -2279,7 +2342,7 @@ rows are mutated after insert; pure join/append-only tables (`DispatchCrew`,
 | Notification | notifications | | **new** |
 | AuditLog | audit_logs | | changed |
 
-**34 tables** (was 25). *(Rev 2.5 added `PatientAccount`. Rev 2.6 added `CareRecommendation`.)*
+**35 tables** (was 25). *(Rev 3.1 added `AmbulanceCrewAssignment`.)*
 
 ---
 
@@ -2287,7 +2350,7 @@ rows are mutated after insert; pure join/append-only tables (`DispatchCrew`,
 
 | Component | Owner | Entities |
 |-----------|-------|----------|
-| Emergency / Ambulance | Member 1 | EmergencyCall, Ambulance, Dispatch, DispatchCrew, RouteLog |
+| Emergency / Ambulance | Member 1 | EmergencyCall, Ambulance, AmbulanceCrewAssignment, Dispatch, DispatchCrew, RouteLog |
 | Staff Management | Member 2 | Shift, Allocation, LeaveRequest, Skill, StaffMemberSkill, WardStaffingRule |
 | Health Equipment | Member 3 | EquipmentCategory, EquipmentItem, **Bed**, PharmacyCategory, PharmacyItem, PharmacyTransaction, MaintenanceSchedule, Warning, ActionRequest |
 | Patient Management | Member 4 | Patient, **PatientAccount**, Admission, BedAssignment, Discharge, DischargeChecklistItem, Appointment, Ward |
@@ -2298,8 +2361,9 @@ specific member's is common: auth and the JWT, the `DbContext` and base classes,
 exception handler, the audit interceptor, the agent workflow tables and the Coordinator
 Agent. Contract: `specs/common-spec.yaml`. Reasoning: `docs/ADR.md` ADR 3.
 
-**Note:** `Ward` sits under Patient Management but is referenced by all four components
-(`Shift.WardId`, `EquipmentItem.WardId`, `Dispatch.DestinationWardId`). *(Rev 3)* Pharmacy
+**Note:** `Ward` sits under Patient Management and is referenced by Staff and Equipment
+(`Shift.WardId`, `EquipmentItem.WardId`). Emergency routes to the configured hospital
+emergency entrance and carries no ward FK as of Rev 3.1. *(Rev 3)* Pharmacy
 stock is central, so `PharmacyItem` has no `WardId`.
 Treat its schema as frozen once agreed — changes to it break three other members.
 
@@ -2377,11 +2441,9 @@ Note for Member 4's own design: patient notifications are local (the app checks 
 status), not push, so `DeviceToken` is not on the Patient Management critical path either
 way.
 
-**2. Single hospital vs. the "non-nearest hospital" approval trigger.** This document
-settles on one hospital with multiple wards, but the Component Plan says the Duty Manager
-approves when the plan "sends the patient to a hospital other than the nearest one" — an
-unreachable branch. The reassignment trigger still works, so the approval demo survives.
-Fix the Component Plan wording, or introduce a `Hospital` entity.
+**2. Single hospital vs. the "non-nearest hospital" approval trigger — RESOLVED (Rev
+3.1).** This release serves one CareLanka Hospital emergency entrance. The Duty Manager's
+heavy gate is pre-arrival ambulance diversion; there is no hospital-selection branch.
 
 **3. Enum storage strategy — RESOLVED (2026-09-07): `HasConversion<string>()` plus a
 CHECK constraint,** stored `snake_case` to match the wire values the specs publish. Full
@@ -2405,9 +2467,10 @@ needs. Either FK it to `Ward` or drop it.
 shift has `EndTime < StartTime`. Rev 2 documents the roll-over rule on the entity, but
 overlap detection stays fiddly. Consider `StartAt`/`EndAt` as `timestamptz` instead.
 
-**7. Triple status bookkeeping.** `CallStatus`, `DispatchStatus` and `AmbulanceStatus` all
-carry `EnRoute` — three rows to keep in sync on every transition. Pick one as
-authoritative and derive the rest, or write down the sync rule.
+**7. Triple status bookkeeping — RESOLVED (Rev 3.1).** `DispatchStatus` is authoritative.
+One transition service updates `CallStatus` and `AmbulanceStatus` projections in the same
+transaction. Eligibility recomputes its invariant inputs and never trusts the ambulance
+projection alone.
 
 **8. Decision log.** This document cites 37 numbered decisions but no log exists in the
 repo, and decisions 1, 3, 5, 28 and 37 are never cited. For a submission graded on

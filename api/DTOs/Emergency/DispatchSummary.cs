@@ -2,7 +2,7 @@ using CareLanka.Api.Data.Enums;
 
 namespace CareLanka.Api.DTOs.Emergency;
 
-public sealed class DispatchSummary
+public class DispatchSummary
 {
     public Guid Id { get; set; }
     public Guid EmergencyCallId { get; set; }

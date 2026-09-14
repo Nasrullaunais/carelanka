@@ -9,7 +9,7 @@ part of 'create_ambulance_request.dart';
 CreateAmbulanceRequest _$CreateAmbulanceRequestFromJson(
   Map<String, dynamic> json,
 ) => CreateAmbulanceRequest(
-  registrationNumber: json['registration_number'] as String,
+  registrationNumber: json['registration_number'] as String?,
   currentLatitude: (json['current_latitude'] as num?)?.toDouble(),
   currentLongitude: (json['current_longitude'] as num?)?.toDouble(),
 );

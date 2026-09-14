@@ -258,6 +258,40 @@ tr:last-child td {
   padding: 2rem 1rem;
 }
 
+/* ---------- emergency dispatch ---------- */
+
+.emergency-notice,
+.emergency-countdown,
+.emergency-warning {
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+
+.emergency-notice,
+.emergency-countdown {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.emergency-warning,
+.emergency-block {
+  color: var(--warn);
+}
+
+.emergency-warning { background: #fdf6e7; }
+.emergency-section { border-top: 1px solid var(--line); margin-top: 1rem; padding-top: 1rem; }
+.emergency-ambulance { display: flex; justify-content: space-between; align-items: center; gap: 1rem; border-bottom: 1px solid var(--line); padding: 0.75rem 0; }
+.emergency-ambulance:last-child { border-bottom: none; }
+.emergency-block { font-size: 0.8rem; margin: 0.25rem 0 0; }
+.emergency-crew { margin: 0 0 0.8rem; padding-left: 1.25rem; }
+.emergency-form { align-items: end; }
+.emergency-action { flex: 0 0 auto; }
+
+@media (max-width: 640px) {
+  .emergency-ambulance { align-items: stretch; flex-direction: column; }
+}
+
 .login-page {
   max-width: 24rem;
   margin: 4rem auto;

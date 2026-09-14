@@ -30,4 +30,7 @@ public interface IAmbulanceService
     Task<Ambulance> ReinstateAsync(
         Guid id,
         CancellationToken cancellationToken = default);
+
+    Task ReportLocationAsync(Guid id, ReportAmbulanceLocationRequest request,
+        CancellationToken cancellationToken = default);
 }

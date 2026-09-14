@@ -303,9 +303,8 @@ public sealed class EmergencyCallEndpointTests
         var client = _application.CreateClient();
         using var response = await client.PostAsJsonAsync("/api/auth/patient/register", new
         {
-            phone_number = $"+947{Random.Shared.Next(10000000, 99999999)}",
-            password = ApiApplication.Password,
-            full_name = "Emergency Caller"
+            username = $"emergency-{Guid.NewGuid():N}",
+            password = ApiApplication.Password
         });
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         await AuthorizeFromAsync(client, response);

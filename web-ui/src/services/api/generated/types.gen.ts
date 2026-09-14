@@ -136,6 +136,7 @@ export type Ambulance = {
     registration_number: string;
     current_latitude?: number | null;
     current_longitude?: number | null;
+    location_updated_at?: string | null;
     status: AmbulanceStatus;
     out_of_service_reason?: string | null;
     is_active: boolean;
@@ -143,11 +144,23 @@ export type Ambulance = {
     updated_at: string;
 };
 
+export type AmbulanceCrewAssignment = {
+    id?: string;
+    ambulance_id?: string;
+    staff_member_id?: string;
+    full_name?: string | null;
+    assigned_at?: string;
+    assigned_by_staff_id?: string;
+    unassigned_at?: string | null;
+    unassigned_by_staff_id?: string | null;
+};
+
 export type AmbulanceDetail = {
     id: string;
     registration_number: string;
     current_latitude?: number | null;
     current_longitude?: number | null;
+    location_updated_at?: string | null;
     status: AmbulanceStatus;
     out_of_service_reason?: string | null;
     is_active: boolean;
@@ -156,7 +169,10 @@ export type AmbulanceDetail = {
     active_dispatch?: DispatchSummary;
     is_divertible?: boolean;
     runs_today?: number;
+    current_crew?: Array<AmbulanceCrewAssignment> | null;
 };
+
+export type AmbulanceEligibilityBlockReason = 'inactive' | 'out_of_service' | 'insufficient_crew' | 'active_dispatch' | 'missing_location' | 'stale_location';
 
 export type AmbulanceSortField = 'registration_number' | 'status' | 'distance';
 
@@ -168,6 +184,11 @@ export type AmbulanceSummary = {
     status: AmbulanceStatus;
     current_latitude?: number | null;
     current_longitude?: number | null;
+    location_updated_at?: string | null;
+    current_crew_count?: number;
+    required_crew_count?: number;
+    is_eligible?: boolean;
+    eligibility_block_reasons?: Array<AmbulanceEligibilityBlockReason> | null;
     active_dispatch_id?: string | null;
     is_divertible: boolean;
     distance_km?: number | null;
@@ -204,6 +225,10 @@ export type AppointmentPagedResult = {
 export type AppointmentStatus = 'scheduled' | 'checked_in' | 'completed' | 'cancelled' | 'no_show';
 
 export type AssetType = 'equipment_item' | 'bed';
+
+export type AssignAmbulanceCrewRequest = {
+    staff_member_id: string;
+};
 
 export type AssignBedRequest = {
     bed_id: string;
@@ -387,7 +412,7 @@ export type CreateAdmissionRequest = {
 };
 
 export type CreateAmbulanceRequest = {
-    registration_number: string;
+    registration_number: string | null;
     current_latitude?: number | null;
     current_longitude?: number | null;
 };
@@ -916,7 +941,7 @@ export type ReportFaultRequest = {
 };
 
 export type RetireAmbulanceRequest = {
-    reason: string;
+    reason: string | null;
 };
 
 export type SettleBillRequest = {
@@ -1630,6 +1655,124 @@ export type ListPatientWorklistResponses = {
 
 export type ListPatientWorklistResponse = ListPatientWorklistResponses[keyof ListPatientWorklistResponses];
 
+export type GetCurrentAmbulanceCrewData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/ambulances/{id}/crew';
+};
+
+export type GetCurrentAmbulanceCrewErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetCurrentAmbulanceCrewError = GetCurrentAmbulanceCrewErrors[keyof GetCurrentAmbulanceCrewErrors];
+
+export type GetCurrentAmbulanceCrewResponses = {
+    /**
+     * OK
+     */
+    200: Array<AmbulanceCrewAssignment>;
+};
+
+export type GetCurrentAmbulanceCrewResponse = GetCurrentAmbulanceCrewResponses[keyof GetCurrentAmbulanceCrewResponses];
+
+export type AssignCurrentAmbulanceCrewData = {
+    body: AssignAmbulanceCrewRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/ambulances/{id}/crew';
+};
+
+export type AssignCurrentAmbulanceCrewErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type AssignCurrentAmbulanceCrewError = AssignCurrentAmbulanceCrewErrors[keyof AssignCurrentAmbulanceCrewErrors];
+
+export type AssignCurrentAmbulanceCrewResponses = {
+    /**
+     * Created
+     */
+    201: AmbulanceCrewAssignment;
+};
+
+export type AssignCurrentAmbulanceCrewResponse = AssignCurrentAmbulanceCrewResponses[keyof AssignCurrentAmbulanceCrewResponses];
+
+export type UnassignCurrentAmbulanceCrewData = {
+    body?: never;
+    path: {
+        ambulanceId: string;
+        staffMemberId: string;
+    };
+    query?: never;
+    url: '/ambulances/{ambulanceId}/crew/{staffMemberId}';
+};
+
+export type UnassignCurrentAmbulanceCrewErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type UnassignCurrentAmbulanceCrewError = UnassignCurrentAmbulanceCrewErrors[keyof UnassignCurrentAmbulanceCrewErrors];
+
+export type UnassignCurrentAmbulanceCrewResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type UnassignCurrentAmbulanceCrewResponse = UnassignCurrentAmbulanceCrewResponses[keyof UnassignCurrentAmbulanceCrewResponses];
+
 export type ListAmbulancesData = {
     body?: never;
     path?: never;
@@ -1639,6 +1782,7 @@ export type ListAmbulancesData = {
         nearToLatitude?: number;
         nearToLongitude?: number;
         includeRetired?: boolean;
+        eligibleOnly?: boolean;
         page?: number;
         pageSize?: number;
         sortBy?: AmbulanceSortField;

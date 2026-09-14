@@ -162,6 +162,12 @@
   <data name="cl_emg_002" xml:space="preserve">
     <value>This ambulance is on an active dispatch. Divert or complete that dispatch first.</value>
   </data>
+  <data name="cl_emg_003" xml:space="preserve">
+    <value>Staff member {0} is not active ambulance crew.</value>
+  </data>
+  <data name="cl_emg_004" xml:space="preserve">
+    <value>Crew member {0} already has a current ambulance assignment.</value>
+  </data>
   <data name="cl_pat_002" xml:space="preserve">
     <value>A patient with NIC {0} is already registered, as record {1}.</value>
     <comment>Look the existing patient up instead of creating a second record for the same person.</comment>

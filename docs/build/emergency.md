@@ -2,7 +2,7 @@
 
 **Owner:** Nasrulla Unais (Member 1)
 
-**Status:** Phase 0 complete 2026-09-13; Phase 1 is next
+**Status:** Phases 0–1 complete 2026-09-13; Phase 2 is next
 
 **Contract:** `specs/emergency-spec.yaml`
 
@@ -238,7 +238,7 @@ routes; all five OpenAPI specs validate without global collisions; Emergency's s
 contract tests pin the settled operations, dispatch enum, immutable crew snapshot and
 Google Maps launch target.
 
-### Phase 1 — Current crew and dispatch eligibility
+### Phase 1 — Current crew and dispatch eligibility — **COMPLETE 2026-09-13**
 
 **Goal:** answer truthfully, before a call arrives, which ambulances can respond.
 
@@ -264,7 +264,8 @@ Tests:
 - Crew changes are rejected during a live dispatch.
 - Ended assignments remain readable as history but no longer count toward readiness.
 
-**Exit criteria:** the fleet list can explain why every ambulance is eligible or blocked.
+**Exit criteria met:** the fleet list explains why every ambulance is eligible or blocked,
+and PostgreSQL rejects concurrent current assignments through the two partial unique indexes.
 
 ### Phase 2 — Patient emergency intake
 
@@ -566,16 +567,22 @@ Already present:
 
 - The original five Emergency entities, configurations and foundation migration.
 - Ambulance CRUD/list/detail/retire/reinstate backend endpoints.
+- Current crew assignment/list/unassignment endpoints, history-preserving assignment rows and
+  database-enforced current-assignment uniqueness.
+- Fleet eligibility decisions with configured crew minimum and explicit block reasons.
+- Repository-wide FluentValidation MVC integration; Emergency ambulance requests and query
+  validation use separate validators.
 - A straight-line `IAmbulanceDistanceService` stub.
+- A documented `IStaffLookupService` stub until Staff Management publishes its implementation.
 - Emergency OpenAPI and ambulance endpoint tests.
 
 Not yet present:
 
-- Current ambulance crew assignments and eligibility.
 - Emergency-call services/controllers.
 - Manual or agent-assisted dispatch.
 - Crew acknowledgement and progress transitions.
 - Emergency React or Flutter screens.
 - Real Maps, live tracking, Firebase delivery, pre-admission or reports.
 
-With Phase 0 aligned, Phase 1 is the next work rather than the AI agent or mobile UI.
+With the fleet now truthful, Phase 2 call intake is next rather than dispatch creation,
+the AI agent or mobile UI.

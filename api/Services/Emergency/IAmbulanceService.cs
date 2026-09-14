@@ -1,5 +1,4 @@
 using CareLanka.Api.DTOs.Emergency;
-using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Common;
 
 namespace CareLanka.Api.Services.Emergency;
@@ -7,15 +6,7 @@ namespace CareLanka.Api.Services.Emergency;
 public interface IAmbulanceService
 {
     Task<PagedResult<AmbulanceSummary>> ListAsync(
-        AmbulanceStatus? status,
-        string? search,
-        decimal? nearToLatitude,
-        decimal? nearToLongitude,
-        bool includeRetired,
-        int page,
-        int pageSize,
-        AmbulanceSortField sortBy,
-        string sortDir,
+        AmbulanceListRequest request,
         CancellationToken cancellationToken = default);
 
     Task<AmbulanceDetail> GetByIdAsync(

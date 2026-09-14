@@ -2,8 +2,8 @@ using System.Text.Json.Serialization;
 
 namespace CareLanka.Api.DTOs.Emergency;
 
-public sealed class RetireAmbulanceRequest
+public sealed class AssignAmbulanceCrewRequest
 {
     [JsonRequired]
-    public string Reason { get; set; } = string.Empty;
+    public Guid StaffMemberId { get; set; }
 }

@@ -9,18 +9,14 @@ part 'patient_register_request.g.dart';
 @JsonSerializable()
 class PatientRegisterRequest {
   const PatientRegisterRequest({
-    required this.phoneNumber,
+    required this.username,
     required this.password,
-    required this.fullName,
   });
   
   factory PatientRegisterRequest.fromJson(Map<String, Object?> json) => _$PatientRegisterRequestFromJson(json);
   
-  @JsonKey(name: 'phone_number')
-  final String phoneNumber;
+  final String username;
   final String password;
-  @JsonKey(name: 'full_name')
-  final String fullName;
 
   Map<String, Object?> toJson() => _$PatientRegisterRequestToJson(this);
 }

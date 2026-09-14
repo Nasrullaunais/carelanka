@@ -5,6 +5,19 @@ single hospital / multiple wards, unified staff identity, generic agent-workflow
 audit-log schemas). PKs are `Guid` (PostgreSQL `uuid`, `default: gen_random_uuid()`)
 throughout.
 
+**Revision 2.13** — patients sign in with a username. `PatientAccount` loses two columns
+and gains one, in the `Common_PatientUsernameLogin` migration. Changes marked *(Rev 2.13)*.
+
+- **`PatientAccount.Username`** replaces `PhoneNumber` as the login identifier. Registration
+  now asks for a username and a password and nothing else; the name, NIC, gender, date of
+  birth and contact number arrive afterwards through `POST /me/pre-register`, which is where
+  they belong — on the medical record, not on the login.
+- **`PatientAccount.FullName` and `PhoneNumber` are gone.** Both duplicated columns on
+  `patients`, and neither had anything to fill it once registration stopped asking. A column
+  that is always empty is worse than no column: the next person to read the schema believes it.
+- **Existing rows kept their login.** The migration backfills `username` from the digits of
+  the old `phone_number` before dropping it, so the same person still reaches the same row.
+
 **Revision 2.12** — the billing tables are written down at last. Four tables that landed on
 2026-09-11 with step 7 and were never added here: `bills`, `bill_line_items`, `billing_rates`
 and `admission_fee_rates`, in the `Patient_AddBilling`, `Patient_AddBillingRates` and
@@ -356,15 +369,25 @@ One staff member may have several devices. Scoped to `StaffMember` only; see
 
 #### PatientAccount extends SoftDeletableEntity *(Rev 2.5 — new)*
 ```
-+ PhoneNumber: string (unique, non-null)               -- the login identifier
++ Username: string (max 50, unique, non-null)          -- the login identifier (Rev 2.13)
 + PasswordHash: string (non-null)
-+ FullName: string (non-null)
 + LastLoginAt: DateTimeOffset (nullable)
 ```
 **Table:** `patient_accounts`
 **Owner:** Patient Management (Member 4).
 **Constraints:**
-- `UNIQUE (phone_number) WHERE is_active`
+- `UNIQUE (username) WHERE is_active`
+
+*(Rev 2.13)* **A login, and nothing more.** `Username` is letters, digits, dots, underscores
+and hyphens, 3 to 50 characters, stored lower-cased so one person cannot hold two accounts
+that differ only in capitals. `UsernameRules` holds the shape, because the register DTO, the
+login DTO and `common-spec.yaml` all have to agree with it.
+
+`CurrentPrincipal.DisplayName` is the username for a patient — the account is created before
+any medical record exists, so there is no person's name to show yet.
+
+`PhoneNumber` and `FullName` were dropped in the same migration. A patient's name and contact
+number live on `patients`, which is the only place staff can trust them.
 
 *(Rev 2.5)* **This table was missing, and three committed specs were already pointing at
 it.** Rev 2.3 resolved Open Decision 1 in favour of patients keeping an app login, but no
@@ -1964,7 +1987,7 @@ never create another `ICU-1`. Worse under EF Core, where a global query filter o
 
 ```sql
 CREATE UNIQUE INDEX ux_staff_members_email     ON staff_members (email)              WHERE is_active;
-CREATE UNIQUE INDEX ux_patient_accounts_phone ON patient_accounts (phone_number)     WHERE is_active;   -- (Rev 2.7)
+CREATE UNIQUE INDEX ux_patient_accounts_username ON patient_accounts (username)       WHERE is_active;   -- (Rev 2.13)
 CREATE UNIQUE INDEX ux_ambulances_reg          ON ambulances (registration_number)   WHERE is_active;
 CREATE UNIQUE INDEX ux_wards_name              ON wards (name)                       WHERE is_active;
 CREATE UNIQUE INDEX ux_beds_ward_number        ON beds (ward_id, bed_number)         WHERE is_active;

@@ -70,25 +70,31 @@ ten minutes and creating accounts on stage is how demos die.
 
 ---
 
-## Patient — sign in with a phone number
+## Patient — sign in with a username
 
 `POST /api/auth/patient/login`
 
-| Phone number | Password | Name |
-| :--- | :--- | :--- |
-| `+94771234567` | `Patient#2026` | Chathura Wijesinghe |
+| Username | Password |
+| :--- | :--- |
+| `chathura.w` | `Patient#2026` |
 
 ```json
 POST /api/auth/patient/login
 {
-  "phone_number": "+94771234567",
+  "username": "chathura.w",
   "password": "Patient#2026"
 }
 ```
 
-**A patient signs in with a phone number, not an email.** That is not a
+**A patient signs in with a username, staff with an email.** That is not a
 different spelling of the same thing — staff and patients are two separate
 tables, with two separate login endpoints, on purpose.
+
+**This account has no `patients` row linked to it,** so `GET /api/auth/me`
+returns `patient_id: null` and every `/api/me/*` route except `pre-register`
+answers 404 with `cl_pat_033`. That is the ordinary state for a fresh sign-up:
+the name, NIC, gender, date of birth and contact number arrive afterwards,
+through `POST /api/me/pre-register`.
 
 ---
 
@@ -127,17 +133,20 @@ Registration is open — no token needed.
 ```json
 POST /api/auth/patient/register
 {
-  "phone_number": "+94770001234",
-  "password": "Something#2026",
-  "full_name": "Your Name"
+  "username": "your.name",
+  "password": "Something#2026"
 }
 ```
+
+A username and a password, and nothing else. Letters, digits, dots, underscores
+and hyphens, 3 to 50 characters, stored lower-cased — so `Your.Name` and
+`your.name` are the same account, not two.
 
 You are signed in immediately: the response is a full token pair, not just
 "created".
 
-Try the same phone number twice and the second one is a `409` — one active
-account per number.
+Try the same username twice and the second one is a `409` — one active account
+per username.
 
 ---
 

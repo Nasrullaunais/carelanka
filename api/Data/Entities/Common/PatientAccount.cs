@@ -2,11 +2,13 @@ namespace CareLanka.Api.Data.Entities.Common;
 
 public class PatientAccount : SoftDeletableEntity
 {
-    public string PhoneNumber { get; set; } = null!;
+    /// <summary>
+    /// What the patient signs in with, stored lower-case so one person cannot
+    /// hold two accounts that differ only in capitals.
+    /// </summary>
+    public string Username { get; set; } = null!;
 
     public string PasswordHash { get; set; } = null!;
-
-    public string FullName { get; set; } = null!;
 
     public DateTimeOffset? LastLoginAt { get; set; }
 

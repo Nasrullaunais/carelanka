@@ -7,6 +7,7 @@ import 'core/auth/session_expiry.dart';
 import 'core/auth/token_store.dart';
 import 'core/network/api.dart';
 import 'core/routing/app_router.dart';
+import 'core/theme/app_theme.dart';
 import 'features/patient/patient_routes.dart';
 import 'services/api_client/care_lanka_api.dart';
 import 'services/api_client/models/current_principal.dart';
@@ -75,7 +76,8 @@ class _CareLankaAppState extends State<CareLankaApp> {
       ],
       child: MaterialApp.router(
         title: 'CareLanka',
-        theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.teal),
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
         routerConfig: _router,
       ),
     );

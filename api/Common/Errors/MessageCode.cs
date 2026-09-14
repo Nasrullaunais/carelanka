@@ -22,7 +22,7 @@ public enum MessageCode
 
     RefreshTokenInvalid,
 
-    PhoneNumberAlreadyRegistered,
+    UsernameAlreadyTaken,
 
     BedNumberTaken,
 

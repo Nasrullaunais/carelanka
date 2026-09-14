@@ -9,14 +9,13 @@ part 'patient_login_request.g.dart';
 @JsonSerializable()
 class PatientLoginRequest {
   const PatientLoginRequest({
-    required this.phoneNumber,
+    required this.username,
     required this.password,
   });
   
   factory PatientLoginRequest.fromJson(Map<String, Object?> json) => _$PatientLoginRequestFromJson(json);
   
-  @JsonKey(name: 'phone_number')
-  final String phoneNumber;
+  final String username;
   final String password;
 
   Map<String, Object?> toJson() => _$PatientLoginRequestToJson(this);

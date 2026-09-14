@@ -66,25 +66,21 @@ class AuthController extends ChangeNotifier {
         ));
   }
 
-  Future<bool> signInAsPatient({required String phoneNumber, required String password}) {
+  Future<bool> signInAsPatient({required String username, required String password}) {
     return _signIn(() => _api.auth.loginPatient(
-          body: PatientLoginRequest(phoneNumber: phoneNumber, password: password),
+          body: PatientLoginRequest(username: username, password: password),
         ));
   }
 
-  /// Creates the login itself. The account has no medical record behind it
-  /// until the patient fills in their details, which is a separate step.
+  /// Creates the login itself. A username and a password are all it takes; the
+  /// account has no medical record behind it until the patient fills in their
+  /// details, which is a separate step.
   Future<bool> registerAsPatient({
-    required String fullName,
-    required String phoneNumber,
+    required String username,
     required String password,
   }) {
     return _signIn(() => _api.auth.registerPatientAccount(
-          body: PatientRegisterRequest(
-            fullName: fullName,
-            phoneNumber: phoneNumber,
-            password: password,
-          ),
+          body: PatientRegisterRequest(username: username, password: password),
         ));
   }
 

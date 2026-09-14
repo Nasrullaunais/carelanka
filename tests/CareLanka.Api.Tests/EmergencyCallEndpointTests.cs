@@ -3,6 +3,8 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using CareLanka.Api.Data;
+using CareLanka.Api.Data.Entities.Common;
+using CareLanka.Api.Data.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -49,6 +51,87 @@ public sealed class EmergencyCallEndpointTests
         using var boardBody = JsonDocument.Parse(await board.Content.ReadAsStringAsync());
         Assert.Contains(boardBody.RootElement.GetProperty("items").EnumerateArray(),
             row => row.GetProperty("id").GetGuid() == callId);
+    }
+
+    [Fact]
+    public async Task A_patient_call_can_be_manually_dispatched_and_handed_over_without_AI()
+    {
+        using var patient = await PatientClientAsync();
+        using var manager = await StaffClientAsync(ApiApplication.ManagerEmail);
+        using var crew = await StaffClientAsync(ApiApplication.AmbulanceEmail);
+        using var callResponse = await patient.PostAsJsonAsync("/api/emergency-calls", Request(Guid.NewGuid(), true));
+        using var callBody = JsonDocument.Parse(await callResponse.Content.ReadAsStringAsync());
+        var callId = callBody.RootElement.GetProperty("id").GetGuid();
+        var ambulanceId = await CreateReadyAmbulanceAsync(manager);
+
+        using var dispatched = await manager.PostAsJsonAsync($"/api/emergency-calls/{callId}/dispatch", new { ambulance_id = ambulanceId });
+        Assert.Equal(HttpStatusCode.Created, dispatched.StatusCode);
+        using var dispatchBody = JsonDocument.Parse(await dispatched.Content.ReadAsStringAsync());
+        var dispatchId = dispatchBody.RootElement.GetProperty("id").GetGuid();
+        Assert.Equal("assigned", dispatchBody.RootElement.GetProperty("status").GetString());
+        Assert.Equal(2, dispatchBody.RootElement.GetProperty("crew_staff_ids").GetArrayLength());
+
+        Assert.Equal(HttpStatusCode.OK, (await crew.PostAsync($"/api/me/dispatches/{dispatchId}/acknowledge", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status = "en_route_to_scene" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status = "at_scene" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status = "transporting_to_hospital" })).StatusCode);
+        using var handover = await crew.PostAsync($"/api/me/dispatches/{dispatchId}/handover", null);
+        Assert.Equal(HttpStatusCode.OK, handover.StatusCode);
+        using var handoverBody = JsonDocument.Parse(await handover.Content.ReadAsStringAsync());
+        Assert.Equal("handed_over", handoverBody.RootElement.GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task Concurrent_dispatches_for_one_ambulance_leave_exactly_one_assigned()
+    {
+        using var firstPatient = await PatientClientAsync();
+        using var secondPatient = await PatientClientAsync();
+        using var manager = await StaffClientAsync(ApiApplication.ManagerEmail);
+        var ambulanceId = await CreateReadyAmbulanceAsync(manager);
+        var firstCall = await CreatePatientCallAsync(firstPatient);
+        var secondCall = await CreatePatientCallAsync(secondPatient);
+
+        var attempts = await Task.WhenAll(
+            manager.PostAsJsonAsync($"/api/emergency-calls/{firstCall}/dispatch", new { ambulance_id = ambulanceId }),
+            manager.PostAsJsonAsync($"/api/emergency-calls/{secondCall}/dispatch", new { ambulance_id = ambulanceId }));
+
+        Assert.Equal([HttpStatusCode.Created, HttpStatusCode.Conflict], attempts.Select(x => x.StatusCode).Order().ToArray());
+        foreach (var attempt in attempts) attempt.Dispose();
+    }
+
+    [Fact]
+    public async Task Caller_tracking_is_narrow_and_location_is_owned_by_responding_crew()
+    {
+        using var patient = await PatientClientAsync();
+        using var otherPatient = await PatientClientAsync();
+        using var manager = await StaffClientAsync(ApiApplication.ManagerEmail);
+        using var crew = await StaffClientAsync(ApiApplication.AmbulanceEmail);
+        var callId = await CreatePatientCallAsync(patient);
+        var ambulanceId = await CreateReadyAmbulanceAsync(manager);
+        using var dispatched = await manager.PostAsJsonAsync($"/api/emergency-calls/{callId}/dispatch", new { ambulance_id = ambulanceId });
+        dispatched.EnsureSuccessStatusCode();
+
+        Assert.Equal(HttpStatusCode.NoContent, (await crew.PostAsJsonAsync($"/api/ambulances/{ambulanceId}/location", new { latitude = 6.930m, longitude = 79.865m })).StatusCode);
+        using var tracking = await patient.GetAsync($"/api/me/emergency-calls/{callId}/tracking");
+        tracking.EnsureSuccessStatusCode();
+        using var body = JsonDocument.Parse(await tracking.Content.ReadAsStringAsync());
+        Assert.Equal(6.930m, body.RootElement.GetProperty("ambulance_latitude").GetDecimal());
+        Assert.False(body.RootElement.TryGetProperty("crew", out _));
+        Assert.False(body.RootElement.TryGetProperty("details", out _));
+        Assert.Equal(HttpStatusCode.Forbidden, (await otherPatient.GetAsync($"/api/me/emergency-calls/{callId}/tracking")).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await patient.PostAsJsonAsync($"/api/me/emergency-calls/{callId}/cancel", new { reason = "No longer needed" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await patient.PostAsJsonAsync($"/api/me/emergency-calls/{callId}/cancellation-request", new { reason = "No longer needed" })).StatusCode);
+    }
+
+    [Fact]
+    public async Task Caller_can_cancel_before_any_dispatch()
+    {
+        using var patient = await PatientClientAsync();
+        var callId = await CreatePatientCallAsync(patient);
+        using var cancelled = await patient.PostAsJsonAsync($"/api/me/emergency-calls/{callId}/cancel", new { reason = "Created by mistake" });
+        Assert.Equal(HttpStatusCode.OK, cancelled.StatusCode);
+        using var body = JsonDocument.Parse(await cancelled.Content.ReadAsStringAsync());
+        Assert.Equal("cancelled", body.RootElement.GetProperty("status").GetString());
     }
 
     [Theory]
@@ -345,6 +428,14 @@ public sealed class EmergencyCallEndpointTests
         details
     };
 
+    private static async Task<Guid> CreatePatientCallAsync(HttpClient patient)
+    {
+        using var response = await patient.PostAsJsonAsync("/api/emergency-calls", Request(Guid.NewGuid(), true));
+        response.EnsureSuccessStatusCode();
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return body.RootElement.GetProperty("id").GetGuid();
+    }
+
     private static async Task<Guid> CreateStaffCallAsync(
         HttpClient manager,
         string marker,
@@ -364,5 +455,41 @@ public sealed class EmergencyCallEndpointTests
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         return body.RootElement.GetProperty("id").GetGuid();
+    }
+
+    private async Task<Guid> CreateReadyAmbulanceAsync(HttpClient manager)
+    {
+        using var created = await manager.PostAsJsonAsync("/api/ambulances", new
+        {
+            registration_number = $"WP-DSP-{Guid.NewGuid():N}"[..20].ToUpperInvariant(),
+            current_latitude = 6.927079, current_longitude = 79.861244
+        });
+        created.EnsureSuccessStatusCode();
+        using var body = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+        var ambulanceId = body.RootElement.GetProperty("id").GetGuid();
+        Guid secondCrewId;
+        using (var scope = _application.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+            secondCrewId = Guid.NewGuid();
+            db.StaffMembers.Add(new StaffMember { Id = secondCrewId, Email = $"crew-{secondCrewId:N}@carelanka.invalid", PasswordHash = "test", FirstName = "Second", LastName = "Crew", Role = StaffRole.AmbulanceCrew, IsActive = true });
+            await db.SaveChangesAsync();
+        }
+        using var me = await manager.GetAsync("/api/auth/me");
+        using var meBody = JsonDocument.Parse(await me.Content.ReadAsStringAsync());
+        var firstCrewId = await StaffIdAsync(ApiApplication.AmbulanceEmail);
+        foreach (var crewId in new[] { firstCrewId, secondCrewId })
+        {
+            using var assigned = await manager.PostAsJsonAsync($"/api/ambulances/{ambulanceId}/crew", new { staff_member_id = crewId });
+            assigned.EnsureSuccessStatusCode();
+        }
+        return ambulanceId;
+    }
+
+    private async Task<Guid> StaffIdAsync(string email)
+    {
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        return await db.StaffMembers.Where(x => x.Email == email).Select(x => x.Id).SingleAsync();
     }
 }

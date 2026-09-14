@@ -28,6 +28,7 @@ public sealed class EmergencyCallConfiguration : IEntityTypeConfiguration<Emerge
         builder.Property(call => call.AddressLabel).HasMaxLength(500);
         builder.Property(call => call.Details).HasMaxLength(1000);
         builder.Property(call => call.Outcome).HasMaxLength(1000);
+        builder.Property(call => call.CancellationRequestReason).HasMaxLength(500);
         builder.Property(call => call.Latitude).HasPrecision(9, 6).IsRequired();
         builder.Property(call => call.Longitude).HasPrecision(9, 6).IsRequired();
         builder.Property(call => call.LocationAccuracyMetres).HasPrecision(10, 2).IsRequired();
@@ -41,6 +42,9 @@ public sealed class EmergencyCallConfiguration : IEntityTypeConfiguration<Emerge
             .HasConversion(new SnakeCaseEnumConverter<CallStatus>())
             .HasMaxLength(20)
             .IsRequired();
+        builder.Property(call => call.CancellationRequestStatus)
+            .HasConversion(new SnakeCaseEnumConverter<CancellationRequestStatus>())
+            .HasMaxLength(20);
 
         builder.HasOne<PatientEntity>()
             .WithMany()

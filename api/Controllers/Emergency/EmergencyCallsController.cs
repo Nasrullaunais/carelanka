@@ -61,4 +61,17 @@ public sealed class EmergencyCallsController : ControllerBase
         [FromBody] UpdateEmergencyCallRequest request,
         CancellationToken cancellationToken)
         => Ok(await _calls.UpdateAsync(id, request, cancellationToken));
+
+    [Authorize(Policy = Policies.DutyManager)]
+    [HttpPost("{id:guid}/dispatch", Name = "dispatchEmergencyCall")]
+    [ProducesResponseType(typeof(DispatchDetail), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<DispatchDetail>> Dispatch(
+        Guid id, [FromBody] ManualDispatchRequest request, [FromServices] IDispatchService dispatches,
+        CancellationToken cancellationToken)
+        => Created((string?)null, await dispatches.DispatchAsync(id, request, cancellationToken));
 }

@@ -93,4 +93,18 @@ public sealed class AmbulancesController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
         => Ok(await _ambulances.ReinstateAsync(id, cancellationToken));
+
+    [Authorize(Policy = Policies.AmbulanceCrew)]
+    [HttpPost("{id:guid}/location", Name = "reportAmbulanceLocation")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<IActionResult> ReportLocation(Guid id, ReportAmbulanceLocationRequest request,
+        CancellationToken cancellationToken)
+    {
+        await _ambulances.ReportLocationAsync(id, request, cancellationToken);
+        return NoContent();
+    }
 }

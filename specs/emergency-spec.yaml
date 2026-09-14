@@ -2455,6 +2455,9 @@ components:
         ambulance_is_on_the_way: { type: boolean }
         ambulance_latitude: { type: number, format: double, nullable: true }
         ambulance_longitude: { type: number, format: double, nullable: true }
+        ambulance_location_is_stale:
+          type: boolean
+          description: True when the reported position is older than the configured freshness limit; show the update time, not a live marker.
         estimated_minutes_to_arrival: { type: integer, nullable: true }
         cancellation_request_status:
           allOf:

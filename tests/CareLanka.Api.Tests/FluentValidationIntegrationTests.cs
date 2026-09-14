@@ -118,5 +118,9 @@ public sealed class FluentValidationIntegrationTests
 
         public Task<Ambulance> ReinstateAsync(Guid id, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
+
+        public Task ReportLocationAsync(Guid id, ReportAmbulanceLocationRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
     }
 }

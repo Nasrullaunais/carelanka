@@ -170,7 +170,7 @@ public sealed class AmbulanceCrewService : IAmbulanceCrewService
     {
         var hasLiveDispatch = await _db.Dispatches.AnyAsync(dispatch =>
             dispatch.AmbulanceId == ambulanceId
-            && (dispatch.Status == DispatchStatus.Assigned || dispatch.Status == DispatchStatus.EnRoute),
+            && DispatchStatusExtensions.LiveStatuses.Contains(dispatch.Status),
             cancellationToken);
         if (hasLiveDispatch)
         {

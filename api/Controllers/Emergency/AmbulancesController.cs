@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using CareLanka.Api.Common.Auth;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Common;
@@ -25,27 +24,9 @@ public sealed class AmbulancesController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
     public async Task<ActionResult<PagedResult<AmbulanceSummary>>> ListAmbulances(
-        [FromQuery] AmbulanceStatus? status,
-        [FromQuery] string? search,
-        [FromQuery][Range(-90, 90)] decimal? nearToLatitude,
-        [FromQuery][Range(-180, 180)] decimal? nearToLongitude,
-        [FromQuery] bool includeRetired = false,
-        [FromQuery][Range(1, int.MaxValue)] int page = 1,
-        [FromQuery][Range(1, 100)] int pageSize = 20,
-        [FromQuery] AmbulanceSortField sortBy = AmbulanceSortField.RegistrationNumber,
-        [FromQuery][RegularExpression("^(asc|desc)$")] string sortDir = "desc",
+        [FromQuery] AmbulanceListRequest request,
         CancellationToken cancellationToken = default)
-        => Ok(await _ambulances.ListAsync(
-            status,
-            search,
-            nearToLatitude,
-            nearToLongitude,
-            includeRetired,
-            page,
-            pageSize,
-            sortBy,
-            sortDir,
-            cancellationToken));
+        => Ok(await _ambulances.ListAsync(request, cancellationToken));
 
     [Authorize(Policy = Policies.EmergencyResponder)]
     [HttpGet("{id:guid}", Name = "getAmbulance")]

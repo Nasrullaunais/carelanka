@@ -66,17 +66,22 @@ actually published.
 
 ## Open stubs
 
-**Two open.** Common auth was never stubbed: it was built and merged in PR #11. Row 2 is
-Equipment waiting on Patient Management, and row 4 is Emergency waiting on its maps integration.
+**Three open.** Common auth was never stubbed: it was built and merged in PR #11. Row 2 is
+Equipment waiting on Patient Management, while rows 4 and 5 are Emergency dependencies.
 **Rows 1 and 3 are gone** — see Replaced below.
 
 | # | What is faked | Where it lives | Standing in for | Owner of the real thing | Added |
 | :-- | :--- | :--- | :--- | :--- | :--- |
 | 2 | Ward names on a bed — every ward is called `Stub ward <id fragment>` | `api/Services/Equipment/Stubs/StubWardDirectory.cs` | `GET /wards` — `patient-spec.yaml` | **M4 Lochana** | 2026-09-09 |
 | 4 | Ambulance distance — straight-line distance instead of road distance | `api/Services/Emergency/Stubs/StubAmbulanceDistanceService.cs` | Maps routing provider | **M1 Nasrulla Unais** | 2026-09-12 |
+| 5 | Staff name, active state and role lookup from the existing auth staff records | `api/Services/Emergency/Stubs/StubStaffLookupService.cs` | `POST /staff/lookup` — `staff-spec.yaml` | **M2 Kaveesha** | 2026-09-13 |
 
 **Row 4** keeps the fleet search usable offline and is the documented provider-down fallback.
 Replace its DI registration when build step 6 adds real road distance and duration.
+
+**Row 5** matches Staff Management's published batch lookup shape and fails closed for unknown
+or inactive staff. Replace its DI registration when `POST /staff/lookup` is built; Emergency
+stores only staff IDs and does not copy staff-owned profile data.
 
 **Row 2 — why the name looks broken on purpose.** `Bed.ward_name` is Patient Management's
 to answer, and a plausible invented name like "Intensive Care" would be indistinguishable

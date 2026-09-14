@@ -18,63 +18,57 @@ public sealed class AmbulanceService : IAmbulanceService
     private readonly CareLankaDbContext _db;
     private readonly ICurrentUser _currentUser;
     private readonly IAmbulanceDistanceService _distances;
+    private readonly IAmbulanceEligibilityService _eligibility;
+    private readonly IAmbulanceCrewService _crew;
+    private readonly TimeProvider _timeProvider;
 
     public AmbulanceService(
         CareLankaDbContext db,
         ICurrentUser currentUser,
-        IAmbulanceDistanceService distances)
+        IAmbulanceDistanceService distances,
+        IAmbulanceEligibilityService eligibility,
+        IAmbulanceCrewService crew,
+        TimeProvider timeProvider)
     {
         _db = db;
         _currentUser = currentUser;
         _distances = distances;
+        _eligibility = eligibility;
+        _crew = crew;
+        _timeProvider = timeProvider;
     }
 
     public async Task<PagedResult<AmbulanceSummary>> ListAsync(
-        AmbulanceStatus? status,
-        string? search,
-        decimal? nearToLatitude,
-        decimal? nearToLongitude,
-        bool includeRetired,
-        int page,
-        int pageSize,
-        AmbulanceSortField sortBy,
-        string sortDir,
+        AmbulanceListRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (nearToLatitude.HasValue != nearToLongitude.HasValue
-            || sortBy == AmbulanceSortField.Distance && nearToLatitude is null)
-        {
-            throw new BadRequestException(MessageCode.ValidationFailed);
-        }
-
         var query = _db.Ambulances.AsNoTracking();
 
-        if (!includeRetired)
+        if (!request.IncludeRetired)
         {
             query = query.Where(ambulance => ambulance.IsActive);
         }
 
-        if (status is { } wantedStatus)
+        if (request.Status is { } wantedStatus)
         {
             query = query.Where(ambulance => ambulance.Status == wantedStatus);
         }
 
-        if (!string.IsNullOrWhiteSpace(search))
+        if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            var term = search.Trim();
+            var term = request.Search.Trim();
             query = query.Where(ambulance => EF.Functions.ILike(ambulance.RegistrationNumber, $"%{term}%"));
         }
 
-        var totalItems = await query.CountAsync(cancellationToken);
         var rows = await query.ToListAsync(cancellationToken);
-        var measuredDistances = nearToLatitude is not null && nearToLongitude is not null
+        var measuredDistances = request.NearToLatitude is not null && request.NearToLongitude is not null
             ? await _distances.MeasureAsync(
                 rows.Select(ambulance => new AmbulanceLocation(
                     ambulance.Id,
                     ambulance.CurrentLatitude,
                     ambulance.CurrentLongitude)).ToList(),
-                nearToLatitude.Value,
-                nearToLongitude.Value,
+                request.NearToLatitude.Value,
+                request.NearToLongitude.Value,
                 cancellationToken)
             : new Dictionary<Guid, double?>();
         var activeDispatches = await _db.Dispatches
@@ -83,20 +77,52 @@ public sealed class AmbulanceService : IAmbulanceService
                 || dispatch.Status == DispatchStatus.EnRoute)
             .Select(dispatch => new { dispatch.AmbulanceId, dispatch.Id })
             .ToDictionaryAsync(dispatch => dispatch.AmbulanceId, dispatch => dispatch.Id, cancellationToken);
+        var crewCounts = await _db.AmbulanceCrewAssignments
+            .AsNoTracking()
+            .Where(assignment => assignment.UnassignedAt == null)
+            .GroupBy(assignment => assignment.AmbulanceId)
+            .Select(group => new { AmbulanceId = group.Key, Count = group.Count() })
+            .ToDictionaryAsync(item => item.AmbulanceId, item => item.Count, cancellationToken);
 
-        var summaries = rows.Select(ambulance => new AmbulanceSummary
+        var summaries = rows.Select(ambulance =>
         {
-            Id = ambulance.Id,
-            RegistrationNumber = ambulance.RegistrationNumber,
-            Status = ambulance.Status,
-            CurrentLatitude = ambulance.CurrentLatitude,
-            CurrentLongitude = ambulance.CurrentLongitude,
-            ActiveDispatchId = activeDispatches.GetValueOrDefault(ambulance.Id),
-            IsDivertible = IsDivertible(ambulance.Status),
-            DistanceKm = measuredDistances.GetValueOrDefault(ambulance.Id)
+            Guid? activeDispatchId = activeDispatches.TryGetValue(ambulance.Id, out var dispatchId)
+                ? dispatchId
+                : null;
+            var crewCount = crewCounts.GetValueOrDefault(ambulance.Id);
+            var decision = _eligibility.Decide(new AmbulanceEligibilityFacts(
+                ambulance.IsActive,
+                ambulance.Status,
+                crewCount,
+                activeDispatchId,
+                ambulance.CurrentLatitude.HasValue && ambulance.CurrentLongitude.HasValue,
+                ambulance.LocationUpdatedAt));
+            return new AmbulanceSummary
+            {
+                Id = ambulance.Id,
+                RegistrationNumber = ambulance.RegistrationNumber,
+                Status = ambulance.Status,
+                CurrentLatitude = ambulance.CurrentLatitude,
+                CurrentLongitude = ambulance.CurrentLongitude,
+                LocationUpdatedAt = ambulance.LocationUpdatedAt,
+                CurrentCrewCount = crewCount,
+                RequiredCrewCount = decision.RequiredCrewCount,
+                IsEligible = decision.IsEligible,
+                EligibilityBlockReasons = decision.BlockReasons,
+                ActiveDispatchId = activeDispatchId,
+                IsDivertible = activeDispatchId is null || IsDivertible(ambulance.Status),
+                DistanceKm = measuredDistances.GetValueOrDefault(ambulance.Id)
+            };
         });
 
-        summaries = (sortBy, sortDir.Equals("asc", StringComparison.OrdinalIgnoreCase)) switch
+        if (request.EligibleOnly)
+        {
+            summaries = summaries.Where(ambulance => ambulance.IsEligible);
+        }
+
+        var totalItems = summaries.Count();
+
+        summaries = (request.SortBy, request.SortDir.Equals("asc", StringComparison.OrdinalIgnoreCase)) switch
         {
             (AmbulanceSortField.Status, true) => summaries.OrderBy(ambulance => ambulance.Status).ThenBy(ambulance => ambulance.Id),
             (AmbulanceSortField.Status, false) => summaries.OrderByDescending(ambulance => ambulance.Status).ThenBy(ambulance => ambulance.Id),
@@ -106,8 +132,8 @@ public sealed class AmbulanceService : IAmbulanceService
             _ => summaries.OrderByDescending(ambulance => ambulance.RegistrationNumber).ThenBy(ambulance => ambulance.Id)
         };
 
-        var items = summaries.Skip((page - 1) * pageSize).Take(pageSize).ToList();
-        return PagedResult<AmbulanceSummary>.From(items, page, pageSize, totalItems);
+        var items = summaries.Skip((request.Page - 1) * request.PageSize).Take(request.PageSize).ToList();
+        return PagedResult<AmbulanceSummary>.From(items, request.Page, request.PageSize, totalItems);
     }
 
     public async Task<AmbulanceDetail> GetByIdAsync(
@@ -127,13 +153,15 @@ public sealed class AmbulanceService : IAmbulanceService
             RegistrationNumber = ambulance.RegistrationNumber,
             CurrentLatitude = ambulance.CurrentLatitude,
             CurrentLongitude = ambulance.CurrentLongitude,
+            LocationUpdatedAt = ambulance.LocationUpdatedAt,
             Status = ambulance.Status,
             OutOfServiceReason = ambulance.OutOfServiceReason,
             IsActive = ambulance.IsActive,
             CreatedAt = ambulance.CreatedAt,
             UpdatedAt = ambulance.UpdatedAt,
             IsDivertible = IsDivertible(ambulance.Status),
-            RunsToday = runsToday
+            RunsToday = runsToday,
+            CurrentCrew = await _crew.ListCurrentForFleetAsync(id, cancellationToken)
         };
     }
 
@@ -154,6 +182,7 @@ public sealed class AmbulanceService : IAmbulanceService
             RegistrationNumber = registrationNumber,
             CurrentLatitude = request.CurrentLatitude,
             CurrentLongitude = request.CurrentLongitude,
+            LocationUpdatedAt = request.CurrentLatitude.HasValue ? _timeProvider.GetUtcNow() : null,
             Status = AmbulanceStatus.Available
         };
 
@@ -246,6 +275,7 @@ public sealed class AmbulanceService : IAmbulanceService
         RegistrationNumber = ambulance.RegistrationNumber,
         CurrentLatitude = ambulance.CurrentLatitude,
         CurrentLongitude = ambulance.CurrentLongitude,
+        LocationUpdatedAt = ambulance.LocationUpdatedAt,
         Status = ambulance.Status,
         OutOfServiceReason = ambulance.OutOfServiceReason,
         IsActive = ambulance.IsActive,

@@ -92,6 +92,9 @@ public sealed class EmergencyOpenApiContractTests
     [InlineData("/ambulances/{id}", "patch", "updateAmbulance")]
     [InlineData("/ambulances/{id}/retire", "post", "retireAmbulance")]
     [InlineData("/ambulances/{id}/reinstate", "post", "reinstateAmbulance")]
+    [InlineData("/ambulances/{id}/crew", "get", "getCurrentAmbulanceCrew")]
+    [InlineData("/ambulances/{id}/crew", "post", "assignCurrentAmbulanceCrew")]
+    [InlineData("/ambulances/{ambulanceId}/crew/{staffMemberId}", "delete", "unassignCurrentAmbulanceCrew")]
     public async Task Ambulance_operation_ids_match_the_contract(
         string path,
         string method,
@@ -110,6 +113,9 @@ public sealed class EmergencyOpenApiContractTests
     [InlineData("/ambulances/{id}", "patch")]
     [InlineData("/ambulances/{id}/retire", "post")]
     [InlineData("/ambulances/{id}/reinstate", "post")]
+    [InlineData("/ambulances/{id}/crew", "get")]
+    [InlineData("/ambulances/{id}/crew", "post")]
+    [InlineData("/ambulances/{ambulanceId}/crew/{staffMemberId}", "delete")]
     public async Task Ambulance_response_statuses_match_the_contract(string path, string method)
     {
         using var document = await GenerateAsync();
@@ -134,6 +140,56 @@ public sealed class EmergencyOpenApiContractTests
             .GetProperty("enum").EnumerateArray().Select(value => value.GetString()!).ToHashSet();
 
         Assert.True(expected.SetEquals(generated));
+    }
+
+    [Fact]
+    public async Task Phase_one_eligibility_shape_matches_the_contract()
+    {
+        using var document = await GenerateAsync();
+        var contract = LoadContract();
+        var expectedReasons = Sequence(
+                contract,
+                "components",
+                "schemas",
+                "AmbulanceEligibilityBlockReason",
+                "enum")
+            .Children.Cast<YamlScalarNode>().Select(value => value.Value!).ToHashSet();
+        var generatedReasons = document.RootElement.GetProperty("components").GetProperty("schemas")
+            .GetProperty("AmbulanceEligibilityBlockReason").GetProperty("enum")
+            .EnumerateArray().Select(value => value.GetString()!).ToHashSet();
+        var expectedFields = Keys(Map(
+            contract,
+            "components",
+            "schemas",
+            "AmbulanceSummary",
+            "properties"));
+        var generatedFields = Keys(
+            document.RootElement,
+            "components",
+            "schemas",
+            "AmbulanceSummary",
+            "properties");
+
+        Assert.True(expectedReasons.SetEquals(generatedReasons));
+        Assert.True(expectedFields.SetEquals(generatedFields));
+    }
+
+    [Fact]
+    public async Task Phase_one_request_and_query_wire_contract_is_generated()
+    {
+        using var document = await GenerateAsync();
+        var operation = document.RootElement.GetProperty("paths").GetProperty("/ambulances")
+            .GetProperty("get");
+        var parameterNames = operation.GetProperty("parameters").EnumerateArray()
+            .Select(parameter => parameter.GetProperty("name").GetString()!).ToHashSet();
+        var assign = document.RootElement.GetProperty("components").GetProperty("schemas")
+            .GetProperty("AssignAmbulanceCrewRequest");
+
+        Assert.Contains("eligibleOnly", parameterNames);
+        Assert.Contains("nearToLatitude", parameterNames);
+        Assert.Contains("nearToLongitude", parameterNames);
+        Assert.Contains("staff_member_id", assign.GetProperty("required")
+            .EnumerateArray().Select(value => value.GetString()));
     }
 
     private static async Task<JsonDocument> GenerateAsync()

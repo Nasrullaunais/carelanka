@@ -39,7 +39,10 @@ static void ConfigureJson(JsonSerializerOptions json)
 
 builder.Services
     .AddControllers(options =>
-        options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true)
+    {
+        options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
+        options.ModelMetadataDetailsProviders.Add(new EmergencyQueryBindingMetadataProvider());
+    })
     .AddJsonOptions(options => ConfigureJson(options.JsonSerializerOptions));
 
 builder.Services.AddFluentValidationAutoValidation();
@@ -294,6 +297,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IAmbulanceEligibilityService, AmbulanceEligibilityService>();
 builder.Services.AddScoped<IAmbulanceService, AmbulanceService>();
 builder.Services.AddScoped<IAmbulanceCrewService, AmbulanceCrewService>();
+builder.Services.AddScoped<IEmergencyCallService, EmergencyCallService>();
 builder.Services.AddScoped<IStaffLookupService, StubStaffLookupService>();
 builder.Services.AddSingleton<IAmbulanceDistanceService, StubAmbulanceDistanceService>();
 
@@ -350,7 +354,9 @@ builder.Services.AddSwaggerGen(options =>
 
     options.DocumentFilter<ApiPrefixAsServerFilter>();
     options.OperationFilter<AnonymousOperationFilter>();
+    options.OperationFilter<EmergencyCallOperationFilter>();
     options.SchemaFilter<JsonRequiredSchemaFilter>();
+    options.SchemaFilter<EmergencyCallSchemaFilter>();
 
 });
 

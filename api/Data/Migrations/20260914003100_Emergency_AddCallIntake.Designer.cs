@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using CareLanka.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CareLanka.Api.Data.Migrations
 {
     [DbContext(typeof(CareLankaDbContext))]
-    partial class CareLankaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260914003100_Emergency_AddCallIntake")]
+    partial class Emergency_AddCallIntake
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -38,6 +41,12 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
 
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("full_name");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
@@ -52,22 +61,22 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("character varying(512)")
                         .HasColumnName("password_hash");
 
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("phone_number");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.Property<string>("Username")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("username");
-
                     b.HasKey("Id")
                         .HasName("pk_patient_accounts");
 
-                    b.HasIndex("Username")
+                    b.HasIndex("PhoneNumber")
                         .IsUnique()
-                        .HasDatabaseName("ux_patient_accounts_username")
+                        .HasDatabaseName("ux_patient_accounts_phone")
                         .HasFilter("is_active");
 
                     b.ToTable("patient_accounts", (string)null);

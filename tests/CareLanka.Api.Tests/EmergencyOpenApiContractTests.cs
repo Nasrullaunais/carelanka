@@ -192,6 +192,80 @@ public sealed class EmergencyOpenApiContractTests
             .EnumerateArray().Select(value => value.GetString()));
     }
 
+    [Theory]
+    [InlineData("/emergency-calls", "post", "createEmergencyCall")]
+    [InlineData("/emergency-calls", "get", "listEmergencyCalls")]
+    [InlineData("/emergency-calls/{id}", "get", "getEmergencyCall")]
+    [InlineData("/emergency-calls/{id}", "patch", "updateEmergencyCall")]
+    [InlineData("/me/emergency-calls", "get", "getMyEmergencyCalls")]
+    public async Task Phase_two_operation_ids_match_the_published_contract(
+        string path,
+        string method,
+        string operationId)
+    {
+        using var document = await GenerateAsync();
+        Assert.Equal(operationId, document.RootElement.GetProperty("paths").GetProperty(path)
+            .GetProperty(method).GetProperty("operationId").GetString());
+    }
+
+    [Theory]
+    [InlineData("/emergency-calls", "post")]
+    [InlineData("/emergency-calls", "get")]
+    [InlineData("/emergency-calls/{id}", "get")]
+    [InlineData("/emergency-calls/{id}", "patch")]
+    [InlineData("/me/emergency-calls", "get")]
+    public async Task Phase_two_response_statuses_match_the_published_contract(string path, string method)
+    {
+        using var document = await GenerateAsync();
+        var contract = LoadContract();
+        var expected = Keys(Map(contract, "paths", path, method, "responses"));
+        var generated = Keys(document.RootElement, "paths", path, method, "responses");
+
+        Assert.True(expected.SetEquals(generated),
+            $"{method.ToUpperInvariant()} {path}: contract [{string.Join(", ", expected)}], "
+            + $"generated [{string.Join(", ", generated)}]");
+    }
+
+    [Fact]
+    public async Task Patient_intake_request_and_own_call_shapes_are_generated_without_caller_input()
+    {
+        using var document = await GenerateAsync();
+        var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
+        var request = schemas.GetProperty("CreateEmergencyCallRequest");
+        var required = request.GetProperty("required").EnumerateArray()
+            .Select(value => value.GetString()!).ToHashSet();
+        var expectedRequired = new[]
+        {
+            "patient_is_caller",
+            "latitude",
+            "longitude",
+            "location_accuracy_metres",
+            "location_captured_at",
+            "idempotency_key"
+        };
+
+        Assert.True(expectedRequired.ToHashSet().SetEquals(required));
+        Assert.False(request.GetProperty("properties").TryGetProperty("caller_user_id", out _));
+        Assert.True(Keys(Map(LoadContract(), "components", "schemas", "CreateEmergencyCallRequest", "properties"))
+            .SetEquals(request.GetProperty("properties").EnumerateObject().Select(property => property.Name)));
+        Assert.True(Keys(Map(LoadContract(), "components", "schemas", "MyEmergencyCallSummary", "properties"))
+            .SetEquals(schemas.GetProperty("MyEmergencyCallSummary").GetProperty("properties")
+                .EnumerateObject().Select(property => property.Name)));
+    }
+
+    [Fact]
+    public async Task Dispatcher_call_board_query_names_match_the_published_wire_contract()
+    {
+        using var document = await GenerateAsync();
+        var names = document.RootElement.GetProperty("paths").GetProperty("/emergency-calls")
+            .GetProperty("get").GetProperty("parameters").EnumerateArray()
+            .Select(parameter => parameter.GetProperty("name").GetString()!).ToHashSet();
+
+        Assert.Equal(
+            new[] { "status", "priority", "search", "from", "to", "unassignedOnly", "page", "pageSize", "sortBy", "sortDir" }.ToHashSet(),
+            names);
+    }
+
     private static async Task<JsonDocument> GenerateAsync()
     {
         using var environment = TestEnvironment.Use();

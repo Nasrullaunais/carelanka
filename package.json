@@ -4,10 +4,12 @@
   "description": "Repo-root tooling only. The React app has its own package.json in web-ui/.",
   "type": "module",
   "scripts": {
-    "check:specs": "node scripts/check-specs.mjs"
+    "check:specs": "node scripts/check-specs.mjs",
+    "lint:specs": "redocly lint specs/common-spec.yaml specs/patient-spec.yaml specs/staff-spec.yaml specs/equipment-spec.yaml specs/emergency-spec.yaml"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^13.0.0",
+    "@redocly/cli": "2.52.1",
     "js-yaml": "^4.1.0"
   }
 }

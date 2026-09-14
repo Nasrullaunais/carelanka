@@ -3,8 +3,6 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace CareLanka.Api.Services.Common;
 
-// In memory, so it resets on restart and is not shared between instances. Deliberate for one
-// deployment: the per-IP middleware limit is the broad defence and this is the narrow one.
 public sealed class LoginThrottle : ILoginThrottle
 {
     private const int MaxFailures = 5;

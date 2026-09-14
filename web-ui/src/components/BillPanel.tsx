@@ -19,32 +19,13 @@ import {
   quantity,
 } from '../types/billing';
 
-// One bill, everywhere a bill is shown.
-//
-// It lives in components/ rather than in a page because it started out on a billing screen of
-// its own. That screen is gone (2026-09-12): "where does the billing happen?" was a fair
-// question to ask of a discharge checklist that had a `Bill settled` box, no bill on the page
-// and no way to reach one — and the answer, a second screen, meant walking the same visit
-// twice while neither page could see what the other had done. There is one screen now and this
-// is the part of it that is the bill.
-//
-// Two things it deliberately does NOT do:
-//
-//   It does not decide who may settle. `canSettle` is passed in, because the billing desk and
-//   the discharge checklist are different permissions and only the duty manager holds both.
-//   A ward nurse sees the bill and reads the total; they do not take money.
-//
-//   It does not invent a charge. The fee and the bed are worked out from the visit; everything
-//   else is typed by a person, because no table in this project ties a treatment, a meal or a
-//   drug to an admission. A fake charge is a number handed to a patient on paper.
-
 export function BillPanel({
   admissionId,
   canSettle,
   showPrint = true,
 }: {
   admissionId: string;
-  /** Whether this viewer may add charges and take money — Policies.BillingDesk. */
+
   canSettle: boolean;
   showPrint?: boolean;
 }) {
@@ -58,7 +39,6 @@ export function BillPanel({
 
   const template = chargeTemplate(templateKey);
 
-  /** Picking a row refills the three boxes under it; the typist can still overwrite any of them. */
   function chooseTemplate(key: string) {
     const chosen = chargeTemplate(key);
 
@@ -71,13 +51,9 @@ export function BillPanel({
   const bill = useQuery({
     ...getAdmissionBillOptions({ path: { admissionId } }),
 
-    // A 404 here means "nobody has opened a bill yet", which is the ordinary state and not a
-    // failure. Retrying would just ask again and toast again.
     retry: false,
   });
 
-  // Settling moves the discharge checklist and can move the admission's status, so the ward
-  // screens have to hear about it too.
   const refreshAll = () =>
     queryClient.invalidateQueries({
       predicate: (query) => {
@@ -96,7 +72,7 @@ export function BillPanel({
   const prepare = useMutation({
     ...prepareAdmissionBillMutation(),
     onSuccess: (result) => {
-      toast.success(`Bill ${result.bill_number} worked out.`);
+      toast.success(`Bill ${result.bill_number} prepared.`);
       void refreshAll();
     },
   });
@@ -121,7 +97,7 @@ export function BillPanel({
   const settle = useMutation({
     ...settleBillMutation(),
     onSuccess: (result) => {
-      toast.success(`Bill ${result.bill_number} settled. The checklist box is ticked.`);
+      toast.success(`Bill ${result.bill_number} settled. Bill settled is now ticked.`);
       void refreshAll();
     },
   });
@@ -130,13 +106,11 @@ export function BillPanel({
     return <p className="empty">Loading the bill…</p>;
   }
 
-  // No bill row yet. Not an error state — say what is missing and offer the one button that
-  // fixes it, to whoever is allowed to press it.
   if (!bill.data) {
     return (
       <>
         <p className="empty">
-          No bill has been opened for this visit yet.
+          No bill has been raised for this admission yet.
           {canSettle && (
             <>
               <br />
@@ -146,15 +120,15 @@ export function BillPanel({
                 disabled={prepare.isPending}
                 onClick={() => prepare.mutate({ path: { admissionId } })}
               >
-                {prepare.isPending ? 'Working it out…' : 'Open the bill'}
+                {prepare.isPending ? 'Preparing…' : 'Raise the bill'}
               </button>
             </>
           )}
         </p>
         <p className="hint">
           {canSettle
-            ? "That reads the visit — the care level and every bed the patient has been in — and writes the lines down at today's rates."
-            : 'Reception opens the bill and takes the money. Nothing on the ward is held up by it until the discharge itself.'}
+            ? "This reads the admission — the care level and every bed used — and adds those lines at today's rates."
+            : 'Reception raises the bill and takes payment. Nothing on the ward is held up until the discharge itself.'}
         </p>
       </>
     );
@@ -173,26 +147,20 @@ export function BillPanel({
         </div>
       )}
 
-      {/* The printable half. Everything outside it is hidden by the print stylesheet, so what
-          comes out of the printer is a bill and not a screenshot of an app. */}
       <BillPrintout bill={data} standalone={showPrint} />
 
-      {/* Everything below is a control, not the document. The discharge card prints as a
-          whole, so the charge form and the settle form have to say so themselves - otherwise
-          the patient's copy of their bill comes out with an empty "Add a charge" form on it. */}
       <div className="no-print">
       {frozen ? (
         <p className="hint">
           Settled{data.settled_at && ` at ${new Date(data.settled_at).toLocaleString()}`}
           {data.settled_by_staff_name && ` by ${data.settled_by_staff_name}`}
-          {data.settlement_note && ` — ${data.settlement_note}`}. A settled bill is frozen: it is
-          the piece of paper the patient was handed, so nothing may be added to it afterwards.
+          {data.settlement_note && ` — ${data.settlement_note}`}. A settled bill is final and
+          cannot be changed.
         </p>
       ) : !canSettle ? (
         <p className="hint">
-          <strong>{money(data.total, data.currency)} outstanding.</strong> Taking money is
-          reception's job, not the ward's — this is here so you can see where the discharge has
-          got to, not so you can settle it.
+          <strong>{money(data.total, data.currency)} outstanding.</strong> Payment is taken by
+          reception. This is shown so the ward can see how far the discharge has got.
         </p>
       ) : (
         <>
@@ -214,7 +182,7 @@ export function BillPanel({
           >
             <div className="row">
               <div className="field">
-                <label htmlFor="charge-kind">What for</label>
+                <label htmlFor="charge-kind">Charge type</label>
                 <select
                   id="charge-kind"
                   value={templateKey}
@@ -228,7 +196,7 @@ export function BillPanel({
                 </select>
               </div>
               <div className="field">
-                <label htmlFor="charge-description">How it reads on the bill</label>
+                <label htmlFor="charge-description">Description on the bill</label>
                 <input
                   id="charge-description"
                   required
@@ -244,20 +212,20 @@ export function BillPanel({
                   id="charge-quantity"
                   required
                   type="number"
-                  min="0.01"
-                  step="0.01"
+                  min="1"
+                  step="1"
                   value={chargeQuantity}
                   onChange={(event) => setChargeQuantity(event.target.value)}
                 />
               </div>
               <div className="field">
-                <label htmlFor="charge-price">Each (LKR)</label>
+                <label htmlFor="charge-price">Unit price (LKR)</label>
                 <input
                   id="charge-price"
                   required
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="any"
                   value={unitPrice}
                   placeholder="3500"
                   onChange={(event) => setUnitPrice(event.target.value)}
@@ -276,16 +244,15 @@ export function BillPanel({
             {template.unitPrice !== null && (
               <>
                 {' '}
-                <strong>The price shown is a suggestion and it is invented</strong> — no real
-                price list was given to us. Change it to whatever was actually charged.
+                The price shown is a default. Change it to the amount actually charged.
               </>
             )}
           </p>
 
           <p className="hint">
-            Treatments, meals, scans and medicines are typed here because nothing in the system
-            records them against a visit. Bed time and care level are the only things it can
-            price on its own, and it does — those lines are already above.
+            Treatments, meals, tests and medicines are entered by hand — nothing in the system
+            records them against an admission. The admission fee and bed charges are worked out
+            automatically and are already listed above.
           </p>
 
           <h3>Settle</h3>
@@ -293,7 +260,7 @@ export function BillPanel({
           <div className="row">
             <div className="field">
               <label htmlFor="settlement-note">
-                How it was paid <span className="muted">(optional)</span>
+                Payment method <span className="muted">(optional)</span>
               </label>
               <input
                 id="settlement-note"
@@ -314,15 +281,15 @@ export function BillPanel({
                   })
                 }
               >
-                {settle.isPending ? 'Settling…' : `Take ${money(data.total, data.currency)}`}
+                {settle.isPending ? 'Settling…' : `Settle ${money(data.total, data.currency)}`}
               </button>
             </div>
           </div>
 
           <p className="hint">
-            Settling freezes the bill and ticks <strong>Bill settled</strong> on the discharge
-            checklist, in one go. That box cannot be ticked any other way, so the money and the
-            ward's checklist can never disagree.
+            Settling makes the bill final and ticks <strong>Bill settled</strong> on the
+            discharge checklist. That item cannot be ticked any other way, so the payment and
+            the checklist can never disagree.
           </p>
 
           <div className="actions" style={{ marginTop: '0.9rem' }}>
@@ -350,9 +317,9 @@ export function BillPanel({
           </div>
 
           <p className="hint">
-            Recalculating replaces the fee and bed lines with today's numbers and leaves typed
-            charges alone. Only a typed charge can be removed — a bed line would come straight
-            back.
+            Recalculating replaces the admission fee and bed lines with today's rates and leaves
+            entered charges alone. Only an entered charge can be removed — a bed line would come
+            straight back.
           </p>
         </>
       )}
@@ -361,25 +328,12 @@ export function BillPanel({
   );
 }
 
-/**
- * The bill itself, and the only part of the page that reaches a printer.
- *
- * A browser print view rather than a generated PDF: it is one stylesheet against a stack that
- * already renders the numbers, it saves to PDF from the print dialog anyway, and it does not
- * put a document-generation dependency into a project that needs one screen of it.
- */
 export function BillPrintout({
   bill,
   standalone = true,
 }: {
   bill: Bill;
-  /**
-   * Whether this is the whole printed document or a section of a bigger one.
-   *
-   * On the discharge screen it is a section: the card around it owns the hospital heading, the
-   * patient block and the `printable` class, and repeating all three inside would print the
-   * patient's name twice under two different headings.
-   */
+
   standalone?: boolean;
 }) {
   return (
@@ -391,8 +345,6 @@ export function BillPrintout({
         </div>
       )}
 
-      {/* Each label and value wrapped, so the grid cannot split a pair across rows and leave
-          every label sitting above somebody else's value. */}
       <dl className="detail-grid">
         {standalone && (
           <div>
@@ -411,11 +363,10 @@ export function BillPrintout({
           <dd>{bill.bill_number}</dd>
         </div>
         <div>
-          <dt>Raised</dt>
+          <dt>Raised on</dt>
           <dd>
             {new Date(bill.created_at).toLocaleString()}
-            {/* Who issued it. A bill handed across a counter names the person who wrote it,
-                and "who do I ask about this charge?" is the first question at the desk. */}
+
             {bill.raised_by_staff_name && (
               <div className="small muted">by {bill.raised_by_staff_name}</div>
             )}
@@ -442,9 +393,9 @@ export function BillPrintout({
       <table>
         <thead>
           <tr>
-            <th>What for</th>
-            <th>How many</th>
-            <th>Each</th>
+            <th>Description</th>
+            <th>Quantity</th>
+            <th>Unit price</th>
             <th>Amount</th>
           </tr>
         </thead>

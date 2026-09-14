@@ -10,10 +10,6 @@ using Xunit;
 
 namespace CareLanka.Api.Tests;
 
-/// <summary>
-/// The status machine, exercised through every endpoint that can move an item. One guard
-/// decides what is legal, so these are the tests that say what "legal" means.
-/// </summary>
 [Collection(ApiCollection.Name)]
 public sealed class EquipmentItemLifecycleTests
 {
@@ -32,10 +28,6 @@ public sealed class EquipmentItemLifecycleTests
         using var body = await ReadJsonAsync(response);
         var item = body.RootElement;
 
-        // The one documented exemption from the transition table. Assigned -> maintenance is
-        // refused everywhere else, but a person saying the machine is broken outranks the
-        // table: the alternative is a known-faulty item still reading as usable. Detaching
-        // the patient is the intended consequence, which is why it is asserted here.
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("maintenance", item.GetProperty("status").GetString());
         Assert.Equal(JsonValueKind.Null, item.GetProperty("assigned_to_admission_id").ValueKind);
@@ -55,8 +47,6 @@ public sealed class EquipmentItemLifecycleTests
         var warning = await db.Warnings.AsNoTracking()
             .SingleAsync(w => w.RelatedEntityId == id);
 
-        // Status and warning are one SaveChanges. If the exemption above ever stops writing
-        // the warning, the item goes quiet in maintenance with nobody told why.
         Assert.Equal(WarningType.EquipmentFaulty, warning.Type);
         Assert.Equal(WarningSeverity.High, warning.Severity);
         Assert.Equal(WarningStatus.Open, warning.Status);
@@ -74,8 +64,6 @@ public sealed class EquipmentItemLifecycleTests
             $"/api/equipment-items/{id}", new { status = "maintenance" });
         using var body = await ReadJsonAsync(response);
 
-        // The exemption belongs to report-fault alone. Editing an assigned item straight into
-        // maintenance would drop a patient's equipment with no fault recorded anywhere.
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal("cl_err_409_transition", body.RootElement.GetProperty("code").GetString());
     }
@@ -90,8 +78,6 @@ public sealed class EquipmentItemLifecycleTests
         var response = await ReportFaultAsync(client, id, "Found in the corridor.");
         using var body = await ReadJsonAsync(response);
 
-        // Retired stays terminal even for a fault. A scrapped item has nothing left to report,
-        // and a replacement is a new row.
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal("cl_equ_006", body.RootElement.GetProperty("code").GetString());
     }
@@ -106,8 +92,6 @@ public sealed class EquipmentItemLifecycleTests
         var response = await AssignAsync(client, id, Guid.NewGuid());
         using var body = await ReadJsonAsync(response);
 
-        // Routed through the same guard as everything else, but the caller still reads the
-        // specific code. "Not available" tells a technician more than the transition wording.
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal("cl_equ_006", body.RootElement.GetProperty("code").GetString());
     }
@@ -150,13 +134,11 @@ public sealed class EquipmentItemLifecycleTests
         var response = await client.PutAsJsonAsync(
             $"/api/equipment-items/{id}", new { status = "assigned" });
 
-        // Available -> assigned is a legal move, but only the assign endpoint carries the
-        // admission id. Allowing it here would leave an item assigned to nobody.
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
-    public async Task An_item_in_maintenance_can_go_back_into_service_or_be_retired()
+    public async Task An_item_with_the_maintenance_unit_cannot_be_talked_back_into_service()
     {
         using var client = await EquipmentClientAsync();
         var repaired = await NewItemIdAsync(client);
@@ -170,8 +152,85 @@ public sealed class EquipmentItemLifecycleTests
         var gone = await client.PutAsJsonAsync(
             $"/api/equipment-items/{scrapped}", new { status = "retired" });
 
-        Assert.Equal(HttpStatusCode.OK, back.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, back.StatusCode);
+
         Assert.Equal(HttpStatusCode.OK, gone.StatusCode);
+    }
+
+    [Fact]
+    public async Task Reporting_a_fault_opens_one_repair_job_for_the_maintenance_unit()
+    {
+        using var client = await EquipmentClientAsync();
+        var id = await NewItemIdAsync(client);
+
+        await ReportFaultAsync(client, id, "Sparking at the plug.");
+        await ReportFaultAsync(client, id, "Also rattling.");
+
+        var jobs = await OpenRepairJobsAsync(id);
+
+        var job = Assert.Single(jobs);
+        Assert.Equal(MaintenanceType.Repair, job.ScheduleType);
+        Assert.Equal("Sparking at the plug.", job.Notes);
+    }
+
+    [Fact]
+    public async Task Completing_the_repair_is_what_returns_the_item_to_service()
+    {
+        using var client = await EquipmentClientAsync();
+        var id = await NewItemIdAsync(client);
+        await ReportFaultAsync(client, id, "Screen flickering.");
+
+        var job = Assert.Single(await OpenRepairJobsAsync(id));
+        var completed = await client.PostAsJsonAsync(
+            $"/api/maintenance-schedules/{job.Id}/complete", new { notes = "New backlight." });
+
+        using var body = await ReadJsonAsync(await client.GetAsync($"/api/equipment-items/{id}"));
+
+        Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
+        Assert.Equal("available", body.RootElement.GetProperty("status").GetString());
+
+        Assert.Empty(await OpenFaultWarningsAsync(id));
+    }
+
+    [Fact]
+    public async Task Retiring_a_faulty_item_clears_it_out_of_the_unit_queue()
+    {
+        using var client = await EquipmentClientAsync();
+        var id = await NewItemIdAsync(client);
+        await ReportFaultAsync(client, id, "Cracked housing, not worth repairing.");
+
+        var retired = await client.PutAsJsonAsync(
+            $"/api/equipment-items/{id}", new { status = "retired" });
+
+        Assert.Equal(HttpStatusCode.OK, retired.StatusCode);
+
+        Assert.Empty(await OpenRepairJobsAsync(id));
+        Assert.Empty(await OpenFaultWarningsAsync(id));
+    }
+
+    private async Task<List<Data.Entities.Equipment.MaintenanceSchedule>> OpenRepairJobsAsync(Guid itemId)
+    {
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        return await db.MaintenanceSchedules
+            .Where(s => s.AssetType == AssetType.EquipmentItem
+                        && s.AssetId == itemId
+                        && (s.Status == MaintenanceStatus.Scheduled
+                            || s.Status == MaintenanceStatus.InProgress))
+            .ToListAsync();
+    }
+
+    private async Task<List<Data.Entities.Equipment.Warning>> OpenFaultWarningsAsync(Guid itemId)
+    {
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        return await db.Warnings
+            .Where(w => w.RelatedEntityType == RelatedEntityType.EquipmentItem
+                        && w.RelatedEntityId == itemId
+                        && w.Status == WarningStatus.Open)
+            .ToListAsync();
     }
 
     [Fact]
@@ -184,8 +243,6 @@ public sealed class EquipmentItemLifecycleTests
         var reported = await ReportFaultAsync(nurse, id, "Sparking at the plug.");
         var assigned = await AssignAsync(nurse, id, Guid.NewGuid());
 
-        // A nurse at the bedside is the person who finds the fault, so the report is open to
-        // any staff. Moving stock around the hospital is not.
         Assert.Equal(HttpStatusCode.OK, reported.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, assigned.StatusCode);
     }

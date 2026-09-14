@@ -18,8 +18,6 @@ public sealed class AdmissionEndpointTests
 
     public AdmissionEndpointTests(ApiApplication application) => _application = application;
 
-    // ---------- starting a visit ----------
-
     [Fact]
     public async Task A_nurse_starts_an_admission_and_it_begins_awaiting_a_bed()
     {
@@ -31,7 +29,6 @@ public sealed class AdmissionEndpointTests
 
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
 
-        // Every admission starts here. Getting a bed is a separate, approved step.
         Assert.Equal("awaiting_bed", body.RootElement.GetProperty("status").GetString());
         Assert.Equal("walk_in", body.RootElement.GetProperty("source").GetString());
         Assert.Equal(
@@ -48,8 +45,6 @@ public sealed class AdmissionEndpointTests
 
         using var body = await ReadJsonAsync(await CreateAsync(client, patientId, nurseId));
 
-        // Recorded proof a human chose the care level. There is no code path in this API that
-        // lets an agent supply it.
         Assert.Equal(nurseId, body.RootElement.GetProperty("category_set_by_staff_id").GetString());
         Assert.True(body.RootElement.TryGetProperty("category_set_at", out var setAt));
         Assert.NotEqual(JsonValueKind.Null, setAt.ValueKind);
@@ -65,7 +60,6 @@ public sealed class AdmissionEndpointTests
         var missing = body.RootElement.GetProperty("missing_fields")
             .EnumerateArray().Select(item => item.GetString()!).ToArray();
 
-        // "Two things missing" does not tell a ward clerk what to chase; these names do.
         Assert.False(body.RootElement.GetProperty("details_complete").GetBoolean());
         Assert.Contains("phone", missing);
         Assert.Contains("address", missing);
@@ -83,8 +77,6 @@ public sealed class AdmissionEndpointTests
 
         using var body = await ReadJsonAsync(await CreateAsync(client, patientId, await NurseIdAsync()));
 
-        // details_complete is a stored generated column over missing_fields, so the two can
-        // never disagree.
         Assert.True(body.RootElement.GetProperty("details_complete").GetBoolean());
         Assert.Empty(body.RootElement.GetProperty("missing_fields").EnumerateArray());
     }
@@ -100,8 +92,6 @@ public sealed class AdmissionEndpointTests
         var second = await CreateAsync(client, patientId, nurseId);
         using var body = await ReadJsonAsync(second);
 
-        // One person, one stay at a time. Almost always the desk not realising this patient is
-        // already in the building.
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
         Assert.Equal("cl_pat_006", body.RootElement.GetProperty("code").GetString());
     }
@@ -113,8 +103,6 @@ public sealed class AdmissionEndpointTests
         var nurseId = await NurseIdAsync();
         var patientId = await NewPatientAsync(client, "Two Desks At Once");
 
-        // Both requests read "no open admission" before either inserts, so the service-layer
-        // check passes twice. ux_admissions_open_patient is what actually stops the second.
         var responses = await Task.WhenAll(
             CreateAsync(client, patientId, nurseId),
             CreateAsync(client, patientId, nurseId));
@@ -127,12 +115,8 @@ public sealed class AdmissionEndpointTests
         using var conflict = await ReadJsonAsync(
             responses.Single(r => r.StatusCode == HttpStatusCode.Conflict));
 
-        // Same code either way. A caller cannot tell which path refused it, and should not
-        // have to.
         Assert.Equal("cl_pat_006", conflict.RootElement.GetProperty("code").GetString());
 
-        // The assertion that does not depend on which path won the race: the patient's own
-        // history has one visit on it, not two.
         using var history = await ReadJsonAsync(await client.GetAsync($"/api/patients/{patientId}"));
         Assert.Single(history.RootElement.GetProperty("admissions").EnumerateArray());
 
@@ -151,8 +135,6 @@ public sealed class AdmissionEndpointTests
         var response = await CreateAsync(client, patientId, await NurseIdAsync(), source: "emergency");
         using var body = await ReadJsonAsync(response);
 
-        // Without it there is no link back to Emergency's record of the same journey, and two
-        // systems describe one arrival with nothing joining them.
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("cl_pat_007", body.RootElement.GetProperty("code").GetString());
     }
@@ -194,8 +176,6 @@ public sealed class AdmissionEndpointTests
         Assert.Equal("cl_pat_008", body.RootElement.GetProperty("code").GetString());
     }
 
-    // ---------- reading ----------
-
     [Fact]
     public async Task An_admission_detail_carries_an_empty_bed_history_and_omits_what_has_no_table()
     {
@@ -205,20 +185,12 @@ public sealed class AdmissionEndpointTests
 
         using var body = await ReadJsonAsync(await client.GetAsync($"/api/admissions/{id}"));
 
-        // Empty because nothing holds a bed on a visit this new — an empty list, never a
-        // missing key.
         Assert.Equal(JsonValueKind.Array, body.RootElement.GetProperty("bed_assignments").ValueKind);
         Assert.Empty(body.RootElement.GetProperty("bed_assignments").EnumerateArray());
 
-        // discharge and bill are present and null. Nobody has opened a checklist or a bill for
-        // a visit that started a second ago, and null says exactly that — which is a different
-        // fact from "this API does not serve it", and a client has to be able to tell them
-        // apart. Both were omitted keys until step 7.
         Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("discharge").ValueKind);
         Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("bill").ValueKind);
 
-        // workflows still has no table behind it, so it is left out rather than faked.
-        // AgentWorkflow is common and unbuilt (ADR 3). See AdmissionDetail and STUBS.md.
         Assert.False(body.RootElement.TryGetProperty("workflows", out _));
     }
 
@@ -290,8 +262,6 @@ public sealed class AdmissionEndpointTests
         var order = body.RootElement.GetProperty("items").EnumerateArray()
             .Select(item => item.GetProperty("urgency").GetString()!).ToArray();
 
-        // Urgency is stored as a snake_case string, so ordering the column alphabetically gives
-        // emergency, routine, urgent — which reads like a sort and is not one.
         Assert.Equal(new[] { "emergency", "urgent", "routine" }, order);
     }
 
@@ -321,8 +291,6 @@ public sealed class AdmissionEndpointTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    // ---------- filling in what was missing ----------
-
     [Fact]
     public async Task Completing_details_clears_the_fields_it_supplies_from_the_missing_list()
     {
@@ -344,7 +312,6 @@ public sealed class AdmissionEndpointTests
         Assert.DoesNotContain("phone", missing);
         Assert.DoesNotContain("date_of_birth", missing);
 
-        // Still incomplete, and it says so rather than rounding up.
         Assert.Contains("address", missing);
         Assert.False(body.RootElement.GetProperty("details_complete").GetBoolean());
     }
@@ -357,8 +324,6 @@ public sealed class AdmissionEndpointTests
         var patientId = await NewPatientAsync(client, "Keeps Their Nic", nic);
         var id = await CreateIdAsync(client, patientId, await NurseIdAsync());
 
-        // Nothing about the NIC in this body. That is the whole difference between this and
-        // the PUT on a patient, where an omitted field is cleared.
         await client.PatchAsJsonAsync($"/api/admissions/{id}/details", new { address = "12 Temple Road" });
 
         using var body = await ReadJsonAsync(await client.GetAsync($"/api/admissions/{id}"));
@@ -379,7 +344,6 @@ public sealed class AdmissionEndpointTests
         var response = await client.PatchAsJsonAsync($"/api/admissions/{id}/details", new { nic = taken });
         using var body = await ReadJsonAsync(response);
 
-        // Merging two records is a decision, not something this endpoint should guess at.
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal("cl_pat_002", body.RootElement.GetProperty("code").GetString());
     }
@@ -394,12 +358,6 @@ public sealed class AdmissionEndpointTests
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
-
-    // ---------- a missing enum is an error, not a default ----------
-    //
-    // [Required] on a plain C# enum always passes, because the model binder has already turned
-    // an absent key into the first declared member. Every existing test on this controller sends
-    // a full body, which is why none of them caught it. These send bodies with one key left out.
 
     [Fact]
     public async Task An_admission_with_no_care_level_is_refused_rather_than_filed_as_icu()
@@ -416,10 +374,6 @@ public sealed class AdmissionEndpointTests
             is_infectious = false
         });
 
-        // icu is declared first because AdmissionCategory runs most to least intensive for the
-        // downgrade ladder. So the default this used to take was not a harmless one: it filed
-        // the patient at the most acute care level in the hospital, and hard rule H2 then
-        // reasons from it.
         Assert.Equal(HttpStatusCode.BadRequest, created.StatusCode);
 
         using var body = await ReadJsonAsync(created);
@@ -441,9 +395,6 @@ public sealed class AdmissionEndpointTests
             is_infectious = false
         });
 
-        // emergency is declared first, so the old default turned every walk-in that forgot the
-        // key into an ambulance arrival - and emergency is the one source that then demands a
-        // dispatch_id, so the error it did produce pointed at the wrong field entirely.
         Assert.Equal(HttpStatusCode.BadRequest, created.StatusCode);
     }
 
@@ -462,18 +413,8 @@ public sealed class AdmissionEndpointTests
             is_infectious = false
         });
 
-        // routine is declared first, so the least urgent patient in the building was the default.
-        // Urgency feeds the worklist sort, so the mistake shows up as an order
-        // that looks deliberate.
         Assert.Equal(HttpStatusCode.BadRequest, created.StatusCode);
     }
-
-    // ---------- the status machine ----------
-    //
-    // docs/build/patient.md calls the seven-state workflow the backbone and says to test it
-    // hardest. AdmissionStatusMachineTests sweeps all 49 from/to pairs with no database; these
-    // check that the two endpoints that move a status actually move everything that goes with
-    // it — the arrival stamp, the bed, and the patient's freedom to be admitted again.
 
     [Fact]
     public async Task A_held_bed_becomes_an_occupied_one_when_the_patient_walks_in()
@@ -489,13 +430,10 @@ public sealed class AdmissionEndpointTests
         Assert.Equal(HttpStatusCode.OK, arrived.StatusCode);
         Assert.Equal("admitted", body.RootElement.GetProperty("status").GetString());
 
-        // The stamp is what separates arriving from every other way of reaching admitted.
         Assert.NotEqual(
             JsonValueKind.Null,
             body.RootElement.GetProperty("admitted_at").ValueKind);
 
-        // And the hold becomes an occupancy. Leave it reserved and the 30-minute expiry can
-        // still take the bed back from a patient who is lying in it.
         using var detail = await ReadJsonAsync(await nurse.GetAsync($"/api/admissions/{id}"));
         var assignment = detail.RootElement.GetProperty("bed_assignments").EnumerateArray().Single();
 
@@ -510,14 +448,12 @@ public sealed class AdmissionEndpointTests
         var patientId = await NewPatientAsync(nurse, "No Bed Yet");
         var id = await CreateIdAsync(nurse, patientId, await NurseIdAsync());
 
-        // Straight from awaiting_bed, skipping the approval and the bed entirely.
         var arrived = await nurse.PostAsync($"/api/admissions/{id}/arrive", null);
         using var body = await ReadJsonAsync(arrived);
 
         Assert.Equal(HttpStatusCode.Conflict, arrived.StatusCode);
         Assert.Equal("cl_err_409_transition", body.RootElement.GetProperty("code").GetString());
 
-        // The message names the two statuses in the words the API publishes, not C# member names.
         Assert.Contains("awaiting_bed", body.RootElement.GetProperty("detail").GetString()!);
         Assert.Contains("admitted", body.RootElement.GetProperty("detail").GetString()!);
     }
@@ -533,8 +469,6 @@ public sealed class AdmissionEndpointTests
         var first = await nurse.PostAsync($"/api/admissions/{id}/arrive", null);
         var second = await nurse.PostAsync($"/api/admissions/{id}/arrive", null);
 
-        // admitted -> admitted is not a move, so the repeat is a 409 and not a quiet success
-        // that resets admitted_at to whenever the button was pressed again.
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
     }
@@ -571,8 +505,6 @@ public sealed class AdmissionEndpointTests
             "diverted_to_other_hospital",
             body.RootElement.GetProperty("cancel_reason").GetString());
 
-        // The half the enum cannot carry, published as well as stored. A reason on its own
-        // rarely answers "why is this bed free again?" a week later.
         Assert.Equal(
             "Ambulance rerouted to Kandy, family informed.",
             body.RootElement.GetProperty("cancel_note").GetString());
@@ -595,8 +527,6 @@ public sealed class AdmissionEndpointTests
         using var detail = await ReadJsonAsync(await nurse.GetAsync($"/api/admissions/{id}"));
         var assignment = detail.RootElement.GetProperty("bed_assignments").EnumerateArray().Single();
 
-        // Leave the hold behind and the bed is out of service for nobody — and
-        // ux_bed_assignments_live_bed then refuses the next patient who needs it.
         Assert.Equal("released", assignment.GetProperty("status").GetString());
         Assert.Equal("cancelled", assignment.GetProperty("release_reason").GetString());
         Assert.Equal(JsonValueKind.Null, assignment.GetProperty("reserved_until").ValueKind);
@@ -617,7 +547,6 @@ public sealed class AdmissionEndpointTests
 
         using var body = await ReadJsonAsync(cancelled);
 
-        // You cannot call off somebody who is physically in your ward. They get discharged.
         Assert.Equal(HttpStatusCode.Conflict, cancelled.StatusCode);
         Assert.Equal("cl_err_409_transition", body.RootElement.GetProperty("code").GetString());
     }
@@ -635,7 +564,6 @@ public sealed class AdmissionEndpointTests
         var second = await manager.PostAsJsonAsync(
             $"/api/admissions/{id}/cancel", new { reason = "false_alarm" });
 
-        // cancelled is terminal, so the second call cannot quietly rewrite the reason.
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
     }
@@ -653,9 +581,6 @@ public sealed class AdmissionEndpointTests
         var nonsense = await manager.PostAsJsonAsync(
             $"/api/admissions/{id}/cancel", new { reason = "bored" });
 
-        // Only a person can say why a patient is not coming, so the reason is mandatory. If an
-        // absent key defaulted to the first enum member, every one of these would be recorded
-        // as diverted_to_other_hospital and nobody would ever notice.
         Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, nonsense.StatusCode);
     }
@@ -684,8 +609,6 @@ public sealed class AdmissionEndpointTests
 
         var again = await CreateAsync(nurse, patientId, nurseId);
 
-        // ux_admissions_open_patient is scoped to the statuses still running, so ending a visit
-        // is what releases the patient. One person, one stay at a time — not one ever.
         Assert.Equal(HttpStatusCode.Created, again.StatusCode);
     }
 
@@ -699,9 +622,6 @@ public sealed class AdmissionEndpointTests
 
         using var manager = await ClientAsync(ApiApplication.ManagerEmail);
 
-        // Both read bed_reserved and both pass the transition check. Without the row lock the
-        // later write simply overwrites the earlier one, and a cancelled patient ends up
-        // admitted — or an admitted one ends up cancelled with their bed released underneath.
         var arrive = nurse.PostAsync($"/api/admissions/{id}/arrive", null);
         var cancel = manager.PostAsJsonAsync(
             $"/api/admissions/{id}/cancel", new { reason = "died_en_route" });
@@ -711,8 +631,6 @@ public sealed class AdmissionEndpointTests
         Assert.Single(codes, HttpStatusCode.OK);
         Assert.Single(codes, HttpStatusCode.Conflict);
     }
-
-    // ---------- who may do what ----------
 
     [Fact]
     public async Task Starting_an_admission_is_403_for_an_administrator_and_401_without_a_token()
@@ -740,14 +658,9 @@ public sealed class AdmissionEndpointTests
 
         using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
 
-        // The admissions board opened to this role on 2026-09-11, when PatientReader and
-        // AdmissionReader were collapsed into PatientDetails. Less a widening than an
-        // admission that the old split was never real - GET /patients/{id} already returned
-        // this role every admission with its care level and status.
         var admissions = await administrator.GetAsync("/api/admissions");
         var patients = await administrator.GetAsync("/api/patients");
 
-        // Reading only. AdmissionEditor is untouched and still the nurse's and the manager's.
         var completed = await administrator.PatchAsJsonAsync(
             $"/api/admissions/{id}/details", new { address = "1 Admin Way" });
 
@@ -763,9 +676,6 @@ public sealed class AdmissionEndpointTests
         var patientId = await NewPatientAsync(nurse, "Doctor Reads");
         var id = await CreateIdAsync(nurse, patientId, await NurseIdAsync());
 
-        // This is why reading and editing are two policies and not one. A doctor has to see
-        // who is in and open a visit; chasing a patient's missing address is desk work, and one
-        // policy over both would have handed them the second for free.
         using var doctor = await ClientAsync(ApiApplication.DoctorEmail);
         var list = await doctor.GetAsync("/api/admissions");
         var read = await doctor.GetAsync($"/api/admissions/{id}");
@@ -806,8 +716,6 @@ public sealed class AdmissionEndpointTests
         var withoutToken = await anonymous.PostAsync($"/api/admissions/{id}/arrive", null);
         var wrongRole = await manager.PostAsync($"/api/admissions/{id}/arrive", null);
 
-        // patient-spec.yaml lists WardNurse alone. The duty manager is not at the bedside and
-        // cannot see whether the patient is in the bed.
         Assert.Equal(HttpStatusCode.Unauthorized, withoutToken.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, wrongRole.StatusCode);
     }
@@ -825,13 +733,9 @@ public sealed class AdmissionEndpointTests
         var withoutToken = await anonymous.PostAsJsonAsync($"/api/admissions/{id}/cancel", body);
         var wrongRole = await nurse.PostAsJsonAsync($"/api/admissions/{id}/cancel", body);
 
-        // Declaring that a patient is not coming is not cheap and not reversible, which is why
-        // it sits one rung higher than everything else on this controller.
         Assert.Equal(HttpStatusCode.Unauthorized, withoutToken.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, wrongRole.StatusCode);
     }
-
-    // ---------- helpers ----------
 
     private static Task<HttpResponseMessage> CreateAsync(
         HttpClient client,
@@ -878,7 +782,6 @@ public sealed class AdmissionEndpointTests
         return body.RootElement.GetProperty("id").GetString()!;
     }
 
-    /// <summary>A patient with every detail filled in, so the admission has no outstanding paperwork.</summary>
     private static async Task<string> NewCompletePatientAsync(HttpClient client, string fullName)
     {
         var created = await client.PostAsJsonAsync("/api/patients", new
@@ -899,25 +802,6 @@ public sealed class AdmissionEndpointTests
         return body.RootElement.GetProperty("id").GetString()!;
     }
 
-    /// <summary>
-    /// Puts an admission into <c>bed_reserved</c> with a live 30-minute hold, by writing the
-    /// rows straight to the database.
-    /// </summary>
-    /// <remarks>
-    /// There is no endpoint that does this yet — reserving a bed is step 6 — and waiting for it
-    /// would leave the only happy path through the backbone untested until then. The rows are
-    /// exactly what step 6 will write, so these tests should keep passing when it lands and
-    /// this helper can be deleted.
-    /// </remarks>
-    /// <summary>
-    /// Gets this admission into <c>bed_reserved</c> the way the API actually does it: a real
-    /// ward, a real bed of Equipment's, and POST /assign-bed.
-    /// </summary>
-    /// <remarks>
-    /// It used to write the admission's status and a BedAssignment row straight to the
-    /// database, because nothing could reserve a bed until step 6. It can now, so it does —
-    /// which is what these tests were written to be ready for.
-    /// </remarks>
     private async Task ReserveABedAsync(string admissionId)
     {
         using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
@@ -959,13 +843,10 @@ public sealed class AdmissionEndpointTests
             .Select(item => item.GetProperty("patient").GetProperty("full_name").GetString()!)
             .ToList();
 
-    // One token per account for the whole class, and one lookup of the nurse's own id.
-    // /api/auth/login is rate limited per IP and every test class shares that budget.
     private static readonly SemaphoreSlim TokenLock = new(1, 1);
     private static readonly Dictionary<string, string> Tokens = new();
     private static string? _nurseId;
 
-    /// <summary>The seeded nurse's StaffMember id, taken off the sign-in response.</summary>
     private async Task<string> NurseIdAsync()
     {
         if (_nurseId is not null)
@@ -1020,7 +901,6 @@ public sealed class AdmissionEndpointTests
     private static async Task<JsonDocument> ReadJsonAsync(HttpResponseMessage response)
         => JsonDocument.Parse(await response.Content.ReadAsStringAsync());
 
-    // Unique per test: the fixture's database is shared across the whole collection.
     private static string NewNic() => $"A{Guid.NewGuid():N}"[..12];
 
     private static string NewPhone() => $"07{Random.Shared.NextInt64(10000000, 99999999)}";

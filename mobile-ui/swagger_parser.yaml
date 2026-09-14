@@ -1,0 +1,11 @@
+swagger_parser:
+  schema_url: http://localhost:5231/swagger/v1/swagger.json
+  output_directory: lib/services/api_client
+  language: dart
+  json_serializer: json_serializable
+  root_client: true
+  root_client_name: CareLankaApi
+  client_postfix: Api
+  put_clients_in_folder: true
+  enums_to_json: true
+  squash_clients: false

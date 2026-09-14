@@ -29,8 +29,6 @@ public class EquipmentItemConfiguration : IEntityTypeConfiguration<EquipmentItem
             .HasMaxLength(20)
             .IsRequired();
 
-        // The category is ours, so this is a real foreign key. Restrict rather than cascade:
-        // deleting a category out from under its items would silently destroy the register.
         builder.HasOne(i => i.Category)
             .WithMany(c => c.Items)
             .HasForeignKey(i => i.CategoryId)
@@ -50,8 +48,6 @@ public class EquipmentItemConfiguration : IEntityTypeConfiguration<EquipmentItem
         builder.HasIndex(i => i.WardId);
         builder.HasIndex(i => i.Status);
 
-        // The maintenance-due sweep only ever looks at items still in service, so the index
-        // does not carry retired rows it would never return.
         builder.HasIndex(i => i.NextMaintenanceDue)
             .HasFilter("status <> 'retired'");
 

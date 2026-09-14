@@ -34,9 +34,10 @@
 | 6 | **Manual bed assignment, no AI** | **Done.** Pick a bed by hand, with the 30-minute hold. The concurrency guarantee lives in the partial unique index, not in code |
 | 6b | **Visits that need no bed (H0) + the patients board** | **Done.** An `outpatient` never enters `awaiting_bed`. `GET /api/patient-worklist` unions bookings and visits so the board can say "not arrived". **No migration** |
 | 7 | Discharge checklist + confirmation | **Done.** `clinical_clearance` gated on the `doctor` role claim. **Billing came with it** — `billing_settled` cannot be an honest tick with nothing behind it |
-| 8 | Codegen gate | |
-| 9 | React: admissions dashboard, bed board, occupancy report | |
-| 10 | Flutter: nurse screens, then the patient's own-stay screens | Local notifications on status change is your device feature |
+| 8 | Codegen gate | **Done.** `bun run check:codegen` in `web-ui/` regenerates and fails on any diff under `src/services/api/generated`. Reads the document off a **running** API on `:5231` |
+| 9 | React: admissions dashboard, bed board, occupancy report | **Done.** `DashboardPage`, `PatientsPage` (the board, with assign / correct bed on the row), `IntakePage`, `AppointmentsPage`, `CapacityPage`, `DischargePage`, `WardsPage`, `BillingSettingsPage` |
+| 9b | **The `/me/*` backend** | **Done 2026-09-12.** Seven routes: `pre-register`, `profile`, `admission`, `history`, book / list / cancel appointments. Not one takes a patient id - all scoped by the `sub` claim. `pre-register` creates no admission; see `patient-management-plan.md` §7.6 |
+| 10 | Flutter: nurse screens, then the patient's own-stay screens | **Next.** Backend is step 9b, done. `mobile-ui/` is still a skeleton and Flutter is not installed on Lochana's machine. Local notifications on status change is your device feature |
 | 11 | **The bed agent** | Hard rules H1–H5 in deterministic C#, soft rules rank. Re-check every hard rule under a row lock at approval time |
 | 12 | React: bed approval + downgrade approval | The two human gates |
 | 13 | `CareRecommendation` entity + configuration + migration | Independent of the bed workflow — no dependency on steps 1–12 beyond `Patient` and `Admission` existing |
@@ -54,7 +55,7 @@ diagram. The one worth knowing before step 6: **`BedReservation` no longer exist
 which is what the spec has always published.
 
 **Step 5 is complete, and appointments with it.** `GET /api/capacity/wards` and
-`GET /api/wards/{id}/occupancy` are live for every staff role, so Kaveesha and Nasrullah are
+`GET /api/wards/{id}/occupancy` are live for every staff role, so Emergency and Staff are
 no longer waiting. Channeling followed: `GET /api/appointments`, `POST /api/appointments` and
 `POST /api/appointments/{id}/check-in`. **No migration** — every table and column those five
 endpoints read was already on `main`. Four things settled while building them:
@@ -81,7 +82,7 @@ endpoints read was already on `main`. Four things settled while building them:
 `POST /patients/{id}/link-account`. Admissions half: `POST /admissions`, `GET /admissions`,
 `GET /admissions/{id}`, `PATCH /admissions/{id}/details`, and from step 4
 `POST /admissions/{id}/arrive` and `POST /admissions/{id}/cancel`. **Step 5, the capacity
-endpoints Kaveesha and Nasrullah are both blocked on, is next.** Things settled while building
+endpoints Emergency and Staff are both blocked on, is next.** Things settled while building
 step 3:
 
 - **`temp_reference` is generated, not requested.** Register with no NIC and no phone and
@@ -277,10 +278,12 @@ body too:
 - **`PatientRegistrar` = general staff, ward nurse, duty manager.** Ambulance crew removed — the
   crew are the response team, the paperwork is done at the desk. **This one reaches into
   Emergency**, because their spec is written around ambulance crew and duty manager and
-  `GeneralStaff` does not appear in it. Raised as §11.9 for Kaveesha; `emergency-spec.yaml` is
-  hers and has not been touched.
+  `GeneralStaff` does not appear in it. Raised as §11.9 for Emergency; `emergency-spec.yaml` is
+  theirs and has not been touched.
 - **Two new policies**, `DischargeChecklist` (nurse, doctor, manager) and `BillingDesk` (general
   staff, administrator, duty manager). Confirming a discharge reuses `AdmissionEditor`.
+  **Superseded 2026-09-12** — confirming is now its own `DischargeConfirmer` (general staff,
+  nurse, duty manager) and the ICU/HDU narrowing is gone. See the addendum below.
 - **Four existing tests changed because the rule changed**, not to go green: equipment
   management can now read the admissions board, the administrator can too, the worklist refusal
   test moved to ambulance crew, and `AdmissionDetail` now serves `discharge` and `bill` instead
@@ -315,12 +318,16 @@ Eight things settled while building it:
 - **H2 refuses an *upgrade* as well as an unapproved downgrade.** Ward types map onto three
   rungs — icu, hdu, everything else — and `day_case` / `outpatient` sit on the bottom rung with
   `inpatient` because there is no ward type below `general`. A general patient into an ICU bed is
-  a 409 even for a duty manager: it is not generosity, it is the last ICU bed spent on somebody
-  who does not need it.
+  a 409: it is not generosity, it is the last ICU bed spent on somebody who does not need it.
+  **Revised 2026-09-12 — the duty manager may now overrule this** (see the step 6 addendum
+  below); a nurse or reception gets a 403 first and never reaches the 409.
 - **The approval split is a 403 from the service, twice over.** ICU and HDU are the duty
   manager's (`cl_pat_012`); so is any downgrade (`cl_pat_013`), checked first because a downgrade
   into HDU is both and "this is a downgrade" is the more specific complaint. It cannot be an
   `[Authorize]` policy because it depends on which bed the body names — same shape as check-in.
+  **Revised 2026-09-12 — ICU and HDU are no longer special.** The split is now the mismatch
+  alone: `cl_pat_012` is the step *up*, `cl_pat_013` the step down, and a matching ward is
+  anybody's. See the addendum below.
 - **One message code per hard rule, not one for "that bed will not work".** `cl_pat_014` taken,
   `015` out of service, `016` too acute, `017` gender policy, `018` isolation, `019` retired
   ward. A nurse who is told which rule refused them knows which other bed to try.
@@ -337,6 +344,38 @@ Eight things settled while building it:
 Two things this step made possible and deliberately did not do: the `wardId` filter on
 `GET /admissions` (now unblocked — a ward is reachable through a live assignment), and a sweep
 that closes lapsed holds nobody has re-assigned over. Both are in `STUBS.md`.
+
+**Step 6 addendum (2026-09-12) — who may place a patient, and a rule about age.** Recorded for
+the group as `integration_of_functions.md` §11.14.
+
+- **New `Policies.BedAssigner`** — general staff, ward nurse, duty manager — on `assign-bed` and
+  `correct-bed`, replacing `AdmissionEditor` there. Reception beds the walk-in it just
+  registered. `AdmissionEditor` is untouched, so reception still cannot cancel a visit or
+  confirm a discharge.
+- **The role rule is now the mismatch and nothing else.** `NeedsDutyManager` no longer names
+  `icu`/`hdu` at all: it is `IsDowngrade || IsMoreAcuteThanNeeded`. An ICU bed for an ICU patient
+  is a match, so a nurse or reception may make it — the old rule made the hospital's most urgent
+  admission wait for a signature on the obvious. Scarcity is an argument against giving an ICU
+  bed to somebody who does *not* need one, which is the step-up case, and that is still gated.
+- **The duty manager may place a patient in a ward more acute than assessed**, which H2 used to
+  refuse for everybody. That is the step-up gate above, and the one place `cl_pat_012` now fires.
+- **Discharge went the same way, and for the same reason.** New `Policies.DischargeConfirmer`
+  (general staff, ward nurse, duty manager) on `POST /discharges/{id}/confirm`, and
+  `DischargeService.EnsureMayConfirm` deleted outright — ICU and HDU discharges are no longer
+  the duty manager's. **`cl_pat_024` is retired and its number must never be reused.** The gate
+  was always the checklist: `clinical_clearance` is a doctor's alone and `billing_settled` is
+  written only by settling the bill, so nobody goes home un-cleared or unpaid whoever confirms
+  it. A duty manager signing after the doctor had already cleared the patient was delay, not
+  safety. Reception is on the list because it settles the bill on that same screen.
+- **New hard rule H6 and code `cl_pat_030`** — a `pediatric` ward takes only patients under 18.
+  One-directional, and an unrecorded date of birth counts as an adult. No override, because like
+  the gender policy it is a property of the ward.
+- **`GET /bed-availability` now allows `pageSize` up to 500.** At the shared cap of 100 the
+  seeded hospital's 135 beds were cut off mid-alphabet, so pediatric and surgical beds could
+  never be chosen — silently, which is what made it dangerous. **Found by clicking the screen,
+  not by a test**, and the same walkthrough caught two more: reception got a red "your role does
+  not allow this" from the walk-in `/arrive` chain that only a ward nurse may call, and an ICU
+  bed for an ICU patient was wrongly coloured as an override when it is simply the right bed.
 
 **Steps 13–16 are self-contained.** Nothing else in the group depends on the care advisory
 agent, and it depends on nothing outside this component beyond the `doctor` role claim,
@@ -408,8 +447,11 @@ possible demo.
 
 Two things your Flutter screens must handle:
 
-- **`principal.patient_id` is null** for someone who signed up but has never been treated
-  here. That is the ordinary state for a new account, not an error.
+- **A signup with no medical record behind it** is the ordinary state for a new account, not
+  an error. **Do not read `principal.patient_id` to detect it** — common auth hard-codes that
+  to null for everybody, so it cannot tell a linked account from an unlinked one
+  (`integration_of_functions.md` §11.7). Call `GET /api/me/profile` on startup: 200 means
+  there is a record, 404 (`cl_pat_033`) means show the details form.
 - `typ: patient` accounts see a completely different navigation tree from staff. `GET
   /auth/me` on startup is what decides which.
 
@@ -433,7 +475,7 @@ Two things your Flutter screens must handle:
 ~~`GET /wards/{id}/occupancy` (M2)~~ **built 2026-09-11**,
 ~~`GET /beds/{id}/occupancy` (M3)~~ **built 2026-09-11**, `POST /admissions/pre-admit` (M1).
 
-**So `POST /admissions/pre-admit` for Kaveesha is the only thing anybody is still waiting on
+**So `POST /admissions/pre-admit` for Emergency is the only thing anybody is still waiting on
 us for** — and after the policy rework on 2026-09-11 its `Roles:` line and `Policies.cs`
 disagree about `AmbulanceCrew`. Nothing is broken today because the endpoint does not exist, but
 that has to be settled before it does. `integration_of_functions.md` §11.9.

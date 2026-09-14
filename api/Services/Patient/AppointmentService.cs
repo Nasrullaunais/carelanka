@@ -16,20 +16,14 @@ namespace CareLanka.Api.Services.Patient;
 
 public sealed class AppointmentService : IAppointmentService
 {
-    // A booking that has not been resolved yet. Everything else is finished with: checked in,
-    // completed, cancelled, or they never turned up.
     private static readonly AppointmentStatus[] OpenStatuses = [AppointmentStatus.Scheduled];
 
-    // A visit that has ended, matching AdmissionService. Anything else counts as open.
     private static readonly AdmissionStatus[] ClosedAdmissionStatuses =
     [
         AdmissionStatus.Discharged,
         AdmissionStatus.Cancelled
     ];
 
-    // The two care levels a ward nurse may not authorise at the desk. Intensive and
-    // high-dependency care are the duty manager's call wherever the admission comes from, so
-    // the rule is here rather than in a policy: it depends on the body, not just the route.
     private static readonly AdmissionCategory[] DutyManagerOnly =
     [
         AdmissionCategory.Icu,
@@ -59,10 +53,6 @@ public sealed class AppointmentService : IAppointmentService
 
         if (date is { } day)
         {
-            // Whole days in UTC, because that is what the column stores. A hospital in Colombo
-            // is UTC+5:30, so "today" here starts at half past five in the morning local time.
-            // Nothing in this project has a timezone yet and inventing one in a filter would
-            // make this list disagree with every report - see RESUME.md, still open.
             var from = new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
             var to = from.AddDays(1);
 
@@ -77,9 +67,6 @@ public sealed class AppointmentService : IAppointmentService
         var totalItems = await query.CountAsync(ct);
 
         var appointments = await query
-            // Time order, because this is a day list a receptionist reads down. Id breaks ties:
-            // two bookings for the same minute otherwise land in an arbitrary order that can
-            // differ between pages, so one is shown twice and another never at all.
             .OrderBy(a => a.ScheduledAt)
             .ThenBy(a => a.Id)
             .Skip((page - 1) * pageSize)
@@ -93,18 +80,59 @@ public sealed class AppointmentService : IAppointmentService
     public async Task<AppointmentResponse> CreateAsync(
         CreateAppointmentRequest request, CancellationToken ct = default)
     {
-        // Not null: [ApiController] has already returned a 400 for a body that left it out. It
-        // is nullable on the request so that omission is an error rather than the year 1.
-        var scheduledAt = request.ScheduledAt!.Value.ToUniversalTime();
+        var patient = await _db.Patients.FirstOrDefaultAsync(p => p.Id == request.PatientId, ct)
+            ?? throw new NotFoundException("Patient", request.PatientId);
+
+        var appointment = await BookAsync(
+            patient, request.ScheduledAt, request.Reason, _currentUser.Id, ct);
+
+        return ToResponse(appointment);
+    }
+
+    public async Task<AppointmentEntity> BookForPatientAsync(
+        Guid patientId, BookAppointmentRequest request, CancellationToken ct = default)
+    {
+        var patient = await _db.Patients.FirstOrDefaultAsync(p => p.Id == patientId, ct)
+            ?? throw new NotFoundException("Patient", patientId);
+
+        return await BookAsync(patient, request.ScheduledAt, request.Reason, null, ct);
+    }
+
+    public async Task<AppointmentEntity> CancelForPatientAsync(
+        Guid appointmentId, Guid patientId, CancellationToken ct = default)
+    {
+        var appointment = await _db.Appointments
+            .FirstOrDefaultAsync(a => a.Id == appointmentId && a.PatientId == patientId, ct)
+            ?? throw new NotFoundException("Appointment", appointmentId);
+
+        if (appointment.Status != AppointmentStatus.Scheduled)
+        {
+            throw new IllegalTransitionException(
+                "Appointment",
+                EnumWire.ToWire(appointment.Status),
+                EnumWire.ToWire(AppointmentStatus.Cancelled));
+        }
+
+        appointment.Status = AppointmentStatus.Cancelled;
+
+        await _db.SaveChangesAsync(ct);
+
+        return appointment;
+    }
+
+    private async Task<AppointmentEntity> BookAsync(
+        PatientEntity patient,
+        DateTimeOffset? requestedAt,
+        string? reason,
+        Guid? bookedByStaffMemberId,
+        CancellationToken ct)
+    {
+        var scheduledAt = requestedAt!.Value.ToUniversalTime();
 
         if (scheduledAt <= DateTimeOffset.UtcNow)
         {
-            // Always a typo. Somebody already in the building is admitted, not booked.
             throw new BadRequestException(MessageCode.AppointmentInThePast);
         }
-
-        var patient = await _db.Patients.FirstOrDefaultAsync(p => p.Id == request.PatientId, ct)
-            ?? throw new NotFoundException("Patient", request.PatientId);
 
         await EnsureNothingOpenForAsync(patient, ct);
 
@@ -114,11 +142,8 @@ public sealed class AppointmentService : IAppointmentService
             PatientId = patient.Id,
             ScheduledAt = scheduledAt,
             Status = AppointmentStatus.Scheduled,
-            Reason = Clean(request.Reason),
-
-            // Off the token, never off the body. Null here would mean the patient booked it
-            // themselves through the app, which is the one thing this path is not.
-            BookedByStaffMemberId = _currentUser.Id
+            Reason = Clean(reason),
+            BookedByStaffMemberId = bookedByStaffMemberId
         };
 
         _db.Appointments.Add(appointment);
@@ -126,33 +151,22 @@ public sealed class AppointmentService : IAppointmentService
 
         appointment.Patient = patient;
 
-        return ToResponse(appointment);
+        return appointment;
     }
 
     public async Task<AdmissionResponse> CheckInAsync(
         Guid id, CheckInRequest request, CancellationToken ct = default)
     {
-        // Not null: [ApiController] has already rejected a body missing either enum.
         var category = request.AdmissionCategory!.Value;
 
         if (DutyManagerOnly.Contains(category) && _currentUser.Role != PrincipalRole.DutyManager)
         {
-            // Checked before anything is read or written, so a nurse reaching for an ICU
-            // check-in is refused on the rule rather than on some later side effect.
             throw new ForbiddenException(
                 MessageCode.CareLevelNeedsDutyManager, EnumWire.ToWire(category));
         }
 
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
 
-        // Takes the lock and nothing else, the same way AdmissionService does. Two desks
-        // checking the same person in at the same instant both read `scheduled` otherwise, and
-        // both pass the status check below. The second request waits here, re-reads, and gets
-        // the honest 409: cannot move from checked_in to checked_in.
-        //
-        // Locking and loading in one composed query would put FOR UPDATE inside a join against
-        // patients, which locks rows nobody asked about. A missing row locks nothing and falls
-        // through to the 404.
         await _db.Database.ExecuteSqlAsync(
             $"SELECT id FROM appointments WHERE id = {id} FOR UPDATE", ct);
 
@@ -163,24 +177,16 @@ public sealed class AppointmentService : IAppointmentService
 
         if (appointment.Status != AppointmentStatus.Scheduled)
         {
-            // checked_in is terminal for this row: from there the record of what happened next
-            // is the Admission. Cancelled and no_show are finished with in the other direction.
             throw new IllegalTransitionException(
                 "Appointment",
                 EnumWire.ToWire(appointment.Status),
                 EnumWire.ToWire(AppointmentStatus.CheckedIn));
         }
 
-        // Through the admission service, not by building the entity here. That is where the
-        // open-admission rule, the "does this staff member exist" check, the missing-fields
-        // calculation and the catch on ux_admissions_open_patient already live — and a
-        // pre-registered arrival has to obey every one of them exactly as a walk-in does.
         var admission = await _admissions.CreateAsync(new CreateAdmissionRequest
         {
             PatientId = appointment.PatientId,
 
-            // The whole point of the endpoint: this is the third arrival path, and afterwards
-            // a report can tell channeling apart from a walk-in and from an ambulance.
             Source = AdmissionSource.PreRegistered,
 
             AdmissionCategory = category,
@@ -188,9 +194,6 @@ public sealed class AppointmentService : IAppointmentService
             Urgency = request.Urgency!.Value,
             IsInfectious = request.IsInfectious,
 
-            // They are standing at the desk. The booked time is when they said they would come,
-            // not a future arrival to staff ahead of, and carrying it forward would put somebody
-            // already here into next hour's incoming count.
             ExpectedArrival = null
         }, ct);
 
@@ -209,20 +212,6 @@ public sealed class AppointmentService : IAppointmentService
     public async Task<AppointmentEntity> GetByIdAsync(Guid id, CancellationToken ct = default)
         => await FindByIdAsync(id, ct) ?? throw new NotFoundException("Appointment", id);
 
-    /// <summary>
-    /// One booking at a time, and never a booking for somebody already in the building.
-    /// </summary>
-    /// <remarks>
-    /// **A read, with no index behind it** — unlike the open-admission rule, which is
-    /// guaranteed by <c>ux_admissions_open_patient</c> and only explained by the read that
-    /// precedes it. Two desks booking the same patient in the same instant both pass this and
-    /// both rows are written.
-    ///
-    /// Left as a read on purpose: the fix is a partial unique index and therefore a migration,
-    /// and the damage is two rows on a worklist rather than anything clinical — the second
-    /// check-in is still refused, by the admission index that does exist. Written down in
-    /// RESUME.md rather than left to be discovered.
-    /// </remarks>
     private async Task EnsureNothingOpenForAsync(PatientEntity patient, CancellationToken ct)
     {
         var alreadyBooked = await _db.Appointments
@@ -239,8 +228,6 @@ public sealed class AppointmentService : IAppointmentService
 
         if (alreadyAdmitted)
         {
-            // Booking a visit for somebody who is already in a bed is not a visit. Their open
-            // admission is the record of them being here.
             throw new ConflictException(MessageCode.PatientHasOpenAdmission, patient.FullName);
         }
     }

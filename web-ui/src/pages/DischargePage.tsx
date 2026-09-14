@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -11,39 +11,18 @@ import type { ChecklistItem, DischargeCandidate } from '../services/api/generate
 import { BillPanel } from '../components/BillPanel';
 import { useSession } from '../services/auth/useSession';
 import {
-  canConfirmDischargeOf,
+  canConfirmDischarge,
   canTickChecklistItem,
   canWorkBillingDesk,
   canOpenDischargeBoard,
 } from '../types/permissions';
-import { admissionCategoryLabels } from '../types/patients';
+import { admissionCategoryLabels, admissionStatusLabels } from '../types/patients';
 import {
   checklistHints,
   checklistLabel,
   checklistOrder,
   mandatoryChecklistItems,
 } from '../types/billing';
-
-// Sending a patient home. The left half is who could go; the right half is the one checklist
-// that decides it, and the sign-off.
-//
-// Three things on this screen are worth knowing before reading the code:
-//
-//   The list is not the decision. A patient with every box ticked is only *offered*; a human
-//   presses the button, and that is the whole point of the gate.
-//
-//   Only the boxes THIS role may tick render as buttons. A ward nurse never sees a control for
-//   "Cleared by a doctor" — offering it and answering 403 is a worse screen than not offering
-//   it, because the nurse cannot tell a permission from a bug.
-//
-//   "Bill settled" has no button for anybody. It is written by settling the bill — which now
-//   happens on THIS page, in the middle of the flow — and nowhere else, so the money and the
-//   tick are one fact rather than two that can drift apart.
-//
-// The order down the page is the order the job is done in: a doctor says the patient is well
-// enough, the bill is filled in and paid, and then somebody sends them home. It used to be a
-// table of five boxes with the bill on a different screen, and "where does the billing happen?"
-// was a fair question to ask of it.
 
 export function DischargePage() {
   const session = useSession();
@@ -52,11 +31,6 @@ export function DischargePage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // The hook cannot go behind an early return, so it is switched off instead. Nobody who
-  // cannot work the checklist should be asking the server at all.
-  // includeDischarged on purpose. Without it this screen empties itself the moment the work is
-  // done: you confirm a discharge, the row vanishes, and there is nowhere left to look up what
-  // just happened. The finished ones come back sorted below everybody still in the building.
   const candidates = useQuery({
     ...listDischargeCandidatesOptions({ query: { includeDischarged: true, pageSize: 50 } }),
     enabled: canWork,
@@ -67,8 +41,8 @@ export function DischargePage() {
       <>
         <h1>Discharge</h1>
         <p className="empty">
-          Discharges are worked by ward nurses, doctors, the duty manager, reception and the
-          hospital administrator. Ambulance crew and equipment managers have no part in one.
+          Your role cannot work discharges. Ward nurses, doctors, the duty manager, reception
+          and the hospital administrator can.
         </p>
       </>
     );
@@ -76,9 +50,6 @@ export function DischargePage() {
 
   const all = candidates.data?.items ?? [];
 
-  // Two lists out of one call, because they are two different things to look at. The top one
-  // is work to do; the bottom one is a record of work finished, and mixing them puts a patient
-  // who left last Tuesday in among the ones a nurse is trying to get home today.
   const rows = all.filter((row) => !row.is_discharged);
   const finished = all.filter((row) => row.is_discharged);
   const ready = rows.filter((row) => row.outstanding_items.length === 0);
@@ -87,16 +58,14 @@ export function DischargePage() {
     <>
       <h1>Discharge</h1>
       <p className="muted">
-        Everyone currently in the building, what they owe, and what is still outstanding before
-        they can go. The bill is raised and settled here too — a discharge is one piece of
-        paper, not two screens. Being on this list changes nothing on its own: a person
-        confirms the discharge.
+        Current admissions, what is outstanding on each, and the bill. Open a row to raise or
+        settle the bill and confirm the discharge.
       </p>
 
       {candidates.isError ? (
         <div className="card">
           <div className="empty">
-            <p>Could not load the ward.</p>
+            <p>Could not load the discharge board.</p>
             <button type="button" className="secondary" onClick={() => void candidates.refetch()}>
               Try again
             </button>
@@ -104,12 +73,12 @@ export function DischargePage() {
         </div>
       ) : (
         <div className="card">
-          <h2>On the ward</h2>
+          <h2>Current admissions</h2>
 
           <div className="stats">
-            <Stat caption="In a bed" value={rows.length} />
+            <Stat caption="Admitted" value={rows.length} />
             <Stat
-              caption="Ready to go"
+              caption="Ready for discharge"
               value={ready.length}
               tone={ready.length === 0 ? 'none' : 'free'}
             />
@@ -118,16 +87,16 @@ export function DischargePage() {
           {candidates.isLoading ? (
             <p className="empty">Loading…</p>
           ) : rows.length === 0 ? (
-            <p className="empty">Nobody is admitted at the moment.</p>
+            <p className="empty">No patients are currently admitted.</p>
           ) : (
             <table>
               <thead>
                 <tr>
                   <th>Patient</th>
-                  <th>Where</th>
+                  <th>Ward and bed</th>
                   <th>Care level</th>
                   <th>Days</th>
-                  <th>Still outstanding</th>
+                  <th>Outstanding</th>
                   <th />
                 </tr>
               </thead>
@@ -140,6 +109,7 @@ export function DischargePage() {
                     onSelect={() =>
                       setSelectedId(row.admission_id === selectedId ? null : row.admission_id)
                     }
+                    onClose={() => setSelectedId(null)}
                   />
                 ))}
               </tbody>
@@ -147,36 +117,33 @@ export function DischargePage() {
           )}
 
           <p className="hint">
-            &ldquo;Ready to go&rdquo; means both required things are done — a doctor has cleared
-            the patient, and the bill is settled. Nothing else holds a discharge up.
+            Ready for discharge means both required items are done: a doctor has cleared the
+            patient, and the bill is settled.
           </p>
         </div>
       )}
 
       {!candidates.isError && (
         <div className="card">
-          <h2>Already gone home</h2>
+          <h2>Discharged</h2>
           <p className="muted">
-            Discharges that are finished. Nothing here can be changed — a confirmed discharge is
-            a record of what happened, not a form. Open one to read the checklist, who signed it
-            off and the bill as it was handed over.
+            Completed discharges. These are read-only records. Open one for the checklist, the
+            sign-off and the bill as it was issued.
           </p>
 
           {candidates.isLoading ? (
             <p className="empty">Loading…</p>
           ) : finished.length === 0 ? (
-            <p className="empty">
-              Nobody has been discharged yet. The first one you confirm appears here.
-            </p>
+            <p className="empty">No discharges recorded yet.</p>
           ) : (
             <table>
               <thead>
                 <tr>
                   <th>Patient</th>
-                  <th>Where they were</th>
+                  <th>Ward and bed</th>
                   <th>Care level</th>
                   <th>Days</th>
-                  <th>Left</th>
+                  <th>Discharged</th>
                   <th />
                 </tr>
               </thead>
@@ -189,20 +156,13 @@ export function DischargePage() {
                     onSelect={() =>
                       setSelectedId(row.admission_id === selectedId ? null : row.admission_id)
                     }
+                    onClose={() => setSelectedId(null)}
                   />
                 ))}
               </tbody>
             </table>
           )}
         </div>
-      )}
-
-      {selectedId && (
-        <DischargeDetail
-          admissionId={selectedId}
-          onClose={() => setSelectedId(null)}
-          onDischarged={() => setSelectedId(null)}
-        />
       )}
     </>
   );
@@ -212,58 +172,66 @@ function CandidateRow({
   row,
   selected,
   onSelect,
+  onClose,
 }: {
   row: DischargeCandidate;
   selected: boolean;
   onSelect: () => void;
+  onClose: () => void;
 }) {
   const outstanding = row.outstanding_items;
 
   return (
-    <tr className={selected ? 'selected' : undefined}>
-      <td>
-        <strong>{row.patient.full_name}</strong>
-        <div className="small muted">{row.patient.patient_code}</div>
-      </td>
-      <td>
-        {row.bed_number ? (
-          <>
-            {row.ward_name}
-            <div className="small muted">Bed {row.bed_number}</div>
-          </>
-        ) : (
-          <span className="muted">No bed</span>
-        )}
-      </td>
-      <td>{admissionCategoryLabels[row.admission_category]}</td>
-      <td>{row.days_in_bed}</td>
-      <td>
-        {row.is_discharged ? (
-          // Nothing is outstanding on a finished visit by definition - it could not have been
-          // confirmed otherwise - so the column carries the useful fact instead.
-          <span className="small">
-            {row.discharged_at
-              ? new Date(row.discharged_at).toLocaleString()
-              : 'Discharged'}
-          </span>
-        ) : outstanding.length === 0 ? (
-          <span className="badge status-available">Ready</span>
-        ) : (
-          <span className="small">{outstanding.map(checklistLabel).join(', ')}</span>
-        )}
-      </td>
-      <td>
-        <button type="button" className="secondary small" onClick={onSelect}>
-          {selected ? 'Close' : 'Open'}
-        </button>
-      </td>
-    </tr>
+    <Fragment>
+      <tr className={selected ? 'open' : undefined}>
+        <td>
+          <strong>{row.patient.full_name}</strong>
+          <div className="small muted">{row.patient.patient_code}</div>
+        </td>
+        <td>
+          {row.bed_number ? (
+            <>
+              {row.ward_name}
+              <div className="small muted">Bed {row.bed_number}</div>
+            </>
+          ) : (
+            <span className="muted">No bed</span>
+          )}
+        </td>
+        <td>{admissionCategoryLabels[row.admission_category]}</td>
+        <td>{row.days_in_bed}</td>
+        <td>
+          {row.is_discharged ? (
+            <span className="small">
+              {row.discharged_at ? new Date(row.discharged_at).toLocaleString() : 'Discharged'}
+            </span>
+          ) : outstanding.length === 0 ? (
+            <span className="badge status-available">Ready</span>
+          ) : (
+            <span className="small">{outstanding.map(checklistLabel).join(', ')}</span>
+          )}
+        </td>
+        <td>
+          <button type="button" className="secondary small" onClick={onSelect}>
+            {selected ? 'Close' : 'Open'}
+          </button>
+        </td>
+      </tr>
+
+      {selected && (
+        <tr className="drawer">
+          <td colSpan={6}>
+            <DischargeDetail
+              admissionId={row.admission_id}
+              onClose={onClose}
+              onDischarged={onClose}
+            />
+          </td>
+        </tr>
+      )}
+    </Fragment>
   );
 }
-
-// ---------------------------------------------------------------------------
-// One patient's checklist
-// ---------------------------------------------------------------------------
 
 function DischargeDetail({
   admissionId,
@@ -282,8 +250,6 @@ function DischargeDetail({
 
   const admission = useQuery(getAdmissionOptions({ path: { id: admissionId } }));
 
-  // Every write here changes the admission, the candidate list, or both — a tick can move the
-  // status to ready_for_discharge, and a confirm takes the row off the board entirely.
   const refreshAll = () =>
     queryClient.invalidateQueries({
       predicate: (query) => {
@@ -310,7 +276,7 @@ function DischargeDetail({
   const confirm = useMutation({
     ...confirmDischargeMutation(),
     onSuccess: () => {
-      toast.success('Discharged. The bed is free again.');
+      toast.success('Discharge confirmed. The bed is free again.');
       void refreshAll();
       onDischarged();
     },
@@ -318,7 +284,7 @@ function DischargeDetail({
 
   if (admission.isLoading) {
     return (
-      <div className="card">
+      <div className="drawer-body">
         <p className="empty">Loading…</p>
       </div>
     );
@@ -326,9 +292,9 @@ function DischargeDetail({
 
   if (admission.isError || !admission.data) {
     return (
-      <div className="card">
+      <div className="drawer-body">
         <div className="empty">
-          <p>Could not open that visit.</p>
+          <p>Could not load this admission.</p>
           <button type="button" className="secondary" onClick={() => void admission.refetch()}>
             Try again
           </button>
@@ -340,8 +306,6 @@ function DischargeDetail({
   const visit = admission.data;
   const checklist = visit.discharge?.checklist ?? {};
 
-  // Fall back to the published vocabulary when no checklist row exists yet, so the boxes are
-  // on screen before anybody has touched them. The server creates the rows on first tick.
   const items = checklistOrder.map((key) => ({
     key,
     item: checklist[key] as ChecklistItem | undefined,
@@ -351,26 +315,22 @@ function DischargeDetail({
   const settled = items.find((entry) => entry.key === 'billing_settled');
 
   const allMandatoryTicked = visit.discharge?.all_mandatory_ticked ?? false;
-  const mayConfirm = canConfirmDischargeOf(role, visit.admission_category);
+  const mayConfirm = canConfirmDischarge(role);
   const maySettle = canWorkBillingDesk(role);
   const isDischarged = visit.status === 'discharged';
 
   return (
-    // The whole card prints, not just the charges table. A discharge document IS the bill:
-    // who was cleared by which doctor, what it cost, who took the money, who sent them home
-    // and what they were told. Printing the expenses alone produced a piece of paper that
-    // proved a number and nothing else.
-    <div className="card printable">
+    <div className="drawer-body printable">
       <div className="print-only print-head">
         <h2>CareLanka Hospital</h2>
         <p>Discharge statement</p>
       </div>
 
       <div className="dialog-head no-print">
-        <h2>
-          {visit.patient?.full_name ?? 'Visit'}{' '}
+        <h3>
+          {visit.patient?.full_name ?? 'Admission'}{' '}
           <span className="badge">{admissionCategoryLabels[visit.admission_category]}</span>
-        </h2>
+        </h3>
         <div className="actions">
           <button type="button" className="secondary small" onClick={() => window.print()}>
             Print / save
@@ -381,7 +341,6 @@ function DischargeDetail({
         </div>
       </div>
 
-      {/* The same heading again for the printed copy, without the buttons. */}
       <h3 className="print-only">
         {visit.patient?.full_name}
         {visit.patient?.patient_code ? ` · ${visit.patient.patient_code}` : ''}
@@ -399,7 +358,7 @@ function DischargeDetail({
           </dd>
         </div>
         <div>
-          <dt>Where</dt>
+          <dt>Ward and bed</dt>
           <dd>
             {visit.bed_number ? (
               <>
@@ -431,7 +390,7 @@ function DischargeDetail({
         <div>
           <dt>Status</dt>
           <dd>
-            {visit.status.replaceAll('_', ' ')}
+            {admissionStatusLabels[visit.status]}
             {isDischarged && visit.discharged_at && (
               <div className="small muted">
                 {new Date(visit.discharged_at).toLocaleString()}
@@ -441,20 +400,11 @@ function DischargeDetail({
         </div>
       </dl>
 
-      {/* ---------- the bill ---------- */}
-
-      <h3>Charges</h3>
+      <h4>Charges</h4>
 
       <BillPanel admissionId={admissionId} canSettle={maySettle && !isDischarged} showPrint={false} />
 
-      {/* ---------- who signed what ---------- */}
-      {/*
-        Below the bill and part of the same document, because that is what a discharge paper
-        is. Three names and three times: the doctor who said they were well enough, the person
-        who took the money, and the person who actually sent them home.
-      */}
-
-      <h3>Sign-off</h3>
+      <h4>Sign-off</h4>
 
       <ChecklistRow
         item={cleared?.item}
@@ -484,41 +434,34 @@ function DischargeDetail({
         </div>
         {visit.discharge?.summary_note && (
           <div>
-            <dt>What they were told</dt>
+            <dt>Discharge instructions</dt>
             <dd>{visit.discharge.summary_note}</dd>
           </div>
         )}
       </dl>
 
-      {/* ---------- the act itself ---------- */}
-
       <div className="no-print">
         {isDischarged ? (
-          <p className="hint">
-            This visit is over. Everything above is a record of what happened and nothing on it
-            can be changed.
-          </p>
+          <p className="hint">This admission is closed. The record above cannot be changed.</p>
         ) : !mayConfirm ? (
           <p className="hint">
-            {visit.admission_category === 'icu' || visit.admission_category === 'hdu'
-              ? 'An ICU or HDU discharge is the duty manager’s decision.'
-              : 'Confirming a discharge is the ward nurse’s or the duty manager’s.'}
+            Only reception, the ward nurse or the duty manager can confirm a discharge.
           </p>
         ) : (
           <>
             <div className="field">
               <label htmlFor="summary-note">
-                What the patient takes home with them <span className="muted">(optional)</span>
+                Discharge instructions <span className="muted">(optional)</span>
               </label>
               <textarea
                 id="summary-note"
                 rows={3}
                 maxLength={2000}
                 value={summaryNote}
-                placeholder="Rest for three days. Come back if the swelling returns."
+                placeholder="Rest for three days. Return if the swelling recurs."
                 onChange={(event) => setSummaryNote(event.target.value)}
               />
-              <p className="hint">This is printed on the discharge paper they take away.</p>
+              <p className="hint">Printed on the discharge statement.</p>
             </div>
 
             <button
@@ -531,13 +474,13 @@ function DischargeDetail({
                 })
               }
             >
-              {confirm.isPending ? 'Discharging…' : 'Confirm discharge'}
+              {confirm.isPending ? 'Confirming…' : 'Confirm discharge'}
             </button>
 
             {!allMandatoryTicked && (
               <p className="hint">
-                Disabled until a doctor has cleared them and the bill is settled. This ends the
-                visit, frees the bed and sends somebody home, so it does not happen halfway.
+                Available once a doctor has cleared the patient and the bill is settled.
+                Confirming ends the admission and releases the bed.
               </p>
             )}
           </>
@@ -547,14 +490,6 @@ function DischargeDetail({
   );
 }
 
-/**
- * One line of the checklist: what it is, whether it is done, and a button only if this person
- * is the one who does it.
- *
- * Hidden rather than disabled. A control the user cannot use reads as a broken screen; an
- * absent one reads as somebody else's job. `billing_settled` passes `mayTick: false` from every
- * role, because settling the bill is what writes it and there is no second way.
- */
 function ChecklistRow({
   item,
   itemKey,
@@ -588,7 +523,7 @@ function ChecklistRow({
             </div>
           </>
         ) : (
-          <span className="muted">Not yet</span>
+          <span className="muted">Not done</span>
         )}
       </div>
       <div style={{ alignSelf: 'center' }}>
@@ -599,7 +534,7 @@ function ChecklistRow({
             disabled={pending}
             onClick={() => onToggle(!ticked)}
           >
-            {ticked ? 'Untick' : 'Tick'}
+            {ticked ? 'Undo' : 'Mark done'}
           </button>
         )}
       </div>

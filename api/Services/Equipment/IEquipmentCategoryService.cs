@@ -10,9 +10,7 @@ public interface IEquipmentCategoryService
     Task<EquipmentCategory> CreateAsync(
         CreateEquipmentCategoryRequest request, CancellationToken cancellationToken = default);
 
-    /// <summary>Null when there is no such live category. For internal lookups - use GetByIdAsync to answer a request.</summary>
     Task<CategoryEntity?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
-    /// <summary>Throws NotFoundException when there is no such live category.</summary>
     Task<CategoryEntity> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 }

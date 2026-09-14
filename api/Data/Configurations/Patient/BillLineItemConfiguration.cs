@@ -15,8 +15,6 @@ public class BillLineItemConfiguration : IEntityTypeConfiguration<BillLineItem>
             t.HasCheckConstraint(
                 "ck_bill_line_items_source", EnumWire.CheckConstraint<BillLineSource>("source"));
 
-            // Money, so the database says so too. A negative quantity or price is a discount,
-            // and a discount is a decision nobody in this component is allowed to make.
             t.HasCheckConstraint("ck_bill_line_items_quantity", "quantity > 0");
             t.HasCheckConstraint("ck_bill_line_items_unit_price", "unit_price >= 0");
         });
@@ -30,16 +28,11 @@ public class BillLineItemConfiguration : IEntityTypeConfiguration<BillLineItem>
 
         builder.Property(i => i.Description).HasMaxLength(200).IsRequired();
 
-        // numeric, never double. A rupee is not representable in binary floating point, and a
-        // bill that is off by a cent is a bill somebody argues about at the counter.
         builder.Property(i => i.Quantity).HasPrecision(10, 2);
         builder.Property(i => i.UnitPrice).HasPrecision(12, 2);
 
-        // LineTotal is Quantity x UnitPrice and nothing else, so there is no column for it.
         builder.Ignore(i => i.LineTotal);
 
-        // Cascade, not Restrict: a line has no meaning without its bill. Same call as the
-        // discharge checklist items.
         builder.HasOne(i => i.Bill)
             .WithMany(b => b.LineItems)
             .HasForeignKey(i => i.BillId)

@@ -14,8 +14,6 @@ namespace CareLanka.Api.Services.Common;
 
 public sealed class AuthService : IAuthService
 {
-    // Verified against when the account does not exist, so an unknown email takes the same
-    // ~100ms as a known one. Without it the timing alone says which addresses are real.
     private static readonly Lazy<string> DecoyHash =
         new(() => new PasswordService().Hash("not-a-real-password-b2f1c9"));
 
@@ -128,8 +126,6 @@ public sealed class AuthService : IAuthService
             throw new UnauthorizedException(MessageCode.RefreshTokenInvalid);
         }
 
-        // A single-use token presented twice means two clients hold it and one is not the owner,
-        // so every live session for this principal dies — not just this one.
         if (stored.RevokedAt is not null)
         {
             await RevokeAllForPrincipalAsync(stored, "reuse_detected", now, ct);
@@ -141,8 +137,6 @@ public sealed class AuthService : IAuthService
             throw new UnauthorizedException(MessageCode.RefreshTokenInvalid);
         }
 
-        // Conditional UPDATE rather than read-then-write, so two refreshes arriving together
-        // cannot both win. The loser changes zero rows and is treated as reuse.
         var rotated = await _db.RefreshTokens
             .Where(r => r.Id == stored.Id && r.RevokedAt == null)
             .ExecuteUpdateAsync(
@@ -157,7 +151,6 @@ public sealed class AuthService : IAuthService
             throw new UnauthorizedException(MessageCode.RefreshTokenInvalid);
         }
 
-        // Comes back null if the account was deactivated mid-session: both query filters exclude it.
         var principal = stored.PrincipalType == PrincipalType.Staff
             ? ToPrincipalOrNull(await _db.StaffMembers.FirstOrDefaultAsync(s => s.Id == stored.StaffMemberId, ct))
             : ToPrincipalOrNull(await _db.PatientAccounts.FirstOrDefaultAsync(p => p.Id == stored.PatientAccountId, ct));
@@ -281,7 +274,6 @@ public sealed class AuthService : IAuthService
     private static CurrentPrincipal? ToPrincipalOrNull(PatientAccount? account)
         => account is null ? null : ToPrincipal(account);
 
-    // By name, not by position: reordering either enum must not promote a nurse to an administrator.
     private static PrincipalRole ToPrincipalRole(StaffRole role)
         => Enum.Parse<PrincipalRole>(role.ToString());
 

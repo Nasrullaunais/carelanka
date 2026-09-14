@@ -6,9 +6,6 @@ using Xunit;
 
 namespace CareLanka.Api.Tests;
 
-// The hand-written equipment-spec.yaml is still the design of record, so what the code
-// publishes has to be checked against it rather than the other way round. Needs no database:
-// it only reads the generated OpenAPI document.
 public sealed class EquipmentOpenApiContractTests
 {
     [Theory]
@@ -26,14 +23,16 @@ public sealed class EquipmentOpenApiContractTests
     [InlineData("/beds", "post", "createBed")]
     [InlineData("/beds/{id}", "patch", "updateBed")]
     [InlineData("/beds/{id}/retire", "post", "retireBed")]
+    [InlineData("/lab-reports", "get", "listLabReports")]
+    [InlineData("/lab-reports", "post", "uploadLabReport")]
+    [InlineData("/lab-reports/{id}/file", "get", "downloadLabReport")]
+    [InlineData("/ward-patients", "get", "listWardPatients")]
     public async Task Bed_operation_ids_match_the_contract(string path, string method, string operationId)
     {
         using var document = await GenerateAsync();
 
         var operation = document.RootElement.GetProperty("paths").GetProperty(path).GetProperty(method);
 
-        // operationId becomes the generated client's function name and is unique across all
-        // five specs, so a drift here renames a function in both frontends.
         Assert.Equal(operationId, operation.GetProperty("operationId").GetString());
     }
 
@@ -52,6 +51,10 @@ public sealed class EquipmentOpenApiContractTests
     [InlineData("/beds", "post")]
     [InlineData("/beds/{id}", "patch")]
     [InlineData("/beds/{id}/retire", "post")]
+    [InlineData("/lab-reports", "get")]
+    [InlineData("/lab-reports", "post")]
+    [InlineData("/lab-reports/{id}/file", "get")]
+    [InlineData("/ward-patients", "get")]
     public async Task Every_outcome_the_contract_publishes_is_declared_by_the_code(string path, string method)
     {
         using var document = await GenerateAsync();
@@ -60,9 +63,6 @@ public sealed class EquipmentOpenApiContractTests
         var expected = Keys(Map(contract, "paths", path, method, "responses"));
         var generated = Keys(document.RootElement, "paths", path, method, "responses");
 
-        // Equality, not a subset. An endpoint that declares only its 200 generates a client
-        // that cannot type its failures, and one that declares an outcome the contract does
-        // not have is a contract change nobody wrote down.
         Assert.True(
             expected.SetEquals(generated),
             $"{method.ToUpperInvariant()} {path} responses differ. "
@@ -79,7 +79,6 @@ public sealed class EquipmentOpenApiContractTests
         var generated = Keys(
             document.RootElement, "components", "schemas", "Bed", "properties");
 
-        // Bed is allOf [AuditFields, the bed itself], so both halves are the promise.
         var expected = Keys(Map(contract, "components", "schemas", "AuditFields", "properties"));
         expected.UnionWith(Keys(BedBody(contract, "properties")));
 
@@ -100,8 +99,6 @@ public sealed class EquipmentOpenApiContractTests
             .GetProperty("components").GetProperty("schemas").GetProperty("BedCondition")
             .GetProperty("enum").EnumerateArray().Select(value => value.GetString()!).ToHashSet();
 
-        // Stored snake_case and published snake_case have to be the same word, or the check
-        // constraint and the client disagree about what a legal value is.
         Assert.True(expected.SetEquals(generated),
             $"Contract: {string.Join(", ", expected)}. Generated: {string.Join(", ", generated)}.");
     }
@@ -117,7 +114,6 @@ public sealed class EquipmentOpenApiContractTests
 
     private static YamlMappingNode BedBody(YamlMappingNode contract, params string[] path)
     {
-        // allOf[0] is the AuditFields reference; allOf[1] is the bed's own object.
         var body = (YamlMappingNode)Sequence(contract, "components", "schemas", "Bed", "allOf")
             .Children[1];
 

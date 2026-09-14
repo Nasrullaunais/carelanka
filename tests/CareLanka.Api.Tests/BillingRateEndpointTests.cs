@@ -6,23 +6,6 @@ using Xunit;
 
 namespace CareLanka.Api.Tests;
 
-/// <summary>
-/// The price grid the hospital administrator edits, and the two things about it that are easy
-/// to get wrong.
-/// </summary>
-/// <remarks>
-/// The prices used to be a static C# table, and the argument for keeping them there was that
-/// nothing in the project changes a price. That stopped being true the moment the administrator
-/// was given the job of setting them.
-///
-/// Two properties are worth more than the CRUD, and both are tested below:
-///
-///   The grid is always complete. A cell nobody has saved falls back to the built-in default,
-///   so a fresh database answers the same shape as one edited for a year.
-///
-///   Editing a price never rewrites a bill already raised. The price is copied onto the line
-///   when the line is written, so a bill is what the patient was actually charged.
-/// </remarks>
 [Collection(ApiCollection.Name)]
 public sealed class BillingRateEndpointTests
 {
@@ -45,8 +28,6 @@ public sealed class BillingRateEndpointTests
 
         var wards = root.GetProperty("wards").EnumerateArray().ToList();
 
-        // Every ward type the API publishes, including the three added with the real ward
-        // board. A ward with no row in the grid is a ward whose beds cannot be priced.
         Assert.Equal(9, wards.Count);
 
         foreach (var ward in wards)
@@ -59,7 +40,6 @@ public sealed class BillingRateEndpointTests
             Assert.Equal(7, keys.Count);
         }
 
-        // One admission fee per care level, for the same reason.
         Assert.Equal(5, root.GetProperty("admission_fees").EnumerateArray().Count());
     }
 
@@ -72,8 +52,6 @@ public sealed class BillingRateEndpointTests
             admission_fees = Array.Empty<object>()
         };
 
-        // Reception takes the money the price list says to take. A desk that can rewrite the
-        // list as it bills is a desk that can charge whatever it likes.
         foreach (var email in new[]
         {
             ApiApplication.ReceptionEmail,
@@ -99,8 +77,6 @@ public sealed class BillingRateEndpointTests
     {
         using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
 
-        // Stored, it would sit in the grid forever priced against nothing, and the settings
-        // screen would show a row no bill can ever use.
         var refused = await administrator.PutAsJsonAsync("/api/billing/rates", new
         {
             expenses = new[]
@@ -118,7 +94,6 @@ public sealed class BillingRateEndpointTests
     {
         using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
 
-        // Not a discount. A typo that pays the patient.
         var refused = await administrator.PutAsJsonAsync("/api/billing/rates", new
         {
             expenses = new[]
@@ -137,7 +112,6 @@ public sealed class BillingRateEndpointTests
         using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
         using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
 
-        // A ward type this test owns outright, so no other test's bill moves under it.
         const string wardType = "mental_health";
 
         await SetBedRateAsync(administrator, wardType, 4_000m);
@@ -150,16 +124,11 @@ public sealed class BillingRateEndpointTests
         var second = await AdmittedVisitAsync(wardType);
         var afterTotal = await PrepareAsync(reception, second);
 
-        // The new visit is priced at the new rate.
         Assert.Equal(afterTotal - beforeTotal, 5_000m);
 
-        // And the bill raised before the change still says what the patient was told it said.
-        // This is the whole reason the price is a column on the line and not a lookup.
         var reread = await BillTotalAsync(reception, first);
         Assert.Equal(beforeTotal, reread);
     }
-
-    // ---------- helpers ----------
 
     private static async Task SetBedRateAsync(HttpClient administrator, string wardType, decimal amount)
     {
@@ -190,7 +159,6 @@ public sealed class BillingRateEndpointTests
         return body.RootElement.GetProperty("total").GetDecimal();
     }
 
-    /// <summary>A patient in a bed on a ward of this test's own, so the bill has a bed line.</summary>
     private async Task<string> AdmittedVisitAsync(string wardType)
     {
         using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
@@ -256,8 +224,6 @@ public sealed class BillingRateEndpointTests
         return admissionId;
     }
 
-    // One token per account for the whole class. /api/auth/login is rate limited per IP and
-    // every test class shares that budget.
     private static readonly SemaphoreSlim TokenLock = new(1, 1);
     private static readonly Dictionary<string, string> Tokens = new();
     private static string? _nurseId;

@@ -4,8 +4,6 @@ public enum MessageCode
 {
     ValidationFailed,
 
-    // Also used for an unknown account and a deactivated one, so login cannot be used
-    // to discover which emails exist.
     InvalidCredentials,
 
     NotAuthenticated,
@@ -26,8 +24,6 @@ public enum MessageCode
 
     PhoneNumberAlreadyRegistered,
 
-    // Equipment
-
     BedNumberTaken,
 
     AssetTagTaken,
@@ -42,6 +38,14 @@ public enum MessageCode
 
     EquipmentNotAssigned,
 
+    EquipmentAwaitingRepair,
+
+    LabReportFileEmpty,
+
+    LabReportFileTooLarge,
+
+    LabReportFileType,
+
     PharmacyCategoryNameTaken,
 
     PharmacyItemNameTaken,
@@ -52,7 +56,6 @@ public enum MessageCode
 
     MaintenanceNotCompletable,
 
-    // Patient Management — cl_pat_*
     WardNameTaken,
 
     PatientNicTaken,
@@ -75,8 +78,6 @@ public enum MessageCode
 
     CareLevelNeedsDutyManager,
 
-    // Manual bed assignment. One code per hard rule, because "that bed will not work" tells a
-    // nurse nothing about which other bed might.
     BedNeedsDutyManager,
 
     BedDowngradeNeedsDutyManager,
@@ -93,29 +94,35 @@ public enum MessageCode
 
     BedWardNotInService,
 
-    // A visit that needs a bed cannot be finished with /complete. That is a discharge, and
-    // discharge has a checklist, an approver and a bed to give back.
     VisitNeedsDischargeNotComplete,
 
     VisitNeedsNoBed,
 
-    // Discharge, step 7.
     ChecklistItemWrongRole,
 
     DischargeChecklistIncomplete,
 
-    DischargeNeedsDutyManager,
-
-    // Billing. billing_settled is not a box anyone ticks by hand - settling the bill is what
-    // writes it, so the money and the checklist cannot disagree.
     BillingTickedBySettlingOnly,
 
     BillAlreadySettled,
 
     BillLineNotRemovable,
 
-    // Correcting a bed that was chosen by mistake.
     BedNotAssigned,
 
-    BedAlreadyTheirs
+    BedAlreadyTheirs,
+
+    BedWardPediatricAdult,
+
+    AmbulanceRegistrationTaken,
+
+    AmbulanceHasActiveDispatch,
+
+    NicLinkedToAnotherAccount,
+
+    NicDoesNotMatchYourRecord,
+
+    AccountHasNoPatientRecord,
+
+    NoCurrentAdmission
 }

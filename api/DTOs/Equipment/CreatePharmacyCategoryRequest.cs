@@ -2,7 +2,6 @@ using System.ComponentModel.DataAnnotations;
 
 namespace CareLanka.Api.DTOs.Equipment;
 
-/// <summary>Body of POST /api/pharmacy-categories.</summary>
 public class CreatePharmacyCategoryRequest
 {
     [Required]

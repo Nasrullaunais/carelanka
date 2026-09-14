@@ -13,25 +13,8 @@ import { expenseHints, expenseLabel, isUnpriceable, money } from '../types/billi
 import { wardTypeLabels } from '../types/wards';
 import { admissionCategoryLabels } from '../types/patients';
 
-// What the hospital charges.
-//
-// The price list used to be a C# file, which meant "what does a bed cost?" was a question only
-// a developer could answer, and only by shipping a build. It is a table now, and this is the
-// screen over it.
-//
-// Two things are true of every number here. Both are said on the page as well as in this
-// comment, because whoever edits them has to know both:
-//
-//   Changing a price NEVER changes a bill already raised. The price is copied onto the line
-//   when the line is written, so today's edit prices tomorrow's bills and every piece of paper
-//   a patient has already been handed stays exactly as it was.
-//
-//   Only the bed price is applied automatically. Everything else is a suggestion that appears
-//   in reception's box when they type a charge, and they can still overwrite it.
-
 type Draft = Record<string, string>;
 
-/** One stable key per box, so the whole grid can live in one flat object. */
 function expenseCell(wardType: WardType, expenseKey: string): string {
   return `${wardType}::${expenseKey}`;
 }
@@ -47,16 +30,10 @@ export function BillingSettingsPage() {
 
   const mayEdit = canSetBillingRates(role);
 
-  // Gated rather than skipped: the hook cannot go behind the early return, and without this
-  // a nurse opening the URL fires a request that 403s and toasts red.
   const rates = useQuery({ ...getBillingRatesOptions(), enabled: mayEdit });
 
-  // The boxes are their own state, not the query's. A grid bound straight to server data
-  // resets the cell you are halfway through typing into every time anything refetches.
   const [draft, setDraft] = useState<Draft>({});
 
-  // Seeded once the rates arrive, and again whenever a save returns the new grid. Keyed off
-  // the fetched data rather than a mount, because the query is not resolved on first render.
   useEffect(() => {
     if (!rates.data) {
       return;
@@ -82,7 +59,6 @@ export function BillingSettingsPage() {
     onSuccess: (book) => {
       toast.success('Prices saved. Bills already raised are untouched.');
 
-      // Everything that shows a price: this grid, and the suggestions in reception's box.
       queryClient.invalidateQueries({
         predicate: (query) =>
           (query.queryKey[0] as { _id?: string } | undefined)?._id === 'getBillingRates',
@@ -97,16 +73,13 @@ export function BillingSettingsPage() {
       <>
         <h1>Billing settings</h1>
         <p className="empty">
-          Your role cannot set prices. Only the hospital administrator can — deciding what the
-          hospital charges is a different job from taking the money.
+          Your role cannot set prices. Only the hospital administrator can — setting rates is a
+          separate responsibility from taking payment.
         </p>
       </>
     );
   }
 
-  /**
-   * What actually changed, so an untouched grid sends nothing and one typo is one row.
-   */
   function changed() {
     const expenses: { ward_type: WardType; expense_key: string; amount: number }[] = [];
     const admission_fees: { category: AdmissionCategory; amount: number }[] = [];
@@ -159,7 +132,7 @@ export function BillingSettingsPage() {
     <>
       <h1>Billing settings</h1>
       <p className="muted">
-        What the hospital charges, in {currency}. Every expense, in every kind of ward.
+        What the hospital charges, in {currency}. Every expense, for every type of ward.
       </p>
 
       <div className="card">
@@ -170,9 +143,9 @@ export function BillingSettingsPage() {
           as it was.
         </p>
         <p className="muted">
-          Only <strong>Bed, per day</strong> is applied on its own — worked out from the ward
-          the patient is actually lying in. The rest are the suggested prices that appear in
-          reception&rsquo;s box when they type a charge, and reception can still overwrite one.
+          Only <strong>Bed, per day</strong> is applied automatically, from the ward the patient
+          is in. The rest are default prices that appear when reception enters a charge, and
+          reception can still change them.
         </p>
       </div>
 
@@ -187,14 +160,12 @@ export function BillingSettingsPage() {
         </div>
       ) : (
         <form onSubmit={submit}>
-          {/* The admission fee first: it is the one charge on every bill, and it is priced by
-              something else entirely — the care level, not the ward. */}
+
           <div className="card">
             <h2>Admission fee</h2>
             <p className="muted">
-              The one-off charge for opening a visit. Priced by the care level a clinician
-              recorded, not by the ward — it is charged before anybody knows which ward the
-              patient will end up in.
+              The one-off charge for opening an admission. Priced by the care level a clinician
+              recorded, not by the ward — it is charged before the ward is known.
             </p>
 
             <table>
@@ -227,9 +198,6 @@ export function BillingSettingsPage() {
             </table>
           </div>
 
-          {/* One card per ward, rather than one enormous ward-by-expense spreadsheet. The grid
-              form hides which ward you are editing the moment you scroll; this way the ward
-              name is always above the box the cursor is in. */}
           {(rates.data?.wards ?? []).map((ward) => (
             <div className="card" key={ward.ward_type}>
               <h2>{wardTypeLabels[ward.ward_type]}</h2>
@@ -251,7 +219,7 @@ export function BillingSettingsPage() {
                           <strong>{expenseLabel(expense.expense_key)}</strong>
                           <br />
                           <span className="muted">
-                            {expenseHints[expense.expense_key] ?? 'Typed at the desk.'}
+                            {expenseHints[expense.expense_key] ?? 'Entered at the desk.'}
                           </span>
                         </td>
                         <td>
@@ -289,8 +257,8 @@ export function BillingSettingsPage() {
 
             {pendingCount > 0 && !save.isPending && (
               <p className="hint">
-                {pendingCount} box{pendingCount === 1 ? '' : 'es'} changed and not yet saved.
-                Each one says what it was before.
+                {pendingCount} price{pendingCount === 1 ? '' : 's'} changed and not yet saved.
+                Each shows its previous value.
               </p>
             )}
           </div>
@@ -300,12 +268,6 @@ export function BillingSettingsPage() {
   );
 }
 
-/**
- * One price box, with what it used to be shown underneath once it stops matching.
- *
- * The old value is the point. Sixty-odd boxes on one page is a page where a mistyped digit
- * disappears, so every changed box says what it was and the save button counts them.
- */
 function PriceBox({
   id,
   label,
@@ -344,11 +306,9 @@ function PriceBox({
       {invalid ? (
         <p className="field-error">A price is a number, and never below zero.</p>
       ) : dirty ? (
-        <p className="hint">Was {money(original, currency)}.</p>
+        <p className="hint">Previously {money(original, currency)}.</p>
       ) : unpriceable && original === 0 ? (
-        // Zero here does not mean free, it means we cannot guess. Saying so stops somebody
-        // "fixing" it to a number that would then be wrong on every bill.
-        <p className="hint">No suggestion — the desk types this one off the slip.</p>
+        <p className="hint">No default — reception enters this from the slip.</p>
       ) : null}
     </div>
   );

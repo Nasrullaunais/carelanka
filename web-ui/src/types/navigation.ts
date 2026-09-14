@@ -3,6 +3,7 @@ import {
   canReadPatientDetails,
   canReadCapacity,
   canReadEquipment,
+  canReadLabReports,
   canReadWards,
   canRegisterPatient,
   canWorkAppointmentDesk,
@@ -10,14 +11,10 @@ import {
   canSetBillingRates,
 } from './permissions';
 
-// Every place a staff member can go, in one list. The dashboard reads it and so does anything
-// else that needs to know what a role can reach, so a new screen is one entry here rather than
-// an edit in three files that quietly drift apart.
-
 export type Destination = {
   to: string;
   label: string;
-  /** One line saying what the job is, not what the screen is called. */
+
   description: string;
   canAccess: (role: PrincipalRole | undefined) => boolean;
 };
@@ -41,10 +38,6 @@ export const destinations: Destination[] = [
     description: 'Who has booked to come in. Take a booking, or check someone in.',
     canAccess: canWorkAppointmentDesk,
   },
-  // One tile, not two. Billing used to be its own screen, which meant the same visit was
-  // walked twice through two pages - a nurse ticked a box on one and reception took the money
-  // on the other, and neither could see what the other had done. The discharge screen is the
-  // whole of a discharge now, bill included.
   {
     to: '/discharge',
     label: 'Discharge and billing',
@@ -77,6 +70,18 @@ export const destinations: Destination[] = [
     canAccess: canReadEquipment,
   },
   {
+    to: '/maintenance-unit',
+    label: 'Maintenance unit',
+    description: 'Machines waiting to be fixed. Confirm a repair and the item goes back into service.',
+    canAccess: canReadEquipment,
+  },
+  {
+    to: '/laboratory',
+    label: 'Laboratory',
+    description: 'File a blood or lab result against a patient, and read what has been filed already.',
+    canAccess: canReadLabReports,
+  },
+  {
     to: '/pharmacy',
     label: 'Pharmacy',
     description: 'Search medicines and supplies, see what is on the shelf, record what moves.',
@@ -84,7 +89,6 @@ export const destinations: Destination[] = [
   },
 ];
 
-/** Only what this role may actually open. A tile they cannot use is worse than no tile. */
 export function destinationsFor(role: PrincipalRole | undefined): Destination[] {
   return destinations.filter((destination) => destination.canAccess(role));
 }

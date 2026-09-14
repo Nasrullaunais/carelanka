@@ -9,9 +9,6 @@ using Xunit;
 
 namespace CareLanka.Api.Tests;
 
-// The drift gate for Patient Management. patient-spec.yaml is still hand-written, so nothing
-// but this test stops the code and the published contract quietly disagreeing. Every schema
-// gets a case here as its endpoints are built.
 public sealed class PatientOpenApiContractTests
 {
     [Theory]
@@ -39,8 +36,6 @@ public sealed class PatientOpenApiContractTests
             .GetProperty("components").GetProperty("schemas").GetProperty(enumName)
             .GetProperty("enum").EnumerateArray().Select(value => value.GetString()!).ToArray();
 
-        // Ordered, not just set-equal: AdmissionCategory's downgrade ladder is an ordinal step,
-        // so the order of these lists is part of the contract, not an accident of declaration.
         Assert.Equal(expected, actual);
     }
 
@@ -72,6 +67,11 @@ public sealed class PatientOpenApiContractTests
     [InlineData("BillLine")]
     [InlineData("AddBillChargeRequest")]
     [InlineData("OutstandingBill")]
+    [InlineData("PreRegisterRequest")]
+    [InlineData("MyProfile")]
+    [InlineData("MyAdmission")]
+    [InlineData("MyAppointment")]
+    [InlineData("BookAppointmentRequest")]
     public async Task Published_schema_required_members_match_the_contract(string schemaName)
     {
         var generated = await GenerateAsync();
@@ -84,6 +84,96 @@ public sealed class PatientOpenApiContractTests
         Assert.True(expected.SetEquals(actual),
             $"{schemaName} required members differ. Contract: {string.Join(", ", expected.Order())}. "
             + $"Generated: {string.Join(", ", actual.Order())}.");
+    }
+
+    [Fact]
+    public async Task Patient_self_service_publishes_the_operationIds_the_mobile_client_generates_against()
+    {
+        var generated = await GenerateAsync();
+        var paths = generated.RootElement.GetProperty("paths");
+
+        Assert.Equal(
+            "preRegisterSelf",
+            paths.GetProperty("/me/pre-register").GetProperty("post")
+                .GetProperty("operationId").GetString());
+        Assert.Equal(
+            "getMyProfile",
+            paths.GetProperty("/me/profile").GetProperty("get")
+                .GetProperty("operationId").GetString());
+        Assert.Equal(
+            "getMyAdmission",
+            paths.GetProperty("/me/admission").GetProperty("get")
+                .GetProperty("operationId").GetString());
+        Assert.Equal(
+            "getMyHistory",
+            paths.GetProperty("/me/history").GetProperty("get")
+                .GetProperty("operationId").GetString());
+        Assert.Equal(
+            "bookMyAppointment",
+            paths.GetProperty("/me/appointments").GetProperty("post")
+                .GetProperty("operationId").GetString());
+        Assert.Equal(
+            "listMyAppointments",
+            paths.GetProperty("/me/appointments").GetProperty("get")
+                .GetProperty("operationId").GetString());
+        Assert.Equal(
+            "cancelMyAppointment",
+            paths.GetProperty("/me/appointments/{id}/cancel").GetProperty("post")
+                .GetProperty("operationId").GetString());
+    }
+
+    [Fact]
+    public async Task Pre_register_publishes_no_admission_shape_and_no_arrival_date()
+    {
+        var generated = await GenerateAsync();
+
+        var request = generated.RootElement
+            .GetProperty("components").GetProperty("schemas")
+            .GetProperty("PreRegisterRequest").GetProperty("properties");
+
+        Assert.False(request.TryGetProperty("expected_arrival", out _));
+        Assert.False(request.TryGetProperty("reason_for_visit", out _));
+
+        var responses = generated.RootElement
+            .GetProperty("paths").GetProperty("/me/pre-register").GetProperty("post")
+            .GetProperty("responses");
+
+        Assert.True(responses.TryGetProperty("200", out var ok));
+        Assert.False(responses.TryGetProperty("201", out _));
+
+        Assert.Equal(
+            "#/components/schemas/MyProfile",
+            ok.GetProperty("content").GetProperty("application/json")
+                .GetProperty("schema").GetProperty("$ref").GetString());
+    }
+
+    [Fact]
+    public async Task Every_self_service_operation_declares_its_failures_and_not_only_its_success()
+    {
+        var generated = await GenerateAsync();
+        var paths = generated.RootElement.GetProperty("paths");
+
+        Assert.Equal(
+            new[] { "200", "400", "401", "403", "409" },
+            Responses(paths.GetProperty("/me/pre-register").GetProperty("post")));
+        Assert.Equal(
+            new[] { "200", "401", "403", "404" },
+            Responses(paths.GetProperty("/me/profile").GetProperty("get")));
+        Assert.Equal(
+            new[] { "200", "401", "403", "404" },
+            Responses(paths.GetProperty("/me/admission").GetProperty("get")));
+        Assert.Equal(
+            new[] { "200", "400", "401", "403" },
+            Responses(paths.GetProperty("/me/history").GetProperty("get")));
+        Assert.Equal(
+            new[] { "201", "400", "401", "403", "409" },
+            Responses(paths.GetProperty("/me/appointments").GetProperty("post")));
+        Assert.Equal(
+            new[] { "200", "400", "401", "403" },
+            Responses(paths.GetProperty("/me/appointments").GetProperty("get")));
+        Assert.Equal(
+            new[] { "200", "401", "403", "404", "409" },
+            Responses(paths.GetProperty("/me/appointments/{id}/cancel").GetProperty("post")));
     }
 
     [Fact]
@@ -127,10 +217,6 @@ public sealed class PatientOpenApiContractTests
             .GetProperty("components").GetProperty("schemas")
             .GetProperty("ChecklistUpdateRequest").GetProperty("properties");
 
-        // The key stays published on purpose. Dropping it would make a client that sends it
-        // look like it had a typo, when what it actually has is a design it has not read:
-        // settling the bill is the only thing that writes this box. The 409 is the answer, and
-        // a 400 for an unknown property would have been the wrong one.
         Assert.True(properties.TryGetProperty("billing_settled", out _));
     }
 
@@ -150,7 +236,6 @@ public sealed class PatientOpenApiContractTests
         var generated = await GenerateAsync();
         var wards = generated.RootElement.GetProperty("paths").GetProperty("/wards");
 
-        // An endpoint declaring only its 200 generates a client that cannot type its failures.
         Assert.Equal(
             new[] { "200", "400", "401", "403" },
             Responses(wards.GetProperty("get")));
@@ -170,8 +255,6 @@ public sealed class PatientOpenApiContractTests
             paths.GetProperty("/patient-worklist").GetProperty("get")
                 .GetProperty("operationId").GetString());
 
-        // No PATCH, no POST, and not by omission. WorklistStatus is derived from two stored
-        // statuses, so a write here would be a fourth place a status could change.
         Assert.Equal(new[] { "get" }, paths.GetProperty("/patient-worklist")
             .EnumerateObject().Select(verb => verb.Name).ToArray());
 
@@ -187,13 +270,10 @@ public sealed class PatientOpenApiContractTests
         var generated = await GenerateAsync();
         var paths = generated.RootElement.GetProperty("paths");
 
-        // An endpoint declaring only its 200 generates a client that cannot type its failures.
         Assert.Equal(
             new[] { "200", "400", "401", "403" },
             Responses(paths.GetProperty("/patient-worklist").GetProperty("get")));
 
-        // 409 twice over on complete: the illegal transition, and cl_pat_020 for a visit that
-        // has a bed and must be discharged instead. One status, two reasons, both documented.
         Assert.Equal(
             new[] { "200", "401", "403", "404", "409" },
             Responses(paths.GetProperty("/admissions/{id}/complete").GetProperty("post")));
@@ -205,8 +285,6 @@ public sealed class PatientOpenApiContractTests
         var generated = await GenerateAsync();
         var paths = generated.RootElement.GetProperty("paths");
 
-        // Two components have been blocked on exactly these two names. Emergency generates
-        // getWardCapacity, Staff Management generates getWardOccupancy.
         Assert.Equal(
             "getWardCapacity",
             paths.GetProperty("/capacity/wards").GetProperty("get").GetProperty("operationId").GetString());
@@ -221,8 +299,6 @@ public sealed class PatientOpenApiContractTests
         var generated = await GenerateAsync();
         var paths = generated.RootElement.GetProperty("paths");
 
-        // No 403 on either: both are AnyStaff, so an authenticated caller is never refused and
-        // publishing a 403 would have every client branch on a status that cannot arrive.
         Assert.Equal(
             new[] { "200", "401" },
             Responses(paths.GetProperty("/capacity/wards").GetProperty("get")));
@@ -237,8 +313,6 @@ public sealed class PatientOpenApiContractTests
         var generated = await GenerateAsync();
         var paths = generated.RootElement.GetProperty("paths");
 
-        // getBedOccupancy is the one Equipment Management generates against, and it is what
-        // retired the last of their stubs. The other two are ours.
         Assert.Equal(
             "listBedAvailability",
             paths.GetProperty("/bed-availability").GetProperty("get").GetProperty("operationId").GetString());
@@ -256,9 +330,6 @@ public sealed class PatientOpenApiContractTests
         var generated = await GenerateAsync();
         var paths = generated.RootElement.GetProperty("paths");
 
-        // No 403 on either read: both are AnyStaff, so an authenticated caller is never refused
-        // and publishing a 403 would have every client branch on a status that cannot arrive.
-        // The 400 on the candidate list is real - page and pageSize are range-checked.
         Assert.Equal(
             new[] { "200", "400", "401" },
             Responses(paths.GetProperty("/bed-availability").GetProperty("get")));
@@ -266,16 +337,11 @@ public sealed class PatientOpenApiContractTests
             new[] { "200", "401", "404" },
             Responses(paths.GetProperty("/beds/{id}/occupancy").GetProperty("get")));
 
-        // Assigning has every one of them, and the 403 is the interesting one: which roles may
-        // place a patient depends on the bed in the body, so it is a refusal at run time.
         Assert.Equal(
             new[] { "200", "400", "401", "403", "404", "409" },
             Responses(paths.GetProperty("/admissions/{id}/assign-bed").GetProperty("post")));
     }
 
-    // The candidate list is not /api/beds on purpose - that route is Equipment Management's,
-    // and one app cannot have two pages at one address. This pins the split, because the
-    // collision would only show up as a startup crash on somebody else's branch.
     [Fact]
     public async Task The_candidate_list_does_not_squat_on_Equipment_s_bed_register()
     {
@@ -286,9 +352,6 @@ public sealed class PatientOpenApiContractTests
         Assert.Equal("createBed", beds.GetProperty("post").GetProperty("operationId").GetString());
     }
 
-    // patients_by_category is an open map on the wire, so nothing in the schema pins its keys.
-    // This is what stops a rename of the C# enum silently changing them, which for a map is a
-    // key that reads as "no patients of that kind" rather than as a break.
     [Fact]
     public void The_care_mix_is_keyed_by_the_published_admission_category_values()
     {
@@ -326,7 +389,6 @@ public sealed class PatientOpenApiContractTests
         var patients = paths.GetProperty("/patients");
         var one = paths.GetProperty("/patients/{id}");
 
-        // An endpoint declaring only its 200 generates a client that cannot type its failures.
         Assert.Equal(new[] { "200", "400", "401", "403" }, Responses(patients.GetProperty("get")));
         Assert.Equal(new[] { "201", "400", "401", "403", "409" }, Responses(patients.GetProperty("post")));
         Assert.Equal(new[] { "200", "401", "403", "404" }, Responses(one.GetProperty("get")));
@@ -371,8 +433,6 @@ public sealed class PatientOpenApiContractTests
 
         Assert.Equal(new[] { "200", "400", "401", "403" }, Responses(admissions.GetProperty("get")));
 
-        // 404 as well as the contract's list: the patient or the categorising clinician can be
-        // absent, and a client that cannot tell that from a validation failure retries forever.
         Assert.Equal(
             new[] { "201", "400", "401", "403", "404", "409" },
             Responses(admissions.GetProperty("post")));
@@ -383,8 +443,6 @@ public sealed class PatientOpenApiContractTests
             new[] { "200", "400", "401", "403", "404", "409" },
             Responses(paths.GetProperty("/admissions/{id}/details").GetProperty("patch")));
 
-        // No 400 on arrive: it takes no body, so there is nothing to fail validation. Cancel
-        // has one, because the reason is mandatory and a client can leave it out.
         Assert.Equal(
             new[] { "200", "401", "403", "404", "409" },
             Responses(paths.GetProperty("/admissions/{id}/arrive").GetProperty("post")));
@@ -423,8 +481,6 @@ public sealed class PatientOpenApiContractTests
             Responses(paths.GetProperty("/appointments/{id}/check-in").GetProperty("post")));
     }
 
-    // Check-in answers with an Admission, not with the booking it consumed. Easy to get wrong
-    // in a generated client and invisible until a screen renders the wrong shape.
     [Fact]
     public async Task Checking_in_publishes_an_admission_because_that_is_what_the_desk_works_from_next()
     {
@@ -438,11 +494,6 @@ public sealed class PatientOpenApiContractTests
         Assert.EndsWith("/Admission", schema.GetProperty("$ref").GetString());
     }
 
-    // The drift gate on the backbone. patient-spec.yaml prints the whole workflow in the
-    // description of its IllegalTransition response, so that text is a contract the group and
-    // both frontends read. This parses it and holds the service's transition table against it,
-    // in both directions - a move added to one and not the other fails here rather than at a
-    // viva.
     [Fact]
     public void The_workflow_the_contract_prints_is_the_workflow_the_service_enforces()
     {
@@ -455,10 +506,6 @@ public sealed class PatientOpenApiContractTests
         Assert.Equal(published.Order(), enforced.Order());
     }
 
-    /// <summary>
-    /// The moves listed in the IllegalTransition response description, as "from -> to" strings.
-    /// The lines look like <c>bed_reserved -> admitted, awaiting_bed, cancelled;</c>.
-    /// </summary>
     private static HashSet<string> PublishedTransitions()
     {
         var description = ((YamlScalarNode)Map(LoadContract(), "components", "responses", "IllegalTransition")
@@ -485,10 +532,6 @@ public sealed class PatientOpenApiContractTests
         return moves;
     }
 
-    // AdmissionDetail deliberately publishes fewer keys than patient-spec.yaml describes:
-    // workflows needs the common AgentWorkflow tables (ADR 3) and discharge needs step 7, so
-    // both are omitted rather than returned empty. This pins that, so re-adding them is a
-    // decision rather than an accident.
     [Fact]
     public async Task AdmissionDetail_omits_only_the_block_that_still_has_no_table_behind_it()
     {
@@ -499,13 +542,9 @@ public sealed class PatientOpenApiContractTests
 
         Assert.True(properties.TryGetProperty("bed_assignments", out _));
 
-        // discharge and bill arrived with step 7. They are published as nullable rather than
-        // omitted, because "nobody has opened one yet" and "this API does not serve it" are
-        // different facts and a client has to be able to tell them apart.
         Assert.True(properties.TryGetProperty("discharge", out _));
         Assert.True(properties.TryGetProperty("bill", out _));
 
-        // workflows still has no table. AgentWorkflow is common and unbuilt (ADR 3).
         Assert.False(properties.TryGetProperty("workflows", out _));
     }
 
@@ -522,13 +561,6 @@ public sealed class PatientOpenApiContractTests
         return JsonDocument.Parse(await client.GetStringAsync("/swagger/v1/swagger.json"));
     }
 
-    // The contract nests a response schema's members under allOf, next to the shared
-    // AuditFields reference, so the required list is not always at the top level.
-    //
-    // Every branch counts, not just the first one with a list. Swashbuckle flattens C#
-    // inheritance into one schema, so the generated Patient carries PatientSummary's required
-    // members as well as its own — reading only one branch compared four members against one
-    // and failed for a document that was actually correct.
     private static HashSet<string> RequiredFromContract(YamlMappingNode contract, string schemaName)
     {
         var schema = Map(contract, "components", "schemas", schemaName);

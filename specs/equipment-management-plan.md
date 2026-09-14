@@ -87,6 +87,8 @@ PharmacyCategory  1 ──< PharmacyItem >── PharmacyTransaction
 EquipmentItem, Bed ──< MaintenanceSchedule (polymorphic: asset_type / asset_id)
 
 Warning ──< ActionRequest (the proposal + approval record)
+
+LabReport ── Patient (Patient Management's table, read-only reference, no FK)
 ```
 
 **EquipmentCategory** — the five categories in §1.1, modelled as a table (not a hard-coded enum) so the Administrator can add a sixth later without a migration.
@@ -206,6 +208,23 @@ Constraint: `UNIQUE(ward_id, bed_number)`.
 | `resolved_at` | timestamptz, nullable | |
 | `created_at` / `updated_at` | timestamptz | |
 
+**LabReport** *(Rev 2, 2026-09-13 — claimed by this component, see `integration_of_functions.md` §11.15.)* — a finished laboratory result and the file itself. Never edited: a corrected result is a new row, so a ward can see that a correction happened rather than finding a value has quietly changed. Hence `Entity` rather than `AuditedEntity`, the same reasoning as `PharmacyTransaction`.
+
+| Field | Type | Notes |
+| :--- | :--- | :--- |
+| `id` | uuid, PK | |
+| `patient_id` | uuid | References Patient Management's `Patient`. **No foreign key and no navigation** — a constraint from here would let Equipment's migrations decide whether one of their rows can be deleted. The same shape as `assigned_to_admission_id` |
+| `test_name` | text (120) | What was tested, in the lab's own words |
+| `summary` | text (1000), nullable | The lab's short summary, if they wrote one. Never a substitute for the file |
+| `file_name` | text (255) | The name only, never a path — a browser sends whatever the client machine had |
+| `content_type` | text (100) | `application/pdf`, `image/jpeg` or `image/png`. An allow-list: the question is whether a ward can open it |
+| `content` | bytea | Stored in the database, so a report cannot go missing from a folder nobody backed up |
+| `byte_size` | integer | `> 0` by check constraint. Published so a ward sees the size before opening it on ward wifi |
+| `uploaded_by_staff_id` | uuid | From the token, never the body |
+| `created_at` | timestamptz | When the lab filed it. No `updated_at` — nothing updates |
+
+Indexed on `(patient_id, created_at DESC)`, which is the only way the table is ever read: one patient, latest result first.
+
 **ActionRequest** — the agent's proposal and the human approval record, in one row.
 
 | Field | Type | Notes |
@@ -278,7 +297,7 @@ WHERE id = :id AND quantity_on_hand >= :qty;
 
 ```
 available ──> assigned ──> available     (returned after use)
-available ──> maintenance ──> available  (repaired, back in service)
+available ──> maintenance ──> available  (repair completed by the maintenance unit)
 available ──> maintenance ──> retired    (beyond repair)
 available ──> retired                     (planned decommission, rare)
 ```
@@ -288,6 +307,10 @@ available ──> retired                     (planned decommission, rare)
 **Assigning an item** (`available -> assigned`) requires `assigned_to_admission_id`. **Releasing it** (`assigned -> available`) clears that field. Unlike Patient Management's `BedAssignment`, this component does not keep a full assignment history table — only the current assignment is stored, which is a deliberate simplification flagged in §15.
 
 **Marking maintenance** (`available -> maintenance`) can happen two ways: the Administrator does it manually, or a Technician's fault report (§7.1) does it automatically — a broken defibrillator changes status the moment it's reported, not on the next scheduled sweep.
+
+**Coming back out of maintenance is the maintenance unit's move, not the Administrator's.** *(Rev 2, 2026-09-13.)* A fault report opens a `MaintenanceSchedule` of type `repair` alongside the warning, and that work order is the only route back to `available` — `POST /maintenance-schedules/{id}/complete` returns the item to service, records who did the work, and closes the fault in one transaction. Editing `status` back to `available` through `PUT /equipment-items/{id}` answers 409 instead.
+
+The reason is the same one behind the bed-occupancy check: a rule that only holds when everybody remembers it is not a rule. Without this, a reported fault is a status a busy Administrator can undo from a dropdown without anybody looking at the machine, and the fault warning stays open behind it. `retired` remains reachable from `maintenance`, because *beyond repair* is the other honest ending — and retiring cancels the open work order and closes the warning, so the unit's queue never lists a machine that no longer exists.
 
 ### 4.2 Bed condition
 
@@ -389,7 +412,18 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 | `POST` | `/api/maintenance-schedules` | Inventory Administrator | Manual scheduling, no agent involved |
 | `POST` | `/api/maintenance-schedules/{id}/complete` | Equipment Technician | **Business op.** §6 steps 8–9. |
 
-### 7.5 Warnings and actions (the agent's surface)
+### 7.5 Laboratory *(Rev 2, 2026-09-13)*
+
+| Method | Route | Role | Notes |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/ward-patients?wardName=` | Doctor, Ward Nurse, Duty Manager, Laboratory | Who is in the hospital now, ward by ward. The picker behind two screens — filing a result and assigning an item. Carries both `admission_id` and `patient_id`. Read through M4's admission service, never their tables |
+| `GET` | `/api/lab-reports?patientId=` | Doctor, Ward Nurse, Duty Manager, Laboratory | One patient's results, newest first. Metadata only |
+| `POST` | `/api/lab-reports` | Laboratory | **Business op.** The only multipart request in this contract. PDF or photo, up to 10 MB. 404 on an unknown patient |
+| `GET` | `/api/lab-reports/{id}/file` | Doctor, Ward Nurse, Duty Manager, Laboratory | The file, served `inline` so a ward reads it on screen |
+
+Two policies, not one: a nurse reads a result and acts on it, while issuing one is the laboratory's work. Reading is narrower than any-staff because a result is clinical information about a named person, and the administrator is on neither for the same reason they cannot read admissions.
+
+### 7.6 Warnings and actions (the agent's surface)
 
 | Method | Route | Role | Notes |
 | :--- | :--- | :--- | :--- |
@@ -402,7 +436,7 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 | `POST` | `/api/action-requests/{id}/reject` | Inventory Administrator | Requires a reason |
 | `GET` | `/api/wards/{wardId}/equipment-readiness` | Inventory Administrator, and the group orchestrator | **Integration surface.** §8.7 — does this ward have working equipment of the types a plan needs? |
 
-### 7.6 Reports
+### 7.7 Reports
 
 | Method | Route | Role | Notes |
 | :--- | :--- | :--- | :--- |
@@ -530,9 +564,11 @@ Per the assignment: workflow id, objective, plan, completed steps, tool calls wi
 | Screen | Contents |
 | :--- | :--- |
 | **Equipment inventory** | Search, filter by category/ward/status, sort, paginate |
-| **Equipment detail** | Item info, maintenance history, current warnings, assign/release |
+| **Equipment detail** | Item info, maintenance history, current warnings, assign/release. *(Rev 2, 2026-09-13.)* Assigning picks the patient by ward rather than taking a pasted admission id |
 | **Pharmacy inventory** | Search, filter by category, below-threshold and expiring-soon highlighted |
 | **Maintenance calendar** | Scheduled and overdue, by asset type |
+| **Maintenance unit** | *(Rev 2, 2026-09-13.)* The repair queue: every machine out of service and what was reported against it. Confirm the repair and the item returns to service; mark it beyond repair and it is retired. The only screen that can bring an item back from `maintenance` — see §4.1 |
+| **Laboratory** | *(Rev 2, 2026-09-13.)* Pick a ward, read down who is in it, and file a result against whoever the specimen came from. Search by code, name or NIC is the second way in, for an outpatient in no ward. Clinical staff see the same screen without the upload form — see §7.5 |
 | **Bed register admin** | Create beds, mark out of service, retire — occupancy block surfaced as a clear error |
 | **Warnings & recommendations queue** | Everything open, recommended action, urgency, cost. Approve / Reject / auto-approved badge. **This is the demo screen.** |
 | **Reports** | Pharmacy consumption, maintenance compliance, utilization, agent performance |

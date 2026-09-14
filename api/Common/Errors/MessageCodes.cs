@@ -8,8 +8,6 @@ public static class MessageCodes
     private static readonly ResourceManager Resources =
         new("CareLanka.Api.Common.Errors.ErrorMessages", typeof(MessageCodes).Assembly);
 
-    // Written out rather than derived from the enum name: these strings are a published
-    // contract, so renaming a C# member must not rename a code clients branch on.
     private static readonly IReadOnlyDictionary<MessageCode, string> Wire =
         new Dictionary<MessageCode, string>
         {
@@ -36,6 +34,10 @@ public static class MessageCodes
             [MessageCode.InsufficientStock] = "cl_equ_010",
             [MessageCode.AdjustmentNeedsNote] = "cl_equ_011",
             [MessageCode.MaintenanceNotCompletable] = "cl_equ_012",
+            [MessageCode.EquipmentAwaitingRepair] = "cl_equ_013",
+            [MessageCode.LabReportFileEmpty] = "cl_equ_014",
+            [MessageCode.LabReportFileTooLarge] = "cl_equ_015",
+            [MessageCode.LabReportFileType] = "cl_equ_016",
             [MessageCode.WardNameTaken] = "cl_pat_001",
             [MessageCode.PatientNicTaken] = "cl_pat_002",
             [MessageCode.PatientAlreadyHasAccount] = "cl_pat_003",
@@ -59,12 +61,18 @@ public static class MessageCodes
             [MessageCode.VisitNeedsNoBed] = "cl_pat_021",
             [MessageCode.ChecklistItemWrongRole] = "cl_pat_022",
             [MessageCode.DischargeChecklistIncomplete] = "cl_pat_023",
-            [MessageCode.DischargeNeedsDutyManager] = "cl_pat_024",
             [MessageCode.BillingTickedBySettlingOnly] = "cl_pat_025",
             [MessageCode.BillAlreadySettled] = "cl_pat_026",
             [MessageCode.BillLineNotRemovable] = "cl_pat_027",
             [MessageCode.BedNotAssigned] = "cl_pat_028",
-            [MessageCode.BedAlreadyTheirs] = "cl_pat_029"
+            [MessageCode.BedAlreadyTheirs] = "cl_pat_029",
+            [MessageCode.BedWardPediatricAdult] = "cl_pat_030",
+            [MessageCode.AmbulanceRegistrationTaken] = "cl_emg_001",
+            [MessageCode.AmbulanceHasActiveDispatch] = "cl_emg_002",
+            [MessageCode.NicLinkedToAnotherAccount] = "cl_pat_031",
+            [MessageCode.NicDoesNotMatchYourRecord] = "cl_pat_032",
+            [MessageCode.AccountHasNoPatientRecord] = "cl_pat_033",
+            [MessageCode.NoCurrentAdmission] = "cl_pat_034"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

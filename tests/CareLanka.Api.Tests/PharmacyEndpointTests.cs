@@ -6,10 +6,6 @@ using Xunit;
 
 namespace CareLanka.Api.Tests;
 
-/// <summary>
-/// The pharmacy catalog and the one rule that matters in it: stock moves only through a
-/// transaction, and it can never go below zero however many people push at once.
-/// </summary>
 [Collection(ApiCollection.Name)]
 public sealed class PharmacyEndpointTests
 {
@@ -29,8 +25,6 @@ public sealed class PharmacyEndpointTests
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.Equal(4, item.GetProperty("quantity_on_hand").GetInt32());
 
-        // Both computed from the quantity at read time. A stored flag is a second source of
-        // truth, and the one that goes stale.
         Assert.True(item.GetProperty("is_available").GetBoolean());
         Assert.True(item.GetProperty("below_threshold").GetBoolean());
     }
@@ -54,8 +48,6 @@ public sealed class PharmacyEndpointTests
         var response = await MoveAsync(client, id, "dispensed", 3);
         using var body = await ReadJsonAsync(response);
 
-        // The endpoint answers with the item, not the transaction: what the caller needs to
-        // see is the shelf after the movement.
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.Equal(7, body.RootElement.GetProperty("quantity_on_hand").GetInt32());
     }
@@ -83,8 +75,6 @@ public sealed class PharmacyEndpointTests
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal("cl_equ_010", body.RootElement.GetProperty("code").GetString());
 
-        // The refusal is the WHERE clause on the update, so nothing was written. If this
-        // ever reads 5 while the transaction list has grown, the two came apart.
         Assert.Equal(5, await QuantityAsync(client, id));
         using var history = await ReadJsonAsync(await client.GetAsync($"/api/pharmacy-items/{id}/transactions"));
         Assert.Equal(0, history.RootElement.GetProperty("total_items").GetInt32());
@@ -97,9 +87,6 @@ public sealed class PharmacyEndpointTests
         using var second = await EquipmentClientAsync();
         var id = await NewItemIdAsync(first, quantity: 1);
 
-        // The whole reason the quantity is changed by one conditional UPDATE rather than a
-        // read followed by a write. Read-then-write lets both callers see 1, both write 0,
-        // and two boxes leave a shelf that held one.
         var both = await Task.WhenAll(
             MoveAsync(first, id, "dispensed", 1),
             MoveAsync(second, id, "dispensed", 1));
@@ -122,8 +109,6 @@ public sealed class PharmacyEndpointTests
 
         var response = await MoveAsync(client, id, "adjusted", 2);
 
-        // A stocktake correction nobody explained cannot be audited afterwards, and this is
-        // the one movement with no delivery or prescription behind it.
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
@@ -153,12 +138,9 @@ public sealed class PharmacyEndpointTests
 
         Assert.Equal(2, rows.Count);
 
-        // Newest first, and quantity is always positive - the type is what gives it a sign.
         Assert.Equal(2, rows[0].GetProperty("quantity").GetInt32());
         Assert.Equal("dispensed", rows[0].GetProperty("type").GetString());
 
-        // Taken from the token, never the body, so nobody can record a movement under
-        // somebody else's name.
         Assert.NotEqual(Guid.Empty, rows[0].GetProperty("performed_by_staff_id").GetGuid());
     }
 
@@ -201,8 +183,6 @@ public sealed class PharmacyEndpointTests
         var second = await CreateCategoryAsync(client, name.ToUpper());
         using var body = await ReadJsonAsync(second);
 
-        // Compared without case: two rows that look identical on a dispensing screen are
-        // worse than a 409.
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
         Assert.Equal("cl_equ_008", body.RootElement.GetProperty("code").GetString());
     }
@@ -217,8 +197,6 @@ public sealed class PharmacyEndpointTests
         var search = await nurse.GetAsync("/api/pharmacy-items?availableOnly=true");
         var move = await MoveAsync(nurse, id, "dispensed", 1);
 
-        // "Do we have this medicine" is a question anyone in the hospital may ask, which is
-        // the literal requirement in the component plan. Moving stock is not.
         Assert.Equal(HttpStatusCode.OK, search.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, move.StatusCode);
     }

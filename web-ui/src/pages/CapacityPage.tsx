@@ -10,23 +10,10 @@ import { canReadCapacity } from '../types/permissions';
 import { admissionCategoryLabels } from '../types/patients';
 import { genderPolicyLabels, wardTypeLabels } from '../types/wards';
 
-// How full the hospital is, ward by ward. Counts only — no names, no records, nothing about
-// any individual patient — which is why every staff role can open it.
-//
-// Two endpoints, and they answer different questions on purpose:
-//
-//   GET /capacity/wards        how many beds are free right now, everywhere
-//   GET /wards/{id}/occupancy  where the people in ONE ward's beds are up to
-//
-// A free bed is one that is usable, empty, and not under a live hold. A hold that has run out
-// counts as free again, and that rule lives in one service so nothing re-invents it.
-
 export function CapacityPage() {
   const session = useSession();
   const [selected, setSelected] = useState<WardCapacity | null>(null);
 
-  // Same reason as the appointments desk: the hook cannot go behind the early return, so it
-  // is switched off instead. Nobody without a staff role should be asking the server at all.
   const isStaffMember = canReadCapacity(session?.principal.role);
 
   const capacity = useQuery({ ...getWardCapacityOptions(), enabled: isStaffMember });
@@ -35,7 +22,7 @@ export function CapacityPage() {
     return (
       <>
         <h1>Bed capacity</h1>
-        <p className="empty">Sign in as a staff member to see bed numbers.</p>
+        <p className="empty">Sign in as a member of staff to see bed capacity.</p>
       </>
     );
   }
@@ -48,14 +35,14 @@ export function CapacityPage() {
     <>
       <h1>Bed capacity</h1>
       <p className="muted">
-        Every ward, how many beds it has, and how many of them you could put someone in this
-        minute. Numbers only — nothing here says who is in a bed.
+        Every ward, its bed count, and how many of those beds are free now. Numbers only —
+        nothing here identifies a patient.
       </p>
 
       {capacity.isError ? (
         <div className="card">
           <div className="empty">
-            <p>Could not count the beds.</p>
+            <p>Could not load bed capacity.</p>
             <button type="button" className="secondary" onClick={() => void capacity.refetch()}>
               Try again
             </button>
@@ -64,18 +51,18 @@ export function CapacityPage() {
       ) : (
         <>
           <div className="card">
-            <h2>The whole hospital</h2>
+            <h2>Hospital total</h2>
 
             <div className="stats">
-              <Stat caption="Beds in total" value={totalBeds} />
-              <Stat caption="Free right now" value={freeBeds} tone={freeBeds === 0 ? 'none' : 'free'} />
-              <Stat caption="Not free" value={totalBeds - freeBeds} />
+              <Stat caption="Total beds" value={totalBeds} />
+              <Stat caption="Free now" value={freeBeds} tone={freeBeds === 0 ? 'none' : 'free'} />
+              <Stat caption="Unavailable" value={totalBeds - freeBeds} />
             </div>
 
             <p className="hint">
-              &ldquo;Not free&rdquo; is everything else at once: someone in the bed, someone
-              holding it on their way in, or Equipment has it out for repair. Open a ward's
-              details below to see which is which.
+              &ldquo;Unavailable&rdquo; covers three cases at once: a patient in the bed, a
+              hold for a patient on their way in, and a bed Equipment has taken out of service.
+              Open a ward below for the breakdown.
               {capacity.data && (
                 <>
                   {' '}
@@ -131,8 +118,7 @@ export function CapacityPage() {
                         </td>
                         <td>{wardTypeLabels[ward.ward_type]}</td>
                         <td>
-                          {/* On the table because a male-only ward with two free beds is no use
-                              to a female patient, and the reader has to be able to see that. */}
+
                           {genderPolicyLabels[ward.gender_policy]}
                         </td>
                         <td>{ward.total_beds}</td>
@@ -159,9 +145,6 @@ export function CapacityPage() {
                         </td>
                       </tr>
 
-                      {/* Under the ward it belongs to, not at the foot of the page. With ten
-                          wards on screen, a card down there is a card you have to scroll to and
-                          then scroll back from, having lost track of which row you opened. */}
                       {selected?.ward_id === ward.ward_id && (
                         <tr className="drawer">
                           <td colSpan={7}>
@@ -176,8 +159,8 @@ export function CapacityPage() {
             )}
 
             <p className="hint">
-              A ward with no beds at all is not a mistake here — beds are registered by
-              Equipment, and a ward exists before anyone puts furniture in it.
+              A ward with no beds is not an error. Beds are registered by Equipment, and a ward
+              exists before any beds are added to it.
             </p>
           </div>
         </>
@@ -185,10 +168,6 @@ export function CapacityPage() {
     </>
   );
 }
-
-// ---------------------------------------------------------------------------
-// One ward, broken down
-// ---------------------------------------------------------------------------
 
 function WardOccupancyPanel({ ward, onClose }: { ward: WardCapacity; onClose: () => void }) {
   const occupancy = useQuery(getWardOccupancyOptions({ path: { id: ward.ward_id } }));
@@ -215,9 +194,7 @@ function WardOccupancyPanel({ ward, onClose }: { ward: WardCapacity; onClose: ()
             <Stat caption="Patient in it" value={occupancy.data.occupied_beds} />
             <Stat caption="Being held" value={occupancy.data.reserved_beds} />
             <Stat caption="Out for repair" value={occupancy.data.out_of_service_beds} />
-            {/* Free comes from the capacity count, not from subtracting the four numbers above.
-                One service owns what "free" means; working it out a second way here is how two
-                screens end up disagreeing by one bed. */}
+
             <Stat
               caption="Free right now"
               value={ward.free_beds}
@@ -226,19 +203,16 @@ function WardOccupancyPanel({ ward, onClose }: { ward: WardCapacity; onClose: ()
           </div>
 
           <p className="hint">
-            &ldquo;Being held&rdquo; is a bed kept for someone on their way in. A hold lasts 30
-            minutes; once it runs out the bed is free again on its own, without anyone
-            releasing it.
+            &ldquo;Held&rdquo; is a bed kept for a patient on their way in. A hold lasts 30
+            minutes and then releases itself.
           </p>
 
           <h4 style={{ marginTop: '1.25rem', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
-            Who is in the beds
+            Patients by care level
           </h4>
           <p className="muted" style={{ marginBottom: '0.9rem' }}>
-            Fifteen ordinary inpatients and two high-dependency patients are both
-            &ldquo;seventeen patients&rdquo;, and they need very different numbers of staff on
-            the floor. This is that difference. It counts only people actually in a bed —
-            someone still on their way is in the next line down.
+            Care level drives how much staffing a ward needs, so a head count alone is not
+            enough. Counts patients in a bed only; patients on their way are on the last line.
           </p>
 
           <table>
@@ -254,7 +228,7 @@ function WardOccupancyPanel({ ward, onClose }: { ward: WardCapacity; onClose: ()
                 </tr>
               ))}
               <tr>
-                <th scope="row">On their way, next 2 hours</th>
+                <th scope="row">Expected within 2 hours</th>
                 <td>
                   <strong>{occupancy.data.incoming_next_2h}</strong>
                 </td>
@@ -263,8 +237,7 @@ function WardOccupancyPanel({ ward, onClose }: { ward: WardCapacity; onClose: ()
           </table>
 
           <p className="hint">
-            Every care level is listed even at zero, so a line does not vanish from a chart the
-            moment it empties.
+            Every care level is listed even at zero, so no line disappears when it empties.
           </p>
         </>
       )}
@@ -280,10 +253,6 @@ function WardOccupancyPanel({ ward, onClose }: { ward: WardCapacity; onClose: ()
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Small pieces
-// ---------------------------------------------------------------------------
 
 function Stat({
   caption,
@@ -302,7 +271,6 @@ function Stat({
   );
 }
 
-/** A bar the length of the ward, shaded for the part of it that is not free. */
 function Meter({ total, free }: { total: number; free: number }) {
   if (total === 0) {
     return <span className="muted">No beds</span>;

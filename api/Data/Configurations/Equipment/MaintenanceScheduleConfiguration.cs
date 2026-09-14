@@ -37,14 +37,10 @@ public class MaintenanceScheduleConfiguration : IEntityTypeConfiguration<Mainten
         builder.Property(m => m.CreatedBy)
             .HasConversion(new SnakeCaseEnumConverter<RaisedBy>()).HasMaxLength(10).IsRequired();
 
-        // Service history for one item.
         builder.HasIndex(m => new { m.AssetType, m.AssetId });
 
-        // The due and overdue sweep. Cancelled and completed rows are never in it.
         builder.HasIndex(m => m.ScheduledDate)
             .HasFilter("status IN ('scheduled', 'in_progress')");
 
-        // No polymorphic foreign key: asset_id points at two different tables, so the
-        // database cannot enforce it. The service checks the asset exists before writing.
     }
 }

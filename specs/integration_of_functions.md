@@ -116,6 +116,7 @@ The second version keeps working when hold expiry, out-of-service beds or a new 
 | `StaffMember`, `Shift`, `Allocation`, `LeaveRequest` | **Staff (M2)** | All — everyone stores staff IDs | Staff only |
 | `EquipmentItem`, `EquipmentCategory`, `PharmacyItem`, `PharmacyCategory`, `PharmacyTransaction`, `MaintenanceSchedule`, `Warning`, `ActionRequest` | **Equipment (M3)** | Patient (ward equipment readiness); any staff (search/availability) | Equipment only |
 | **`Bed`** — exists, number, condition, repairs | **Equipment (M3)** | Patient (to find candidates) | Equipment only |
+| **`LabReport`** — a finished laboratory result and the file itself | **Equipment (M3)** — *claimed 2026-09-13, see §11.14* | Doctor, ward nurse, duty manager | Equipment only (the laboratory) |
 | `Patient`, `Admission`, `Discharge`, `DischargeChecklistItem` | **Patient (M4)** | Emergency, Staff (aggregates only) | Patient only |
 | **`Bill`, `BillLineItem`** — what a visit costs and whether it is paid | **Patient (M4)** — *claimed 2026-09-11, see §11.10* | Nobody yet | Patient only |
 | **`BillingRate`, `AdmissionFeeRate`** — what the hospital charges | **Patient (M4)** — *added 2026-09-11, see §11.13* | Nobody yet | Read: any staff. Write: administrator only |
@@ -599,6 +600,17 @@ The read is one line — `Patients.Where(p => p.UserAccountId == account.Id)` �
 `AuthService` is **common**, not M4's, so M4 has not written it. Whoever owns common picks
 it up, or the group agrees M4 may. Until then the link is written and never read.
 
+*(Update, 2026-09-12.)* **Still open, and no longer blocking.** M4 added
+`GET /api/me/profile`, which answers the same question from inside Patient Management — 200
+with the patient's own details, 404 (`cl_pat_033`) while the login has no record linked. The
+Flutter app calls that on startup instead of reading `principal.patient_id`.
+
+That is a work-around, not the fix. `CurrentPrincipal.PatientId` is still published, still
+documented as the linked record, and still always `null`, so **anything that trusts it is
+wrong today** — including any screen in Emergency or Staff that reaches for it. Either
+common populates it or it comes off the schema; publishing a field that is always null is
+the worst of the three options.
+
 **11.8 (RESOLVED 2026-09-11) — an Equipment token can now read the patient register.**
 *(Raised and closed by M4 on 2026-09-11, while adding `patient_code` — §6.4.)*
 
@@ -648,7 +660,7 @@ one policy in `Program.cs` and one test,
 **M4 stops here.** How M3 uses the code — what their screen asks for, and what their assign
 endpoint takes — is theirs to decide and theirs to build. M4 has written nothing on that side.
 
-**11.9 (OPEN — raised by M4 on 2026-09-11, for Kaveesha / M1) — the ambulance crew no longer
+**11.9 (OPEN — raised by M4 on 2026-09-11, for Nasrulla Unais / M1) — the ambulance crew no longer
 registers patients.**
 
 **What changed.** `Policies.PatientRegistrar` is now `GeneralStaff`, `WardNurse`,
@@ -670,7 +682,7 @@ scene.
 | `GET /patients`, `GET /admissions`, `GET /patient-worklist` | `AmbulanceCrew` was never on these and still is not — it is the one staff role on no Patient Management policy |
 | `POST /admissions/pre-admit` | **not built.** Its `Roles:` line in `patient-spec.yaml` still says `AmbulanceCrew, DutyManager`, so the spec and `Policies.cs` currently disagree about that role. Nothing is broken today because there is no code behind it — but it has to be settled before there is. |
 
-**M4 has not edited `emergency-spec.yaml`.** It is Kaveesha's file. Three ways out, and the
+**M4 has not edited `emergency-spec.yaml`.** It is Nasrulla Unais's file. Three ways out, and the
 choice is hers: put `GeneralStaff` into the emergency flow; keep `AmbulanceCrew` on
 `pre-admit` alone as a documented exception, since a pre-admission is a dispatch record rather
 than desk paperwork; or argue the crew should keep registration and M4 reverts.
@@ -713,7 +725,7 @@ file's worth of seam and somebody has to own the screen.
 ---
 
 
-**11.11 (OPEN — raised by M4 on 2026-09-11, for Kaveesha / M1) — `WardType` gained three
+**11.11 (OPEN — raised by M4 on 2026-09-11, for Nasrulla Unais / M1) — `WardType` gained three
 members.**
 
 The ward board went from ten wards split by sex to the eight the hospital actually has, and
@@ -730,7 +742,7 @@ the catch-all arm of `BedPlacementRules.Rung` — so no existing rule changed, a
 is placeable in all three exactly as before.
 
 **What M1 needs to decide.** `emergency-spec.yaml` publishes `WardTypeHint`, which mirrors
-`WardType` and still lists six values. **It has not been touched** — it is Kaveesha's file, and
+`WardType` and still lists six values. **It has not been touched** — it is Nasrulla Unais's file, and
 a disagreement about somebody else's schema is an open item, not an edit. Nothing is broken
 today because the endpoint that uses it does not exist yet. Either add the three members when
 that endpoint is built, or decide that a routing *hint* deliberately carries a coarser
@@ -770,6 +782,136 @@ a rate prices tomorrow's bills and never rewrites one a patient has already been
 
 **Read is `AnyStaff`, write is `HospitalAdministrator`.** Everyone at the desk needs the
 suggested price in the box in front of them; deciding what that price is is a different job.
+
+**11.14 (DECIDED by M4 on 2026-09-12) — a new `Policies.BedAssigner`, and the duty manager may
+now place a patient in a ward more acute than assessed.**
+
+Three changes, all inside Patient Management, but the first is a new entry in the group-owned
+`Policies.cs` and the second changes a published hard rule, so both are recorded here.
+
+**1. `Policies.BedAssigner` — general staff, ward nurse, duty manager.** New policy, now on
+`POST /admissions/{id}/assign-bed` and `POST /admissions/{id}/correct-bed`, which previously
+used `AdmissionEditor`. Reception registers, admits and beds a walk-in standing at the desk;
+stopping one step short handed the final act to a ward nurse who is not there.
+
+**Deliberately not just widening `AdmissionEditor`,** which also guards cancelling a visit and
+confirming a discharge. Reception bedding a walk-in does not imply reception sending somebody
+home. `AdmissionEditor` is untouched and is still ward nurse and duty manager.
+
+**Widening the route did not widen which bed anyone may choose.** That reads the ward the
+chosen bed stands in, which is in the request body and cannot be a route policy, so
+`BedAssignmentService.EnsureMayApprove` still answers 403 (`cl_pat_012` / `cl_pat_013`) for
+anything off the care level's own path — see change 2. Verified live: doctor, administrator,
+equipment manager and ambulance crew are all still refused the route outright.
+
+**2. The role split is now the care-level match, and nothing else.** `NeedsDutyManager` no
+longer names `icu` or `hdu` at all — it is "does this ward give the care this patient was
+assessed as needing, yes or no".
+
+- **A matching ward is anybody's** who may place a patient, **intensive care included.** An ICU
+  bed for an ICU patient is the right bed; making a nurse find a duty manager for it delayed the
+  most urgent admission in the hospital for a decision nobody had to make. The scarcity argument
+  is about not giving an ICU bed to somebody who does *not* need one — which is the step up, and
+  that is still gated.
+- **A mismatched ward is the duty manager's alone**, in both directions: a downgrade
+  (`cl_pat_013`) or a ward more acute than assessed (`cl_pat_012`). Hard rule H2 upward used to
+  be a flat 409 for everybody; the duty manager may now overrule it, for the night when the
+  general ward is full and there is an empty ICU bed. The React bed picker colours these buttons
+  **amber** so an off-path bed is never taken by accident.
+
+**For the viva, since §5.2 used to call the ICU rule a high-impact approval gate.** The **AI
+gate is untouched** — every agent proposal is still an `AgentProposedChange` a human approves,
+and no agent places anybody. What changed is only which human approves a routine, correctly
+matched placement. The surviving role gate is the off-path bed, which is where the judgement
+call actually is.
+
+**2b. Discharge went the same way.** New `Policies.DischargeConfirmer` — general staff, ward
+nurse, duty manager — on `POST /discharges/{admissionId}/confirm`, replacing `AdmissionEditor`
+there, and the ICU/HDU narrowing inside `DischargeService` is **deleted**. Any of those three
+now confirms a discharge at any care level.
+
+**`cl_pat_024` is retired. Do not reuse the number** — a client still branching on it would
+silently match whatever took its place. It is the only code this project has ever withdrawn.
+
+**Why this is not a loosening of patient safety.** The gate was never the role; it is the
+checklist. `ConfirmAsync` refuses with `cl_pat_023` unless both mandatory items are ticked, and
+`clinical_clearance` is **a doctor's alone** — no other role and no automated process can set
+it. So no patient goes home without a doctor having cleared them, whoever presses confirm. The
+duty manager's signature came *after* the doctor's and added a second wait, not a second
+judgement. Reception is on the list because it settles the bill and hands over the discharge
+document on that same screen.
+
+**3. New hard rule H6, and a new code `cl_pat_030`.** A `pediatric` ward admits only patients
+under 18. One-directional — a child is not confined to one, or a child needing intensive care
+could not be given it. **A patient with no recorded date of birth is refused**, on the same
+reasoning as H3's handling of `unknown`. Unlike H2 there is no duty-manager override: like the
+gender policy it is a property of the ward, not a judgement call.
+
+**Consequence for everyone else: a date of birth now matters clinically.** The React intake
+form requires one for any patient who can give one. **M1 in particular** — an unidentified
+casualty record with no date of birth cannot be placed in the children's ward, which is correct
+but worth knowing before it surprises somebody at the demo.
+
+**One unrelated bug fixed in passing.** `GET /bed-availability` capped `pageSize` at 100 like
+every other paged route. The seeded hospital has 135 beds, so the picker silently cut off
+mid-alphabet and pediatric and surgical beds could never be chosen at all. That one endpoint now
+allows up to 500 — it feeds a complete candidate list, not a page anybody browses — and the
+screen says so if the list is ever incomplete again.
+
+**11.15 (OPEN — announced by M3 on 2026-09-13) — Equipment Management has claimed laboratory
+reports.**
+
+Not a question, and not a request. It is here for the same reason §11.10 is: claiming an unowned
+area silently is exactly what this section exists to prevent.
+
+**What was built.** `LabReport`, migration `Equipment_AddLabReports`, three endpoints under
+`/lab-reports`, and a React screen. Design is `equipment-management-plan.md` §6.6; the contract
+is `equipment-spec.yaml`.
+
+**Why here rather than in Patient Management.** A result is produced by a hospital service unit,
+which is what this component is about, and the row stores nothing clinical about the person: a
+`patient_id` and a file, exactly the read-only reference `EquipmentItem.assigned_to_admission_id`
+already is. Nothing in Patient Management changes, and nothing here copies a name, a NIC or a
+ward.
+
+**Why it exists at all.** A ward currently waits for paper to be carried up from the basement. A
+result that is filed the moment the lab issues it is readable at the nursing station straight
+away, and the specimen's own journey does not change.
+
+**Two things other people should know.**
+
+**1. `Policies.LabReportReader`, `Policies.LabReportAuthor` and
+`Policies.PatientLocationReader` are new entries in the group-owned `Policies.cs`.** Reader is
+doctor, ward nurse, duty manager and the laboratory. Author is the laboratory alone.
+`PatientLocationReader` gates `GET /ward-patients` and holds the same four roles as Reader today,
+under a separate name because knowing which ward somebody is in is not reading a test result. The administrator is on neither, for the same reason they are
+not on `AdmissionReader`: reading one patient's blood result is clinical work.
+
+**2. The laboratory rides on `equipment_manager`, and it should not forever.** `StaffRole` has
+no laboratory value, and adding one is a change to `staff-spec.yaml` and `common-spec.yaml`
+together — M2's and the common owner's call, the same conversation as Open Decision 11. Until
+then those two policies are where a `laboratory` role would be added, and nothing else changes.
+
+**3. Two screens browse by ward, and they read it through M4's service rather than their tables.**
+`GET /ward-patients` lists who is in the hospital now, optionally filtered to one ward. The
+laboratory uses it to file a result against the right person, and the equipment register uses it
+to assign an item to a bedside - **that screen used to take a pasted admission id**. The row
+carries both ids, because an assignment points at the visit and a result points at the person.
+Searching by code, name or NIC is still there as the lab's second way in, for an outpatient who is
+in no ward at all.
+
+**Nothing of M4's changed for it, and nothing new is disclosed.** It calls
+`IAdmissionService.ListAsync`, the same shape as the bed-occupancy adapter. Every
+field it publishes — name, code, ward, bed, visit status — is already visible to these roles
+through `GET /patients/{id}`, which carries a patient's admissions with the ward on them. This
+saves opening one patient at a time; it does not widen who can see what. **M4's admissions list
+endpoint and its read policy are untouched.**
+
+**One thing M3 would still like, and is not blocked on.** The filter matches on **ward name**,
+because `AdmissionSummary` publishes `ward_name` and not a ward id, and the rows are filtered in
+Equipment after the read. That is honest at a few hundred beds and wrong at ten thousand. When M4
+publishes the `wardId` filter on `GET /admissions` that `STUBS.md` already calls unblocked,
+`WardPatientService` collapses to one delegating call. Recorded in `STUBS.md`.
 
 ---
 
@@ -896,7 +1038,7 @@ Mirrors §10's and §16's format, from Staff's side — read from `staff-spec.ya
 
 ## 22. Emergency ↔ Patient Management (Member 4) — confirmed from Emergency's side
 
-§4 above already documents this boundary from Patient Management's side, written before `emergency-spec.yaml` existed. `emergency-spec.yaml` (Member 1, Kaveesha) now agrees with every point found there:
+§4 above already documents this boundary from Patient Management's side, written before `emergency-spec.yaml` existed. `emergency-spec.yaml` (Member 1, Nasrulla Unais) now agrees with every point found there:
 
 - **The call screen split holds.** Patient Management builds the emergency-call form (a patient-role Flutter screen); Emergency owns `POST /emergency-calls`, the `EmergencyCall` record and everything downstream. Neither side writes the other's table.
 - **`patient_is_caller` and `caller_user_id` are now on the wire, as §4.2 and §10 asked for.** `emergency-spec.yaml`'s `CreateEmergencyCallRequest` carries `patient_is_caller` as a required field. **`caller_user_id` is not a request field** — it is read from the JWT of whoever posts the call, because a client that could name its own caller id could file a call under somebody else's account. It is null for a call logged at the front desk on behalf of a walk-in or phone caller. Both are carried forward unchanged onto the dispatch notification's `DispatchNotification` schema, matching the JSON shape §4.2 already specified field-for-field: `dispatch_id`, `caller_user_id`, `patient_is_caller`, `patient_id`, `provisional_name`, `provisional_gender`, `expected_arrival`, `urgency`, `destination_ward_type_hint`.

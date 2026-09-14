@@ -129,9 +129,6 @@ export function ItemDetailCard({ id, onClose }: { id: string; onClose: () => voi
         </div>
       )}
 
-      {/* Assignment is missing from this list on purpose. Available -> assigned is a legal
-          move, but only the assign endpoint can make it, because it carries the admission
-          id. The Assign button on the register row is that path. */}
       <p className="hint">
         Only moves the server will accept are offered here. Reporting a fault is the one
         exception to that list: it can move an item into maintenance from any state but

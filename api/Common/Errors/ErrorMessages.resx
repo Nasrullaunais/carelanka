@@ -132,6 +132,22 @@
     <value>This maintenance task is already {0} and cannot be completed again.</value>
     <comment>Overdue is not a blocker: it is stored as scheduled and only reads as overdue.</comment>
   </data>
+  <data name="cl_equ_014" xml:space="preserve">
+    <value>That file is empty. Check the scan saved properly and upload it again.</value>
+    <comment>An empty upload is almost always a scanner that did not finish, so the message says where to look.</comment>
+  </data>
+  <data name="cl_equ_015" xml:space="preserve">
+    <value>That file is too large. A report may be up to {0} MB.</value>
+    <comment>States the limit, because "too large" without a number cannot be acted on.</comment>
+  </data>
+  <data name="cl_equ_016" xml:space="preserve">
+    <value>A report has to be a PDF or a photograph (JPEG or PNG). This one is {0}.</value>
+    <comment>Names what is allowed and what arrived. An allow-list: the question is whether a ward can open it.</comment>
+  </data>
+  <data name="cl_equ_013" xml:space="preserve">
+    <value>{0} is with the maintenance unit. It comes back into service when they complete the repair, not by editing its status.</value>
+    <comment>Says where the item is and who releases it, because the caller's next move is to go and look at the repair queue.</comment>
+  </data>
   <data name="cl_equ_011" xml:space="preserve">
     <value>A stock adjustment needs a note saying why.</value>
     <comment>Plan section 5.1: adjustments are stocktake corrections, and an unexplained one is unauditable.</comment>
@@ -139,6 +155,12 @@
   <data name="cl_pat_001" xml:space="preserve">
     <value>A ward named {0} already exists.</value>
     <comment>Only active wards are checked. A retired ward's name can be reused.</comment>
+  </data>
+  <data name="cl_emg_001" xml:space="preserve">
+    <value>Ambulance registration {0} is already in use.</value>
+  </data>
+  <data name="cl_emg_002" xml:space="preserve">
+    <value>This ambulance is on an active dispatch. Divert or complete that dispatch first.</value>
   </data>
   <data name="cl_pat_002" xml:space="preserve">
     <value>A patient with NIC {0} is already registered, as record {1}.</value>
@@ -179,8 +201,8 @@
     <comment>Intensive and high-dependency care are the duty manager's to authorise, wherever the admission comes from.</comment>
   </data>
   <data name="cl_pat_012" xml:space="preserve">
-    <value>Only a duty manager may assign a bed in {0} (ward type {1}).</value>
-    <comment>Intensive care and high dependency are the duty manager's wherever the request comes from. patient-management-plan.md 5.2.</comment>
+    <value>{0} (ward type {1}) gives more intensive care than the {2} level this patient was assessed at. Only a duty manager may approve that.</value>
+    <comment>The step up. Revised 2026-09-12: this used to refuse every ICU and HDU ward regardless of the patient, which stopped a nurse bedding an ICU patient in the ICU bed that matched them. The rule is now the match alone - see patient-management-plan.md 5.2.</comment>
   </data>
   <data name="cl_pat_013" xml:space="preserve">
     <value>{0} (ward type {1}) gives less intensive care than the {2} level this patient was assessed at. Only a duty manager may approve a downgrade.</value>
@@ -196,7 +218,7 @@
   </data>
   <data name="cl_pat_016" xml:space="preserve">
     <value>Bed {0} is in a ward of type {1}, which is more acute than the {2} care this patient needs.</value>
-    <comment>Hard rule H2 in the upward direction. Not generosity — it is the last ICU bed spent on somebody who does not need it.</comment>
+    <comment>Hard rule H2 in the upward direction. Not generosity — it is the last ICU bed spent on somebody who does not need it. The duty manager may overrule it; nobody else reaches this message, because a more acute ward is always icu or hdu and those are refused earlier with cl_pat_012.</comment>
   </data>
   <data name="cl_pat_017" xml:space="preserve">
     <value>Bed {0} is in a ward with a {1} gender policy, which does not admit a patient recorded as {2}.</value>
@@ -226,10 +248,6 @@
     <value>This discharge is not ready: {0} still outstanding.</value>
     <comment>Every mandatory checklist item has to be ticked before a patient can be sent home.</comment>
   </data>
-  <data name="cl_pat_024" xml:space="preserve">
-    <value>Sending an {0} patient home is the duty manager's decision.</value>
-    <comment>A ward nurse confirms outpatient, day_case and inpatient discharges. ICU and HDU are one rung higher.</comment>
-  </data>
   <data name="cl_pat_025" xml:space="preserve">
     <value>Tick billing_settled by settling the bill, not by hand.</value>
     <comment>One fact in one place. Settling the bill is the only thing that writes this box, so a paid bill and an unticked box cannot happen.</comment>
@@ -249,5 +267,25 @@
   <data name="cl_pat_029" xml:space="preserve">
     <value>The patient is already in bed {0}.</value>
     <comment>Correcting a bed to the one they are already in would release and re-take the same bed, losing the time they have been in it for no reason.</comment>
+  </data>
+  <data name="cl_pat_030" xml:space="preserve">
+    <value>Bed {0} is in a children's ward, which admits patients under {1}. Record the patient's date of birth if it is missing.</value>
+    <comment>Hard rule H6. Like the gender policy it is a property of the ward, so there is no duty-manager override. An unrecorded date of birth reads as an adult, and the message says how to fix that.</comment>
+  </data>
+  <data name="cl_pat_031" xml:space="preserve">
+    <value>Those details belong to a record we already hold for someone else. Ask at the hospital desk.</value>
+    <comment>Patient self-service. Stops one signup taking over another person's medical record by typing their NIC. Deliberately says nothing about whose record it is, or whether that person has a login.</comment>
+  </data>
+  <data name="cl_pat_032" xml:space="preserve">
+    <value>Your record is registered under a different NIC. Ask at the hospital desk to have it changed.</value>
+    <comment>Patient self-service. Which human a login belongs to is not something the app may change; correcting it is desk work with a person to check it.</comment>
+  </data>
+  <data name="cl_pat_033" xml:space="preserve">
+    <value>Your login is not linked to a hospital record yet. Fill in your details first.</value>
+    <comment>Patient self-service. A login on its own is not a medical record - POST /me/pre-register is what joins the two. Answers a read (404) and a booking (409) alike, so the wording names the fix rather than the endpoint.</comment>
+  </data>
+  <data name="cl_pat_034" xml:space="preserve">
+    <value>You have no current stay.</value>
+    <comment>Patient self-service. Not being in hospital is the ordinary state, so this is a plain sentence and not an error the app should make a fuss about.</comment>
   </data>
 </root>

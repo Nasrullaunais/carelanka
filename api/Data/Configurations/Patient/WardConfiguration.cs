@@ -33,9 +33,6 @@ public class WardConfiguration : IEntityTypeConfiguration<Ward>
             .HasMaxLength(20)
             .IsRequired();
 
-        // Scoped WHERE is_active. A plain UNIQUE means retiring ward ICU-1 makes the name
-        // unusable forever, and the query filter hides the blocking row so the duplicate
-        // check in the service passes and SaveChanges throws instead.
         builder.HasIndex(w => w.Name)
             .HasDatabaseName(NameUniqueIndex)
             .IsUnique()

@@ -12,8 +12,6 @@ export function AppShell() {
 
   const logout = useMutation({
     ...logoutMutation(),
-    // Whether or not the server accepted it, the local session ends. Logging out twice is a
-    // 204, and a failed logout that left you signed in would be the worse outcome.
     onSettled: () => {
       clearSession();
       queryClient.clear();
@@ -28,9 +26,6 @@ export function AppShell() {
           CareLanka
         </Link>
 
-        {/* One link, not one per screen. Seven roles reach different sets of pages, and a bar
-            carrying all of them is mostly other people's work. The dashboard is where a role
-            sees its own. */}
         <nav className="shell-nav">
           <NavLink to="/" end>
             Dashboard

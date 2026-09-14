@@ -50,6 +50,11 @@ tags:
     description: Medicines and medical supplies - catalog, quantity, and the transaction log that drives it.
   - name: Maintenance
     description: Scheduled and completed service, calibration and repair for equipment and beds.
+  - name: Laboratory
+    description: |
+      Finished laboratory results, filed against the patient they belong to. Claimed by this
+      component on 2026-09-13 - see integration_of_functions.md section 11.14. The patient is a
+      read-only id here, exactly as an assigned equipment item's admission is.
   - name: Monitoring
     description: The Equipment Monitoring Agent - warnings, proposed actions, and human approval.
   - name: Reports
@@ -208,7 +213,14 @@ paths:
     put:
       tags: [Equipment]
       summary: Update an equipment item
-      description: 'Roles: InventoryAdministrator.'
+      description: |
+        Roles: InventoryAdministrator.
+
+        A `status` of `maintenance` cannot be edited back to `available` here. The item is with
+        the maintenance unit and returns to service only when they complete the repair, so this
+        answers 409. `retired` is still reachable from `maintenance`: scrapping a machine nobody
+        can fix is the other real outcome of a fault, and it closes that item's open work order
+        and fault warning with it.
       operationId: updateEquipmentItem
       requestBody:
         required: true
@@ -226,7 +238,9 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: That status change is not a legal move in the equipment lifecycle.
+          description: >-
+            That status change is not a legal move in the equipment lifecycle, or the item is
+            with the maintenance unit and only they can return it to service.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -338,6 +352,12 @@ paths:
         Business operation beyond CRUD. Sets `status = maintenance` immediately and raises a
         `Warning` with `raised_by = user` - a broken defibrillator does not wait for the next
         agent sweep.
+
+        It also opens a `MaintenanceSchedule` of type `repair`, dated today, carrying the
+        description as its notes. That row is the maintenance unit's work order: the item comes
+        back into service through `POST /maintenance-schedules/{id}/complete` and no other way.
+        An item already waiting on an open job does not get a second one - a further fault on
+        the same machine is more detail on the same repair.
       operationId: reportEquipmentFault
       requestBody:
         required: true
@@ -689,6 +709,178 @@ paths:
                       items:
                         type: array
                         items: { $ref: '#/components/schemas/PharmacyTransaction' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ------------------------------------------------------------------
+  # Laboratory
+  # ------------------------------------------------------------------
+
+  /lab-reports:
+    get:
+      tags: [Laboratory]
+      summary: One patient's laboratory results, newest first
+      description: |
+        Roles: Doctor, WardNurse, DutyManager, and the laboratory itself.
+
+        Metadata only. Each row says what the file is and how big it is; the file itself is
+        `GET /lab-reports/{id}/file`, so opening a patient does not pull every PDF they have
+        ever had down the wire.
+
+        Deliberately narrower than any-staff: a result is clinical information about a named
+        person. Also deliberately not the admissions read policy, which excludes the
+        laboratory - the people who produced a result have to be able to see it.
+      operationId: listLabReports
+      parameters:
+        - name: patientId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of results for that patient
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/LabReport' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Laboratory]
+      summary: File a finished laboratory result against a patient
+      description: |
+        Roles: the laboratory alone.
+
+        Business operation beyond CRUD, and the only multipart request in this contract: it
+        carries the scanned report itself. A PDF or a photograph of one (JPEG or PNG), up to
+        10 MB. Anything else is 400, as is an empty file.
+
+        `patient_id` is checked against Patient Management before anything is stored - a result
+        filed against an id that does not exist is worse than a rejected upload, because
+        nothing errors and the ward waits for a report sitting under a typo. 404 if it is
+        unknown.
+
+        `uploaded_by_staff_id` comes from the token, never the body, so a caller cannot file a
+        result as somebody else. A report is never edited: a corrected result is a new report,
+        so the ward can see that a correction happened.
+      operationId: uploadLabReport
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [PatientId, TestName, File]
+              properties:
+                PatientId: { type: string, format: uuid }
+                TestName: { type: string, minLength: 2, maxLength: 120 }
+                Summary: { type: string, maxLength: 1000 }
+                File: { type: string, format: binary }
+      responses:
+        '201':
+          description: Filed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LabReport' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: No such patient.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /ward-patients:
+    get:
+      tags: [Laboratory]
+      summary: Who is in the hospital right now, ward by ward
+      description: |
+        Roles: Doctor, WardNurse, DutyManager, and the laboratory itself.
+
+        Two screens pick a patient rather than make somebody type an id, and this is what both
+        read: the laboratory filing a result, and the equipment register assigning an item. A lab
+        works from a rack of specimens that arrived from one ward; an assignment goes to a
+        bedside. Omit `wardName` for every current visit, including outpatients holding no bed at
+        all - the assign screen hides those, since equipment goes to a bed.
+
+        Carries both ids. `admission_id` is what an equipment assignment points at;
+        `patient_id` is what a lab report points at, because a result belongs to the person and
+        not to the visit.
+
+        A visit counts as current while it is `awaiting_bed`, `awaiting_approval`,
+        `bed_reserved`, `admitted` or `ready_for_discharge`. Awaiting-bed is in deliberately: a
+        specimen is often taken before anybody has found a bed. Discharged and cancelled are out.
+
+        One row per current visit. Somebody readmitted the same day has two, which is right for
+        an assignment and harmless for a report.
+
+        **Read through Patient Management's admission service, never their tables.** Everything
+        published here is already visible to these roles through `GET /patients/{id}`, which
+        carries a patient's admissions with the ward name on them; this shape saves opening one
+        patient at a time. See `integration_of_functions.md` §11.15.
+
+        **`wardName`, not a ward id, because that is what `AdmissionSummary` publishes.** The
+        screen takes the name from `GET /wards`, which carries both. When M4 publishes the
+        `wardId` filter on `GET /admissions` that `STUBS.md` already calls unblocked, this
+        parameter becomes an id.
+      operationId: listWardPatients
+      parameters:
+        - name: wardName
+          in: query
+          required: false
+          schema: { type: string }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of patients currently in the hospital
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/WardPatient' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /lab-reports/{id}/file:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Laboratory]
+      summary: The report file itself
+      description: |
+        Roles: Doctor, WardNurse, DutyManager, and the laboratory itself.
+
+        Served as the document it is, with `Content-Disposition: inline`, so a ward reads the
+        result on screen rather than downloading it onto a shared nursing-station machine.
+      operationId: downloadLabReport
+      responses:
+        '200':
+          description: The stored file
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+            image/jpeg:
+              schema: { type: string, format: binary }
+            image/png:
+              schema: { type: string, format: binary }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -1543,6 +1735,90 @@ components:
             completed_at: { type: string, format: date-time, nullable: true }
             notes: { type: string, nullable: true }
             created_by: { $ref: '#/components/schemas/RaisedBy' }
+
+    # ---------- laboratory ----------
+
+    LabReport:
+      type: object
+      description: |
+        One finished laboratory result. Metadata only - the bytes are a separate request.
+
+        No `updated_at`, because a report is issued once and never edited. A corrected result is
+        a new report, so a ward can see that a correction happened rather than finding a value
+        has quietly changed.
+      properties:
+        id: { type: string, format: uuid }
+        patient_id:
+          type: string
+          format: uuid
+          description: >-
+            References Patient Management's Patient table. An id and nothing else - no name, no
+            NIC, no ward - so nothing here goes stale when they change one of theirs.
+        test_name:
+          type: string
+          description: 'What was tested, in the lab''s own words: "Full blood count".'
+        summary:
+          type: string
+          nullable: true
+          description: The lab's short summary, if they wrote one. Never a substitute for the file.
+        file_name: { type: string }
+        content_type:
+          type: string
+          description: 'One of `application/pdf`, `image/jpeg`, `image/png`. An allow-list: the question is whether a ward can open it.'
+        byte_size:
+          type: integer
+          description: So a ward sees how big it is before opening it on ward wifi.
+        uploaded_by_staff_id:
+          type: string
+          format: uuid
+          description: From the token, never the body. Staff Management owns the person.
+        created_at:
+          type: string
+          format: date-time
+          description: When the lab filed it.
+
+    WardPatient:
+      type: object
+      description: |
+        One current hospital visit, as the two screens that pick a patient need to see it: by
+        where they are lying, not by an identifier somebody has to type.
+
+        No clinical detail and no contact details - a name, a code, and where they are lying.
+      properties:
+        admission_id:
+          type: string
+          format: uuid
+          description: What an equipment assignment points at.
+        patient_id:
+          type: string
+          format: uuid
+          description: What a lab report points at. A result belongs to the person, not the visit.
+        patient_code: { type: string }
+        full_name: { type: string }
+        ward_name:
+          type: string
+          nullable: true
+          description: Null for a visit holding no bed. An outpatient in for a blood test is still a patient the lab files against.
+        bed_number: { type: string, nullable: true }
+        admission_status:
+          $ref: '#/components/schemas/AdmissionStatus'
+
+    # M4 owns this enum. Byte-identical to patient-spec.yaml, deliberately, because the spec
+    # checker compares shared schemas across all five contracts and a paraphrase is a conflict.
+    # Republished here only because WardPatient carries it; this contract never writes it.
+    AdmissionStatus:
+      type: string
+      description: |
+        Where the patient is in their journey. Never mixed with data completeness - see
+        `details_complete`.
+      enum:
+        - awaiting_bed
+        - awaiting_approval
+        - bed_reserved
+        - admitted
+        - ready_for_discharge
+        - discharged
+        - cancelled
 
     # ---------- monitoring: warnings, actions, workflow ----------
 

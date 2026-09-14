@@ -7,6 +7,7 @@ using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Equipment;
 using Microsoft.EntityFrameworkCore;
 using ItemEntity = CareLanka.Api.Data.Entities.Equipment.EquipmentItem;
+using ScheduleEntity = CareLanka.Api.Data.Entities.Equipment.MaintenanceSchedule;
 using WarningEntity = CareLanka.Api.Data.Entities.Equipment.Warning;
 
 namespace CareLanka.Api.Services.Equipment;
@@ -44,8 +45,6 @@ public sealed class EquipmentItemService : IEquipmentItemService
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            // ILIKE via EF.Functions, so a technician typing "vent" finds the ventilators
-            // without knowing the casing on the label.
             var term = $"%{query.Search.Trim()}%";
 
             items = items.Where(i =>
@@ -73,8 +72,6 @@ public sealed class EquipmentItemService : IEquipmentItemService
     public async Task<EquipmentItem> CreateAsync(
         CreateEquipmentItemRequest request, CancellationToken cancellationToken = default)
     {
-        // Throws 404 rather than a foreign-key violation, so a mistyped category id reads as
-        // "no such category" instead of a 500.
         var category = await _db.EquipmentCategories
             .FirstOrDefaultAsync(c => c.Id == request.CategoryId, cancellationToken)
             ?? throw new NotFoundException("Equipment category", request.CategoryId);
@@ -99,8 +96,6 @@ public sealed class EquipmentItemService : IEquipmentItemService
             Model = request.Model.Trim(),
             Manufacturer = request.Manufacturer.Trim(),
             PurchaseDate = request.PurchaseDate,
-            // Always available. There is no way to register an item already assigned or
-            // retired, because neither has a story behind it.
             Status = EquipmentStatus.Available,
             WardId = request.WardId,
             AssetTag = assetTag,
@@ -138,8 +133,6 @@ public sealed class EquipmentItemService : IEquipmentItemService
 
         if (request.Status is { } status && status != item.Status)
         {
-            // Assignment needs an admission id and this request has no field for one. Allowing
-            // it here would leave an item reading as assigned to nobody.
             if (status == EquipmentStatus.Assigned)
             {
                 throw new BadRequestException(MessageCode.ValidationFailed);
@@ -147,14 +140,17 @@ public sealed class EquipmentItemService : IEquipmentItemService
 
             EnsureTransitionAllowed(item, status, TransitionReason.Update);
 
-            // Releasing through a status change has to clear the admission too, or the item
-            // reads as available while still pointing at a patient.
             if (status != EquipmentStatus.Assigned)
             {
                 item.AssignedToAdmissionId = null;
             }
 
             item.Status = status;
+
+            if (status == EquipmentStatus.Retired)
+            {
+                await CloseOpenRepairWorkAsync(item.Id, cancellationToken);
+            }
         }
 
         if (request.Name is { } name)
@@ -210,8 +206,6 @@ public sealed class EquipmentItemService : IEquipmentItemService
 
         item.Status = EquipmentStatus.Available;
 
-        // No history row. Plan section 4.1 keeps only the current assignment, which section
-        // 12 lists as a deliberate simplification rather than an oversight.
         item.AssignedToAdmissionId = null;
 
         await _db.SaveChangesAsync(cancellationToken);
@@ -224,24 +218,16 @@ public sealed class EquipmentItemService : IEquipmentItemService
     {
         var item = await GetByIdAsync(id, cancellationToken);
 
-        // Assigned -> maintenance is not in the transition table. A fault report is the one
-        // caller exempt from it; see the note on TransitionReason.Fault in the guard.
         EnsureTransitionAllowed(item, EquipmentStatus.Maintenance, TransitionReason.Fault);
 
-        // A broken defibrillator changes status the moment it is reported, not on the next
-        // agent sweep. Status and warning are one SaveChanges, so a failure leaves neither.
         item.Status = EquipmentStatus.Maintenance;
 
-        // Dropping the patient link is the documented consequence of that exemption rather
-        // than a side effect. A faulty item must not keep reading as in use by anyone.
         item.AssignedToAdmissionId = null;
 
         _db.Warnings.Add(new WarningEntity
         {
             Id = Guid.NewGuid(),
             Type = WarningType.EquipmentFaulty,
-            // A reported fault is a person saying the thing is broken. That outranks anything
-            // the threshold sweep infers, so it does not start at low.
             Severity = WarningSeverity.High,
             RelatedEntityType = RelatedEntityType.EquipmentItem,
             RelatedEntityId = item.Id,
@@ -251,9 +237,68 @@ public sealed class EquipmentItemService : IEquipmentItemService
             RaisedBy = RaisedBy.User
         });
 
+        await OpenRepairJobAsync(item, description.Trim(), cancellationToken);
+
         await _db.SaveChangesAsync(cancellationToken);
 
         return await ToItemAsync(item, cancellationToken);
+    }
+
+    private async Task CloseOpenRepairWorkAsync(Guid itemId, CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+
+        var jobs = await _db.MaintenanceSchedules
+            .Where(s => s.AssetType == AssetType.EquipmentItem
+                        && s.AssetId == itemId
+                        && (s.Status == MaintenanceStatus.Scheduled
+                            || s.Status == MaintenanceStatus.InProgress))
+            .ToListAsync(cancellationToken);
+
+        foreach (var job in jobs)
+        {
+            job.Status = MaintenanceStatus.Cancelled;
+        }
+
+        var warnings = await _db.Warnings
+            .Where(w => w.RelatedEntityType == RelatedEntityType.EquipmentItem
+                        && w.RelatedEntityId == itemId
+                        && w.Status == WarningStatus.Open)
+            .ToListAsync(cancellationToken);
+
+        foreach (var warning in warnings)
+        {
+            warning.Status = WarningStatus.ActionTaken;
+            warning.ResolvedAt = now;
+        }
+    }
+
+    private async Task OpenRepairJobAsync(
+        ItemEntity item, string description, CancellationToken cancellationToken)
+    {
+        var alreadyOpen = await _db.MaintenanceSchedules.AnyAsync(
+            s => s.AssetType == AssetType.EquipmentItem
+                 && s.AssetId == item.Id
+                 && (s.Status == MaintenanceStatus.Scheduled
+                     || s.Status == MaintenanceStatus.InProgress),
+            cancellationToken);
+
+        if (alreadyOpen)
+        {
+            return;
+        }
+
+        _db.MaintenanceSchedules.Add(new ScheduleEntity
+        {
+            Id = Guid.NewGuid(),
+            AssetType = AssetType.EquipmentItem,
+            AssetId = item.Id,
+            ScheduleType = MaintenanceType.Repair,
+            ScheduledDate = DateOnly.FromDateTime(DateTimeOffset.UtcNow.UtcDateTime),
+            Status = MaintenanceStatus.Scheduled,
+            Notes = description,
+            CreatedBy = RaisedBy.User
+        });
     }
 
     public Task<ItemEntity?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default)
@@ -263,8 +308,6 @@ public sealed class EquipmentItemService : IEquipmentItemService
     public async Task<ItemEntity> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         => await FindByIdAsync(id, cancellationToken) ?? throw new NotFoundException("Equipment item", id);
 
-    // Which caller is asking. It selects the 409 the caller reads back, and Fault carries the
-    // single documented exemption from the table below.
     private enum TransitionReason
     {
         Update,
@@ -273,23 +316,19 @@ public sealed class EquipmentItemService : IEquipmentItemService
         Fault
     }
 
-    // available -> assigned -> available, available -> maintenance -> available or retired,
-    // available -> retired. Retired is terminal: a replacement is a new row.
-    //
-    // Every status change in this service comes through here, assign, release and report-fault
-    // included. Each of those used to carry its own smaller check, which is how assigned ->
-    // maintenance slipped past on the fault path.
     private static void EnsureTransitionAllowed(
         ItemEntity item, EquipmentStatus to, TransitionReason reason)
     {
-        // The documented exemption. A reported fault outranks the table: a person has said the
-        // machine is broken, and refusing that until the item is released would leave a
-        // known-faulty item reading as usable with a patient on it. Assigned -> maintenance is
-        // legal here and nowhere else, and it drops the assignment on purpose. Retired stays
-        // terminal even for a fault, because a scrapped item has nothing left to report.
         if (reason == TransitionReason.Fault && item.Status != EquipmentStatus.Retired)
         {
             return;
+        }
+
+        if (reason == TransitionReason.Update
+            && item.Status == EquipmentStatus.Maintenance
+            && to == EquipmentStatus.Available)
+        {
+            throw new ConflictException(MessageCode.EquipmentAwaitingRepair, item.Name);
         }
 
         var allowed = item.Status switch
@@ -307,8 +346,6 @@ public sealed class EquipmentItemService : IEquipmentItemService
             return;
         }
 
-        // One rule, different wording. "Not available" tells a technician more than "illegal
-        // transition available -> assigned" does, so the lifecycle endpoints keep their codes.
         throw reason switch
         {
             TransitionReason.Release => new ConflictException(MessageCode.EquipmentNotAssigned, item.Name),
@@ -325,13 +362,6 @@ public sealed class EquipmentItemService : IEquipmentItemService
         var takenByItem = await _db.EquipmentItems.AnyAsync(
             i => i.AssetTag == assetTag && (ignoring == null || i.Id != ignoring), cancellationToken);
 
-        // Beds carry tags from the same scheme, and the by-tag lookup has to resolve to one
-        // thing. A tag unique only within its own table would break that.
-        //
-        // Known gap: this is the only uniqueness rule in the codebase not backed by a database
-        // constraint, because Postgres cannot index across two tables. A bed and an item
-        // claiming the same tag in overlapping transactions can both pass this check. Issue
-        // #17 carries the fix: a shared asset-tag table that both rows point at.
         var takenByBed = await _db.Beds.AnyAsync(b => b.AssetTag == assetTag, cancellationToken);
 
         if (takenByItem || takenByBed)
@@ -362,7 +392,6 @@ public sealed class EquipmentItemService : IEquipmentItemService
     {
         var descending = !string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
 
-        // Id breaks ties so paging cannot drop or repeat a row when two items share a value.
         return (sortBy, descending) switch
         {
             ("name", true) => items.OrderByDescending(i => i.Name).ThenBy(i => i.Id),
@@ -470,8 +499,6 @@ public sealed class EquipmentItemService : IEquipmentItemService
             AssetId = schedule.AssetId,
             ScheduleType = schedule.ScheduleType,
             ScheduledDate = schedule.ScheduledDate,
-            // Overdue is derived here rather than stored, so nothing has to sweep the table
-            // at midnight to keep it honest.
             Status = schedule.Status == MaintenanceStatus.Scheduled && schedule.ScheduledDate < today
                 ? MaintenanceStatus.Overdue
                 : schedule.Status,

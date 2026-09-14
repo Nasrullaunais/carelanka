@@ -12,14 +12,6 @@ import {
 } from '../types/identifiers';
 import { genderLabels, genders } from '../types/patients';
 
-// The patient details form, written once and used twice: to register somebody, and to correct
-// what was typed.
-//
-// It lives in its own file because the two callers are the same eight boxes with the same eight
-// rules and a different verb. Two copies is how a validation rule gets fixed on the register
-// form and left wrong on the edit form, and nobody notices until a bad phone number is already
-// in the database.
-
 export type PatientFormValue = {
   fullName: string;
   gender: Gender;
@@ -28,9 +20,6 @@ export type PatientFormValue = {
   contactName: string;
   contactPhone: string;
 
-  // Three pickers rather than one <input type="date">. The native control opens on this month,
-  // and a patient born in 1997 is a long way back from there - which is how a desk ends up
-  // leaving date of birth blank on every record.
   birthYear: number | null;
   birthMonth: number | null;
   birthDay: number | null;
@@ -50,7 +39,6 @@ export function emptyPatientForm(unidentified: boolean): PatientFormValue {
   };
 }
 
-/** An existing record, unpacked into the boxes. Used to prefill the edit form. */
 export function patientFormFrom(patient: Patient): PatientFormValue {
   const [year, month, day] = (patient.date_of_birth ?? '').split('-');
 
@@ -67,32 +55,32 @@ export function patientFormFrom(patient: Patient): PatientFormValue {
   };
 }
 
-/**
- * What is wrong with the form right now, or nothing.
- *
- * Told at the field, not on submit. The server checks all of this too - a browser is not a
- * boundary - but a form that accepts what you typed and then fails on submit makes you hunt for
- * which of eight boxes was wrong.
- */
-export function patientFormProblems(value: PatientFormValue) {
+export function patientFormProblems(value: PatientFormValue, identified = false) {
   const dateOfBirth = toIsoDate(value.birthYear, value.birthMonth, value.birthDay);
 
   const phone = phoneProblem(value.phone);
   const contactPhone = phoneProblem(value.contactPhone);
   const dateOfBirthError = dateOfBirthProblem(dateOfBirth);
 
-  // A part-filled date is not an error, it is an unfinished one. Saying "that is not a date" to
-  // somebody who has picked the year and is reaching for the month is just rude.
   const dateIncomplete =
     (value.birthYear !== null || value.birthMonth !== null || value.birthDay !== null) &&
     dateOfBirth === '';
+
+  const missing = {
+    phone: identified && value.phone.trim().length === 0,
+    address: identified && value.address.trim().length === 0,
+    dateOfBirth: identified && dateOfBirth === '' && !dateIncomplete,
+  };
 
   const blocked =
     value.fullName.trim().length === 0 ||
     phone !== null ||
     contactPhone !== null ||
     dateOfBirthError !== null ||
-    dateIncomplete;
+    dateIncomplete ||
+    missing.phone ||
+    missing.address ||
+    missing.dateOfBirth;
 
   return {
     isoDate: dateOfBirth,
@@ -100,16 +88,11 @@ export function patientFormProblems(value: PatientFormValue) {
     contactPhone,
     dateOfBirth: dateOfBirthError,
     dateIncomplete,
+    missing,
     blocked,
   };
 }
 
-/**
- * The form as the API takes it.
- *
- * Blank optional fields go as null, not "". The server computes missing_fields off the patient
- * row, so an empty string would count as filled in and the desk would never be told to chase it.
- */
 export function patientFormBody(value: PatientFormValue, nic: string | null) {
   const orNull = (text: string) => (text.trim().length > 0 ? text.trim() : null);
 
@@ -125,7 +108,6 @@ export function patientFormBody(value: PatientFormValue, nic: string | null) {
   };
 }
 
-/** Keeps the boxes, and gives back one setter so a caller changes one field at a time. */
 export function usePatientForm(initial: PatientFormValue) {
   const [value, setValue] = useState(initial);
 
@@ -136,13 +118,6 @@ export function usePatientForm(initial: PatientFormValue) {
   return { value, set, replace: setValue };
 }
 
-/**
- * How much room is left in a field, shown only once it starts to matter.
- *
- * A counter sitting under every box from the moment the form loads is noise; one that appears
- * at three quarters full is a warning. Either way the input's own maxLength is what stops the
- * typing - this only explains why it stopped.
- */
 export function Counter({ value, limit }: { value: string; limit: number }) {
   if (value.length < limit * 0.75) {
     return null;
@@ -152,7 +127,7 @@ export function Counter({ value, limit }: { value: string; limit: number }) {
 
   return (
     <p className={left === 0 ? 'field-error' : 'hint'}>
-      {left === 0 ? `That is the limit - ${limit} characters.` : `${left} characters left.`}
+      {left === 0 ? `Limit reached - ${limit} characters.` : `${left} characters left.`}
     </p>
   );
 }
@@ -161,13 +136,16 @@ export function PatientFields({
   value,
   set,
   idPrefix,
+  identified = false,
 }: {
   value: PatientFormValue;
   set: <K extends keyof PatientFormValue>(key: K, next: PatientFormValue[K]) => void;
-  /** Register and edit can both be mounted in one session, so the ids must not collide. */
+
   idPrefix: string;
+
+  identified?: boolean;
 }) {
-  const problems = patientFormProblems(value);
+  const problems = patientFormProblems(value, identified);
 
   return (
     <>
@@ -252,7 +230,14 @@ export function PatientFields({
           </div>
           {problems.dateOfBirth && <p className="field-error">{problems.dateOfBirth}</p>}
           {problems.dateIncomplete && !problems.dateOfBirth && (
-            <p className="hint">Pick all three, or leave all three blank.</p>
+            <p className="hint">
+              {identified ? 'Select all three.' : 'Select all three, or leave all three blank.'}
+            </p>
+          )}
+          {problems.missing.dateOfBirth && (
+            <p className="field-error">
+              Required. Ward eligibility depends on the patient's age.
+            </p>
           )}
         </div>
       </div>
@@ -266,10 +251,12 @@ export function PatientFields({
             inputMode="tel"
             maxLength={20}
             placeholder="0771234567"
-            aria-invalid={problems.phone !== null}
+            aria-invalid={problems.phone !== null || problems.missing.phone}
+            required={identified}
             onChange={(event) => set('phone', event.target.value)}
           />
           {problems.phone && <p className="field-error">{problems.phone}</p>}
+          {problems.missing.phone && <p className="field-error">Required.</p>}
         </div>
         <div className="field">
           <label htmlFor={`${idPrefix}-address`}>Address</label>
@@ -277,17 +264,21 @@ export function PatientFields({
             id={`${idPrefix}-address`}
             value={value.address}
             maxLength={fieldLimits.address}
+            aria-invalid={problems.missing.address}
+            required={identified}
             onChange={(event) => set('address', event.target.value)}
           />
+          {problems.missing.address && <p className="field-error">Required.</p>}
           <Counter value={value.address} limit={fieldLimits.address} />
         </div>
       </div>
 
       <div className="row">
         <div className="field">
-          {/* "Emergency contact" sitting next to "Emergency contact phone" reads as though the
-              first one also wants a number. Say what goes in the box. */}
-          <label htmlFor={`${idPrefix}-contact-name`}>Who to ring in an emergency</label>
+
+          <label htmlFor={`${idPrefix}-contact-name`}>
+            Emergency contact name {identified && <span className="muted">(optional)</span>}
+          </label>
           <input
             id={`${idPrefix}-contact-name`}
             value={value.contactName}
@@ -295,10 +286,12 @@ export function PatientFields({
             placeholder="Nilanthi Gunawardena"
             onChange={(event) => set('contactName', event.target.value)}
           />
-          <p className="hint">Their name.</p>
+          <p className="hint">Who to call in an emergency.</p>
         </div>
         <div className="field">
-          <label htmlFor={`${idPrefix}-contact-phone`}>Their phone number</label>
+          <label htmlFor={`${idPrefix}-contact-phone`}>
+            Emergency contact phone {identified && <span className="muted">(optional)</span>}
+          </label>
           <input
             id={`${idPrefix}-contact-phone`}
             value={value.contactPhone}
@@ -315,7 +308,6 @@ export function PatientFields({
   );
 }
 
-/** Submit handler wrapper, so neither caller has to remember preventDefault. */
 export function onSubmit(handler: () => void) {
   return (event: FormEvent) => {
     event.preventDefault();

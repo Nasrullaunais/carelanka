@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace CareLanka.Api.Controllers.Common;
 
-/// <summary>Unauthenticated liveness probe.</summary>
 [ApiController]
 [Route("api/health")]
 [Tags("Health")]
@@ -15,7 +14,6 @@ public class HealthController : ControllerBase
 
     public HealthController(IHealthService health) => _health = health;
 
-    /// <summary>Liveness and database connectivity. An API that answers "up" while PostgreSQL is unreachable is worse than one that says nothing, because it stops anyone from looking.</summary>
     [AllowAnonymous]
     [HttpGet(Name = "getHealth")]
     [ProducesResponseType(typeof(HealthStatus), StatusCodes.Status200OK)]

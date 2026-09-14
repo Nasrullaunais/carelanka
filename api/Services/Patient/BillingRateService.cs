@@ -9,18 +9,6 @@ using BillingRateEntity = CareLanka.Api.Data.Entities.Patient.BillingRate;
 
 namespace CareLanka.Api.Services.Patient;
 
-/// <summary>
-/// The price grid the hospital administrator edits, and the one place a price is read from.
-/// </summary>
-/// <remarks>
-/// <b>A missing row is filled in from the built-in defaults rather than treated as an error.</b>
-/// That is what makes this safe to ship on a database that has never seen the settings screen:
-/// the grid is complete from the first request, whether or not anybody has saved anything.
-///
-/// <b>Editing a rate never touches a bill already raised.</b> The price is copied onto the line
-/// when the line is written, so today's change prices tomorrow's bills and leaves every piece of
-/// paper a patient has already been handed exactly as it was.
-/// </remarks>
 public sealed class BillingRateService : IBillingRateService
 {
     private readonly CareLankaDbContext _db;
@@ -52,8 +40,6 @@ public sealed class BillingRateService : IBillingRateService
             throw new BadRequestException(MessageCode.ValidationFailed);
         }
 
-        // An unknown expense key is refused rather than stored. Stored, it would sit in the
-        // grid forever priced against nothing, and the screen would show a row no bill can use.
         var unknown = request.Expenses
             .Select(update => update.ExpenseKey.Trim())
             .FirstOrDefault(key => !BillingRateDefaults.ExpenseKeys.Contains(key));
@@ -121,10 +107,6 @@ public sealed class BillingRateService : IBillingRateService
         return await GetBookAsync(ct);
     }
 
-    /// <summary>
-    /// Reads both tables and fills every gap from the defaults, so the caller always gets a
-    /// complete grid.
-    /// </summary>
     private async Task<(
         IReadOnlyDictionary<(WardType, string), decimal> Rates,
         IReadOnlyDictionary<AdmissionCategory, decimal> Fees)> ReadAsync(CancellationToken ct)

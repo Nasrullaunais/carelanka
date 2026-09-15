@@ -442,7 +442,7 @@ paths:
       tags: [Admissions]
       summary: Mark the patient as physically present in the bed
       description: |
-        Roles: WardNurse.
+        Roles: WardNurse, GeneralStaff, DutyManager.
 
         Business operation beyond CRUD. Moves `bed_reserved` -> `admitted`, sets `admitted_at`,
         and flips the bed assignment from `reserved` to `occupied` so the hold can no longer
@@ -1697,32 +1697,26 @@ paths:
   /patient-worklist:
     get:
       tags: [Admissions]
-      summary: The ward board - bookings and visits in one list
+      summary: The ward board - everyone in the hospital's care
       description: |
         Roles: GeneralStaff, WardNurse, DutyManager, HospitalAdministrator, Doctor, EquipmentManager. The same as `GET /admissions`, because it is the same data read a different way.
 
-        **Two tables, one list.** A row is either a booking nobody has checked in yet
-        (`kind: booking`, `status: not_arrived`) or a visit that has started (`kind: visit`).
+        **Everyone physically here**: waiting for a bed, in a bed, or just finished.
 
-        **Why this exists and `GET /admissions` cannot do it.** An `Admission` is created by
-        arriving, so a list of admissions can never say "not arrived" about anybody. The
-        patient booked in for a scan at eleven was invisible until she walked through the
-        door, and the desk had to read a second screen to find her.
+        **Bookings are not on it - changed 2026-09-15.** They used to appear as
+        `kind: booking` / `status: not_arrived` rows, which put the same patient on two
+        screens and let them fall off this one halfway through: the moment a booking was
+        completed it stopped being `scheduled`, had no admission behind it, and vanished. A
+        booking now lives on `GET /appointments` until the patient walks in, and `kind`,
+        `reason` and `not_arrived` are gone with it.
 
-        **One row per person's business, never two.** A booking that has been checked in is
-        terminal at `checked_in` and is left out; its admission stands for it. So a booking
-        becomes a visit on this list rather than appearing beside it.
-
-        **Read-only and derived.** `status` is a reading of `AppointmentStatus` or
-        `AdmissionStatus`, not a fourth stored status - see `WorklistStatus`. Nothing
-        transitions between its values, and every write still goes to the endpoint that owns
-        the row: `/appointments/{id}/check-in`, `/admissions/{id}/assign-bed`,
+        **Read-only and derived.** `status` is a reading of `AdmissionStatus`, not a second
+        stored status - see `WorklistStatus`. Nothing transitions between its values, and
+        every write goes to the endpoint that owns the row: `/admissions/{id}/assign-bed`,
         `/admissions/{id}/arrive`, `/admissions/{id}/complete`. There is no PATCH here and
         there will not be one.
 
-        No `sortBy`. It is a worklist read top to bottom, newest first - not a report. One
-        sort key across two tables whose time columns mean different things would order it by
-        a column nobody asked for.
+        No `sortBy`. It is a worklist read top to bottom, newest first - not a report.
       operationId: listPatientWorklist
       parameters:
         - name: search
@@ -1765,10 +1759,11 @@ paths:
         a nurse works from; the patient's own view of the same booking is
         `GET /me/appointments`, and the two are deliberately different shapes.
 
-        **Reading the list is wider than acting on a booking** (widened 2026-09-15). Checking
-        in, cancelling and completing stay on WardNurse and DutyManager, but the billing desk
-        has to reach a completed appointment to bill it and cannot check anyone in. Same split
-        as `GET /discharges/candidates` against the checklist endpoints.
+        **Reading the list is wider than acting on a booking** (widened 2026-09-15). Booking,
+        checking in, cancelling and completing are WardNurse, GeneralStaff and DutyManager -
+        the front desk does this work day to day - while HospitalAdministrator reads the list
+        without acting on it. Same split as `GET /discharges/candidates` against the checklist
+        endpoints.
       operationId: listAppointments
       parameters:
         - $ref: '#/components/parameters/Page'
@@ -1798,7 +1793,7 @@ paths:
       tags: [Admissions]
       summary: Book a visit on a patient's behalf
       description: |
-        Roles: WardNurse, DutyManager.
+        Roles: WardNurse, GeneralStaff, DutyManager.
 
         The desk equivalent of `POST /me/appointments`, for someone who phoned in or walked
         up without the app. Records `booked_by_staff_id`; that field is null for a
@@ -1825,6 +1820,68 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
+  /appointments/{id}/confirm:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Admissions]
+      summary: Confirm a booking at the desk
+      description: |
+        Roles: WardNurse, GeneralStaff, DutyManager.
+
+        The desk reads the booking and accepts it. `scheduled` -> `confirmed`, and nothing
+        physical happens - the patient may not be due for weeks.
+
+        **This is why it is not the same click as admitting them.** Before it existed the desk
+        had one button, "check in and admit", sitting next to a booking three weeks out.
+        Pressing it created an admission and started a bed search for somebody who was not in
+        the building. Reviewing a booking and taking delivery of a patient are days apart, so
+        they are two actions.
+
+        Confirming is the gate on all three day-of endings. Records who confirmed and when.
+      operationId: confirmAppointment
+      responses:
+        '200':
+          description: The booking, now confirmed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Appointment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
+  /appointments/{id}/no-show:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Admissions]
+      summary: Mark that the patient never came
+      description: |
+        Roles: WardNurse, GeneralStaff, DutyManager.
+
+        They were expected, the time has passed, and they did not come. `confirmed` ->
+        `no_show`, and 409 from anywhere else.
+
+        **A separate ending from `cancelled`**, which somebody chose and can explain. Nobody
+        chose this one, so there is no reason field and nothing is shown to the patient beyond
+        the status itself.
+
+        **The desk presses this**; nothing flips it overnight. Doing that automatically needs
+        a scheduled job, and this application has none - a status that changed by itself with
+        no process behind it would be a lie in the audit trail.
+      operationId: markAppointmentNoShow
+      responses:
+        '200':
+          description: The booking, now marked as not attended
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Appointment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
   /appointments/{id}/cancel:
     parameters:
       - $ref: '#/components/parameters/PathId'
@@ -1839,8 +1896,8 @@ paths:
         rebook after 14:00" - which is why there is no separate propose-a-time flow. The
         patient books again themselves.
 
-        Only a `scheduled` booking can be called off. Once it is `checked_in` the patient is
-        already in the building, and 409 says so.
+        A `scheduled` or `confirmed` booking can be called off. Once it is `completed` the
+        patient has already been seen or admitted, and 409 says so.
 
         **The patient's own cancel is a different route**, `POST /me/appointments/{id}/cancel`,
         and records no reason and no staff id. That difference is what
@@ -1877,8 +1934,10 @@ paths:
         bill, raised against the appointment at `POST /appointments/{id}/bill`.
 
         **Check in is the other path**, and the two are exclusive: checking in creates an
-        `Admission` and is for a patient who is staying. Only a `scheduled` booking can be
-        completed.
+        `Admission` and is for a patient who is staying. Both land the booking on `completed`;
+        `admission_id` is what says which happened.
+
+        **Needs a `confirmed` booking.** 409 otherwise - see `AppointmentStatus`.
       operationId: completeAppointment
       responses:
         '200':
@@ -1918,10 +1977,18 @@ paths:
       tags: [Billing]
       summary: Raise or re-price an appointment bill
       description: |
-        Roles: GeneralStaff, HospitalAdministrator.
+        Roles: GeneralStaff, WardNurse, HospitalAdministrator, DutyManager.
+
+        Wider than the admission bill by the ward nurse (widened 2026-09-15): an outpatient
+        walks in and out the same day, so whoever records the visit as seen is who takes the
+        money for it. An admission bill is settled at discharge and stays reception's.
 
         Writes the bill if it does not exist, then replaces its generated line with a single
         `consultation_fee`. Typed `manual` lines are left alone. 409 once settled.
+
+        **409 `cl_pat_035` when the visit ended in an admission.** A `completed` booking with
+        `admission_id` set is billed on the admission at discharge, and charging it here as
+        well would charge the same visit twice. All four appointment-bill endpoints refuse it.
       operationId: prepareAppointmentBill
       responses:
         '200':
@@ -1948,7 +2015,7 @@ paths:
       tags: [Billing]
       summary: Add a typed charge to an appointment bill
       description: |
-        Roles: GeneralStaff, HospitalAdministrator. 409 once settled.
+        Roles: GeneralStaff, WardNurse, HospitalAdministrator, DutyManager. 409 once settled.
       operationId: addAppointmentBillCharge
       requestBody:
         required: true
@@ -1985,7 +2052,7 @@ paths:
       tags: [Billing]
       summary: Remove a typed charge from an appointment bill
       description: |
-        Roles: GeneralStaff, HospitalAdministrator.
+        Roles: GeneralStaff, WardNurse, HospitalAdministrator, DutyManager.
 
         Only a `manual` line can be removed. Removing a generated one is 409.
       operationId: removeAppointmentBillCharge
@@ -2014,10 +2081,11 @@ paths:
       tags: [Billing]
       summary: Settle an appointment bill
       description: |
-        Roles: GeneralStaff, HospitalAdministrator.
+        Roles: GeneralStaff, WardNurse, HospitalAdministrator, DutyManager.
 
         Freezes the bill. **Ticks no discharge checklist item**, unlike settling an admission
-        bill - nobody was admitted, so there is no discharge to tick.
+        bill - nobody was admitted, so there is no discharge to tick. That is exactly why the
+        ward nurse is on this one and not on `POST /admissions/{admissionId}/bill/settle`.
       operationId: settleAppointmentBill
       requestBody:
         required: false
@@ -2047,22 +2115,28 @@ paths:
       tags: [Admissions]
       summary: Check in an expected patient
       description: |
-        Roles: WardNurse for outpatient, day_case and inpatient. DutyManager for ICU and HDU.
+        Roles: WardNurse and GeneralStaff for outpatient, day_case and inpatient. DutyManager
+        for ICU and HDU.
 
         **Business op.** Turns an `Appointment` into an `Admission` with
-        `source = pre_registered`, in one transaction: the appointment moves to `checked_in`
-        and the admission is created.
+        `source = pre_registered`, in one transaction: the appointment moves to `completed`
+        with its `admission_id` set, and the admission is created.
+
+        **Needs a `confirmed` booking.** 409 otherwise. This is the desk saying the patient is
+        standing in front of them, so it must not be reachable on a booking three weeks out.
 
         The care level is set here, by the staff member checking them in - not by the patient
         at booking time and not by the agent. Same rule every other admission path follows,
         and `category_set_by_staff_id` records who chose it.
 
-        **The role split depends on the body, not the route.** A WardNurse may check somebody
-        in as `outpatient`, `day_case` or `inpatient`; `icu` and `hdu` are the DutyManager's
-        alone, and a nurse asking for either is a 403 carrying `cl_pat_011`.
+        **The role split depends on the body, not the route.** A WardNurse or GeneralStaff may
+        check somebody in as `outpatient`, `day_case` or `inpatient`; `icu` and `hdu` are the
+        DutyManager's alone, and anyone else asking for either is a 403 carrying `cl_pat_011`.
 
         Returns the **admission**, not the appointment - the admission is what the desk works
-        from next, and the booking is finished with.
+        from next, and the booking is finished with. From here the patient is on
+        `GET /patient-worklist`, and their bill is the admission's, settled at discharge.
+        Billing the appointment as well is 409 `cl_pat_035`.
 
         From this point the admission behaves like any other: it needs a bed, so the bed
         agent runs on it exactly as it would for a walk-in.
@@ -2491,16 +2565,38 @@ components:
     AppointmentStatus:
       type: string
       description: |
-        `checked_in` is terminal for the appointment - from there the record of what happens
-        next is the `Admission`, not this row.
-      enum: [scheduled, checked_in, completed, cancelled, no_show]
+        Where a booking is up to. **Reworked 2026-09-15**, and `checked_in` was removed.
+
+        | Value | Shown as | What it means |
+        | :--- | :--- | :--- |
+        | `scheduled` | Needs confirming | Booked in the app. Nobody at the desk has read it. |
+        | `confirmed` | Expected | The desk accepted it. Not arrived; the date may be weeks out. |
+        | `completed` | Finished | Over, either way - see below. |
+        | `cancelled` | Cancelled | The patient or the desk called it off. |
+        | `no_show` | Did not come | Was expected, the time passed, they never came. |
+
+        **Confirming is never skipped.** Admitting, recording the patient as seen, and marking
+        them as never having come all require `confirmed` and 409 otherwise. Without that step
+        the desk could press "admit" on a booking three weeks out and start a bed search for
+        somebody who is not in the building.
+
+        **`completed` has two endings, and `admission_id` tells them apart.** Null means the
+        patient was seen and went home, and the bill is on this appointment. Set means they
+        were admitted; the `Admission` carries the story from there and the bill is settled at
+        discharge. Billing the appointment in that case is 409 `cl_pat_035` - the same visit
+        must not be charged twice.
+
+        `checked_in` used to be a status of its own. It said nothing `admission_id` did not
+        already say, and it made a two-ending list read as six states instead of five.
+      enum: [scheduled, confirmed, completed, cancelled, no_show]
 
     Appointment:
       description: A booked visit, as staff see it.
       allOf:
         - $ref: '#/components/schemas/AuditFields'
         - type: object
-          required: [id, patient, scheduled_at, status, can_cancel, can_complete]
+          required: [id, patient, scheduled_at, status, can_confirm, can_cancel,
+                     can_complete]
           properties:
             id: { type: string, format: uuid }
             patient: { $ref: '#/components/schemas/PatientSummary' }
@@ -2517,11 +2613,22 @@ components:
               format: uuid
               nullable: true
               description: Null for a self-booking from the patient app.
+            confirmed_at:
+              type: string
+              format: date-time
+              nullable: true
+              description: When the desk confirmed it. Null while `scheduled`.
+            confirmed_by_staff_id:
+              type: string
+              format: uuid
+              nullable: true
             admission_id:
               type: string
               format: uuid
               nullable: true
-              description: Set once checked in.
+              description: |
+                Set when the visit ended in an admission rather than the patient going home.
+                The status reads `completed` either way, so this is what tells the two apart.
             cancellation_reason:
               type: string
               nullable: true
@@ -2535,14 +2642,18 @@ components:
               format: uuid
               nullable: true
               description: Null when the patient cancelled it themselves from the app.
-            can_cancel:
+            can_confirm:
               type: boolean
               description: True only while `scheduled`.
+            can_cancel:
+              type: boolean
+              description: True while `scheduled` or `confirmed`.
             can_complete:
               type: boolean
               description: |
-                True only while `scheduled`. Completing records that the patient came, was
-                seen and went home - no admission, no bed, bill only.
+                True only while `confirmed`, and the gate on all three day-of endings: admit
+                the patient, record them as seen and gone home, or mark them as never having
+                come. One flag rather than three because they share the one precondition.
 
     MyAppointment:
       type: object
@@ -2660,28 +2771,17 @@ components:
         same word, one shared app - so the names have to differ.
       enum: [routine, urgent, emergency]
 
-    WorklistKind:
-      type: string
-      description: |
-        Which table a ward-board row came out of, and therefore what can be done to it. A
-        `booking` is checked in; a `visit` gets a bed, arrives, or is completed. A screen that
-        cannot tell the two apart offers the wrong button.
-      enum: [booking, visit]
-
     WorklistStatus:
       type: string
       description: |
         What the ward board says about one person, in the words a nurse uses.
 
-        **Derived, never stored.** It is a reading of two other stored statuses -
-        `AppointmentStatus` for a booking and `AdmissionStatus` for a visit - and it exists
-        because neither on its own answers "what is happening with this patient". Nothing
-        transitions between these values; the transition rules live on `AdmissionStatus`,
-        which is the authoritative one.
+        **Derived, never stored.** It is a reading of `AdmissionStatus` in the words a nurse
+        uses, and nothing transitions between these values; the transition rules live on
+        `AdmissionStatus`, which is the authoritative one.
 
         | Value | What it means | Read from |
         | :--- | :--- | :--- |
-        | `not_arrived` | Booked in, not here yet | appointment `scheduled` |
         | `awaiting_bed` | Here, needs a bed, has not got one | `awaiting_bed`, `awaiting_approval` |
         | `bed_ready` | A bed is held; nobody has marked them as being in it | `bed_reserved` |
         | `admitted` | In the hospital and being treated | `admitted`, `ready_for_discharge` |
@@ -2696,44 +2796,39 @@ components:
         `bed_ready` is deliberately not folded into `awaiting_bed`, because the hold expires
         after thirty minutes: "a bed is waiting, go and collect them" is a different job from
         "find them a bed", and it is the one with a clock on it.
-      enum: [not_arrived, awaiting_bed, bed_ready, admitted, completed, cancelled]
+
+        `not_arrived` was removed on 2026-09-15 with the bookings themselves - see
+        `GET /patient-worklist`.
+      enum: [awaiting_bed, bed_ready, admitted, completed, cancelled]
 
     WorklistRow:
       type: object
       description: |
         One line of the ward board: one patient, and what is happening with them right now.
 
-        Deliberately not `AdmissionSummary` with extra nullable fields. Half the columns on a
-        booking are genuinely unknown rather than null-as-in-empty - nobody has chosen a care
-        level for a patient who has not arrived - and making the admission schema pretend
-        otherwise would turn every one of its fields optional for every caller.
-      required: [id, kind, patient, status, requires_bed, when]
+        Deliberately not `AdmissionSummary`. This is the board a nurse reads top to bottom,
+        and it carries only what that reading needs; the admission schema answers a different
+        question and is free to grow without widening every row here.
+      required: [id, patient, status, requires_bed, when]
       properties:
         id:
           type: string
           format: uuid
-          description: The appointment id or the admission id, depending on `kind`.
-        kind: { $ref: '#/components/schemas/WorklistKind' }
+          description: The admission id.
         patient: { $ref: '#/components/schemas/PatientSummary' }
         status: { $ref: '#/components/schemas/WorklistStatus' }
         requires_bed:
           type: boolean
-          description: >-
-            False for a booking as well as for an outpatient. Nobody has chosen a care level
-            for somebody who has not arrived, so "does this need a bed" has no answer yet -
-            and a screen must not offer to assign one on a guess.
+          description: False for an outpatient, who is seen and goes home.
         source:
           allOf:
             - $ref: '#/components/schemas/AdmissionSource'
           nullable: true
-          description: How they came in. Null on a booking - they have not come in.
+          description: How they came in.
         admission_category:
           allOf:
             - $ref: '#/components/schemas/AdmissionCategory'
           nullable: true
-          description: >-
-            Null on a booking. The care level is set by staff at check-in, never at booking
-            time.
         urgency:
           allOf:
             - $ref: '#/components/schemas/AdmissionUrgency'
@@ -2747,17 +2842,8 @@ components:
           type: string
           format: date-time
           description: |
-            The one time that matters for this row: when a booking is due, or when a visit
-            started. Two different facts under one name on purpose - the board is read top to
-            bottom as a chronology, and a column that was `scheduled_at` on some rows and
-            blank on others could not be read that way at all. A visit not yet marked as
-            arrived falls back to when its record was opened, which is the closest true thing.
-        reason:
-          type: string
-          nullable: true
-          description: >-
-            Why they are coming, as the desk or the patient typed it - "Scan", "Blood test".
-            Null on a visit: the reason is not carried onto the admission.
+            When the visit started. A visit not yet marked as arrived falls back to when its
+            record was opened, which is the closest true thing.
 
     AdmissionStatus:
       type: string

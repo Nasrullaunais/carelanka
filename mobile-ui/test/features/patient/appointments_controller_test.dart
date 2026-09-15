@@ -52,17 +52,19 @@ void main() {
     expect(controller.past.map((a) => a.appointmentId), ['done', 'older']);
   });
 
-  test('a checked-in visit still counts as open', () async {
+  // Once a visit is over you are either home or in a bed, so the stay is what you are waiting
+  // on. Leaving it open kept Home headlining it as "your next visit" long after discharge.
+  test('a finished visit is no longer upcoming', () async {
     final service = FakePatientService()
       ..appointmentsResult = appointmentPage([
-        _appointment(id: 'here', status: AppointmentStatus.checkedIn, at: now),
+        _appointment(id: 'here', status: AppointmentStatus.completed, at: now),
       ]);
     final controller = AppointmentsController(service);
 
     await controller.load();
 
-    expect(controller.upcoming.single.appointmentId, 'here');
-    expect(controller.past, isEmpty);
+    expect(controller.upcoming, isEmpty);
+    expect(controller.past.single.appointmentId, 'here');
   });
 
   test('a refused booking comes back to the screen instead of being swallowed', () async {

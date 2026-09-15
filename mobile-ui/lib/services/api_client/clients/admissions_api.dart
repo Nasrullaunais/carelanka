@@ -103,6 +103,16 @@ abstract class AdmissionsApi {
     @Body() CreateAppointmentRequest? body,
   });
 
+  @POST('/appointments/{id}/confirm')
+  Future<Appointment> confirmAppointment({
+    @Path('id') required String id,
+  });
+
+  @POST('/appointments/{id}/no-show')
+  Future<Appointment> markAppointmentNoShow({
+    @Path('id') required String id,
+  });
+
   @POST('/appointments/{id}/check-in')
   Future<Admission> checkInAppointment({
     @Path('id') required String id,

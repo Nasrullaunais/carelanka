@@ -6,7 +6,6 @@ export function arrivalRouteLabel(row: WorklistRow): string {
 }
 
 export const worklistStatusLabels: Record<WorklistStatus, string> = {
-  not_arrived: 'Not arrived',
   awaiting_bed: 'Awaiting bed',
   bed_ready: 'Bed ready',
   admitted: 'Admitted',
@@ -27,9 +26,6 @@ export function worklistStatusDetail(row: WorklistRow): string | null {
 
     case 'awaiting_bed':
       return 'Needs a bed';
-
-    case 'not_arrived':
-      return null;
 
     default:
       return bed;

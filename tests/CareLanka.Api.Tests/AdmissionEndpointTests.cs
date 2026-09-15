@@ -687,6 +687,40 @@ public sealed class AdmissionEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, completed.StatusCode);
     }
 
+    [Theory]
+    [InlineData("nic", "!!!not-a-nic!!!")]
+    [InlineData("nic", "12345")]
+    [InlineData("phone", "12")]
+    [InlineData("emergency_contact_phone", "071123456")]
+    public async Task Completing_details_refuses_a_malformed_identifier(string field, string value)
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var patientId = await NewPatientAsync(nurse, "Details Format Check");
+        var id = await CreateIdAsync(nurse, patientId, await NurseIdAsync());
+
+        var response = await nurse.PatchAsJsonAsync(
+            $"/api/admissions/{id}/details",
+            new Dictionary<string, string> { [field] = value });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        using var body = await ReadJsonAsync(response);
+        Assert.True(body.RootElement.GetProperty("errors").TryGetProperty(field, out _));
+    }
+
+    [Fact]
+    public async Task Completing_details_accepts_a_blank_field_as_leave_it_alone()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var patientId = await NewPatientAsync(nurse, "Details Blank Check");
+        var id = await CreateIdAsync(nurse, patientId, await NurseIdAsync());
+
+        var response = await nurse.PatchAsJsonAsync(
+            $"/api/admissions/{id}/details", new { nic = "", phone = "  " });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
     [Fact]
     public async Task A_duty_manager_may_read_and_complete_an_admission()
     {
@@ -704,20 +738,30 @@ public sealed class AdmissionEndpointTests
     }
 
     [Fact]
-    public async Task Marking_arrival_belongs_to_the_nurse_at_the_bedside_and_nobody_else()
+    public async Task Marking_arrival_belongs_to_the_desk_and_the_ward_and_nobody_else()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         var patientId = await NewPatientAsync(nurse, "Arrival Role Check");
         var id = await CreateIdAsync(nurse, patientId, await NurseIdAsync());
 
         using var anonymous = _application.CreateClient();
+        using var doctor = await ClientAsync(ApiApplication.DoctorEmail);
+        using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
         using var manager = await ClientAsync(ApiApplication.ManagerEmail);
 
         var withoutToken = await anonymous.PostAsync($"/api/admissions/{id}/arrive", null);
-        var wrongRole = await manager.PostAsync($"/api/admissions/{id}/arrive", null);
+        var wrongRole = await doctor.PostAsync($"/api/admissions/{id}/arrive", null);
 
         Assert.Equal(HttpStatusCode.Unauthorized, withoutToken.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, wrongRole.StatusCode);
+
+        // Reception and the duty manager are past the policy. They get 409 because this
+        // admission has no bed yet, which is a state problem and not a permission one.
+        foreach (var allowed in new[] { reception, manager, nurse })
+        {
+            var response = await allowed.PostAsync($"/api/admissions/{id}/arrive", null);
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        }
     }
 
     [Fact]

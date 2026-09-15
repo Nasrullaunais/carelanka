@@ -290,6 +290,10 @@
     <value>Your login is not linked to a hospital record yet. Fill in your details first.</value>
     <comment>Patient self-service. A login on its own is not a medical record - POST /me/pre-register is what joins the two. Answers a read (404) and a booking (409) alike, so the wording names the fix rather than the endpoint.</comment>
   </data>
+  <data name="cl_pat_035" xml:space="preserve">
+    <value>This visit ended in an admission, so its bill is raised on the admission at discharge.</value>
+    <comment>A booking reads as completed whether the patient went home or stayed in. Billing it here as well as on the admission would charge the same visit twice, so the appointment bill is refused once admission_id is set.</comment>
+  </data>
   <data name="cl_pat_034" xml:space="preserve">
     <value>You have no current stay.</value>
     <comment>Patient self-service. Not being in hospital is the ordinary state, so this is a plain sentence and not an error the app should make a fuss about.</comment>

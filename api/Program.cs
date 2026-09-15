@@ -209,6 +209,11 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
 
+    options.AddPolicy(Policies.ArrivalConfirmer, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.GeneralStaff),
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager)));
+
     options.AddPolicy(Policies.DischargeConfirmer, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.GeneralStaff),
         EnumWire.ToWire(StaffRole.WardNurse),
@@ -231,7 +236,14 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.HospitalAdministrator),
         EnumWire.ToWire(StaffRole.DutyManager)));
 
+    options.AddPolicy(Policies.AppointmentBillingDesk, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.GeneralStaff),
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator),
+        EnumWire.ToWire(StaffRole.DutyManager)));
+
     options.AddPolicy(Policies.AppointmentDesk, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.GeneralStaff),
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
 

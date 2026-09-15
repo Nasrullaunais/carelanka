@@ -24,9 +24,11 @@ class ProfileController extends ChangeNotifier {
 
   bool get isLinked => _profile.valueOrNull != null;
 
-  Future<void> load() async {
-    _profile = const AsyncData.loading();
-    notifyListeners();
+  Future<void> load({bool showLoading = true}) async {
+    if (showLoading) {
+      _profile = const AsyncData.loading();
+      notifyListeners();
+    }
 
     try {
       _profile = AsyncData.ready(await _service.loadMyProfile());

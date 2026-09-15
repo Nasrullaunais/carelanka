@@ -26,6 +26,13 @@ public static class Policies
 
     public const string BedAssigner = nameof(BedAssigner);
 
+    /// <summary>
+    /// Confirming the patient is physically in the bed. The desk and the ward both see them
+    /// arrive, so this is the same three roles as <see cref="BedAssigner"/> rather than the
+    /// nurse alone.
+    /// </summary>
+    public const string ArrivalConfirmer = nameof(ArrivalConfirmer);
+
     public const string DischargeConfirmer = nameof(DischargeConfirmer);
 
     public const string DischargeChecklist = nameof(DischargeChecklist);
@@ -33,6 +40,15 @@ public static class Policies
     public const string DischargeBoard = nameof(DischargeBoard);
 
     public const string BillingDesk = nameof(BillingDesk);
+
+    /// <summary>
+    /// Working an outpatient bill - the visit the patient walks in and out of on the same day.
+    /// Wider than <see cref="BillingDesk"/> by the ward nurse, because the nurse who records
+    /// the visit as seen is standing in front of the patient and is who takes the money for it.
+    /// An admission bill stays on <see cref="BillingDesk"/>: it is settled at discharge, which
+    /// ticks the discharge checklist, and that tick is reception's alone.
+    /// </summary>
+    public const string AppointmentBillingDesk = nameof(AppointmentBillingDesk);
 
     public const string AppointmentDesk = nameof(AppointmentDesk);
 

@@ -29,6 +29,10 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
   Gender? _gender;
   DateTime? _dateOfBirth;
 
+  // Off until the first submit, then on: errors appear when the form is sent, and clear as each
+  // field is fixed rather than sitting there red until the next submit.
+  bool _submitted = false;
+
   @override
   void initState() {
     super.initState();
@@ -66,6 +70,8 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
   }
 
   Future<void> _submit() async {
+    setState(() => _submitted = true);
+
     if (!_formKey.currentState!.validate()) return;
 
     final controller = context.read<ProfileController>();
@@ -109,6 +115,8 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
       body: SafeArea(
         child: Form(
           key: _formKey,
+          autovalidateMode:
+              _submitted ? AutovalidateMode.onUserInteraction : AutovalidateMode.disabled,
           child: ListView(
             padding: const EdgeInsets.fromLTRB(
               AppTheme.gutter,

@@ -212,7 +212,7 @@ export function BillPanel({
               ? "This adds the consultation fee at today's rate. Nobody was admitted, so there is no admission fee and no bed charge."
               : "This reads the admission — the care level and every bed used — and adds those lines at today's rates."
             : forAppointment
-              ? 'Reception raises the bill and takes payment.'
+              ? 'Reception or the ward nurse raises the bill and takes payment.'
               : 'Reception raises the bill and takes payment. Nothing on the ward is held up until the discharge itself.'}
         </p>
       </>

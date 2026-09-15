@@ -11,7 +11,6 @@ class WorklistStatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final (label, background, foreground) = switch (status) {
-      WorklistStatus.notArrived => ('Not arrived', scheme.surfaceContainerHighest, scheme.onSurfaceVariant),
       WorklistStatus.awaitingBed => ('Awaiting bed', scheme.tertiaryContainer, scheme.onTertiaryContainer),
       WorklistStatus.bedReady => ('Bed ready', scheme.primaryContainer, scheme.onPrimaryContainer),
       WorklistStatus.admitted => ('Admitted', scheme.secondaryContainer, scheme.onSecondaryContainer),

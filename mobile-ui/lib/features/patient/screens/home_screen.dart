@@ -32,9 +32,9 @@ class HomeScreen extends StatelessWidget {
       body: RefreshIndicator(
         onRefresh: () async {
           await Future.wait([
-            context.read<ProfileController>().load(),
-            stay.load(),
-            appointments.load(),
+            context.read<ProfileController>().load(showLoading: false),
+            stay.load(showLoading: false),
+            appointments.load(showLoading: false),
           ]);
         },
         child: ListView(

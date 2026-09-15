@@ -16,6 +16,15 @@ public class Appointment : AuditedEntity
 
     public Guid? BookedByStaffMemberId { get; set; }
 
+    public DateTimeOffset? ConfirmedAt { get; set; }
+
+    public Guid? ConfirmedByStaffMemberId { get; set; }
+
+    /// <summary>
+    /// Set when the visit ended in an admission rather than the patient going home. It is what
+    /// tells the two <c>Completed</c> outcomes apart, and what blocks a second bill: an admitted
+    /// patient is billed on the admission at discharge, never here.
+    /// </summary>
     public Guid? AdmissionId { get; set; }
 
     public Admission? Admission { get; set; }

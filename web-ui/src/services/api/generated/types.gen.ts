@@ -209,9 +209,12 @@ export type Appointment = {
     status: AppointmentStatus;
     reason?: string | null;
     booked_by_staff_id?: string | null;
+    confirmed_at?: string | null;
+    confirmed_by_staff_id?: string | null;
     admission_id?: string | null;
     cancellation_reason?: string | null;
     cancelled_by_staff_id?: string | null;
+    can_confirm: boolean;
     can_cancel: boolean;
     can_complete: boolean;
     created_at?: string;
@@ -226,7 +229,7 @@ export type AppointmentPagedResult = {
     total_pages: number;
 };
 
-export type AppointmentStatus = 'scheduled' | 'checked_in' | 'completed' | 'cancelled' | 'no_show';
+export type AppointmentStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
 
 export type AssetType = 'equipment_item' | 'bed';
 
@@ -1203,11 +1206,8 @@ export type WarningStatus = 'open' | 'acknowledged' | 'action_taken' | 'dismisse
 
 export type WarningType = 'low_stock' | 'medicine_expiring' | 'maintenance_overdue' | 'equipment_faulty';
 
-export type WorklistKind = 'booking' | 'visit';
-
 export type WorklistRow = {
     id: string;
-    kind: WorklistKind;
     patient: PatientSummary;
     status: WorklistStatus;
     requires_bed: boolean;
@@ -1217,7 +1217,6 @@ export type WorklistRow = {
     ward_name?: string | null;
     bed_number?: string | null;
     when: string;
-    reason?: string | null;
 };
 
 export type WorklistRowPagedResult = {
@@ -1228,7 +1227,7 @@ export type WorklistRowPagedResult = {
     total_pages: number;
 };
 
-export type WorklistStatus = 'not_arrived' | 'awaiting_bed' | 'bed_ready' | 'admitted' | 'completed' | 'cancelled';
+export type WorklistStatus = 'awaiting_bed' | 'bed_ready' | 'admitted' | 'completed' | 'cancelled';
 
 export type ListAdmissionsData = {
     body?: never;
@@ -1677,6 +1676,84 @@ export type CreateAppointmentResponses = {
 };
 
 export type CreateAppointmentResponse = CreateAppointmentResponses[keyof CreateAppointmentResponses];
+
+export type ConfirmAppointmentData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/appointments/{id}/confirm';
+};
+
+export type ConfirmAppointmentErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ConfirmAppointmentError = ConfirmAppointmentErrors[keyof ConfirmAppointmentErrors];
+
+export type ConfirmAppointmentResponses = {
+    /**
+     * OK
+     */
+    200: Appointment;
+};
+
+export type ConfirmAppointmentResponse = ConfirmAppointmentResponses[keyof ConfirmAppointmentResponses];
+
+export type MarkAppointmentNoShowData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/appointments/{id}/no-show';
+};
+
+export type MarkAppointmentNoShowErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type MarkAppointmentNoShowError = MarkAppointmentNoShowErrors[keyof MarkAppointmentNoShowErrors];
+
+export type MarkAppointmentNoShowResponses = {
+    /**
+     * OK
+     */
+    200: Appointment;
+};
+
+export type MarkAppointmentNoShowResponse = MarkAppointmentNoShowResponses[keyof MarkAppointmentNoShowResponses];
 
 export type CheckInAppointmentData = {
     body?: CheckInRequest;

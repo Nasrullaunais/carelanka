@@ -23,7 +23,6 @@ public sealed class PatientOpenApiContractTests
     [InlineData("AssignmentStatus")]
     [InlineData("AssignedBy")]
     [InlineData("ReleaseReason")]
-    [InlineData("WorklistKind")]
     [InlineData("WorklistStatus")]
     [InlineData("BillLineSource")]
     public async Task Published_enum_values_match_the_contract_in_order(string enumName)

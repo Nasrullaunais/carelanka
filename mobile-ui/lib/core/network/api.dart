@@ -7,7 +7,6 @@ import '../config/api_config.dart';
 import 'api_exception.dart';
 import 'auth_interceptor.dart';
 
-/// Builds the one API client the whole app shares.
 CareLankaApi buildApi({
   required TokenStore tokens,
   required SessionExpiry sessionExpiry,
@@ -17,8 +16,6 @@ CareLankaApi buildApi({
     baseUrl: baseUrl,
     connectTimeout: const Duration(seconds: 15),
     receiveTimeout: const Duration(seconds: 30),
-    // Let every status through to the interceptor so a ProblemDetails body is
-    // parsed rather than thrown away as a transport error.
     validateStatus: (status) => status != null && status < 400,
   ));
 
@@ -31,8 +28,6 @@ CareLankaApi buildApi({
   return CareLankaApi(dio, baseUrl: baseUrl);
 }
 
-/// Wrap every generated-client call in this so screens only ever see
-/// [ApiException], never a raw [DioException].
 Future<T> callApi<T>(Future<T> Function() request) async {
   try {
     return await request();

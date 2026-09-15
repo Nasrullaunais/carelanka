@@ -22,8 +22,6 @@ class AppointmentsScreen extends StatefulWidget {
 }
 
 class AppointmentsScreenState extends State<AppointmentsScreen> {
-  /// Home's "Book a visit" opens the same sheet this screen owns, so the flow
-  /// lives in one place rather than being written twice.
   Future<void> book() async {
     final controller = context.read<AppointmentsController>();
     final request = await showBookAppointmentSheet(context);
@@ -77,9 +75,7 @@ class AppointmentsScreenState extends State<AppointmentsScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<AppointmentsController>();
-    // The API answers an empty page rather than an error for an unlinked
-    // account, so an empty list alone cannot tell these two apart - and
-    // offering "Book a visit" here would earn a 409 on the first tap.
+    // An unlinked account also gets an empty page from the API, not an error — check isLinked, not list emptiness.
     final linked = context.watch<ProfileController>().isLinked;
 
     return Scaffold(
@@ -213,8 +209,6 @@ class _AppointmentCard extends StatelessWidget {
                             ?.copyWith(color: scheme.onSurfaceVariant),
                       ),
                       const SizedBox(height: 10),
-                      // status_text is the server's wording for the state
-                      // machine. The chip colours it; it never rewrites it.
                       StatusChip.appointment(
                         status: appointment.status,
                         label: appointment.statusText,
@@ -238,8 +232,6 @@ class _AppointmentCard extends StatelessWidget {
                 child: Text(appointment.reason!, style: theme.textTheme.bodyMedium),
               ),
             ],
-            // The desk's own words, shown as written. It is where they name a
-            // time the clinic can see the patient instead.
             if (appointment.cancellationReason != null) ...[
               const SizedBox(height: 14),
               _Notice(
@@ -249,8 +241,6 @@ class _AppointmentCard extends StatelessWidget {
                 body: appointment.cancellationReason!,
               ),
             ],
-            // Staff have already acted on this booking, so the patient cannot
-            // undo it from here. Saying only "no button" would read as a bug.
             if (appointment.status == AppointmentStatus.checkedIn) ...[
               const SizedBox(height: 14),
               _Notice(
@@ -262,8 +252,6 @@ class _AppointmentCard extends StatelessWidget {
                     'visit charge.',
               ),
             ],
-            // can_cancel is the server's decision, not ours — a scheduled visit
-            // stops being cancellable once the ward has checked you in.
             if (appointment.canCancel && onCancel != null) ...[
               const SizedBox(height: 8),
               Align(
@@ -283,8 +271,6 @@ class _AppointmentCard extends StatelessWidget {
   }
 }
 
-/// A small inline panel on a card. `NoticeBanner` is the page-level version and
-/// is too heavy to sit inside a list item.
 class _Notice extends StatelessWidget {
   const _Notice({
     required this.icon,

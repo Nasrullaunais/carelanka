@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 
-/// A titled block of content. Every patient screen is built from these, so the
-/// spacing between a heading and its content is decided once.
 class SectionCard extends StatelessWidget {
   const SectionCard({
     super.key,
@@ -51,9 +49,6 @@ class SectionCard extends StatelessWidget {
   }
 }
 
-/// A label on the left, its value on the right. Returns nothing at all when the
-/// value is null — a row reading "Bed: —" is noise on a screen someone is
-/// reading in a hospital bed.
 class DetailRow extends StatelessWidget {
   const DetailRow({super.key, required this.label, required this.value, this.icon});
 
@@ -97,14 +92,6 @@ class DetailRow extends StatelessWidget {
   }
 }
 
-/// Something the reader should act on but is not an error — missing details,
-/// a visit that was called off.
-///
-/// An ordinary card carrying one coloured icon and a coloured left edge, not a
-/// block of colour. A filled amber panel shouts at the same volume whether it
-/// is telling you your phone number is missing or that you are being wheeled
-/// into surgery, and three of them on one screen is a traffic accident. The
-/// colour is on the edge and the icon; the text stays ordinary text.
 class NoticeBanner extends StatelessWidget {
   const NoticeBanner({
     super.key,
@@ -120,7 +107,6 @@ class NoticeBanner extends StatelessWidget {
   final String? body;
   final List<String> bullets;
 
-  /// The one colour this notice is allowed to use.
   final Color accent;
   final IconData icon;
   final Widget? action;
@@ -137,9 +123,7 @@ class NoticeBanner extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppTheme.radiusL),
         border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.6)),
       ),
-      // The accent edge has to be exactly as tall as the text beside it, and
-      // `stretch` alone cannot work that out inside a list, where the height is
-      // unbounded until the children are measured.
+      // IntrinsicHeight: stretch alone can't size the accent edge to match unbounded content in a list.
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -224,8 +208,6 @@ class NoticeBanner extends StatelessWidget {
   }
 }
 
-/// The date as a calendar tile — how every appointment list on a phone shows
-/// "when", because the day number is what the eye lands on first.
 class DateBlock extends StatelessWidget {
   const DateBlock({super.key, required this.date, required this.muted});
 

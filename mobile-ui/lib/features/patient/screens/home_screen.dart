@@ -17,15 +17,9 @@ import '../widgets/patient_id_card.dart';
 import 'my_details_screen.dart';
 import 'past_visits_screen.dart';
 
-/// The screen the patient opens the app to.
-///
-/// One question gets answered above the fold: *what is happening to me right
-/// now?* Everything else is below it.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key, required this.onOpenTab});
 
-  /// Jumps to one of the shell's other tabs. Home is a summary — every card on
-  /// it is a shortcut to the screen that owns that thing.
   final void Function(PatientTab tab) onOpenTab;
 
   @override
@@ -77,11 +71,6 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-/// Home for an account with no hospital record behind it.
-///
-/// Everything else on Home is built from that record, so there is nothing
-/// truthful to show until it exists. One thing to do, and no controls that
-/// would be refused the moment they were tapped.
 class _NotLinkedYet extends StatelessWidget {
   const _NotLinkedYet();
 
@@ -110,9 +99,6 @@ class _NotLinkedYet extends StatelessWidget {
   }
 }
 
-/// The tabs the shell owns. Home links to the other three by name rather than
-/// by index, so reordering the bar cannot silently send someone to the wrong
-/// screen.
 enum PatientTab { home, appointments, myStay, profile }
 
 class _Greeting extends StatelessWidget {
@@ -171,8 +157,6 @@ String _timeOfDayGreeting() {
   return 'Good evening';
 }
 
-/// The one card that matters. A current stay outranks a booking, because
-/// somebody lying in a bed does not care what is in the diary next month.
 class _WhatsNext extends StatelessWidget {
   const _WhatsNext({required this.stay, required this.nextVisit, required this.onOpenTab});
 
@@ -222,8 +206,6 @@ class _CurrentStayCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          // The server's own sentence for the state machine. Re-wording it here
-          // is how the app and the ward end up disagreeing.
           Text(
             admission.statusText,
             style: theme.textTheme.headlineSmall?.copyWith(color: Colors.white),
@@ -471,9 +453,6 @@ class _QuickActions extends StatelessWidget {
             MaterialPageRoute(builder: (_) => const PastVisitsScreen()),
           ),
         ),
-        // Only ever the patient's own emergency contact. There is no hospital
-        // switchboard number in the API, and inventing one here would put a
-        // wrong number in front of someone having an emergency.
         if (emergencyPhone != null)
           _ActionTile(
             icon: Icons.phone_in_talk_outlined,

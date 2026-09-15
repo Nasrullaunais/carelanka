@@ -9,11 +9,6 @@ import '../state/profile_controller.dart';
 import '../validation/patient_fields.dart';
 import '../widgets/panels.dart';
 
-/// The details the hospital needs before it can treat you.
-///
-/// Always pushed on top of something, so it always has a way back out. Whether
-/// it reads as first-time setup or as a correction comes from whether the
-/// account has a record yet, not from a flag a caller could get wrong.
 class MyDetailsScreen extends StatefulWidget {
   const MyDetailsScreen({super.key});
 
@@ -31,9 +26,6 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
   final _emergencyName = TextEditingController();
   final _emergencyPhone = TextEditingController();
 
-  /// Null until picked. The form only offers male and female, so a record
-  /// carrying anything else starts blank rather than showing a value the
-  /// dropdown cannot display.
   Gender? _gender;
   DateTime? _dateOfBirth;
 
@@ -91,9 +83,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     if (!mounted) return;
 
     if (!saved) {
-      // Field errors are already rendered under the fields they belong to.
-      // Toasting "One or more fields are not valid" on top of them names
-      // nothing and hides the field that does.
+      // Field errors already render under their fields — only toast when there's no field to blame.
       if (controller.fieldErrors.isEmpty) {
         final message = controller.saveError?.message ?? 'Could not save your details.';
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
@@ -235,8 +225,6 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                       keyboardType: TextInputType.phone,
                       maxLength: PatientFieldLimits.phone,
                       serverErrors: errors['emergency_contact_phone'],
-                      // Optional, but a number in the wrong shape is worse than
-                      // none — nobody finds out until the ward has to call it.
                       validator: (v) =>
                           (v == null || v.trim().isEmpty) ? null : validatePhoneNumber(v),
                     ),
@@ -259,13 +247,10 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
   }
 }
 
-/// The server's own validation message, shown against the field it belongs to
-/// rather than in a toast the reader has to map back.
 String? _firstError(List<String>? serverErrors) =>
     (serverErrors == null || serverErrors.isEmpty) ? null : serverErrors.first;
 
-/// What the patient form offers. The wire enum also carries `other` and
-/// `unknown` for records created by staff, so [genderLabel] still handles them.
+// The wire enum also carries `other`/`unknown` for records staff created — genderLabel below still has to handle them.
 const _offeredGenders = [Gender.male, Gender.female];
 
 String genderLabel(Gender gender) => switch (gender) {
@@ -276,10 +261,6 @@ String genderLabel(Gender gender) => switch (gender) {
       Gender.$unknown => 'Unknown',
     };
 
-/// `emergency_contact_phone` → `Emergency contact phone`.
-///
-/// `missing_fields` arrives as wire names, because the server is naming its own
-/// columns. Showing them raw makes the app look like a database browser.
 String prettyFieldName(String wireName) {
   final words = wireName.split('_').where((w) => w.isNotEmpty).toList();
   if (words.isEmpty) return wireName;
@@ -297,8 +278,6 @@ String initialsOf(String name) {
   return (parts.first.characters.first + parts.last.characters.first).toUpperCase();
 }
 
-/// The form reads and writes the same controller the calling screen watches, so
-/// it has to be carried across into the pushed route.
 void openMyDetails(BuildContext context, ProfileController controller) {
   Navigator.of(context).push(MaterialPageRoute(
     builder: (_) => ChangeNotifierProvider<ProfileController>.value(
@@ -308,9 +287,6 @@ void openMyDetails(BuildContext context, ProfileController controller) {
   ));
 }
 
-/// A date picker that behaves like the text fields around it: same box, same
-/// floating label, and its "required" message lands under the box rather than
-/// in a snack bar, so `Form.validate()` covers it like any other field.
 class _DateOfBirthField extends StatelessWidget {
   const _DateOfBirthField({
     required this.value,

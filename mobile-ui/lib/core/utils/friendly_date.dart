@@ -1,26 +1,18 @@
 import 'package:intl/intl.dart';
 
-/// Dates written the way a person would say them.
-///
-/// Everything here takes UTC off the wire and renders local time — the API
-/// sends `DateTimeOffset` in UTC, so calling `.toLocal()` is not optional.
+// Renders local time everywhere — the API sends DateTimeOffset in UTC, so .toLocal() is not optional.
 class FriendlyDate {
   const FriendlyDate._();
 
-  /// `18/09/2026`
   static String date(DateTime value) => DateFormat('dd/MM/yyyy').format(value.toLocal());
 
-  /// `Fri, 18 Sep`
   static String dayAndMonth(DateTime value) => DateFormat('EEE, d MMM').format(value.toLocal());
 
-  /// `9:00 AM`
   static String time(DateTime value) => DateFormat('h:mm a').format(value.toLocal());
 
-  /// `Fri, 18 Sep 2026 at 9:00 AM`
   static String full(DateTime value) =>
       '${DateFormat('EEE, d MMM yyyy').format(value.toLocal())} at ${time(value)}';
 
-  /// `Today`, `Tomorrow`, `Yesterday`, else `Fri, 18 Sep`.
   static String relativeDay(DateTime value, {DateTime? now}) {
     final days = _calendarDaysFromNow(value, now);
     return switch (days) {
@@ -31,12 +23,9 @@ class FriendlyDate {
     };
   }
 
-  /// `Today at 9:00 AM`, `Tomorrow at 9:00 AM`, `Fri, 18 Sep at 9:00 AM`.
   static String relativeDayAndTime(DateTime value, {DateTime? now}) =>
       '${relativeDay(value, now: now)} at ${time(value)}';
 
-  /// How far away it is, as a phrase you could say out loud: `In 4 days`,
-  /// `In 2 hours`, `Now`, `3 days ago`.
   static String countdown(DateTime value, {DateTime? now}) {
     final current = now ?? DateTime.now();
     final target = value.toLocal();
@@ -57,9 +46,7 @@ class FriendlyDate {
     return ahead ? 'In $amount' : '$amount ago';
   }
 
-  /// Whole calendar days between today and [value] — not `difference.inDays`,
-  /// which counts 24-hour blocks and so calls 11pm tonight "0 days" and 1am
-  /// tomorrow "0 days" as well.
+  // Calendar days, not difference.inDays — that counts 24-hour blocks and calls both 11pm tonight and 1am tomorrow "0 days".
   static int _calendarDaysFromNow(DateTime value, DateTime? now) {
     final current = now ?? DateTime.now();
     final today = DateTime(current.year, current.month, current.day);

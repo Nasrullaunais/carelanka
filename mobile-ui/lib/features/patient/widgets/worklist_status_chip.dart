@@ -2,10 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../services/api_client/models/worklist_status.dart';
 
-/// Colour and wording for a worklist row's status.
-///
-/// The vocabulary comes from the backend's `WorklistStatus`, so a new value
-/// added there shows up here as `$unknown` rather than a crash.
 class WorklistStatusChip extends StatelessWidget {
   const WorklistStatusChip({super.key, required this.status});
 

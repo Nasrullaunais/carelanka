@@ -10,7 +10,6 @@ import '../widgets/panels.dart';
 import '../widgets/stay_journey.dart';
 import '../widgets/status_presentation.dart';
 
-/// Where the patient is up to, for someone reading it from a hospital bed.
 class MyStayScreen extends StatelessWidget {
   const MyStayScreen({super.key, this.onBookVisit});
 
@@ -68,8 +67,6 @@ class _Admission extends StatelessWidget {
     final scheme = theme.colorScheme;
     final journey = StayJourney.of(admission.status);
 
-    // Before a bed is found there is no ward, no bed and no date, and a card
-    // titled "Location and dates" holding nothing is worse than no card.
     final hasPlaceOrTime =
         admission.wardName != null ||
         admission.bedNumber != null ||
@@ -171,9 +168,6 @@ class _StatusHeadline extends StatelessWidget {
     final scheme = theme.colorScheme;
     final look = StatusLook.ofAdmission(admission.status, scheme);
 
-    // The colour is a badge behind the icon, not the whole panel. This is the
-    // first thing on the screen, and a full-bleed colour block here sets the
-    // volume for everything under it.
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -191,7 +185,6 @@ class _StatusHeadline extends StatelessWidget {
             child: Icon(look.icon, size: 22, color: look.color),
           ),
           const SizedBox(width: 14),
-          // The server's own sentence, verbatim.
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(top: 2),

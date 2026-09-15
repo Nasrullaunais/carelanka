@@ -16,8 +16,6 @@ class AppointmentsController extends ChangeNotifier {
 
   AsyncData<List<MyAppointment>> get appointments => _appointments;
 
-  /// True while a booking or cancellation is in flight, so the screen can stop
-  /// a second tap turning into a second appointment.
   bool get busy => _busy;
 
   List<MyAppointment> get upcoming =>
@@ -45,8 +43,6 @@ class AppointmentsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Returns the error rather than swallowing it: booking fails for reasons the
-  /// patient can act on — one open booking at a time, and none while admitted.
   Future<ApiException?> book({required DateTime scheduledAt, String? reason}) async {
     return _write(() => _service.bookAppointment(scheduledAt: scheduledAt, reason: reason));
   }

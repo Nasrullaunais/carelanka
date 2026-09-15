@@ -19,7 +19,6 @@ class PatientPaths {
   static const worklist = '/ward/worklist';
 }
 
-/// Registered in `app.dart`.
 final List<RouteBase> patientRoutes = [
   GoRoute(path: PatientPaths.home, builder: (_, __) => const _PatientArea()),
   GoRoute(
@@ -31,16 +30,12 @@ final List<RouteBase> patientRoutes = [
   ),
 ];
 
-/// Where a role this component owns lands after signing in. Returns null for
-/// roles that belong to another component.
 String? patientHomePathFor(PrincipalRole role) => switch (role) {
       PrincipalRole.patient => PatientPaths.home,
       PrincipalRole.wardNurse => PatientPaths.worklist,
       _ => null,
     };
 
-/// The tabs share these, so they are created once here rather than per tab —
-/// switching tabs should not throw away a loaded list.
 class _PatientArea extends StatelessWidget {
   const _PatientArea();
 

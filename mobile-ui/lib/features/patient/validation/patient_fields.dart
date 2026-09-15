@@ -1,11 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// The shapes the API enforces on a patient record, mirrored here so a typo is
-/// caught before it costs a round trip.
-///
-/// `PatientIdentifierFormats` on the server is the original. The web app
-/// carries the same pair in `types/identifiers.ts`, and all three have to agree
-/// or one of them rejects what the others accept.
+// Mirrors PatientIdentifierFormats on the server and types/identifiers.ts in the web app — all three must agree.
 abstract final class PatientFieldLimits {
   static const fullName = 200;
   static const nic = 20;
@@ -35,9 +30,6 @@ String? validateFullName(String? value) {
   return _withinLimit(value, PatientFieldLimits.fullName);
 }
 
-/// Optional here, unlike the desk form in the web app. The server takes the
-/// record without one and reports it under `missing_fields` instead, so a
-/// patient who cannot type an address still gets an account.
 String? validateAddress(String? value) =>
     _withinLimit(value, PatientFieldLimits.address);
 
@@ -50,9 +42,6 @@ String? validateVisitReason(String? value) =>
 String? _withinLimit(String? value, int limit) =>
     (value != null && value.length > limit) ? 'Use $limit characters or fewer' : null;
 
-/// A character count that stays out of the way until the limit is close, the
-/// way the web app's `Counter` does. Material's own counter is always on, which
-/// puts a number under every field on the form whether or not it is near full.
 Widget? Function(BuildContext, {required int currentLength, required bool isFocused, required int? maxLength})
     nearLimitCounter() {
   return (context, {required currentLength, required isFocused, required maxLength}) {

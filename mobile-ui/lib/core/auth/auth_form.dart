@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// The shared frame for the welcome, sign-in and sign-up screens, so all three
-/// line up on a phone and on a wide browser window alike.
 class AuthScaffold extends StatelessWidget {
   const AuthScaffold({
     super.key,
@@ -126,10 +124,7 @@ class AuthSubmitButton extends StatelessWidget {
   }
 }
 
-/// The same shape `UsernameRules` enforces on the server, so a typo is caught
-/// before it costs a round trip. Kept off the sign-in screen on purpose - a
-/// login that explains the rules tells a stranger what a valid username
-/// looks like.
+// Deliberately not shown on the sign-in screen — it would tell a stranger what a valid username looks like.
 String? validateUsername(String? value) {
   final text = value?.trim() ?? '';
   if (text.isEmpty) return 'Choose a username';
@@ -141,7 +136,6 @@ String? validateUsername(String? value) {
   return null;
 }
 
-/// Sri Lankan mobile numbers, in the shape the API's seeded accounts use.
 String? validatePhoneNumber(String? value) {
   final text = value?.trim() ?? '';
   if (text.isEmpty) return 'Enter your phone number';

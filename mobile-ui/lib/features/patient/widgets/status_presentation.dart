@@ -4,21 +4,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../services/api_client/models/admission_status.dart';
 import '../../../services/api_client/models/appointment_status.dart';
 
-/// How a status looks. Colour and icon only — the *words* always come from the
-/// server's `status_text`, so the app and the ward never say different things.
-///
-/// Three colours, not seven. Every state is one of:
-///   **teal**  — on track, nothing for you to do
-///   **amber** — waiting on somebody, or something is needed from you
-///   **red**   — called off
-///   **grey**  — finished, in the past
-///
-/// Giving each of the seven states its own colour was the first attempt. It
-/// made a list of visits look like a paint chart and, worse, gave no hint which
-/// row mattered. A reader can hold three meanings in their head, not seven.
-///
-/// Both switches are exhaustive over a generated enum. Add a state to the API
-/// and this file stops compiling, which is the point.
+// Both switches below are exhaustive over a generated enum — a new API state fails the build here rather than silently falling through.
 class StatusLook {
   const StatusLook({required this.icon, required this.color, required this.surface});
 
@@ -28,7 +14,6 @@ class StatusLook {
 
   static StatusLook ofAdmission(AdmissionStatus status, ColorScheme scheme) {
     return switch (status) {
-      // Nobody has a bed for them yet, and that is the ward's move to make.
       AdmissionStatus.awaitingBed => StatusLook(
           icon: Icons.hourglass_empty_rounded,
           color: scheme.warning,
@@ -94,7 +79,6 @@ class StatusLook {
           color: scheme.error,
           surface: scheme.errorContainer,
         ),
-      // Not an error the patient can fix, but not a normal ending either.
       AppointmentStatus.noShow => StatusLook(
           icon: Icons.event_busy_outlined,
           color: scheme.warning,
@@ -109,7 +93,6 @@ class StatusLook {
   }
 }
 
-/// The server's status sentence, wearing its colour.
 class StatusChip extends StatelessWidget {
   const StatusChip({super.key, required this.label, required this.look, this.compact = false});
 

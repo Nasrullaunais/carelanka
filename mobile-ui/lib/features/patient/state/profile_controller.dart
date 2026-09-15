@@ -7,10 +7,6 @@ import '../../../services/api_client/models/my_profile.dart';
 import '../../../services/api_client/models/pre_register_request.dart';
 import '../services/patient_service.dart';
 
-/// Whether this login has a hospital record behind it, and what it says.
-///
-/// Nothing else under `/me/*` works until it does, so this is loaded once when
-/// the patient area opens and shared by every tab.
 class ProfileController extends ChangeNotifier {
   ProfileController(this._service);
 
@@ -20,7 +16,7 @@ class ProfileController extends ChangeNotifier {
   bool _saving = false;
   ApiException? _saveError;
 
-  /// `null` inside [AsyncReady] means the account exists but has no record yet.
+  // `null` inside AsyncReady means the account exists but has no hospital record yet.
   AsyncData<MyProfile?> get profile => _profile;
   bool get saving => _saving;
   ApiException? get saveError => _saveError;
@@ -42,8 +38,7 @@ class ProfileController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Creates the record on first save, and updates it afterwards — the endpoint
-  /// matches on NIC, so calling it twice lands on the same record.
+  // The endpoint matches on NIC — creates on first save, updates on later ones, so calling it twice is safe.
   Future<bool> save({
     required String nic,
     required String fullName,

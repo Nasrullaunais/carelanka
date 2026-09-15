@@ -33,8 +33,6 @@ class _BookAppointmentSheetState extends State<_BookAppointmentSheet> {
   DateTime? _date;
   TimeOfDay? _time;
 
-  /// Clinic hours, offered as taps. Picking a time on a wheel is the slowest
-  /// part of booking anything on a phone.
   static const _suggestedTimes = [
     TimeOfDay(hour: 9, minute: 0),
     TimeOfDay(hour: 11, minute: 0),

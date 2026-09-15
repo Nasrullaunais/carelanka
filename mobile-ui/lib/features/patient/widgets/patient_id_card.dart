@@ -4,12 +4,6 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../core/theme/app_theme.dart';
 
-/// The patient code, big enough to read out and scannable at the desk.
-///
-/// Deliberately a plain card. It was a second teal gradient at first, stacked
-/// under the one on the card above it, and two coloured blocks in a row means
-/// neither one is the thing you look at. A scanner also copes better with a
-/// black code on white than on a tinted panel.
 class PatientIdCard extends StatelessWidget {
   const PatientIdCard({super.key, required this.patientCode, required this.fullName});
 

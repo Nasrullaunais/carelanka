@@ -118,9 +118,6 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-/// The header for an account with no record behind it. `display_name` is the
-/// username at this point - the account is created before any medical record
-/// exists, so there is no person's name to show.
 class _AccountOnlyHeader extends StatelessWidget {
   const _AccountOnlyHeader();
 

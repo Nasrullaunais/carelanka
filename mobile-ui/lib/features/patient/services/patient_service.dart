@@ -9,22 +9,15 @@ import '../../../services/api_client/models/my_profile.dart';
 import '../../../services/api_client/models/pre_register_request.dart';
 import '../../../services/api_client/models/worklist_row_paged_result.dart';
 
-/// Every Patient Management call the mobile app makes.
-///
-/// Wraps the generated client rather than replacing it: the shapes stay
-/// generated, and [callApi] is what turns a transport failure into an
-/// `ApiException` the screens already know how to render.
 class PatientService {
   const PatientService(this._api);
 
   final CareLankaApi _api;
 
-  /// The signed-in account has no hospital record behind it yet. It arrives as
-  /// a 404 from `/me/profile` and `/me/admission`, and as a 409 from booking a
-  /// visit, so branch on this code rather than on the status.
+  // Arrives as 404 from /me/profile and /me/admission, and 409 from booking — branch on this code, not the status.
   static const notLinkedCode = 'cl_pat_033';
 
-  /// Linked, but not admitted right now. Also a 404, and not the same thing.
+  // Also a 404, but distinct from notLinkedCode: linked, just not admitted right now.
   static const noCurrentStayCode = 'cl_pat_034';
 
   Future<MyProfile> loadMyProfile() {

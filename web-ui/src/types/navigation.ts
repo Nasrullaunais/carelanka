@@ -35,7 +35,7 @@ export const destinations: Destination[] = [
   {
     to: '/appointments',
     label: 'Expected visits',
-    description: 'Who has booked to come in. Take a booking, or check someone in.',
+    description: 'Who has booked to come in, and when they are expected.',
     canAccess: canOpenAppointmentBoard,
   },
   {

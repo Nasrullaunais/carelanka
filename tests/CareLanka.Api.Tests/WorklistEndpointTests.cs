@@ -138,41 +138,31 @@ public sealed class WorklistEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
     }
 
+    /// The board is people who are here. A booking is worked from the expected visits screen
+    /// until the patient walks in, which is what stopped the same person being on two lists.
     [Fact]
-    public async Task A_booking_nobody_has_checked_in_reads_as_not_arrived()
+    public async Task A_booking_nobody_has_admitted_is_not_on_the_board_at_all()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         var patient = await NewPatientAsync(nurse);
         await BookAsync(nurse, patient.Id);
 
-        var row = await BoardRowAsync(nurse, patient.Name);
-
-        Assert.Equal("booking", row.GetProperty("kind").GetString());
-        Assert.Equal("not_arrived", row.GetProperty("status").GetString());
-        Assert.Equal(JsonValueKind.Null, row.GetProperty("admission_category").ValueKind);
-        Assert.False(row.GetProperty("requires_bed").GetBoolean());
+        Assert.Empty(await BoardRowsAsync(nurse, patient.Name));
+        Assert.Empty(await BoardRowsAsync(nurse, patient.Name, includeFinished: true));
     }
 
     [Fact]
-    public async Task A_booking_carries_its_reason_so_a_scan_is_not_a_blood_test()
-    {
-        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
-        var patient = await NewPatientAsync(nurse);
-        await BookAsync(nurse, patient.Id, reason: "Scan");
-
-        var row = await BoardRowAsync(nurse, patient.Name);
-
-        Assert.Equal("Scan", row.GetProperty("reason").GetString());
-    }
-
-    [Fact]
-    public async Task A_checked_in_booking_appears_once_as_its_visit_and_not_twice()
+    public async Task An_admitted_booking_appears_once_as_its_visit_and_not_twice()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         var patient = await NewPatientAsync(nurse);
         var appointmentId = await BookAsync(nurse, patient.Id);
 
-        var checkedIn = await nurse.PostAsJsonAsync(
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await nurse.PostAsync($"/api/appointments/{appointmentId}/confirm", null)).StatusCode);
+
+        var admitted = await nurse.PostAsJsonAsync(
             $"/api/appointments/{appointmentId}/check-in",
             new
             {
@@ -182,13 +172,11 @@ public sealed class WorklistEndpointTests
                 is_infectious = false
             });
 
-        Assert.Equal(HttpStatusCode.Created, checkedIn.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, admitted.StatusCode);
 
         var rows = await BoardRowsAsync(nurse, patient.Name);
 
         Assert.Single(rows);
-        Assert.Equal("visit", rows[0].GetProperty("kind").GetString());
-
         Assert.Equal("admitted", rows[0].GetProperty("status").GetString());
         Assert.False(rows[0].GetProperty("requires_bed").GetBoolean());
     }
@@ -202,7 +190,6 @@ public sealed class WorklistEndpointTests
 
         var row = await BoardRowAsync(nurse, patient.Name);
 
-        Assert.Equal("visit", row.GetProperty("kind").GetString());
         Assert.Equal("awaiting_bed", row.GetProperty("status").GetString());
         Assert.True(row.GetProperty("requires_bed").GetBoolean());
         Assert.Equal(JsonValueKind.Null, row.GetProperty("bed_number").ValueKind);
@@ -264,15 +251,14 @@ public sealed class WorklistEndpointTests
     }
 
     [Fact]
-    public async Task The_board_pages_across_both_tables_without_repeating_or_losing_a_row()
+    public async Task The_board_pages_without_repeating_or_losing_a_row()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
 
         var surname = $"Union{Guid.NewGuid():N}"[..14];
 
-        for (var i = 0; i < 3; i++)
+        for (var i = 0; i < 6; i++)
         {
-            await BookAsync(nurse, (await NewPatientAsync(nurse, surname)).Id);
             await AdmitAsync(nurse, (await NewPatientAsync(nurse, surname)).Id, "outpatient");
         }
 

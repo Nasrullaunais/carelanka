@@ -1816,10 +1816,18 @@ which was a real gap worth keeping.
 `patient-spec.yaml` has no value for. Adding it means adding it to the published enum too,
 so it is carried to Open Decisions as item 10 rather than decided here by one member.
 
-### AppointmentStatus *(Rev 2 — new)*
+### AppointmentStatus *(Rev 2.3 — `CheckedIn` replaced by `Confirmed`)*
 ```
-Scheduled, CheckedIn, Completed, Cancelled, NoShow
+Scheduled, Confirmed, Completed, Cancelled, NoShow
 ```
+Shown to staff as: Needs confirming, Expected, Finished, Cancelled, Did not come.
+
+`Confirmed` is the desk saying it has read the booking, and is the gate on every day-of
+action — without it, "admit" sat one click away on a booking three weeks out.
+
+`Completed` covers both endings. `AdmissionId` null means the patient was seen and went home
+and the bill is on the appointment; set means they were admitted, and the bill is the
+admission's. `CheckedIn` said nothing `AdmissionId` did not already say.
 
 ### BedCondition *(Rev 2.2 — replaces BedStatus)*
 ```

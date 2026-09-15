@@ -138,6 +138,31 @@ class EmptyView extends StatelessWidget {
   }
 }
 
+/// Lets a message that does not scroll -- an empty or error state -- still answer a pull down.
+/// Without this a patient waiting on staff has no way to ask again short of restarting the app.
+class RefreshableMessage extends StatelessWidget {
+  const RefreshableMessage({super.key, required this.onRefresh, required this.child});
+
+  final Future<void> Function() onRefresh;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class Skeleton extends StatefulWidget {
   const Skeleton({super.key, required this.height, this.width, this.radius = AppTheme.radiusS});
 

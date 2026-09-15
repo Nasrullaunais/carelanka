@@ -1,14 +1,17 @@
 import { Fragment, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   cancelAppointmentAtTheDeskMutation,
   checkInAppointmentMutation,
   completeAppointmentMutation,
+  confirmAppointmentMutation,
   createAppointmentMutation,
   listAppointmentsOptions,
   listPatientsOptions,
+  markAppointmentNoShowMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
 import type {
   Admission,
@@ -21,13 +24,15 @@ import type {
 import { useSession } from '../services/auth/useSession';
 import { BillPanel } from '../components/BillPanel';
 import {
+  canBillAppointment,
   canOpenAppointmentBoard,
   canSetHighCareLevel,
   canWorkAppointmentDesk,
-  canWorkBillingDesk,
 } from '../types/permissions';
 import {
+  appointmentOutcome,
   appointmentStatusLabels,
+  appointmentStatusTone,
   appointmentStatuses,
   deskCareLevels,
   dutyManagerCareLevels,
@@ -49,17 +54,18 @@ export function AppointmentsPage() {
   const role = session?.principal.role;
 
   const [date, setDate] = useState(() => utcDay(new Date()));
-  const [status, setStatus] = useState<AppointmentStatus | ''>('scheduled');
+  const [status, setStatus] = useState<AppointmentStatus | ''>('');
   const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
   const [open, setOpen] = useState<{ appointment: Appointment; action: DeskAction } | null>(null);
   const [admitted, setAdmitted] = useState<Admission | null>(null);
 
   // Two different questions: who may see the list, and who may act on a
-  // booking. Reception can bill a finished visit but cannot check anyone in.
+  // booking. The administrator can bill a finished visit but cannot check
+  // anyone in.
   const canSee = canOpenAppointmentBoard(role);
   const isDesk = canWorkAppointmentDesk(role);
-  const billing = canWorkBillingDesk(role);
+  const billing = canBillAppointment(role);
 
   const appointments = useQuery({
     ...listAppointmentsOptions({
@@ -78,8 +84,8 @@ export function AppointmentsPage() {
       <>
         <h1>Expected visits</h1>
         <p className="empty">
-          Your role cannot open the bookings list. Ward nurses, the duty manager and the
-          billing desk can.
+          Your role cannot open the bookings list. Reception, ward nurses, the duty manager
+          and the administrator can.
         </p>
       </>
     );
@@ -100,20 +106,35 @@ export function AppointmentsPage() {
     );
   }
 
+  const refreshBookings = () =>
+    queryClient.invalidateQueries({
+      predicate: (query) =>
+        (query.queryKey[0] as { _id?: string } | undefined)?._id === 'listAppointments',
+    });
+
+  const confirm = useMutation({
+    ...confirmAppointmentMutation(),
+    onSuccess: (updated) => {
+      toast.success(`${updated.patient.full_name}'s visit is confirmed.`);
+      void refreshBookings();
+    },
+  });
+
+  const noShow = useMutation({
+    ...markAppointmentNoShowMutation(),
+    onSuccess: (updated) => {
+      toast.success(`${updated.patient.full_name} marked as not attended.`);
+      void refreshBookings();
+      setOpen(null);
+    },
+  });
+
   const complete = useMutation({
     ...completeAppointmentMutation(),
     onSuccess: (updated) => {
       toast.success('Visit recorded. Raise the bill below.');
-      void queryClient.invalidateQueries({
-        predicate: (query) =>
-          (query.queryKey[0] as { _id?: string } | undefined)?._id === 'listAppointments',
-      });
+      void refreshBookings();
       setAdmitted(null);
-
-      // Completing moves the booking out of the "Expected" filter the desk
-      // starts on, which would hide the very row whose bill we just opened.
-      setStatus('completed');
-      setPage(1);
       setOpen({ appointment: updated, action: 'bill' });
     },
   });
@@ -130,12 +151,16 @@ export function AppointmentsPage() {
     complete.mutate({ path: { id: appointment.id } });
   }
 
+  function markNotAttended(appointment: Appointment) {
+    noShow.mutate({ path: { id: appointment.id } });
+  }
+
   return (
     <>
       <h1>Expected visits</h1>
       <p className="muted">
-        Patients booked to come in, so the desk knows before they arrive. Checking a patient in
-        turns the appointment into an admission and starts the search for a bed.
+        Patients booked to come in, so the desk knows before they arrive. Confirm a booking
+        when you read it; the actions for the day itself open up once it is confirmed.
       </p>
 
       <div className="card">
@@ -205,6 +230,8 @@ export function AppointmentsPage() {
           onRetry={() => void appointments.refetch()}
           onAction={toggle}
           onSeenAndBill={seenAndBill}
+          onConfirm={(appointment) => confirm.mutate({ path: { id: appointment.id } })}
+          onNotAttended={markNotAttended}
           canAct={isDesk}
           canBill={billing}
           showDate={date === ''}
@@ -217,7 +244,7 @@ export function AppointmentsPage() {
 
             if (open?.action === 'bill') {
               return (
-                <BillPanel appointmentId={appointment.id} canSettle={canWorkBillingDesk(role)} />
+                <BillPanel appointmentId={appointment.id} canSettle={billing} />
               );
             }
 
@@ -277,6 +304,8 @@ function AppointmentTable({
   onRetry,
   onAction,
   onSeenAndBill,
+  onConfirm,
+  onNotAttended,
   canAct,
   canBill,
   showDate,
@@ -290,6 +319,8 @@ function AppointmentTable({
   onRetry: () => void;
   onAction: (appointment: Appointment, action: DeskAction) => void;
   onSeenAndBill: (appointment: Appointment) => void;
+  onConfirm: (appointment: Appointment) => void;
+  onNotAttended: (appointment: Appointment) => void;
   canAct: boolean;
   canBill: boolean;
   showDate: boolean;
@@ -362,24 +393,46 @@ function AppointmentTable({
                 {appointment.booked_by_staff_id ? 'At the desk' : 'In the app'}
               </td>
               <td>
-                <span
-                  className={appointment.status === 'scheduled' ? 'badge' : 'badge retired'}
-                >
+                <span className={appointmentStatusTone(appointment.status)}>
                   {appointmentStatusLabels[appointment.status]}
                 </span>
+                {appointmentOutcome(appointment) && (
+                  <>
+                    <br />
+                    <span className="muted">{appointmentOutcome(appointment)}</span>
+                  </>
+                )}
               </td>
               <td className="row" style={{ gap: '0.4rem', justifyContent: 'flex-end' }}>
+                {/* Nothing on the day is offered until the desk has read the booking, so a
+                    visit weeks away can never start a bed search by mistake. */}
+                {canAct && appointment.can_confirm && (
+                  <button type="button" onClick={() => onConfirm(appointment)}>
+                    Check and confirm
+                  </button>
+                )}
+
                 {canAct && appointment.can_complete && (
                   <button type="button" onClick={() => onAction(appointment, 'check-in')}>
                     {openId === appointment.id && openAction === 'check-in'
                       ? 'Close'
-                      : 'Check in and admit'}
+                      : 'Patient has arrived — admit'}
                   </button>
                 )}
 
                 {canAct && appointment.can_complete && (
                   <button type="button" className="secondary" onClick={() => onSeenAndBill(appointment)}>
                     {openId === appointment.id && openAction === 'bill' ? 'Close' : 'Seen and bill'}
+                  </button>
+                )}
+
+                {canAct && appointment.can_complete && (
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => onNotAttended(appointment)}
+                  >
+                    Did not come
                   </button>
                 )}
 
@@ -395,8 +448,9 @@ function AppointmentTable({
                   </button>
                 )}
 
-                {/* A completed visit still has a bill to work on. */}
-                {canBill && appointment.status === 'completed' && (
+                {/* An admitted patient is billed on their admission at discharge, so this
+                    row has no bill of its own. */}
+                {canBill && appointment.status === 'completed' && !appointment.admission_id && (
                   <button
                     type="button"
                     className="secondary"
@@ -404,6 +458,12 @@ function AppointmentTable({
                   >
                     {openId === appointment.id && openAction === 'bill' ? 'Close' : 'Bill'}
                   </button>
+                )}
+
+                {appointment.status === 'completed' && appointment.admission_id && (
+                  <Link to="/patients" className="muted" style={{ fontSize: '0.82rem' }}>
+                    On the ward board
+                  </Link>
                 )}
               </td>
             </tr>
@@ -690,7 +750,7 @@ function CheckInPanel({
   const checkIn = useMutation({
     ...checkInAppointmentMutation(),
     onSuccess: (admission) => {
-      toast.success(`${appointment.patient.full_name} checked in.`);
+      toast.success(`${appointment.patient.full_name} admitted.`);
 
       queryClient.invalidateQueries({
         predicate: (query) => {
@@ -722,11 +782,12 @@ function CheckInPanel({
 
   return (
     <div className="drawer-body">
-      <h3>Check in {appointment.patient.full_name}</h3>
+      <h3>Admit {appointment.patient.full_name}</h3>
       <p className="muted" style={{ marginBottom: '0.9rem' }}>
         Booked for {localDateTime(appointment.scheduled_at)}
-        {appointment.reason ? ` — ${appointment.reason}` : ''}. From here this is an ordinary
-        admission, and the bed search runs exactly as it would for a walk-in.
+        {appointment.reason ? ` — ${appointment.reason}` : ''}. Only do this with the patient
+        in front of you: from here it is an ordinary admission, and the bed search runs
+        exactly as it would for a walk-in.
       </p>
 
       <form onSubmit={submit}>
@@ -787,7 +848,7 @@ function CheckInPanel({
 
         <div className="row">
           <button type="submit" disabled={checkIn.isPending}>
-            {checkIn.isPending ? 'Checking in…' : 'Check in and admit'}
+            {checkIn.isPending ? 'Admitting…' : 'Admit to a ward'}
           </button>
           <button type="button" className="secondary" onClick={onCancel}>
             Cancel
@@ -807,7 +868,7 @@ function CheckedInCard({
 }) {
   return (
     <div className="card">
-      <h2>Checked in</h2>
+      <h2>Admitted</h2>
       <p className="muted">
         {admission.patient?.full_name ?? 'The patient'} is admitted and awaiting a bed. Care
         level: <strong>{admissionCategoryLabels[admission.admission_category]}</strong>.

@@ -9,9 +9,6 @@ public class WorklistRow
     public Guid Id { get; set; }
 
     [Required]
-    public WorklistKind Kind { get; set; }
-
-    [Required]
     public PatientSummary Patient { get; set; } = null!;
 
     [Required]
@@ -33,5 +30,4 @@ public class WorklistRow
     [Required]
     public DateTimeOffset When { get; set; }
 
-    public string? Reason { get; set; }
 }

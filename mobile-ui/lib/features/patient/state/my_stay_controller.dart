@@ -31,9 +31,11 @@ class MyStayController extends ChangeNotifier {
 
   AsyncData<MyStay> get state => _state;
 
-  Future<void> load() async {
-    _state = const AsyncData.loading();
-    notifyListeners();
+  Future<void> load({bool showLoading = true}) async {
+    if (showLoading) {
+      _state = const AsyncData.loading();
+      notifyListeners();
+    }
 
     try {
       _state = AsyncData.ready(MyStayCurrent(await _service.loadMyAdmission()));

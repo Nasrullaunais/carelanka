@@ -26,13 +26,17 @@ class AppointmentsController extends ChangeNotifier {
       (_appointments.valueOrNull ?? const []).where((a) => !_isOpen(a)).toList()
         ..sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));
 
+  // Completed is deliberately not open, whichever way it ended. Either the patient went home
+  // or they are in a bed, and the stay -- not the booking -- is what they are waiting on.
   static bool _isOpen(MyAppointment appointment) =>
       appointment.status == AppointmentStatus.scheduled ||
-      appointment.status == AppointmentStatus.checkedIn;
+      appointment.status == AppointmentStatus.confirmed;
 
-  Future<void> load() async {
-    _appointments = const AsyncData.loading();
-    notifyListeners();
+  Future<void> load({bool showLoading = true}) async {
+    if (showLoading) {
+      _appointments = const AsyncData.loading();
+      notifyListeners();
+    }
 
     try {
       final page = await _service.loadMyAppointments();

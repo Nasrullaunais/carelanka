@@ -212,6 +212,11 @@ public sealed class BillingService : IBillingService
             .FirstOrDefaultAsync(row => row.Id == appointmentId, ct)
             ?? throw new NotFoundException("Appointment", appointmentId);
 
+        if (appointment.AdmissionId is not null)
+        {
+            throw new ConflictException(MessageCode.AppointmentBilledOnItsAdmission);
+        }
+
         var bill = await FindOrOpenForAppointmentAsync(appointment, ct);
 
         if (bill.IsSettled)

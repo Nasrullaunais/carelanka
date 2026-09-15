@@ -80,7 +80,27 @@ class _PatientShellState extends State<PatientShell> {
     }
   }
 
-  void _openTab(PatientTab tab) => setState(() => _tab = tab);
+  // Staff change the stay from the other side of the hospital, so opening a tab refetches what
+  // that tab shows. Silently: the screen keeps what it has until the new answer arrives.
+  void _openTab(PatientTab tab) {
+    setState(() => _tab = tab);
+    _refresh(tab);
+  }
+
+  void _refresh(PatientTab tab) {
+    switch (tab) {
+      case PatientTab.home:
+        context.read<ProfileController>().load(showLoading: false);
+        context.read<MyStayController>().load(showLoading: false);
+        context.read<AppointmentsController>().load(showLoading: false);
+      case PatientTab.appointments:
+        context.read<AppointmentsController>().load(showLoading: false);
+      case PatientTab.myStay:
+        context.read<MyStayController>().load(showLoading: false);
+      case PatientTab.profile:
+        context.read<ProfileController>().load(showLoading: false);
+    }
+  }
 
   void _bookVisit() {
     setState(() => _tab = PatientTab.appointments);

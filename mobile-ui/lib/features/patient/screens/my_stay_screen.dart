@@ -18,6 +18,7 @@ class MyStayScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<MyStayController>();
+    Future<void> refresh() => controller.load(showLoading: false);
 
     return Scaffold(
       appBar: AppBar(title: const Text('My stay')),
@@ -26,28 +27,34 @@ class MyStayScreen extends StatelessWidget {
         onRetry: controller.load,
         loading: const _StaySkeleton(),
         builder: (context, stay) => switch (stay) {
-          MyStayNotLinked() => const EmptyView(
-            icon: Icons.badge_outlined,
-            title: 'No hospital record',
-            message: 'Your account is not yet linked to a hospital record.',
+          MyStayNotLinked() => RefreshableMessage(
+            onRefresh: refresh,
+            child: const EmptyView(
+              icon: Icons.badge_outlined,
+              title: 'No hospital record',
+              message: 'Your account is not yet linked to a hospital record.',
+            ),
           ),
-          MyStayNoAdmission() => EmptyView(
-            icon: Icons.event_available_outlined,
-            title: 'Not currently admitted',
-            message: 'Your ward, bed and progress will appear here once '
-                'hospital staff admit you.',
-            action: onBookVisit == null
-                ? null
-                : FilledButton.icon(
-                    onPressed: onBookVisit,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Book a visit'),
-                    style: FilledButton.styleFrom(minimumSize: const Size(200, 48)),
-                  ),
+          MyStayNoAdmission() => RefreshableMessage(
+            onRefresh: refresh,
+            child: EmptyView(
+              icon: Icons.event_available_outlined,
+              title: 'Not currently admitted',
+              message: 'Your ward, bed and progress will appear here once '
+                  'hospital staff admit you.',
+              action: onBookVisit == null
+                  ? null
+                  : FilledButton.icon(
+                      onPressed: onBookVisit,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Book a visit'),
+                      style: FilledButton.styleFrom(minimumSize: const Size(200, 48)),
+                    ),
+            ),
           ),
           MyStayCurrent(:final admission) => _Admission(
             admission: admission,
-            onRefresh: controller.load,
+            onRefresh: refresh,
           ),
         },
       ),

@@ -64,7 +64,7 @@ class StatusLook {
           color: scheme.primary,
           surface: scheme.primaryContainer,
         ),
-      AppointmentStatus.checkedIn => StatusLook(
+      AppointmentStatus.confirmed => StatusLook(
           icon: Icons.how_to_reg_outlined,
           color: scheme.primary,
           surface: scheme.primaryContainer,

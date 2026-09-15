@@ -101,7 +101,7 @@ public class BillingController : ControllerBase
         Guid appointmentId, CancellationToken ct)
         => Ok(await _billing.GetForAppointmentAsync(appointmentId, ct));
 
-    [Authorize(Policy = Policies.BillingDesk)]
+    [Authorize(Policy = Policies.AppointmentBillingDesk)]
     [HttpPost("appointments/{appointmentId:guid}/bill", Name = "prepareAppointmentBill")]
     [ProducesResponseType(typeof(BillResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
@@ -112,7 +112,7 @@ public class BillingController : ControllerBase
         Guid appointmentId, CancellationToken ct)
         => Ok(await _billing.PrepareForAppointmentAsync(appointmentId, ct));
 
-    [Authorize(Policy = Policies.BillingDesk)]
+    [Authorize(Policy = Policies.AppointmentBillingDesk)]
     [HttpPost("appointments/{appointmentId:guid}/bill/charges", Name = "addAppointmentBillCharge")]
     [ProducesResponseType(typeof(BillResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
@@ -124,7 +124,7 @@ public class BillingController : ControllerBase
         Guid appointmentId, [FromBody] AddBillChargeRequest request, CancellationToken ct)
         => Ok(await _billing.AddAppointmentChargeAsync(appointmentId, request, ct));
 
-    [Authorize(Policy = Policies.BillingDesk)]
+    [Authorize(Policy = Policies.AppointmentBillingDesk)]
     [HttpDelete("appointments/{appointmentId:guid}/bill/charges/{lineId:guid}", Name = "removeAppointmentBillCharge")]
     [ProducesResponseType(typeof(BillResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
@@ -135,7 +135,7 @@ public class BillingController : ControllerBase
         Guid appointmentId, Guid lineId, CancellationToken ct)
         => Ok(await _billing.RemoveAppointmentChargeAsync(appointmentId, lineId, ct));
 
-    [Authorize(Policy = Policies.BillingDesk)]
+    [Authorize(Policy = Policies.AppointmentBillingDesk)]
     [HttpPost("appointments/{appointmentId:guid}/bill/settle", Name = "settleAppointmentBill")]
     [ProducesResponseType(typeof(BillResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]

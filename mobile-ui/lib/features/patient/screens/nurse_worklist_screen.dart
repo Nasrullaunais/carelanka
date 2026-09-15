@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../../../core/auth/auth_controller.dart';
 import '../../../core/widgets/async_view.dart';
-import '../../../services/api_client/models/worklist_kind.dart';
 import '../../../services/api_client/models/worklist_row.dart';
 import '../state/worklist_controller.dart';
 import '../widgets/worklist_status_chip.dart';
@@ -97,20 +96,17 @@ class _WorklistTile extends StatelessWidget {
     final place = [row.wardName, row.bedNumber].whereType<String>().join(' · ');
 
     return ListTile(
-      leading: Icon(
-        row.kind == WorklistKind.booking ? Icons.event_outlined : Icons.local_hospital_outlined,
-      ),
+      leading: const Icon(Icons.local_hospital_outlined),
       title: Text(row.patient.fullName),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(row.patient.patientCode, style: theme.textTheme.bodySmall),
           if (place.isNotEmpty) Text(place, style: theme.textTheme.bodySmall),
-          if (row.reason != null) Text(row.reason!, style: theme.textTheme.bodySmall),
         ],
       ),
       trailing: WorklistStatusChip(status: row.status),
-      isThreeLine: place.isNotEmpty || row.reason != null,
+      isThreeLine: place.isNotEmpty,
     );
   }
 }

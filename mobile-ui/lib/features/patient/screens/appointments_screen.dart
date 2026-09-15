@@ -4,10 +4,9 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/friendly_date.dart';
 import '../../../core/widgets/async_view.dart';
-import '../../../services/api_client/models/appointment_status.dart';
 import '../../../services/api_client/models/my_appointment.dart';
-import '../hospital_contact.dart';
 import '../state/appointments_controller.dart';
+import '../state/my_stay_controller.dart';
 import '../state/profile_controller.dart';
 import '../widgets/panels.dart';
 import '../widgets/status_presentation.dart';
@@ -77,10 +76,14 @@ class AppointmentsScreenState extends State<AppointmentsScreen> {
     final controller = context.watch<AppointmentsController>();
     // An unlinked account also gets an empty page from the API, not an error — check isLinked, not list emptiness.
     final linked = context.watch<ProfileController>().isLinked;
+    // A patient who is still in a bed books nothing: the ward is already looking after them,
+    // and the API refuses it anyway. Hide the button rather than let them meet a 409.
+    final admitted = context.watch<MyStayController>().state.valueOrNull is MyStayCurrent;
+    Future<void> refresh() => controller.load(showLoading: false);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Appointments')),
-      floatingActionButton: linked
+      floatingActionButton: linked && !admitted
           ? FloatingActionButton.extended(
               onPressed: controller.busy ? null : book,
               icon: const Icon(Icons.add),
@@ -96,37 +99,54 @@ class AppointmentsScreenState extends State<AppointmentsScreen> {
           final past = controller.past;
 
           if (!linked) {
-            return EmptyView(
-              icon: Icons.badge_outlined,
-              title: 'Complete your details',
-              message: 'Add your details before booking a visit.',
-              action: FilledButton(
-                onPressed: () => openMyDetails(context, context.read<ProfileController>()),
-                style: FilledButton.styleFrom(minimumSize: const Size(200, 48)),
-                child: const Text('Add my details'),
+            return RefreshableMessage(
+              onRefresh: refresh,
+              child: EmptyView(
+                icon: Icons.badge_outlined,
+                title: 'Complete your details',
+                message: 'Add your details before booking a visit.',
+                action: FilledButton(
+                  onPressed: () => openMyDetails(context, context.read<ProfileController>()),
+                  style: FilledButton.styleFrom(minimumSize: const Size(200, 48)),
+                  child: const Text('Add my details'),
+                ),
               ),
             );
           }
 
           if (upcoming.isEmpty && past.isEmpty) {
-            return EmptyView(
-              icon: Icons.event_available_outlined,
-              title: 'No visits booked',
-              message: 'Your booked visits will appear here.',
-              action: FilledButton.icon(
-                onPressed: controller.busy ? null : book,
-                icon: const Icon(Icons.add),
-                label: const Text('Book a visit'),
-                style: FilledButton.styleFrom(minimumSize: const Size(200, 48)),
-              ),
+            return RefreshableMessage(
+              onRefresh: refresh,
+              child: admitted
+                  ? const EmptyView(
+                      icon: Icons.local_hospital_outlined,
+                      title: 'You are in hospital',
+                      message: 'Booking opens again once you have been discharged. Until then '
+                          'the ward is looking after everything.',
+                    )
+                  : EmptyView(
+                      icon: Icons.event_available_outlined,
+                      title: 'No visits booked',
+                      message: 'Your booked visits will appear here.',
+                      action: FilledButton.icon(
+                        onPressed: controller.busy ? null : book,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Book a visit'),
+                        style: FilledButton.styleFrom(minimumSize: const Size(200, 48)),
+                      ),
+                    ),
             );
           }
 
           return RefreshIndicator(
-            onRefresh: controller.load,
+            onRefresh: refresh,
             child: ListView(
               padding: const EdgeInsets.fromLTRB(AppTheme.gutter, 4, AppTheme.gutter, 104),
               children: [
+                if (admitted) ...[
+                  const SizedBox(height: 14),
+                  const _AdmittedNotice(),
+                ],
                 if (upcoming.isNotEmpty) ...[
                   const _SectionHeading('Upcoming'),
                   for (final appointment in upcoming)
@@ -151,6 +171,21 @@ class AppointmentsScreenState extends State<AppointmentsScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+class _AdmittedNotice extends StatelessWidget {
+  const _AdmittedNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return _Notice(
+      icon: Icons.local_hospital_outlined,
+      accent: Theme.of(context).colorScheme.primary,
+      title: 'You are in hospital right now',
+      body: 'You cannot book another visit until you have been discharged. '
+          'Anything you need while you are here, ask the ward.',
     );
   }
 }
@@ -239,17 +274,6 @@ class _AppointmentCard extends StatelessWidget {
                 accent: scheme.error,
                 title: 'Cancelled by the hospital',
                 body: appointment.cancellationReason!,
-              ),
-            ],
-            if (appointment.status == AppointmentStatus.checkedIn) ...[
-              const SizedBox(height: 14),
-              _Notice(
-                icon: Icons.support_agent_outlined,
-                accent: scheme.onSurfaceVariant,
-                title: 'This visit can no longer be cancelled here',
-                body: 'Please contact reception on ${HospitalContact.reception}. '
-                    'A cancellation at this stage may incur a fee of 50% of the '
-                    'visit charge.',
               ),
             ],
             if (appointment.canCancel && onCancel != null) ...[

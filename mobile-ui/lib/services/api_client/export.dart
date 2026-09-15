@@ -175,7 +175,6 @@ export 'models/warning.dart';
 export 'models/warning_severity.dart';
 export 'models/warning_status.dart';
 export 'models/warning_type.dart';
-export 'models/worklist_kind.dart';
 export 'models/worklist_row.dart';
 export 'models/worklist_row_paged_result.dart';
 export 'models/worklist_status.dart';

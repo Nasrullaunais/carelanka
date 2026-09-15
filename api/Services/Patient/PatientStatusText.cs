@@ -39,10 +39,10 @@ public static class PatientStatusText
         => status switch
     {
         AppointmentStatus.Scheduled =>
-            "Booked. You can still cancel this.",
+            "Booked. The hospital will confirm it shortly, and you can still cancel.",
 
-        AppointmentStatus.CheckedIn =>
-            "You have been checked in.",
+        AppointmentStatus.Confirmed =>
+            "Confirmed by the hospital. You can still cancel this.",
 
         AppointmentStatus.Completed =>
             "This visit is finished.",

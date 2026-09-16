@@ -112,7 +112,7 @@ each says so in the spec:
 
 | What | Why | Arrives with |
 | :--- | :--- | :--- |
-| `AdmissionDetail.workflows` | `AgentWorkflow` is common and unbuilt (ADR 3) | Step 11 |
+| `AdmissionDetail.workflows` | `AgentWorkflow` is common and **still unbuilt** (ADR 3, re-swept 2026-09-16 — no entity, no migration, no controller anywhere in `api/`) | Step 12, and it cannot arrive before the common tables do |
 | `AdmissionDetail.discharge` | No discharge row is written yet | Step 7 |
 | `wardId` filter on `GET /admissions` | **No longer blocked** — a live `BedAssignment` now says which ward an admission is in. Still unpublished: this step did not need it, and adding an untested filter was not worth it | Next commit on this track |
 | **Nurses scoped to their own ward** on `GET /admissions` and `GET /admissions/{id}` | Half unblocked: an admission's ward is now knowable. Still waiting on **M2** to publish which ward a nurse works in | M2 |
@@ -175,7 +175,8 @@ needs from others" sections of `integration_of_functions.md` (§10, §16, §21,
 
 | Needed by | What | From | Contract |
 | :--- | :--- | :--- | :--- |
-| M4 Patient | Bed register — id, ward, number, condition, isolation, distance | **M3** | `GET /beds`. Patient's **hardest dependency** — the bed agent has nothing to reason over without it |
+| ~~M4 Patient~~ | ~~Bed register — id, ward, number, condition, isolation, distance~~ | ~~**M3**~~ | **BUILT 2026-09-10 — not a stub any more.** Read through `IBedRegistryService`, the one file in Patient Management that knows Equipment's bed table exists |
+| **M4 Patient** | **`AgentWorkflow` / `AgentProposedChange` — the record of what an agent did** | **Common (the group)** | **Patient's hardest remaining dependency, and everybody else's.** ADR 3 settled the design on 2026-09-07; nobody has built it. `BedAssignment.WorkflowId` is already a column pointing at a missing table, and `build/patient.md` steps 12 and 15 both sit behind it. Not one member's to write (`CLAUDE.md`, "Common vs. yours") — raise it with the group. **If it is stubbed, the stub must be recorded here**: a workflow record quietly dropped in memory looks exactly like one that was persisted, and assignment §9.1 scores persistence |
 | M1, M3, M4 | Staff name and role by ID | **M2** | `POST /staff/lookup`. Needed by three people to render "Approved by …" — small, high value, worth building early |
 | ~~M1 Emergency~~ | ~~Free bed counts per ward~~ | ~~**M4**~~ | **BUILT 2026-09-11 — not a stub any more.** `GET /api/capacity/wards` is live and every staff role may read it. Shape: `WardCapacitySummary` in `specs/patient-spec.yaml`. `free_beds` is usable, unoccupied and not under a live hold; **a hold past its `reserved_until` counts as free**, and that expiry rule lives in `CapacityService` so nobody re-implements it |
 | M1 Emergency | Create a pre-admission from a dispatch | **M4** | `POST /admissions/pre-admit` |

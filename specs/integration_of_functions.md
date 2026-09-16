@@ -116,13 +116,15 @@ The second version keeps working when hold expiry, out-of-service beds or a new 
 | `StaffMember`, `Shift`, `Allocation`, `LeaveRequest` | **Staff (M2)** | All — everyone stores staff IDs | Staff only |
 | `EquipmentItem`, `EquipmentCategory`, `PharmacyItem`, `PharmacyCategory`, `PharmacyTransaction`, `MaintenanceSchedule`, `Warning`, `ActionRequest` | **Equipment (M3)** | Patient (ward equipment readiness); any staff (search/availability) | Equipment only |
 | **`Bed`** — exists, number, condition, repairs | **Equipment (M3)** | Patient (to find candidates) | Equipment only |
-| **`LabReport`** — a finished laboratory result and the file itself | **Equipment (M3)** — *claimed 2026-09-13, see §11.14* | Doctor, ward nurse, duty manager | Equipment only (the laboratory) |
-| `Patient`, `Admission`, `Discharge`, `DischargeChecklistItem` | **Patient (M4)** | Emergency, Staff (aggregates only) | Patient only |
+| **`LabReport`** — a finished laboratory result and the file itself | **Equipment (M3)** — *claimed 2026-09-13, see §11.15* | Doctor, ward nurse, duty manager | Equipment only (the laboratory) |
+| `Patient`, `Admission`, `Appointment`, `Discharge`, `DischargeChecklistItem` | **Patient (M4)** | Emergency, Staff (aggregates only) | Patient only |
+| **`PatientMedicalProfile`** — conditions, allergies, current symptoms, recent situation | **Patient (M4)** — *added 2026-09-16, see §11.17* | Nobody else. Not published cross-component and not patient-readable | Patient only — ward nurse or doctor |
+| **`CareRecommendation`** — a patient's own report and the drafted reply | **Patient (M4)** | Nobody else | Patient only |
 | **`Bill`, `BillLineItem`** — what a visit costs and whether it is paid | **Patient (M4)** — *claimed 2026-09-11, see §11.10* | Nobody yet | Patient only |
 | **`BillingRate`, `AdmissionFeeRate`** — what the hospital charges | **Patient (M4)** — *added 2026-09-11, see §11.13* | Nobody yet | Read: any staff. Write: administrator only |
 | **`BedAssignment`** — who is in a bed, holds, approvals | **Patient (M4)** | Equipment (before servicing a bed) | Patient only |
 | `Ward` — name, type, gender policy | **Patient (M4)** — *see §11.1* | All | Patient only |
-| `AgentWorkflow`, `AgentProposedChange` | **Common (group-owned)** — *DECIDED, §11.2* | All five agents | All five agents, by `workflow_id` |
+| `AgentWorkflow`, `AgentProposedChange` | **Common (group-owned)** — *DECIDED §11.2, **and still not built anywhere** as of 2026-09-16* | All five agents | All five agents, by `workflow_id` |
 | `StaffMember`, `PatientAccount`, `RefreshToken`, login, JWT issuing | **Common (group-owned)** — `specs/common-spec.yaml` | All | Common only |
 | `AuditLog`, `Notification`, `DeviceToken` | **Common (group-owned)** | All | Written by the audit interceptor, never by hand |
 
@@ -330,8 +332,8 @@ occupied              free
    │                     │
    │                     ▼
    │            If that tips the ward to full, the agent
-   │            proposes a downgrade — which always needs
-   │            Duty Manager approval
+   │            suggests a downgrade — which always needs
+   │            a Duty Manager to commit it
 ```
 
 **The hard rule: maintenance never evicts a patient.** If the bed is occupied or under a live hold, Equipment waits. M4 exposes the check; M3 respects the answer.
@@ -398,11 +400,14 @@ Pre-admission created, status = awaiting_bed                    [M4]
   clinical staff set admission_category                       (human)
         │
         ▼
-Patient Admission & Bed Agent                                   [M4]
+Bed & Patient Details Agent                                   [M4]
   reads Equipment's bed register  ────────read──────────────►   [M3]
-  filters on hard rules, ranks on soft rules
-  proposes a bed, places a 30-minute hold in BedAssignment
+  filters on hard rules H0-H6, ranks on soft rules
+  suggests a best bed plus every other bed that passed
   deterministic validator re-checks every hard rule
+  WRITES NOTHING and holds no bed — changed 2026-09-16.
+  The 30-minute hold is written when a human commits, by
+  POST /admissions/{id}/assign-bed, under a row lock.
         │
         ▼
 Staff Allocation Agent                                          [M2]
@@ -943,6 +948,50 @@ override. Nobody outside M4 writes that column today, so this is a note, not a r
 
 **Still open on M4's side:** attempt rate-limiting on the claim endpoints. Authenticated, so
 every attempt is attributable to an account, but nothing stops a login trying repeatedly.
+
+---
+
+**11.17 (OPEN — announced by M4 on 2026-09-16) — both Patient Management agents were redesigned,
+and one of the three changes affects everybody.**
+
+Full reasoning is `patient-management-plan.md` §8, rewritten the same day. Three changes; the
+first is the only one anybody else needs to read.
+
+**1. The bed agent holds no write tool at all, and this is worth copying.** It used to place a
+30-minute hold on its chosen bed before a human saw anything, on the reasoning that a hold is
+not an admission so it is low-impact. That is wrong in a way only visible at scale: a hold takes
+a real bed out of circulation, so **an agent run nobody acts on quietly makes a ward look full
+to every other component** — to M1's dispatch agent choosing a destination, to M2's staffing
+agent reading occupancy, and to the Coordinator assembling a plan. All four of its tools are now
+read-only. Committing is a human pressing a button on `POST /admissions/{id}/assign-bed`, the
+manual endpoint that has existed since 2026-09-11, with its row lock and its hard rules.
+
+*The question for the other three: if your agent's "proposal" reserves, locks or allocates
+something real, what does a run nobody approves cost the rest of the hospital?* Not a request to
+change anything — an argument that landed here and might land there.
+
+**Two contract consequences.** `POST /bed-assignments/{id}/approve` and `/reject` are
+**withdrawn from `patient-spec.yaml`** — neither was ever built, and nothing to approve exists
+any more. `POST /admissions/{id}/bed-suggestion` became `POST /bed-suggestions`, taking either
+an `admission_id` or an NIC / patient code. `AdmissionStatus.AwaitingApproval` is consequently
+**never set** — it stays in the shared enum because Equipment's ward-patient list reads it, and
+removing a value from a shared enum is a cross-component change for no gain. **M3: nothing
+breaks, but no admission will ever appear in that state again.**
+
+**2. A new table, `PatientMedicalProfile`.** One row per patient, four free-text fields a nurse
+types: conditions, allergies, current symptoms, recent situation. It exists because the care
+advisory agent was reading demographics and the administrative shape of past visits, which is
+nothing to reason over. **Not published cross-component, not patient-readable, and not an EHR** —
+no vitals, no lab results, no coded diagnosis. Announced rather than asked, on the same footing
+as §11.10 and §11.13: an unowned thing inside one component's own boundary, claimed in the open
+so nobody builds a second one. **M3, one note:** this is *not* where laboratory results go.
+`LabReport` is yours (§11.15) and stays yours; this is four sentences a clinician typed.
+
+**3. Care recommendation review widened from `Doctor` to `Doctor` or `WardNurse`.** The agent now
+only runs for admitted patients, and the person who will actually walk over and look at one is
+the nurse on shift. `clinical_clearance` on the discharge checklist did **not** move and is still
+Doctor-only. **M2, this is a note not a request** — `Doctor` and `WardNurse` are both already in
+`StaffRole` and M4 only reads the claim.
 
 ---
 

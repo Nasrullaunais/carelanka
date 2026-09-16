@@ -46,7 +46,7 @@ logins are in `TEST_ACCOUNTS.md`.
 
 | Component | Where it is |
 | :--- | :--- |
-| **Patient** (Lochana) | 12 controllers, 43 routes. Wards, patients, admissions and the 7-state machine, capacity, bed assignment, the worklist, discharge, billing, and the seven `/api/me/*` patient routes. React screens for all of it. Left: the two AI agents (steps 11–16), the reports, and `POST /admissions/pre-admit` |
+| **Patient** (Lochana) | 12 controllers, 43 routes. Wards, patients, admissions and the 7-state machine, capacity, bed assignment, the worklist, discharge, billing, and the `/api/me/*` patient routes. React screens and a real Flutter patient app for all of it. Left: `PatientMedicalProfile`, the two AI agents and their screens (steps 11–16), the reports, and `POST /admissions/pre-admit` |
 | **Equipment** (Sethmin) | 8 controllers. Beds, equipment items and categories, pharmacy, maintenance, and the laboratory (`/lab-reports`, `/ward-patients`) |
 | **Emergency** (Nasrulla Unais) | Phases 0–2: aligned contract, ambulance/current-crew readiness, and patient/staff emergency-call intake with caller-scoped APIs |
 | **Staff** (Kaveesha) | Not started — no entities, no controllers, and no `staff-management-plan.md` |
@@ -57,12 +57,17 @@ Emergency, Kaveesha has Staff. `BUILD_PLAN.md` is the authority if this line goe
 `web-ui/` is a full Vite app — login, app shell, and screens for Patient, Equipment and the
 laboratory, with the generated client under `src/services/api/generated/`.
 
-**`mobile-ui/` is still a skeleton.** Every folder under `lib/` is a `.gitkeep`, `app.dart`
-renders one line of text, and there is no `android/` or `ios/` — nobody has run
-`flutter create .` yet.
+**`mobile-ui/` is a real Flutter app** *(as of 2026-09-16 — this line used to say "still a
+skeleton")*. `android/` and `ios/` exist, the generated `api_client` is wired up, and
+`lib/features/patient/` is a built and tested feature. The other three feature folders are
+still empty.
 
 Still not built anywhere: the audit interceptor, `AgentWorkflow` / `AgentProposedChange`, any
 AI agent, and CI (there is no `.github/`).
+
+**`AgentWorkflow` is now the thing in front of the most work.** It is common, group-owned and
+settled by ADR 3, and every agent in the project needs it — Patient Management's two are
+designed and ready to build behind it (`docs/build/patient.md` steps 11–16).
 
 **Where a committed contract in `specs/` already answers a question, that contract wins over
 anything written here.** This section goes stale fastest of anything in this file — check the

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/auth/auth_form.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/friendly_date.dart';
+import '../../../core/widgets/phone_width.dart';
 import '../../../services/api_client/models/gender.dart';
 import '../state/profile_controller.dart';
 import '../validation/patient_fields.dart';
@@ -45,14 +46,23 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
       _address.text = existing.address ?? '';
       _emergencyName.text = existing.emergencyContactName ?? '';
       _emergencyPhone.text = existing.emergencyContactPhone ?? '';
-      _gender = _offeredGenders.contains(existing.gender) ? existing.gender : null;
+      _gender = _offeredGenders.contains(existing.gender)
+          ? existing.gender
+          : null;
       _dateOfBirth = existing.dateOfBirth;
     }
   }
 
   @override
   void dispose() {
-    for (final controller in [_nic, _fullName, _phone, _address, _emergencyName, _emergencyPhone]) {
+    for (final controller in [
+      _nic,
+      _fullName,
+      _phone,
+      _address,
+      _emergencyName,
+      _emergencyPhone,
+    ]) {
       controller.dispose();
     }
     super.dispose();
@@ -91,8 +101,11 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     if (!saved) {
       // Field errors already render under their fields — only toast when there's no field to blame.
       if (controller.fieldErrors.isEmpty) {
-        final message = controller.saveError?.message ?? 'Could not save your details.';
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+        final message =
+            controller.saveError?.message ?? 'Could not save your details.';
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
       }
       return;
     }
@@ -110,144 +123,164 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(title: Text(_firstTime ? 'Add my details' : 'My details')),
-      body: SafeArea(
-        child: Form(
-          key: _formKey,
-          autovalidateMode:
-              _submitted ? AutovalidateMode.onUserInteraction : AutovalidateMode.disabled,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-              AppTheme.gutter,
-              8,
-              AppTheme.gutter,
-              32,
-            ),
-            children: [
-              if (_firstTime) ...[
-                NoticeBanner(
-                  icon: Icons.assignment_ind_outlined,
-                  accent: scheme.primary,
-                  title: 'Complete your registration',
-                  body: 'These details are required before you can book a visit.',
-                ),
-                const SizedBox(height: 20),
-              ],
-              SectionCard(
-                title: 'About you',
-                icon: Icons.person_outline,
-                child: Column(
-                  children: [
-                    _Field(
-                      controller: _fullName,
-                      label: 'Full name',
-                      enabled: !controller.saving,
-                      maxLength: PatientFieldLimits.fullName,
-                      serverErrors: errors['full_name'],
-                      validator: validateFullName,
-                    ),
-                    _Field(
-                      controller: _nic,
-                      label: 'NIC',
-                      enabled: !controller.saving,
-                      maxLength: PatientFieldLimits.nic,
-                      serverErrors: errors['nic'],
-                      validator: validateNic,
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<Gender>(
-                      initialValue: _gender,
-                      decoration: InputDecoration(
-                        labelText: 'Gender',
-                        errorText: _firstError(errors['gender']),
+    return PhoneWidth(
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(_firstTime ? 'Add my details' : 'My details'),
+        ),
+        body: SafeArea(
+          child: Form(
+            key: _formKey,
+            autovalidateMode: _submitted
+                ? AutovalidateMode.onUserInteraction
+                : AutovalidateMode.disabled,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(
+                AppTheme.gutter,
+                8,
+                AppTheme.gutter,
+                32,
+              ),
+              children: [
+                if (_firstTime) ...[
+                  NoticeBanner(
+                    icon: Icons.assignment_ind_outlined,
+                    accent: scheme.primary,
+                    title: 'Complete your registration',
+                    body:
+                        'These details are required before you can book a visit.',
+                  ),
+                  const SizedBox(height: 20),
+                ],
+                SectionCard(
+                  title: 'About you',
+                  icon: Icons.person_outline,
+                  child: Column(
+                    children: [
+                      _Field(
+                        controller: _fullName,
+                        label: 'Full name',
+                        enabled: !controller.saving,
+                        maxLength: PatientFieldLimits.fullName,
+                        serverErrors: errors['full_name'],
+                        validator: validateFullName,
                       ),
-                      items: _offeredGenders
-                          .map((g) => DropdownMenuItem(value: g, child: Text(genderLabel(g))))
-                          .toList(),
-                      onChanged: controller.saving ? null : (v) => setState(() => _gender = v),
-                      validator: (v) => v == null ? 'Choose your gender' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    _DateOfBirthField(
-                      value: _dateOfBirth,
-                      enabled: !controller.saving,
-                      serverError: _firstError(errors['date_of_birth']),
-                      pick: _pickDateOfBirth,
-                      onChanged: (picked) => setState(() => _dateOfBirth = picked),
-                    ),
-                  ],
+                      _Field(
+                        controller: _nic,
+                        label: 'NIC',
+                        enabled: !controller.saving,
+                        maxLength: PatientFieldLimits.nic,
+                        serverErrors: errors['nic'],
+                        validator: validateNic,
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<Gender>(
+                        initialValue: _gender,
+                        decoration: InputDecoration(
+                          labelText: 'Gender',
+                          errorText: _firstError(errors['gender']),
+                        ),
+                        items: _offeredGenders
+                            .map(
+                              (g) => DropdownMenuItem(
+                                value: g,
+                                child: Text(genderLabel(g)),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: controller.saving
+                            ? null
+                            : (v) => setState(() => _gender = v),
+                        validator: (v) =>
+                            v == null ? 'Choose your gender' : null,
+                      ),
+                      const SizedBox(height: 12),
+                      _DateOfBirthField(
+                        value: _dateOfBirth,
+                        enabled: !controller.saving,
+                        serverError: _firstError(errors['date_of_birth']),
+                        pick: _pickDateOfBirth,
+                        onChanged: (picked) =>
+                            setState(() => _dateOfBirth = picked),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              SectionCard(
-                title: 'How to reach you',
-                icon: Icons.contact_page_outlined,
-                child: Column(
-                  children: [
-                    _Field(
-                      controller: _phone,
-                      label: 'Phone',
-                      enabled: !controller.saving,
-                      keyboardType: TextInputType.phone,
-                      maxLength: PatientFieldLimits.phone,
-                      serverErrors: errors['phone'],
-                      validator: validatePhoneNumber,
-                    ),
-                    _Field(
-                      controller: _address,
-                      label: 'Address (optional)',
-                      enabled: !controller.saving,
-                      maxLength: PatientFieldLimits.address,
-                      serverErrors: errors['address'],
-                      validator: validateAddress,
-                    ),
-                  ],
+                const SizedBox(height: 16),
+                SectionCard(
+                  title: 'How to reach you',
+                  icon: Icons.contact_page_outlined,
+                  child: Column(
+                    children: [
+                      _Field(
+                        controller: _phone,
+                        label: 'Phone',
+                        enabled: !controller.saving,
+                        keyboardType: TextInputType.phone,
+                        maxLength: PatientFieldLimits.phone,
+                        serverErrors: errors['phone'],
+                        validator: validatePhoneNumber,
+                      ),
+                      _Field(
+                        controller: _address,
+                        label: 'Address (optional)',
+                        enabled: !controller.saving,
+                        maxLength: PatientFieldLimits.address,
+                        serverErrors: errors['address'],
+                        validator: validateAddress,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              SectionCard(
-                title: 'Emergency contact',
-                icon: Icons.emergency_outlined,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Who the hospital should contact in an emergency.',
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: scheme.onSurfaceVariant),
-                    ),
-                    const SizedBox(height: 12),
-                    _Field(
-                      controller: _emergencyName,
-                      label: 'Name (optional)',
-                      enabled: !controller.saving,
-                      maxLength: PatientFieldLimits.contactName,
-                      serverErrors: errors['emergency_contact_name'],
-                      validator: validateContactName,
-                    ),
-                    _Field(
-                      controller: _emergencyPhone,
-                      label: 'Phone (optional)',
-                      enabled: !controller.saving,
-                      keyboardType: TextInputType.phone,
-                      maxLength: PatientFieldLimits.phone,
-                      serverErrors: errors['emergency_contact_phone'],
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? null : validatePhoneNumber(v),
-                    ),
-                  ],
+                const SizedBox(height: 16),
+                SectionCard(
+                  title: 'Emergency contact',
+                  icon: Icons.emergency_outlined,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Who the hospital should contact in an emergency.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _Field(
+                        controller: _emergencyName,
+                        label: 'Name (optional)',
+                        enabled: !controller.saving,
+                        maxLength: PatientFieldLimits.contactName,
+                        serverErrors: errors['emergency_contact_name'],
+                        validator: validateContactName,
+                      ),
+                      _Field(
+                        controller: _emergencyPhone,
+                        label: 'Phone (optional)',
+                        enabled: !controller.saving,
+                        keyboardType: TextInputType.phone,
+                        maxLength: PatientFieldLimits.phone,
+                        serverErrors: errors['emergency_contact_phone'],
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? null
+                            : validatePhoneNumber(v),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 28),
-              FilledButton(
-                onPressed: controller.saving ? null : _submit,
-                child: controller.saving
-                    ? const SizedBox(
-                        height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                    : Text(_firstTime ? 'Save my details' : 'Save changes'),
-              ),
-            ],
+                const SizedBox(height: 28),
+                FilledButton(
+                  onPressed: controller.saving ? null : _submit,
+                  child: controller.saving
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(_firstTime ? 'Save my details' : 'Save changes'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -262,12 +295,12 @@ String? _firstError(List<String>? serverErrors) =>
 const _offeredGenders = [Gender.male, Gender.female];
 
 String genderLabel(Gender gender) => switch (gender) {
-      Gender.male => 'Male',
-      Gender.female => 'Female',
-      Gender.other => 'Other',
-      Gender.unknown => 'Prefer not to say',
-      Gender.$unknown => 'Unknown',
-    };
+  Gender.male => 'Male',
+  Gender.female => 'Female',
+  Gender.other => 'Other',
+  Gender.unknown => 'Prefer not to say',
+  Gender.$unknown => 'Unknown',
+};
 
 String prettyFieldName(String wireName) {
   final words = wireName.split('_').where((w) => w.isNotEmpty).toList();
@@ -280,19 +313,26 @@ String prettyFieldName(String wireName) {
 }
 
 String initialsOf(String name) {
-  final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+  final parts = name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((p) => p.isNotEmpty)
+      .toList();
   if (parts.isEmpty) return '?';
   if (parts.length == 1) return parts.first.characters.first.toUpperCase();
-  return (parts.first.characters.first + parts.last.characters.first).toUpperCase();
+  return (parts.first.characters.first + parts.last.characters.first)
+      .toUpperCase();
 }
 
 void openMyDetails(BuildContext context, ProfileController controller) {
-  Navigator.of(context).push(MaterialPageRoute(
-    builder: (_) => ChangeNotifierProvider<ProfileController>.value(
-      value: controller,
-      child: const MyDetailsScreen(),
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => ChangeNotifierProvider<ProfileController>.value(
+        value: controller,
+        child: const MyDetailsScreen(),
+      ),
     ),
-  ));
+  );
 }
 
 class _DateOfBirthField extends StatelessWidget {
@@ -332,7 +372,9 @@ class _DateOfBirthField extends StatelessWidget {
             prefixIcon: const Icon(Icons.cake_outlined),
           ),
           isEmpty: field.value == null,
-          child: field.value == null ? null : Text(FriendlyDate.date(field.value!)),
+          child: field.value == null
+              ? null
+              : Text(FriendlyDate.date(field.value!)),
         ),
       ),
     );

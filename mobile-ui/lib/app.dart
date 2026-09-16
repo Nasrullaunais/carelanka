@@ -8,6 +8,7 @@ import 'core/auth/token_store.dart';
 import 'core/network/api.dart';
 import 'core/routing/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'features/equipment/equipment_routes.dart';
 import 'features/patient/patient_routes.dart';
 import 'services/api_client/care_lanka_api.dart';
 import 'services/api_client/models/current_principal.dart';
@@ -17,11 +18,14 @@ const _noScreensPath = '/not-built-yet';
 /// Each member plugs their feature in by adding one entry here and one to
 /// [_homePathFor]. Nothing else in this file should need to change.
 final List<RouteBase> _featureRoutes = [
+  ...equipmentRoutes,
   ...patientRoutes,
 ];
 
 String _homePathFor(CurrentPrincipal principal) =>
-    patientHomePathFor(principal.role) ?? _noScreensPath;
+    patientHomePathFor(principal.role) ??
+    equipmentHomePathFor(principal.role) ??
+    _noScreensPath;
 
 /// Root widget of the CareLanka mobile app.
 class CareLankaApp extends StatefulWidget {

@@ -174,15 +174,14 @@ public sealed class EquipmentItemLifecycleTests
     }
 
     [Fact]
-    public async Task Completing_the_repair_is_what_returns_the_item_to_service()
+    public async Task Confirming_the_repair_done_is_what_returns_the_item_to_service()
     {
         using var client = await EquipmentClientAsync();
         var id = await NewItemIdAsync(client);
         await ReportFaultAsync(client, id, "Screen flickering.");
 
         var job = Assert.Single(await OpenRepairJobsAsync(id));
-        var completed = await client.PostAsJsonAsync(
-            $"/api/maintenance-schedules/{job.Id}/complete", new { notes = "New backlight." });
+        var completed = await ConfirmDoneAsync(job.Id);
 
         using var body = await ReadJsonAsync(await client.GetAsync($"/api/equipment-items/{id}"));
 
@@ -206,6 +205,16 @@ public sealed class EquipmentItemLifecycleTests
 
         Assert.Empty(await OpenRepairJobsAsync(id));
         Assert.Empty(await OpenFaultWarningsAsync(id));
+    }
+
+    // Only the hospital administrator, with the confirmation code, can say a job is done.
+    private async Task<HttpResponseMessage> ConfirmDoneAsync(Guid scheduleId)
+    {
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
+        administrator.DefaultRequestHeaders.Add(
+            "X-Confirmation-Code", ApiApplication.EquipmentConfirmationCode);
+
+        return await administrator.PostAsync($"/api/maintenance-schedules/{scheduleId}/confirm", null);
     }
 
     private async Task<List<Data.Entities.Equipment.MaintenanceSchedule>> OpenRepairJobsAsync(Guid itemId)

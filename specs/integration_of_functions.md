@@ -1017,6 +1017,22 @@ value is in `TEST_ACCOUNTS.md`. Change it anywhere real.
 - **Anyone listing equipment** (a readiness check, a report): an unconfirmed item is not in
   `GET /equipment-items`, which is the point — it is not usable stock yet.
 
+**11.19 (OPEN — announced by M3 on 2026-09-16) — maintenance is confirmed done by the hospital
+administrator.**
+
+Not a request. Follows 11.18 with the same role, the same code and the same mobile screen.
+
+**What changed.** A reported fault or scheduled job now appears straight away in the hospital
+administrator's Flutter app, and confirming it done (`POST /maintenance-schedules/{id}/confirm`) is
+the only way it is completed — that is what returns the item or bed to service and closes the
+warning. `POST /maintenance-schedules/{id}/complete` was **removed**. No schema change: no migration,
+no new `MaintenanceStatus` value. Design is `equipment-management-plan.md` §6.1.
+
+**What it means for the others.**
+- **M4:** a bed out of service for repair comes back `usable` when the administrator confirms the
+  job. `GET /beds` is still the only thing to read.
+- **Anyone who called `/complete`:** nobody outside Equipment did, but it no longer exists.
+
 ---
 
 ## 12. For the other three members

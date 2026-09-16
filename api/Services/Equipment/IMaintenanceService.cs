@@ -13,8 +13,13 @@ public interface IMaintenanceService
     Task<MaintenanceSchedule> CreateAsync(
         CreateMaintenanceScheduleRequest request, CancellationToken cancellationToken = default);
 
-    Task<MaintenanceSchedule> CompleteAsync(
-        Guid id, string? notes, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<MaintenanceSchedule>> ListOpenAsync(
+        string? confirmationCode, CancellationToken cancellationToken = default);
+
+    Task<PendingEquipmentCount> CountOpenAsync(CancellationToken cancellationToken = default);
+
+    Task<MaintenanceSchedule> ConfirmDoneAsync(
+        Guid id, string? confirmationCode, CancellationToken cancellationToken = default);
 
     Task<ScheduleEntity?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default);
 

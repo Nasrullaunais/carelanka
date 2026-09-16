@@ -62,7 +62,7 @@ When the hospital buys a new item, the Administrator adds it under the matching 
 | Role | App | What they can do here |
 | :--- | :--- | :--- |
 | **Inventory Administrator** | React | Add/manage equipment and pharmacy categories, add equipment items and pharmacy items, update equipment status, bed register admin, the warnings/recommendations queue (approve / reject), reports |
-| **Hospital Administrator** *(Rev 3, 2026-09-16)* | Flutter | Confirm or reject a newly registered equipment item before it joins the register — see §4.3 |
+| **Hospital Administrator** *(Rev 3, 2026-09-16)* | Flutter | Confirm or reject a newly registered equipment item before it joins the register — see §4.3. Confirm maintenance done — see §6.1 |
 | **Equipment Technician** | Flutter | Scan an asset tag to pull up its record, update an equipment item's status in the field, mark a maintenance task complete, report a fault |
 | **Any authenticated staff role** *(shared JWT, no Equipment-specific grant needed)* | Flutter / React | Search equipment and pharmacy items and check availability — a read-only capability, not gated to a role we define, because any nurse, doctor or crew member across the hospital may need to know "do we have X in stock" |
 
@@ -309,7 +309,7 @@ available ──> retired                     (planned decommission, rare)
 
 **Marking maintenance** (`available -> maintenance`) can happen two ways: the Administrator does it manually, or a Technician's fault report (§7.1) does it automatically — a broken defibrillator changes status the moment it's reported, not on the next scheduled sweep.
 
-**Coming back out of maintenance is the maintenance unit's move, not the Administrator's.** *(Rev 2, 2026-09-13.)* A fault report opens a `MaintenanceSchedule` of type `repair` alongside the warning, and that work order is the only route back to `available` — `POST /maintenance-schedules/{id}/complete` returns the item to service, records who did the work, and closes the fault in one transaction. Editing `status` back to `available` through `PUT /equipment-items/{id}` answers 409 instead.
+**Coming back out of maintenance is the maintenance unit's move, not the Administrator's.** *(Rev 2, 2026-09-13.)* A fault report opens a `MaintenanceSchedule` of type `repair` alongside the warning, and that work order is the only route back to `available` — the hospital administrator confirming it done (`POST /maintenance-schedules/{id}/confirm`, §6.1) returns the item to service, records who confirmed it, and closes the fault in one transaction. Editing `status` back to `available` through `PUT /equipment-items/{id}` answers 409 instead.
 
 The reason is the same one behind the bed-occupancy check: a rule that only holds when everybody remembers it is not a rule. Without this, a reported fault is a status a busy Administrator can undo from a dropdown without anybody looking at the machine, and the fault warning stays open behind it. `retired` remains reachable from `maintenance`, because *beyond repair* is the other honest ending — and retiring cancels the open work order and closes the warning, so the unit's queue never lists a machine that no longer exists.
 
@@ -374,11 +374,21 @@ Two independent triggers, both checked by the same sweep:
 5. THRESHOLD    deterministic rule decides requires_approval (§8.6)
 6. APPROVE      Administrator approves in React (or it auto-clears)
 7. SCHEDULE     MaintenanceSchedule row created, status = scheduled; EquipmentItem.status -> maintenance
-8. COMPLETE     Technician scans the asset tag, marks it done in Flutter
+8. CONFIRM      hospital administrator confirms it done in Flutter, with the confirmation code
 9. RECOMPUTE    next_maintenance_due advances; EquipmentItem.status -> available; Warning -> action_taken
 ```
 
-A Technician or any staff member can also report a fault directly (`POST /api/equipment-items/{id}/report-fault`) without waiting for the sweep, exactly as §4.1 describes.
+A Technician or any staff member can also report a fault directly (`POST /api/equipment-items/{id}/report-fault`) without waiting for the sweep, exactly as §4.1 describes. The equipment manager can also book a service, calibration or repair by hand from the Maintenance unit screen.
+
+### 6.1 The hospital administrator confirms maintenance done *(Rev 3, 2026-09-16)*
+
+Every open job — a reported fault's repair the moment it is reported, and anything scheduled — appears in the hospital administrator's mobile app. Confirming one done (`POST /maintenance-schedules/{id}/confirm`) completes it, records the administrator in `performed_by_staff_id`, returns the item to service, advances `next_maintenance_due` and closes the warning.
+
+```
+fault reported / job scheduled ──> open (web list + mobile list) ──(confirm done, mobile)──> completed
+```
+
+That is the only way a job is completed. The equipment manager's old `POST /maintenance-schedules/{id}/complete` was removed, so the person booking the work cannot sign it off. The rule and the code are the same as §4.3: only the hospital administrator, and every list and confirm call sends `X-Confirmation-Code`, checked by the API.
 
 ---
 
@@ -432,7 +442,9 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/maintenance-schedules` | Inventory Administrator, Equipment Technician | `?status=`, `?assetType=`, `?overdue=true` |
 | `POST` | `/api/maintenance-schedules` | Inventory Administrator | Manual scheduling, no agent involved |
-| `POST` | `/api/maintenance-schedules/{id}/complete` | Equipment Technician | **Business op.** §6 steps 8–9. |
+| `GET` | `/api/maintenance-schedules/pending-confirmation` | Hospital Administrator + code | *(Rev 3)* Every open job, earliest due first. §6.1 |
+| `GET` | `/api/maintenance-schedules/pending-confirmation/count` | Equipment Manager, Hospital Administrator | *(Rev 3)* How many are open — no code |
+| `POST` | `/api/maintenance-schedules/{id}/confirm` | Hospital Administrator + code | *(Rev 3)* **Business op.** §6 steps 8–9. Replaces `/complete`, which was removed |
 
 ### 7.5 Laboratory *(Rev 2, 2026-09-13)*
 
@@ -589,7 +601,7 @@ Per the assignment: workflow id, objective, plan, completed steps, tool calls wi
 | **Equipment detail** | Item info, maintenance history, current warnings, assign/release. *(Rev 2, 2026-09-13.)* Assigning picks the patient by ward rather than taking a pasted admission id |
 | **Pharmacy inventory** | Search, filter by category, below-threshold and expiring-soon highlighted |
 | **Maintenance calendar** | Scheduled and overdue, by asset type |
-| **Maintenance unit** | *(Rev 2, 2026-09-13.)* The repair queue: every machine out of service and what was reported against it. Confirm the repair and the item returns to service; mark it beyond repair and it is retired. The only screen that can bring an item back from `maintenance` — see §4.1 |
+| **Maintenance unit** | *(Rev 2, 2026-09-13.)* The repair queue: every machine out of service and what was reported against it. Mark it beyond repair and it is retired. *(Rev 3, 2026-09-16.)* Also books a service, calibration or repair for any item. Jobs are confirmed done by the hospital administrator in the mobile app, not here — see §6.1 |
 | **Laboratory** | *(Rev 2, 2026-09-13.)* Pick a ward, read down who is in it, and file a result against whoever the specimen came from. Search by code, name or NIC is the second way in, for an outpatient in no ward. Clinical staff see the same screen without the upload form — see §7.5 |
 | **Bed register admin** | Create beds, mark out of service, retire — occupancy block surfaced as a clear error |
 | **Warnings & recommendations queue** | Everything open, recommended action, urgency, cost. Approve / Reject / auto-approved badge. **This is the demo screen.** |
@@ -614,6 +626,7 @@ Protected routes by role, loading / empty / success / error states throughout.
 | Screen | Contents |
 | :--- | :--- |
 | Equipment confirmation | How many items are waiting. Opening it asks for the confirmation code; the API checks it. Then each waiting item with Confirm and Reject — §4.3 |
+| Maintenance confirmation | How many jobs are open. Same code step. Then each job — item, type, due date, what was reported — with Confirm done — §6.1 |
 
 **Any staff (shared role, §2):**
 
@@ -735,6 +748,7 @@ Rule-based assertions, not an LLM judge.
 | No equipment-assignment history table | Your plan describes a status field, not an audit trail; keeping only the current assignment is the literal reading | Add an `EquipmentAssignment` table (mirroring Patient's `BedAssignment`) if the group wants "who had this before" queries |
 | One `ActionRequest`/`Warning` pair covers both pharmacy and equipment problems | One contract, one approvals queue, one report, instead of two nearly-identical proposal systems | Split by domain if pharmacy and equipment approvals end up needing very different fields |
 | A newly registered item waits for the hospital administrator to confirm it *(Rev 3, 2026-09-16)* | Stops a mistyped or duplicate item reaching the register and being handed to a patient. The administrator is a different person from the registering equipment manager, and a confirmation code checked by the API sits on top of the role | Drop the code and rely on the role alone, or let items register straight onto the list again |
+| Maintenance is confirmed done by the hospital administrator *(Rev 3, 2026-09-16)* | A machine is only handed back to the wards when someone other than the person who booked the work says it is done, with the same code as item registration | Give the equipment manager a way to complete a job again |
 | Threshold-based auto-approval | Confirmed in our conversation — keeps the agent doing useful daily work while still gating anything costly, urgent or irreversible | "Always require approval" is the safer, simpler fallback |
 
 ---

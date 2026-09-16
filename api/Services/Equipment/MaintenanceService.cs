@@ -26,17 +26,20 @@ public sealed class MaintenanceService : IMaintenanceService
     private readonly IBedOccupancyPort _occupancy;
     private readonly IWardDirectory _wards;
     private readonly ICurrentUser _currentUser;
+    private readonly IEquipmentConfirmationCode _confirmationCode;
 
     public MaintenanceService(
         CareLankaDbContext db,
         IBedOccupancyPort occupancy,
         IWardDirectory wards,
-        ICurrentUser currentUser)
+        ICurrentUser currentUser,
+        IEquipmentConfirmationCode confirmationCode)
     {
         _db = db;
         _occupancy = occupancy;
         _wards = wards;
         _currentUser = currentUser;
+        _confirmationCode = confirmationCode;
     }
 
     public async Task<PagedResult<MaintenanceSchedule>> ListAsync(
@@ -115,12 +118,35 @@ public sealed class MaintenanceService : IMaintenanceService
         return await ToDtoAsync(schedule, cancellationToken);
     }
 
-    public async Task<MaintenanceSchedule> CompleteAsync(
-        Guid id, string? notes, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<MaintenanceSchedule>> ListOpenAsync(
+        string? confirmationCode, CancellationToken cancellationToken = default)
     {
+        _confirmationCode.Ensure(confirmationCode);
+
+        var today = Today();
+
+        var rows = await OpenSchedules()
+            .AsNoTracking()
+            .OrderBy(s => s.ScheduledDate)
+            .ThenBy(s => s.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        var labels = await LabelsAsync(rows, cancellationToken);
+
+        return rows.Select(s => ToDto(s, labels, today)).ToList();
+    }
+
+    public async Task<PendingEquipmentCount> CountOpenAsync(CancellationToken cancellationToken = default)
+        => new() { Count = await OpenSchedules().CountAsync(cancellationToken) };
+
+    public async Task<MaintenanceSchedule> ConfirmDoneAsync(
+        Guid id, string? confirmationCode, CancellationToken cancellationToken = default)
+    {
+        _confirmationCode.Ensure(confirmationCode);
+
         var schedule = await GetByIdAsync(id, cancellationToken);
 
-        if (schedule.Status != MaintenanceStatus.Scheduled)
+        if (schedule.Status is not (MaintenanceStatus.Scheduled or MaintenanceStatus.InProgress))
         {
             throw new ConflictException(
                 MessageCode.MaintenanceNotCompletable, EnumWire.ToWire(schedule.Status));
@@ -132,11 +158,6 @@ public sealed class MaintenanceService : IMaintenanceService
         schedule.CompletedAt = now;
         schedule.PerformedByStaffId = _currentUser.Id;
 
-        if (Normalise(notes) is { } written)
-        {
-            schedule.Notes = written;
-        }
-
         await PutBackInServiceAsync(schedule, cancellationToken);
         await CloseWarningsAsync(schedule, now, cancellationToken);
 
@@ -144,6 +165,10 @@ public sealed class MaintenanceService : IMaintenanceService
 
         return await ToDtoAsync(schedule, cancellationToken);
     }
+
+    private IQueryable<ScheduleEntity> OpenSchedules()
+        => _db.MaintenanceSchedules.Where(
+            s => s.Status == MaintenanceStatus.Scheduled || s.Status == MaintenanceStatus.InProgress);
 
     public Task<ScheduleEntity?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default)
         => _db.MaintenanceSchedules.FirstOrDefaultAsync(s => s.Id == id, cancellationToken);

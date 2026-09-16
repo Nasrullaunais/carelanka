@@ -8,8 +8,10 @@ import 'screens/equipment_home_screen.dart';
 import 'screens/lab_reports_screen.dart';
 import 'services/equipment_confirmation_service.dart';
 import 'services/lab_reports_service.dart';
+import 'services/maintenance_confirmation_service.dart';
 import 'services/report_file_source.dart';
 import 'state/equipment_confirmation_controller.dart';
+import 'state/maintenance_confirmation_controller.dart';
 
 class EquipmentPaths {
   const EquipmentPaths._();
@@ -35,10 +37,19 @@ final List<RouteBase> equipmentRoutes = [
   ),
   GoRoute(
     path: EquipmentPaths.confirmation,
-    builder: (context, _) => ChangeNotifierProvider(
-      create: (context) => EquipmentConfirmationController(
-        EquipmentConfirmationService(context.read<CareLankaApi>()),
-      ),
+    builder: (context, _) => MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (context) => EquipmentConfirmationController(
+            EquipmentConfirmationService(context.read<CareLankaApi>()),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => MaintenanceConfirmationController(
+            MaintenanceConfirmationService(context.read<CareLankaApi>()),
+          ),
+        ),
+      ],
       child: const EquipmentHomeScreen(),
     ),
   ),

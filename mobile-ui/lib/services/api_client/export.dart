@@ -76,7 +76,6 @@ export 'models/checklist_item.dart';
 export 'models/checklist_update_request.dart';
 export 'models/claim_by_patient_code_request.dart';
 export 'models/complete_details_request.dart';
-export 'models/complete_maintenance_schedule_request.dart';
 export 'models/confirm_discharge_request.dart';
 export 'models/correct_bed_request.dart';
 export 'models/create_admission_request.dart';

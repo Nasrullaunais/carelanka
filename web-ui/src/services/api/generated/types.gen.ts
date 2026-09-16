@@ -408,10 +408,6 @@ export type CompleteDetailsRequest = {
     emergency_contact_phone?: string | null;
 };
 
-export type CompleteMaintenanceScheduleRequest = {
-    notes?: string | null;
-};
-
 export type ConfirmDischargeRequest = {
     summary_note?: string | null;
 };
@@ -4244,20 +4240,80 @@ export type CreateMaintenanceScheduleResponses = {
 
 export type CreateMaintenanceScheduleResponse = CreateMaintenanceScheduleResponses[keyof CreateMaintenanceScheduleResponses];
 
-export type CompleteMaintenanceScheduleData = {
-    body?: CompleteMaintenanceScheduleRequest;
+export type ListMaintenanceSchedulesAwaitingConfirmationData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/maintenance-schedules/pending-confirmation';
+};
+
+export type ListMaintenanceSchedulesAwaitingConfirmationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListMaintenanceSchedulesAwaitingConfirmationError = ListMaintenanceSchedulesAwaitingConfirmationErrors[keyof ListMaintenanceSchedulesAwaitingConfirmationErrors];
+
+export type ListMaintenanceSchedulesAwaitingConfirmationResponses = {
+    /**
+     * OK
+     */
+    200: Array<MaintenanceSchedule>;
+};
+
+export type ListMaintenanceSchedulesAwaitingConfirmationResponse = ListMaintenanceSchedulesAwaitingConfirmationResponses[keyof ListMaintenanceSchedulesAwaitingConfirmationResponses];
+
+export type CountMaintenanceSchedulesAwaitingConfirmationData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/maintenance-schedules/pending-confirmation/count';
+};
+
+export type CountMaintenanceSchedulesAwaitingConfirmationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type CountMaintenanceSchedulesAwaitingConfirmationError = CountMaintenanceSchedulesAwaitingConfirmationErrors[keyof CountMaintenanceSchedulesAwaitingConfirmationErrors];
+
+export type CountMaintenanceSchedulesAwaitingConfirmationResponses = {
+    /**
+     * OK
+     */
+    200: PendingEquipmentCount;
+};
+
+export type CountMaintenanceSchedulesAwaitingConfirmationResponse = CountMaintenanceSchedulesAwaitingConfirmationResponses[keyof CountMaintenanceSchedulesAwaitingConfirmationResponses];
+
+export type ConfirmMaintenanceScheduleData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
     path: {
         id: string;
     };
     query?: never;
-    url: '/maintenance-schedules/{id}/complete';
+    url: '/maintenance-schedules/{id}/confirm';
 };
 
-export type CompleteMaintenanceScheduleErrors = {
-    /**
-     * Bad Request
-     */
-    400: ValidationProblemDetails;
+export type ConfirmMaintenanceScheduleErrors = {
     /**
      * Unauthorized
      */
@@ -4276,16 +4332,16 @@ export type CompleteMaintenanceScheduleErrors = {
     409: ProblemDetails;
 };
 
-export type CompleteMaintenanceScheduleError = CompleteMaintenanceScheduleErrors[keyof CompleteMaintenanceScheduleErrors];
+export type ConfirmMaintenanceScheduleError = ConfirmMaintenanceScheduleErrors[keyof ConfirmMaintenanceScheduleErrors];
 
-export type CompleteMaintenanceScheduleResponses = {
+export type ConfirmMaintenanceScheduleResponses = {
     /**
      * OK
      */
     200: MaintenanceSchedule;
 };
 
-export type CompleteMaintenanceScheduleResponse = CompleteMaintenanceScheduleResponses[keyof CompleteMaintenanceScheduleResponses];
+export type ConfirmMaintenanceScheduleResponse = ConfirmMaintenanceScheduleResponses[keyof ConfirmMaintenanceScheduleResponses];
 
 export type GetMyEmergencyCallsData = {
     body?: never;

@@ -75,13 +75,16 @@ and can start an agent workflow.
 **Creates and retires wards.** Reads patient details, the bookings list and the discharge
 board. **Confirms new equipment** in the mobile app — an item the equipment manager registers
 only reaches the web register once the administrator confirms it. The app asks for the
-confirmation code first: `equipment2026`.
+confirmation code first: `equipment2026`. **Confirms maintenance done** the same way — every
+reported fault and scheduled job is listed there, and confirming it puts the item back into
+service.
 **Cannot:** register, admit, bed, or discharge anyone.
 
 ### Equipment manager
 Beds, equipment items, pharmacy and maintenance. **Files lab reports** — the only role that
 can. Reads patient details and lab reports.
-**Cannot:** confirm an item they registered — the hospital administrator does that.
+**Cannot:** confirm an item they registered, or confirm maintenance done — the hospital
+administrator does both. Schedules maintenance on the web Maintenance unit page.
 
 ### Ambulance crew
 Emergency calls and ambulances.

@@ -210,14 +210,25 @@ public sealed class MaintenanceService : IMaintenanceService
     private async Task EnsureAssetExistsAsync(
         AssetType assetType, Guid assetId, CancellationToken cancellationToken)
     {
-        var exists = assetType == AssetType.Bed
-            ? await _db.Beds.AnyAsync(b => b.Id == assetId, cancellationToken)
-            : await _db.EquipmentItems.AnyAsync(i => i.Id == assetId, cancellationToken);
-
-        if (!exists)
+        if (assetType == AssetType.Bed)
         {
-            throw new NotFoundException(
-                assetType == AssetType.Bed ? "Bed" : "Equipment item", assetId);
+            if (!await _db.Beds.AnyAsync(b => b.Id == assetId, cancellationToken))
+            {
+                throw new NotFoundException("Bed", assetId);
+            }
+
+            return;
+        }
+
+        var item = await _db.EquipmentItems.AsNoTracking()
+            .Where(i => i.Id == assetId)
+            .Select(i => new { i.Name, i.AwaitingConfirmation })
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? throw new NotFoundException("Equipment item", assetId);
+
+        if (item.AwaitingConfirmation)
+        {
+            throw new ConflictException(MessageCode.EquipmentAwaitingConfirmation, item.Name);
         }
     }
 

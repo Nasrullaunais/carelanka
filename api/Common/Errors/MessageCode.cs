@@ -46,6 +46,12 @@ public enum MessageCode
 
     LabReportFileType,
 
+    ConfirmationCodeIncorrect,
+
+    EquipmentAwaitingConfirmation,
+
+    EquipmentNotAwaitingConfirmation,
+
     PharmacyCategoryNameTaken,
 
     PharmacyItemNameTaken,

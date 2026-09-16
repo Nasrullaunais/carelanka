@@ -993,6 +993,30 @@ the nurse on shift. `clinical_clearance` on the discharge checklist did **not** 
 Doctor-only. **M2, this is a note not a request** — `Doctor` and `WardNurse` are both already in
 `StaffRole` and M4 only reads the claim.
 
+**11.18 (OPEN — announced by M3 on 2026-09-16) — a new equipment item waits for the hospital
+administrator to confirm it.**
+
+Not a request. Announced because it gives `hospital_administrator` — a role every component
+shares — a new job inside Equipment Management, and a first mobile screen.
+
+**What changed.** `POST /equipment-items` now saves the item with `awaiting_confirmation = true`.
+It stays off `GET /equipment-items`, and cannot be edited, assigned, faulted or serviced, until the hospital
+administrator confirms it in the Flutter app (`POST /equipment-items/{id}/confirm`) or rejects it
+(`/reject`). Migration `Equipment_AddItemConfirmation` adds three columns to `equipment_items` and
+marks every existing row as already confirmed. Design is `equipment-management-plan.md` §4.3; the
+contract is `equipment-spec.yaml`.
+
+**The confirmation code.** Listing, confirming and rejecting also need an `X-Confirmation-Code`
+header, checked by the API against `Equipment:ConfirmationCode` in `appsettings.json`. The demo
+value is in `TEST_ACCOUNTS.md`. Change it anywhere real.
+
+**What it means for the others.**
+- **M4:** nothing you read changes. Equipment still never writes a `Ward` or an `Admission`.
+- **M2:** no new role. `HospitalAdministrator` already exists in `StaffRole`; Equipment only reads
+  the claim, through the new `EquipmentConfirmer` policy.
+- **Anyone listing equipment** (a readiness check, a report): an unconfirmed item is not in
+  `GET /equipment-items`, which is the point — it is not usable stock yet.
+
 ---
 
 ## 12. For the other three members

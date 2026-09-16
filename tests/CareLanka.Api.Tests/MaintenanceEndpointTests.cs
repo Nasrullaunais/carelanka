@@ -247,7 +247,7 @@ public sealed class MaintenanceEndpointTests
 
     private record Item(Guid Id, string Name, string AssetTag);
 
-    private static async Task<Item> NewItemAsync(HttpClient client)
+    private async Task<Item> NewItemAsync(HttpClient client)
     {
         using var category = await ReadJsonAsync(await client.PostAsJsonAsync(
             "/api/equipment-categories", new { name = $"Cat {Guid.NewGuid():N}"[..18] }));
@@ -265,7 +265,21 @@ public sealed class MaintenanceEndpointTests
             ward_id = Guid.NewGuid()
         }));
 
-        return new Item(body.RootElement.GetProperty("id").GetGuid(), "Ventilator", tag);
+        var id = body.RootElement.GetProperty("id").GetGuid();
+
+        await ConfirmAsync(id);
+
+        return new Item(id, "Ventilator", tag);
+    }
+
+    private async Task ConfirmAsync(Guid id)
+    {
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
+        administrator.DefaultRequestHeaders.Add(
+            "X-Confirmation-Code", ApiApplication.EquipmentConfirmationCode);
+
+        var response = await administrator.PostAsync($"/api/equipment-items/{id}/confirm", null);
+        response.EnsureSuccessStatusCode();
     }
 
     private static Task<HttpResponseMessage> ScheduleAsync(

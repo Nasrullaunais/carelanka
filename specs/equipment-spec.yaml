@@ -124,6 +124,11 @@ paths:
         `name`, `category_id`, `model`, `manufacturer` and `purchase_date` are the fields named
         in the component plan; `asset_tag`, `ward_id` and `serial_number` are additions the plan
         depends on for the QR-scan device feature and ward-location tracking.
+
+        The new item has `awaiting_confirmation = true`. It is left out of
+        `GET /equipment-items` and cannot be edited, assigned, faulted or serviced until a
+        hospital administrator confirms it through `POST /equipment-items/{id}/confirm`. A
+        mistake is fixed by the administrator rejecting it and the item being registered again.
       operationId: createEquipmentItem
       requestBody:
         required: true
@@ -132,7 +137,7 @@ paths:
             schema: { $ref: '#/components/schemas/CreateEquipmentItemRequest' }
       responses:
         '201':
-          description: Created, status `available`
+          description: Created, status `available` and awaiting confirmation
           content:
             application/json:
               schema: { $ref: '#/components/schemas/EquipmentItem' }
@@ -153,7 +158,11 @@ paths:
     get:
       tags: [Equipment]
       summary: Search equipment items
-      description: 'Roles: any authenticated staff.'
+      description: |
+        Roles: any authenticated staff.
+
+        Confirmed items only. An item still awaiting confirmation is not part of the register
+        yet - see `GET /equipment-items/pending-confirmation`.
       operationId: listEquipmentItems
       parameters:
         - name: search
@@ -193,6 +202,120 @@ paths:
                         items: { $ref: '#/components/schemas/EquipmentItemSummary' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /equipment-items/pending-confirmation:
+    get:
+      tags: [Equipment]
+      summary: List newly registered items awaiting confirmation
+      description: |
+        Roles: HospitalAdministrator, with the confirmation code.
+
+        The hospital administrator's queue in the mobile app, oldest first. The equipment
+        manager who registers an item cannot confirm it, so nobody approves their own entry.
+        A missing or wrong `X-Confirmation-Code` answers 403 `cl_equ_017`, the same as a role
+        that may not confirm at all. The code lives in the API's configuration
+        (`Equipment:ConfirmationCode`), never in a client.
+      operationId: listEquipmentItemsAwaitingConfirmation
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
+      responses:
+        '200':
+          description: Every item awaiting confirmation
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/EquipmentItem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: This role may not confirm equipment, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /equipment-items/pending-confirmation/count:
+    get:
+      tags: [Equipment]
+      summary: Count the items awaiting confirmation
+      description: |
+        Roles: EquipmentManager, HospitalAdministrator.
+
+        Lets the web dashboard say how many registered items have not reached the register yet.
+        A number only, so it needs no confirmation code.
+      operationId: countEquipmentItemsAwaitingConfirmation
+      responses:
+        '200':
+          description: How many items are awaiting confirmation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PendingEquipmentCount' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /equipment-items/{id}/confirm:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Equipment]
+      summary: Confirm a newly registered item onto the register
+      description: |
+        Roles: HospitalAdministrator, with the confirmation code.
+
+        Business operation beyond CRUD. Clears `awaiting_confirmation` and stamps
+        `confirmed_by_staff_id` and `confirmed_at`. From then on the item is listed and can be
+        used like any other.
+      operationId: confirmEquipmentItem
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
+      responses:
+        '200':
+          description: Confirmed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EquipmentItem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: This role may not confirm equipment, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This item is not awaiting confirmation - it was already confirmed.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /equipment-items/{id}/reject:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Equipment]
+      summary: Reject a newly registered item
+      description: |
+        Roles: HospitalAdministrator, with the confirmation code.
+
+        Business operation beyond CRUD. Soft-deletes an item that is still awaiting
+        confirmation, so it never reaches the register and its asset tag and serial number can
+        be registered again with the right details.
+      operationId: rejectEquipmentItem
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
+      responses:
+        '204':
+          description: Rejected and removed
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: This role may not confirm equipment, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This item is not awaiting confirmation - it was already confirmed.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /equipment-items/{id}:
     parameters:
@@ -239,8 +362,9 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
           description: >-
-            That status change is not a legal move in the equipment lifecycle, or the item is
-            with the maintenance unit and only they can return it to service.
+            That status change is not a legal move in the equipment lifecycle, the item is
+            with the maintenance unit and only they can return it to service, or it is still
+            awaiting confirmation.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -1388,6 +1512,12 @@ components:
       name: sortDir
       in: query
       schema: { type: string, enum: [asc, desc], default: desc }
+    ConfirmationCode:
+      name: X-Confirmation-Code
+      in: header
+      required: true
+      description: The equipment confirmation code, checked by the API against `Equipment:ConfirmationCode`.
+      schema: { type: string }
 
   responses:
     BadRequest:
@@ -1583,6 +1713,21 @@ components:
               format: uuid
               nullable: true
               description: Set when status = assigned. References Patient Management's Admission table.
+            awaiting_confirmation:
+              type: boolean
+              description: True from registration until a hospital administrator confirms the item.
+            confirmed_by_staff_id:
+              type: string
+              format: uuid
+              nullable: true
+              description: The hospital administrator who confirmed it. Null for items registered before confirmation existed.
+            confirmed_at: { type: string, format: date-time, nullable: true }
+
+    PendingEquipmentCount:
+      type: object
+      required: [count]
+      properties:
+        count: { type: integer, minimum: 0 }
 
     EquipmentItemDetail:
       allOf:

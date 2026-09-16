@@ -12,9 +12,9 @@ class ClaimByPatientCodeRequest {
     this.patientCode,
     this.nic,
   });
-
+  
   factory ClaimByPatientCodeRequest.fromJson(Map<String, Object?> json) => _$ClaimByPatientCodeRequestFromJson(json);
-
+  
   @JsonKey(name: 'patient_code')
   final String? patientCode;
   final String? nic;

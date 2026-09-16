@@ -73,12 +73,15 @@ and can start an agent workflow.
 ### Hospital administrator
 **Sets prices** — the admission fee per care level and every ward's rates. Nobody else can.
 **Creates and retires wards.** Reads patient details, the bookings list and the discharge
-board.
+board. **Confirms new equipment** in the mobile app — an item the equipment manager registers
+only reaches the web register once the administrator confirms it. The app asks for the
+confirmation code first: `equipment2026`.
 **Cannot:** register, admit, bed, or discharge anyone.
 
 ### Equipment manager
 Beds, equipment items, pharmacy and maintenance. **Files lab reports** — the only role that
 can. Reads patient details and lab reports.
+**Cannot:** confirm an item they registered — the hospital administrator does that.
 
 ### Ambulance crew
 Emergency calls and ambulances.

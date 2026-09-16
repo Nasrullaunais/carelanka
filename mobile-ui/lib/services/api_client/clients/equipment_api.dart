@@ -13,6 +13,7 @@ import '../models/equipment_item.dart';
 import '../models/equipment_item_detail.dart';
 import '../models/equipment_item_summary_paged_result.dart';
 import '../models/equipment_status.dart';
+import '../models/pending_equipment_count.dart';
 import '../models/report_fault_request.dart';
 import '../models/update_equipment_item_request.dart';
 
@@ -45,6 +46,26 @@ abstract class EquipmentApi {
   @POST('/equipment-items')
   Future<EquipmentItem> createEquipmentItem({
     @Body() CreateEquipmentItemRequest? body,
+  });
+
+  @GET('/equipment-items/pending-confirmation')
+  Future<List<EquipmentItem>> listEquipmentItemsAwaitingConfirmation({
+    @Header('X-Confirmation-Code') required String xConfirmationCode,
+  });
+
+  @GET('/equipment-items/pending-confirmation/count')
+  Future<PendingEquipmentCount> countEquipmentItemsAwaitingConfirmation();
+
+  @POST('/equipment-items/{id}/confirm')
+  Future<EquipmentItem> confirmEquipmentItem({
+    @Path('id') required String id,
+    @Header('X-Confirmation-Code') required String xConfirmationCode,
+  });
+
+  @POST('/equipment-items/{id}/reject')
+  Future<void> rejectEquipmentItem({
+    @Path('id') required String id,
+    @Header('X-Confirmation-Code') required String xConfirmationCode,
   });
 
   @GET('/equipment-items/{id}')

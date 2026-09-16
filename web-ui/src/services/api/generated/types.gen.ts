@@ -664,6 +664,9 @@ export type EquipmentItem = {
     purchase_date: string;
     serial_number?: string | null;
     assigned_to_admission_id?: string | null;
+    awaiting_confirmation: boolean;
+    confirmed_by_staff_id?: string | null;
+    confirmed_at?: string | null;
     created_at: string;
     updated_at: string;
 };
@@ -683,6 +686,9 @@ export type EquipmentItemDetail = {
     purchase_date: string;
     serial_number?: string | null;
     assigned_to_admission_id?: string | null;
+    awaiting_confirmation: boolean;
+    confirmed_by_staff_id?: string | null;
+    confirmed_at?: string | null;
     created_at: string;
     updated_at: string;
     maintenance_history: Array<MaintenanceSchedule>;
@@ -823,7 +829,8 @@ export type MyAppointmentPagedResult = {
 };
 
 export type MyBill = {
-    admission_id: string;
+    admission_id?: string | null;
+    appointment_id?: string | null;
     bill_number: string;
     currency: string;
     lines: Array<MyBillLine>;
@@ -853,6 +860,24 @@ export type MyEmergencyCallSummary = {
 
 export type MyEmergencyCallSummaryPagedResult = {
     items: Array<MyEmergencyCallSummary>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
+export type MyLabReport = {
+    id: string;
+    test_name: string;
+    summary?: string | null;
+    file_name: string;
+    content_type: string;
+    byte_size: number;
+    created_at: string;
+};
+
+export type MyLabReportPagedResult = {
+    items: Array<MyLabReport>;
     page: number;
     page_size: number;
     total_items: number;
@@ -975,6 +1000,10 @@ export type PatientSummaryPagedResult = {
     page_size: number;
     total_items: number;
     total_pages: number;
+};
+
+export type PendingEquipmentCount = {
+    count: number;
 };
 
 export type PharmacyCategory = {
@@ -3563,6 +3592,151 @@ export type CreateEquipmentItemResponses = {
 
 export type CreateEquipmentItemResponse = CreateEquipmentItemResponses[keyof CreateEquipmentItemResponses];
 
+export type ListEquipmentItemsAwaitingConfirmationData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/equipment-items/pending-confirmation';
+};
+
+export type ListEquipmentItemsAwaitingConfirmationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListEquipmentItemsAwaitingConfirmationError = ListEquipmentItemsAwaitingConfirmationErrors[keyof ListEquipmentItemsAwaitingConfirmationErrors];
+
+export type ListEquipmentItemsAwaitingConfirmationResponses = {
+    /**
+     * OK
+     */
+    200: Array<EquipmentItem>;
+};
+
+export type ListEquipmentItemsAwaitingConfirmationResponse = ListEquipmentItemsAwaitingConfirmationResponses[keyof ListEquipmentItemsAwaitingConfirmationResponses];
+
+export type CountEquipmentItemsAwaitingConfirmationData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/equipment-items/pending-confirmation/count';
+};
+
+export type CountEquipmentItemsAwaitingConfirmationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type CountEquipmentItemsAwaitingConfirmationError = CountEquipmentItemsAwaitingConfirmationErrors[keyof CountEquipmentItemsAwaitingConfirmationErrors];
+
+export type CountEquipmentItemsAwaitingConfirmationResponses = {
+    /**
+     * OK
+     */
+    200: PendingEquipmentCount;
+};
+
+export type CountEquipmentItemsAwaitingConfirmationResponse = CountEquipmentItemsAwaitingConfirmationResponses[keyof CountEquipmentItemsAwaitingConfirmationResponses];
+
+export type ConfirmEquipmentItemData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/equipment-items/{id}/confirm';
+};
+
+export type ConfirmEquipmentItemErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ConfirmEquipmentItemError = ConfirmEquipmentItemErrors[keyof ConfirmEquipmentItemErrors];
+
+export type ConfirmEquipmentItemResponses = {
+    /**
+     * OK
+     */
+    200: EquipmentItem;
+};
+
+export type ConfirmEquipmentItemResponse = ConfirmEquipmentItemResponses[keyof ConfirmEquipmentItemResponses];
+
+export type RejectEquipmentItemData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/equipment-items/{id}/reject';
+};
+
+export type RejectEquipmentItemErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RejectEquipmentItemError = RejectEquipmentItemErrors[keyof RejectEquipmentItemErrors];
+
+export type RejectEquipmentItemResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type RejectEquipmentItemResponse = RejectEquipmentItemResponses[keyof RejectEquipmentItemResponses];
+
 export type GetEquipmentItemData = {
     body?: never;
     path: {
@@ -4401,6 +4575,112 @@ export type GetMyBillResponses = {
 };
 
 export type GetMyBillResponse = GetMyBillResponses[keyof GetMyBillResponses];
+
+export type GetMyAppointmentBillData = {
+    body?: never;
+    path: {
+        appointmentId: string;
+    };
+    query?: never;
+    url: '/me/appointments/{appointmentId}/bill';
+};
+
+export type GetMyAppointmentBillErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetMyAppointmentBillError = GetMyAppointmentBillErrors[keyof GetMyAppointmentBillErrors];
+
+export type GetMyAppointmentBillResponses = {
+    /**
+     * OK
+     */
+    200: MyBill;
+};
+
+export type GetMyAppointmentBillResponse = GetMyAppointmentBillResponses[keyof GetMyAppointmentBillResponses];
+
+export type GetMyLabReportsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/me/lab-reports';
+};
+
+export type GetMyLabReportsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type GetMyLabReportsError = GetMyLabReportsErrors[keyof GetMyLabReportsErrors];
+
+export type GetMyLabReportsResponses = {
+    /**
+     * OK
+     */
+    200: MyLabReportPagedResult;
+};
+
+export type GetMyLabReportsResponse = GetMyLabReportsResponses[keyof GetMyLabReportsResponses];
+
+export type DownloadMyLabReportData = {
+    body?: never;
+    path: {
+        reportId: string;
+    };
+    query?: never;
+    url: '/me/lab-reports/{reportId}/file';
+};
+
+export type DownloadMyLabReportErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type DownloadMyLabReportError = DownloadMyLabReportErrors[keyof DownloadMyLabReportErrors];
+
+export type DownloadMyLabReportResponses = {
+    /**
+     * OK
+     */
+    200: Blob | File;
+};
+
+export type DownloadMyLabReportResponse = DownloadMyLabReportResponses[keyof DownloadMyLabReportResponses];
 
 export type ListMyAppointmentsData = {
     body?: never;

@@ -29,6 +29,16 @@ public interface IEquipmentItemService
     Task<EquipmentItem> ReportFaultAsync(
         Guid id, string description, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<EquipmentItem>> ListAwaitingConfirmationAsync(
+        string? confirmationCode, CancellationToken cancellationToken = default);
+
+    Task<PendingEquipmentCount> CountAwaitingConfirmationAsync(CancellationToken cancellationToken = default);
+
+    Task<EquipmentItem> ConfirmAsync(
+        Guid id, string? confirmationCode, CancellationToken cancellationToken = default);
+
+    Task RejectAsync(Guid id, string? confirmationCode, CancellationToken cancellationToken = default);
+
     Task<ItemEntity?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<ItemEntity> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);

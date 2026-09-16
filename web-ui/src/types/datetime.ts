@@ -17,6 +17,10 @@ export function localDateTime(iso: string): string {
   });
 }
 
+export function hasPassed(iso: string): boolean {
+  return new Date(iso).getTime() <= Date.now();
+}
+
 export function localInputValue(when: Date): string {
   const offset = when.getTimezoneOffset() * 60_000;
   return new Date(when.getTime() - offset).toISOString().slice(0, 16);

@@ -1,19 +1,25 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 
 class PickedReport {
-  const PickedReport({required this.file, required this.name});
+  const PickedReport({this.file, this.bytes, required this.name})
+      : assert(file != null || bytes != null);
 
-  final File file;
+  final File? file;
+
+  // A browser has no file path, so on web the picked file arrives as bytes instead.
+  final Uint8List? bytes;
+
   final String name;
 
   static const maxBytes = 10 * 1024 * 1024;
 
   static const allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png'];
 
-  int get byteSize => file.lengthSync();
+  int get byteSize => bytes?.length ?? file!.lengthSync();
 
   bool get isTooBig => byteSize > maxBytes;
 
@@ -45,6 +51,8 @@ class DeviceReportFileSource implements ReportFileSource {
     );
     if (shot == null) return null;
 
+    if (kIsWeb) return PickedReport(bytes: await shot.readAsBytes(), name: shot.name);
+
     return PickedReport(file: File(shot.path), name: shot.name);
   }
 
@@ -53,11 +61,20 @@ class DeviceReportFileSource implements ReportFileSource {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: PickedReport.allowedExtensions,
+      withData: kIsWeb,
     );
 
     final picked = result?.files.singleOrNull;
-    final path = picked?.path;
-    if (picked == null || path == null) return null;
+    if (picked == null) return null;
+
+    // file_picker throws when `path` is read on web.
+    if (kIsWeb) {
+      final bytes = picked.bytes;
+      return bytes == null ? null : PickedReport(bytes: bytes, name: picked.name);
+    }
+
+    final path = picked.path;
+    if (path == null) return null;
 
     return PickedReport(file: File(path), name: picked.name);
   }

@@ -83,7 +83,7 @@ class PatientLabReportsController extends ChangeNotifier {
       final report = await _service.uploadReport(
         patientId: patient.id,
         testName: testName.trim(),
-        file: file.file,
+        report: file,
         summary: writtenSummary.isEmpty ? null : writtenSummary,
       );
 

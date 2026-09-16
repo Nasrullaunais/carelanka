@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../services/report_file_source.dart';
@@ -11,7 +10,6 @@ class ReportAttachment extends StatelessWidget {
     required this.onPhotograph,
     required this.onAttachPdf,
     required this.onRemove,
-    this.uploadSupported = !kIsWeb,
   });
 
   final PickedReport? attachment;
@@ -20,36 +18,24 @@ class ReportAttachment extends StatelessWidget {
   final VoidCallback onAttachPdf;
   final VoidCallback onRemove;
 
-  // The generated upload call takes a dart:io File, which a browser cannot provide.
-  final bool uploadSupported;
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final picked = attachment;
 
     if (picked == null) {
-      final canPick = enabled && uploadSupported;
-
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (!uploadSupported) ...[
-            Text(
-              'Uploading a report works in the Android or iOS app, not in a browser.',
-              style: TextStyle(color: theme.colorScheme.error),
-            ),
-            const SizedBox(height: 8),
-          ],
           FilledButton.tonalIcon(
-            onPressed: canPick ? onPhotograph : null,
+            onPressed: enabled ? onPhotograph : null,
             icon: const Icon(Icons.photo_camera_outlined),
             label: const Text('Photograph the report'),
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
-            onPressed: canPick ? onAttachPdf : null,
+            onPressed: enabled ? onAttachPdf : null,
             icon: const Icon(Icons.attach_file),
             label: const Text('Attach a PDF'),
             style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),

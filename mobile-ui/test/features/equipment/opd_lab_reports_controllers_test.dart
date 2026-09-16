@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:carelanka_mobile/core/network/api_exception.dart';
 import 'package:carelanka_mobile/core/widgets/async_data.dart';
@@ -115,6 +116,22 @@ void main() {
       expect(controller.attachment, isNull);
       expect(controller.reports.valueOrNull!.map((r) => r.testName),
           ['Full blood count', 'Lipid profile']);
+    });
+
+    test('uploads a file picked in a browser, which has bytes but no path', () async {
+      final service = FakeLabReportsService();
+      final picked = PickedReport(bytes: Uint8List(2048), name: 'report.pdf');
+      final controller = controllerFor(service, FakeReportFileSource(document: picked));
+
+      await controller.pickDocument();
+
+      expect(controller.attachment!.byteSize, 2048);
+      expect(controller.validate(testName: 'Full blood count', summary: ''), isNull);
+
+      await controller.upload(testName: 'Full blood count', summary: '');
+
+      expect(service.uploads, 1);
+      expect(service.uploadedReport, same(picked));
     });
 
     test('sends no summary when the summary is blank', () async {

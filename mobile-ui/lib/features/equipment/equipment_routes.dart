@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -18,7 +19,10 @@ final List<RouteBase> equipmentRoutes = [
     path: EquipmentPaths.labReports,
     builder: (context, _) => MultiProvider(
       providers: [
-        Provider(create: (context) => LabReportsService(context.read<CareLankaApi>())),
+        Provider(create: (context) => LabReportsService(
+              context.read<CareLankaApi>(),
+              context.read<Dio>(),
+            )),
         Provider<ReportFileSource>(create: (_) => DeviceReportFileSource()),
       ],
       child: const LabReportsScreen(),

@@ -351,16 +351,16 @@ public sealed class MeService : IMeService
         }
 
         var code = request.PatientCode.Trim().ToUpperInvariant();
+        var nic = request.Nic.Trim();
 
         var patient = await _db.Patients.FirstOrDefaultAsync(p => p.PatientCode == code, ct);
 
-        // One message for every way this fails. A distinct "wrong date of birth" would tell
-        // a stranger holding the slip that the code is real, which is what the date of birth
-        // is there to stop.
+        // One message for every way this fails. A distinct "wrong NIC" would tell a stranger
+        // holding the slip that the code is real, which is what the NIC is there to stop.
         if (patient is null
             || patient.UserAccountId is not null
-            || patient.DateOfBirth is null
-            || patient.DateOfBirth != request.DateOfBirth)
+            || patient.Nic is null
+            || patient.Nic != nic)
         {
             throw new NotFoundException(MessageCode.PatientCodeNotClaimable);
         }

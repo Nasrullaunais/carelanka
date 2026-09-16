@@ -791,9 +791,9 @@ Two endpoints, same body, `patient_code` + `date_of_birth`:
 Four decisions worth defending:
 
 1. **The account exists before the claim.** Registration stays `POST /auth/patient/register`, which is common and not ours. Claiming from a real login makes the claim attributable, and keeps this out of common auth entirely.
-2. **Both fields, or nothing.** The code is 27.5 billion combinations from a CSPRNG (`PatientCodes.Next`), so it cannot be guessed — but it is printed on paper, and paper gets photographed, dropped and left on trolleys. The date of birth is the second factor that makes a found slip insufficient on its own.
-3. **One message for every failure**, `cl_pat_037` — no such code, wrong date of birth, no date of birth on file, already claimed. A distinct "wrong date of birth" would confirm to whoever holds the slip that the code is real, which is the thing the date of birth is there to stop.
-4. **A record with no date of birth cannot be claimed.** There is no second factor to check, so it is desk work. `POST /patients/{id}/link-account` already exists for exactly that, Duty Manager only.
+2. **Both fields, or nothing.** The code is 27.5 billion combinations from a CSPRNG (`PatientCodes.Next`), so it cannot be guessed — but it is printed on paper, and paper gets photographed, dropped and left on trolleys. The NIC is the second factor that makes a found slip insufficient on its own.
+3. **One message for every failure**, `cl_pat_037` — no such code, wrong NIC, no NIC on file, already claimed. A distinct "wrong NIC" would confirm to whoever holds the slip that the code is real, which is the thing the NIC is there to stop.
+4. **A record with no NIC cannot be claimed.** There is no second factor to check, so it is desk work. `POST /patients/{id}/link-account` already exists for exactly that, Duty Manager only.
 
 **Still open:** attempt rate-limiting. The claim is authenticated, so an attacker must register first and every attempt is attributable, which is why this did not block the feature — but a login that fails twenty claims in a minute should be stopped, and nothing stops it today.
 

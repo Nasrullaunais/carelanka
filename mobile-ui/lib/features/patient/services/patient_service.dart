@@ -60,26 +60,26 @@ class PatientService {
 
   Future<PatientClaimPreview> previewClaim({
     required String patientCode,
-    required DateTime dateOfBirth,
+    required String nic,
   }) {
     return callApi(() => _api.patientSelfService.previewMyClaim(
-          body: _claimRequest(patientCode, dateOfBirth),
+          body: _claimRequest(patientCode, nic),
         ));
   }
 
   Future<MyProfile> claimRecord({
     required String patientCode,
-    required DateTime dateOfBirth,
+    required String nic,
   }) {
     return callApi(() => _api.patientSelfService.claimMyRecord(
-          body: _claimRequest(patientCode, dateOfBirth),
+          body: _claimRequest(patientCode, nic),
         ));
   }
 
-  static ClaimByPatientCodeRequest _claimRequest(String patientCode, DateTime dateOfBirth) {
+  static ClaimByPatientCodeRequest _claimRequest(String patientCode, String nic) {
     return ClaimByPatientCodeRequest(
       patientCode: patientCode.trim().toUpperCase(),
-      dateOfBirth: dateOfBirth,
+      nic: nic.trim(),
     );
   }
 

@@ -4,5 +4,5 @@ public class ClaimByPatientCodeRequest
 {
     public string PatientCode { get; set; } = string.Empty;
 
-    public DateOnly? DateOfBirth { get; set; }
+    public string Nic { get; set; } = string.Empty;
 }

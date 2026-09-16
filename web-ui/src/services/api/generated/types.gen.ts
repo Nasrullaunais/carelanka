@@ -395,7 +395,7 @@ export type ChecklistUpdateRequest = {
 
 export type ClaimByPatientCodeRequest = {
     patient_code?: string | null;
-    date_of_birth?: string | null;
+    nic?: string | null;
 };
 
 export type CompleteDetailsRequest = {

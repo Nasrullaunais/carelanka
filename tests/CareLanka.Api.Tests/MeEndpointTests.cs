@@ -425,11 +425,10 @@ public sealed class MeEndpointTests
     public async Task A_walk_in_who_installs_the_app_afterwards_claims_the_record_the_desk_made()
     {
         using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
-        var dateOfBirth = new DateOnly(1988, 4, 17);
+        var nic = NewNic();
 
-        // No NIC: the exact record that /me/pre-register cannot match on.
         var (patientId, patientCode) =
-            await NewWalkInAtTheDeskAsync(nurse, "Sunil Fernando", dateOfBirth);
+            await NewWalkInAtTheDeskAsync(nurse, "Sunil Fernando", nic);
 
         await AdmitAsync(nurse, patientId);
 
@@ -439,7 +438,7 @@ public sealed class MeEndpointTests
         using var beforeBody = await ReadJsonAsync(stayBefore);
         Assert.Equal("cl_pat_033", beforeBody.RootElement.GetProperty("code").GetString());
 
-        var claimed = await ClaimAsync(patient, patientCode, dateOfBirth);
+        var claimed = await ClaimAsync(patient, patientCode, nic);
         Assert.Equal(HttpStatusCode.OK, claimed.StatusCode);
 
         var stayAfter = await patient.GetAsync("/api/me/admission");
@@ -458,17 +457,17 @@ public sealed class MeEndpointTests
     public async Task The_preview_masks_the_name_so_a_found_slip_shows_a_stranger_almost_nothing()
     {
         using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
-        var dateOfBirth = new DateOnly(1990, 1, 9);
+        var nic = NewNic();
 
         var (_, patientCode) =
-            await NewWalkInAtTheDeskAsync(nurse, "Kamala Jayasuriya", dateOfBirth);
+            await NewWalkInAtTheDeskAsync(nurse, "Kamala Jayasuriya", nic);
 
         using var patient = await NewPatientAccountAsync();
 
         var preview = await patient.PostAsJsonAsync("/api/me/claim/preview", new
         {
             patient_code = patientCode,
-            date_of_birth = dateOfBirth
+            nic
         });
 
         using var body = await ReadJsonAsync(preview);
@@ -485,26 +484,27 @@ public sealed class MeEndpointTests
     }
 
     [Fact]
-    public async Task A_wrong_date_of_birth_gives_the_same_answer_as_a_code_that_does_not_exist()
+    public async Task A_wrong_nic_gives_the_same_answer_as_a_code_that_does_not_exist()
     {
         using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
+        var nic = NewNic();
 
         var (_, patientCode) =
-            await NewWalkInAtTheDeskAsync(nurse, "Ravi Bandara", new DateOnly(1975, 6, 30));
+            await NewWalkInAtTheDeskAsync(nurse, "Ravi Bandara", nic);
 
         using var patient = await NewPatientAccountAsync();
 
-        var wrongDate = await ClaimAsync(patient, patientCode, new DateOnly(1975, 6, 29));
-        using var wrongDateBody = await ReadJsonAsync(wrongDate);
+        var wrongNic = await ClaimAsync(patient, patientCode, NewNic());
+        using var wrongNicBody = await ReadJsonAsync(wrongNic);
 
-        var noSuchCode = await ClaimAsync(patient, "PZZZZZZZ", new DateOnly(1975, 6, 30));
+        var noSuchCode = await ClaimAsync(patient, "PZZZZZZZ", nic);
         using var noSuchCodeBody = await ReadJsonAsync(noSuchCode);
 
-        Assert.Equal(HttpStatusCode.NotFound, wrongDate.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, wrongNic.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, noSuchCode.StatusCode);
 
         // Identical, deliberately: a different answer would confirm the code is real.
-        Assert.Equal("cl_pat_037", wrongDateBody.RootElement.GetProperty("code").GetString());
+        Assert.Equal("cl_pat_037", wrongNicBody.RootElement.GetProperty("code").GetString());
         Assert.Equal("cl_pat_037", noSuchCodeBody.RootElement.GetProperty("code").GetString());
     }
 
@@ -512,16 +512,16 @@ public sealed class MeEndpointTests
     public async Task A_record_somebody_has_already_claimed_cannot_be_claimed_again()
     {
         using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
-        var dateOfBirth = new DateOnly(1982, 11, 3);
+        var nic = NewNic();
 
         var (_, patientCode) =
-            await NewWalkInAtTheDeskAsync(nurse, "Already Taken", dateOfBirth);
+            await NewWalkInAtTheDeskAsync(nurse, "Already Taken", nic);
 
         using var first = await NewPatientAccountAsync();
-        Assert.Equal(HttpStatusCode.OK, (await ClaimAsync(first, patientCode, dateOfBirth)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await ClaimAsync(first, patientCode, nic)).StatusCode);
 
         using var second = await NewPatientAccountAsync();
-        var stolen = await ClaimAsync(second, patientCode, dateOfBirth);
+        var stolen = await ClaimAsync(second, patientCode, nic);
         using var body = await ReadJsonAsync(stolen);
 
         Assert.Equal(HttpStatusCode.NotFound, stolen.StatusCode);
@@ -532,14 +532,14 @@ public sealed class MeEndpointTests
     public async Task A_login_that_already_has_a_record_is_refused_a_second_one()
     {
         using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
-        var dateOfBirth = new DateOnly(1995, 2, 14);
+        var nic = NewNic();
 
-        var (_, patientCode) = await NewWalkInAtTheDeskAsync(nurse, "Second Record", dateOfBirth);
+        var (_, patientCode) = await NewWalkInAtTheDeskAsync(nurse, "Second Record", nic);
 
         using var patient = await NewPatientAccountAsync();
         Assert.Equal(HttpStatusCode.OK, (await PreRegisterAsync(patient, NewNic(), "Own Record")).StatusCode);
 
-        var claimed = await ClaimAsync(patient, patientCode, dateOfBirth);
+        var claimed = await ClaimAsync(patient, patientCode, nic);
         using var body = await ReadJsonAsync(claimed);
 
         Assert.Equal(HttpStatusCode.Conflict, claimed.StatusCode);
@@ -547,7 +547,7 @@ public sealed class MeEndpointTests
     }
 
     [Fact]
-    public async Task A_claim_without_a_date_of_birth_never_reaches_the_service()
+    public async Task A_claim_without_a_nic_never_reaches_the_service()
     {
         using var patient = await NewPatientAccountAsync();
 
@@ -649,18 +649,18 @@ public sealed class MeEndpointTests
     }
 
     private static Task<HttpResponseMessage> ClaimAsync(
-        HttpClient patient, string patientCode, DateOnly dateOfBirth)
+        HttpClient patient, string patientCode, string nic)
         => patient.PostAsJsonAsync(
-            "/api/me/claim", new { patient_code = patientCode, date_of_birth = dateOfBirth });
+            "/api/me/claim", new { patient_code = patientCode, nic });
 
     private static async Task<(string Id, string PatientCode)> NewWalkInAtTheDeskAsync(
-        HttpClient nurse, string fullName, DateOnly dateOfBirth)
+        HttpClient nurse, string fullName, string nic)
     {
         var created = await nurse.PostAsJsonAsync("/api/patients", new
         {
             full_name = fullName,
             gender = "male",
-            date_of_birth = dateOfBirth
+            nic
         });
 
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);

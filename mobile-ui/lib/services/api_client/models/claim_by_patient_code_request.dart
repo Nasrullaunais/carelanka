@@ -10,15 +10,14 @@ part 'claim_by_patient_code_request.g.dart';
 class ClaimByPatientCodeRequest {
   const ClaimByPatientCodeRequest({
     this.patientCode,
-    this.dateOfBirth,
+    this.nic,
   });
-  
+
   factory ClaimByPatientCodeRequest.fromJson(Map<String, Object?> json) => _$ClaimByPatientCodeRequestFromJson(json);
-  
+
   @JsonKey(name: 'patient_code')
   final String? patientCode;
-  @JsonKey(name: 'date_of_birth')
-  final DateTime? dateOfBirth;
+  final String? nic;
 
   Map<String, Object?> toJson() => _$ClaimByPatientCodeRequestToJson(this);
 }

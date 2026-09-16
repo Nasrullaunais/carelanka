@@ -10,6 +10,9 @@ public sealed class ClaimByPatientCodeRequestValidator : AbstractValidator<Claim
     private static readonly Regex CodeFormat =
         new(PatientIdentifierFormats.PatientCode, RegexOptions.Compiled);
 
+    private static readonly Regex NicFormat =
+        new(PatientIdentifierFormats.Nic, RegexOptions.Compiled);
+
     public ClaimByPatientCodeRequestValidator()
     {
         RuleLevelCascadeMode = CascadeMode.Stop;
@@ -19,15 +22,9 @@ public sealed class ClaimByPatientCodeRequestValidator : AbstractValidator<Claim
             .Must(code => CodeFormat.IsMatch(code.Trim().ToUpperInvariant()))
             .WithMessage(PatientIdentifierFormats.PatientCodeMessage);
 
-        RuleFor(request => request.DateOfBirth)
-            .NotNull().WithMessage("Enter your date of birth.")
-            .Must(dateOfBirth => dateOfBirth <= Today)
-            .WithMessage("A date of birth cannot be in the future.")
-            .Must(dateOfBirth => dateOfBirth >= Today.AddYears(-PatientIdentifierFormats.MaxAgeYears))
-            .WithMessage(
-                $"A date of birth cannot be more than {PatientIdentifierFormats.MaxAgeYears} "
-                + "years ago. Check the year.");
+        RuleFor(request => request.Nic)
+            .NotEmpty().WithMessage("Enter the NIC from your hospital slip.")
+            .Must(nic => NicFormat.IsMatch(nic.Trim()))
+            .WithMessage(PatientIdentifierFormats.NicMessage);
     }
-
-    private static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
 }

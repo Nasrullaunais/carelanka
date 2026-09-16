@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/friendly_date.dart';
 import '../../../core/widgets/async_view.dart';
+import '../../../core/widgets/phone_width.dart';
 import '../../../services/api_client/care_lanka_api.dart';
 import '../../../services/api_client/models/my_admission.dart';
 import '../services/patient_service.dart';
@@ -19,7 +20,8 @@ class PastVisitsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (context) =>
-          PastVisitsController(PatientService(context.read<CareLankaApi>()))..load(),
+          PastVisitsController(PatientService(context.read<CareLankaApi>()))
+            ..load(),
       child: const _PastVisitsView(),
     );
   }
@@ -32,31 +34,38 @@ class _PastVisitsView extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = context.watch<PastVisitsController>();
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Past visits')),
-      body: AsyncView<List<MyAdmission>>(
-        state: controller.visits,
-        onRetry: controller.load,
-        loading: const _Skeleton(),
-        builder: (context, visits) {
-          if (visits.isEmpty) {
-            return const EmptyView(
-              icon: Icons.history,
-              title: 'No past visits',
-              message: 'Completed stays will appear here.',
-            );
-          }
+    return PhoneWidth(
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Past visits')),
+        body: AsyncView<List<MyAdmission>>(
+          state: controller.visits,
+          onRetry: controller.load,
+          loading: const _Skeleton(),
+          builder: (context, visits) {
+            if (visits.isEmpty) {
+              return const EmptyView(
+                icon: Icons.history,
+                title: 'No past visits',
+                message: 'Completed stays will appear here.',
+              );
+            }
 
-          return RefreshIndicator(
-            onRefresh: controller.load,
-            child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(AppTheme.gutter, 12, AppTheme.gutter, 32),
-              itemCount: visits.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (_, index) => _VisitCard(visit: visits[index]),
-            ),
-          );
-        },
+            return RefreshIndicator(
+              onRefresh: controller.load,
+              child: ListView.separated(
+                padding: const EdgeInsets.fromLTRB(
+                  AppTheme.gutter,
+                  12,
+                  AppTheme.gutter,
+                  32,
+                ),
+                itemCount: visits.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (_, index) => _VisitCard(visit: visits[index]),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -73,7 +82,10 @@ class _VisitCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final place = [visit.wardName, visit.bedNumber].whereType<String>().join(' · ');
+    final place = [
+      visit.wardName,
+      visit.bedNumber,
+    ].whereType<String>().join(' · ');
     final when = visit.dischargedAt ?? visit.admittedAt;
     final instructions = visit.dischargeInstructions;
 
@@ -103,8 +115,9 @@ class _VisitCard extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           place,
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(color: scheme.onSurfaceVariant),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
                         ),
                       ],
                       const SizedBox(height: 10),
@@ -129,10 +142,13 @@ class _VisitCard extends StatelessWidget {
                         context: context,
                         builder: (dialogContext) => AlertDialog(
                           title: const Text(_instructionsLabel),
-                          content: SingleChildScrollView(child: Text(instructions)),
+                          content: SingleChildScrollView(
+                            child: Text(instructions),
+                          ),
                           actions: [
                             TextButton(
-                              onPressed: () => Navigator.of(dialogContext).pop(),
+                              onPressed: () =>
+                                  Navigator.of(dialogContext).pop(),
                               child: const Text('Close'),
                             ),
                           ],
@@ -175,7 +191,12 @@ class _Skeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(AppTheme.gutter, 12, AppTheme.gutter, 32),
+      padding: const EdgeInsets.fromLTRB(
+        AppTheme.gutter,
+        12,
+        AppTheme.gutter,
+        32,
+      ),
       children: const [
         Skeleton(height: 120, radius: AppTheme.radiusL),
         SizedBox(height: 10),

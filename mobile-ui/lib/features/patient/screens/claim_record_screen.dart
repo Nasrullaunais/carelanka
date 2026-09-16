@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/phone_width.dart';
 import '../../../services/api_client/models/patient_claim_preview.dart';
 import '../hospital_contact.dart';
 import '../state/profile_controller.dart';
@@ -11,12 +12,14 @@ import '../widgets/dialer.dart';
 import '../widgets/panels.dart';
 
 void openClaimRecord(BuildContext context, ProfileController controller) {
-  Navigator.of(context).push(MaterialPageRoute(
-    builder: (_) => ChangeNotifierProvider<ProfileController>.value(
-      value: controller,
-      child: const ClaimRecordScreen(),
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => ChangeNotifierProvider<ProfileController>.value(
+        value: controller,
+        child: const ClaimRecordScreen(),
+      ),
     ),
-  ));
+  );
 }
 
 /// For the patient the hospital registered at the desk - a walk-in, an emergency arrival -
@@ -51,9 +54,9 @@ class _ClaimRecordScreenState extends State<ClaimRecordScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final preview = await context.read<ProfileController>().previewClaim(
-          patientCode: _code.text,
-          nic: _nic.text,
-        );
+      patientCode: _code.text,
+      nic: _nic.text,
+    );
 
     if (!mounted) return;
 
@@ -67,9 +70,9 @@ class _ClaimRecordScreenState extends State<ClaimRecordScreen> {
 
   Future<void> _confirm() async {
     final claimed = await context.read<ProfileController>().claim(
-          patientCode: _code.text,
-          nic: _nic.text,
-        );
+      patientCode: _code.text,
+      nic: _nic.text,
+    );
 
     if (!mounted) return;
 
@@ -86,9 +89,11 @@ class _ClaimRecordScreenState extends State<ClaimRecordScreen> {
   }
 
   void _showError(String fallback) {
-    final message = context.read<ProfileController>().saveError?.message ?? fallback;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message), duration: const Duration(seconds: 5)));
+    final message =
+        context.read<ProfileController>().saveError?.message ?? fallback;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 5)),
+    );
   }
 
   @override
@@ -96,14 +101,21 @@ class _ClaimRecordScreenState extends State<ClaimRecordScreen> {
     final controller = context.watch<ProfileController>();
     final preview = _preview;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('I have a patient code')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(AppTheme.gutter, 12, AppTheme.gutter, 32),
-          children: preview == null
-              ? _form(controller)
-              : _confirmation(preview, controller),
+    return PhoneWidth(
+      child: Scaffold(
+        appBar: AppBar(title: const Text('I have a patient code')),
+        body: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(
+              AppTheme.gutter,
+              12,
+              AppTheme.gutter,
+              32,
+            ),
+            children: preview == null
+                ? _form(controller)
+                : _confirmation(preview, controller),
+          ),
         ),
       ),
     );
@@ -117,13 +129,16 @@ class _ClaimRecordScreenState extends State<ClaimRecordScreen> {
       Text(
         'If the hospital registered you at the desk, your record already exists. '
         'Enter the patient code from the slip they gave you and we will find it.',
-        style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: scheme.onSurfaceVariant,
+        ),
       ),
       const SizedBox(height: 20),
       Form(
         key: _formKey,
-        autovalidateMode:
-            _submitted ? AutovalidateMode.onUserInteraction : AutovalidateMode.disabled,
+        autovalidateMode: _submitted
+            ? AutovalidateMode.onUserInteraction
+            : AutovalidateMode.disabled,
         child: Column(
           children: [
             TextFormField(
@@ -142,7 +157,9 @@ class _ClaimRecordScreenState extends State<ClaimRecordScreen> {
               ),
               validator: (value) {
                 final code = (value ?? '').trim();
-                if (code.isEmpty) return 'Enter the patient code from your slip.';
+                if (code.isEmpty) {
+                  return 'Enter the patient code from your slip.';
+                }
                 if (!_codeFormat.hasMatch(code)) {
                   return 'A patient code is a P followed by seven characters.';
                 }
@@ -169,7 +186,9 @@ class _ClaimRecordScreenState extends State<ClaimRecordScreen> {
       const SizedBox(height: 10),
       Text(
         'We ask for both so that a lost slip on its own is not enough to open your record.',
-        style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: scheme.onSurfaceVariant,
+        ),
       ),
       const SizedBox(height: 22),
       FilledButton(
@@ -177,19 +196,26 @@ class _ClaimRecordScreenState extends State<ClaimRecordScreen> {
         style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
         child: controller.saving
             ? const SizedBox(
-                height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
             : const Text('Find my record'),
       ),
       const SizedBox(height: 24),
       const _DeskHelp(
         title: 'No slip, or the code will not work?',
-        body: 'Some records are created without a code you can use. '
+        body:
+            'Some records are created without a code you can use. '
             'The desk can link your account for you.',
       ),
     ];
   }
 
-  List<Widget> _confirmation(PatientClaimPreview preview, ProfileController controller) {
+  List<Widget> _confirmation(
+    PatientClaimPreview preview,
+    ProfileController controller,
+  ) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
@@ -198,7 +224,9 @@ class _ClaimRecordScreenState extends State<ClaimRecordScreen> {
       const SizedBox(height: 8),
       Text(
         'We have hidden most of the details on purpose. You should still recognise them.',
-        style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: scheme.onSurfaceVariant,
+        ),
       ),
       const SizedBox(height: 18),
       SectionCard(
@@ -228,12 +256,17 @@ class _ClaimRecordScreenState extends State<ClaimRecordScreen> {
         style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
         child: controller.saving
             ? const SizedBox(
-                height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
             : const Text('Yes, this is me'),
       ),
       const SizedBox(height: 10),
       OutlinedButton(
-        onPressed: controller.saving ? null : () => setState(() => _preview = null),
+        onPressed: controller.saving
+            ? null
+            : () => setState(() => _preview = null),
         style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
         child: const Text('No, go back'),
       ),
@@ -275,6 +308,8 @@ class _DeskHelp extends StatelessWidget {
 
 class _UpperCaseFormatter extends TextInputFormatter {
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue _, TextEditingValue next) =>
-      next.copyWith(text: next.text.toUpperCase());
+  TextEditingValue formatEditUpdate(
+    TextEditingValue _,
+    TextEditingValue next,
+  ) => next.copyWith(text: next.text.toUpperCase());
 }

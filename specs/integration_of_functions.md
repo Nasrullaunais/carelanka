@@ -923,7 +923,7 @@ the record staff created. `POST /patients/{id}/link-account` exists for this but
 account GUID and no screen calls it, so in practice the gap was open.
 
 **What was built.** `POST /me/claim/preview` and `POST /me/claim`, both Patient-only, both taking
-`patient_code` + `date_of_birth`. Preview answers a **masked** summary; claim links through the
+`patient_code` + `nic`. Preview answers a **masked** summary; claim links through the
 same `IPatientService.LinkAccountAsync` the desk override already uses. Design is
 `patient-management-plan.md` §7.6b.
 
@@ -933,13 +933,13 @@ JWT. The account is created first through the existing `POST /auth/patient/regis
 claim is an authenticated call from that login. An anonymous "enter a code and set a password"
 flow would have been the other design, and it was rejected twice over: it would have put M4's
 hands in common auth, and it would have handed a stranger holding a dropped hospital slip a
-patient's name, date of birth, address and emergency contact before asking anybody to prove
-anything.
+patient's name, NIC, address and emergency contact before asking anybody to prove anything.
 
-**The one thing another member might care about.** `Patient.DateOfBirth` is now load-bearing for
-more than age rules — it is the second factor on the claim. A record with no date of birth cannot
-be claimed from the app at all and has to go through the Duty Manager link endpoint. Nobody
-outside M4 writes that column today, so this is a note, not a request.
+**The one thing another member might care about.** `Patient.Nic` is now the second factor on the
+claim, not just the pre-register match key. A record with no NIC on file cannot be claimed from
+the app at all and has to go through the Duty Manager link endpoint — the same walk-in-without-NIC
+gap described above, so a record created with `temp_reference` and no NIC still needs the desk
+override. Nobody outside M4 writes that column today, so this is a note, not a request.
 
 **Still open on M4's side:** attempt rate-limiting on the claim endpoints. Authenticated, so
 every attempt is attributable to an account, but nothing stops a login trying repeatedly.

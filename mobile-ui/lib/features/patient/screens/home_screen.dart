@@ -14,6 +14,7 @@ import '../state/profile_controller.dart';
 import '../widgets/dialer.dart';
 import '../widgets/panels.dart';
 import '../widgets/patient_id_card.dart';
+import 'claim_record_screen.dart';
 import 'my_details_screen.dart';
 import 'my_reports_screen.dart';
 import 'past_visits_screen.dart';
@@ -88,11 +89,25 @@ class _NotLinkedYet extends StatelessWidget {
           icon: Icons.badge_outlined,
           accent: theme.colorScheme.warning,
           title: 'Complete your registration',
-          body: 'Add your details to book visits and view your stay.',
-          action: FilledButton(
-            onPressed: () => openMyDetails(context, context.read<ProfileController>()),
-            style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
-            child: const Text('Add my details'),
+          body: 'Add your details to book visits and view your stay. If the hospital has '
+              'already registered you at the desk, use your patient code instead so your '
+              'stay and history come with you.',
+          action: Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              FilledButton(
+                onPressed: () => openMyDetails(context, context.read<ProfileController>()),
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+                child: const Text('Add my details'),
+              ),
+              OutlinedButton(
+                onPressed: () =>
+                    openClaimRecord(context, context.read<ProfileController>()),
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+                child: const Text('I have a patient code'),
+              ),
+            ],
           ),
         ),
       ],

@@ -3,10 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../../core/utils/friendly_date.dart';
 import '../../../services/api_client/models/patient_claim_preview.dart';
 import '../hospital_contact.dart';
 import '../state/profile_controller.dart';
+import '../validation/patient_fields.dart';
 import '../widgets/dialer.dart';
 import '../widgets/panels.dart';
 
@@ -32,8 +32,8 @@ class ClaimRecordScreen extends StatefulWidget {
 class _ClaimRecordScreenState extends State<ClaimRecordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _code = TextEditingController();
+  final _nic = TextEditingController();
 
-  DateTime? _dateOfBirth;
   bool _submitted = false;
 
   PatientClaimPreview? _preview;
@@ -41,6 +41,7 @@ class _ClaimRecordScreenState extends State<ClaimRecordScreen> {
   @override
   void dispose() {
     _code.dispose();
+    _nic.dispose();
     super.dispose();
   }
 
@@ -51,13 +52,13 @@ class _ClaimRecordScreenState extends State<ClaimRecordScreen> {
 
     final preview = await context.read<ProfileController>().previewClaim(
           patientCode: _code.text,
-          dateOfBirth: _dateOfBirth!,
+          nic: _nic.text,
         );
 
     if (!mounted) return;
 
     if (preview == null) {
-      _showError('We could not find that record.');
+      _showError('That patient code and NIC do not match. Call the desk.');
       return;
     }
 
@@ -67,14 +68,14 @@ class _ClaimRecordScreenState extends State<ClaimRecordScreen> {
   Future<void> _confirm() async {
     final claimed = await context.read<ProfileController>().claim(
           patientCode: _code.text,
-          dateOfBirth: _dateOfBirth!,
+          nic: _nic.text,
         );
 
     if (!mounted) return;
 
     if (!claimed) {
       setState(() => _preview = null);
-      _showError('We could not link that record.');
+      _showError('That patient code and NIC do not match. Call the desk.');
       return;
     }
 
@@ -88,20 +89,6 @@ class _ClaimRecordScreenState extends State<ClaimRecordScreen> {
     final message = context.read<ProfileController>().saveError?.message ?? fallback;
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message), duration: const Duration(seconds: 5)));
-  }
-
-  Future<void> _pickDateOfBirth() async {
-    final now = DateTime.now();
-
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _dateOfBirth ?? DateTime(now.year - 30),
-      firstDate: DateTime(now.year - 120),
-      lastDate: now,
-      helpText: 'Date of birth',
-    );
-
-    if (picked != null) setState(() => _dateOfBirth = picked);
   }
 
   @override
@@ -163,25 +150,18 @@ class _ClaimRecordScreenState extends State<ClaimRecordScreen> {
               },
             ),
             const SizedBox(height: 14),
-            InkWell(
-              onTap: controller.saving ? null : _pickDateOfBirth,
-              borderRadius: BorderRadius.circular(AppTheme.radiusM),
-              child: InputDecorator(
-                decoration: InputDecoration(
-                  labelText: 'Date of birth',
-                  errorText: _submitted && _dateOfBirth == null
-                      ? 'Enter your date of birth.'
-                      : null,
-                ),
-                child: Text(
-                  _dateOfBirth == null
-                      ? 'Tap to choose'
-                      : FriendlyDate.dayAndMonth(_dateOfBirth!),
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: _dateOfBirth == null ? scheme.onSurfaceVariant : null,
-                  ),
-                ),
+            TextFormField(
+              controller: _nic,
+              enabled: !controller.saving,
+              autocorrect: false,
+              textCapitalization: TextCapitalization.characters,
+              maxLength: PatientFieldLimits.nic,
+              decoration: const InputDecoration(
+                labelText: 'NIC',
+                hintText: '199534501V',
+                counterText: '',
               ),
+              validator: validateNic,
             ),
           ],
         ),

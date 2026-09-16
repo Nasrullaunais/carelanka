@@ -1525,19 +1525,18 @@ paths:
 
         For the patient who was registered at the desk - a walk-in, an emergency arrival -
         and only afterwards installed the app. Staff already hold their record; this joins
-        their new login to it. Where `POST /me/pre-register` matches on NIC, this matches on
-        the patient code printed on their hospital slip, which is the only handle a record
-        created without a NIC has.
+        their new login to it, matching on the patient code printed on their hospital slip
+        plus the NIC on file for that record.
 
-        **Answers the "is this you?" step, and answers it masked.** Holding a code and a date
-        of birth is enough to be shown `L••••a D•••••••e`; it is not enough to be handed the
-        record. A slip of paper gets photographed, dropped and left on trolleys, so the reply
-        carries nothing a stranger could use and nothing a patient could not recognise.
+        **Answers the "is this you?" step, and answers it masked.** Holding a code and a
+        matching NIC is enough to be shown `L••••a D•••••••e`; it is not enough to be handed
+        the record. A slip of paper gets photographed, dropped and left on trolleys, so the
+        reply carries nothing a stranger could use and nothing a patient could not recognise.
 
-        Both the code and the date of birth must match. 404 `cl_pat_037` covers every failure
-        with one message - no such code, wrong date of birth, no date of birth on file,
-        already claimed. Naming which one would confirm to whoever holds the slip that the
-        code is real, and that is precisely what the date of birth is there to prevent.
+        Both the code and the NIC must match. 404 `cl_pat_037` covers every failure with one
+        message - no such code, wrong NIC, no NIC on file, already claimed. Naming which one
+        would confirm to whoever holds the slip that the code is real, and that is precisely
+        what the NIC is there to prevent.
 
         Nothing is written. Call `POST /me/claim` with the same body to commit.
       operationId: previewMyClaim
@@ -4298,9 +4297,9 @@ components:
       type: object
       description: |
         Both fields are required and both must match. The code alone is a slip of paper, and
-        paper gets photographed and dropped; the date of birth is the second factor that
-        stops a found slip from being enough on its own.
-      required: [patient_code, date_of_birth]
+        paper gets photographed and dropped; the NIC is the second factor that stops a found
+        slip from being enough on its own.
+      required: [patient_code, nic]
       properties:
         patient_code:
           type: string
@@ -4309,7 +4308,10 @@ components:
             31-letter alphabet with the ambiguous ones (I, L, O, 0, 1) left out. Matched
             case-insensitively.
           example: PK4M9XB2
-        date_of_birth: { type: string, format: date }
+        nic:
+          type: string
+          description: The NIC on file for the record that code belongs to. Matched exactly.
+          example: 199534501V
 
     PatientClaimPreview:
       type: object

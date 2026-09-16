@@ -82,7 +82,7 @@ class ProfileController extends ChangeNotifier {
   /// theirs before [claim] attaches their login to it. Writes nothing.
   Future<PatientClaimPreview?> previewClaim({
     required String patientCode,
-    required DateTime dateOfBirth,
+    required String nic,
   }) async {
     _saving = true;
     _saveError = null;
@@ -91,7 +91,7 @@ class ProfileController extends ChangeNotifier {
     try {
       return await _service.previewClaim(
         patientCode: patientCode,
-        dateOfBirth: dateOfBirth,
+        nic: nic,
       );
     } on ApiException catch (error) {
       _saveError = error;
@@ -104,7 +104,7 @@ class ProfileController extends ChangeNotifier {
 
   Future<bool> claim({
     required String patientCode,
-    required DateTime dateOfBirth,
+    required String nic,
   }) async {
     _saving = true;
     _saveError = null;
@@ -112,7 +112,7 @@ class ProfileController extends ChangeNotifier {
 
     try {
       _profile = AsyncData.ready(
-        await _service.claimRecord(patientCode: patientCode, dateOfBirth: dateOfBirth),
+        await _service.claimRecord(patientCode: patientCode, nic: nic),
       );
       return true;
     } on ApiException catch (error) {

@@ -5,7 +5,6 @@ import 'package:carelanka_mobile/core/theme/app_theme.dart';
 import 'package:carelanka_mobile/features/equipment/screens/lab_reports_screen.dart';
 import 'package:carelanka_mobile/features/equipment/services/lab_reports_service.dart';
 import 'package:carelanka_mobile/features/equipment/services/report_file_source.dart';
-import 'package:carelanka_mobile/features/equipment/widgets/report_attachment.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -142,27 +141,6 @@ void main() {
 
     expect(find.text('No such patient.'), findsOneWidget);
     expect(find.text('Upload report'), findsOneWidget);
-  });
-
-  testWidgets('in a browser the upload buttons are off and say why', (tester) async {
-    var photographed = false;
-
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: ReportAttachment(
-          attachment: null,
-          enabled: true,
-          uploadSupported: false,
-          onPhotograph: () => photographed = true,
-          onAttachPdf: () {},
-          onRemove: () {},
-        ),
-      ),
-    ));
-
-    expect(find.textContaining('not in a browser'), findsOneWidget);
-    await tester.tap(find.text('Photograph the report'));
-    expect(photographed, isFalse);
   });
 
   testWidgets('every screen fits a phone-width display', (tester) async {

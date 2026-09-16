@@ -27,6 +27,7 @@ class FakeLabReportsService implements LabReportsService {
   String? uploadedPatientId;
   String? uploadedTestName;
   String? uploadedSummary;
+  PickedReport? uploadedReport;
   int uploads = 0;
 
   @override
@@ -66,13 +67,14 @@ class FakeLabReportsService implements LabReportsService {
   Future<LabReport> uploadReport({
     required String patientId,
     required String testName,
-    required File file,
+    required PickedReport report,
     String? summary,
   }) async {
     uploads++;
     uploadedPatientId = patientId;
     uploadedTestName = testName;
     uploadedSummary = summary;
+    uploadedReport = report;
 
     final failure = uploadFailure;
     if (failure != null) throw failure;

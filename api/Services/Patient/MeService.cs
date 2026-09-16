@@ -5,10 +5,12 @@ using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Patient;
 using CareLanka.Api.Services.Common;
+using CareLanka.Api.Services.Equipment;
 using Microsoft.EntityFrameworkCore;
 using AdmissionEntity = CareLanka.Api.Data.Entities.Patient.Admission;
 using AppointmentEntity = CareLanka.Api.Data.Entities.Patient.Appointment;
 using BillEntity = CareLanka.Api.Data.Entities.Patient.Bill;
+using LabReportDto = CareLanka.Api.DTOs.Equipment.LabReport;
 using PatientEntity = CareLanka.Api.Data.Entities.Patient.Patient;
 
 namespace CareLanka.Api.Services.Patient;
@@ -26,19 +28,22 @@ public sealed class MeService : IMeService
     private readonly IPatientService _patients;
     private readonly IAppointmentService _appointments;
     private readonly IBedRegistryService _beds;
+    private readonly ILabReportService _labReports;
 
     public MeService(
         CareLankaDbContext db,
         ICurrentUser currentUser,
         IPatientService patients,
         IAppointmentService appointments,
-        IBedRegistryService beds)
+        IBedRegistryService beds,
+        ILabReportService labReports)
     {
         _db = db;
         _currentUser = currentUser;
         _patients = patients;
         _appointments = appointments;
         _beds = beds;
+        _labReports = labReports;
     }
 
     public async Task<MyProfile> PreRegisterAsync(
@@ -149,6 +154,24 @@ public sealed class MeService : IMeService
         var instructions = await InstructionsByAdmissionAsync([admission.Id], ct);
 
         return ToMyAdmission(admission, beds, instructions);
+    }
+
+    public async Task<PagedResult<MyLabReport>> GetLabReportsAsync(
+        int page, int pageSize, CancellationToken ct = default)
+    {
+        var patient = await GetMyRecordAsync(ct);
+
+        var reports = await _labReports.ListForPatientAsync(patient.Id, page, pageSize, ct);
+
+        return PagedResult<MyLabReport>.From(
+            reports.Items.Select(ToMyLabReport).ToList(), page, pageSize, reports.TotalItems);
+    }
+
+    public async Task<LabReportFile> GetLabReportFileAsync(Guid reportId, CancellationToken ct = default)
+    {
+        var patient = await GetMyRecordAsync(ct);
+
+        return await _labReports.GetFileForPatientAsync(reportId, patient.Id, ct);
     }
 
     public async Task<PagedResult<MyAdmission>> GetHistoryAsync(
@@ -438,6 +461,17 @@ public sealed class MeService : IMeService
             CancellationReason = appointment.CancellationReason,
             CancelledByHospital = appointment.CancelledByStaffMemberId is not null
         };
+
+    private static MyLabReport ToMyLabReport(LabReportDto report) => new()
+    {
+        Id = report.Id,
+        TestName = report.TestName,
+        Summary = report.Summary,
+        FileName = report.FileName,
+        ContentType = report.ContentType,
+        ByteSize = report.ByteSize,
+        CreatedAt = report.CreatedAt
+    };
 
     private static MyProfile ToProfile(PatientEntity patient)
     {

@@ -127,6 +127,8 @@ export 'models/my_bill.dart';
 export 'models/my_bill_line.dart';
 export 'models/my_emergency_call_summary.dart';
 export 'models/my_emergency_call_summary_paged_result.dart';
+export 'models/my_lab_report.dart';
+export 'models/my_lab_report_paged_result.dart';
 export 'models/my_profile.dart';
 export 'models/outstanding_bill.dart';
 export 'models/outstanding_bill_paged_result.dart';

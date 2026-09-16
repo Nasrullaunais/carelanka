@@ -1,10 +1,17 @@
 using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Patient;
+using CareLanka.Api.Services.Equipment;
 
 namespace CareLanka.Api.Services.Patient;
 
 public interface IMeService
 {
+    Task<PagedResult<MyLabReport>> GetLabReportsAsync(
+        int page, int pageSize, CancellationToken cancellationToken = default);
+
+    Task<LabReportFile> GetLabReportFileAsync(
+        Guid reportId, CancellationToken cancellationToken = default);
+
     Task<MyProfile> PreRegisterAsync(
         PreRegisterRequest request, CancellationToken cancellationToken = default);
 

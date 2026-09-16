@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -39,6 +40,7 @@ class _CareLankaAppState extends State<CareLankaApp> {
   late final TokenStore _tokens;
   late final SessionExpiry _sessionExpiry;
   late final CareLankaApi _api;
+  late final Dio _dio;
   late final AuthController _auth;
   late final GoRouter _router;
 
@@ -47,7 +49,9 @@ class _CareLankaAppState extends State<CareLankaApp> {
     super.initState();
     _tokens = TokenStore();
     _sessionExpiry = SessionExpiry();
-    _api = buildApi(tokens: _tokens, sessionExpiry: _sessionExpiry);
+    final built = buildApi(tokens: _tokens, sessionExpiry: _sessionExpiry);
+    _api = built.api;
+    _dio = built.dio;
     _auth = AuthController(api: _api, tokens: _tokens, sessionExpiry: _sessionExpiry);
 
     // Built once. The router watches _auth itself through refreshListenable, so
@@ -76,6 +80,7 @@ class _CareLankaAppState extends State<CareLankaApp> {
     return MultiProvider(
       providers: [
         Provider<CareLankaApi>.value(value: _api),
+        Provider<Dio>.value(value: _dio),
         ChangeNotifierProvider<AuthController>.value(value: _auth),
       ],
       child: MaterialApp.router(

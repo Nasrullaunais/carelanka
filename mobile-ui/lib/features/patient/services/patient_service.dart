@@ -7,6 +7,7 @@ import '../../../services/api_client/models/my_admission_paged_result.dart';
 import '../../../services/api_client/models/my_appointment.dart';
 import '../../../services/api_client/models/my_appointment_paged_result.dart';
 import '../../../services/api_client/models/my_bill.dart';
+import '../../../services/api_client/models/my_lab_report_paged_result.dart';
 import '../../../services/api_client/models/my_profile.dart';
 import '../../../services/api_client/models/patient_claim_preview.dart';
 import '../../../services/api_client/models/pre_register_request.dart';
@@ -100,6 +101,15 @@ class PatientService {
   Future<MyAppointment> cancelAppointment(String appointmentId) {
     return callApi(() => _api.patientSelfService.cancelMyAppointment(id: appointmentId));
   }
+
+  Future<MyLabReportPagedResult> loadMyLabReports({int page = 1, int pageSize = 20}) {
+    return callApi(
+        () => _api.patientSelfService.getMyLabReports(page: page, pageSize: pageSize));
+  }
+
+  /// The relative path for [downloadBytes] — the generated client's own
+  /// `downloadMyLabReport` corrupts binary content, see [downloadBytes].
+  static String labReportFilePath(String reportId) => '/me/lab-reports/$reportId/file';
 
   Future<WorklistRowPagedResult> loadWorklist({
     String? search,

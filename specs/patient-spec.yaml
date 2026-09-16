@@ -1719,6 +1719,71 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /me/lab-reports:
+    get:
+      tags: [Patient Self-Service]
+      summary: Your own laboratory results, newest first
+      description: |
+        Roles: Patient. Resolved from the JWT - there is no patient id to pass, unlike the
+        staff `GET /lab-reports`, so being handed somebody else's is impossible rather than
+        merely checked.
+
+        Metadata only, same reasoning as the staff route: each row says what the test was and
+        how big the file is, so opening this screen does not pull every PDF down the wire.
+        The file itself is `GET /me/lab-reports/{reportId}/file`.
+
+        Reads through Equipment's laboratory service, never Patient Management's own tables -
+        `lab_reports` is theirs (`integration_of_functions.md` §3). An empty list is the
+        ordinary state for a patient with no results yet, not an error.
+      operationId: getMyLabReports
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of your own results
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/MyLabReport' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /me/lab-reports/{reportId}/file:
+    parameters:
+      - name: reportId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+        description: One of your own results, from /me/lab-reports.
+    get:
+      tags: [Patient Self-Service]
+      summary: The file behind one of your own results
+      description: |
+        Roles: Patient. A wrong id and a right id that belongs to somebody else both answer
+        404 identically, so neither answer confirms the other id exists.
+
+        `Content-Disposition: inline` - a patient reading a result on their own phone is the
+        normal case, not a forced download.
+      operationId: downloadMyLabReport
+      responses:
+        '200':
+          description: The file
+          content:
+            application/pdf: { schema: { type: string, format: binary } }
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/png: { schema: { type: string, format: binary } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /me/appointments:
     post:
       tags: [Patient Self-Service]
@@ -4206,6 +4271,28 @@ components:
         settled: { type: boolean }
         settled_at: { type: string, format: date-time, nullable: true }
         updated_at: { type: string, format: date-time }
+
+    MyLabReport:
+      type: object
+      description: |
+        What a patient may see of their own laboratory result. A separate shape, not a
+        filtered `LabReport` (Equipment's, in equipment-spec.yaml) - same reasoning as
+        `MyBill`. It carries no `patient_id` and no `uploaded_by_staff_id`, because a patient
+        reading their own list already knows both and neither is their business regardless.
+
+        Metadata only, same as the staff shape - the file itself is
+        `GET /me/lab-reports/{reportId}/file`.
+      required: [id, test_name, file_name, content_type, byte_size, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        test_name:
+          type: string
+          description: 'What was tested, in the lab''s own words: "Full blood count".'
+        summary: { type: string, nullable: true }
+        file_name: { type: string }
+        content_type: { type: string, example: application/pdf }
+        byte_size: { type: integer }
+        created_at: { type: string, format: date-time }
 
     ClaimByPatientCodeRequest:
       type: object

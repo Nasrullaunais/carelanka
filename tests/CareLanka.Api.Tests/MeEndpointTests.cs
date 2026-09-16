@@ -421,6 +421,257 @@ public sealed class MeEndpointTests
         Assert.Equal("cl_err_401_missing", body.RootElement.GetProperty("code").GetString());
     }
 
+    [Fact]
+    public async Task A_walk_in_who_installs_the_app_afterwards_claims_the_record_the_desk_made()
+    {
+        using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
+        var dateOfBirth = new DateOnly(1988, 4, 17);
+
+        // No NIC: the exact record that /me/pre-register cannot match on.
+        var (patientId, patientCode) =
+            await NewWalkInAtTheDeskAsync(nurse, "Sunil Fernando", dateOfBirth);
+
+        await AdmitAsync(nurse, patientId);
+
+        using var patient = await NewPatientAccountAsync();
+
+        var stayBefore = await patient.GetAsync("/api/me/admission");
+        using var beforeBody = await ReadJsonAsync(stayBefore);
+        Assert.Equal("cl_pat_033", beforeBody.RootElement.GetProperty("code").GetString());
+
+        var claimed = await ClaimAsync(patient, patientCode, dateOfBirth);
+        Assert.Equal(HttpStatusCode.OK, claimed.StatusCode);
+
+        var stayAfter = await patient.GetAsync("/api/me/admission");
+        using var afterBody = await ReadJsonAsync(stayAfter);
+
+        Assert.Equal(HttpStatusCode.OK, stayAfter.StatusCode);
+        Assert.Equal(patientId, await LinkedRecordIdAsync(patient));
+        Assert.NotEqual(Guid.Empty.ToString(), afterBody.RootElement
+            .GetProperty("admission_id").GetString());
+
+        using var profile = await ReadJsonAsync(await patient.GetAsync("/api/me/profile"));
+        Assert.Equal("Sunil Fernando", profile.RootElement.GetProperty("full_name").GetString());
+    }
+
+    [Fact]
+    public async Task The_preview_masks_the_name_so_a_found_slip_shows_a_stranger_almost_nothing()
+    {
+        using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
+        var dateOfBirth = new DateOnly(1990, 1, 9);
+
+        var (_, patientCode) =
+            await NewWalkInAtTheDeskAsync(nurse, "Kamala Jayasuriya", dateOfBirth);
+
+        using var patient = await NewPatientAccountAsync();
+
+        var preview = await patient.PostAsJsonAsync("/api/me/claim/preview", new
+        {
+            patient_code = patientCode,
+            date_of_birth = dateOfBirth
+        });
+
+        using var body = await ReadJsonAsync(preview);
+        var masked = body.RootElement.GetProperty("masked_full_name").GetString()!;
+
+        Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
+        Assert.DoesNotContain("Kamala", masked);
+        Assert.DoesNotContain("Jayasuriya", masked);
+        Assert.StartsWith("K", masked);
+
+        // Preview writes nothing: the record is still unclaimed.
+        using var stillUnlinked = await ReadJsonAsync(await patient.GetAsync("/api/me/profile"));
+        Assert.Equal("cl_pat_033", stillUnlinked.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task A_wrong_date_of_birth_gives_the_same_answer_as_a_code_that_does_not_exist()
+    {
+        using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
+
+        var (_, patientCode) =
+            await NewWalkInAtTheDeskAsync(nurse, "Ravi Bandara", new DateOnly(1975, 6, 30));
+
+        using var patient = await NewPatientAccountAsync();
+
+        var wrongDate = await ClaimAsync(patient, patientCode, new DateOnly(1975, 6, 29));
+        using var wrongDateBody = await ReadJsonAsync(wrongDate);
+
+        var noSuchCode = await ClaimAsync(patient, "PZZZZZZZ", new DateOnly(1975, 6, 30));
+        using var noSuchCodeBody = await ReadJsonAsync(noSuchCode);
+
+        Assert.Equal(HttpStatusCode.NotFound, wrongDate.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, noSuchCode.StatusCode);
+
+        // Identical, deliberately: a different answer would confirm the code is real.
+        Assert.Equal("cl_pat_037", wrongDateBody.RootElement.GetProperty("code").GetString());
+        Assert.Equal("cl_pat_037", noSuchCodeBody.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task A_record_somebody_has_already_claimed_cannot_be_claimed_again()
+    {
+        using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
+        var dateOfBirth = new DateOnly(1982, 11, 3);
+
+        var (_, patientCode) =
+            await NewWalkInAtTheDeskAsync(nurse, "Already Taken", dateOfBirth);
+
+        using var first = await NewPatientAccountAsync();
+        Assert.Equal(HttpStatusCode.OK, (await ClaimAsync(first, patientCode, dateOfBirth)).StatusCode);
+
+        using var second = await NewPatientAccountAsync();
+        var stolen = await ClaimAsync(second, patientCode, dateOfBirth);
+        using var body = await ReadJsonAsync(stolen);
+
+        Assert.Equal(HttpStatusCode.NotFound, stolen.StatusCode);
+        Assert.Equal("cl_pat_037", body.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task A_login_that_already_has_a_record_is_refused_a_second_one()
+    {
+        using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
+        var dateOfBirth = new DateOnly(1995, 2, 14);
+
+        var (_, patientCode) = await NewWalkInAtTheDeskAsync(nurse, "Second Record", dateOfBirth);
+
+        using var patient = await NewPatientAccountAsync();
+        Assert.Equal(HttpStatusCode.OK, (await PreRegisterAsync(patient, NewNic(), "Own Record")).StatusCode);
+
+        var claimed = await ClaimAsync(patient, patientCode, dateOfBirth);
+        using var body = await ReadJsonAsync(claimed);
+
+        Assert.Equal(HttpStatusCode.Conflict, claimed.StatusCode);
+        Assert.Equal("cl_pat_004", body.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task A_claim_without_a_date_of_birth_never_reaches_the_service()
+    {
+        using var patient = await NewPatientAccountAsync();
+
+        var response = await patient.PostAsJsonAsync(
+            "/api/me/claim", new { patient_code = "PK4M9XB2" });
+
+        using var body = await ReadJsonAsync(response);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("cl_err_400", body.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task A_stay_the_billing_desk_has_not_priced_reads_as_no_bill_rather_than_an_error()
+    {
+        using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
+        using var patient = await NewPatientAccountAsync();
+
+        var admissionId = await AdmittedPatientWithAppAccountAsync(nurse, patient);
+
+        var bill = await patient.GetAsync($"/api/me/admissions/{admissionId}/bill");
+        using var body = await ReadJsonAsync(bill);
+
+        Assert.Equal(HttpStatusCode.NotFound, bill.StatusCode);
+        Assert.Equal("cl_pat_036", body.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task A_bill_is_provisional_while_they_are_in_a_bed_and_final_once_discharged()
+    {
+        using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
+        using var manager = await StaffClientAsync(ApiApplication.ManagerEmail);
+        using var patient = await NewPatientAccountAsync();
+
+        var admissionId = await AdmittedPatientWithAppAccountAsync(nurse, patient);
+
+        var prepared = await manager.PostAsJsonAsync(
+            $"/api/admissions/{admissionId}/bill", new { });
+        Assert.Equal(HttpStatusCode.OK, prepared.StatusCode);
+
+        var whileIn = await patient.GetAsync($"/api/me/admissions/{admissionId}/bill");
+        using var whileInBody = await ReadJsonAsync(whileIn);
+
+        Assert.Equal(HttpStatusCode.OK, whileIn.StatusCode);
+        Assert.False(whileInBody.RootElement.GetProperty("is_final").GetBoolean());
+        Assert.NotEmpty(whileInBody.RootElement.GetProperty("lines").EnumerateArray());
+
+        // Staff-only fields must not be on the patient's copy at all.
+        foreach (var staffOnly in new[] { "raised_by_staff_name", "settlement_note", "patient" })
+        {
+            Assert.False(whileInBody.RootElement.TryGetProperty(staffOnly, out _));
+        }
+
+        await DischargeAsync(await LinkedRecordIdAsync(patient));
+
+        var afterwards = await patient.GetAsync($"/api/me/admissions/{admissionId}/bill");
+        using var afterBody = await ReadJsonAsync(afterwards);
+
+        Assert.Equal(HttpStatusCode.OK, afterwards.StatusCode);
+        Assert.True(afterBody.RootElement.GetProperty("is_final").GetBoolean());
+    }
+
+    [Fact]
+    public async Task One_patient_cannot_read_another_patients_bill()
+    {
+        using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
+        using var manager = await StaffClientAsync(ApiApplication.ManagerEmail);
+        using var owner = await NewPatientAccountAsync();
+        using var stranger = await NewPatientAccountAsync();
+
+        var admissionId = await AdmittedPatientWithAppAccountAsync(nurse, owner);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await manager.PostAsJsonAsync($"/api/admissions/{admissionId}/bill", new { })).StatusCode);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await PreRegisterAsync(stranger, NewNic(), "Nosy Neighbour")).StatusCode);
+
+        var peek = await stranger.GetAsync($"/api/me/admissions/{admissionId}/bill");
+
+        // 404, not 403: a stranger learns nothing about whether that admission exists.
+        Assert.Equal(HttpStatusCode.NotFound, peek.StatusCode);
+    }
+
+    private async Task<string> AdmittedPatientWithAppAccountAsync(
+        HttpClient nurse, HttpClient patient)
+    {
+        var nic = NewNic();
+        var patientId = await NewPatientAtTheDeskAsync(nurse, "Billed Patient", nic);
+
+        Assert.Equal(HttpStatusCode.OK, (await PreRegisterAsync(patient, nic, "Billed Patient")).StatusCode);
+
+        await AdmitAsync(nurse, patientId);
+
+        using var body = await ReadJsonAsync(await patient.GetAsync("/api/me/admission"));
+
+        return body.RootElement.GetProperty("admission_id").GetString()!;
+    }
+
+    private static Task<HttpResponseMessage> ClaimAsync(
+        HttpClient patient, string patientCode, DateOnly dateOfBirth)
+        => patient.PostAsJsonAsync(
+            "/api/me/claim", new { patient_code = patientCode, date_of_birth = dateOfBirth });
+
+    private static async Task<(string Id, string PatientCode)> NewWalkInAtTheDeskAsync(
+        HttpClient nurse, string fullName, DateOnly dateOfBirth)
+    {
+        var created = await nurse.PostAsJsonAsync("/api/patients", new
+        {
+            full_name = fullName,
+            gender = "male",
+            date_of_birth = dateOfBirth
+        });
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+
+        using var body = await ReadJsonAsync(created);
+
+        return (
+            body.RootElement.GetProperty("id").GetString()!,
+            body.RootElement.GetProperty("patient_code").GetString()!);
+    }
+
     private async Task<HttpClient> NewPatientAccountAsync()
     {
         var client = _application.CreateClient();

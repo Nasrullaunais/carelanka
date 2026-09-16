@@ -15,6 +15,7 @@ import '../widgets/dialer.dart';
 import '../widgets/panels.dart';
 import '../widgets/patient_id_card.dart';
 import 'my_details_screen.dart';
+import 'my_reports_screen.dart';
 import 'past_visits_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -451,6 +452,14 @@ class _QuickActions extends StatelessWidget {
           caption: 'Completed stays',
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const PastVisitsScreen()),
+          ),
+        ),
+        _ActionTile(
+          icon: Icons.description_outlined,
+          label: 'My reports',
+          caption: 'Lab results',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const MyReportsScreen()),
           ),
         ),
         if (emergencyPhone != null)

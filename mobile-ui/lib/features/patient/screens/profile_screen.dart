@@ -8,7 +8,9 @@ import '../../../services/api_client/models/my_profile.dart';
 import '../state/profile_controller.dart';
 import '../widgets/dialer.dart';
 import '../widgets/panels.dart';
+import 'claim_record_screen.dart';
 import 'my_details_screen.dart';
+import 'my_reports_screen.dart';
 import 'past_visits_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -32,11 +34,24 @@ class ProfileScreen extends StatelessWidget {
               icon: Icons.badge_outlined,
               accent: scheme.warning,
               title: 'No hospital record',
-              body: 'Add your details to create your hospital record.',
-              action: FilledButton(
-                onPressed: () => openMyDetails(context, profileController),
-                style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
-                child: const Text('Add my details'),
+              body: 'Add your details to create your hospital record. If the hospital has '
+                  'already registered you at the desk, use your patient code instead so '
+                  'your stay and history come with you.',
+              action: Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                children: [
+                  FilledButton(
+                    onPressed: () => openMyDetails(context, profileController),
+                    style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+                    child: const Text('Add my details'),
+                  ),
+                  OutlinedButton(
+                    onPressed: () => openClaimRecord(context, profileController),
+                    style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+                    child: const Text('I have a patient code'),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 16),
@@ -102,6 +117,16 @@ class ProfileScreen extends StatelessWidget {
                   onTap: () => Navigator.of(
                     context,
                   ).push(MaterialPageRoute(builder: (_) => const PastVisitsScreen())),
+                ),
+                const Divider(indent: 20, endIndent: 20),
+                ListTile(
+                  leading: const Icon(Icons.description_outlined),
+                  title: const Text('My reports'),
+                  subtitle: const Text('Lab results'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute(builder: (_) => const MyReportsScreen())),
                 ),
                 const Divider(indent: 20, endIndent: 20),
                 ListTile(

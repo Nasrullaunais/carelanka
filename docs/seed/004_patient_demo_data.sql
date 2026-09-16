@@ -27,21 +27,76 @@
 --                                                          `completed`, billed on the
 --                                                          appointment and settled.
 --
+-- Two records exist for the patient self-service work added on 2026-09-16, and are called out
+-- here so nobody "tidies" them away:
+--
+--   * **Nadeesha Wickrama (`P3J8N2Q5`) has no NIC**, only a `temp_reference`. She is the
+--     walk-in who arrived without papers, which is the one case `POST /me/pre-register`
+--     cannot match on and `POST /me/claim` exists for.
+--   * **Ishara Gunawardena's bill (`B6N4Y8Z2`) is raised but not settled, on an admission
+--     that is still open.** It is the only row that makes `MyBill.is_final` false, so it is
+--     the only way to see the "still adding up / So far" state without preparing a bill by
+--     hand in the React billing desk.
+--
+-- **None of the twelve is linked to a patient app login** (`user_account_id` is NULL on every
+-- one). That is deliberate: an unlinked record with a date of birth is exactly what the app's
+-- "I have a patient code" flow claims. Register a fresh login in the app, claim one of the
+-- codes below, and My Stay, Past Visits and the bill all populate from there.
+--
 -- Run it whole, in one go, after 000-003:
 --   psql -U postgres -d carelanka -f docs/seed/004_patient_demo_data.sql
 
 BEGIN;
 
-TRUNCATE TABLE
-    bill_line_items,
-    bills,
-    discharge_checklist_items,
-    discharges,
-    bed_assignments,
-    appointments,
-    admissions,
-    patients
-RESTART IDENTITY CASCADE;
+-- ---------------------------------------------------------------------------
+-- 0. Clear the old visit data — without taking anybody else's with it
+-- ---------------------------------------------------------------------------
+
+-- **This used to be `TRUNCATE ... RESTART IDENTITY CASCADE` and that was wrong.**
+-- `emergency_calls.patient_id` is a foreign key onto `patients`, and TRUNCATE's CASCADE
+-- means "empty every table that references these too" — it does not honour the
+-- ON DELETE RESTRICT the column is declared with. So the old line silently emptied
+-- `emergency_calls`, then `dispatches` through
+-- `fk_dispatches_emergency_calls_emergency_call_id`, then `route_logs` after that.
+-- Three tables of somebody else's component, gone, with nothing printed.
+--
+-- Ordered DELETEs instead. They respect the declared behaviour, so anything we have not
+-- thought about raises an error here rather than disappearing quietly.
+
+-- Emergency keeps its calls; they just stop pointing at patients about to be deleted.
+-- The column is nullable, which is what makes detaching possible at all.
+UPDATE emergency_calls SET patient_id = NULL WHERE patient_id IS NOT NULL;
+
+-- Equipment's kit stops pointing at admissions about to be deleted. Also nullable, and
+-- there is no foreign key behind it, so nothing would have complained if we left it
+-- dangling — which is exactly why it is worth doing by hand.
+UPDATE equipment_items
+SET assigned_to_admission_id = NULL
+WHERE assigned_to_admission_id IS NOT NULL;
+
+DELETE FROM bill_line_items;
+DELETE FROM bills;
+DELETE FROM discharge_checklist_items;
+DELETE FROM discharges;
+DELETE FROM bed_assignments;
+DELETE FROM appointments;
+DELETE FROM admissions;
+DELETE FROM patients;
+
+-- `lab_reports.patient_id` is Equipment's, carries no foreign key, and is NOT NULL, so it
+-- can be neither detached nor left honest. Say so out loud rather than orphaning in silence.
+DO $$
+DECLARE v_orphans int;
+BEGIN
+    SELECT count(*) INTO v_orphans FROM lab_reports;
+
+    IF v_orphans > 0 THEN
+        RAISE WARNING
+            '% lab_reports row(s) now point at patients that no longer exist. That table is '
+            'Equipment Management''s and this script does not delete it. Re-run Equipment''s '
+            'lab seed, or clear it, before demoing the laboratory screens.', v_orphans;
+    END IF;
+END $$;
 
 DO $$
 DECLARE
@@ -61,6 +116,7 @@ DECLARE
 
     -- Scenario 2 — walk-in, admitted, bed assigned
     v_p3 uuid := gen_random_uuid(); v_ad3 uuid := gen_random_uuid(); v_ba3 uuid := gen_random_uuid();
+    v_bl3 uuid := gen_random_uuid();
     v_p4 uuid := gen_random_uuid(); v_ad4 uuid := gen_random_uuid(); v_ba4 uuid := gen_random_uuid();
     v_admitted_3 timestamptz := now() - interval '20 hours';
     v_admitted_4 timestamptz := now() - interval '30 hours';
@@ -118,15 +174,20 @@ BEGIN
     -- 1. Walk-in intake, admitted, no bed assigned yet
     -- ==============================================================================
 
+    -- Nadeesha arrived with no papers, so she has no NIC and a `temp_reference` instead —
+    -- the shape `PatientService.NextTempReferenceAsync` generates. She is here on purpose:
+    -- `POST /me/pre-register` matches on NIC, so a record without one is precisely the case
+    -- `POST /me/claim` was built for. Claim her with `P3J8N2Q5` + 1988-01-14.
     INSERT INTO patients
-        (id, patient_code, full_name, nic, gender, date_of_birth, phone, address,
+        (id, patient_code, full_name, nic, temp_reference, gender, date_of_birth, phone, address,
          emergency_contact_name, emergency_contact_phone,
          created_at, updated_at, is_active, deleted_at)
     VALUES
-        (v_p1, 'P2H4K7M9', 'Kasun Mendis', '927654321V', 'male', '1992-03-25',
+        (v_p1, 'P2H4K7M9', 'Kasun Mendis', '927654321V', NULL, 'male', '1992-03-25',
          '+94771234501', '12 Kandy Road, Kadawatha', 'Nadeesha Mendis', '+94771234502',
          now() - interval '3 hours', now() - interval '3 hours', true, NULL),
-        (v_p2, 'P3J8N2Q5', 'Nadeesha Wickrama', '889012345V', 'female', '1988-01-14',
+        (v_p2, 'P3J8N2Q5', 'Nadeesha Wickrama', NULL, 'UNKNOWN-' || to_char(now(), 'YYYY') || '-0001',
+         'female', '1988-01-14',
          '+94771234503', '34 High Level Road, Nugegoda', 'Chaminda Wickrama', '+94771234504',
          now() - interval '90 minutes', now() - interval '90 minutes', true, NULL);
 
@@ -182,6 +243,29 @@ BEGIN
     VALUES
         (v_ba3, v_ad3, v_bed_s2_1, 'occupied', 'user', v_admitted_3, false, v_admitted_3, v_admitted_3),
         (v_ba4, v_ad4, v_bed_s2_2, 'occupied', 'user', v_admitted_4, false, v_admitted_4, v_admitted_4);
+
+    -- Ishara's bill is raised but NOT settled, on an admission that is still open. This is the
+    -- only record here that makes `MyBill.is_final = false`, which is what the Flutter screen
+    -- labels "So far" under a "still adding up" banner instead of showing it as an amount due.
+    -- Every other bill in this file is on a closed admission and reads as final, so without
+    -- this row that state cannot be seen without preparing a bill by hand in the React desk.
+    -- Ruwan is deliberately left unbilled: an admitted patient the desk has not got to yet is
+    -- the ordinary case, and it is what makes `/me/.../bill` answer 404 `cl_pat_036`.
+    INSERT INTO bills
+        (id, admission_id, bill_number, raised_by_staff_member_id,
+         settled_at, settled_by_staff_member_id, settlement_note, created_at, updated_at)
+    VALUES
+        (v_bl3, v_ad3, 'B6N4Y8Z2', v_reception,
+         NULL, NULL, NULL, v_admitted_3 + interval '2 hours', v_admitted_3 + interval '2 hours');
+
+    INSERT INTO bill_line_items
+        (id, bill_id, source, description, quantity, unit_price, bed_assignment_id,
+         created_at, updated_at)
+    VALUES
+        (gen_random_uuid(), v_bl3, 'admission_fee', 'Inpatient admission fee', 1, 3000.00,
+         NULL, v_admitted_3 + interval '2 hours', v_admitted_3 + interval '2 hours'),
+        (gen_random_uuid(), v_bl3, 'bed_stay', 'General Ward bed charge (1 night so far)', 1, 6000.00,
+         v_ba3, v_admitted_3 + interval '2 hours', v_admitted_3 + interval '2 hours');
 
     -- ==============================================================================
     -- 3. Appointment booked, not confirmed yet
@@ -384,10 +468,15 @@ END $$;
 COMMIT;
 
 -- What you should have afterwards: 12 patients, 6 admissions (2 awaiting_bed, 2 admitted,
--- 2 discharged), 6 appointments (2 scheduled, 2 confirmed, 2 completed), 4 bills all settled.
+-- 2 discharged), 6 appointments (2 scheduled, 2 confirmed, 2 completed), and 5 bills — 4
+-- settled and 1 still open on Ishara's live admission. One patient carries no NIC, and none
+-- of the twelve is linked to an app login.
 SELECT
     (SELECT count(*) FROM patients)                                   AS patients,
     (SELECT count(*) FROM admissions)                                 AS admissions,
     (SELECT count(*) FROM appointments)                               AS appointments,
     (SELECT count(*) FROM bed_assignments WHERE status = 'occupied')  AS beds_occupied,
-    (SELECT count(*) FROM bills WHERE settled_at IS NOT NULL)         AS bills_settled;
+    (SELECT count(*) FROM bills WHERE settled_at IS NOT NULL)         AS bills_settled,
+    (SELECT count(*) FROM bills WHERE settled_at IS NULL)             AS bills_open,
+    (SELECT count(*) FROM patients WHERE nic IS NULL)                 AS claimable_no_nic,
+    (SELECT count(*) FROM patients WHERE user_account_id IS NOT NULL) AS linked_to_an_app_login;

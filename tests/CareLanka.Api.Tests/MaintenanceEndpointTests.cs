@@ -69,7 +69,7 @@ public sealed class MaintenanceEndpointTests
     }
 
     [Fact]
-    public async Task Completing_a_service_puts_the_item_back_to_work_and_books_the_next_one()
+    public async Task Confirming_a_service_done_puts_the_item_back_to_work_and_books_the_next_one()
     {
         using var client = await EquipmentClientAsync();
         var item = await NewItemAsync(client);
@@ -81,13 +81,11 @@ public sealed class MaintenanceEndpointTests
             await ScheduleAsync(client, item.Id, DateTime.UtcNow, type: "repair"));
         var scheduleId = created.RootElement.GetProperty("id").GetGuid();
 
-        var response = await client.PostAsJsonAsync(
-            $"/api/maintenance-schedules/{scheduleId}/complete", new { notes = "Fan replaced." });
+        var response = await ConfirmDoneAsync(scheduleId);
         using var done = await ReadJsonAsync(response);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("completed", done.RootElement.GetProperty("status").GetString());
-        Assert.Equal("Fan replaced.", done.RootElement.GetProperty("notes").GetString());
 
         Assert.NotEqual(
             Guid.Empty, done.RootElement.GetProperty("performed_by_staff_id").GetGuid());
@@ -107,16 +105,12 @@ public sealed class MaintenanceEndpointTests
         var serviced = await NewItemAsync(client);
         using var a = await ReadJsonAsync(
             await ScheduleAsync(client, serviced.Id, DateTime.UtcNow, type: "routine_service"));
-        await client.PostAsJsonAsync(
-            $"/api/maintenance-schedules/{a.RootElement.GetProperty("id").GetGuid()}/complete",
-            new { });
+        await ConfirmDoneAsync(a.RootElement.GetProperty("id").GetGuid());
 
         var repaired = await NewItemAsync(client);
         using var b = await ReadJsonAsync(
             await ScheduleAsync(client, repaired.Id, DateTime.UtcNow, type: "repair"));
-        await client.PostAsJsonAsync(
-            $"/api/maintenance-schedules/{b.RootElement.GetProperty("id").GetGuid()}/complete",
-            new { });
+        await ConfirmDoneAsync(b.RootElement.GetProperty("id").GetGuid());
 
         using var servicedDetail = await ReadJsonAsync(
             await client.GetAsync($"/api/equipment-items/{serviced.Id}"));
@@ -142,9 +136,8 @@ public sealed class MaintenanceEndpointTests
             await ScheduleAsync(client, item.Id, DateTime.UtcNow));
         var id = created.RootElement.GetProperty("id").GetGuid();
 
-        await client.PostAsJsonAsync($"/api/maintenance-schedules/{id}/complete", new { });
-        var second = await client.PostAsJsonAsync(
-            $"/api/maintenance-schedules/{id}/complete", new { });
+        await ConfirmDoneAsync(id);
+        var second = await ConfirmDoneAsync(id);
         using var body = await ReadJsonAsync(second);
 
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
@@ -246,6 +239,16 @@ public sealed class MaintenanceEndpointTests
     }
 
     private record Item(Guid Id, string Name, string AssetTag);
+
+    // Only the hospital administrator, with the confirmation code, can say a job is done.
+    private async Task<HttpResponseMessage> ConfirmDoneAsync(Guid scheduleId)
+    {
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
+        administrator.DefaultRequestHeaders.Add(
+            "X-Confirmation-Code", ApiApplication.EquipmentConfirmationCode);
+
+        return await administrator.PostAsync($"/api/maintenance-schedules/{scheduleId}/confirm", null);
+    }
 
     private async Task<Item> NewItemAsync(HttpClient client)
     {

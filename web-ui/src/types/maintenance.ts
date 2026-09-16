@@ -15,3 +15,9 @@ export const maintenanceStatusLabels: Record<MaintenanceStatus, string> = {
 };
 
 export const openMaintenanceStatuses: MaintenanceStatus[] = ['scheduled', 'in_progress'];
+
+export const schedulableMaintenanceTypes: MaintenanceType[] = [
+  'routine_service',
+  'calibration',
+  'repair',
+];

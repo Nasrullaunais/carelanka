@@ -7,6 +7,7 @@ import '../../../core/widgets/async_view.dart';
 import '../../../core/widgets/phone_width.dart';
 import '../../../services/api_client/models/equipment_item.dart';
 import '../state/equipment_confirmation_controller.dart';
+import '../widgets/confirmation_code_gate.dart';
 
 class EquipmentConfirmationScreen extends StatelessWidget {
   const EquipmentConfirmationScreen({super.key});
@@ -28,83 +29,14 @@ class EquipmentConfirmationScreen extends StatelessWidget {
               ),
           ],
         ),
-        body: controller.isUnlocked ? const _AwaitingList() : const _CodeGate(),
+        body: controller.isUnlocked
+            ? const _AwaitingList()
+            : ConfirmationCodeGate(
+                controller: controller,
+                explanation:
+                    'New equipment only reaches the web dashboard after you confirm it here.',
+              ),
       ),
-    );
-  }
-}
-
-class _CodeGate extends StatefulWidget {
-  const _CodeGate();
-
-  @override
-  State<_CodeGate> createState() => _CodeGateState();
-}
-
-class _CodeGateState extends State<_CodeGate> {
-  final _code = TextEditingController();
-
-  @override
-  void dispose() {
-    _code.dispose();
-    super.dispose();
-  }
-
-  Future<void> _unlock() async {
-    final unlocked = await context.read<EquipmentConfirmationController>().unlock(_code.text);
-    if (!unlocked) _code.clear();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = context.watch<EquipmentConfirmationController>();
-    final problem = controller.unlockProblem;
-    final theme = Theme.of(context);
-
-    return ListView(
-      padding: const EdgeInsets.all(AppTheme.gutter),
-      children: [
-        Icon(Icons.lock_outline, size: 40, color: theme.colorScheme.primary),
-        const SizedBox(height: 12),
-        Text(
-          'Enter the confirmation code',
-          style: theme.textTheme.titleMedium,
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'New equipment only reaches the web dashboard after you confirm it here.',
-          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: AppTheme.gutter),
-        TextField(
-          controller: _code,
-          enabled: !controller.unlocking,
-          obscureText: true,
-          autocorrect: false,
-          enableSuggestions: false,
-          decoration: InputDecoration(
-            labelText: 'Confirmation code',
-            errorText: problem,
-          ),
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) => _unlock(),
-        ),
-        const SizedBox(height: AppTheme.gutter),
-        FilledButton.icon(
-          onPressed: controller.unlocking ? null : _unlock,
-          icon: controller.unlocking
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.lock_open),
-          label: Text(controller.unlocking ? 'Checking…' : 'Unlock'),
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-        ),
-      ],
     );
   }
 }
@@ -207,7 +139,7 @@ class _AwaitingItemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<EquipmentConfirmationController>();
-    final busy = controller.isBusy(item.id);
+    final busy = controller.isBusy(item);
     final theme = Theme.of(context);
     final serial = item.serialNumber;
 
@@ -224,11 +156,11 @@ class _AwaitingItemCard extends StatelessWidget {
               style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 10),
-            _Detail(label: 'Make', value: '${item.manufacturer} ${item.model}'),
-            if (serial != null) _Detail(label: 'Serial', value: serial),
-            _Detail(label: 'Location', value: item.wardName ?? 'Central store'),
-            _Detail(label: 'Purchased', value: FriendlyDate.date(item.purchaseDate)),
-            _Detail(label: 'Registered', value: FriendlyDate.full(item.createdAt)),
+            ConfirmationDetail(label: 'Make', value: '${item.manufacturer} ${item.model}'),
+            if (serial != null) ConfirmationDetail(label: 'Serial', value: serial),
+            ConfirmationDetail(label: 'Location', value: item.wardName ?? 'Central store'),
+            ConfirmationDetail(label: 'Purchased', value: FriendlyDate.date(item.purchaseDate)),
+            ConfirmationDetail(label: 'Registered', value: FriendlyDate.full(item.createdAt)),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -257,35 +189,6 @@ class _AwaitingItemCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _Detail extends StatelessWidget {
-  const _Detail({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 92,
-            child: Text(
-              label,
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
-          ),
-          Expanded(child: Text(value, style: theme.textTheme.bodyMedium)),
-        ],
       ),
     );
   }

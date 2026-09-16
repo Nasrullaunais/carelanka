@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using CareLanka.Api.Common.Errors;
 using CareLanka.Api.Common.Exceptions;
 using CareLanka.Api.Common.Persistence;
@@ -9,7 +7,6 @@ using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Equipment;
 using CareLanka.Api.Services.Common;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using ItemEntity = CareLanka.Api.Data.Entities.Equipment.EquipmentItem;
 using ScheduleEntity = CareLanka.Api.Data.Entities.Equipment.MaintenanceSchedule;
 using WarningEntity = CareLanka.Api.Data.Entities.Equipment.Warning;
@@ -21,18 +18,18 @@ public sealed class EquipmentItemService : IEquipmentItemService
     private readonly CareLankaDbContext _db;
     private readonly IWardDirectory _wards;
     private readonly ICurrentUser _currentUser;
-    private readonly IOptions<EquipmentOptions> _options;
+    private readonly IEquipmentConfirmationCode _confirmationCode;
 
     public EquipmentItemService(
         CareLankaDbContext db,
         IWardDirectory wards,
         ICurrentUser currentUser,
-        IOptions<EquipmentOptions> options)
+        IEquipmentConfirmationCode confirmationCode)
     {
         _db = db;
         _wards = wards;
         _currentUser = currentUser;
-        _options = options;
+        _confirmationCode = confirmationCode;
     }
 
     public async Task<PagedResult<EquipmentItemSummary>> ListAsync(
@@ -262,7 +259,7 @@ public sealed class EquipmentItemService : IEquipmentItemService
     public async Task<IReadOnlyList<EquipmentItem>> ListAwaitingConfirmationAsync(
         string? confirmationCode, CancellationToken cancellationToken = default)
     {
-        EnsureConfirmationCode(confirmationCode);
+        _confirmationCode.Ensure(confirmationCode);
 
         var rows = await _db.EquipmentItems.AsNoTracking()
             .Include(i => i.Category)
@@ -291,7 +288,7 @@ public sealed class EquipmentItemService : IEquipmentItemService
     public async Task<EquipmentItem> ConfirmAsync(
         Guid id, string? confirmationCode, CancellationToken cancellationToken = default)
     {
-        EnsureConfirmationCode(confirmationCode);
+        _confirmationCode.Ensure(confirmationCode);
 
         var item = await GetAwaitingConfirmationAsync(id, cancellationToken);
 
@@ -307,7 +304,7 @@ public sealed class EquipmentItemService : IEquipmentItemService
     public async Task RejectAsync(
         Guid id, string? confirmationCode, CancellationToken cancellationToken = default)
     {
-        EnsureConfirmationCode(confirmationCode);
+        _confirmationCode.Ensure(confirmationCode);
 
         var item = await GetAwaitingConfirmationAsync(id, cancellationToken);
 
@@ -315,17 +312,6 @@ public sealed class EquipmentItemService : IEquipmentItemService
         item.DeletedAt = DateTimeOffset.UtcNow;
 
         await _db.SaveChangesAsync(cancellationToken);
-    }
-
-    private void EnsureConfirmationCode(string? supplied)
-    {
-        var expected = Encoding.UTF8.GetBytes(_options.Value.ConfirmationCode);
-        var actual = Encoding.UTF8.GetBytes(supplied ?? string.Empty);
-
-        if (expected.Length == 0 || !CryptographicOperations.FixedTimeEquals(expected, actual))
-        {
-            throw new ForbiddenException(MessageCode.ConfirmationCodeIncorrect);
-        }
     }
 
     private async Task<ItemEntity> GetAwaitingConfirmationAsync(Guid id, CancellationToken cancellationToken)

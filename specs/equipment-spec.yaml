@@ -479,7 +479,8 @@ paths:
 
         It also opens a `MaintenanceSchedule` of type `repair`, dated today, carrying the
         description as its notes. That row is the maintenance unit's work order: the item comes
-        back into service through `POST /maintenance-schedules/{id}/complete` and no other way.
+        back into service when the hospital administrator confirms it done
+        (`POST /maintenance-schedules/{id}/confirm`), and no other way.
         An item already waiting on an open job does not get a second one - a further fault on
         the same machine is more detail on the same repair.
       operationId: reportEquipmentFault
@@ -1081,40 +1082,87 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
-  /maintenance-schedules/{id}/complete:
+  /maintenance-schedules/pending-confirmation:
+    get:
+      tags: [Maintenance]
+      summary: List open maintenance for the hospital administrator to confirm done
+      description: |
+        Roles: HospitalAdministrator, with the confirmation code.
+
+        Every open job - a reported fault's repair as soon as it is reported, and anything
+        scheduled - earliest due first. The hospital administrator's queue in the mobile app. A
+        missing or wrong `X-Confirmation-Code` answers 403 `cl_equ_017`, the same code and rule
+        as confirming a newly registered equipment item.
+      operationId: listMaintenanceSchedulesAwaitingConfirmation
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
+      responses:
+        '200':
+          description: Every open maintenance task
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MaintenanceSchedule' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: This role may not confirm maintenance, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /maintenance-schedules/pending-confirmation/count:
+    get:
+      tags: [Maintenance]
+      summary: Count open maintenance
+      description: |
+        Roles: EquipmentManager, HospitalAdministrator.
+
+        A number only, so it needs no confirmation code.
+      operationId: countMaintenanceSchedulesAwaitingConfirmation
+      responses:
+        '200':
+          description: How many maintenance tasks are open
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PendingEquipmentCount' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /maintenance-schedules/{id}/confirm:
     parameters:
       - $ref: '#/components/parameters/PathId'
     post:
       tags: [Maintenance]
-      summary: Mark a maintenance task complete
+      summary: Confirm a maintenance task done
       description: |
-        Roles: EquipmentTechnician.
+        Roles: HospitalAdministrator, with the confirmation code.
 
-        Business operation beyond CRUD. Sets `status = completed`, `completed_at`,
-        `performed_by_staff_id` from the caller's JWT, and recomputes `next_maintenance_due`.
-        For `asset_type = equipment_item`, sets `EquipmentItem.status` back to `available`. The
+        Business operation beyond CRUD, and the only way a task is completed. Sets
+        `status = completed`, `completed_at`, `performed_by_staff_id` from the caller's JWT, and
+        recomputes `next_maintenance_due`. For `asset_type = equipment_item`, sets
+        `EquipmentItem.status` back to `available`; for a bed, `condition` back to `usable`. The
         related `Warning`, if any, moves to `action_taken`.
-      operationId: completeMaintenanceSchedule
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                notes: { type: string, maxLength: 1000 }
+      operationId: confirmMaintenanceSchedule
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
       responses:
         '200':
-          description: Completed
+          description: Confirmed done
           content:
             application/json:
               schema: { $ref: '#/components/schemas/MaintenanceSchedule' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+        '403':
+          description: This role may not confirm maintenance, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: This schedule is not in a status that can be completed.
+          description: This task is not open - it is already completed or was cancelled.
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   # ------------------------------------------------------------------
@@ -1876,7 +1924,11 @@ components:
             schedule_type: { $ref: '#/components/schemas/MaintenanceType' }
             scheduled_date: { type: string, format: date }
             status: { $ref: '#/components/schemas/MaintenanceStatus' }
-            performed_by_staff_id: { type: string, format: uuid, nullable: true }
+            performed_by_staff_id:
+              type: string
+              format: uuid
+              nullable: true
+              description: The hospital administrator who confirmed the task done.
             completed_at: { type: string, format: date-time, nullable: true }
             notes: { type: string, nullable: true }
             created_by: { $ref: '#/components/schemas/RaisedBy' }

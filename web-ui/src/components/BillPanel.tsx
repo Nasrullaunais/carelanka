@@ -22,7 +22,7 @@ import {
   billLineSourceHints,
   billLineSourceLabels,
   chargeTemplate,
-  chargeTemplates,
+  chargeTemplatesFor,
   isRemovableLine,
   money,
   quantity,
@@ -48,17 +48,18 @@ export function BillPanel({
   const forAppointment = owner.appointmentId !== undefined;
 
   const visitWord = forAppointment ? 'appointment' : 'admission';
+  const templates = chargeTemplatesFor(forAppointment);
 
-  const [templateKey, setTemplateKey] = useState(chargeTemplates[0].key);
-  const [description, setDescription] = useState(chargeTemplates[0].label);
+  const [templateKey, setTemplateKey] = useState(templates[0].key);
+  const [description, setDescription] = useState(templates[0].label);
   const [chargeQuantity, setChargeQuantity] = useState('1');
-  const [unitPrice, setUnitPrice] = useState(String(chargeTemplates[0].unitPrice ?? ''));
+  const [unitPrice, setUnitPrice] = useState(String(templates[0].unitPrice ?? ''));
   const [settlementNote, setSettlementNote] = useState('');
 
-  const template = chargeTemplate(templateKey);
+  const template = chargeTemplate(templateKey, forAppointment);
 
   function chooseTemplate(key: string) {
-    const chosen = chargeTemplate(key);
+    const chosen = chargeTemplate(key, forAppointment);
 
     setTemplateKey(key);
     setDescription(chosen.key === 'other' ? '' : chosen.label);
@@ -270,7 +271,7 @@ export function BillPanel({
                   value={templateKey}
                   onChange={(event) => chooseTemplate(event.target.value)}
                 >
-                  {chargeTemplates.map((option) => (
+                  {templates.map((option) => (
                     <option key={option.key} value={option.key}>
                       {option.label}
                     </option>
@@ -506,9 +507,9 @@ export function BillPrintout({
         <thead>
           <tr>
             <th>Description</th>
-            <th>Quantity</th>
-            <th>Unit price</th>
-            <th>Amount</th>
+            <th className="nowrap">Quantity</th>
+            <th className="nowrap">Unit price</th>
+            <th className="nowrap">Amount</th>
           </tr>
         </thead>
         <tbody>
@@ -518,16 +519,16 @@ export function BillPrintout({
                 {line.description}
                 <div className="small muted">{billLineSourceLabels[line.source]}</div>
               </td>
-              <td>{quantity(line.quantity)}</td>
-              <td>{money(line.unit_price, bill.currency)}</td>
-              <td>{money(line.line_total, bill.currency)}</td>
+              <td className="nowrap">{quantity(line.quantity)}</td>
+              <td className="nowrap">{money(line.unit_price, bill.currency)}</td>
+              <td className="nowrap">{money(line.line_total, bill.currency)}</td>
             </tr>
           ))}
           <tr>
             <th scope="row" colSpan={3}>
               Total
             </th>
-            <td>
+            <td className="nowrap">
               <strong>{money(bill.total, bill.currency)}</strong>
             </td>
           </tr>

@@ -208,8 +208,14 @@ table {
   font-size: 0.9rem;
 }
 
+/* Rows wrap unevenly the moment one column's text runs to a second line — a status
+   badge with a note under it, say, next to a plain one-line date. Top-aligning every
+   cell keeps every row's first line on one shared baseline regardless of how tall its
+   neighbours grow, instead of the action button drifting to the middle of a tall row
+   while the row's own text sits at the top. */
 th {
   text-align: left;
+  vertical-align: top;
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -219,8 +225,17 @@ th {
 }
 
 td {
+  vertical-align: top;
   padding: 0.6rem;
   border-bottom: 1px solid var(--line);
+}
+
+/* A handful of columns are always one short, fixed word or two ("At the desk", "Ready") —
+   wrapping those to a second line only because their column happens to be narrow makes
+   the row taller than its content needs, which is what throws neighbouring rows out of
+   rhythm. */
+td.nowrap {
+  white-space: nowrap;
 }
 
 tr:last-child td {
@@ -419,6 +434,22 @@ tr.selected {
 
 .detail-grid dd {
   margin: 0.15rem 0 0;
+}
+
+/* The sign-off list borrows `.field`'s label-plus-hint look for what is not a form field,
+   so giving it its own grid keeps the label, the status and the action lined up on one row
+   each instead of stacking at whatever height each one's own text happens to need. */
+.checklist-row {
+  display: grid;
+  grid-template-columns: minmax(12rem, 2fr) minmax(10rem, 1.5fr) auto;
+  align-items: start;
+  gap: 0.85rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.checklist-row:last-of-type {
+  border-bottom: none;
 }
 
 .dialog-head {

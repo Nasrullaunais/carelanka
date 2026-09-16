@@ -1818,6 +1818,40 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
+  /me/appointments/{appointmentId}/bill:
+    parameters:
+      - name: appointmentId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+        description: One of your own appointments, from /me/appointments.
+    get:
+      tags: [Patient Self-Service]
+      summary: The bill for a visit you were seen at and sent home from
+      description: |
+        Roles: Patient. Resolved from the JWT, and the appointment must be one of yours -
+        another patient's id answers 404, the same as an id that does not exist.
+
+        Returns `MyBill`, the same shape `GET /me/admissions/{admissionId}/bill` returns,
+        with `appointment_id` set instead of `admission_id`. `is_final` is always true - a
+        consultation charge is raised once, not accrued like bed nights are.
+
+        404 `cl_pat_036` when the billing desk has not raised a bill for the visit yet.
+
+        404 `cl_pat_035` when the visit ended in an admission instead of the patient going
+        straight home - the bill is on that admission, not this appointment. The app reads
+        that as "look in Past visits", not as an error.
+      operationId: getMyAppointmentBill
+      responses:
+        '200':
+          description: The bill for that visit
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyBill' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   # ------------------------------------------------------------------
   # Appointments - staff side
   # ------------------------------------------------------------------
@@ -4141,10 +4175,16 @@ components:
         What a patient may see of their own bill. A separate shape, not a filtered staff
         `Bill` - it carries no `raised_by`, no `settled_by`, no settlement note and no
         `PatientSummary`, because it does not contain them.
+
+        Served by two routes: `GET /me/admissions/{admissionId}/bill` for a stay, and
+        `GET /me/appointments/{appointmentId}/bill` for a visit the patient was seen at and
+        sent home from without ever being admitted. Exactly one of `admission_id` and
+        `appointment_id` is set, matching which route answered.
       required:
-        [admission_id, bill_number, currency, lines, total, is_final, settled, updated_at]
+        [bill_number, currency, lines, total, is_final, settled, updated_at]
       properties:
-        admission_id: { type: string, format: uuid }
+        admission_id: { type: string, format: uuid, nullable: true }
+        appointment_id: { type: string, format: uuid, nullable: true }
         bill_number:
           type: string
           description: The handle a patient quotes at the counter, e.g. B7K2X9Q.
@@ -4156,9 +4196,10 @@ components:
         is_final:
           type: boolean
           description: |
-            False while the admission is still open. Bed nights keep accruing, so the total
+            False while an admission is still open. Bed nights keep accruing, so the total
             will grow and the app must show it as a running total rather than the amount due.
-            True once the admission is discharged or cancelled.
+            True once the admission is discharged or cancelled. Always true for an
+            `appointment_id` bill - a consultation charge is raised once, not accrued.
 
             Named `is_final` rather than `final` because `final` is a reserved word in Dart,
             and the generator would otherwise rename it to `finalValue` in the mobile client.

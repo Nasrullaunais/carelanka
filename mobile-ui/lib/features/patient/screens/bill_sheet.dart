@@ -117,3 +117,143 @@ class _BillSheetState extends State<_BillSheet> {
     return BillView(bill: _bill!);
   }
 }
+
+/// Loaded when opened, same reasoning as [showBillSheet]. A finished visit's bill
+/// lives on the appointment only when the patient went home without being admitted -
+/// [PatientService.appointmentBilledOnItsAdmissionCode] says the visit became a stay
+/// instead, and this sheet points the patient at Past visits rather than showing an error.
+Future<void> showAppointmentBillSheet(
+  BuildContext context, {
+  required PatientService service,
+  required String appointmentId,
+  required VoidCallback onViewPastVisits,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (_) => _AppointmentBillSheet(
+      service: service,
+      appointmentId: appointmentId,
+      onViewPastVisits: onViewPastVisits,
+    ),
+  );
+}
+
+class _AppointmentBillSheet extends StatefulWidget {
+  const _AppointmentBillSheet({
+    required this.service,
+    required this.appointmentId,
+    required this.onViewPastVisits,
+  });
+
+  final PatientService service;
+  final String appointmentId;
+  final VoidCallback onViewPastVisits;
+
+  @override
+  State<_AppointmentBillSheet> createState() => _AppointmentBillSheetState();
+}
+
+class _AppointmentBillSheetState extends State<_AppointmentBillSheet> {
+  MyBill? _bill;
+  ApiException? _error;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final bill = await widget.service.loadMyAppointmentBill(widget.appointmentId);
+      if (!mounted) return;
+      setState(() {
+        _bill = bill;
+        _loading = false;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error;
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(AppTheme.gutter, 0, AppTheme.gutter, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Your bill', style: theme.textTheme.titleLarge),
+            const SizedBox(height: 16),
+            Flexible(child: SingleChildScrollView(child: _body())),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _body() {
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 32),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final error = _error;
+
+    if (error != null) {
+      if (error.code == PatientService.appointmentBilledOnItsAdmissionCode) {
+        return EmptyView(
+          icon: Icons.local_hospital_outlined,
+          title: 'This visit became a stay',
+          message: 'You were admitted, so the bill is on that stay instead.',
+          action: FilledButton.icon(
+            onPressed: () {
+              Navigator.of(context).pop();
+              widget.onViewPastVisits();
+            },
+            icon: const Icon(Icons.history),
+            label: const Text('View past visits'),
+            style: FilledButton.styleFrom(minimumSize: const Size(200, 48)),
+          ),
+        );
+      }
+
+      return error.code == PatientService.noBillCode || error.isNotFound
+          ? const EmptyView(
+              icon: Icons.receipt_long_outlined,
+              title: 'No bill yet',
+              message: 'The billing desk has not raised a bill for this visit.',
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(error.message),
+                ),
+                OutlinedButton(onPressed: _load, child: const Text('Try again')),
+              ],
+            );
+    }
+
+    return BillView(bill: _bill!);
+  }
+}

@@ -7,7 +7,6 @@ part of 'my_bill.dart';
 // **************************************************************************
 
 MyBill _$MyBillFromJson(Map<String, dynamic> json) => MyBill(
-  admissionId: json['admission_id'] as String,
   billNumber: json['bill_number'] as String,
   currency: json['currency'] as String,
   lines: (json['lines'] as List<dynamic>)
@@ -17,6 +16,8 @@ MyBill _$MyBillFromJson(Map<String, dynamic> json) => MyBill(
   isFinal: json['is_final'] as bool,
   settled: json['settled'] as bool,
   updatedAt: DateTime.parse(json['updated_at'] as String),
+  admissionId: json['admission_id'] as String?,
+  appointmentId: json['appointment_id'] as String?,
   settledAt: json['settled_at'] == null
       ? null
       : DateTime.parse(json['settled_at'] as String),
@@ -24,6 +25,7 @@ MyBill _$MyBillFromJson(Map<String, dynamic> json) => MyBill(
 
 Map<String, dynamic> _$MyBillToJson(MyBill instance) => <String, dynamic>{
   'admission_id': instance.admissionId,
+  'appointment_id': instance.appointmentId,
   'bill_number': instance.billNumber,
   'currency': instance.currency,
   'lines': instance.lines,

@@ -85,6 +85,14 @@ public class MeController : ControllerBase
     public async Task<ActionResult<MyBill>> GetMyBill(Guid admissionId, CancellationToken ct)
         => Ok(await _me.GetBillAsync(admissionId, ct));
 
+    [HttpGet("appointments/{appointmentId:guid}/bill", Name = "getMyAppointmentBill")]
+    [ProducesResponseType(typeof(MyBill), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<ActionResult<MyBill>> GetMyAppointmentBill(Guid appointmentId, CancellationToken ct)
+        => Ok(await _me.GetAppointmentBillAsync(appointmentId, ct));
+
     [HttpPost("appointments", Name = "bookMyAppointment")]
     [ProducesResponseType(typeof(MyAppointment), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]

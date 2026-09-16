@@ -102,7 +102,34 @@ public sealed class MeService : IMeService
             .FirstOrDefaultAsync(b => b.AdmissionId == admissionId, ct)
             ?? throw new NotFoundException(MessageCode.NoBillRaised);
 
-        return ToMyBill(admission, bill);
+        return ToMyBill(bill, ClosedStatuses.Contains(admission.Status));
+    }
+
+    public async Task<MyBill> GetAppointmentBillAsync(Guid appointmentId, CancellationToken ct = default)
+    {
+        var patient = await GetMyRecordAsync(ct);
+
+        var appointment = await _db.Appointments
+            .AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Id == appointmentId && a.PatientId == patient.Id, ct)
+            ?? throw new NotFoundException("Appointment", appointmentId);
+
+        // Set means the visit ended in an admission, so the bill lives there instead -
+        // same rule the staff billing endpoint enforces on the way in.
+        if (appointment.AdmissionId is not null)
+        {
+            throw new NotFoundException(MessageCode.AppointmentBilledOnItsAdmission);
+        }
+
+        var bill = await _db.Bills
+            .AsNoTracking()
+            .Include(b => b.LineItems)
+            .FirstOrDefaultAsync(b => b.AppointmentId == appointmentId, ct)
+            ?? throw new NotFoundException(MessageCode.NoBillRaised);
+
+        // An appointment bill is a one-off consultation charge, never a running total that
+        // grows day over day like a stay's does, so it reads as final as soon as it exists.
+        return ToMyBill(bill, isFinal: true);
     }
 
     public async Task<MyAdmission> GetCurrentAdmissionAsync(CancellationToken ct = default)
@@ -366,7 +393,7 @@ public sealed class MeService : IMeService
         };
     }
 
-    private static MyBill ToMyBill(AdmissionEntity admission, BillEntity bill)
+    private static MyBill ToMyBill(BillEntity bill, bool isFinal)
     {
         var lines = bill.LineItems
             .OrderBy(line => line.Source)
@@ -384,12 +411,13 @@ public sealed class MeService : IMeService
 
         return new MyBill
         {
-            AdmissionId = admission.Id,
+            AdmissionId = bill.AdmissionId,
+            AppointmentId = bill.AppointmentId,
             BillNumber = bill.BillNumber,
             Currency = BillingRates.Currency,
             Lines = lines,
             Total = decimal.Round(lines.Sum(line => line.LineTotal), 2),
-            IsFinal = ClosedStatuses.Contains(admission.Status),
+            IsFinal = isFinal,
             Settled = bill.IsSettled,
             SettledAt = bill.SettledAt,
             UpdatedAt = bill.UpdatedAt

@@ -18,6 +18,9 @@ public interface IMeService
 
     Task<MyBill> GetBillAsync(Guid admissionId, CancellationToken cancellationToken = default);
 
+    Task<MyBill> GetAppointmentBillAsync(
+        Guid appointmentId, CancellationToken cancellationToken = default);
+
     Task<MyAdmission> GetCurrentAdmissionAsync(CancellationToken cancellationToken = default);
 
     Task<PagedResult<MyAdmission>> GetHistoryAsync(

@@ -49,6 +49,14 @@ class PatientService {
     return callApi(() => _api.patientSelfService.getMyBill(admissionId: admissionId));
   }
 
+  // Also a 404: the visit ended in an admission, so its bill is there instead.
+  static const appointmentBilledOnItsAdmissionCode = 'cl_pat_035';
+
+  Future<MyBill> loadMyAppointmentBill(String appointmentId) {
+    return callApi(
+        () => _api.patientSelfService.getMyAppointmentBill(appointmentId: appointmentId));
+  }
+
   Future<PatientClaimPreview> previewClaim({
     required String patientCode,
     required DateTime dateOfBirth,

@@ -54,6 +54,11 @@ abstract class PatientSelfServiceApi {
     @Path('admissionId') required String admissionId,
   });
 
+  @GET('/me/appointments/{appointmentId}/bill')
+  Future<MyBill> getMyAppointmentBill({
+    @Path('appointmentId') required String appointmentId,
+  });
+
   @POST('/me/appointments')
   Future<MyAppointment> bookMyAppointment({
     @Body() BookAppointmentRequest? body,

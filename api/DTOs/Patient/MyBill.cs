@@ -4,8 +4,13 @@ namespace CareLanka.Api.DTOs.Patient;
 
 public class MyBill
 {
-    [Required]
-    public Guid AdmissionId { get; set; }
+    /// <summary>
+    /// Exactly one of <see cref="AdmissionId"/> and <see cref="AppointmentId"/> is set,
+    /// mirroring the staff <c>Bill</c> entity.
+    /// </summary>
+    public Guid? AdmissionId { get; set; }
+
+    public Guid? AppointmentId { get; set; }
 
     [Required]
     public string BillNumber { get; set; } = string.Empty;

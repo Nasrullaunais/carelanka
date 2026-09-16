@@ -11,7 +11,6 @@ part 'my_bill.g.dart';
 @JsonSerializable()
 class MyBill {
   const MyBill({
-    required this.admissionId,
     required this.billNumber,
     required this.currency,
     required this.lines,
@@ -19,13 +18,17 @@ class MyBill {
     required this.isFinal,
     required this.settled,
     required this.updatedAt,
+    this.admissionId,
+    this.appointmentId,
     this.settledAt,
   });
   
   factory MyBill.fromJson(Map<String, Object?> json) => _$MyBillFromJson(json);
   
   @JsonKey(name: 'admission_id')
-  final String admissionId;
+  final String? admissionId;
+  @JsonKey(name: 'appointment_id')
+  final String? appointmentId;
   @JsonKey(name: 'bill_number')
   final String billNumber;
   final String currency;

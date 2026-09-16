@@ -909,6 +909,43 @@ publishes the `wardId` filter on `GET /admissions` that `STUBS.md` already calls
 
 ---
 
+**11.16 (OPEN — announced by M4 on 2026-09-16) — a patient can now attach their app login to a
+record the desk created, using the patient code.**
+
+Here because it sits next to common auth without being part of it, and everybody should be able
+to see where the line was drawn.
+
+**The problem.** `POST /me/pre-register` links a login to an existing record by matching on NIC,
+and `CreatePatientRequest.Nic` is optional — a walk-in or an emergency arrival is often
+registered without one, which is what `temp_reference` is for. That patient installs the app
+afterwards, fills in the form, and gets a **second, empty record**, while their real stay sits on
+the record staff created. `POST /patients/{id}/link-account` exists for this but takes a raw
+account GUID and no screen calls it, so in practice the gap was open.
+
+**What was built.** `POST /me/claim/preview` and `POST /me/claim`, both Patient-only, both taking
+`patient_code` + `date_of_birth`. Preview answers a **masked** summary; claim links through the
+same `IPatientService.LinkAccountAsync` the desk override already uses. Design is
+`patient-management-plan.md` §7.6b.
+
+**What it does not touch — and this is the part for the group.** **Nothing in common auth
+changed.** No new auth endpoint, no change to `PatientAccount`, no change to registration or the
+JWT. The account is created first through the existing `POST /auth/patient/register`, and the
+claim is an authenticated call from that login. An anonymous "enter a code and set a password"
+flow would have been the other design, and it was rejected twice over: it would have put M4's
+hands in common auth, and it would have handed a stranger holding a dropped hospital slip a
+patient's name, date of birth, address and emergency contact before asking anybody to prove
+anything.
+
+**The one thing another member might care about.** `Patient.DateOfBirth` is now load-bearing for
+more than age rules — it is the second factor on the claim. A record with no date of birth cannot
+be claimed from the app at all and has to go through the Duty Manager link endpoint. Nobody
+outside M4 writes that column today, so this is a note, not a request.
+
+**Still open on M4's side:** attempt rate-limiting on the claim endpoints. Authenticated, so
+every attempt is attributable to an account, but nothing stops a login trying repeatedly.
+
+---
+
 ## 12. For the other three members
 
 This file originally described every boundary **from the Patient Management side**, because that was the first component designed. Equipment Management (§13–§16) added its own sections, written against `equipment-management-plan.md` and `equipment-spec.yaml`. Staff Management (§17–§21) and Emergency (§22–§26) now have theirs too, written against `staff-spec.yaml` and `emergency-management-plan.md`/`emergency-spec.yaml` respectively. If something here is wrong about your component, raise it in §11 rather than working around it.

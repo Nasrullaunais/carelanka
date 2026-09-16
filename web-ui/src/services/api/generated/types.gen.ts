@@ -393,6 +393,11 @@ export type ChecklistUpdateRequest = {
     billing_settled?: boolean | null;
 };
 
+export type ClaimByPatientCodeRequest = {
+    patient_code?: string | null;
+    date_of_birth?: string | null;
+};
+
 export type CompleteDetailsRequest = {
     nic?: string | null;
     full_name?: string | null;
@@ -817,6 +822,26 @@ export type MyAppointmentPagedResult = {
     total_pages: number;
 };
 
+export type MyBill = {
+    admission_id: string;
+    bill_number: string;
+    currency: string;
+    lines: Array<MyBillLine>;
+    total: number;
+    is_final: boolean;
+    settled: boolean;
+    settled_at?: string | null;
+    updated_at: string;
+};
+
+export type MyBillLine = {
+    source: BillLineSource;
+    description: string;
+    quantity: number;
+    unit_price: number;
+    line_total: number;
+};
+
 export type MyEmergencyCallSummary = {
     id?: string;
     patient_is_caller?: boolean;
@@ -886,6 +911,12 @@ export type Patient = {
     has_account: boolean;
     created_at?: string;
     updated_at?: string;
+};
+
+export type PatientClaimPreview = {
+    patient_code: string;
+    masked_full_name: string;
+    masked_phone?: string | null;
 };
 
 export type PatientDetail = {
@@ -4152,6 +4183,88 @@ export type PreRegisterSelfResponses = {
 
 export type PreRegisterSelfResponse = PreRegisterSelfResponses[keyof PreRegisterSelfResponses];
 
+export type PreviewMyClaimData = {
+    body?: ClaimByPatientCodeRequest;
+    path?: never;
+    query?: never;
+    url: '/me/claim/preview';
+};
+
+export type PreviewMyClaimErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type PreviewMyClaimError = PreviewMyClaimErrors[keyof PreviewMyClaimErrors];
+
+export type PreviewMyClaimResponses = {
+    /**
+     * OK
+     */
+    200: PatientClaimPreview;
+};
+
+export type PreviewMyClaimResponse = PreviewMyClaimResponses[keyof PreviewMyClaimResponses];
+
+export type ClaimMyRecordData = {
+    body?: ClaimByPatientCodeRequest;
+    path?: never;
+    query?: never;
+    url: '/me/claim';
+};
+
+export type ClaimMyRecordErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ClaimMyRecordError = ClaimMyRecordErrors[keyof ClaimMyRecordErrors];
+
+export type ClaimMyRecordResponses = {
+    /**
+     * OK
+     */
+    200: MyProfile;
+};
+
+export type ClaimMyRecordResponse = ClaimMyRecordResponses[keyof ClaimMyRecordResponses];
+
 export type GetMyProfileData = {
     body?: never;
     path?: never;
@@ -4253,6 +4366,41 @@ export type GetMyHistoryResponses = {
 };
 
 export type GetMyHistoryResponse = GetMyHistoryResponses[keyof GetMyHistoryResponses];
+
+export type GetMyBillData = {
+    body?: never;
+    path: {
+        admissionId: string;
+    };
+    query?: never;
+    url: '/me/admissions/{admissionId}/bill';
+};
+
+export type GetMyBillErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetMyBillError = GetMyBillErrors[keyof GetMyBillErrors];
+
+export type GetMyBillResponses = {
+    /**
+     * OK
+     */
+    200: MyBill;
+};
+
+export type GetMyBillResponse = GetMyBillResponses[keyof GetMyBillResponses];
 
 export type ListMyAppointmentsData = {
     body?: never;

@@ -10,6 +10,7 @@ import '../services/patient_service.dart';
 import '../state/past_visits_controller.dart';
 import '../widgets/panels.dart';
 import '../widgets/status_presentation.dart';
+import 'bill_sheet.dart';
 
 class PastVisitsScreen extends StatelessWidget {
   const PastVisitsScreen({super.key});
@@ -118,27 +119,49 @@ class _VisitCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (instructions != null) ...[
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () => showDialog<void>(
-                  context: context,
-                  builder: (dialogContext) => AlertDialog(
-                    title: const Text(_instructionsLabel),
-                    content: SingleChildScrollView(child: Text(instructions)),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(dialogContext).pop(),
-                        child: const Text('Close'),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                if (instructions != null)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => showDialog<void>(
+                        context: context,
+                        builder: (dialogContext) => AlertDialog(
+                          title: const Text(_instructionsLabel),
+                          content: SingleChildScrollView(child: Text(instructions)),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(dialogContext).pop(),
+                              child: const Text('Close'),
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
+                      icon: const Icon(Icons.assignment_outlined, size: 18),
+                      label: const Text('Instructions'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(44),
+                      ),
+                    ),
+                  ),
+                if (instructions != null) const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => showBillSheet(
+                      context,
+                      service: PatientService(context.read<CareLankaApi>()),
+                      admissionId: visit.admissionId,
+                    ),
+                    icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                    label: const Text('Bill'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(44),
+                    ),
                   ),
                 ),
-                icon: const Icon(Icons.assignment_outlined, size: 18),
-                label: const Text(_instructionsLabel),
-                style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
-              ),
-            ],
+              ],
+            ),
           ],
         ),
       ),

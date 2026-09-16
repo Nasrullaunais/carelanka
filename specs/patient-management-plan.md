@@ -759,9 +759,12 @@ Creating, retiring and taking beds out of service are **Equipment's endpoints, n
 | Method | Route | Role | Notes |
 | :--- | :--- | :--- | :--- |
 | `POST` | `/api/me/pre-register` | Patient | **Details only.** Creates or links a record via NIC match. Creates no admission — see below. Answers 200, because called twice it is the same record both times |
+| `POST` | `/api/me/claim/preview` | Patient | **Masked** look-up of the record a patient code belongs to. Writes nothing — see §7.6b |
+| `POST` | `/api/me/claim` | Patient | Links this login to that record. One record per login (`cl_pat_004`) |
 | `GET` | `/api/me/profile` | Patient | Their own details, and what is still blank. 404 while the login has no record linked |
 | `GET` | `/api/me/admission` | Patient | **Narrow response.** Status, plain-language status text, ward name, bed number, discharge instructions. Nothing else |
 | `GET` | `/api/me/history` | Patient | Their own **finished** visits, same narrow shape. The open one is `/me/admission`, so it is not listed twice |
+| `GET` | `/api/me/admissions/{admissionId}/bill` | Patient | **Narrow response.** Their own bill for their own stay — see §7.6c. 404 `cl_pat_036` until the desk raises one |
 | `POST` | `/api/me/appointments` | Patient | Book a visit. One open booking at a time, and none while admitted |
 | `GET` | `/api/me/appointments` | Patient | Their own bookings, upcoming and past |
 | `POST` | `/api/me/appointments/{id}/cancel` | Patient | Only a `scheduled` one, and only their own — somebody else's reads as 404 |
@@ -772,7 +775,43 @@ The patient response is a **different DTO**, not a filtered one. It cannot leak 
 
 **`/me/profile` was added at the same time**, because nothing else could answer "does this login have a record yet". `GET /auth/me` publishes `patient_id` and common auth hard-codes it to `null` for everybody — `integration_of_functions.md` §11.7.
 
-**Not one of these routes takes a patient id.** Every one resolves the record from the `sub` claim. A route with no id in it cannot be given somebody else's, which is the only real defence against the worst bug this component could have.
+**Not one of these routes takes a patient id.** Every one resolves the record from the `sub` claim. A route with no id in it cannot be given somebody else's, which is the only real defence against the worst bug this component could have. `/me/admissions/{admissionId}/bill` takes an *admission* id, not a patient id, and the service still resolves the patient from the claim first — somebody else's admission answers 404, exactly as a made-up id does.
+
+### 7.6b Claiming a record with a patient code
+
+*Added 2026-09-16.*
+
+**The problem in one sentence: `/me/pre-register` matches on NIC, and `CreatePatientRequest.Nic` is optional.** A walk-in or an emergency arrival can be registered at the desk with no NIC at all — that is what `temp_reference` exists for. When that patient installs the app afterwards and fills in the details form, nothing matches, so they get a **second, empty record** while their actual stay sits on the one staff created. The patient code on their hospital slip is the only handle that record has.
+
+Two endpoints, same body, `patient_code` + `date_of_birth`:
+
+- **`POST /me/claim/preview`** answers the "is this you?" step and answers it **masked** — `L••••a D•••••••e` and a phone ending `567`. Enough for the real patient to recognise, near-useless to anybody else. Writes nothing.
+- **`POST /me/claim`** commits it, through the same `IPatientService.LinkAccountAsync` the desk override uses.
+
+Four decisions worth defending:
+
+1. **The account exists before the claim.** Registration stays `POST /auth/patient/register`, which is common and not ours. Claiming from a real login makes the claim attributable, and keeps this out of common auth entirely.
+2. **Both fields, or nothing.** The code is 27.5 billion combinations from a CSPRNG (`PatientCodes.Next`), so it cannot be guessed — but it is printed on paper, and paper gets photographed, dropped and left on trolleys. The date of birth is the second factor that makes a found slip insufficient on its own.
+3. **One message for every failure**, `cl_pat_037` — no such code, wrong date of birth, no date of birth on file, already claimed. A distinct "wrong date of birth" would confirm to whoever holds the slip that the code is real, which is the thing the date of birth is there to stop.
+4. **A record with no date of birth cannot be claimed.** There is no second factor to check, so it is desk work. `POST /patients/{id}/link-account` already exists for exactly that, Duty Manager only.
+
+**Still open:** attempt rate-limiting. The claim is authenticated, so an attacker must register first and every attempt is attributable, which is why this did not block the feature — but a login that fails twenty claims in a minute should be stopped, and nothing stops it today.
+
+### 7.6c The patient's own bill
+
+*Added 2026-09-16.*
+
+`MyBill` is a **separate narrow shape**, not the staff `Bill` filtered. The staff bill carries `raised_by_staff_id` and name, `settled_by_staff_id` and name, the free-text `settlement_note` and a whole `PatientSummary` with the NIC in it. None of that is the patient's business, and a shape that does not contain a field cannot leak it — the same argument as `MyAdmission` in §7.6, and `PatientOpenApiContractTests` asserts each of those six field names is absent.
+
+**`is_final` is the field that matters.** A bill read mid-stay is a running total: bed nights are still accruing and `POST /admissions/{id}/bill` regenerates them each time the desk reprepares it. So `is_final` is false while the admission is open and true once it is discharged or cancelled, and the Flutter screen labels the number "So far" with a banner rather than "Total". Showing a growing number as an amount due is the one way this screen could actively mislead somebody.
+
+It is named `is_final` and not `final` because `final` is a reserved word in Dart and `swagger_parser` would otherwise generate `finalValue` into the mobile client.
+
+**One endpoint serves two screens.** My Stay reads it for the current admission; Past Visits reads it per discharged visit, on demand when the sheet opens rather than with the list — twenty past visits should not cost twenty requests to render a screen most of them never tap.
+
+**No bill row is the ordinary state.** `bills` rows are created lazily, when the desk first prepares, charges or settles, so a patient admitted this morning has none. That is `cl_pat_036` and a 404, and both frontends read it as "nothing to show yet" rather than an error.
+
+Appointment bills are **not** exposed here. A `Bill` carries either an `admission_id` or an `appointment_id`, and only the admission side has a patient-facing route today.
 
 ### 7.7 Care recommendations and the second agent
 

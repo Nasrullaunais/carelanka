@@ -8,7 +8,15 @@ public interface IMeService
     Task<MyProfile> PreRegisterAsync(
         PreRegisterRequest request, CancellationToken cancellationToken = default);
 
+    Task<PatientClaimPreview> PreviewClaimAsync(
+        ClaimByPatientCodeRequest request, CancellationToken cancellationToken = default);
+
+    Task<MyProfile> ClaimAsync(
+        ClaimByPatientCodeRequest request, CancellationToken cancellationToken = default);
+
     Task<MyProfile> GetProfileAsync(CancellationToken cancellationToken = default);
+
+    Task<MyBill> GetBillAsync(Guid admissionId, CancellationToken cancellationToken = default);
 
     Task<MyAdmission> GetCurrentAdmissionAsync(CancellationToken cancellationToken = default);
 

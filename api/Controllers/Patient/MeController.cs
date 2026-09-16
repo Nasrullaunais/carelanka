@@ -28,6 +28,28 @@ public class MeController : ControllerBase
         [FromBody] PreRegisterRequest request, CancellationToken ct)
         => Ok(await _me.PreRegisterAsync(request, ct));
 
+    [HttpPost("claim/preview", Name = "previewMyClaim")]
+    [ProducesResponseType(typeof(PatientClaimPreview), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<PatientClaimPreview>> PreviewMyClaim(
+        [FromBody] ClaimByPatientCodeRequest request, CancellationToken ct)
+        => Ok(await _me.PreviewClaimAsync(request, ct));
+
+    [HttpPost("claim", Name = "claimMyRecord")]
+    [ProducesResponseType(typeof(MyProfile), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<MyProfile>> ClaimMyRecord(
+        [FromBody] ClaimByPatientCodeRequest request, CancellationToken ct)
+        => Ok(await _me.ClaimAsync(request, ct));
+
     [HttpGet("profile", Name = "getMyProfile")]
     [ProducesResponseType(typeof(MyProfile), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
@@ -54,6 +76,14 @@ public class MeController : ControllerBase
         [FromQuery][Range(1, 100)] int pageSize = 20,
         CancellationToken ct = default)
         => Ok(await _me.GetHistoryAsync(page, pageSize, ct));
+
+    [HttpGet("admissions/{admissionId:guid}/bill", Name = "getMyBill")]
+    [ProducesResponseType(typeof(MyBill), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<ActionResult<MyBill>> GetMyBill(Guid admissionId, CancellationToken ct)
+        => Ok(await _me.GetBillAsync(admissionId, ct));
 
     [HttpPost("appointments", Name = "bookMyAppointment")]
     [ProducesResponseType(typeof(MyAppointment), StatusCodes.Status201Created)]

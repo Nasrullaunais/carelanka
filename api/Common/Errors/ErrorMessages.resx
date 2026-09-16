@@ -298,4 +298,12 @@
     <value>You have no current stay.</value>
     <comment>Patient self-service. Not being in hospital is the ordinary state, so this is a plain sentence and not an error the app should make a fuss about.</comment>
   </data>
+  <data name="cl_pat_036" xml:space="preserve">
+    <value>No bill has been raised for this stay yet.</value>
+    <comment>Patient self-service. A bill row only exists once the billing desk prepares one, so an admitted patient often has none. Ordinary state, not a fault.</comment>
+  </data>
+  <data name="cl_pat_037" xml:space="preserve">
+    <value>We could not match that patient code and date of birth. Check the slip the hospital gave you, or ask at the desk.</value>
+    <comment>Patient self-service. Deliberately one message for every failure - no such code, wrong date of birth, no date of birth on file, already claimed. Saying which would confirm to a stranger holding a slip that the code is real, which is the thing the date of birth is there to stop.</comment>
+  </data>
 </root>

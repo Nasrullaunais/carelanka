@@ -130,5 +130,9 @@ public enum MessageCode
 
     NoCurrentAdmission,
 
-    AppointmentBilledOnItsAdmission
+    AppointmentBilledOnItsAdmission,
+
+    NoBillRaised,
+
+    PatientCodeNotClaimable
 }

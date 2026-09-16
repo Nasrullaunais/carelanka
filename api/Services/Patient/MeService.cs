@@ -8,6 +8,7 @@ using CareLanka.Api.Services.Common;
 using Microsoft.EntityFrameworkCore;
 using AdmissionEntity = CareLanka.Api.Data.Entities.Patient.Admission;
 using AppointmentEntity = CareLanka.Api.Data.Entities.Patient.Appointment;
+using BillEntity = CareLanka.Api.Data.Entities.Patient.Bill;
 using PatientEntity = CareLanka.Api.Data.Entities.Patient.Patient;
 
 namespace CareLanka.Api.Services.Patient;
@@ -60,8 +61,49 @@ public sealed class MeService : IMeService
             : await CreateAndLinkRecordAsync(accountId, nic, request, ct);
     }
 
+    public async Task<PatientClaimPreview> PreviewClaimAsync(
+        ClaimByPatientCodeRequest request, CancellationToken ct = default)
+    {
+        var patient = await FindClaimableAsync(request, ct);
+
+        return new PatientClaimPreview
+        {
+            PatientCode = patient.PatientCode,
+            MaskedFullName = MaskedIdentity.Name(patient.FullName),
+            MaskedPhone = MaskedIdentity.Phone(patient.Phone)
+        };
+    }
+
+    public async Task<MyProfile> ClaimAsync(
+        ClaimByPatientCodeRequest request, CancellationToken ct = default)
+    {
+        var patient = await FindClaimableAsync(request, ct);
+
+        await _patients.LinkAccountAsync(patient.Id, _currentUser.Id, ct);
+
+        return ToProfile(patient);
+    }
+
     public async Task<MyProfile> GetProfileAsync(CancellationToken ct = default)
         => ToProfile(await GetMyRecordAsync(ct));
+
+    public async Task<MyBill> GetBillAsync(Guid admissionId, CancellationToken ct = default)
+    {
+        var patient = await GetMyRecordAsync(ct);
+
+        var admission = await _db.Admissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Id == admissionId && a.PatientId == patient.Id, ct)
+            ?? throw new NotFoundException("Admission", admissionId);
+
+        var bill = await _db.Bills
+            .AsNoTracking()
+            .Include(b => b.LineItems)
+            .FirstOrDefaultAsync(b => b.AdmissionId == admissionId, ct)
+            ?? throw new NotFoundException(MessageCode.NoBillRaised);
+
+        return ToMyBill(admission, bill);
+    }
 
     public async Task<MyAdmission> GetCurrentAdmissionAsync(CancellationToken ct = default)
     {
@@ -250,6 +292,32 @@ public sealed class MeService : IMeService
         }
     }
 
+    private async Task<PatientEntity> FindClaimableAsync(
+        ClaimByPatientCodeRequest request, CancellationToken ct)
+    {
+        if (await FindMyRecordAsync(ct) is not null)
+        {
+            throw new ConflictException(MessageCode.AccountAlreadyLinked);
+        }
+
+        var code = request.PatientCode.Trim().ToUpperInvariant();
+
+        var patient = await _db.Patients.FirstOrDefaultAsync(p => p.PatientCode == code, ct);
+
+        // One message for every way this fails. A distinct "wrong date of birth" would tell
+        // a stranger holding the slip that the code is real, which is what the date of birth
+        // is there to stop.
+        if (patient is null
+            || patient.UserAccountId is not null
+            || patient.DateOfBirth is null
+            || patient.DateOfBirth != request.DateOfBirth)
+        {
+            throw new NotFoundException(MessageCode.PatientCodeNotClaimable);
+        }
+
+        return patient;
+    }
+
     private Task<PatientEntity?> FindMyRecordAsync(CancellationToken ct)
         => _db.Patients.FirstOrDefaultAsync(p => p.UserAccountId == _currentUser.Id, ct);
 
@@ -295,6 +363,36 @@ public sealed class MeService : IMeService
             DischargeInstructions = instructions.TryGetValue(admission.Id, out var note) ? note : null,
             DetailsComplete = admission.DetailsComplete,
             MissingFields = admission.MissingFields.ToList()
+        };
+    }
+
+    private static MyBill ToMyBill(AdmissionEntity admission, BillEntity bill)
+    {
+        var lines = bill.LineItems
+            .OrderBy(line => line.Source)
+            .ThenBy(line => line.CreatedAt)
+            .ThenBy(line => line.Description)
+            .Select(line => new MyBillLine
+            {
+                Source = line.Source,
+                Description = line.Description,
+                Quantity = line.Quantity,
+                UnitPrice = line.UnitPrice,
+                LineTotal = line.LineTotal
+            })
+            .ToList();
+
+        return new MyBill
+        {
+            AdmissionId = admission.Id,
+            BillNumber = bill.BillNumber,
+            Currency = BillingRates.Currency,
+            Lines = lines,
+            Total = decimal.Round(lines.Sum(line => line.LineTotal), 2),
+            IsFinal = ClosedStatuses.Contains(admission.Status),
+            Settled = bill.IsSettled,
+            SettledAt = bill.SettledAt,
+            UpdatedAt = bill.UpdatedAt
         };
     }
 

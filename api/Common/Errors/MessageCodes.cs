@@ -75,7 +75,9 @@ public static class MessageCodes
             [MessageCode.NicDoesNotMatchYourRecord] = "cl_pat_032",
             [MessageCode.AccountHasNoPatientRecord] = "cl_pat_033",
             [MessageCode.NoCurrentAdmission] = "cl_pat_034",
-            [MessageCode.AppointmentBilledOnItsAdmission] = "cl_pat_035"
+            [MessageCode.AppointmentBilledOnItsAdmission] = "cl_pat_035",
+            [MessageCode.NoBillRaised] = "cl_pat_036",
+            [MessageCode.PatientCodeNotClaimable] = "cl_pat_037"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

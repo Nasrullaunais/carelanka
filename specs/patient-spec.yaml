@@ -1516,6 +1516,93 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
+  /me/claim/preview:
+    post:
+      tags: [Patient Self-Service]
+      summary: Check a patient code before claiming it
+      description: |
+        Roles: Patient. Resolved from the JWT.
+
+        For the patient who was registered at the desk - a walk-in, an emergency arrival -
+        and only afterwards installed the app. Staff already hold their record; this joins
+        their new login to it. Where `POST /me/pre-register` matches on NIC, this matches on
+        the patient code printed on their hospital slip, which is the only handle a record
+        created without a NIC has.
+
+        **Answers the "is this you?" step, and answers it masked.** Holding a code and a date
+        of birth is enough to be shown `L••••a D•••••••e`; it is not enough to be handed the
+        record. A slip of paper gets photographed, dropped and left on trolleys, so the reply
+        carries nothing a stranger could use and nothing a patient could not recognise.
+
+        Both the code and the date of birth must match. 404 `cl_pat_037` covers every failure
+        with one message - no such code, wrong date of birth, no date of birth on file,
+        already claimed. Naming which one would confirm to whoever holds the slip that the
+        code is real, and that is precisely what the date of birth is there to prevent.
+
+        Nothing is written. Call `POST /me/claim` with the same body to commit.
+      operationId: previewMyClaim
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClaimByPatientCodeRequest' }
+      responses:
+        '200':
+          description: A masked summary of the record that code belongs to
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatientClaimPreview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This login is already linked to a patient record (`cl_pat_004`)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /me/claim:
+    post:
+      tags: [Patient Self-Service]
+      summary: Link your login to the record the hospital already holds
+      description: |
+        Roles: Patient. Resolved from the JWT.
+
+        Commits what `POST /me/claim/preview` showed, taking the same body. From here the
+        login owns that record: `/me/admission` starts answering with the stay staff created
+        at the desk, ward and bed and all, and `/me/history` with everything before it.
+
+        **The account must exist first.** Registration is `POST /auth/patient/register` and is
+        not part of this. Claiming from a real login rather than from an anonymous caller is
+        what makes the claim attributable, and it keeps this endpoint out of common auth.
+
+        One record per login, one login per record. 409 `cl_pat_004` when this login already
+        has a record - claiming a second would orphan the first patient's history, so the app
+        sends them to the desk. The same 404 `cl_pat_037` as the preview covers every other
+        failure.
+      operationId: claimMyRecord
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClaimByPatientCodeRequest' }
+      responses:
+        '200':
+          description: The record, now yours
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyProfile' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This login is already linked to a patient record (`cl_pat_004`)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
   /me/profile:
     get:
       tags: [Patient Self-Service]
@@ -1590,6 +1677,47 @@ paths:
                         items: { $ref: '#/components/schemas/MyAdmission' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+
+  /me/admissions/{admissionId}/bill:
+    parameters:
+      - name: admissionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+        description: One of your own admissions, from /me/admission or /me/history.
+    get:
+      tags: [Patient Self-Service]
+      summary: The bill for one of your stays
+      description: |
+        Roles: Patient. Resolved from the JWT, and the admission must be one of yours -
+        another patient's id answers 404, the same as an id that does not exist.
+
+        Returns `MyBill`, a separate narrow shape on the same principle as `MyAdmission`.
+        The staff `Bill` carries who raised it, who settled it, the settlement note and a
+        `PatientSummary` with the NIC in it. None of that is a patient's business, and a
+        separate shape cannot leak what it does not contain.
+
+        **`is_final` is the field that matters.** While the admission is still open, bed
+        nights are still accruing and the total will grow, so `is_final` is false and the app
+        must label the number as a running total rather than the amount due. It turns true
+        once the admission is discharged or cancelled.
+
+        404 `cl_pat_036` when the billing desk has not raised a bill for the stay yet, which
+        is the ordinary state for a patient who was admitted this morning. The app reads that
+        as "nothing to show yet", not as an error.
+
+        Serves both screens: My Stay reads it for the current admission, Past Visits for a
+        discharged one. One bill per admission, so the admission id is the whole key.
+      operationId: getMyBill
+      responses:
+        '200':
+          description: The bill for that stay
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyBill' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /me/appointments:
     post:
@@ -3993,6 +4121,85 @@ components:
           type: array
           items: { type: string }
           description: So the patient can be asked to supply what is still outstanding.
+
+    MyBillLine:
+      type: object
+      description: |
+        One line of a patient's own bill. Carries no id: a patient cannot add, remove or
+        query a single line, so the id would be noise on the wire.
+      required: [source, description, quantity, unit_price, line_total]
+      properties:
+        source: { $ref: '#/components/schemas/BillLineSource' }
+        description: { type: string }
+        quantity: { type: number, format: double }
+        unit_price: { type: number, format: double }
+        line_total: { type: number, format: double }
+
+    MyBill:
+      type: object
+      description: |
+        What a patient may see of their own bill. A separate shape, not a filtered staff
+        `Bill` - it carries no `raised_by`, no `settled_by`, no settlement note and no
+        `PatientSummary`, because it does not contain them.
+      required:
+        [admission_id, bill_number, currency, lines, total, is_final, settled, updated_at]
+      properties:
+        admission_id: { type: string, format: uuid }
+        bill_number:
+          type: string
+          description: The handle a patient quotes at the counter, e.g. B7K2X9Q.
+        currency: { type: string, example: LKR }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/MyBillLine' }
+        total: { type: number, format: double }
+        is_final:
+          type: boolean
+          description: |
+            False while the admission is still open. Bed nights keep accruing, so the total
+            will grow and the app must show it as a running total rather than the amount due.
+            True once the admission is discharged or cancelled.
+
+            Named `is_final` rather than `final` because `final` is a reserved word in Dart,
+            and the generator would otherwise rename it to `finalValue` in the mobile client.
+        settled: { type: boolean }
+        settled_at: { type: string, format: date-time, nullable: true }
+        updated_at: { type: string, format: date-time }
+
+    ClaimByPatientCodeRequest:
+      type: object
+      description: |
+        Both fields are required and both must match. The code alone is a slip of paper, and
+        paper gets photographed and dropped; the date of birth is the second factor that
+        stops a found slip from being enough on its own.
+      required: [patient_code, date_of_birth]
+      properties:
+        patient_code:
+          type: string
+          description: |
+            The code on the patient's hospital slip - a P and seven characters from a
+            31-letter alphabet with the ambiguous ones (I, L, O, 0, 1) left out. Matched
+            case-insensitively.
+          example: PK4M9XB2
+        date_of_birth: { type: string, format: date }
+
+    PatientClaimPreview:
+      type: object
+      description: |
+        The "is this you?" step, masked. The caller has proved they hold a code and a
+        matching date of birth, which earns them enough to recognise themselves and no more.
+      required: [patient_code, masked_full_name]
+      properties:
+        patient_code: { type: string }
+        masked_full_name:
+          type: string
+          description: First and last letter of each word, the rest bulleted.
+          example: "L••••a D•••••••e"
+        masked_phone:
+          type: string
+          nullable: true
+          description: Last three digits only. Null when the record holds no phone number.
+          example: "•••••••567"
 
     # ---------- reports ----------
 

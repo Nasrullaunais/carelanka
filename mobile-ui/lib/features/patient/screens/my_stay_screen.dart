@@ -5,8 +5,12 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/friendly_date.dart';
 import '../../../core/widgets/async_view.dart';
 import '../../../services/api_client/models/my_admission.dart';
+import '../../../services/api_client/models/my_bill.dart';
 import '../state/my_stay_controller.dart';
+import '../state/profile_controller.dart';
+import '../widgets/bill_view.dart';
 import '../widgets/panels.dart';
+import 'claim_record_screen.dart';
 import '../widgets/stay_journey.dart';
 import '../widgets/status_presentation.dart';
 
@@ -29,10 +33,19 @@ class MyStayScreen extends StatelessWidget {
         builder: (context, stay) => switch (stay) {
           MyStayNotLinked() => RefreshableMessage(
             onRefresh: refresh,
-            child: const EmptyView(
+            child: EmptyView(
               icon: Icons.badge_outlined,
               title: 'No hospital record',
-              message: 'Your account is not yet linked to a hospital record.',
+              message: 'Your account is not yet linked to a hospital record. If the '
+                  'hospital registered you at the desk, your stay is waiting on a '
+                  'record you can claim with your patient code.',
+              action: FilledButton.icon(
+                onPressed: () =>
+                    openClaimRecord(context, context.read<ProfileController>()),
+                icon: const Icon(Icons.badge_outlined),
+                label: const Text('I have a patient code'),
+                style: FilledButton.styleFrom(minimumSize: const Size(220, 48)),
+              ),
             ),
           ),
           MyStayNoAdmission() => RefreshableMessage(
@@ -52,8 +65,9 @@ class MyStayScreen extends StatelessWidget {
                     ),
             ),
           ),
-          MyStayCurrent(:final admission) => _Admission(
+          MyStayCurrent(:final admission, :final bill) => _Admission(
             admission: admission,
+            bill: bill,
             onRefresh: refresh,
           ),
         },
@@ -63,9 +77,10 @@ class MyStayScreen extends StatelessWidget {
 }
 
 class _Admission extends StatelessWidget {
-  const _Admission({required this.admission, required this.onRefresh});
+  const _Admission({required this.admission, required this.bill, required this.onRefresh});
 
   final MyAdmission admission;
+  final MyBill? bill;
   final Future<void> Function() onRefresh;
 
   @override
@@ -73,6 +88,7 @@ class _Admission extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final journey = StayJourney.of(admission.status);
+    final currentBill = bill;
 
     final hasPlaceOrTime =
         admission.wardName != null ||
@@ -137,6 +153,14 @@ class _Admission extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+          ],
+          if (currentBill != null) ...[
+            const SizedBox(height: 16),
+            SectionCard(
+              title: 'Your bill',
+              icon: Icons.receipt_long_outlined,
+              child: BillView(bill: currentBill),
             ),
           ],
           if (admission.dischargeInstructions != null) ...[

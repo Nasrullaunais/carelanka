@@ -88,13 +88,6 @@ class AppointmentsScreenState extends State<AppointmentsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Appointments')),
-      floatingActionButton: linked && !admitted
-          ? FloatingActionButton.extended(
-              onPressed: controller.busy ? null : book,
-              icon: const Icon(Icons.add),
-              label: const Text('Book a visit'),
-            )
-          : null,
       body: AsyncView<List<MyAppointment>>(
         state: controller.appointments,
         onRetry: controller.load,

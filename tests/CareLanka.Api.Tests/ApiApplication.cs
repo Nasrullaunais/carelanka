@@ -28,6 +28,8 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
     public const string AmbulanceEmail = "ambulance.tests@carelanka.invalid";
     public const string SigningKey = "test-signing-key-that-is-at-least-32-characters";
 
+    public const string EquipmentConfirmationCode = "test-confirmation-code";
+
     private readonly string _databasePassword = Guid.NewGuid().ToString("N");
     private readonly PostgreSqlContainer _database;
     private string? _originalConnectionString;
@@ -49,6 +51,7 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
         builder.UseEnvironment("Testing");
 
         builder.UseSetting("RateLimits:AuthPerMinute", "1000");
+        builder.UseSetting("Equipment:ConfirmationCode", EquipmentConfirmationCode);
 
         builder.ConfigureLogging(logging => logging.AddProvider(new CapturingLoggerProvider(Logs)));
         builder.ConfigureServices(services =>

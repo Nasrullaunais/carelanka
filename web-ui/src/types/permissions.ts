@@ -30,6 +30,12 @@ export function canManageEquipment(role: PrincipalRole | undefined): boolean {
   return role === 'equipment_manager';
 }
 
+// The equipment manager registers an item and the hospital administrator confirms it on the
+// mobile app. Both need to know how many are still waiting.
+export function canTrackEquipmentConfirmations(role: PrincipalRole | undefined): boolean {
+  return role === 'equipment_manager' || role === 'hospital_administrator';
+}
+
 export function canReportFault(role: PrincipalRole | undefined): boolean {
   return isStaff(role);
 }

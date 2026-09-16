@@ -253,7 +253,7 @@ public sealed class EquipmentItemLifecycleTests
     private static Task<HttpResponseMessage> ReportFaultAsync(HttpClient client, Guid id, string description)
         => client.PostAsJsonAsync($"/api/equipment-items/{id}/report-fault", new { description });
 
-    private static async Task<Guid> NewItemIdAsync(HttpClient client)
+    private async Task<Guid> NewItemIdAsync(HttpClient client)
     {
         using var category = await ReadJsonAsync(await client.PostAsJsonAsync(
             "/api/equipment-categories", new { name = $"Category {Guid.NewGuid():N}"[..20] }));
@@ -269,7 +269,23 @@ public sealed class EquipmentItemLifecycleTests
             ward_id = Guid.NewGuid()
         }));
 
-        return body.RootElement.GetProperty("id").GetGuid();
+        var id = body.RootElement.GetProperty("id").GetGuid();
+
+        await ConfirmAsync(id);
+
+        return id;
+    }
+
+    // A registered item cannot be assigned, faulted or serviced until the hospital administrator
+    // confirms it, so every test that needs a working item confirms it first.
+    private async Task ConfirmAsync(Guid id)
+    {
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
+        administrator.DefaultRequestHeaders.Add(
+            "X-Confirmation-Code", ApiApplication.EquipmentConfirmationCode);
+
+        var response = await administrator.PostAsync($"/api/equipment-items/{id}/confirm", null);
+        response.EnsureSuccessStatusCode();
     }
 
     private Task<HttpClient> EquipmentClientAsync() => ClientAsync(ApiApplication.EquipmentEmail);

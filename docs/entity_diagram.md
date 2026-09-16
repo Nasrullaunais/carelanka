@@ -723,17 +723,24 @@ the service-layer duplicate check. *(Decision 33, revised)*
 + AssetTag: string (non-null, max 50)
 + SerialNumber: string (nullable, max 100)
 + NextMaintenanceDue: DateOnly (nullable)
++ AwaitingConfirmation: bool (non-null, default false) -- true from registration until confirmed
++ ConfirmedByStaffId: Guid (nullable) -- the hospital administrator who confirmed it
++ ConfirmedAt: DateTimeOffset (nullable)
 ```
 **Table:** `equipment_items`
 **Constraints:** UNIQUE(AssetTag) **WHERE is_active** · UNIQUE(SerialNumber) **WHERE
 is_active AND serial_number IS NOT NULL** · CHECK(status IN the enum)
 **Indexes:** `(CategoryId)` · `(WardId)` · `(Status)` · `(NextMaintenanceDue) WHERE status
-<> 'retired'`
+<> 'retired'` · `(AwaitingConfirmation) WHERE awaiting_confirmation`
 **Note:** Durable, individually tracked assets. `WardId` and `AssignedToAdmissionId` are
 bare references into Patient Management's tables — no foreign key, because we never write
 them. Asset tags are meant to be unique across beds and equipment together; Postgres cannot
 index across two tables, so that half is enforced in application code and is a **known gap**
 tracked as issue #17. *(Decision 8)*
+*(Rev 3.1, 2026-09-16)* A new item waits with `AwaitingConfirmation = true` until the hospital
+administrator confirms it; a rejected one is soft-deleted. Rows that existed before the column
+default to `false`, i.e. already confirmed. `ConfirmedByStaffId` is a bare staff id, the same as
+`PerformedByStaffId`. See `equipment-management-plan.md` §4.3.
 
 #### Bed extends SoftDeletableEntity — **owned here, defined under Patient Management**
 See the `Bed` entry in the Patient Management section. Listed here so this section is a

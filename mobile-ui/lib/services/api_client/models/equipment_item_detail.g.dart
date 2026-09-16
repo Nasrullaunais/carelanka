@@ -17,6 +17,7 @@ EquipmentItemDetail _$EquipmentItemDetailFromJson(Map<String, dynamic> json) =>
       assetTag: json['asset_tag'] as String,
       status: EquipmentStatus.fromJson(json['status'] as String),
       purchaseDate: DateTime.parse(json['purchase_date'] as String),
+      awaitingConfirmation: json['awaiting_confirmation'] as bool,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
       maintenanceHistory: (json['maintenance_history'] as List<dynamic>)
@@ -32,6 +33,10 @@ EquipmentItemDetail _$EquipmentItemDetailFromJson(Map<String, dynamic> json) =>
           : DateTime.parse(json['next_maintenance_due'] as String),
       serialNumber: json['serial_number'] as String?,
       assignedToAdmissionId: json['assigned_to_admission_id'] as String?,
+      confirmedByStaffId: json['confirmed_by_staff_id'] as String?,
+      confirmedAt: json['confirmed_at'] == null
+          ? null
+          : DateTime.parse(json['confirmed_at'] as String),
     );
 
 Map<String, dynamic> _$EquipmentItemDetailToJson(
@@ -51,6 +56,9 @@ Map<String, dynamic> _$EquipmentItemDetailToJson(
   'purchase_date': instance.purchaseDate.toIso8601String(),
   'serial_number': instance.serialNumber,
   'assigned_to_admission_id': instance.assignedToAdmissionId,
+  'awaiting_confirmation': instance.awaitingConfirmation,
+  'confirmed_by_staff_id': instance.confirmedByStaffId,
+  'confirmed_at': instance.confirmedAt?.toIso8601String(),
   'created_at': instance.createdAt.toIso8601String(),
   'updated_at': instance.updatedAt.toIso8601String(),
   'maintenance_history': instance.maintenanceHistory,

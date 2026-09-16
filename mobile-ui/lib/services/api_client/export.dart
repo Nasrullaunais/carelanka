@@ -142,6 +142,7 @@ export 'models/patient_register_request.dart';
 export 'models/patient_sort_field.dart';
 export 'models/patient_summary.dart';
 export 'models/patient_summary_paged_result.dart';
+export 'models/pending_equipment_count.dart';
 export 'models/pharmacy_category.dart';
 export 'models/pharmacy_item.dart';
 export 'models/pharmacy_item_paged_result.dart';

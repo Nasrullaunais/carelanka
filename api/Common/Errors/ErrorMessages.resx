@@ -144,6 +144,18 @@
     <value>A report has to be a PDF or a photograph (JPEG or PNG). This one is {0}.</value>
     <comment>Names what is allowed and what arrived. An allow-list: the question is whether a ward can open it.</comment>
   </data>
+  <data name="cl_equ_017" xml:space="preserve">
+    <value>That confirmation code is not correct.</value>
+    <comment>Deliberately says nothing about the right code or how close the guess was.</comment>
+  </data>
+  <data name="cl_equ_018" xml:space="preserve">
+    <value>{0} is still waiting for the hospital administrator to confirm it, so it cannot be used yet.</value>
+    <comment>Names who unblocks it, because the caller cannot confirm it themselves.</comment>
+  </data>
+  <data name="cl_equ_019" xml:space="preserve">
+    <value>{0} is not waiting for confirmation. Someone may already have confirmed it.</value>
+    <comment>The likely cause is a second administrator acting on the same item first.</comment>
+  </data>
   <data name="cl_equ_013" xml:space="preserve">
     <value>{0} is with the maintenance unit. It comes back into service when they complete the repair, not by editing its status.</value>
     <comment>Says where the item is and who releases it, because the caller's next move is to go and look at the repair queue.</comment>

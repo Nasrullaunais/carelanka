@@ -62,6 +62,7 @@ When the hospital buys a new item, the Administrator adds it under the matching 
 | Role | App | What they can do here |
 | :--- | :--- | :--- |
 | **Inventory Administrator** | React | Add/manage equipment and pharmacy categories, add equipment items and pharmacy items, update equipment status, bed register admin, the warnings/recommendations queue (approve / reject), reports |
+| **Hospital Administrator** *(Rev 3, 2026-09-16)* | Flutter | Confirm or reject a newly registered equipment item before it joins the register — see §4.3 |
 | **Equipment Technician** | Flutter | Scan an asset tag to pull up its record, update an equipment item's status in the field, mark a maintenance task complete, report a fault |
 | **Any authenticated staff role** *(shared JWT, no Equipment-specific grant needed)* | Flutter / React | Search equipment and pharmacy items and check availability — a read-only capability, not gated to a role we define, because any nurse, doctor or crew member across the hospital may need to know "do we have X in stock" |
 
@@ -316,6 +317,23 @@ The reason is the same one behind the bed-occupancy check: a rule that only hold
 
 Two states only, matching Patient Management's `Bed` schema exactly: `usable` / `out_of_service`. Retiring a bed is a separate, explicit, irreversible endpoint (§7.2), not a status value, so its one-way nature is visible in the API rather than hidden inside a generic update.
 
+### 4.3 Confirmation before the register *(Rev 3, 2026-09-16)*
+
+A newly registered `EquipmentItem` does not go straight onto the register. It is saved with `awaiting_confirmation = true` and waits for the hospital administrator to confirm it in the mobile app.
+
+```
+registered ──> awaiting confirmation ──> confirmed   (joins the register, status available)
+                                     └─> rejected    (soft-deleted, never listed)
+```
+
+While it waits, the item is left out of `GET /equipment-items`, and editing it, assigning it, reporting a fault against it or scheduling its maintenance all answer 409 `cl_equ_018`. The administrator confirms exactly what was registered; a mistake is fixed by rejecting it and registering it again. Confirming stamps `confirmed_by_staff_id` and `confirmed_at`. Rejecting soft-deletes the row, so its asset tag and serial number are free to be registered again with the right details. Items that existed before this rule are treated as confirmed.
+
+**Who confirms.** Only the hospital administrator — a different person from the equipment manager who registered the item, so nobody approves their own entry. The role is enforced by the `EquipmentConfirmer` policy.
+
+**The confirmation code.** On top of the role, listing, confirming and rejecting all send an `X-Confirmation-Code` header. The API compares it against `Equipment:ConfirmationCode` in its own configuration and answers 403 `cl_equ_017` when it is missing or wrong. It is never stored in a client: a code checked only in the app can be read out of the web build, and the endpoint would still be callable without it.
+
+**Why not a new `EquipmentStatus` value.** Waiting for confirmation is not a lifecycle state of a machine in use — it is whether the register has accepted the row at all. A separate flag keeps the transition matrix in §4.1 unchanged, and the web status filter never offers a state nobody on the dashboard can see.
+
 ---
 
 ## 5. The pharmacy workflow
@@ -374,7 +392,7 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/equipment-categories` | Any staff | |
 | `POST` | `/api/equipment-categories` | Inventory Administrator | |
-| `POST` | `/api/equipment-items` | Inventory Administrator | Register a new item under a category |
+| `POST` | `/api/equipment-items` | Inventory Administrator | Register a new item under a category. It awaits confirmation — §4.3 |
 | `GET` | `/api/equipment-items` | Any staff | `?search=`, `?categoryId=`, `?wardId=`, `?status=`. Paginated, sortable. |
 | `GET` | `/api/equipment-items/{id}` | Any staff | Includes maintenance history |
 | `GET` | `/api/equipment-items/by-tag/{assetTag}` | Equipment Technician | **Business op.** What the QR scan resolves to. |
@@ -382,6 +400,10 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 | `POST` | `/api/equipment-items/{id}/assign` | Inventory Administrator, Equipment Technician | **Business op.** Requires `admission_id`. `available -> assigned`. |
 | `POST` | `/api/equipment-items/{id}/release` | Inventory Administrator, Equipment Technician | **Business op.** `assigned -> available`, clears the admission link. |
 | `POST` | `/api/equipment-items/{id}/report-fault` | Equipment Technician, any staff | **Business op.** §6, last paragraph. |
+| `GET` | `/api/equipment-items/pending-confirmation` | Hospital Administrator + code | *(Rev 3)* Items awaiting confirmation, oldest first. §4.3 |
+| `GET` | `/api/equipment-items/pending-confirmation/count` | Equipment Manager, Hospital Administrator | *(Rev 3)* How many are waiting — no code, a number only |
+| `POST` | `/api/equipment-items/{id}/confirm` | Hospital Administrator + code | *(Rev 3)* **Business op.** Joins the register |
+| `POST` | `/api/equipment-items/{id}/reject` | Hospital Administrator + code | *(Rev 3)* **Business op.** Soft-deletes it; the tag is free again |
 
 ### 7.2 Beds
 
@@ -563,7 +585,7 @@ Per the assignment: workflow id, objective, plan, completed steps, tool calls wi
 
 | Screen | Contents |
 | :--- | :--- |
-| **Equipment inventory** | Search, filter by category/ward/status, sort, paginate |
+| **Equipment inventory** | Search, filter by category/ward/status, sort, paginate. *(Rev 3, 2026-09-16.)* Lists confirmed items only, and tells the equipment manager and administrator how many registered items are still awaiting confirmation |
 | **Equipment detail** | Item info, maintenance history, current warnings, assign/release. *(Rev 2, 2026-09-13.)* Assigning picks the patient by ward rather than taking a pasted admission id |
 | **Pharmacy inventory** | Search, filter by category, below-threshold and expiring-soon highlighted |
 | **Maintenance calendar** | Scheduled and overdue, by asset type |
@@ -586,6 +608,12 @@ Protected routes by role, loading / empty / success / error states throughout.
 | Complete service | Confirm work done, add notes |
 | Report a fault | Free-text report against a scanned item |
 | Assign / release equipment | Link or clear `assigned_to_admission_id` |
+
+**Hospital Administrator** *(Rev 3, 2026-09-16)*:
+
+| Screen | Contents |
+| :--- | :--- |
+| Equipment confirmation | How many items are waiting. Opening it asks for the confirmation code; the API checks it. Then each waiting item with Confirm and Reject — §4.3 |
 
 **Any staff (shared role, §2):**
 
@@ -706,6 +734,7 @@ Rule-based assertions, not an LLM judge.
 | One central pharmacy quantity, not per-ward | Matches your plan's description; per-ward stock is the more complex model used for equipment consumables in an earlier draft, dropped here to match what you actually described | Add `ward_id` to `PharmacyItem` (or split into a `PharmacyStockLevel` table) if per-ward tracking turns out to matter |
 | No equipment-assignment history table | Your plan describes a status field, not an audit trail; keeping only the current assignment is the literal reading | Add an `EquipmentAssignment` table (mirroring Patient's `BedAssignment`) if the group wants "who had this before" queries |
 | One `ActionRequest`/`Warning` pair covers both pharmacy and equipment problems | One contract, one approvals queue, one report, instead of two nearly-identical proposal systems | Split by domain if pharmacy and equipment approvals end up needing very different fields |
+| A newly registered item waits for the hospital administrator to confirm it *(Rev 3, 2026-09-16)* | Stops a mistyped or duplicate item reaching the register and being handed to a patient. The administrator is a different person from the registering equipment manager, and a confirmation code checked by the API sits on top of the role | Drop the code and rely on the role alone, or let items register straight onto the list again |
 | Threshold-based auto-approval | Confirmed in our conversation — keeps the agent doing useful daily work while still gating anything costly, urgent or irreversible | "Always require approval" is the safer, simpler fallback |
 
 ---

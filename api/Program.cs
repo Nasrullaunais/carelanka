@@ -109,6 +109,13 @@ builder.Services
         "Emergency:LocationMaxAgeMinutes must be greater than zero.")
     .ValidateOnStart();
 
+builder.Services
+    .AddOptions<EquipmentOptions>()
+    .Bind(builder.Configuration.GetSection(EquipmentOptions.SectionName))
+    .Validate(options => !string.IsNullOrWhiteSpace(options.ConfirmationCode),
+        "Equipment:ConfirmationCode must be set.")
+    .ValidateOnStart();
+
 var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 
 JsonWebTokenHandler.DefaultInboundClaimTypeMap.Clear();
@@ -269,6 +276,13 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager),
         EnumWire.ToWire(StaffRole.EquipmentManager)));
+
+    options.AddPolicy(Policies.EquipmentConfirmer, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
+    options.AddPolicy(Policies.EquipmentConfirmationTracker, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.EquipmentManager),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
 });
 
 var authRequestsPerMinute = builder.Configuration.GetValue("RateLimits:AuthPerMinute", 20);
@@ -373,6 +387,7 @@ builder.Services.AddSwaggerGen(options =>
     options.DocumentFilter<ApiPrefixAsServerFilter>();
     options.OperationFilter<AnonymousOperationFilter>();
     options.OperationFilter<EmergencyCallOperationFilter>();
+    options.OperationFilter<ConfirmationCodeHeaderOperationFilter>();
     options.SchemaFilter<JsonRequiredSchemaFilter>();
     options.SchemaFilter<EmergencyCallSchemaFilter>();
 

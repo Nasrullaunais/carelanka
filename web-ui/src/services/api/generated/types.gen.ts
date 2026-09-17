@@ -880,6 +880,21 @@ export type MyLabReportPagedResult = {
     total_pages: number;
 };
 
+export type MyPrescription = {
+    id: string;
+    note?: string | null;
+    file_name: string;
+    content_type: string;
+    byte_size: number;
+    status: PrescriptionStatus;
+    token_date?: string | null;
+    token_number?: number | null;
+    ready_at?: string | null;
+    delivered_at?: string | null;
+    rejection_reason?: string | null;
+    created_at: string;
+};
+
 export type MyProfile = {
     patient_code: string;
     full_name: string;
@@ -1067,6 +1082,27 @@ export type PreRegisterRequest = {
     emergency_contact_phone?: string | null;
 };
 
+export type Prescription = {
+    id: string;
+    patient_id: string;
+    patient_code: string;
+    patient_name: string;
+    note?: string | null;
+    file_name: string;
+    content_type: string;
+    byte_size: number;
+    status: PrescriptionStatus;
+    token_date?: string | null;
+    token_number?: number | null;
+    ready_at?: string | null;
+    delivered_at?: string | null;
+    rejection_reason?: string | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type PrescriptionStatus = 'submitted' | 'ready' | 'delivered' | 'rejected';
+
 export type PrincipalRole = 'ward_nurse' | 'doctor' | 'ambulance_crew' | 'general_staff' | 'duty_manager' | 'hospital_administrator' | 'equipment_manager' | 'patient';
 
 export type PrincipalType = 'staff' | 'patient';
@@ -1084,6 +1120,10 @@ export type RaisedBy = 'agent' | 'user';
 
 export type RefreshTokenRequest = {
     refresh_token: string;
+};
+
+export type RejectPrescriptionRequest = {
+    reason: string | null;
 };
 
 export type RelatedEntityType = 'pharmacy_item' | 'equipment_item' | 'bed';
@@ -5080,6 +5120,79 @@ export type LinkPatientAccountResponses = {
 
 export type LinkPatientAccountResponse = LinkPatientAccountResponses[keyof LinkPatientAccountResponses];
 
+export type ListMyPrescriptionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/me/prescriptions';
+};
+
+export type ListMyPrescriptionsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type ListMyPrescriptionsError = ListMyPrescriptionsErrors[keyof ListMyPrescriptionsErrors];
+
+export type ListMyPrescriptionsResponses = {
+    /**
+     * OK
+     */
+    200: Array<MyPrescription>;
+};
+
+export type ListMyPrescriptionsResponse = ListMyPrescriptionsResponses[keyof ListMyPrescriptionsResponses];
+
+export type UploadMyPrescriptionData = {
+    body?: {
+        File?: Blob | File;
+        Note?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/me/prescriptions';
+};
+
+export type UploadMyPrescriptionErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type UploadMyPrescriptionError = UploadMyPrescriptionErrors[keyof UploadMyPrescriptionErrors];
+
+export type UploadMyPrescriptionResponses = {
+    /**
+     * Created
+     */
+    201: MyPrescription;
+};
+
+export type UploadMyPrescriptionResponse = UploadMyPrescriptionResponses[keyof UploadMyPrescriptionResponses];
+
 export type ListPharmacyCategoriesData = {
     body?: never;
     path?: never;
@@ -5335,6 +5448,197 @@ export type RecordPharmacyTransactionResponses = {
 };
 
 export type RecordPharmacyTransactionResponse = RecordPharmacyTransactionResponses[keyof RecordPharmacyTransactionResponses];
+
+export type ListPrescriptionsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: PrescriptionStatus;
+    };
+    url: '/prescriptions';
+};
+
+export type ListPrescriptionsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListPrescriptionsError = ListPrescriptionsErrors[keyof ListPrescriptionsErrors];
+
+export type ListPrescriptionsResponses = {
+    /**
+     * OK
+     */
+    200: Array<Prescription>;
+};
+
+export type ListPrescriptionsResponse = ListPrescriptionsResponses[keyof ListPrescriptionsResponses];
+
+export type DownloadPrescriptionData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/prescriptions/{id}/file';
+};
+
+export type DownloadPrescriptionErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type DownloadPrescriptionError = DownloadPrescriptionErrors[keyof DownloadPrescriptionErrors];
+
+export type DownloadPrescriptionResponses = {
+    /**
+     * OK
+     */
+    200: Blob | File;
+};
+
+export type DownloadPrescriptionResponse = DownloadPrescriptionResponses[keyof DownloadPrescriptionResponses];
+
+export type MarkPrescriptionReadyData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/prescriptions/{id}/ready';
+};
+
+export type MarkPrescriptionReadyErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type MarkPrescriptionReadyError = MarkPrescriptionReadyErrors[keyof MarkPrescriptionReadyErrors];
+
+export type MarkPrescriptionReadyResponses = {
+    /**
+     * OK
+     */
+    200: Prescription;
+};
+
+export type MarkPrescriptionReadyResponse = MarkPrescriptionReadyResponses[keyof MarkPrescriptionReadyResponses];
+
+export type MarkPrescriptionDeliveredData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/prescriptions/{id}/deliver';
+};
+
+export type MarkPrescriptionDeliveredErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type MarkPrescriptionDeliveredError = MarkPrescriptionDeliveredErrors[keyof MarkPrescriptionDeliveredErrors];
+
+export type MarkPrescriptionDeliveredResponses = {
+    /**
+     * OK
+     */
+    200: Prescription;
+};
+
+export type MarkPrescriptionDeliveredResponse = MarkPrescriptionDeliveredResponses[keyof MarkPrescriptionDeliveredResponses];
+
+export type RejectPrescriptionData = {
+    body?: RejectPrescriptionRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/prescriptions/{id}/reject';
+};
+
+export type RejectPrescriptionErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RejectPrescriptionError = RejectPrescriptionErrors[keyof RejectPrescriptionErrors];
+
+export type RejectPrescriptionResponses = {
+    /**
+     * OK
+     */
+    200: Prescription;
+};
+
+export type RejectPrescriptionResponse = RejectPrescriptionResponses[keyof RejectPrescriptionResponses];
 
 export type ListBedAvailabilityData = {
     body?: never;

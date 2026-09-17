@@ -83,6 +83,8 @@ service.
 ### Equipment manager
 Beds, equipment items, pharmacy and maintenance. **Files lab reports** — the only role that
 can. Reads patient details and lab reports.
+**Runs the pharmacy's prescription queue** on the web Pharmacy page: marks one ready (which issues
+the patient's token), delivered, or can't fill.
 **Cannot:** confirm an item they registered, or confirm maintenance done — the hospital
 administrator does both. Schedules maintenance on the web Maintenance unit page.
 
@@ -92,7 +94,9 @@ Emergency calls and ambulances.
 
 ### Patient (mobile app only)
 Their own record and nothing else: saves their details, books and cancels one visit at a
-time, follows their current stay, and reads their discharge instructions afterwards.
+time, follows their current stay, and reads their discharge instructions afterwards. **Sends a
+prescription** to the pharmacy from the Prescriptions tab and sees its collection token once it is
+ready.
 No `/api/me/*` route takes a patient id — every one resolves the record from the token, so
 being handed somebody else's is impossible rather than merely checked.
 

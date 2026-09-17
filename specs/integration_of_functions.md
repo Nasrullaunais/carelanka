@@ -1033,6 +1033,33 @@ no new `MaintenanceStatus` value. Design is `equipment-management-plan.md` §6.1
   job. `GET /beds` is still the only thing to read.
 - **Anyone who called `/complete`:** nobody outside Equipment did, but it no longer exists.
 
+**11.20 (OPEN — announced by M3 on 2026-09-17) — patients send prescriptions to the pharmacy
+from the app. This touches Patient Management's code, so please read it, Lochana.**
+
+**What was built.** `Prescription`, migration `Equipment_AddPrescriptions`, the patient's
+`GET`/`POST /api/me/prescriptions` and the pharmacy's `/api/prescriptions` routes, a Prescriptions
+card on the web Pharmacy page, and a Prescriptions tab in the patient app. Design is
+`equipment-management-plan.md` §5.4; contract is `equipment-spec.yaml`.
+
+**Why the patient's routes sit under `/me` but are Equipment's.** It is the patient's own view, so
+it reads like every other `/me` route, and it resolves the patient from the token the same way. The
+pharmacy is this component's, so the controller (`MyPrescriptionsController`), service and table
+are ours — the same split as `LabReport`, except that here Equipment also serves the patient side.
+
+**Exactly what changed in Patient Management's files — all small, all additive:**
+- `IPatientService` / `PatientService`: a new read, `FindByUserAccountIdAsync`. Equipment reaches
+  it through `PatientDirectoryAdapter` and never touches `patients` directly.
+- `mobile-ui/lib/features/patient/screens/home_screen.dart`: `PatientTab` gains `prescriptions`,
+  between `myStay` and `profile`.
+- `.../screens/patient_shell.dart`: one tab entry, one `IndexedStack` child
+  (`MyPrescriptionsTab`, from `features/equipment`), and one refresh case.
+- `.../patient_routes.dart`: `_PatientArea` provides a `PrescriptionService`.
+- `test/features/patient/unlinked_account_test.dart` and `patient_screens_layout_test.dart`: both
+  provide a fake `PrescriptionService`; the unlinked test now expects five tabs.
+
+**No data crosses the other way.** The prescription stores the patient id only; the pharmacy shows
+code and name read through `IPatientService` at display time.
+
 ---
 
 ## 12. For the other three members

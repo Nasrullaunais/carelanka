@@ -10,6 +10,7 @@ class ReportAttachment extends StatelessWidget {
     required this.onPhotograph,
     required this.onAttachPdf,
     required this.onRemove,
+    this.photographLabel = 'Photograph the report',
   });
 
   final PickedReport? attachment;
@@ -17,6 +18,7 @@ class ReportAttachment extends StatelessWidget {
   final VoidCallback onPhotograph;
   final VoidCallback onAttachPdf;
   final VoidCallback onRemove;
+  final String photographLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +32,7 @@ class ReportAttachment extends StatelessWidget {
           FilledButton.tonalIcon(
             onPressed: enabled ? onPhotograph : null,
             icon: const Icon(Icons.photo_camera_outlined),
-            label: const Text('Photograph the report'),
+            label: Text(photographLabel),
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
           ),
           const SizedBox(height: 8),

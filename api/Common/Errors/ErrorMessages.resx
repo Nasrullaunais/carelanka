@@ -156,6 +156,22 @@
     <value>{0} is not waiting for confirmation. Someone may already have confirmed it.</value>
     <comment>The likely cause is a second administrator acting on the same item first.</comment>
   </data>
+  <data name="cl_equ_020" xml:space="preserve">
+    <value>This prescription is {0}, so it cannot be marked {1}.</value>
+    <comment>Ready needs a waiting prescription and delivered needs a ready one. Usually a second pharmacist got there first.</comment>
+  </data>
+  <data name="cl_equ_021" xml:space="preserve">
+    <value>That file is empty. Take the photo again and send it.</value>
+    <comment>Patient-facing, so it says what to do rather than what went wrong.</comment>
+  </data>
+  <data name="cl_equ_022" xml:space="preserve">
+    <value>That file is too large. A prescription may be up to {0} MB.</value>
+    <comment>States the limit, because "too large" without a number cannot be acted on.</comment>
+  </data>
+  <data name="cl_equ_023" xml:space="preserve">
+    <value>A prescription has to be a photo (JPEG or PNG) or a PDF. This one is {0}.</value>
+    <comment>Names what is allowed and what arrived.</comment>
+  </data>
   <data name="cl_equ_013" xml:space="preserve">
     <value>{0} is with the maintenance unit. It comes back into service when they complete the repair, not by editing its status.</value>
     <comment>Says where the item is and who releases it, because the caller's next move is to go and look at the repair queue.</comment>

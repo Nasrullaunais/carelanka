@@ -52,6 +52,14 @@ public enum MessageCode
 
     EquipmentNotAwaitingConfirmation,
 
+    PrescriptionWrongStatus,
+
+    PrescriptionFileEmpty,
+
+    PrescriptionFileTooLarge,
+
+    PrescriptionFileType,
+
     PharmacyCategoryNameTaken,
 
     PharmacyItemNameTaken,

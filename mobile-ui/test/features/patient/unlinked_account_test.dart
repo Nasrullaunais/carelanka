@@ -3,6 +3,7 @@ import 'package:carelanka_mobile/core/auth/session_expiry.dart';
 import 'package:carelanka_mobile/core/auth/token_store.dart';
 import 'package:carelanka_mobile/core/network/api_exception.dart';
 import 'package:carelanka_mobile/core/theme/app_theme.dart';
+import 'package:carelanka_mobile/features/equipment/services/prescription_service.dart';
 import 'package:carelanka_mobile/features/patient/screens/appointments_screen.dart';
 import 'package:carelanka_mobile/features/patient/screens/home_screen.dart';
 import 'package:carelanka_mobile/features/patient/screens/patient_shell.dart';
@@ -16,6 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
+import '../equipment/fake_prescriptions.dart';
 import 'fake_patient_service.dart';
 
 /// What a signed-in account with no hospital record behind it can see and do.
@@ -63,6 +65,7 @@ void main() {
           ChangeNotifierProvider.value(value: stay),
           ChangeNotifierProvider.value(value: appointments),
           ChangeNotifierProvider.value(value: auth),
+          Provider<PrescriptionService>.value(value: FakePrescriptionService()),
         ],
         child: MaterialApp(theme: AppTheme.light, home: screen),
       ),
@@ -70,11 +73,11 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('the shell still shows all four tabs', (tester) async {
+  testWidgets('the shell still shows all five tabs', (tester) async {
     await pumpUnlinked(tester, const PatientShell());
 
     expect(find.byType(NavigationBar), findsOneWidget);
-    for (final label in ['Home', 'Appointments', 'My stay', 'Profile']) {
+    for (final label in ['Home', 'Appointments', 'My stay', 'Prescriptions', 'Profile']) {
       expect(find.text(label), findsOneWidget, reason: '$label tab is missing');
     }
     expect(tester.takeException(), isNull);

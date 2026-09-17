@@ -802,6 +802,30 @@ makes an `Include` silently drop history rows once an item is retired — the tr
 outlive the thing it describes. An `adjusted` row requires a `Note`; a stocktake correction
 nobody explained cannot be audited later.
 
+#### Prescription extends AuditedEntity *(Rev 4.1 — new, 2026-09-17)*
+```
++ PatientId: Guid (non-null) -- Patient Management's patient, id only
++ Note: string (nullable, max 500) -- from the patient
++ FileName: string (non-null, max 255)
++ ContentType: string (non-null, max 100) -- image/jpeg | image/png | application/pdf
++ Content: byte[] (non-null)
++ ByteSize: int (non-null) -- > 0, at most 10 MB
++ Status: PrescriptionStatus (non-null)
++ TokenDate: DateOnly (nullable) -- Sri Lanka date the token belongs to
++ TokenNumber: int (nullable) -- set on ready, restarts at 1 each day
++ ReadyAt / ReadyByStaffId (nullable)
++ DeliveredAt / DeliveredByStaffId (nullable)
++ RejectionReason: string (nullable, max 500) / RejectedAt / RejectedByStaffId (nullable)
+```
+**Table:** `prescriptions`
+**Constraints:** CHECK(byte_size > 0) · CHECK(status IN the enum) · UNIQUE(TokenDate, TokenNumber)
+**WHERE token_number IS NOT NULL**
+**Indexes:** `(PatientId, CreatedAt DESC)` · `(Status, CreatedAt)`
+**Note:** A photo of a prescription a patient sends from the app, so the pharmacy can have the
+medicine ready and the patient collects by token. No foreign key on `PatientId`, for the reason
+`LabReport` gives. Staff ids are bare references, like `PerformedByStaffId`. See
+`equipment-management-plan.md` §5.4.
+
 #### LabReport extends Entity *(Rev 4 — new, 2026-09-13)*
 ```
 + PatientId: Guid (non-null) -- Patient Management's row, id only, NO FK
@@ -1729,6 +1753,13 @@ AND status = 'scheduled'`, so nothing has to be swept nightly and nothing can dr
 EquipmentItem, Bed
 ```
 Serialized as `equipment_item`, `bed`. What a `MaintenanceSchedule` row points at.
+
+### PrescriptionStatus *(Rev 4.1 — new, 2026-09-17)*
+```
+Submitted, Ready, Delivered, Rejected
+```
+Serialized as `submitted`, `ready`, `delivered`, `rejected`. `Ready` is when a token is issued;
+`Rejected` carries a reason the patient reads.
 
 ### PharmacyTransactionType *(Rev 3 — new)*
 ```

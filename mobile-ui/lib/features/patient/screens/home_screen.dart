@@ -125,7 +125,7 @@ class _NotLinkedYet extends StatelessWidget {
   }
 }
 
-enum PatientTab { home, appointments, myStay, profile }
+enum PatientTab { home, appointments, myStay, prescriptions, profile }
 
 class _Greeting extends StatelessWidget {
   const _Greeting({required this.profile});

@@ -62,6 +62,7 @@ When the hospital buys a new item, the Administrator adds it under the matching 
 | Role | App | What they can do here |
 | :--- | :--- | :--- |
 | **Inventory Administrator** | React | Add/manage equipment and pharmacy categories, add equipment items and pharmacy items, update equipment status, bed register admin, the warnings/recommendations queue (approve / reject), reports |
+| **Patient** *(Rev 3, 2026-09-17)* | Flutter | Send a photo of a prescription to the pharmacy, then follow it: waiting, ready with a collection token, delivered, or can't be filled — see §5.4 |
 | **Hospital Administrator** *(Rev 3, 2026-09-16)* | Flutter | Confirm or reject a newly registered equipment item before it joins the register — see §4.3. Confirm maintenance done — see §6.1 |
 | **Equipment Technician** | Flutter | Scan an asset tag to pull up its record, update an equipment item's status in the field, mark a maintenance task complete, report a fault |
 | **Any authenticated staff role** *(shared JWT, no Equipment-specific grant needed)* | Flutter / React | Search equipment and pharmacy items and check availability — a read-only capability, not gated to a role we define, because any nurse, doctor or crew member across the hospital may need to know "do we have X in stock" |
@@ -364,6 +365,22 @@ Two independent triggers, both checked by the same sweep:
 
 ---
 
+### 5.4 Prescriptions from the patient app *(Rev 3, 2026-09-17)*
+
+A patient photographs their prescription in the mobile app and sends it to the pharmacy, so the medicine is ready before they arrive and they collect it by token instead of queueing.
+
+```
+patient sends photo ──> submitted ──(pharmacy: ready)──> ready, token N ──(pharmacy: delivered)──> delivered
+                            └──────────────(pharmacy: can't fill, with a reason)──────────────> rejected
+```
+
+- **Sending.** `POST /api/me/prescriptions`: a JPEG, PNG or PDF up to 10 MB, and an optional note. The patient comes from the token. A login not yet linked to a hospital record is told to add its details first (`cl_pat_033`).
+- **The pharmacy.** The Pharmacy page lists prescriptions by status, opens the photo, and moves each one on. The pharmacy stands on `equipment_manager`, because `StaffRole` has no pharmacist.
+- **The token.** Marking ready issues the next number for the day, counted in Sri Lanka time and restarting at 1 each morning. `(token_date, token_number)` is unique, so two pharmacists pressing Ready together get two numbers rather than one each.
+- **The patient's view.** The Prescriptions tab shows each one's state; a ready one shows the token large enough to hold up at the counter, a delivered one shows when it was collected, a rejected one shows the pharmacy's reason.
+
+No stock moves here. Dispensing from stock is still a `PharmacyTransaction` (§5.1), recorded separately; linking a prescription to the items dispensed is not built.
+
 ## 6. The maintenance workflow
 
 ```
@@ -435,6 +452,13 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 | `GET` | `/api/pharmacy-items/{id}` | Any staff | |
 | `POST` | `/api/pharmacy-items/{id}/transactions` | Role depends on `type` — see §5.1 | **Business op.** The atomic conditional update from §3.3. |
 | `GET` | `/api/pharmacy-items/{id}/transactions` | Inventory Administrator | History, paginated |
+| `GET` | `/api/me/prescriptions` | Patient | *(Rev 3)* Own prescriptions, newest first. §5.4 |
+| `POST` | `/api/me/prescriptions` | Patient | *(Rev 3)* Send a photo or PDF, multipart |
+| `GET` | `/api/prescriptions` | Equipment Manager | *(Rev 3)* `?status=`; open work oldest first, history the latest 100 |
+| `GET` | `/api/prescriptions/{id}/file` | Equipment Manager | *(Rev 3)* The photo, inline |
+| `POST` | `/api/prescriptions/{id}/ready` | Equipment Manager | *(Rev 3)* **Business op.** Issues today's next token |
+| `POST` | `/api/prescriptions/{id}/deliver` | Equipment Manager | *(Rev 3)* **Business op.** `ready -> delivered` |
+| `POST` | `/api/prescriptions/{id}/reject` | Equipment Manager | *(Rev 3)* **Business op.** With a reason the patient sees |
 
 ### 7.4 Maintenance
 
@@ -599,7 +623,7 @@ Per the assignment: workflow id, objective, plan, completed steps, tool calls wi
 | :--- | :--- |
 | **Equipment inventory** | Search, filter by category/ward/status, sort, paginate. *(Rev 3, 2026-09-16.)* Lists confirmed items only, and tells the equipment manager and administrator how many registered items are still awaiting confirmation |
 | **Equipment detail** | Item info, maintenance history, current warnings, assign/release. *(Rev 2, 2026-09-13.)* Assigning picks the patient by ward rather than taking a pasted admission id |
-| **Pharmacy inventory** | Search, filter by category, below-threshold and expiring-soon highlighted |
+| **Pharmacy inventory** | Search, filter by category, below-threshold and expiring-soon highlighted. *(Rev 3, 2026-09-17.)* A **Prescriptions from the app** card: waiting, ready, delivered and can't-fill tabs, view the photo, Ready (issues a token), Mark delivered, Can't fill with a reason — §5.4 |
 | **Maintenance calendar** | Scheduled and overdue, by asset type |
 | **Maintenance unit** | *(Rev 2, 2026-09-13.)* The repair queue: every machine out of service and what was reported against it. Mark it beyond repair and it is retired. *(Rev 3, 2026-09-16.)* Also books a service, calibration or repair for any item. Jobs are confirmed done by the hospital administrator in the mobile app, not here — see §6.1 |
 | **Laboratory** | *(Rev 2, 2026-09-13.)* Pick a ward, read down who is in it, and file a result against whoever the specimen came from. Search by code, name or NIC is the second way in, for an outpatient in no ward. Clinical staff see the same screen without the upload form — see §7.5 |
@@ -627,6 +651,12 @@ Protected routes by role, loading / empty / success / error states throughout.
 | :--- | :--- |
 | Equipment confirmation | How many items are waiting. Opening it asks for the confirmation code; the API checks it. Then each waiting item with Confirm and Reject — §4.3 |
 | Maintenance confirmation | How many jobs are open. Same code step. Then each job — item, type, due date, what was reported — with Confirm done — §6.1 |
+
+**Patient** *(Rev 3, 2026-09-17)* — a tab in the patient app, built here and placed there by `PatientShell`:
+
+| Screen | Contents |
+| :--- | :--- |
+| Prescriptions | Every prescription sent and its state; the token shown large once ready. Upload prescription: photograph it or attach a PDF, optional note — §5.4 |
 
 **Any staff (shared role, §2):**
 
@@ -749,6 +779,7 @@ Rule-based assertions, not an LLM judge.
 | One `ActionRequest`/`Warning` pair covers both pharmacy and equipment problems | One contract, one approvals queue, one report, instead of two nearly-identical proposal systems | Split by domain if pharmacy and equipment approvals end up needing very different fields |
 | A newly registered item waits for the hospital administrator to confirm it *(Rev 3, 2026-09-16)* | Stops a mistyped or duplicate item reaching the register and being handed to a patient. The administrator is a different person from the registering equipment manager, and a confirmation code checked by the API sits on top of the role | Drop the code and rely on the role alone, or let items register straight onto the list again |
 | Maintenance is confirmed done by the hospital administrator *(Rev 3, 2026-09-16)* | A machine is only handed back to the wards when someone other than the person who booked the work says it is done, with the same code as item registration | Give the equipment manager a way to complete a job again |
+| Patients send prescriptions from the app and collect by token *(Rev 3, 2026-09-17)* | No queue at the pharmacy window: the medicine is ready before the patient arrives, and a daily token number is short enough to call out | Keep dispensing walk-in only |
 | Threshold-based auto-approval | Confirmed in our conversation — keeps the agent doing useful daily work while still gating anything costly, urgent or irreversible | "Always require approval" is the safer, simpler fallback |
 
 ---

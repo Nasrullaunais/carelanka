@@ -228,6 +228,9 @@ public sealed class PatientService : IPatientService
     public Task<PatientEntity?> FindByIdAsync(Guid id, CancellationToken ct = default)
         => _db.Patients.FirstOrDefaultAsync(p => p.Id == id, ct);
 
+    public Task<PatientEntity?> FindByUserAccountIdAsync(Guid accountId, CancellationToken ct = default)
+        => _db.Patients.AsNoTracking().FirstOrDefaultAsync(p => p.UserAccountId == accountId, ct);
+
     public async Task<PatientEntity> GetByIdAsync(Guid id, CancellationToken ct = default)
         => await FindByIdAsync(id, ct) ?? throw new NotFoundException("Patient", id);
 

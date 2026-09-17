@@ -1,9 +1,11 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/api_client/care_lanka_api.dart';
 import '../../services/api_client/models/principal_role.dart';
+import '../equipment/services/prescription_service.dart';
 import 'screens/nurse_worklist_screen.dart';
 import 'screens/patient_shell.dart';
 import 'services/patient_service.dart';
@@ -48,6 +50,10 @@ class _PatientArea extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ProfileController(service)),
         ChangeNotifierProvider(create: (_) => MyStayController(service)),
         ChangeNotifierProvider(create: (_) => AppointmentsController(service)),
+        Provider(
+          create: (context) =>
+              PrescriptionService(context.read<CareLankaApi>(), context.read<Dio>()),
+        ),
       ],
       child: const PatientShell(),
     );

@@ -22,12 +22,14 @@ import type {
 import { WardPatientPicker } from '../components/WardPatientPicker';
 import { useSession } from '../services/auth/useSession';
 import {
+  canConfirmEquipment,
   canManageEquipment,
   canReportFault,
   canTrackEquipmentConfirmations,
 } from '../types/permissions';
 import { equipmentStatusLabels, equipmentStatuses } from '../types/equipment';
 import { ItemDetailCard } from './equipment/ItemDetailCard';
+import { ConfirmNewEquipmentCard } from './equipment/ConfirmNewEquipmentCard';
 
 const PAGE_SIZE = 10;
 
@@ -165,6 +167,8 @@ export function EquipmentPage() {
         </div>
       </div>
 
+      {canConfirmEquipment(role) && <ConfirmNewEquipmentCard />}
+
       {canManageEquipment(role) && (
         <RegisterItemCard
           categories={(categories.data ?? []).map((c) => ({ id: c.id, name: c.name }))}
@@ -193,8 +197,8 @@ export function EquipmentPage() {
                 : `${awaitingConfirmation.data.count} items are`}{' '}
               awaiting confirmation.
             </strong>{' '}
-            The hospital administrator confirms new items in the mobile app. Each one appears
-            here once it is confirmed.
+            The hospital administrator confirms new items, on this page or in the mobile app.
+            Each one appears here once it is confirmed.
           </p>
         )}
         <ItemTable
@@ -613,8 +617,8 @@ function RegisterItemCard({
     <div className="card">
       <h2>Register an item</h2>
       <p className="muted" style={{ marginBottom: '0.9rem' }}>
-        A new item waits for the hospital administrator to confirm it in the mobile app, and
-        only then joins the register below. Once confirmed it is available. There is no way to
+        A new item waits for the hospital administrator to confirm it, on the web or in the
+        mobile app, and only then joins the register below. Once confirmed it is available. There is no way to
         register one already assigned or retired, because neither has a story behind it. Asset
         tags are unique across beds and equipment together, since a tag scan has to resolve to
         one thing.

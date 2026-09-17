@@ -1001,7 +1001,8 @@ shares — a new job inside Equipment Management, and a first mobile screen.
 
 **What changed.** `POST /equipment-items` now saves the item with `awaiting_confirmation = true`.
 It stays off `GET /equipment-items`, and cannot be edited, assigned, faulted or serviced, until the hospital
-administrator confirms it in the Flutter app (`POST /equipment-items/{id}/confirm`) or rejects it
+administrator confirms it in the Flutter app or, since 2026-09-17, on the web Equipment page
+(`POST /equipment-items/{id}/confirm`) or rejects it
 (`/reject`). Migration `Equipment_AddItemConfirmation` adds three columns to `equipment_items` and
 marks every existing row as already confirmed. Design is `equipment-management-plan.md` §4.3; the
 contract is `equipment-spec.yaml`.

@@ -320,7 +320,7 @@ Two states only, matching Patient Management's `Bed` schema exactly: `usable` / 
 
 ### 4.3 Confirmation before the register *(Rev 3, 2026-09-16)*
 
-A newly registered `EquipmentItem` does not go straight onto the register. It is saved with `awaiting_confirmation = true` and waits for the hospital administrator to confirm it in the mobile app.
+A newly registered `EquipmentItem` does not go straight onto the register. It is saved with `awaiting_confirmation = true` and waits for the hospital administrator to confirm it — in the mobile app, or on the web Equipment page *(Rev 3, 2026-09-17)*. Both call the same endpoints with the same code.
 
 ```
 registered ──> awaiting confirmation ──> confirmed   (joins the register, status available)
@@ -621,7 +621,7 @@ Per the assignment: workflow id, objective, plan, completed steps, tool calls wi
 
 | Screen | Contents |
 | :--- | :--- |
-| **Equipment inventory** | Search, filter by category/ward/status, sort, paginate. *(Rev 3, 2026-09-16.)* Lists confirmed items only, and tells the equipment manager and administrator how many registered items are still awaiting confirmation |
+| **Equipment inventory** | Search, filter by category/ward/status, sort, paginate. *(Rev 3, 2026-09-16.)* Lists confirmed items only, and tells the equipment manager and administrator how many registered items are still awaiting confirmation. *(Rev 3, 2026-09-17.)* The hospital administrator also gets a **Confirm new equipment** card: enter the confirmation code, then Confirm or Reject each waiting item — the same queue as the mobile app, §4.3 |
 | **Equipment detail** | Item info, maintenance history, current warnings, assign/release. *(Rev 2, 2026-09-13.)* Assigning picks the patient by ward rather than taking a pasted admission id |
 | **Pharmacy inventory** | Search, filter by category, below-threshold and expiring-soon highlighted. *(Rev 3, 2026-09-17.)* A **Prescriptions from the app** card: waiting, ready, delivered and can't-fill tabs, view the photo, Ready (issues a token), Mark delivered, Can't fill with a reason — §5.4 |
 | **Maintenance calendar** | Scheduled and overdue, by asset type |

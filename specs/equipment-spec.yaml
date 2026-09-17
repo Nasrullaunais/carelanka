@@ -210,7 +210,8 @@ paths:
       description: |
         Roles: HospitalAdministrator, with the confirmation code.
 
-        The hospital administrator's queue in the mobile app, oldest first. The equipment
+        The hospital administrator's queue - in the mobile app and on the web Equipment page -
+        oldest first. The equipment
         manager who registers an item cannot confirm it, so nobody approves their own entry.
         A missing or wrong `X-Confirmation-Code` answers 403 `cl_equ_017`, the same as a role
         that may not confirm at all. The code lives in the API's configuration

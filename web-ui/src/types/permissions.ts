@@ -36,6 +36,12 @@ export function canTrackEquipmentConfirmations(role: PrincipalRole | undefined):
   return role === 'equipment_manager' || role === 'hospital_administrator';
 }
 
+// Only the hospital administrator, so nobody confirms an item they registered themselves. The API
+// also wants the confirmation code on top of the role.
+export function canConfirmEquipment(role: PrincipalRole | undefined): boolean {
+  return role === 'hospital_administrator';
+}
+
 export function canReportFault(role: PrincipalRole | undefined): boolean {
   return isStaff(role);
 }

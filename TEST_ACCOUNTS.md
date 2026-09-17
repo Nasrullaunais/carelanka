@@ -73,9 +73,9 @@ and can start an agent workflow.
 ### Hospital administrator
 **Sets prices** — the admission fee per care level and every ward's rates. Nobody else can.
 **Creates and retires wards.** Reads patient details, the bookings list and the discharge
-board. **Confirms new equipment** in the mobile app — an item the equipment manager registers
-only reaches the web register once the administrator confirms it. The app asks for the
-confirmation code first: `equipment2026`. **Confirms maintenance done** the same way — every
+board. **Confirms new equipment** in the mobile app or on the web Equipment page — an item the
+equipment manager registers only reaches the web register once the administrator confirms it.
+Both ask for the confirmation code first: `equipment2026`. **Confirms maintenance done** the same way — every
 reported fault and scheduled job is listed there, and confirming it puts the item back into
 service.
 **Cannot:** register, admit, bed, or discharge anyone.

@@ -399,7 +399,7 @@ A Technician or any staff member can also report a fault directly (`POST /api/eq
 
 ### 6.1 The hospital administrator confirms maintenance done *(Rev 3, 2026-09-16)*
 
-Every open job — a reported fault's repair the moment it is reported, and anything scheduled — appears in the hospital administrator's mobile app. Confirming one done (`POST /maintenance-schedules/{id}/confirm`) completes it, records the administrator in `performed_by_staff_id`, returns the item to service, advances `next_maintenance_due` and closes the warning.
+Every open job — a reported fault's repair the moment it is reported, and anything scheduled — appears for the hospital administrator — in the mobile app, and on the web Maintenance unit page *(Rev 3, 2026-09-17)*. Confirming one done (`POST /maintenance-schedules/{id}/confirm`) completes it, records the administrator in `performed_by_staff_id`, returns the item to service, advances `next_maintenance_due` and closes the warning.
 
 ```
 fault reported / job scheduled ──> open (web list + mobile list) ──(confirm done, mobile)──> completed
@@ -625,7 +625,7 @@ Per the assignment: workflow id, objective, plan, completed steps, tool calls wi
 | **Equipment detail** | Item info, maintenance history, current warnings, assign/release. *(Rev 2, 2026-09-13.)* Assigning picks the patient by ward rather than taking a pasted admission id |
 | **Pharmacy inventory** | Search, filter by category, below-threshold and expiring-soon highlighted. *(Rev 3, 2026-09-17.)* A **Prescriptions from the app** card: waiting, ready, delivered and can't-fill tabs, view the photo, Ready (issues a token), Mark delivered, Can't fill with a reason — §5.4 |
 | **Maintenance calendar** | Scheduled and overdue, by asset type |
-| **Maintenance unit** | *(Rev 2, 2026-09-13.)* The repair queue: every machine out of service and what was reported against it. Mark it beyond repair and it is retired. *(Rev 3, 2026-09-16.)* Also books a service, calibration or repair for any item. Jobs are confirmed done by the hospital administrator in the mobile app, not here — see §6.1 |
+| **Maintenance unit** | *(Rev 2, 2026-09-13.)* The repair queue: every machine out of service and what was reported against it. Mark it beyond repair and it is retired. *(Rev 3, 2026-09-16.)* Also books a service, calibration or repair for any item. Jobs are confirmed done by the hospital administrator, not the equipment manager — see §6.1. *(Rev 3, 2026-09-17.)* The administrator gets a **Confirm maintenance done** card on this page: enter the confirmation code, then Confirm done on each open job. The open-jobs table itself is the equipment manager's |
 | **Laboratory** | *(Rev 2, 2026-09-13.)* Pick a ward, read down who is in it, and file a result against whoever the specimen came from. Search by code, name or NIC is the second way in, for an outpatient in no ward. Clinical staff see the same screen without the upload form — see §7.5 |
 | **Bed register admin** | Create beds, mark out of service, retire — occupancy block surfaced as a clear error |
 | **Warnings & recommendations queue** | Everything open, recommended action, urgency, cost. Approve / Reject / auto-approved badge. **This is the demo screen.** |

@@ -1290,7 +1290,8 @@ paths:
         Roles: HospitalAdministrator, with the confirmation code.
 
         Every open job - a reported fault's repair as soon as it is reported, and anything
-        scheduled - earliest due first. The hospital administrator's queue in the mobile app. A
+        scheduled - earliest due first. The hospital administrator's queue, in the mobile app and
+        on the web Maintenance unit page. A
         missing or wrong `X-Confirmation-Code` answers 403 `cl_equ_017`, the same code and rule
         as confirming a newly registered equipment item.
       operationId: listMaintenanceSchedulesAwaitingConfirmation

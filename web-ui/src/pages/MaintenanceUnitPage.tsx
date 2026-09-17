@@ -10,13 +10,14 @@ import {
 } from '../services/api/generated/@tanstack/react-query.gen';
 import type { MaintenanceSchedule, MaintenanceType } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
-import { canManageEquipment } from '../types/permissions';
+import { canConfirmEquipment, canManageEquipment } from '../types/permissions';
 import {
   maintenanceStatusLabels,
   maintenanceTypeLabels,
   schedulableMaintenanceTypes,
 } from '../types/maintenance';
 import { Dialog } from './EquipmentPage';
+import { ConfirmMaintenanceCard } from './equipment/ConfirmMaintenanceCard';
 
 const PAGE_SIZE = 10;
 
@@ -28,11 +29,14 @@ export function MaintenanceUnitPage() {
   const [page, setPage] = useState(1);
   const [scrapping, setScrapping] = useState<MaintenanceSchedule | null>(null);
 
-  const queue = useQuery(
-    listMaintenanceSchedulesOptions({
+  // The work list is the equipment manager's route; the administrator sees the same jobs in
+  // their confirmation card instead.
+  const queue = useQuery({
+    ...listMaintenanceSchedulesOptions({
       query: { status: 'scheduled', page, pageSize: PAGE_SIZE },
     }),
-  );
+    enabled: manage,
+  });
 
   const rows = queue.data?.items ?? [];
   const totalPages = queue.data?.total_pages ?? 1;
@@ -42,97 +46,101 @@ export function MaintenanceUnitPage() {
       <h1>Maintenance unit</h1>
       <p className="muted">
         Every service, calibration and repair still open. The hospital administrator confirms each
-        job done in the mobile app, and that is what puts the item back into service and closes
-        any fault reported against it.
+        job done, on this page or in the mobile app, and that is what puts the item back into
+        service and closes any fault reported against it.
       </p>
+
+      {canConfirmEquipment(role) && <ConfirmMaintenanceCard />}
 
       {manage && <ScheduleMaintenanceCard />}
 
-      <div className="card">
-        <h2>Open jobs</h2>
+      {manage && (
+        <div className="card">
+          <h2>Open jobs</h2>
 
-        {queue.isPending && <p className="empty">Loading the queue…</p>}
+          {queue.isPending && <p className="empty">Loading the queue…</p>}
 
-        {queue.isError && (
-          <p className="empty">
-            The queue could not be loaded.{' '}
-            <button type="button" className="secondary" onClick={() => queue.refetch()}>
-              Try again
-            </button>
-          </p>
-        )}
+          {queue.isError && (
+            <p className="empty">
+              The queue could not be loaded.{' '}
+              <button type="button" className="secondary" onClick={() => queue.refetch()}>
+                Try again
+              </button>
+            </p>
+          )}
 
-        {queue.isSuccess && rows.length === 0 && (
-          <p className="empty">Nothing waiting. Every job has been dealt with.</p>
-        )}
+          {queue.isSuccess && rows.length === 0 && (
+            <p className="empty">Nothing waiting. Every job has been dealt with.</p>
+          )}
 
-        {rows.length > 0 && (
-          <table>
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>Why</th>
-                <th>Due</th>
-                <th>Notes</th>
-                <th>State</th>
-                {manage && <th>Action</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((job) => (
-                <tr key={job.id}>
-                  <td>{job.asset_label}</td>
-                  <td>{maintenanceTypeLabels[job.schedule_type]}</td>
-                  <td>{job.scheduled_date}</td>
-                  <td>{job.notes ?? <span className="muted">No notes.</span>}</td>
-                  <td>
-                    <span className="badge">{maintenanceStatusLabels[job.status]}</span>
-                  </td>
-                  {manage && (
-                    <td>
-                      {job.asset_type === 'equipment_item' && job.schedule_type === 'repair' ? (
-                        <button
-                          type="button"
-                          className="secondary"
-                          onClick={() => setScrapping(job)}
-                        >
-                          Beyond repair
-                        </button>
-                      ) : (
-                        <span className="muted">Confirmed on mobile</span>
-                      )}
-                    </td>
-                  )}
+          {rows.length > 0 && (
+            <table>
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Why</th>
+                  <th>Due</th>
+                  <th>Notes</th>
+                  <th>State</th>
+                  {manage && <th>Action</th>}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody>
+                {rows.map((job) => (
+                  <tr key={job.id}>
+                    <td>{job.asset_label}</td>
+                    <td>{maintenanceTypeLabels[job.schedule_type]}</td>
+                    <td>{job.scheduled_date}</td>
+                    <td>{job.notes ?? <span className="muted">No notes.</span>}</td>
+                    <td>
+                      <span className="badge">{maintenanceStatusLabels[job.status]}</span>
+                    </td>
+                    {manage && (
+                      <td>
+                        {job.asset_type === 'equipment_item' && job.schedule_type === 'repair' ? (
+                          <button
+                            type="button"
+                            className="secondary"
+                            onClick={() => setScrapping(job)}
+                          >
+                            Beyond repair
+                          </button>
+                        ) : (
+                          <span className="muted">Confirmed by the administrator</span>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
 
-        {totalPages > 1 && (
-          <div className="pager">
-            <button
-              type="button"
-              className="secondary"
-              disabled={page <= 1}
-              onClick={() => setPage((current) => current - 1)}
-            >
-              Previous
-            </button>
-            <span className="muted">
-              Page {page} of {totalPages}
-            </span>
-            <button
-              type="button"
-              className="secondary"
-              disabled={page >= totalPages}
-              onClick={() => setPage((current) => current + 1)}
-            >
-              Next
-            </button>
-          </div>
-        )}
-      </div>
+          {totalPages > 1 && (
+            <div className="pager">
+              <button
+                type="button"
+                className="secondary"
+                disabled={page <= 1}
+                onClick={() => setPage((current) => current - 1)}
+              >
+                Previous
+              </button>
+              <span className="muted">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                type="button"
+                className="secondary"
+                disabled={page >= totalPages}
+                onClick={() => setPage((current) => current + 1)}
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {scrapping && <ScrapDialog job={scrapping} onClose={() => setScrapping(null)} />}
     </>

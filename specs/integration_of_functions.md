@@ -1024,7 +1024,7 @@ administrator.**
 Not a request. Follows 11.18 with the same role, the same code and the same mobile screen.
 
 **What changed.** A reported fault or scheduled job now appears straight away in the hospital
-administrator's Flutter app, and confirming it done (`POST /maintenance-schedules/{id}/confirm`) is
+administrator's Flutter app and, since 2026-09-17, on the web Maintenance unit page; confirming it done (`POST /maintenance-schedules/{id}/confirm`) is
 the only way it is completed — that is what returns the item or bed to service and closes the
 warning. `POST /maintenance-schedules/{id}/complete` was **removed**. No schema change: no migration,
 no new `MaintenanceStatus` value. Design is `equipment-management-plan.md` §6.1.

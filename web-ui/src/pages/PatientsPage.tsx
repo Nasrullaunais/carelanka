@@ -1,6 +1,5 @@
 import { Fragment, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -228,15 +227,7 @@ export function PatientsPage() {
                           </span>
                         </>
                       ) : (
-                        <span className="muted">
-                          Set at check-in
-                          {row.reason ? (
-                            <>
-                              <br />
-                              For: {row.reason}
-                            </>
-                          ) : null}
-                        </span>
+                        <span className="muted">Not recorded</span>
                       )}
                     </td>
                     <td>
@@ -376,12 +367,6 @@ function RowActions({
 
   return (
     <>
-
-      {row.status === 'not_arrived' && (
-        <Link to="/appointments" className="muted" style={{ fontSize: '0.82rem' }}>
-          Check in at the desk
-        </Link>
-      )}
 
       {row.status === 'awaiting_bed' && row.requires_bed && canAssignBed(role) && (
         <button type="button" onClick={() => onAssign('assign')}>
@@ -695,10 +680,7 @@ function AssignBedPanel({
 function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void }) {
   const patient = useQuery(getPatientOptions({ path: { id: row.patient.id } }));
 
-  const visit = useQuery({
-    ...getAdmissionOptions({ path: { id: row.id } }),
-    enabled: row.kind === 'visit',
-  });
+  const visit = useQuery(getAdmissionOptions({ path: { id: row.id } }));
 
   const liveBed = visit.data?.bed_assignments?.find(
     (assignment) => assignment.status !== 'released',
@@ -735,29 +717,10 @@ function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void 
         </table>
       )}
 
-      {row.kind === 'booking' ? (
-        <>
-          <h4 style={{ marginTop: '1.25rem', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
-            This appointment
-          </h4>
-          <table>
-            <tbody>
-              <Field label="Scheduled for">{localDateTime(row.when)}</Field>
-              <Field label="Reason" empty="Not given">
-                {row.reason}
-              </Field>
-            </tbody>
-          </table>
-          <p className="hint">
-            There is no visit record yet. Checking the patient in at the bookings desk creates
-            one, and the care level is recorded there by the member of staff at the desk.
-          </p>
-        </>
-      ) : (
-        <>
-          <h4 style={{ marginTop: '1.25rem', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
-            This visit
-          </h4>
+      <>
+        <h4 style={{ marginTop: '1.25rem', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+          This visit
+        </h4>
           {visit.isLoading && <p className="empty">Loading…</p>}
           {visit.data && (
             <table>
@@ -818,8 +781,7 @@ function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void 
               </ul>
             </>
           )}
-        </>
-      )}
+      </>
 
       <button
         type="button"

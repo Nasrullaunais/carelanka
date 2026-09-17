@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/widgets/async_data.dart';
 import '../../../core/widgets/async_view.dart';
 import '../../../core/widgets/phone_width.dart';
 import '../../../services/api_client/models/my_profile.dart';
@@ -12,14 +13,6 @@ import 'home_screen.dart';
 import 'my_stay_screen.dart';
 import 'profile_screen.dart';
 
-/// The patient area: home, appointments, stay and profile behind a bottom bar.
-///
-/// A new account has no hospital record behind it, and without one there is no
-/// stay to show and booking a visit is refused. The tabs still open - each one
-/// says why it is empty and offers the details form - because a blocking form
-/// with no way past it strands anyone who signed up with the wrong account.
-/// The record is loaded once here so each tab does not have to discover that
-/// for itself.
 class PatientShell extends StatefulWidget {
   const PatientShell({super.key});
 
@@ -30,8 +23,10 @@ class PatientShell extends StatefulWidget {
 class _PatientShellState extends State<PatientShell> {
   PatientTab _tab = PatientTab.home;
 
-  /// Home's "Book a visit" opens the sheet that Appointments owns, so the
-  /// booking flow exists once. Reaching it needs that screen's state.
+  late final ProfileController _profile;
+
+  bool? _wasLinked;
+
   final _appointmentsKey = GlobalKey<AppointmentsScreenState>();
 
   static const _bar = [
@@ -54,21 +49,59 @@ class _PatientShellState extends State<PatientShell> {
   @override
   void initState() {
     super.initState();
-    // Every tab reads from these, and Home reads from all three at once, so
-    // they are loaded here rather than by whichever screen happens to build
-    // first.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<ProfileController>().load();
       context.read<MyStayController>().load();
       context.read<AppointmentsController>().load();
     });
+
+    _profile = context.read<ProfileController>();
+    _profile.addListener(_onProfileChanged);
   }
 
-  void _openTab(PatientTab tab) => setState(() => _tab = tab);
+  @override
+  void dispose() {
+    _profile.removeListener(_onProfileChanged);
+    super.dispose();
+  }
 
-  /// Jumps to Appointments and opens the booking sheet on top of it, so the
-  /// patient lands on the list their new booking will appear in.
+  // Refetches stay/appointments once a first-time save creates the hospital record — both were fetched before it existed.
+  void _onProfileChanged() {
+    if (_profile.profile is AsyncLoading) return;
+
+    final linked = _profile.isLinked;
+    final previous = _wasLinked;
+    _wasLinked = linked;
+
+    if (previous == false && linked) {
+      context.read<MyStayController>().load();
+      context.read<AppointmentsController>().load();
+    }
+  }
+
+  // Staff change the stay from the other side of the hospital, so opening a tab refetches what
+  // that tab shows. Silently: the screen keeps what it has until the new answer arrives.
+  void _openTab(PatientTab tab) {
+    setState(() => _tab = tab);
+    _refresh(tab);
+  }
+
+  void _refresh(PatientTab tab) {
+    switch (tab) {
+      case PatientTab.home:
+        context.read<ProfileController>().load(showLoading: false);
+        context.read<MyStayController>().load(showLoading: false);
+        context.read<AppointmentsController>().load(showLoading: false);
+      case PatientTab.appointments:
+        context.read<AppointmentsController>().load(showLoading: false);
+      case PatientTab.myStay:
+        context.read<MyStayController>().load(showLoading: false);
+      case PatientTab.profile:
+        context.read<ProfileController>().load(showLoading: false);
+    }
+  }
+
   void _bookVisit() {
     setState(() => _tab = PatientTab.appointments);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -80,8 +113,6 @@ class _PatientShellState extends State<PatientShell> {
   Widget build(BuildContext context) {
     final profile = context.watch<ProfileController>();
 
-    // Wraps everything, not just the tabs — the loading state is part of the
-    // same app and should sit in the same frame.
     return PhoneWidth(
       child: AsyncView<MyProfile?>(
         state: profile.profile,

@@ -16,7 +16,9 @@ class MyAppointment {
     required this.status,
     required this.statusText,
     required this.canCancel,
+    required this.cancelledByHospital,
     this.reason,
+    this.cancellationReason,
   });
   
   factory MyAppointment.fromJson(Map<String, Object?> json) => _$MyAppointmentFromJson(json);
@@ -31,6 +33,10 @@ class MyAppointment {
   final String? reason;
   @JsonKey(name: 'can_cancel')
   final bool canCancel;
+  @JsonKey(name: 'cancellation_reason')
+  final String? cancellationReason;
+  @JsonKey(name: 'cancelled_by_hospital')
+  final bool cancelledByHospital;
 
   Map<String, Object?> toJson() => _$MyAppointmentToJson(this);
 }

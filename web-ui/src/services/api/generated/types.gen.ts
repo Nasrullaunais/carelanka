@@ -209,7 +209,14 @@ export type Appointment = {
     status: AppointmentStatus;
     reason?: string | null;
     booked_by_staff_id?: string | null;
+    confirmed_at?: string | null;
+    confirmed_by_staff_id?: string | null;
     admission_id?: string | null;
+    cancellation_reason?: string | null;
+    cancelled_by_staff_id?: string | null;
+    can_confirm: boolean;
+    can_cancel: boolean;
+    can_complete: boolean;
     created_at?: string;
     updated_at?: string;
 };
@@ -222,7 +229,7 @@ export type AppointmentPagedResult = {
     total_pages: number;
 };
 
-export type AppointmentStatus = 'scheduled' | 'checked_in' | 'completed' | 'cancelled' | 'no_show';
+export type AppointmentStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
 
 export type AssetType = 'equipment_item' | 'bed';
 
@@ -309,7 +316,8 @@ export type BedPagedResult = {
 
 export type Bill = {
     id: string;
-    admission_id: string;
+    admission_id?: string | null;
+    appointment_id?: string | null;
     bill_number: string;
     currency: string;
     lines: Array<BillLine>;
@@ -335,7 +343,7 @@ export type BillLine = {
     line_total: number;
 };
 
-export type BillLineSource = 'admission_fee' | 'bed_stay' | 'manual';
+export type BillLineSource = 'admission_fee' | 'bed_stay' | 'consultation_fee' | 'manual';
 
 export type BillingRateBook = {
     wards: Array<WardRates>;
@@ -359,6 +367,10 @@ export type CancelAdmissionRequest = {
 
 export type CancelDispatchRequest = {
     reason?: string | null;
+};
+
+export type CancelAppointmentRequest = {
+    reason: string;
 };
 
 export type CancelReason = 'diverted_to_other_hospital' | 'false_alarm' | 'died_en_route' | 'patient_refused' | 'no_show';
@@ -840,6 +852,8 @@ export type MyAppointment = {
     status_text: string;
     reason?: string | null;
     can_cancel: boolean;
+    cancellation_reason?: string | null;
+    cancelled_by_hospital: boolean;
 };
 
 export type MyAppointmentPagedResult = {
@@ -1275,11 +1289,8 @@ export type WarningStatus = 'open' | 'acknowledged' | 'action_taken' | 'dismisse
 
 export type WarningType = 'low_stock' | 'medicine_expiring' | 'maintenance_overdue' | 'equipment_faulty';
 
-export type WorklistKind = 'booking' | 'visit';
-
 export type WorklistRow = {
     id: string;
-    kind: WorklistKind;
     patient: PatientSummary;
     status: WorklistStatus;
     requires_bed: boolean;
@@ -1289,7 +1300,6 @@ export type WorklistRow = {
     ward_name?: string | null;
     bed_number?: string | null;
     when: string;
-    reason?: string | null;
 };
 
 export type WorklistRowPagedResult = {
@@ -1300,7 +1310,7 @@ export type WorklistRowPagedResult = {
     total_pages: number;
 };
 
-export type WorklistStatus = 'not_arrived' | 'awaiting_bed' | 'bed_ready' | 'admitted' | 'completed' | 'cancelled';
+export type WorklistStatus = 'awaiting_bed' | 'bed_ready' | 'admitted' | 'completed' | 'cancelled';
 
 export type ListAdmissionsData = {
     body?: never;
@@ -1750,6 +1760,84 @@ export type CreateAppointmentResponses = {
 
 export type CreateAppointmentResponse = CreateAppointmentResponses[keyof CreateAppointmentResponses];
 
+export type ConfirmAppointmentData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/appointments/{id}/confirm';
+};
+
+export type ConfirmAppointmentErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ConfirmAppointmentError = ConfirmAppointmentErrors[keyof ConfirmAppointmentErrors];
+
+export type ConfirmAppointmentResponses = {
+    /**
+     * OK
+     */
+    200: Appointment;
+};
+
+export type ConfirmAppointmentResponse = ConfirmAppointmentResponses[keyof ConfirmAppointmentResponses];
+
+export type MarkAppointmentNoShowData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/appointments/{id}/no-show';
+};
+
+export type MarkAppointmentNoShowErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type MarkAppointmentNoShowError = MarkAppointmentNoShowErrors[keyof MarkAppointmentNoShowErrors];
+
+export type MarkAppointmentNoShowResponses = {
+    /**
+     * OK
+     */
+    200: Appointment;
+};
+
+export type MarkAppointmentNoShowResponse = MarkAppointmentNoShowResponses[keyof MarkAppointmentNoShowResponses];
+
 export type CheckInAppointmentData = {
     body?: CheckInRequest;
     path: {
@@ -1792,6 +1880,88 @@ export type CheckInAppointmentResponses = {
 };
 
 export type CheckInAppointmentResponse = CheckInAppointmentResponses[keyof CheckInAppointmentResponses];
+
+export type CancelAppointmentAtTheDeskData = {
+    body?: CancelAppointmentRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/appointments/{id}/cancel';
+};
+
+export type CancelAppointmentAtTheDeskErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CancelAppointmentAtTheDeskError = CancelAppointmentAtTheDeskErrors[keyof CancelAppointmentAtTheDeskErrors];
+
+export type CancelAppointmentAtTheDeskResponses = {
+    /**
+     * OK
+     */
+    200: Appointment;
+};
+
+export type CancelAppointmentAtTheDeskResponse = CancelAppointmentAtTheDeskResponses[keyof CancelAppointmentAtTheDeskResponses];
+
+export type CompleteAppointmentData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/appointments/{id}/complete';
+};
+
+export type CompleteAppointmentErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CompleteAppointmentError = CompleteAppointmentErrors[keyof CompleteAppointmentErrors];
+
+export type CompleteAppointmentResponses = {
+    /**
+     * OK
+     */
+    200: Appointment;
+};
+
+export type CompleteAppointmentResponse = CompleteAppointmentResponses[keyof CompleteAppointmentResponses];
 
 export type ListPatientWorklistData = {
     body?: never;
@@ -2805,6 +2975,206 @@ export type ListOutstandingBillsResponses = {
 };
 
 export type ListOutstandingBillsResponse = ListOutstandingBillsResponses[keyof ListOutstandingBillsResponses];
+
+export type GetAppointmentBillData = {
+    body?: never;
+    path: {
+        appointmentId: string;
+    };
+    query?: never;
+    url: '/appointments/{appointmentId}/bill';
+};
+
+export type GetAppointmentBillErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetAppointmentBillError = GetAppointmentBillErrors[keyof GetAppointmentBillErrors];
+
+export type GetAppointmentBillResponses = {
+    /**
+     * OK
+     */
+    200: Bill;
+};
+
+export type GetAppointmentBillResponse = GetAppointmentBillResponses[keyof GetAppointmentBillResponses];
+
+export type PrepareAppointmentBillData = {
+    body?: never;
+    path: {
+        appointmentId: string;
+    };
+    query?: never;
+    url: '/appointments/{appointmentId}/bill';
+};
+
+export type PrepareAppointmentBillErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type PrepareAppointmentBillError = PrepareAppointmentBillErrors[keyof PrepareAppointmentBillErrors];
+
+export type PrepareAppointmentBillResponses = {
+    /**
+     * OK
+     */
+    200: Bill;
+};
+
+export type PrepareAppointmentBillResponse = PrepareAppointmentBillResponses[keyof PrepareAppointmentBillResponses];
+
+export type AddAppointmentBillChargeData = {
+    body?: AddBillChargeRequest;
+    path: {
+        appointmentId: string;
+    };
+    query?: never;
+    url: '/appointments/{appointmentId}/bill/charges';
+};
+
+export type AddAppointmentBillChargeErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type AddAppointmentBillChargeError = AddAppointmentBillChargeErrors[keyof AddAppointmentBillChargeErrors];
+
+export type AddAppointmentBillChargeResponses = {
+    /**
+     * OK
+     */
+    200: Bill;
+};
+
+export type AddAppointmentBillChargeResponse = AddAppointmentBillChargeResponses[keyof AddAppointmentBillChargeResponses];
+
+export type RemoveAppointmentBillChargeData = {
+    body?: never;
+    path: {
+        appointmentId: string;
+        lineId: string;
+    };
+    query?: never;
+    url: '/appointments/{appointmentId}/bill/charges/{lineId}';
+};
+
+export type RemoveAppointmentBillChargeErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RemoveAppointmentBillChargeError = RemoveAppointmentBillChargeErrors[keyof RemoveAppointmentBillChargeErrors];
+
+export type RemoveAppointmentBillChargeResponses = {
+    /**
+     * OK
+     */
+    200: Bill;
+};
+
+export type RemoveAppointmentBillChargeResponse = RemoveAppointmentBillChargeResponses[keyof RemoveAppointmentBillChargeResponses];
+
+export type SettleAppointmentBillData = {
+    body?: SettleBillRequest;
+    path: {
+        appointmentId: string;
+    };
+    query?: never;
+    url: '/appointments/{appointmentId}/bill/settle';
+};
+
+export type SettleAppointmentBillErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type SettleAppointmentBillError = SettleAppointmentBillErrors[keyof SettleAppointmentBillErrors];
+
+export type SettleAppointmentBillResponses = {
+    /**
+     * OK
+     */
+    200: Bill;
+};
+
+export type SettleAppointmentBillResponse = SettleAppointmentBillResponses[keyof SettleAppointmentBillResponses];
 
 export type GetBillingRatesData = {
     body?: never;

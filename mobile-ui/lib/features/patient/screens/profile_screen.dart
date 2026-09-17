@@ -31,9 +31,8 @@ class ProfileScreen extends StatelessWidget {
             NoticeBanner(
               icon: Icons.badge_outlined,
               accent: scheme.warning,
-              title: 'No hospital record yet',
-              body: 'Your login is not joined to a hospital record, so there '
-                  'is nothing to show here yet.',
+              title: 'No hospital record',
+              body: 'Add your details to create your hospital record.',
               action: FilledButton(
                 onPressed: () => openMyDetails(context, profileController),
                 style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
@@ -48,7 +47,7 @@ class ProfileScreen extends StatelessWidget {
               NoticeBanner(
                 icon: Icons.info_outline,
                 accent: scheme.warning,
-                title: 'Some details are still missing',
+                title: 'Incomplete details',
                 bullets: profile.missingFields.map(prettyFieldName).toList(),
                 action: OutlinedButton(
                   onPressed: () => openMyDetails(context, profileController),
@@ -98,7 +97,7 @@ class ProfileScreen extends StatelessWidget {
                 ListTile(
                   leading: const Icon(Icons.history),
                   title: const Text('Past visits'),
-                  subtitle: const Text('Stays that have finished'),
+                  subtitle: const Text('Completed stays'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.of(
                     context,
@@ -119,9 +118,6 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-/// The header for an account with no record behind it. `display_name` is the
-/// username at this point - the account is created before any medical record
-/// exists, so there is no person's name to show.
 class _AccountOnlyHeader extends StatelessWidget {
   const _AccountOnlyHeader();
 
@@ -236,7 +232,7 @@ class _EmergencyContact extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Nobody is listed. The ward would have no one to call.',
+              'No emergency contact has been added.',
               style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
             ),
             const SizedBox(height: 14),

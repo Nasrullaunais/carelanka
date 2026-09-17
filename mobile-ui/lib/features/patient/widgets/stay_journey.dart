@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../services/api_client/models/admission_status.dart';
 
-/// One stop on the way through a hospital stay.
 enum JourneyStep {
   waitingForBed('Waiting for a bed', 'Reception is finding you a bed', Icons.hourglass_empty_rounded),
   bedReady('Bed ready', 'A bed is being held for you', Icons.bed_outlined),
@@ -17,23 +16,15 @@ enum JourneyStep {
   final IconData icon;
 }
 
-/// Where the patient is, and whether the stay ended early.
 class StayJourney {
   const StayJourney({required this.reached, required this.cancelled});
 
-  /// The step the patient is standing on. Null only when the stay was called
-  /// off before it started.
+  // Null only when the stay was cancelled before it started.
   final JourneyStep? reached;
 
   final bool cancelled;
 
-  /// The four steps come from `patient-spec.yaml`'s own `WorklistStatus`
-  /// grouping of the seven stored states — the same folding the ward board
-  /// uses, so the patient and the ward are reading one journey, not two.
-  ///
-  /// `awaiting_approval` sits with `awaiting_bed`, and `ready_for_discharge`
-  /// with `admitted`, because in both cases nothing has changed about where the
-  /// patient physically is.
+  // Folds the seven stored AdmissionStatus values into WorklistStatus's four patient-facing steps (patient-spec.yaml), same as the ward board.
   factory StayJourney.of(AdmissionStatus status) {
     return switch (status) {
       AdmissionStatus.awaitingBed ||
@@ -57,8 +48,6 @@ class StayJourney {
   bool isCurrent(JourneyStep step) => step == reached;
 }
 
-/// The journey drawn as a rail, so "where am I up to" is one glance rather
-/// than a sentence that has to be decoded.
 class StayJourneyTracker extends StatelessWidget {
   const StayJourneyTracker({super.key, required this.journey});
 

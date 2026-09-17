@@ -63,8 +63,7 @@ class _PatientLoginScreenState extends State<PatientLoginScreen> {
                 label: 'Username',
                 enabled: !_busy,
                 keyboardType: TextInputType.text,
-                // Deliberately only checked for emptiness. Anything more tells
-                // a stranger what a valid username looks like.
+                // Only checked for emptiness — anything more tells a stranger what a valid username looks like.
                 validator: (value) => (value == null || value.trim().isEmpty)
                     ? 'Enter your username'
                     : null,

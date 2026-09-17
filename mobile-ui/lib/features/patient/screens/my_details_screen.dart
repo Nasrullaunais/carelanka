@@ -6,13 +6,9 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/friendly_date.dart';
 import '../../../services/api_client/models/gender.dart';
 import '../state/profile_controller.dart';
+import '../validation/patient_fields.dart';
 import '../widgets/panels.dart';
 
-/// The details the hospital needs before it can treat you.
-///
-/// Always pushed on top of something, so it always has a way back out. Whether
-/// it reads as first-time setup or as a correction comes from whether the
-/// account has a record yet, not from a flag a caller could get wrong.
 class MyDetailsScreen extends StatefulWidget {
   const MyDetailsScreen({super.key});
 
@@ -30,11 +26,12 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
   final _emergencyName = TextEditingController();
   final _emergencyPhone = TextEditingController();
 
-  /// Null until picked. The form only offers male and female, so a record
-  /// carrying anything else starts blank rather than showing a value the
-  /// dropdown cannot display.
   Gender? _gender;
   DateTime? _dateOfBirth;
+
+  // Off until the first submit, then on: errors appear when the form is sent, and clear as each
+  // field is fixed rather than sitting there red until the next submit.
+  bool _submitted = false;
 
   @override
   void initState() {
@@ -73,6 +70,8 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
   }
 
   Future<void> _submit() async {
+    setState(() => _submitted = true);
+
     if (!_formKey.currentState!.validate()) return;
 
     final controller = context.read<ProfileController>();
@@ -90,9 +89,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     if (!mounted) return;
 
     if (!saved) {
-      // Field errors are already rendered under the fields they belong to.
-      // Toasting "One or more fields are not valid" on top of them names
-      // nothing and hides the field that does.
+      // Field errors already render under their fields — only toast when there's no field to blame.
       if (controller.fieldErrors.isEmpty) {
         final message = controller.saveError?.message ?? 'Could not save your details.';
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
@@ -102,7 +99,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
 
     Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Your details are saved.')),
+      const SnackBar(content: Text('Your details have been saved.')),
     );
   }
 
@@ -114,10 +111,12 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     final scheme = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: Text(_firstTime ? 'Finish setting up' : 'My details')),
+      appBar: AppBar(title: Text(_firstTime ? 'Add my details' : 'My details')),
       body: SafeArea(
         child: Form(
           key: _formKey,
+          autovalidateMode:
+              _submitted ? AutovalidateMode.onUserInteraction : AutovalidateMode.disabled,
           child: ListView(
             padding: const EdgeInsets.fromLTRB(
               AppTheme.gutter,
@@ -128,11 +127,10 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
             children: [
               if (_firstTime) ...[
                 NoticeBanner(
-                  icon: Icons.waving_hand_outlined,
+                  icon: Icons.assignment_ind_outlined,
                   accent: scheme.primary,
-                  title: 'Your account is ready',
-                  body: 'The hospital needs a few details before you can book a '
-                      'visit or follow a stay.',
+                  title: 'Complete your registration',
+                  body: 'These details are required before you can book a visit.',
                 ),
                 const SizedBox(height: 20),
               ],
@@ -145,16 +143,17 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                       controller: _fullName,
                       label: 'Full name',
                       enabled: !controller.saving,
+                      maxLength: PatientFieldLimits.fullName,
                       serverErrors: errors['full_name'],
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Enter your full name' : null,
+                      validator: validateFullName,
                     ),
                     _Field(
                       controller: _nic,
                       label: 'NIC',
                       enabled: !controller.saving,
+                      maxLength: PatientFieldLimits.nic,
                       serverErrors: errors['nic'],
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter your NIC' : null,
+                      validator: validateNic,
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<Gender>(
@@ -191,6 +190,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                       label: 'Phone',
                       enabled: !controller.saving,
                       keyboardType: TextInputType.phone,
+                      maxLength: PatientFieldLimits.phone,
                       serverErrors: errors['phone'],
                       validator: validatePhoneNumber,
                     ),
@@ -198,7 +198,9 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                       controller: _address,
                       label: 'Address (optional)',
                       enabled: !controller.saving,
+                      maxLength: PatientFieldLimits.address,
                       serverErrors: errors['address'],
+                      validator: validateAddress,
                     ),
                   ],
                 ),
@@ -211,8 +213,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Who the ward should call if something happens while you '
-                      'are here.',
+                      'Who the hospital should contact in an emergency.',
                       style: theme.textTheme.bodySmall
                           ?.copyWith(color: scheme.onSurfaceVariant),
                     ),
@@ -221,16 +222,17 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                       controller: _emergencyName,
                       label: 'Name (optional)',
                       enabled: !controller.saving,
+                      maxLength: PatientFieldLimits.contactName,
                       serverErrors: errors['emergency_contact_name'],
+                      validator: validateContactName,
                     ),
                     _Field(
                       controller: _emergencyPhone,
                       label: 'Phone (optional)',
                       enabled: !controller.saving,
                       keyboardType: TextInputType.phone,
+                      maxLength: PatientFieldLimits.phone,
                       serverErrors: errors['emergency_contact_phone'],
-                      // Optional, but a number in the wrong shape is worse than
-                      // none — nobody finds out until the ward has to call it.
                       validator: (v) =>
                           (v == null || v.trim().isEmpty) ? null : validatePhoneNumber(v),
                     ),
@@ -253,13 +255,10 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
   }
 }
 
-/// The server's own validation message, shown against the field it belongs to
-/// rather than in a toast the reader has to map back.
 String? _firstError(List<String>? serverErrors) =>
     (serverErrors == null || serverErrors.isEmpty) ? null : serverErrors.first;
 
-/// What the patient form offers. The wire enum also carries `other` and
-/// `unknown` for records created by staff, so [genderLabel] still handles them.
+// The wire enum also carries `other`/`unknown` for records staff created — genderLabel below still has to handle them.
 const _offeredGenders = [Gender.male, Gender.female];
 
 String genderLabel(Gender gender) => switch (gender) {
@@ -270,10 +269,6 @@ String genderLabel(Gender gender) => switch (gender) {
       Gender.$unknown => 'Unknown',
     };
 
-/// `emergency_contact_phone` → `Emergency contact phone`.
-///
-/// `missing_fields` arrives as wire names, because the server is naming its own
-/// columns. Showing them raw makes the app look like a database browser.
 String prettyFieldName(String wireName) {
   final words = wireName.split('_').where((w) => w.isNotEmpty).toList();
   if (words.isEmpty) return wireName;
@@ -291,8 +286,6 @@ String initialsOf(String name) {
   return (parts.first.characters.first + parts.last.characters.first).toUpperCase();
 }
 
-/// The form reads and writes the same controller the calling screen watches, so
-/// it has to be carried across into the pushed route.
 void openMyDetails(BuildContext context, ProfileController controller) {
   Navigator.of(context).push(MaterialPageRoute(
     builder: (_) => ChangeNotifierProvider<ProfileController>.value(
@@ -302,9 +295,6 @@ void openMyDetails(BuildContext context, ProfileController controller) {
   ));
 }
 
-/// A date picker that behaves like the text fields around it: same box, same
-/// floating label, and its "required" message lands under the box rather than
-/// in a snack bar, so `Form.validate()` covers it like any other field.
 class _DateOfBirthField extends StatelessWidget {
   const _DateOfBirthField({
     required this.value,
@@ -356,6 +346,7 @@ class _Field extends StatelessWidget {
     required this.enabled,
     this.validator,
     this.keyboardType,
+    this.maxLength,
     this.serverErrors,
   });
 
@@ -364,6 +355,7 @@ class _Field extends StatelessWidget {
   final bool enabled;
   final String? Function(String?)? validator;
   final TextInputType? keyboardType;
+  final int? maxLength;
   final List<String>? serverErrors;
 
   @override
@@ -374,6 +366,8 @@ class _Field extends StatelessWidget {
         controller: controller,
         enabled: enabled,
         keyboardType: keyboardType,
+        maxLength: maxLength,
+        buildCounter: nearLimitCounter(),
         decoration: InputDecoration(
           labelText: label,
           errorText: _firstError(serverErrors),

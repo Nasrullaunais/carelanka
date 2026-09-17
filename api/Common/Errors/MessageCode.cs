@@ -128,5 +128,7 @@ public enum MessageCode
 
     AccountHasNoPatientRecord,
 
-    NoCurrentAdmission
+    NoCurrentAdmission,
+
+    AppointmentBilledOnItsAdmission
 }

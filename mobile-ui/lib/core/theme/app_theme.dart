@@ -1,14 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// The look of the whole app, in one place.
-///
-/// Shared, so a screen never hard-codes a colour or a corner radius. If you
-/// find yourself writing `Color(0x...)` in a feature, the value belongs here.
 class AppTheme {
   const AppTheme._();
 
-  /// A calm blue-green. Hospital apps avoid red and orange as brand colours —
-  /// those have to stay free to mean "urgent" wherever they appear.
   static const _seed = Color(0xFF00695C);
 
   static ThemeData get light => _build(Brightness.light);
@@ -118,31 +112,17 @@ class AppTheme {
   static const radiusL = 16.0;
   static const radiusXL = 24.0;
 
-  /// The gutter every screen uses down both edges.
   static const gutter = 20.0;
 }
 
-/// Colours that carry a meaning rather than a brand.
-///
-/// Deliberately short. This app has **three** signals beyond the brand teal:
-/// something needs you (amber), something went wrong (the scheme's own error
-/// red), and something is finished (grey). Everything else is teal or neutral.
-///
-/// A blue "info" colour was tried and removed — sitting next to teal it read as
-/// a second brand colour, and a reader cannot tell two accent colours apart if
-/// neither is obviously more urgent. Where information needs highlighting,
-/// use `primary` on a neutral surface.
+// Deliberately three signals only: warning (amber), error (scheme red) and muted (grey) — a blue "info" accent was tried and dropped as indistinguishable from the brand teal.
 extension StatusColors on ColorScheme {
-  /// Waiting on somebody, or missing something. The only colour in the app
-  /// that competes with the brand for attention, so it is used sparingly.
   Color get warning =>
       brightness == Brightness.light ? const Color(0xFF8A5A00) : const Color(0xFFE8BE7E);
 
-  /// A tint, not a slab — meant to sit behind an icon, not a whole card.
   Color get warningSurface =>
       brightness == Brightness.light ? const Color(0xFFFBF2E3) : const Color(0xFF3A2606);
 
-  /// Done, closed, historical. Deliberately colourless.
   Color get muted => onSurfaceVariant;
 
   Color get mutedSurface => surfaceContainerHighest;

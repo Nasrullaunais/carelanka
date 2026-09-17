@@ -304,10 +304,13 @@ public sealed class MeService : IMeService
             AppointmentId = appointment.Id,
             ScheduledAt = appointment.ScheduledAt,
             Status = appointment.Status,
-            StatusText = PatientStatusText.For(appointment.Status),
+            StatusText = PatientStatusText.For(
+                appointment.Status, appointment.CancelledByStaffMemberId is not null),
             Reason = appointment.Reason,
 
-            CanCancel = appointment.Status == AppointmentStatus.Scheduled
+            CanCancel = appointment.Status == AppointmentStatus.Scheduled,
+            CancellationReason = appointment.CancellationReason,
+            CancelledByHospital = appointment.CancelledByStaffMemberId is not null
         };
 
     private static MyProfile ToProfile(PatientEntity patient)

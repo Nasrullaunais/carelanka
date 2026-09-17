@@ -71,6 +71,7 @@ export 'models/book_appointment_request.dart';
 export 'models/call_priority.dart';
 export 'models/call_status.dart';
 export 'models/cancel_admission_request.dart';
+export 'models/cancel_appointment_request.dart';
 export 'models/cancel_dispatch_request.dart';
 export 'models/cancel_reason.dart';
 export 'models/cancellation_request_status.dart';
@@ -196,4 +197,3 @@ export 'models/worklist_status.dart';
 export 'models/sort_dir.dart';
 // Root client
 export 'care_lanka_api.dart';
-

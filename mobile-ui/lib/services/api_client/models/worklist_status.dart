@@ -6,8 +6,6 @@ import 'package:json_annotation/json_annotation.dart';
 
 @JsonEnum()
 enum WorklistStatus {
-  @JsonValue('not_arrived')
-  notArrived('not_arrived'),
   @JsonValue('awaiting_bed')
   awaitingBed('awaiting_bed'),
   @JsonValue('bed_ready')

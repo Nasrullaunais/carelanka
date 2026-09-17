@@ -6,5 +6,7 @@ public enum BillLineSource
 
     BedStay,
 
+    ConsultationFee,
+
     Manual
 }

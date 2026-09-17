@@ -3,12 +3,14 @@ import type { BillLineSource } from '../services/api/generated';
 export const billLineSourceLabels: Record<BillLineSource, string> = {
   admission_fee: 'Admission fee',
   bed_stay: 'Bed',
+  consultation_fee: 'Consultation fee',
   manual: 'Added manually',
 };
 
 export const billLineSourceHints: Record<BillLineSource, string> = {
   admission_fee: 'Worked out from the care level recorded by a clinician.',
   bed_stay: 'Worked out from the time the patient spent in that bed.',
+  consultation_fee: 'The standard charge for being seen at a booked appointment.',
   manual: 'Entered by hand. Nothing in the system records treatments against an admission.',
 };
 
@@ -89,7 +91,10 @@ export type ChargeTemplate = {
   defaultQuantity: number;
 };
 
-export const chargeTemplates: ChargeTemplate[] = [
+/// Meals, ward medicine and transport home only make sense once someone is actually
+/// staying — offering them on an appointment bill is what let "Meals" sit as the default
+/// charge type for a patient who was only ever seen at a desk and sent home.
+const stayOnlyTemplates: ChargeTemplate[] = [
   {
     key: 'food',
     label: 'Meals',
@@ -107,6 +112,26 @@ export const chargeTemplates: ChargeTemplate[] = [
     defaultQuantity: 1,
   },
   {
+    key: 'transport',
+    label: 'Transport home',
+    hint: 'Charged only when the hospital arranges it. A patient collected by family is not charged.',
+    unitPrice: 3500,
+    quantityLabel: 'Trips',
+    defaultQuantity: 1,
+  },
+];
+
+/// Charges that make sense whether or not the patient was ever admitted.
+const commonTemplates: ChargeTemplate[] = [
+  {
+    key: 'tests',
+    label: 'Blood test, scan or X-ray',
+    hint: 'Blood work, imaging and anything sent to a lab. Name the test in the description.',
+    unitPrice: 3500,
+    quantityLabel: 'Tests',
+    defaultQuantity: 1,
+  },
+  {
     key: 'therapy',
     label: 'Therapy',
     hint: 'Physiotherapy and similar, per session attended.',
@@ -115,24 +140,8 @@ export const chargeTemplates: ChargeTemplate[] = [
     defaultQuantity: 1,
   },
   {
-    key: 'tests',
-    label: 'Tests and scans',
-    hint: 'X-rays, blood work and anything sent to a lab. Name the test in the description.',
-    unitPrice: 3500,
-    quantityLabel: 'Tests',
-    defaultQuantity: 1,
-  },
-  {
-    key: 'transport',
-    label: 'Transport home',
-    hint: 'Charged only when the hospital arranges it. A patient collected by family is not charged.',
-    unitPrice: 3500,
-    quantityLabel: 'Trips',
-    defaultQuantity: 1,
-  },
-  {
     key: 'take_home_medicine',
-    label: 'Take-home medicine',
+    label: 'Medicine to take home',
     hint: 'Medicine the patient leaves with. The line on the bill is the only record of it.',
     unitPrice: null,
     quantityLabel: 'Items',
@@ -148,6 +157,14 @@ export const chargeTemplates: ChargeTemplate[] = [
   },
 ];
 
-export function chargeTemplate(key: string): ChargeTemplate {
-  return chargeTemplates.find((template) => template.key === key) ?? chargeTemplates[0];
+export const admissionChargeTemplates: ChargeTemplate[] = [...commonTemplates, ...stayOnlyTemplates];
+export const appointmentChargeTemplates: ChargeTemplate[] = commonTemplates;
+
+export function chargeTemplatesFor(forAppointment: boolean): ChargeTemplate[] {
+  return forAppointment ? appointmentChargeTemplates : admissionChargeTemplates;
+}
+
+export function chargeTemplate(key: string, forAppointment: boolean): ChargeTemplate {
+  const templates = chargeTemplatesFor(forAppointment);
+  return templates.find((template) => template.key === key) ?? templates[0];
 }

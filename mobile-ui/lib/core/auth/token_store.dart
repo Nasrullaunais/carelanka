@@ -1,7 +1,5 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// Holds the JWT pair in the platform's encrypted store — Keystore on Android,
-/// Keychain on iOS. Never in plain preferences.
 class TokenStore {
   TokenStore([FlutterSecureStorage? storage])
       : _storage = storage ?? const FlutterSecureStorage();
@@ -13,8 +11,6 @@ class TokenStore {
 
   String? _cachedAccess;
 
-  /// Read synchronously by the request interceptor, so it is kept in memory
-  /// after the first load rather than hitting the keystore on every call.
   String? get cachedAccessToken => _cachedAccess;
 
   Future<String?> readAccessToken() async {

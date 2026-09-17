@@ -83,7 +83,7 @@ void main() {
   testWidgets('home asks for the details instead of rendering blank', (tester) async {
     await pumpUnlinked(tester, HomeScreen(onOpenTab: (_) {}));
 
-    expect(find.text('Finish setting up'), findsOneWidget);
+    expect(find.text('Complete your registration'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Add my details'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -95,7 +95,7 @@ void main() {
     // cannot tell "no visits yet" from "no record" by the list alone.
     expect(find.byType(FloatingActionButton), findsNothing);
     expect(find.text('Book a visit'), findsNothing);
-    expect(find.text('Finish setting up first'), findsOneWidget);
+    expect(find.text('Complete your details'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -105,7 +105,7 @@ void main() {
     // The escape hatch. Signing up on the wrong account has to be undoable
     // without reinstalling the app.
     expect(find.text('Sign out'), findsOneWidget);
-    expect(find.text('No hospital record yet'), findsOneWidget);
+    expect(find.text('No hospital record'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

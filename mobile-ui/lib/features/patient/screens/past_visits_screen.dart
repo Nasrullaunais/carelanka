@@ -41,9 +41,8 @@ class _PastVisitsView extends StatelessWidget {
           if (visits.isEmpty) {
             return const EmptyView(
               icon: Icons.history,
-              title: 'No finished visits',
-              message: 'Once a stay ends it moves here, with whatever the ward '
-                  'sent you home with.',
+              title: 'No past visits',
+              message: 'Completed stays will appear here.',
             );
           }
 

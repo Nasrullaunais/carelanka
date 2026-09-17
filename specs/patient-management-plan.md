@@ -1356,25 +1356,43 @@ There is a demo cost to removing them too. Our emergency path leans on the contr
 
 **Built 2026-09-11: the staff three.** `GET /api/appointments`, `POST /api/appointments` and `POST /api/appointments/{id}/check-in` are live, with 24 tests. The three `/me/*` ones are still contract only — this heading said "Built" of all six before any of them existed, which was a description of the design and read as a description of the code.
 
-The care level is still set by staff at check-in, never by the patient at booking time — the same rule every other admission path follows. **A ward nurse may set `outpatient`, `day_case` or `inpatient`; `icu` and `hdu` are the duty manager's** and a nurse asking for either is a 403 carrying `cl_pat_011`. That rule reads the request body rather than the route, so it is a check in `AppointmentService` and not a policy on the action.
+**The desk confirms a booking before anything else happens to it** *(added 2026-09-15)*.
+`POST /appointments/{id}/confirm` moves `scheduled` -> `confirmed`, and admitting, recording
+the patient as seen, and marking them as never having come all 409 without it.
 
-### The patients board is two tables, not one
+**The problem it fixes, in one sentence:** the desk had one button, "check in and admit",
+sitting beside a booking three weeks out — and pressing it created an admission and started
+a bed search for somebody who was not in the building. Reading a booking and taking delivery
+of a patient are days apart, so they are two actions.
 
-**Built 2026-09-11.** `GET /api/patient-worklist`, with `WorklistRow`, `WorklistKind` and
-`WorklistStatus`.
+`checked_in` went at the same time. A booking is `completed` whichever way it ended, and
+`admission_id` says which: null for seen-and-went-home, set for admitted. That is also the
+guard on double billing — `POST /appointments/{id}/bill` is 409 `cl_pat_035` once it is set,
+because an admitted patient is billed on the admission at discharge.
 
-**The problem, in one sentence:** an `Admission` is created by *arriving*, so a list of
-admissions can never say "not arrived" about anybody. The patient who booked a scan for eleven
-was invisible on the patients screen until she walked through the door, and the desk had to
-read a second screen to find her.
+`POST /appointments/{id}/no-show` fills in the last hole: `no_show` existed in the enum from
+the start and nothing could ever write it. The desk presses it; nothing flips overnight,
+because there is no scheduled job in this application and a status that changed by itself
+with no process behind it would be a lie in the audit trail.
 
-So the board unions the two tables that between them describe a person's business with the
-hospital: **scheduled `Appointment`s** and **`Admission`s**. A booking that has been checked in
-is terminal at `checked_in` and is left out — its admission stands for it — so a booking
-*becomes* a visit on the board rather than appearing beside it. One row per person, never two.
+The care level is still set by staff at check-in, never by the patient at booking time — the same rule every other admission path follows. **A ward nurse or reception may set `outpatient`, `day_case` or `inpatient`; `icu` and `hdu` are the duty manager's** and anyone else asking for either is a 403 carrying `cl_pat_011`. That rule reads the request body rather than the route, so it is a check in `AppointmentService` and not a policy on the action.
 
-`WorklistStatus` is **derived and never stored.** It is a reading of `AppointmentStatus` or
-`AdmissionStatus`, and nothing transitions between its values: the transition rules stay on
+### The patients board is everyone who is here
+
+**Built 2026-09-11 as two tables. Narrowed to one on 2026-09-15.**
+`GET /api/patient-worklist`, with `WorklistRow` and `WorklistStatus`.
+
+It used to union scheduled `Appointment`s with `Admission`s, so the desk could see a patient
+before she walked through the door. **That was the wrong screen for it.** The same person sat
+on two lists, and the booking half fell off this one halfway through: complete a booking and
+it stopped being `scheduled`, had no admission behind it, and simply vanished.
+
+So bookings went back where they belong — `GET /appointments`, the screen that has the buttons
+for them — and this board is now exactly the `Admission` table: **everyone physically in the
+hospital's care.** `WorklistKind`, `not_arrived` and the row's `reason` went with them.
+
+`WorklistStatus` is **derived and never stored.** It is a reading of `AdmissionStatus` in the
+words a nurse uses, and nothing transitions between its values: the transition rules stay on
 `AdmissionStatus`, which is the authoritative one, and every write still goes to the endpoint
 that owns the row. There is no `PATCH /patient-worklist` and there will not be one.
 

@@ -65,8 +65,18 @@ export function canEditAdmissions(role: PrincipalRole | undefined): boolean {
   return role === 'ward_nurse' || role === 'duty_manager';
 }
 
+/// Reception is on this on purpose: booking, checking in, calling off and
+/// recording a visit as seen is front-desk work, and the desk is who the
+/// patient walks up to.
 export function canWorkAppointmentDesk(role: PrincipalRole | undefined): boolean {
-  return role === 'ward_nurse' || role === 'duty_manager';
+  return role === 'ward_nurse' || role === 'general_staff' || role === 'duty_manager';
+}
+
+/// Who may open the bookings list. Wider than who may act on a booking: the
+/// billing desk has to reach a finished appointment to bill it, but cannot
+/// check anyone in. Mirrors `canOpenDischargeBoard`.
+export function canOpenAppointmentBoard(role: PrincipalRole | undefined): boolean {
+  return canWorkAppointmentDesk(role) || canWorkBillingDesk(role);
 }
 
 export function canSetHighCareLevel(role: PrincipalRole | undefined): boolean {
@@ -108,12 +118,20 @@ export function canWorkBillingDesk(role: PrincipalRole | undefined): boolean {
   );
 }
 
+/// An outpatient bill, not an admission one. Wider by the ward nurse: the
+/// patient walks in and out the same day, so whoever records the visit as seen
+/// is who takes the money for it. Settling an admission bill ticks the
+/// discharge checklist and stays reception's alone.
+export function canBillAppointment(role: PrincipalRole | undefined): boolean {
+  return canWorkBillingDesk(role) || role === 'ward_nurse';
+}
+
 export function canCompleteVisit(role: PrincipalRole | undefined): boolean {
   return role === 'ward_nurse' || role === 'duty_manager';
 }
 
 export function canMarkArrived(role: PrincipalRole | undefined): boolean {
-  return role === 'ward_nurse';
+  return role === 'ward_nurse' || role === 'general_staff' || role === 'duty_manager';
 }
 
 export function canReadCapacity(role: PrincipalRole | undefined): boolean {

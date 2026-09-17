@@ -17,15 +17,9 @@ import '../widgets/patient_id_card.dart';
 import 'my_details_screen.dart';
 import 'past_visits_screen.dart';
 
-/// The screen the patient opens the app to.
-///
-/// One question gets answered above the fold: *what is happening to me right
-/// now?* Everything else is below it.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key, required this.onOpenTab});
 
-  /// Jumps to one of the shell's other tabs. Home is a summary — every card on
-  /// it is a shortcut to the screen that owns that thing.
   final void Function(PatientTab tab) onOpenTab;
 
   @override
@@ -38,9 +32,9 @@ class HomeScreen extends StatelessWidget {
       body: RefreshIndicator(
         onRefresh: () async {
           await Future.wait([
-            context.read<ProfileController>().load(),
-            stay.load(),
-            appointments.load(),
+            context.read<ProfileController>().load(showLoading: false),
+            stay.load(showLoading: false),
+            appointments.load(showLoading: false),
           ]);
         },
         child: ListView(
@@ -67,7 +61,7 @@ class HomeScreen extends StatelessWidget {
               _CompleteDetailsBanner(missing: profile.missingFields),
             ],
             const SizedBox(height: 24),
-            Text('Things you can do', style: Theme.of(context).textTheme.titleSmall),
+            Text('Quick actions', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 12),
             _QuickActions(profile: profile, onOpenTab: onOpenTab),
           ],
@@ -77,11 +71,6 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-/// Home for an account with no hospital record behind it.
-///
-/// Everything else on Home is built from that record, so there is nothing
-/// truthful to show until it exists. One thing to do, and no controls that
-/// would be refused the moment they were tapped.
 class _NotLinkedYet extends StatelessWidget {
   const _NotLinkedYet();
 
@@ -97,10 +86,8 @@ class _NotLinkedYet extends StatelessWidget {
         NoticeBanner(
           icon: Icons.badge_outlined,
           accent: theme.colorScheme.warning,
-          title: 'Finish setting up',
-          body: 'Your login works, but it is not joined to a hospital record '
-              'yet. Add your details and you can book a visit and follow a '
-              'stay from here.',
+          title: 'Complete your registration',
+          body: 'Add your details to book visits and view your stay.',
           action: FilledButton(
             onPressed: () => openMyDetails(context, context.read<ProfileController>()),
             style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
@@ -112,9 +99,6 @@ class _NotLinkedYet extends StatelessWidget {
   }
 }
 
-/// The tabs the shell owns. Home links to the other three by name rather than
-/// by index, so reordering the bar cannot silently send someone to the wrong
-/// screen.
 enum PatientTab { home, appointments, myStay, profile }
 
 class _Greeting extends StatelessWidget {
@@ -173,8 +157,6 @@ String _timeOfDayGreeting() {
   return 'Good evening';
 }
 
-/// The one card that matters. A current stay outranks a booking, because
-/// somebody lying in a bed does not care what is in the diary next month.
 class _WhatsNext extends StatelessWidget {
   const _WhatsNext({required this.stay, required this.nextVisit, required this.onOpenTab});
 
@@ -224,8 +206,6 @@ class _CurrentStayCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          // The server's own sentence for the state machine. Re-wording it here
-          // is how the app and the ward end up disagreeing.
           Text(
             admission.statusText,
             style: theme.textTheme.headlineSmall?.copyWith(color: Colors.white),
@@ -253,15 +233,15 @@ class _CurrentStayCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
-                'The ward still needs ${admission.missingFields.length} detail'
-                '${admission.missingFields.length == 1 ? '' : 's'}',
+                '${admission.missingFields.length} detail'
+                '${admission.missingFields.length == 1 ? '' : 's'} missing',
                 style: theme.textTheme.labelSmall?.copyWith(color: Colors.white),
               ),
             ),
           ],
           const SizedBox(height: 12),
           Text(
-            'Tap to follow your progress',
+            'View your progress',
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: Colors.white.withValues(alpha: 0.75)),
           ),
@@ -291,11 +271,10 @@ class _NextVisitOrNothing extends StatelessWidget {
             children: [
               Icon(Icons.event_available_outlined, size: 26, color: theme.colorScheme.primary),
               const SizedBox(height: 12),
-              Text('Nothing booked', style: theme.textTheme.titleMedium),
+              Text('No upcoming visits', style: theme.textTheme.titleMedium),
               const SizedBox(height: 4),
               Text(
-                'When you need to be seen, book a visit and the hospital will '
-                'have your details ready before you arrive.',
+                'Book a visit when you need to be seen.',
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
@@ -421,8 +400,8 @@ class _CompleteDetailsBanner extends StatelessWidget {
     return NoticeBanner(
       icon: Icons.info_outline,
       accent: scheme.warning,
-      title: 'Finish your details',
-      body: 'The hospital needs these before your next visit.',
+      title: 'Incomplete details',
+      body: 'The hospital requires the following before your next visit.',
       bullets: missing.map(prettyFieldName).toList(),
       action: OutlinedButton(
         onPressed: () => openMyDetails(context, controller),
@@ -457,26 +436,23 @@ class _QuickActions extends StatelessWidget {
         _ActionTile(
           icon: Icons.add_circle_outline,
           label: 'Book a visit',
-          caption: 'Pick a day and time',
+          caption: 'Choose a date and time',
           onTap: () => onOpenTab(PatientTab.appointments),
         ),
         _ActionTile(
           icon: Icons.monitor_heart_outlined,
           label: 'My stay',
-          caption: 'Where you are up to',
+          caption: 'Current admission',
           onTap: () => onOpenTab(PatientTab.myStay),
         ),
         _ActionTile(
           icon: Icons.history,
           label: 'Past visits',
-          caption: 'Stays that finished',
+          caption: 'Completed stays',
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const PastVisitsScreen()),
           ),
         ),
-        // Only ever the patient's own emergency contact. There is no hospital
-        // switchboard number in the API, and inventing one here would put a
-        // wrong number in front of someone having an emergency.
         if (emergencyPhone != null)
           _ActionTile(
             icon: Icons.phone_in_talk_outlined,

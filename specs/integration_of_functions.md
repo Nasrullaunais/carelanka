@@ -1030,6 +1030,10 @@ warning. `POST /maintenance-schedules/{id}/complete` was **removed**. No schema 
 no new `MaintenanceStatus` value. Design is `equipment-management-plan.md` §6.1.
 
 **What it means for the others.**
+- **Since 2026-09-17 the maintenance unit is the hospital administrator's alone.**
+  `GET`/`POST /maintenance-schedules` moved from `EquipmentManager` to the new `MaintenanceDesk`
+  policy (hospital administrator), and `PUT /equipment-items/{id}` accepts the administrator too, so
+  they can retire a machine beyond repair. The equipment manager reports faults and nothing more.
 - **M4:** a bed out of service for repair comes back `usable` when the administrator confirms the
   job. `GET /beds` is still the only thing to read.
 - **Anyone who called `/complete`:** nobody outside Equipment did, but it no longer exists.

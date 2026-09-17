@@ -42,6 +42,12 @@ export function canConfirmEquipment(role: PrincipalRole | undefined): boolean {
   return role === 'hospital_administrator';
 }
 
+// The maintenance unit is the hospital administrator's: booking work, the open-jobs list, confirming
+// repairs and retiring what cannot be fixed. The equipment manager only reports faults.
+export function canRunMaintenance(role: PrincipalRole | undefined): boolean {
+  return role === 'hospital_administrator';
+}
+
 export function canReportFault(role: PrincipalRole | undefined): boolean {
   return isStaff(role);
 }

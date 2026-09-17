@@ -338,7 +338,8 @@ paths:
       tags: [Equipment]
       summary: Update an equipment item
       description: |
-        Roles: InventoryAdministrator.
+        Roles: EquipmentManager, HospitalAdministrator. The administrator uses it to retire a machine
+        the maintenance unit cannot repair.
 
         A `status` of `maintenance` cannot be edited back to `available` here. The item is with
         the maintenance unit and returns to service only when they complete the repair, so this
@@ -1219,7 +1220,8 @@ paths:
       tags: [Maintenance]
       summary: List maintenance schedules
       description: |
-        Roles: InventoryAdministrator, EquipmentTechnician.
+        Roles: HospitalAdministrator. The maintenance unit is theirs; the equipment manager only
+        reports faults.
 
         `overdue=true` returns `status = scheduled AND scheduled_date < today`, computed at read
         time - nothing cached, nothing to drift.
@@ -1256,7 +1258,7 @@ paths:
       tags: [Maintenance]
       summary: Schedule maintenance manually, without the agent
       description: |
-        Roles: InventoryAdministrator.
+        Roles: HospitalAdministrator.
 
         The manual path must always work: if the only way to schedule service were through the
         agent, the hospital stops the moment the agent stops. When `asset_type = bed`, this still

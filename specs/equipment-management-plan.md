@@ -63,7 +63,7 @@ When the hospital buys a new item, the Administrator adds it under the matching 
 | :--- | :--- | :--- |
 | **Inventory Administrator** | React | Add/manage equipment and pharmacy categories, add equipment items and pharmacy items, update equipment status, bed register admin, the warnings/recommendations queue (approve / reject), reports |
 | **Patient** *(Rev 3, 2026-09-17)* | Flutter | Send a photo of a prescription to the pharmacy, then follow it: waiting, ready with a collection token, delivered, or can't be filled — see §5.4 |
-| **Hospital Administrator** *(Rev 3, 2026-09-16)* | Flutter | Confirm or reject a newly registered equipment item before it joins the register — see §4.3. Confirm maintenance done — see §6.1 |
+| **Hospital Administrator** *(Rev 3, 2026-09-16)* | Flutter | Confirm or reject a newly registered equipment item before it joins the register — see §4.3. Confirm maintenance done — see §6.1. *(Rev 3, 2026-09-17.)* Runs the maintenance unit on the web: books maintenance, reads the open-jobs list, and retires a machine beyond repair. The equipment manager only reports faults |
 | **Equipment Technician** | Flutter | Scan an asset tag to pull up its record, update an equipment item's status in the field, mark a maintenance task complete, report a fault |
 | **Any authenticated staff role** *(shared JWT, no Equipment-specific grant needed)* | Flutter / React | Search equipment and pharmacy items and check availability — a read-only capability, not gated to a role we define, because any nurse, doctor or crew member across the hospital may need to know "do we have X in stock" |
 
@@ -423,7 +423,7 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 | `GET` | `/api/equipment-items` | Any staff | `?search=`, `?categoryId=`, `?wardId=`, `?status=`. Paginated, sortable. |
 | `GET` | `/api/equipment-items/{id}` | Any staff | Includes maintenance history |
 | `GET` | `/api/equipment-items/by-tag/{assetTag}` | Equipment Technician | **Business op.** What the QR scan resolves to. |
-| `PUT` | `/api/equipment-items/{id}` | Inventory Administrator | |
+| `PUT` | `/api/equipment-items/{id}` | Inventory Administrator; Hospital Administrator *(Rev 3, 2026-09-17)* | The administrator retires a machine beyond repair through it |
 | `POST` | `/api/equipment-items/{id}/assign` | Inventory Administrator, Equipment Technician | **Business op.** Requires `admission_id`. `available -> assigned`. |
 | `POST` | `/api/equipment-items/{id}/release` | Inventory Administrator, Equipment Technician | **Business op.** `assigned -> available`, clears the admission link. |
 | `POST` | `/api/equipment-items/{id}/report-fault` | Equipment Technician, any staff | **Business op.** §6, last paragraph. |
@@ -464,8 +464,8 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 
 | Method | Route | Role | Notes |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/api/maintenance-schedules` | Inventory Administrator, Equipment Technician | `?status=`, `?assetType=`, `?overdue=true` |
-| `POST` | `/api/maintenance-schedules` | Inventory Administrator | Manual scheduling, no agent involved |
+| `GET` | `/api/maintenance-schedules` | Hospital Administrator *(Rev 3, 2026-09-17)* | `?status=`, `?assetType=`, `?overdue=true` |
+| `POST` | `/api/maintenance-schedules` | Hospital Administrator *(Rev 3, 2026-09-17)* | Manual scheduling, no agent involved |
 | `GET` | `/api/maintenance-schedules/pending-confirmation` | Hospital Administrator + code | *(Rev 3)* Every open job, earliest due first. §6.1 |
 | `GET` | `/api/maintenance-schedules/pending-confirmation/count` | Equipment Manager, Hospital Administrator | *(Rev 3)* How many are open — no code |
 | `POST` | `/api/maintenance-schedules/{id}/confirm` | Hospital Administrator + code | *(Rev 3)* **Business op.** §6 steps 8–9. Replaces `/complete`, which was removed |
@@ -625,7 +625,7 @@ Per the assignment: workflow id, objective, plan, completed steps, tool calls wi
 | **Equipment detail** | Item info, maintenance history, current warnings, assign/release. *(Rev 2, 2026-09-13.)* Assigning picks the patient by ward rather than taking a pasted admission id |
 | **Pharmacy inventory** | Search, filter by category, below-threshold and expiring-soon highlighted. *(Rev 3, 2026-09-17.)* A **Prescriptions from the app** card: waiting, ready, delivered and can't-fill tabs, view the photo, Ready (issues a token), Mark delivered, Can't fill with a reason — §5.4 |
 | **Maintenance calendar** | Scheduled and overdue, by asset type |
-| **Maintenance unit** | *(Rev 2, 2026-09-13.)* The repair queue: every machine out of service and what was reported against it. Mark it beyond repair and it is retired. *(Rev 3, 2026-09-16.)* Also books a service, calibration or repair for any item. Jobs are confirmed done by the hospital administrator, not the equipment manager — see §6.1. *(Rev 3, 2026-09-17.)* The administrator gets a **Confirm maintenance done** card on this page: enter the confirmation code, then Confirm done on each open job. The open-jobs table itself is the equipment manager's |
+| **Maintenance unit** | *(Rev 3, 2026-09-17 — the hospital administrator's page only.)* Book a service, calibration or repair; the open-jobs list with Beyond repair (retires the item); and Confirm maintenance done, after the confirmation code — §6.1. The equipment manager does not see it: they report faults from the Equipment page |
 | **Laboratory** | *(Rev 2, 2026-09-13.)* Pick a ward, read down who is in it, and file a result against whoever the specimen came from. Search by code, name or NIC is the second way in, for an outpatient in no ward. Clinical staff see the same screen without the upload form — see §7.5 |
 | **Bed register admin** | Create beds, mark out of service, retire — occupancy block surfaced as a clear error |
 | **Warnings & recommendations queue** | Everything open, recommended action, urgency, cost. Approve / Reject / auto-approved badge. **This is the demo screen.** |

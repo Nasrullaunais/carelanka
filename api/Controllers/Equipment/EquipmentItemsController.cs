@@ -119,7 +119,7 @@ public class EquipmentItemsController : ControllerBase
         string assetTag, CancellationToken ct)
         => Ok(await _items.GetDetailByTagAsync(assetTag, ct));
 
-    [Authorize(Policy = Policies.EquipmentManager)]
+    [Authorize(Policy = Policies.EquipmentItemEditor)]
     [HttpPut("{id:guid}", Name = "updateEquipmentItem")]
     [ProducesResponseType(typeof(EquipmentItem), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]

@@ -174,15 +174,14 @@ public sealed class EquipmentItemLifecycleTests
     }
 
     [Fact]
-    public async Task Completing_the_repair_is_what_returns_the_item_to_service()
+    public async Task Confirming_the_repair_done_is_what_returns_the_item_to_service()
     {
         using var client = await EquipmentClientAsync();
         var id = await NewItemIdAsync(client);
         await ReportFaultAsync(client, id, "Screen flickering.");
 
         var job = Assert.Single(await OpenRepairJobsAsync(id));
-        var completed = await client.PostAsJsonAsync(
-            $"/api/maintenance-schedules/{job.Id}/complete", new { notes = "New backlight." });
+        var completed = await ConfirmDoneAsync(job.Id);
 
         using var body = await ReadJsonAsync(await client.GetAsync($"/api/equipment-items/{id}"));
 
@@ -206,6 +205,16 @@ public sealed class EquipmentItemLifecycleTests
 
         Assert.Empty(await OpenRepairJobsAsync(id));
         Assert.Empty(await OpenFaultWarningsAsync(id));
+    }
+
+    // Only the hospital administrator, with the confirmation code, can say a job is done.
+    private async Task<HttpResponseMessage> ConfirmDoneAsync(Guid scheduleId)
+    {
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
+        administrator.DefaultRequestHeaders.Add(
+            "X-Confirmation-Code", ApiApplication.EquipmentConfirmationCode);
+
+        return await administrator.PostAsync($"/api/maintenance-schedules/{scheduleId}/confirm", null);
     }
 
     private async Task<List<Data.Entities.Equipment.MaintenanceSchedule>> OpenRepairJobsAsync(Guid itemId)
@@ -253,7 +262,7 @@ public sealed class EquipmentItemLifecycleTests
     private static Task<HttpResponseMessage> ReportFaultAsync(HttpClient client, Guid id, string description)
         => client.PostAsJsonAsync($"/api/equipment-items/{id}/report-fault", new { description });
 
-    private static async Task<Guid> NewItemIdAsync(HttpClient client)
+    private async Task<Guid> NewItemIdAsync(HttpClient client)
     {
         using var category = await ReadJsonAsync(await client.PostAsJsonAsync(
             "/api/equipment-categories", new { name = $"Category {Guid.NewGuid():N}"[..20] }));
@@ -269,7 +278,23 @@ public sealed class EquipmentItemLifecycleTests
             ward_id = Guid.NewGuid()
         }));
 
-        return body.RootElement.GetProperty("id").GetGuid();
+        var id = body.RootElement.GetProperty("id").GetGuid();
+
+        await ConfirmAsync(id);
+
+        return id;
+    }
+
+    // A registered item cannot be assigned, faulted or serviced until the hospital administrator
+    // confirms it, so every test that needs a working item confirms it first.
+    private async Task ConfirmAsync(Guid id)
+    {
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
+        administrator.DefaultRequestHeaders.Add(
+            "X-Confirmation-Code", ApiApplication.EquipmentConfirmationCode);
+
+        var response = await administrator.PostAsync($"/api/equipment-items/{id}/confirm", null);
+        response.EnsureSuccessStatusCode();
     }
 
     private Task<HttpClient> EquipmentClientAsync() => ClientAsync(ApiApplication.EquipmentEmail);

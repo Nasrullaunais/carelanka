@@ -38,6 +38,13 @@ public static class MessageCodes
             [MessageCode.LabReportFileEmpty] = "cl_equ_014",
             [MessageCode.LabReportFileTooLarge] = "cl_equ_015",
             [MessageCode.LabReportFileType] = "cl_equ_016",
+            [MessageCode.ConfirmationCodeIncorrect] = "cl_equ_017",
+            [MessageCode.EquipmentAwaitingConfirmation] = "cl_equ_018",
+            [MessageCode.EquipmentNotAwaitingConfirmation] = "cl_equ_019",
+            [MessageCode.PrescriptionWrongStatus] = "cl_equ_020",
+            [MessageCode.PrescriptionFileEmpty] = "cl_equ_021",
+            [MessageCode.PrescriptionFileTooLarge] = "cl_equ_022",
+            [MessageCode.PrescriptionFileType] = "cl_equ_023",
             [MessageCode.WardNameTaken] = "cl_pat_001",
             [MessageCode.PatientNicTaken] = "cl_pat_002",
             [MessageCode.PatientAlreadyHasAccount] = "cl_pat_003",
@@ -75,7 +82,9 @@ public static class MessageCodes
             [MessageCode.NicDoesNotMatchYourRecord] = "cl_pat_032",
             [MessageCode.AccountHasNoPatientRecord] = "cl_pat_033",
             [MessageCode.NoCurrentAdmission] = "cl_pat_034",
-            [MessageCode.AppointmentBilledOnItsAdmission] = "cl_pat_035"
+            [MessageCode.AppointmentBilledOnItsAdmission] = "cl_pat_035",
+            [MessageCode.NoBillRaised] = "cl_pat_036",
+            [MessageCode.PatientCodeNotClaimable] = "cl_pat_037"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

@@ -73,12 +73,21 @@ and can start an agent workflow.
 ### Hospital administrator
 **Sets prices** — the admission fee per care level and every ward's rates. Nobody else can.
 **Creates and retires wards.** Reads patient details, the bookings list and the discharge
-board.
+board. **Confirms new equipment** in the mobile app or on the web Equipment page — an item the
+equipment manager registers only reaches the web register once the administrator confirms it.
+Both ask for the confirmation code first: `equipment2026`. **Confirms maintenance done** the same way, in the
+mobile app or on the web Maintenance unit page — every reported fault and scheduled job is listed
+there, and confirming it puts the item back into service. **Runs the maintenance unit** on the web:
+books maintenance, sees the open jobs, and retires a machine beyond repair.
 **Cannot:** register, admit, bed, or discharge anyone.
 
 ### Equipment manager
 Beds, equipment items, pharmacy and maintenance. **Files lab reports** — the only role that
 can. Reads patient details and lab reports.
+**Runs the pharmacy's prescription queue** on the web Pharmacy page: marks one ready (which issues
+the patient's token), delivered, or can't fill.
+**Cannot:** confirm an item they registered, or run the maintenance unit (booking, confirming or
+retiring) — the hospital administrator does those. Reports a fault from the Equipment page.
 
 ### Ambulance crew
 Emergency calls and ambulances.
@@ -86,7 +95,9 @@ Emergency calls and ambulances.
 
 ### Patient (mobile app only)
 Their own record and nothing else: saves their details, books and cancels one visit at a
-time, follows their current stay, and reads their discharge instructions afterwards.
+time, follows their current stay, and reads their discharge instructions afterwards. **Sends a
+prescription** to the pharmacy from the Prescriptions tab and sees its collection token once it is
+ready.
 No `/api/me/*` route takes a patient id — every one resolves the record from the token, so
 being handed somebody else's is impossible rather than merely checked.
 

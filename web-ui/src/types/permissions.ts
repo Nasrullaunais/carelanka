@@ -30,6 +30,24 @@ export function canManageEquipment(role: PrincipalRole | undefined): boolean {
   return role === 'equipment_manager';
 }
 
+// The equipment manager registers an item and the hospital administrator confirms it on the
+// mobile app. Both need to know how many are still waiting.
+export function canTrackEquipmentConfirmations(role: PrincipalRole | undefined): boolean {
+  return role === 'equipment_manager' || role === 'hospital_administrator';
+}
+
+// Only the hospital administrator, so nobody confirms an item they registered themselves. The API
+// also wants the confirmation code on top of the role.
+export function canConfirmEquipment(role: PrincipalRole | undefined): boolean {
+  return role === 'hospital_administrator';
+}
+
+// The maintenance unit is the hospital administrator's: booking work, the open-jobs list, confirming
+// repairs and retiring what cannot be fixed. The equipment manager only reports faults.
+export function canRunMaintenance(role: PrincipalRole | undefined): boolean {
+  return role === 'hospital_administrator';
+}
+
 export function canReportFault(role: PrincipalRole | undefined): boolean {
   return isStaff(role);
 }

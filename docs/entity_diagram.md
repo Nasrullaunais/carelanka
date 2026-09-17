@@ -5,6 +5,24 @@ single hospital / multiple wards, unified staff identity, generic agent-workflow
 audit-log schemas). PKs are `Guid` (PostgreSQL `uuid`, `default: gen_random_uuid()`)
 throughout.
 
+**Revision 3.2** *(2026-09-16)* — both Patient Management agents were redesigned after the rest
+of that component was built and tested. Three schema-visible consequences, all marked *(Rev 3.2)*:
+
+- **`PatientMedicalProfile` (new)** — one row per patient, `UNIQUE(patient_id)`, four free-text
+  fields a clinician types. It exists because the Patient Care Advisory Agent had nothing to
+  reason over. Owned by Patient Management. See
+  [`PatientMedicalProfile`](#patientmedicalprofile-extends-auditedentity-rev-32--new).
+- **`AdmissionStatus.AwaitingApproval` is no longer reached.** The bed agent holds no write
+  tool, so there is no proposal sitting in the domain waiting to be approved; the pause lives
+  on the `AgentWorkflow` row. The value stays in the enum — Equipment's ward-patient list reads
+  it, and removing a value from a shared enum is a cross-component change for no gain.
+- **`CareRecommendation`'s review gate widened to `Doctor` OR `WardNurse`**, with a new
+  deterministic rule (CR5) against `PatientMedicalProfile.Allergies` holding the line instead
+  of the role alone.
+
+`AssignedBy.Agent` also changed meaning without changing shape — it now records that a human
+committed a bed the agent *suggested*, not that the agent wrote the row.
+
 **Revision 2.13** — patients sign in with a username. `PatientAccount` loses two columns
 and gains one, in the `Common_PatientUsernameLogin` migration. Changes marked *(Rev 2.13)*.
 
@@ -705,17 +723,24 @@ the service-layer duplicate check. *(Decision 33, revised)*
 + AssetTag: string (non-null, max 50)
 + SerialNumber: string (nullable, max 100)
 + NextMaintenanceDue: DateOnly (nullable)
++ AwaitingConfirmation: bool (non-null, default false) -- true from registration until confirmed
++ ConfirmedByStaffId: Guid (nullable) -- the hospital administrator who confirmed it
++ ConfirmedAt: DateTimeOffset (nullable)
 ```
 **Table:** `equipment_items`
 **Constraints:** UNIQUE(AssetTag) **WHERE is_active** · UNIQUE(SerialNumber) **WHERE
 is_active AND serial_number IS NOT NULL** · CHECK(status IN the enum)
 **Indexes:** `(CategoryId)` · `(WardId)` · `(Status)` · `(NextMaintenanceDue) WHERE status
-<> 'retired'`
+<> 'retired'` · `(AwaitingConfirmation) WHERE awaiting_confirmation`
 **Note:** Durable, individually tracked assets. `WardId` and `AssignedToAdmissionId` are
 bare references into Patient Management's tables — no foreign key, because we never write
 them. Asset tags are meant to be unique across beds and equipment together; Postgres cannot
 index across two tables, so that half is enforced in application code and is a **known gap**
 tracked as issue #17. *(Decision 8)*
+*(Rev 3.1, 2026-09-16)* A new item waits with `AwaitingConfirmation = true` until the hospital
+administrator confirms it; a rejected one is soft-deleted. Rows that existed before the column
+default to `false`, i.e. already confirmed. `ConfirmedByStaffId` is a bare staff id, the same as
+`PerformedByStaffId`. See `equipment-management-plan.md` §4.3.
 
 #### Bed extends SoftDeletableEntity — **owned here, defined under Patient Management**
 See the `Bed` entry in the Patient Management section. Listed here so this section is a
@@ -776,6 +801,30 @@ withdrawn. It also carries **no navigation back to `PharmacyItem`** in the EF mo
 makes an `Include` silently drop history rows once an item is retired — the trail has to
 outlive the thing it describes. An `adjusted` row requires a `Note`; a stocktake correction
 nobody explained cannot be audited later.
+
+#### Prescription extends AuditedEntity *(Rev 4.1 — new, 2026-09-17)*
+```
++ PatientId: Guid (non-null) -- Patient Management's patient, id only
++ Note: string (nullable, max 500) -- from the patient
++ FileName: string (non-null, max 255)
++ ContentType: string (non-null, max 100) -- image/jpeg | image/png | application/pdf
++ Content: byte[] (non-null)
++ ByteSize: int (non-null) -- > 0, at most 10 MB
++ Status: PrescriptionStatus (non-null)
++ TokenDate: DateOnly (nullable) -- Sri Lanka date the token belongs to
++ TokenNumber: int (nullable) -- set on ready, restarts at 1 each day
++ ReadyAt / ReadyByStaffId (nullable)
++ DeliveredAt / DeliveredByStaffId (nullable)
++ RejectionReason: string (nullable, max 500) / RejectedAt / RejectedByStaffId (nullable)
+```
+**Table:** `prescriptions`
+**Constraints:** CHECK(byte_size > 0) · CHECK(status IN the enum) · UNIQUE(TokenDate, TokenNumber)
+**WHERE token_number IS NOT NULL**
+**Indexes:** `(PatientId, CreatedAt DESC)` · `(Status, CreatedAt)`
+**Note:** A photo of a prescription a patient sends from the app, so the pharmacy can have the
+medicine ready and the patient collects by token. No foreign key on `PatientId`, for the reason
+`LabReport` gives. Staff ids are bare references, like `PerformedByStaffId`. See
+`equipment-management-plan.md` §5.4.
 
 #### LabReport extends Entity *(Rev 4 — new, 2026-09-13)*
 ```
@@ -896,7 +945,7 @@ patient.
 + GenderPolicy: GenderPolicy (non-null)                 -- (Rev 2; Rev 2.8: enum was WardGenderPolicy)
 ```
 **Table:** `wards` — **built.** `Patient_AddWard`, `api/Data/Entities/Patient/Ward.cs`.
-**Note:** `Type` lets the Patient Admission & Bed Agent filter candidate beds by matching
+**Note:** `Type` lets the Bed & Patient Details Agent filter candidate beds by matching
 ward type to the patient's category. *(Decision 31)*
 
 *(Rev 2.2)* **`Type` is its own enum, not `AdmissionCategory`.** Reusing `AdmissionCategory`
@@ -1212,7 +1261,7 @@ keeping occupancy off `Bed`. A background sweep moves `reserved` rows past `Rese
 **Table:** `discharges` — **built.** `Patient_AddAdmission`.
 **Note:** 1:1 companion row created **at admission time**, with its checklist rows unticked,
 not only once discharge actually happens — this gives clinical staff somewhere to
-update readiness during the stay, and gives the Patient Admission & Bed Agent a
+update readiness during the stay, and gives the Bed & Patient Details Agent a
 persistent target to monitor. `DischargedAt`/`DischargeSummary` stay null until
 confirmed. *(Decisions 10, 32)*
 *(Rev 2.9)* **`ReadinessStatus` is gone entirely.** Rev 2 already made it derived — `Ready`
@@ -1343,6 +1392,52 @@ are invented — no real price list was given to us — and `BillingRates.cs` st
 the fallback `PriceList.Defaults` reads when a row is missing. So a fresh database prices a
 bill correctly before anybody has opened the settings screen.
 
+#### PatientMedicalProfile extends AuditedEntity *(Rev 3.2 — new)*
+```
++ PatientId: Guid (non-null) FK → Patient.Id           -- UNIQUE, one profile per patient
++ KnownConditions: string (nullable)                   -- diabetes, asthma, hypertension
++ Allergies: string (nullable)                         -- read deterministically by CR5
++ CurrentSymptoms: string (nullable)                   -- what they are in with this time
++ RecentSituation: string (nullable)                   -- a fall last week, a finished course
++ UpdatedByStaffMemberId: Guid (non-null) FK → StaffMember.Id
+```
+**Table:** `patient_medical_profiles`
+**Index:** `UNIQUE(patient_id)` — a plain unique, **not** scoped `WHERE is_active`, because
+this is `AuditedEntity` and not soft-deletable. There is no such thing as retiring a
+patient's medical history; the `Patient` row is the soft-deletable thing and the profile
+goes with it.
+
+**Note:** *(Rev 3.2)* **The problem in one sentence: this schema had never stored a single
+clinical fact, so the "care advisory" agent had nothing to advise on.** It read demographics
+and the administrative shape of past visits, which made it a model rephrasing a sentence
+rather than an agent. This table is what it reads instead.
+
+Four things it deliberately is not:
+
+- **Not a diagnosis.** Every character is what a clinician typed. No field records anything
+  this system worked out. Recording that a patient is asthmatic is not diagnosing asthma, so
+  `patient-management-plan.md` §1's clinical scope line does not move.
+- **Not an EHR.** No vitals, no lab results, no coded conditions, no clinical assessment, no
+  change history beyond `UpdatedAt` and who wrote it. `patient-management-plan.md` §11 says so
+  plainly rather than implying otherwise.
+- **Not per-visit.** One row per patient, so `CurrentSymptoms` describes whichever visit it
+  was last written during. Accepted deliberately: a per-admission profile is one a nurse
+  retypes every visit, and the one that gets retyped is the one that stops being filled in.
+- **Not patient-readable.** There is no `/me/` route. Showing somebody their own clinical
+  record raises correction rights and wording questions that are a feature in their own right.
+
+**An empty profile is the ordinary state, not an error.** Every field is nullable and the row
+is created lazily on first write. The agent handles an empty one by drafting from the
+patient's own words and saying it had no history to work from.
+
+**`Allergies` is the field that earns the table.** CR5 rejects any agent draft naming a
+substance recorded there, deterministically, before a reviewer sees it — and that check is
+only possible because the allergy is a stored field rather than a sentence buried in a note.
+That is the same instinct as the bed agent's hard rules: the thing that must never fail is
+plain C# reading a column, not the model being asked nicely.
+
+---
+
 #### CareRecommendation extends AuditedEntity *(Rev 2.6 — new)*
 ```
 + PatientId: Guid (non-null) FK → Patient.Id
@@ -1353,7 +1448,7 @@ bill correctly before anybody has opened the settings screen.
 + UrgencyFlag: CareUrgency (nullable)                   -- the agent's draft triage flag
 + AgentMessage: string (nullable)                       -- the agent's draft, doctor-facing only
 + Status: CareRecommendationStatus (non-null)
-+ ReviewedByStaffMemberId: Guid (nullable) FK → StaffMember.Id  -- Doctor role, enforced in code
++ ReviewedByStaffMemberId: Guid (nullable) FK → StaffMember.Id  -- Doctor OR WardNurse, enforced in code (Rev 3.2)
 + ReviewedAt: DateTimeOffset (nullable)
 + DoctorMessage: string (nullable)                     -- what the patient actually sees
 + RejectionReason: string (nullable)                   -- staff-facing only, never sent to the patient
@@ -1364,9 +1459,19 @@ lecturer's direction — see the Rev 2.6 note above. `AgentMessage` and `DoctorM
 deliberately two columns, not one edited in place: the model's draft must survive
 independently of what a doctor approved, for the same audit reason `AgentWorkflow`
 already keeps a `FinalOutcome` separate from its `Plan`. **The patient never reads
-`AgentMessage`** — only `DoctorMessage`, and only once `Status = Approved`. A `Doctor`
-role check gates every write to the review fields; `ReviewedByStaffMemberId` is how a
-`clinical_clearance`-style approval trail exists for this agent too.
+`AgentMessage`** — only `DoctorMessage`, and only once `Status = Approved`.
+`ReviewedByStaffMemberId` is how a `clinical_clearance`-style approval trail exists for this
+agent too.
+
+*(Rev 3.2)* **The review gate is now `Doctor` OR `WardNurse`, not `Doctor` alone.** The agent
+only runs for admitted patients, and the person who will walk over and look at one is the
+nurse on shift — Doctor-only meant a draft about a headache waited for a ward round. What
+holds the line instead is deterministic rather than role-based: CR1 forbids a drug name or a
+dosage in `AgentMessage` whoever approves it, and CR5 (new) rejects any draft contradicting
+the recorded `PatientMedicalProfile.Allergies`. `DoctorMessage` keeps its name although a
+nurse may now write it; renaming a published field to gain nothing is churn.
+`clinical_clearance` on the discharge checklist did **not** move and is still Doctor-only.
+Full reasoning and what it costs: `patient-management-plan.md` §8.16.
 **Why no new column on `AgentProposedChange`.** That table's typed FKs
 (`ProposedStaffMemberId`, `ProposedShiftId`, `ProposedBedId`, `ProposedWardId`) exist
 because those four values need referential integrity and query-by-content. This agent's
@@ -1649,6 +1754,13 @@ EquipmentItem, Bed
 ```
 Serialized as `equipment_item`, `bed`. What a `MaintenanceSchedule` row points at.
 
+### PrescriptionStatus *(Rev 4.1 — new, 2026-09-17)*
+```
+Submitted, Ready, Delivered, Rejected
+```
+Serialized as `submitted`, `ready`, `delivered`, `rejected`. `Ready` is when a token is issued;
+`Rejected` carries a reason the patient reads.
+
 ### PharmacyTransactionType *(Rev 3 — new)*
 ```
 Received, Dispensed, Adjusted, ExpiredRemoved
@@ -1862,9 +1974,14 @@ a hold ended is a different fact from the state it ended in, and keeping them ap
 ```
 Agent, User
 ```
-Serialized as `agent`, `user`. Whether the bed agent proposed this or a human picked it.
-Used on `BedAssignment.AssignedBy` and `Discharge.FlaggedBy`, and it is what the approval
-gate and the agent-performance report both read.
+Serialized as `agent`, `user`. Used on `BedAssignment.AssignedBy` and `Discharge.FlaggedBy`,
+and it is what the agent-performance report reads.
+
+*(Rev 3.2)* **What `Agent` means changed, and it is worth being exact.** It no longer means
+"the agent wrote this row" — the bed agent cannot write anything. It means **a human committed
+a bed the agent had suggested**: `POST /admissions/{id}/assign-bed` was called with a
+`workflow_id`, so the assignment is attributable to a run. Every row is written by a person
+either way; this column records whether a model was involved in choosing it.
 
 ### ReleaseReason *(Rev 2.9 — new)*
 ```
@@ -1888,7 +2005,7 @@ middle states of the flow. `Expected` is now `AwaitingBed`; `Active` is now `Adm
 | Status | Meaning | `AdmittedAt` |
 | :-- | :-- | :--: |
 | `AwaitingBed` | Record exists, no bed found yet. The emergency pre-arrival state. | null |
-| `AwaitingApproval` | The bed agent proposed a bed; a human has not approved it. | null |
+| `AwaitingApproval` | **Reserved, and no longer reached.** *(Rev 3.2)* It meant "the bed agent proposed a bed and a human has not approved it". The agent no longer writes a proposal — it holds no write tool at all — so the pause lives on the `AgentWorkflow` row and the admission stays at `AwaitingBed` until somebody commits a bed. Kept in the enum because Equipment's ward-patient list already reads it and removing a value from a shared enum is a cross-component change for no gain. Nothing sets it; nothing should. See `patient-management-plan.md` §8.6b | null |
 | `BedReserved` | Approved and held (`BedAssignment.Status = Reserved`); patient not yet in it. | null |
 | `Admitted` | In the bed. Live `BedAssignment` with `EndAt IS NULL`. | set |
 | `ReadyForDischarge` | Every `DischargeChecklistItem` complete; awaiting confirmation. | set |
@@ -1932,8 +2049,8 @@ model judgement alone.
 PendingReview, Approved, Rejected
 ```
 A `CareRecommendation` is invisible to the patient until `Approved`. `Rejected` still
-records the doctor's reason, but the patient only ever sees a generic note that their
-doctor reviewed it — never `RejectionReason` itself.
+records the reviewer's reason, but the patient only ever sees a generic note that it was
+reviewed — never `RejectionReason` itself.
 
 ### PatientDetailField *(Rev 2.1 — new; Rev 2.9 — aligned to the spec)*
 ```

@@ -397,6 +397,11 @@ export type ChecklistUpdateRequest = {
     billing_settled?: boolean | null;
 };
 
+export type ClaimByPatientCodeRequest = {
+    patient_code?: string | null;
+    nic?: string | null;
+};
+
 export type CompleteDetailsRequest = {
     nic?: string | null;
     full_name?: string | null;
@@ -405,10 +410,6 @@ export type CompleteDetailsRequest = {
     address?: string | null;
     emergency_contact_name?: string | null;
     emergency_contact_phone?: string | null;
-};
-
-export type CompleteMaintenanceScheduleRequest = {
-    notes?: string | null;
 };
 
 export type ConfirmDischargeRequest = {
@@ -702,6 +703,9 @@ export type EquipmentItem = {
     purchase_date: string;
     serial_number?: string | null;
     assigned_to_admission_id?: string | null;
+    awaiting_confirmation: boolean;
+    confirmed_by_staff_id?: string | null;
+    confirmed_at?: string | null;
     created_at: string;
     updated_at: string;
 };
@@ -721,6 +725,9 @@ export type EquipmentItemDetail = {
     purchase_date: string;
     serial_number?: string | null;
     assigned_to_admission_id?: string | null;
+    awaiting_confirmation: boolean;
+    confirmed_by_staff_id?: string | null;
+    confirmed_at?: string | null;
     created_at: string;
     updated_at: string;
     maintenance_history: Array<MaintenanceSchedule>;
@@ -876,6 +883,27 @@ export type MyCallTracking = {
     updated_at?: string;
 };
 
+export type MyBill = {
+    admission_id?: string | null;
+    appointment_id?: string | null;
+    bill_number: string;
+    currency: string;
+    lines: Array<MyBillLine>;
+    total: number;
+    is_final: boolean;
+    settled: boolean;
+    settled_at?: string | null;
+    updated_at: string;
+};
+
+export type MyBillLine = {
+    source: BillLineSource;
+    description: string;
+    quantity: number;
+    unit_price: number;
+    line_total: number;
+};
+
 export type MyEmergencyCallSummary = {
     id?: string;
     patient_is_caller?: boolean;
@@ -891,6 +919,39 @@ export type MyEmergencyCallSummaryPagedResult = {
     page_size: number;
     total_items: number;
     total_pages: number;
+};
+
+export type MyLabReport = {
+    id: string;
+    test_name: string;
+    summary?: string | null;
+    file_name: string;
+    content_type: string;
+    byte_size: number;
+    created_at: string;
+};
+
+export type MyLabReportPagedResult = {
+    items: Array<MyLabReport>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
+export type MyPrescription = {
+    id: string;
+    note?: string | null;
+    file_name: string;
+    content_type: string;
+    byte_size: number;
+    status: PrescriptionStatus;
+    token_date?: string | null;
+    token_number?: number | null;
+    ready_at?: string | null;
+    delivered_at?: string | null;
+    rejection_reason?: string | null;
+    created_at: string;
 };
 
 export type MyProfile = {
@@ -945,6 +1006,12 @@ export type Patient = {
     has_account: boolean;
     created_at?: string;
     updated_at?: string;
+};
+
+export type PatientClaimPreview = {
+    patient_code: string;
+    masked_full_name: string;
+    masked_phone?: string | null;
 };
 
 export type PatientDetail = {
@@ -1003,6 +1070,10 @@ export type PatientSummaryPagedResult = {
     page_size: number;
     total_items: number;
     total_pages: number;
+};
+
+export type PendingEquipmentCount = {
+    count: number;
 };
 
 export type PharmacyCategory = {
@@ -1070,6 +1141,27 @@ export type PreRegisterRequest = {
     emergency_contact_phone?: string | null;
 };
 
+export type Prescription = {
+    id: string;
+    patient_id: string;
+    patient_code: string;
+    patient_name: string;
+    note?: string | null;
+    file_name: string;
+    content_type: string;
+    byte_size: number;
+    status: PrescriptionStatus;
+    token_date?: string | null;
+    token_number?: number | null;
+    ready_at?: string | null;
+    delivered_at?: string | null;
+    rejection_reason?: string | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type PrescriptionStatus = 'submitted' | 'ready' | 'delivered' | 'rejected';
+
 export type PrincipalRole = 'ward_nurse' | 'doctor' | 'ambulance_crew' | 'general_staff' | 'duty_manager' | 'hospital_administrator' | 'equipment_manager' | 'patient';
 
 export type PrincipalType = 'staff' | 'patient';
@@ -1092,6 +1184,10 @@ export type ReassignDispatchRequest = {
 
 export type RefreshTokenRequest = {
     refresh_token: string;
+};
+
+export type RejectPrescriptionRequest = {
+    reason: string | null;
 };
 
 export type RelatedEntityType = 'pharmacy_item' | 'equipment_item' | 'bed';
@@ -3906,6 +4002,151 @@ export type CreateEquipmentItemResponses = {
 
 export type CreateEquipmentItemResponse = CreateEquipmentItemResponses[keyof CreateEquipmentItemResponses];
 
+export type ListEquipmentItemsAwaitingConfirmationData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/equipment-items/pending-confirmation';
+};
+
+export type ListEquipmentItemsAwaitingConfirmationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListEquipmentItemsAwaitingConfirmationError = ListEquipmentItemsAwaitingConfirmationErrors[keyof ListEquipmentItemsAwaitingConfirmationErrors];
+
+export type ListEquipmentItemsAwaitingConfirmationResponses = {
+    /**
+     * OK
+     */
+    200: Array<EquipmentItem>;
+};
+
+export type ListEquipmentItemsAwaitingConfirmationResponse = ListEquipmentItemsAwaitingConfirmationResponses[keyof ListEquipmentItemsAwaitingConfirmationResponses];
+
+export type CountEquipmentItemsAwaitingConfirmationData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/equipment-items/pending-confirmation/count';
+};
+
+export type CountEquipmentItemsAwaitingConfirmationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type CountEquipmentItemsAwaitingConfirmationError = CountEquipmentItemsAwaitingConfirmationErrors[keyof CountEquipmentItemsAwaitingConfirmationErrors];
+
+export type CountEquipmentItemsAwaitingConfirmationResponses = {
+    /**
+     * OK
+     */
+    200: PendingEquipmentCount;
+};
+
+export type CountEquipmentItemsAwaitingConfirmationResponse = CountEquipmentItemsAwaitingConfirmationResponses[keyof CountEquipmentItemsAwaitingConfirmationResponses];
+
+export type ConfirmEquipmentItemData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/equipment-items/{id}/confirm';
+};
+
+export type ConfirmEquipmentItemErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ConfirmEquipmentItemError = ConfirmEquipmentItemErrors[keyof ConfirmEquipmentItemErrors];
+
+export type ConfirmEquipmentItemResponses = {
+    /**
+     * OK
+     */
+    200: EquipmentItem;
+};
+
+export type ConfirmEquipmentItemResponse = ConfirmEquipmentItemResponses[keyof ConfirmEquipmentItemResponses];
+
+export type RejectEquipmentItemData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/equipment-items/{id}/reject';
+};
+
+export type RejectEquipmentItemErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RejectEquipmentItemError = RejectEquipmentItemErrors[keyof RejectEquipmentItemErrors];
+
+export type RejectEquipmentItemResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type RejectEquipmentItemResponse = RejectEquipmentItemResponses[keyof RejectEquipmentItemResponses];
+
 export type GetEquipmentItemData = {
     body?: never;
     path: {
@@ -4413,20 +4654,80 @@ export type CreateMaintenanceScheduleResponses = {
 
 export type CreateMaintenanceScheduleResponse = CreateMaintenanceScheduleResponses[keyof CreateMaintenanceScheduleResponses];
 
-export type CompleteMaintenanceScheduleData = {
-    body?: CompleteMaintenanceScheduleRequest;
+export type ListMaintenanceSchedulesAwaitingConfirmationData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/maintenance-schedules/pending-confirmation';
+};
+
+export type ListMaintenanceSchedulesAwaitingConfirmationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListMaintenanceSchedulesAwaitingConfirmationError = ListMaintenanceSchedulesAwaitingConfirmationErrors[keyof ListMaintenanceSchedulesAwaitingConfirmationErrors];
+
+export type ListMaintenanceSchedulesAwaitingConfirmationResponses = {
+    /**
+     * OK
+     */
+    200: Array<MaintenanceSchedule>;
+};
+
+export type ListMaintenanceSchedulesAwaitingConfirmationResponse = ListMaintenanceSchedulesAwaitingConfirmationResponses[keyof ListMaintenanceSchedulesAwaitingConfirmationResponses];
+
+export type CountMaintenanceSchedulesAwaitingConfirmationData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/maintenance-schedules/pending-confirmation/count';
+};
+
+export type CountMaintenanceSchedulesAwaitingConfirmationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type CountMaintenanceSchedulesAwaitingConfirmationError = CountMaintenanceSchedulesAwaitingConfirmationErrors[keyof CountMaintenanceSchedulesAwaitingConfirmationErrors];
+
+export type CountMaintenanceSchedulesAwaitingConfirmationResponses = {
+    /**
+     * OK
+     */
+    200: PendingEquipmentCount;
+};
+
+export type CountMaintenanceSchedulesAwaitingConfirmationResponse = CountMaintenanceSchedulesAwaitingConfirmationResponses[keyof CountMaintenanceSchedulesAwaitingConfirmationResponses];
+
+export type ConfirmMaintenanceScheduleData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
     path: {
         id: string;
     };
     query?: never;
-    url: '/maintenance-schedules/{id}/complete';
+    url: '/maintenance-schedules/{id}/confirm';
 };
 
-export type CompleteMaintenanceScheduleErrors = {
-    /**
-     * Bad Request
-     */
-    400: ValidationProblemDetails;
+export type ConfirmMaintenanceScheduleErrors = {
     /**
      * Unauthorized
      */
@@ -4445,16 +4746,16 @@ export type CompleteMaintenanceScheduleErrors = {
     409: ProblemDetails;
 };
 
-export type CompleteMaintenanceScheduleError = CompleteMaintenanceScheduleErrors[keyof CompleteMaintenanceScheduleErrors];
+export type ConfirmMaintenanceScheduleError = ConfirmMaintenanceScheduleErrors[keyof ConfirmMaintenanceScheduleErrors];
 
-export type CompleteMaintenanceScheduleResponses = {
+export type ConfirmMaintenanceScheduleResponses = {
     /**
      * OK
      */
     200: MaintenanceSchedule;
 };
 
-export type CompleteMaintenanceScheduleResponse = CompleteMaintenanceScheduleResponses[keyof CompleteMaintenanceScheduleResponses];
+export type ConfirmMaintenanceScheduleResponse = ConfirmMaintenanceScheduleResponses[keyof ConfirmMaintenanceScheduleResponses];
 
 export type GetMyEmergencyCallsData = {
     body?: never;
@@ -4816,6 +5117,88 @@ export type PreRegisterSelfResponses = {
 
 export type PreRegisterSelfResponse = PreRegisterSelfResponses[keyof PreRegisterSelfResponses];
 
+export type PreviewMyClaimData = {
+    body?: ClaimByPatientCodeRequest;
+    path?: never;
+    query?: never;
+    url: '/me/claim/preview';
+};
+
+export type PreviewMyClaimErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type PreviewMyClaimError = PreviewMyClaimErrors[keyof PreviewMyClaimErrors];
+
+export type PreviewMyClaimResponses = {
+    /**
+     * OK
+     */
+    200: PatientClaimPreview;
+};
+
+export type PreviewMyClaimResponse = PreviewMyClaimResponses[keyof PreviewMyClaimResponses];
+
+export type ClaimMyRecordData = {
+    body?: ClaimByPatientCodeRequest;
+    path?: never;
+    query?: never;
+    url: '/me/claim';
+};
+
+export type ClaimMyRecordErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ClaimMyRecordError = ClaimMyRecordErrors[keyof ClaimMyRecordErrors];
+
+export type ClaimMyRecordResponses = {
+    /**
+     * OK
+     */
+    200: MyProfile;
+};
+
+export type ClaimMyRecordResponse = ClaimMyRecordResponses[keyof ClaimMyRecordResponses];
+
 export type GetMyProfileData = {
     body?: never;
     path?: never;
@@ -4917,6 +5300,147 @@ export type GetMyHistoryResponses = {
 };
 
 export type GetMyHistoryResponse = GetMyHistoryResponses[keyof GetMyHistoryResponses];
+
+export type GetMyBillData = {
+    body?: never;
+    path: {
+        admissionId: string;
+    };
+    query?: never;
+    url: '/me/admissions/{admissionId}/bill';
+};
+
+export type GetMyBillErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetMyBillError = GetMyBillErrors[keyof GetMyBillErrors];
+
+export type GetMyBillResponses = {
+    /**
+     * OK
+     */
+    200: MyBill;
+};
+
+export type GetMyBillResponse = GetMyBillResponses[keyof GetMyBillResponses];
+
+export type GetMyAppointmentBillData = {
+    body?: never;
+    path: {
+        appointmentId: string;
+    };
+    query?: never;
+    url: '/me/appointments/{appointmentId}/bill';
+};
+
+export type GetMyAppointmentBillErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetMyAppointmentBillError = GetMyAppointmentBillErrors[keyof GetMyAppointmentBillErrors];
+
+export type GetMyAppointmentBillResponses = {
+    /**
+     * OK
+     */
+    200: MyBill;
+};
+
+export type GetMyAppointmentBillResponse = GetMyAppointmentBillResponses[keyof GetMyAppointmentBillResponses];
+
+export type GetMyLabReportsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/me/lab-reports';
+};
+
+export type GetMyLabReportsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type GetMyLabReportsError = GetMyLabReportsErrors[keyof GetMyLabReportsErrors];
+
+export type GetMyLabReportsResponses = {
+    /**
+     * OK
+     */
+    200: MyLabReportPagedResult;
+};
+
+export type GetMyLabReportsResponse = GetMyLabReportsResponses[keyof GetMyLabReportsResponses];
+
+export type DownloadMyLabReportData = {
+    body?: never;
+    path: {
+        reportId: string;
+    };
+    query?: never;
+    url: '/me/lab-reports/{reportId}/file';
+};
+
+export type DownloadMyLabReportErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type DownloadMyLabReportError = DownloadMyLabReportErrors[keyof DownloadMyLabReportErrors];
+
+export type DownloadMyLabReportResponses = {
+    /**
+     * OK
+     */
+    200: Blob | File;
+};
+
+export type DownloadMyLabReportResponse = DownloadMyLabReportResponses[keyof DownloadMyLabReportResponses];
 
 export type ListMyAppointmentsData = {
     body?: never;
@@ -5260,6 +5784,79 @@ export type LinkPatientAccountResponses = {
 
 export type LinkPatientAccountResponse = LinkPatientAccountResponses[keyof LinkPatientAccountResponses];
 
+export type ListMyPrescriptionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/me/prescriptions';
+};
+
+export type ListMyPrescriptionsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type ListMyPrescriptionsError = ListMyPrescriptionsErrors[keyof ListMyPrescriptionsErrors];
+
+export type ListMyPrescriptionsResponses = {
+    /**
+     * OK
+     */
+    200: Array<MyPrescription>;
+};
+
+export type ListMyPrescriptionsResponse = ListMyPrescriptionsResponses[keyof ListMyPrescriptionsResponses];
+
+export type UploadMyPrescriptionData = {
+    body?: {
+        File?: Blob | File;
+        Note?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/me/prescriptions';
+};
+
+export type UploadMyPrescriptionErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type UploadMyPrescriptionError = UploadMyPrescriptionErrors[keyof UploadMyPrescriptionErrors];
+
+export type UploadMyPrescriptionResponses = {
+    /**
+     * Created
+     */
+    201: MyPrescription;
+};
+
+export type UploadMyPrescriptionResponse = UploadMyPrescriptionResponses[keyof UploadMyPrescriptionResponses];
+
 export type ListPharmacyCategoriesData = {
     body?: never;
     path?: never;
@@ -5515,6 +6112,197 @@ export type RecordPharmacyTransactionResponses = {
 };
 
 export type RecordPharmacyTransactionResponse = RecordPharmacyTransactionResponses[keyof RecordPharmacyTransactionResponses];
+
+export type ListPrescriptionsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: PrescriptionStatus;
+    };
+    url: '/prescriptions';
+};
+
+export type ListPrescriptionsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListPrescriptionsError = ListPrescriptionsErrors[keyof ListPrescriptionsErrors];
+
+export type ListPrescriptionsResponses = {
+    /**
+     * OK
+     */
+    200: Array<Prescription>;
+};
+
+export type ListPrescriptionsResponse = ListPrescriptionsResponses[keyof ListPrescriptionsResponses];
+
+export type DownloadPrescriptionData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/prescriptions/{id}/file';
+};
+
+export type DownloadPrescriptionErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type DownloadPrescriptionError = DownloadPrescriptionErrors[keyof DownloadPrescriptionErrors];
+
+export type DownloadPrescriptionResponses = {
+    /**
+     * OK
+     */
+    200: Blob | File;
+};
+
+export type DownloadPrescriptionResponse = DownloadPrescriptionResponses[keyof DownloadPrescriptionResponses];
+
+export type MarkPrescriptionReadyData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/prescriptions/{id}/ready';
+};
+
+export type MarkPrescriptionReadyErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type MarkPrescriptionReadyError = MarkPrescriptionReadyErrors[keyof MarkPrescriptionReadyErrors];
+
+export type MarkPrescriptionReadyResponses = {
+    /**
+     * OK
+     */
+    200: Prescription;
+};
+
+export type MarkPrescriptionReadyResponse = MarkPrescriptionReadyResponses[keyof MarkPrescriptionReadyResponses];
+
+export type MarkPrescriptionDeliveredData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/prescriptions/{id}/deliver';
+};
+
+export type MarkPrescriptionDeliveredErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type MarkPrescriptionDeliveredError = MarkPrescriptionDeliveredErrors[keyof MarkPrescriptionDeliveredErrors];
+
+export type MarkPrescriptionDeliveredResponses = {
+    /**
+     * OK
+     */
+    200: Prescription;
+};
+
+export type MarkPrescriptionDeliveredResponse = MarkPrescriptionDeliveredResponses[keyof MarkPrescriptionDeliveredResponses];
+
+export type RejectPrescriptionData = {
+    body?: RejectPrescriptionRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/prescriptions/{id}/reject';
+};
+
+export type RejectPrescriptionErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RejectPrescriptionError = RejectPrescriptionErrors[keyof RejectPrescriptionErrors];
+
+export type RejectPrescriptionResponses = {
+    /**
+     * OK
+     */
+    200: Prescription;
+};
+
+export type RejectPrescriptionResponse = RejectPrescriptionResponses[keyof RejectPrescriptionResponses];
 
 export type ListBedAvailabilityData = {
     body?: never;

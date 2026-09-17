@@ -843,9 +843,21 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("assigned_to_admission_id");
 
+                    b.Property<bool>("AwaitingConfirmation")
+                        .HasColumnType("boolean")
+                        .HasColumnName("awaiting_confirmation");
+
                     b.Property<Guid>("CategoryId")
                         .HasColumnType("uuid")
                         .HasColumnName("category_id");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("confirmed_at");
+
+                    b.Property<Guid?>("ConfirmedByStaffId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("confirmed_by_staff_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -911,6 +923,10 @@ namespace CareLanka.Api.Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_equipment_items_asset_tag")
                         .HasFilter("is_active");
+
+                    b.HasIndex("AwaitingConfirmation")
+                        .HasDatabaseName("ix_equipment_items_awaiting_confirmation")
+                        .HasFilter("awaiting_confirmation");
 
                     b.HasIndex("CategoryId")
                         .HasDatabaseName("ix_equipment_items_category_id");
@@ -1261,6 +1277,117 @@ namespace CareLanka.Api.Data.Migrations
                             t.HasCheckConstraint("ck_pharmacy_transactions_quantity", "quantity > 0");
 
                             t.HasCheckConstraint("ck_pharmacy_transactions_type", "type IN ('received', 'dispensed', 'adjusted', 'expired_removed')");
+                        });
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Equipment.Prescription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("ByteSize")
+                        .HasColumnType("integer")
+                        .HasColumnName("byte_size");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("content");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("content_type");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeliveredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("delivered_at");
+
+                    b.Property<Guid?>("DeliveredByStaffId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("delivered_by_staff_id");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("file_name");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("note");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<DateTimeOffset?>("ReadyAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ready_at");
+
+                    b.Property<Guid?>("ReadyByStaffId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ready_by_staff_id");
+
+                    b.Property<DateTimeOffset?>("RejectedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("rejected_at");
+
+                    b.Property<Guid?>("RejectedByStaffId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rejected_by_staff_id");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("rejection_reason");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<DateOnly?>("TokenDate")
+                        .HasColumnType("date")
+                        .HasColumnName("token_date");
+
+                    b.Property<int?>("TokenNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("token_number");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_prescriptions");
+
+                    b.HasIndex("PatientId", "CreatedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_prescriptions_patient_id_created_at");
+
+                    b.HasIndex("Status", "CreatedAt")
+                        .HasDatabaseName("ix_prescriptions_status_created_at");
+
+                    b.HasIndex("TokenDate", "TokenNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ux_prescriptions_token")
+                        .HasFilter("token_number IS NOT NULL");
+
+                    b.ToTable("prescriptions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_prescriptions_byte_size", "byte_size > 0");
+
+                            t.HasCheckConstraint("ck_prescriptions_status", "status IN ('submitted', 'ready', 'delivered', 'rejected')");
                         });
                 });
 

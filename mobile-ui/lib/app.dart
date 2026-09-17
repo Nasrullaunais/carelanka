@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +9,7 @@ import 'core/auth/token_store.dart';
 import 'core/network/api.dart';
 import 'core/routing/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'features/equipment/equipment_routes.dart';
 import 'features/patient/patient_routes.dart';
 import 'features/emergency/emergency_routes.dart';
 import 'services/api_client/care_lanka_api.dart';
@@ -19,11 +21,15 @@ const _noScreensPath = '/not-built-yet';
 /// [_homePathFor]. Nothing else in this file should need to change.
 final List<RouteBase> _featureRoutes = [
   ...emergencyRoutes,
+  ...equipmentRoutes,
   ...patientRoutes,
 ];
 
 String _homePathFor(CurrentPrincipal principal) =>
-    emergencyHomePathFor(principal.role) ?? patientHomePathFor(principal.role) ?? _noScreensPath;
+    emergencyHomePathFor(principal.role) ??
+    patientHomePathFor(principal.role) ??
+    equipmentHomePathFor(principal.role) ??
+    _noScreensPath;
 
 /// Root widget of the CareLanka mobile app.
 class CareLankaApp extends StatefulWidget {
@@ -37,6 +43,7 @@ class _CareLankaAppState extends State<CareLankaApp> {
   late final TokenStore _tokens;
   late final SessionExpiry _sessionExpiry;
   late final CareLankaApi _api;
+  late final Dio _dio;
   late final AuthController _auth;
   late final GoRouter _router;
 
@@ -45,7 +52,9 @@ class _CareLankaAppState extends State<CareLankaApp> {
     super.initState();
     _tokens = TokenStore();
     _sessionExpiry = SessionExpiry();
-    _api = buildApi(tokens: _tokens, sessionExpiry: _sessionExpiry);
+    final built = buildApi(tokens: _tokens, sessionExpiry: _sessionExpiry);
+    _api = built.api;
+    _dio = built.dio;
     _auth = AuthController(api: _api, tokens: _tokens, sessionExpiry: _sessionExpiry);
 
     // Built once. The router watches _auth itself through refreshListenable, so
@@ -74,6 +83,7 @@ class _CareLankaAppState extends State<CareLankaApp> {
     return MultiProvider(
       providers: [
         Provider<CareLankaApi>.value(value: _api),
+        Provider<Dio>.value(value: _dio),
         ChangeNotifierProvider<AuthController>.value(value: _auth),
       ],
       child: MaterialApp.router(

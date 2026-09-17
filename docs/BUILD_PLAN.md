@@ -159,7 +159,7 @@ its dependencies.
 | **[Emergency](build/emergency.md)** | `EmergencyCall`, `Ambulance`, `AmbulanceCrewAssignment`, `Dispatch`, `DispatchCrew`, `RouteLog` | `emergency-spec.yaml` (42) | 11 |
 | **[Staff](build/staff.md)** | `Skill`, `StaffMemberSkill`, `Shift`, `Allocation`, `LeaveRequest`, `WardStaffingRule` | `staff-spec.yaml` (32) | 12 |
 | **[Equipment](build/equipment.md)** | `EquipmentCategory`, `EquipmentItem`, `Bed`, `Pharmacy*`, `MaintenanceSchedule`, `Warning`, `ActionRequest` | `equipment-spec.yaml` (28) | 11 |
-| **[Patient](build/patient.md)** | `Patient`, `Admission`, `Ward`, `BedAssignment`, `Discharge`, `DischargeChecklistItem`, `Appointment` | `patient-spec.yaml` (40) | 16 |
+| **[Patient](build/patient.md)** | `Patient`, `Admission`, `Ward`, `BedAssignment`, `Discharge`, `DischargeChecklistItem`, `Appointment`, `Bill*`, `BillingRate`, `AdmissionFeeRate`, `CareRecommendation`, `PatientMedicalProfile` | `patient-spec.yaml` (63) | 16 — **1–10 done; 11–16 are the two agents and their screens** |
 
 ---
 
@@ -178,8 +178,10 @@ column, then read your row.
 
 **The two in bold are the ones that matter most.**
 
-`GET /beds` (M3 → M4) is the deepest dependency in the project — M4's bed agent has nothing
-to reason over without it.
+`GET /beds` (M3 → M4) was the deepest dependency in the project — M4's bed agent has nothing
+to reason over without it. **Resolved 2026-09-10**: the register is real and M4 reads it
+through `IBedRegistryService`. The deepest *remaining* one is `AgentWorkflow`, which is
+common, unbuilt, and in front of all five agents — see §7 row 4b.
 
 `GET /beds/{id}/occupancy` (M4 → M3) is the one place a stub is genuinely dangerous rather
 than merely temporary. Equipment calls it before taking a bed out of service, and a fake
@@ -199,7 +201,7 @@ rather than discovering at the demo.
 | 1 | **First real cross-component read** | M3 → M4 | Equipment's bed register replaces M4's stub. Delete the `STUBS.md` row |
 | 2 | **Staff lookup replaces three stubs** | M2 → M1, M3, M4 | "Approved by Dr. Perera" renders from real data in all three |
 | 3 | **The pre-admission call** | M1 → M4 | A dispatch creates an `Admission` in `awaiting_bed`. Watch the urgency translation — `critical/high/medium/low` becomes `routine/urgent/emergency`, and a mismatch is a 400 |
-| 4 | **The full emergency workflow** | all five | `CareLanka_Component_Plan.md` §6, end to end: call in Flutter → dispatch → pre-admission → bed proposal → staffing check → equipment check → one human approval → back to Flutter. **This is the assessed cross-platform workflow** (§9.1, §10) |
+| 4 | **The full emergency workflow** | all five | `CareLanka_Component_Plan.md` §6, end to end: call in Flutter → dispatch → pre-admission → bed suggestion → staffing check → equipment check → one human approval → back to Flutter. **This is the assessed cross-platform workflow** (§9.1, §10). *Note 2026-09-16: M4's bed step now suggests without reserving, so a plan that stalls at approval leaves nothing half-allocated on the patient side — `integration_of_functions.md` §11.17* |
 
 ---
 
@@ -211,7 +213,7 @@ rather than discovering at the demo.
 | 2 | Auth + workflow contract | Common | **Done** — `specs/common-spec.yaml` |
 | 3 | Spec gate | Common | **Done** — `bun run check:specs` |
 | 4 | Backend bootstrap + auth | Common | **Implemented in PR #11, verified 2026-09-08** — EF Core + PostgreSQL, base entities, `Common_AddIdentity`, login/registration/refresh/logout/`/auth/me`, policies, exception handler, `/health`. Setup: `api/README.md` |
-| 4b | Audit interceptor + `AgentWorkflow` tables | Common | Not built. Nothing else is waiting on them — the three other tracks are unblocked by #4 |
+| 4b | Audit interceptor + `AgentWorkflow` tables | Common | **Not built, and now blocking.** The audit interceptor still blocks nobody. The `AgentWorkflow` / `AgentProposedChange` pair is a different matter: **every agent in the project needs it, and M4's two are ready to be built behind it** (`build/patient.md` steps 11–16). `BedAssignment.WorkflowId` is already a column pointing at a table that does not exist. Re-swept 2026-09-16 — no entity, no configuration, no migration, no controller |
 | 5 | CI — `.github/` | Common | Not built. §13 grades it |
 | 6 | Auth integration + generated-contract test project | Common | **Done in PR #11** — `CareLanka.Api.Tests`, 15 tests against disposable PostgreSQL |
 | 7 | `web-ui/` scaffold | Common | Not built. Blocks all React work |

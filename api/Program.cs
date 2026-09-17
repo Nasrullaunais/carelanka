@@ -109,6 +109,13 @@ builder.Services
         "Emergency:LocationMaxAgeMinutes must be greater than zero.")
     .ValidateOnStart();
 
+builder.Services
+    .AddOptions<EquipmentOptions>()
+    .Bind(builder.Configuration.GetSection(EquipmentOptions.SectionName))
+    .Validate(options => !string.IsNullOrWhiteSpace(options.ConfirmationCode),
+        "Equipment:ConfirmationCode must be set.")
+    .ValidateOnStart();
+
 var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 
 JsonWebTokenHandler.DefaultInboundClaimTypeMap.Clear();
@@ -269,6 +276,20 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager),
         EnumWire.ToWire(StaffRole.EquipmentManager)));
+
+    options.AddPolicy(Policies.EquipmentConfirmer, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
+    options.AddPolicy(Policies.EquipmentConfirmationTracker, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.EquipmentManager),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
+    options.AddPolicy(Policies.MaintenanceDesk, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
+    options.AddPolicy(Policies.EquipmentItemEditor, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.EquipmentManager),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
 });
 
 var authRequestsPerMinute = builder.Configuration.GetValue("RateLimits:AuthPerMinute", 20);
@@ -327,7 +348,9 @@ builder.Services.AddScoped<IEquipmentItemService, EquipmentItemService>();
 builder.Services.AddScoped<IPharmacyCategoryService, PharmacyCategoryService>();
 builder.Services.AddScoped<IPharmacyItemService, PharmacyItemService>();
 builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();
+builder.Services.AddSingleton<IEquipmentConfirmationCode, EquipmentConfirmationCode>();
 builder.Services.AddScoped<ILabReportService, LabReportService>();
+builder.Services.AddScoped<IPrescriptionService, PrescriptionService>();
 builder.Services.AddScoped<IWardService, WardService>();
 builder.Services.AddScoped<IPatientService, PatientService>();
 builder.Services.AddScoped<IAdmissionService, AdmissionService>();
@@ -375,6 +398,7 @@ builder.Services.AddSwaggerGen(options =>
     options.DocumentFilter<ApiPrefixAsServerFilter>();
     options.OperationFilter<AnonymousOperationFilter>();
     options.OperationFilter<EmergencyCallOperationFilter>();
+    options.OperationFilter<ConfirmationCodeHeaderOperationFilter>();
     options.SchemaFilter<JsonRequiredSchemaFilter>();
     options.SchemaFilter<EmergencyCallSchemaFilter>();
 

@@ -72,4 +72,18 @@ public static class Policies
     // which ward somebody is in is what the laboratory and the equipment register both need to
     // offer a patient to pick, and neither of those is reading a test result.
     public const string PatientLocationReader = nameof(PatientLocationReader);
+
+    // Somebody other than the equipment manager who registered an item, so nobody approves
+    // their own entry. The confirmation code is checked by the service on top of this.
+    public const string EquipmentConfirmer = nameof(EquipmentConfirmer);
+
+    public const string EquipmentConfirmationTracker = nameof(EquipmentConfirmationTracker);
+
+    // The maintenance unit is run by the hospital administrator: booking work, reading the work
+    // list, and confirming it done. The equipment manager reports faults and nothing more here.
+    public const string MaintenanceDesk = nameof(MaintenanceDesk);
+
+    // Editing an item stays with the equipment manager; the administrator also needs it to retire a
+    // machine the maintenance unit cannot fix.
+    public const string EquipmentItemEditor = nameof(EquipmentItemEditor);
 }

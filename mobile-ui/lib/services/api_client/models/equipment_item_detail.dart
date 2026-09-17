@@ -22,6 +22,7 @@ class EquipmentItemDetail {
     required this.assetTag,
     required this.status,
     required this.purchaseDate,
+    required this.awaitingConfirmation,
     required this.createdAt,
     required this.updatedAt,
     required this.maintenanceHistory,
@@ -31,6 +32,8 @@ class EquipmentItemDetail {
     this.nextMaintenanceDue,
     this.serialNumber,
     this.assignedToAdmissionId,
+    this.confirmedByStaffId,
+    this.confirmedAt,
   });
   
   factory EquipmentItemDetail.fromJson(Map<String, Object?> json) => _$EquipmentItemDetailFromJson(json);
@@ -58,6 +61,12 @@ class EquipmentItemDetail {
   final String? serialNumber;
   @JsonKey(name: 'assigned_to_admission_id')
   final String? assignedToAdmissionId;
+  @JsonKey(name: 'awaiting_confirmation')
+  final bool awaitingConfirmation;
+  @JsonKey(name: 'confirmed_by_staff_id')
+  final String? confirmedByStaffId;
+  @JsonKey(name: 'confirmed_at')
+  final DateTime? confirmedAt;
   @JsonKey(name: 'created_at')
   final DateTime createdAt;
   @JsonKey(name: 'updated_at')

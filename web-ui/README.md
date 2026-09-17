@@ -44,8 +44,14 @@ For Patient Management that splits the screens like this:
 
 | | Screens |
 | :--- | :--- |
-| **React (here)** | Admissions dashboard, bed board, ICU/downgrade bed approval, discharge confirmation, occupancy report |
-| **Flutter (`mobile-ui/`)** | Nurse: approve a normal-ward bed, update status, complete details, request discharge. Patient: my stay, book a visit, discharge instructions, ask about a symptom |
+| **React (here)** | Admissions dashboard, the patients board, intake, appointments, capacity, the bed suggestion panel, discharge confirmation, billing and billing rates, the medical profile editor, the care draft review queue, occupancy report |
+| **Flutter (`mobile-ui/`)** | Nurse: place a patient in a normal-ward bed, update status, complete details, maintain the medical profile, review care drafts, request discharge. Patient: my stay, my bill, past visits, book a visit, claim my record, discharge instructions, and — **while admitted only** — tell us how you are feeling and read the approved reply |
+
+*(Screen list refreshed 2026-09-16. The React side used to say "ICU/downgrade bed approval",
+which no longer exists as a screen: the bed agent writes nothing, so there is no proposal
+waiting to be approved after the fact — pressing "Use this bed" on a suggestion is the
+approval, and it calls the same `assign-bed` endpoint a manual pick has always used. See
+`specs/patient-management-plan.md` §8.6b.)*
 
 `POST /auth/patient/login` exists in the API and is generated into the client here. That is
 fine — the generated client mirrors the whole API. It is simply never called from this app.

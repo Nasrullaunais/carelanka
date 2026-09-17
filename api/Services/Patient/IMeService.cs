@@ -1,14 +1,32 @@
 using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Patient;
+using CareLanka.Api.Services.Equipment;
 
 namespace CareLanka.Api.Services.Patient;
 
 public interface IMeService
 {
+    Task<PagedResult<MyLabReport>> GetLabReportsAsync(
+        int page, int pageSize, CancellationToken cancellationToken = default);
+
+    Task<LabReportFile> GetLabReportFileAsync(
+        Guid reportId, CancellationToken cancellationToken = default);
+
     Task<MyProfile> PreRegisterAsync(
         PreRegisterRequest request, CancellationToken cancellationToken = default);
 
+    Task<PatientClaimPreview> PreviewClaimAsync(
+        ClaimByPatientCodeRequest request, CancellationToken cancellationToken = default);
+
+    Task<MyProfile> ClaimAsync(
+        ClaimByPatientCodeRequest request, CancellationToken cancellationToken = default);
+
     Task<MyProfile> GetProfileAsync(CancellationToken cancellationToken = default);
+
+    Task<MyBill> GetBillAsync(Guid admissionId, CancellationToken cancellationToken = default);
+
+    Task<MyBill> GetAppointmentBillAsync(
+        Guid appointmentId, CancellationToken cancellationToken = default);
 
     Task<MyAdmission> GetCurrentAdmissionAsync(CancellationToken cancellationToken = default);
 

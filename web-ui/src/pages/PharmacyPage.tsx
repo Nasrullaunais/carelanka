@@ -14,6 +14,7 @@ import { canManageEquipment } from '../types/permissions';
 import { Dialog } from './EquipmentPage';
 import { StockDialog } from './pharmacy/StockDialog';
 import { ItemHistoryCard } from './pharmacy/ItemHistoryCard';
+import { PrescriptionsCard } from './pharmacy/PrescriptionsCard';
 
 const PAGE_SIZE = 10;
 
@@ -71,6 +72,8 @@ export function PharmacyPage() {
         per medicine for the whole hospital. Whether wards need their own stock is open
         question 1 in the component plan.
       </p>
+
+      {canManageEquipment(role) && <PrescriptionsCard />}
 
       <div className="card">
         <h2>Search</h2>

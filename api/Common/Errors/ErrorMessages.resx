@@ -144,6 +144,34 @@
     <value>A report has to be a PDF or a photograph (JPEG or PNG). This one is {0}.</value>
     <comment>Names what is allowed and what arrived. An allow-list: the question is whether a ward can open it.</comment>
   </data>
+  <data name="cl_equ_017" xml:space="preserve">
+    <value>That confirmation code is not correct.</value>
+    <comment>Deliberately says nothing about the right code or how close the guess was.</comment>
+  </data>
+  <data name="cl_equ_018" xml:space="preserve">
+    <value>{0} is still waiting for the hospital administrator to confirm it, so it cannot be used yet.</value>
+    <comment>Names who unblocks it, because the caller cannot confirm it themselves.</comment>
+  </data>
+  <data name="cl_equ_019" xml:space="preserve">
+    <value>{0} is not waiting for confirmation. Someone may already have confirmed it.</value>
+    <comment>The likely cause is a second administrator acting on the same item first.</comment>
+  </data>
+  <data name="cl_equ_020" xml:space="preserve">
+    <value>This prescription is {0}, so it cannot be marked {1}.</value>
+    <comment>Ready needs a waiting prescription and delivered needs a ready one. Usually a second pharmacist got there first.</comment>
+  </data>
+  <data name="cl_equ_021" xml:space="preserve">
+    <value>That file is empty. Take the photo again and send it.</value>
+    <comment>Patient-facing, so it says what to do rather than what went wrong.</comment>
+  </data>
+  <data name="cl_equ_022" xml:space="preserve">
+    <value>That file is too large. A prescription may be up to {0} MB.</value>
+    <comment>States the limit, because "too large" without a number cannot be acted on.</comment>
+  </data>
+  <data name="cl_equ_023" xml:space="preserve">
+    <value>A prescription has to be a photo (JPEG or PNG) or a PDF. This one is {0}.</value>
+    <comment>Names what is allowed and what arrived.</comment>
+  </data>
   <data name="cl_equ_013" xml:space="preserve">
     <value>{0} is with the maintenance unit. It comes back into service when they complete the repair, not by editing its status.</value>
     <comment>Says where the item is and who releases it, because the caller's next move is to go and look at the repair queue.</comment>
@@ -297,5 +325,13 @@
   <data name="cl_pat_034" xml:space="preserve">
     <value>You have no current stay.</value>
     <comment>Patient self-service. Not being in hospital is the ordinary state, so this is a plain sentence and not an error the app should make a fuss about.</comment>
+  </data>
+  <data name="cl_pat_036" xml:space="preserve">
+    <value>No bill has been raised for this stay yet.</value>
+    <comment>Patient self-service. A bill row only exists once the billing desk prepares one, so an admitted patient often has none. Ordinary state, not a fault.</comment>
+  </data>
+  <data name="cl_pat_037" xml:space="preserve">
+    <value>That patient code and NIC do not match. Check the slip the hospital gave you, or call the desk.</value>
+    <comment>Patient self-service. Deliberately one message for every failure - no such code, wrong NIC, no NIC on file, already claimed. Saying which would confirm to a stranger holding a slip that the code is real, which is the thing the NIC is there to stop.</comment>
   </data>
 </root>

@@ -1,4 +1,4 @@
-import type { PharmacyTransactionType } from '../services/api/generated';
+import type { PharmacyTransactionType, PrescriptionStatus } from '../services/api/generated';
 
 export const transactionTypeLabels: Record<PharmacyTransactionType, string> = {
   received: 'Received',
@@ -24,3 +24,12 @@ export const needsNote: Record<PharmacyTransactionType, boolean> = {
   adjusted: true,
   expired_removed: false,
 };
+
+export const prescriptionStatusLabels: Record<PrescriptionStatus, string> = {
+  submitted: 'Waiting',
+  ready: 'Ready for collection',
+  delivered: 'Delivered',
+  rejected: "Can't fill",
+};
+
+export const prescriptionStatuses = Object.keys(prescriptionStatusLabels) as PrescriptionStatus[];

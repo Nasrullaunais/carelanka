@@ -267,6 +267,16 @@ tr:last-child td {
   margin: 0 0 1rem;
 }
 
+.info-note {
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  padding: 0.6rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  color: var(--ink);
+  margin: 0 0 1rem;
+}
+
 .empty {
   text-align: center;
   color: var(--ink-soft);

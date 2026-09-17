@@ -116,13 +116,15 @@ The second version keeps working when hold expiry, out-of-service beds or a new 
 | `StaffMember`, `Shift`, `Allocation`, `LeaveRequest` | **Staff (M2)** | All — everyone stores staff IDs | Staff only |
 | `EquipmentItem`, `EquipmentCategory`, `PharmacyItem`, `PharmacyCategory`, `PharmacyTransaction`, `MaintenanceSchedule`, `Warning`, `ActionRequest` | **Equipment (M3)** | Patient (ward equipment readiness); any staff (search/availability) | Equipment only |
 | **`Bed`** — exists, number, condition, repairs | **Equipment (M3)** | Patient (to find candidates) | Equipment only |
-| **`LabReport`** — a finished laboratory result and the file itself | **Equipment (M3)** — *claimed 2026-09-13, see §11.14* | Doctor, ward nurse, duty manager | Equipment only (the laboratory) |
-| `Patient`, `Admission`, `Discharge`, `DischargeChecklistItem` | **Patient (M4)** | Emergency, Staff (aggregates only) | Patient only |
+| **`LabReport`** — a finished laboratory result and the file itself | **Equipment (M3)** — *claimed 2026-09-13, see §11.15* | Doctor, ward nurse, duty manager | Equipment only (the laboratory) |
+| `Patient`, `Admission`, `Appointment`, `Discharge`, `DischargeChecklistItem` | **Patient (M4)** | Emergency, Staff (aggregates only) | Patient only |
+| **`PatientMedicalProfile`** — conditions, allergies, current symptoms, recent situation | **Patient (M4)** — *added 2026-09-16, see §11.17* | Nobody else. Not published cross-component and not patient-readable | Patient only — ward nurse or doctor |
+| **`CareRecommendation`** — a patient's own report and the drafted reply | **Patient (M4)** | Nobody else | Patient only |
 | **`Bill`, `BillLineItem`** — what a visit costs and whether it is paid | **Patient (M4)** — *claimed 2026-09-11, see §11.10* | Nobody yet | Patient only |
 | **`BillingRate`, `AdmissionFeeRate`** — what the hospital charges | **Patient (M4)** — *added 2026-09-11, see §11.13* | Nobody yet | Read: any staff. Write: administrator only |
 | **`BedAssignment`** — who is in a bed, holds, approvals | **Patient (M4)** | Equipment (before servicing a bed) | Patient only |
 | `Ward` — name, type, gender policy | **Patient (M4)** — *see §11.1* | All | Patient only |
-| `AgentWorkflow`, `AgentProposedChange` | **Common (group-owned)** — *DECIDED, §11.2* | All five agents | All five agents, by `workflow_id` |
+| `AgentWorkflow`, `AgentProposedChange` | **Common (group-owned)** — *DECIDED §11.2, **and still not built anywhere** as of 2026-09-16* | All five agents | All five agents, by `workflow_id` |
 | `StaffMember`, `PatientAccount`, `RefreshToken`, login, JWT issuing | **Common (group-owned)** — `specs/common-spec.yaml` | All | Common only |
 | `AuditLog`, `Notification`, `DeviceToken` | **Common (group-owned)** | All | Written by the audit interceptor, never by hand |
 
@@ -330,8 +332,8 @@ occupied              free
    │                     │
    │                     ▼
    │            If that tips the ward to full, the agent
-   │            proposes a downgrade — which always needs
-   │            Duty Manager approval
+   │            suggests a downgrade — which always needs
+   │            a Duty Manager to commit it
 ```
 
 **The hard rule: maintenance never evicts a patient.** If the bed is occupied or under a live hold, Equipment waits. M4 exposes the check; M3 respects the answer.
@@ -398,11 +400,14 @@ Pre-admission created, status = awaiting_bed                    [M4]
   clinical staff set admission_category                       (human)
         │
         ▼
-Patient Admission & Bed Agent                                   [M4]
+Bed & Patient Details Agent                                   [M4]
   reads Equipment's bed register  ────────read──────────────►   [M3]
-  filters on hard rules, ranks on soft rules
-  proposes a bed, places a 30-minute hold in BedAssignment
+  filters on hard rules H0-H6, ranks on soft rules
+  suggests a best bed plus every other bed that passed
   deterministic validator re-checks every hard rule
+  WRITES NOTHING and holds no bed — changed 2026-09-16.
+  The 30-minute hold is written when a human commits, by
+  POST /admissions/{id}/assign-bed, under a row lock.
         │
         ▼
 Staff Allocation Agent                                          [M2]
@@ -906,6 +911,159 @@ because `AdmissionSummary` publishes `ward_name` and not a ward id, and the rows
 Equipment after the read. That is honest at a few hundred beds and wrong at ten thousand. When M4
 publishes the `wardId` filter on `GET /admissions` that `STUBS.md` already calls unblocked,
 `WardPatientService` collapses to one delegating call. Recorded in `STUBS.md`.
+
+---
+
+**11.16 (OPEN — announced by M4 on 2026-09-16) — a patient can now attach their app login to a
+record the desk created, using the patient code.**
+
+Here because it sits next to common auth without being part of it, and everybody should be able
+to see where the line was drawn.
+
+**The problem.** `POST /me/pre-register` links a login to an existing record by matching on NIC,
+and `CreatePatientRequest.Nic` is optional — a walk-in or an emergency arrival is often
+registered without one, which is what `temp_reference` is for. That patient installs the app
+afterwards, fills in the form, and gets a **second, empty record**, while their real stay sits on
+the record staff created. `POST /patients/{id}/link-account` exists for this but takes a raw
+account GUID and no screen calls it, so in practice the gap was open.
+
+**What was built.** `POST /me/claim/preview` and `POST /me/claim`, both Patient-only, both taking
+`patient_code` + `nic`. Preview answers a **masked** summary; claim links through the
+same `IPatientService.LinkAccountAsync` the desk override already uses. Design is
+`patient-management-plan.md` §7.6b.
+
+**What it does not touch — and this is the part for the group.** **Nothing in common auth
+changed.** No new auth endpoint, no change to `PatientAccount`, no change to registration or the
+JWT. The account is created first through the existing `POST /auth/patient/register`, and the
+claim is an authenticated call from that login. An anonymous "enter a code and set a password"
+flow would have been the other design, and it was rejected twice over: it would have put M4's
+hands in common auth, and it would have handed a stranger holding a dropped hospital slip a
+patient's name, NIC, address and emergency contact before asking anybody to prove anything.
+
+**The one thing another member might care about.** `Patient.Nic` is now the second factor on the
+claim, not just the pre-register match key. A record with no NIC on file cannot be claimed from
+the app at all and has to go through the Duty Manager link endpoint — the same walk-in-without-NIC
+gap described above, so a record created with `temp_reference` and no NIC still needs the desk
+override. Nobody outside M4 writes that column today, so this is a note, not a request.
+
+**Still open on M4's side:** attempt rate-limiting on the claim endpoints. Authenticated, so
+every attempt is attributable to an account, but nothing stops a login trying repeatedly.
+
+---
+
+**11.17 (OPEN — announced by M4 on 2026-09-16) — both Patient Management agents were redesigned,
+and one of the three changes affects everybody.**
+
+Full reasoning is `patient-management-plan.md` §8, rewritten the same day. Three changes; the
+first is the only one anybody else needs to read.
+
+**1. The bed agent holds no write tool at all, and this is worth copying.** It used to place a
+30-minute hold on its chosen bed before a human saw anything, on the reasoning that a hold is
+not an admission so it is low-impact. That is wrong in a way only visible at scale: a hold takes
+a real bed out of circulation, so **an agent run nobody acts on quietly makes a ward look full
+to every other component** — to M1's dispatch agent choosing a destination, to M2's staffing
+agent reading occupancy, and to the Coordinator assembling a plan. All four of its tools are now
+read-only. Committing is a human pressing a button on `POST /admissions/{id}/assign-bed`, the
+manual endpoint that has existed since 2026-09-11, with its row lock and its hard rules.
+
+*The question for the other three: if your agent's "proposal" reserves, locks or allocates
+something real, what does a run nobody approves cost the rest of the hospital?* Not a request to
+change anything — an argument that landed here and might land there.
+
+**Two contract consequences.** `POST /bed-assignments/{id}/approve` and `/reject` are
+**withdrawn from `patient-spec.yaml`** — neither was ever built, and nothing to approve exists
+any more. `POST /admissions/{id}/bed-suggestion` became `POST /bed-suggestions`, taking either
+an `admission_id` or an NIC / patient code. `AdmissionStatus.AwaitingApproval` is consequently
+**never set** — it stays in the shared enum because Equipment's ward-patient list reads it, and
+removing a value from a shared enum is a cross-component change for no gain. **M3: nothing
+breaks, but no admission will ever appear in that state again.**
+
+**2. A new table, `PatientMedicalProfile`.** One row per patient, four free-text fields a nurse
+types: conditions, allergies, current symptoms, recent situation. It exists because the care
+advisory agent was reading demographics and the administrative shape of past visits, which is
+nothing to reason over. **Not published cross-component, not patient-readable, and not an EHR** —
+no vitals, no lab results, no coded diagnosis. Announced rather than asked, on the same footing
+as §11.10 and §11.13: an unowned thing inside one component's own boundary, claimed in the open
+so nobody builds a second one. **M3, one note:** this is *not* where laboratory results go.
+`LabReport` is yours (§11.15) and stays yours; this is four sentences a clinician typed.
+
+**3. Care recommendation review widened from `Doctor` to `Doctor` or `WardNurse`.** The agent now
+only runs for admitted patients, and the person who will actually walk over and look at one is
+the nurse on shift. `clinical_clearance` on the discharge checklist did **not** move and is still
+Doctor-only. **M2, this is a note not a request** — `Doctor` and `WardNurse` are both already in
+`StaffRole` and M4 only reads the claim.
+
+**11.18 (OPEN — announced by M3 on 2026-09-16) — a new equipment item waits for the hospital
+administrator to confirm it.**
+
+Not a request. Announced because it gives `hospital_administrator` — a role every component
+shares — a new job inside Equipment Management, and a first mobile screen.
+
+**What changed.** `POST /equipment-items` now saves the item with `awaiting_confirmation = true`.
+It stays off `GET /equipment-items`, and cannot be edited, assigned, faulted or serviced, until the hospital
+administrator confirms it in the Flutter app or, since 2026-09-17, on the web Equipment page
+(`POST /equipment-items/{id}/confirm`) or rejects it
+(`/reject`). Migration `Equipment_AddItemConfirmation` adds three columns to `equipment_items` and
+marks every existing row as already confirmed. Design is `equipment-management-plan.md` §4.3; the
+contract is `equipment-spec.yaml`.
+
+**The confirmation code.** Listing, confirming and rejecting also need an `X-Confirmation-Code`
+header, checked by the API against `Equipment:ConfirmationCode` in `appsettings.json`. The demo
+value is in `TEST_ACCOUNTS.md`. Change it anywhere real.
+
+**What it means for the others.**
+- **M4:** nothing you read changes. Equipment still never writes a `Ward` or an `Admission`.
+- **M2:** no new role. `HospitalAdministrator` already exists in `StaffRole`; Equipment only reads
+  the claim, through the new `EquipmentConfirmer` policy.
+- **Anyone listing equipment** (a readiness check, a report): an unconfirmed item is not in
+  `GET /equipment-items`, which is the point — it is not usable stock yet.
+
+**11.19 (OPEN — announced by M3 on 2026-09-16) — maintenance is confirmed done by the hospital
+administrator.**
+
+Not a request. Follows 11.18 with the same role, the same code and the same mobile screen.
+
+**What changed.** A reported fault or scheduled job now appears straight away in the hospital
+administrator's Flutter app and, since 2026-09-17, on the web Maintenance unit page; confirming it done (`POST /maintenance-schedules/{id}/confirm`) is
+the only way it is completed — that is what returns the item or bed to service and closes the
+warning. `POST /maintenance-schedules/{id}/complete` was **removed**. No schema change: no migration,
+no new `MaintenanceStatus` value. Design is `equipment-management-plan.md` §6.1.
+
+**What it means for the others.**
+- **Since 2026-09-17 the maintenance unit is the hospital administrator's alone.**
+  `GET`/`POST /maintenance-schedules` moved from `EquipmentManager` to the new `MaintenanceDesk`
+  policy (hospital administrator), and `PUT /equipment-items/{id}` accepts the administrator too, so
+  they can retire a machine beyond repair. The equipment manager reports faults and nothing more.
+- **M4:** a bed out of service for repair comes back `usable` when the administrator confirms the
+  job. `GET /beds` is still the only thing to read.
+- **Anyone who called `/complete`:** nobody outside Equipment did, but it no longer exists.
+
+**11.20 (OPEN — announced by M3 on 2026-09-17) — patients send prescriptions to the pharmacy
+from the app. This touches Patient Management's code, so please read it, Lochana.**
+
+**What was built.** `Prescription`, migration `Equipment_AddPrescriptions`, the patient's
+`GET`/`POST /api/me/prescriptions` and the pharmacy's `/api/prescriptions` routes, a Prescriptions
+card on the web Pharmacy page, and a Prescriptions tab in the patient app. Design is
+`equipment-management-plan.md` §5.4; contract is `equipment-spec.yaml`.
+
+**Why the patient's routes sit under `/me` but are Equipment's.** It is the patient's own view, so
+it reads like every other `/me` route, and it resolves the patient from the token the same way. The
+pharmacy is this component's, so the controller (`MyPrescriptionsController`), service and table
+are ours — the same split as `LabReport`, except that here Equipment also serves the patient side.
+
+**Exactly what changed in Patient Management's files — all small, all additive:**
+- `IPatientService` / `PatientService`: a new read, `FindByUserAccountIdAsync`. Equipment reaches
+  it through `PatientDirectoryAdapter` and never touches `patients` directly.
+- `mobile-ui/lib/features/patient/screens/home_screen.dart`: `PatientTab` gains `prescriptions`,
+  between `myStay` and `profile`.
+- `.../screens/patient_shell.dart`: one tab entry, one `IndexedStack` child
+  (`MyPrescriptionsTab`, from `features/equipment`), and one refresh case.
+- `.../patient_routes.dart`: `_PatientArea` provides a `PrescriptionService`.
+- `test/features/patient/unlinked_account_test.dart` and `patient_screens_layout_test.dart`: both
+  provide a fake `PrescriptionService`; the unlinked test now expects five tabs.
+
+**No data crosses the other way.** The prescription stores the patient id only; the pharmacy shows
+code and name read through `IPatientService` at display time.
 
 ---
 

@@ -46,6 +46,20 @@ public enum MessageCode
 
     LabReportFileType,
 
+    ConfirmationCodeIncorrect,
+
+    EquipmentAwaitingConfirmation,
+
+    EquipmentNotAwaitingConfirmation,
+
+    PrescriptionWrongStatus,
+
+    PrescriptionFileEmpty,
+
+    PrescriptionFileTooLarge,
+
+    PrescriptionFileType,
+
     PharmacyCategoryNameTaken,
 
     PharmacyItemNameTaken,
@@ -130,5 +144,9 @@ public enum MessageCode
 
     NoCurrentAdmission,
 
-    AppointmentBilledOnItsAdmission
+    AppointmentBilledOnItsAdmission,
+
+    NoBillRaised,
+
+    PatientCodeNotClaimable
 }

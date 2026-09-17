@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>CareLanka uses the camera to photograph a printed lab report so it can be uploaded to the patient record.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>CareLanka attaches a saved lab report to the patient record.</string>
 </dict>
 </plist>

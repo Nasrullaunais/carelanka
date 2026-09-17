@@ -4,6 +4,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/widgets/async_data.dart';
 import '../../../services/api_client/models/gender.dart';
 import '../../../services/api_client/models/my_profile.dart';
+import '../../../services/api_client/models/patient_claim_preview.dart';
 import '../../../services/api_client/models/pre_register_request.dart';
 import '../services/patient_service.dart';
 
@@ -67,6 +68,52 @@ class ProfileController extends ChangeNotifier {
         emergencyContactPhone: _blankToNull(emergencyContactPhone),
       ));
       _profile = AsyncData.ready(saved);
+      return true;
+    } on ApiException catch (error) {
+      _saveError = error;
+      return false;
+    } finally {
+      _saving = false;
+      notifyListeners();
+    }
+  }
+
+  /// Looks up the record a patient code belongs to, masked, so they can confirm it is
+  /// theirs before [claim] attaches their login to it. Writes nothing.
+  Future<PatientClaimPreview?> previewClaim({
+    required String patientCode,
+    required String nic,
+  }) async {
+    _saving = true;
+    _saveError = null;
+    notifyListeners();
+
+    try {
+      return await _service.previewClaim(
+        patientCode: patientCode,
+        nic: nic,
+      );
+    } on ApiException catch (error) {
+      _saveError = error;
+      return null;
+    } finally {
+      _saving = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> claim({
+    required String patientCode,
+    required String nic,
+  }) async {
+    _saving = true;
+    _saveError = null;
+    notifyListeners();
+
+    try {
+      _profile = AsyncData.ready(
+        await _service.claimRecord(patientCode: patientCode, nic: nic),
+      );
       return true;
     } on ApiException catch (error) {
       _saveError = error;

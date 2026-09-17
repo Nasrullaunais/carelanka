@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using CareLanka.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CareLanka.Api.Data.Migrations
 {
     [DbContext(typeof(CareLankaDbContext))]
-    partial class CareLankaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260914005931_Staff_AddStaffCore")]
+    partial class Staff_AddStaffCore
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -38,6 +41,12 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
 
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("full_name");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
@@ -52,22 +61,22 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("character varying(512)")
                         .HasColumnName("password_hash");
 
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("phone_number");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.Property<string>("Username")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("username");
-
                     b.HasKey("Id")
                         .HasName("pk_patient_accounts");
 
-                    b.HasIndex("Username")
+                    b.HasIndex("PhoneNumber")
                         .IsUnique()
-                        .HasDatabaseName("ux_patient_accounts_username")
+                        .HasDatabaseName("ux_patient_accounts_phone")
                         .HasFilter("is_active");
 
                     b.ToTable("patient_accounts", (string)null);
@@ -247,10 +256,6 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
-                    b.Property<DateTimeOffset?>("LocationUpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("location_updated_at");
-
                     b.Property<string>("OutOfServiceReason")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -293,77 +298,12 @@ namespace CareLanka.Api.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.AmbulanceCrewAssignment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("AmbulanceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("ambulance_id");
-
-                    b.Property<DateTimeOffset>("AssignedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("assigned_at");
-
-                    b.Property<Guid>("AssignedByStaffId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("assigned_by_staff_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid>("StaffMemberId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("staff_member_id");
-
-                    b.Property<DateTimeOffset?>("UnassignedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("unassigned_at");
-
-                    b.Property<Guid?>("UnassignedByStaffId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("unassigned_by_staff_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_ambulance_crew_assignments");
-
-                    b.HasIndex("AssignedByStaffId")
-                        .HasDatabaseName("ix_ambulance_crew_assignments_assigned_by_staff_id");
-
-                    b.HasIndex("StaffMemberId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_ambulance_crew_assignments_current_staff")
-                        .HasFilter("unassigned_at IS NULL");
-
-                    b.HasIndex("UnassignedByStaffId")
-                        .HasDatabaseName("ix_ambulance_crew_assignments_unassigned_by_staff_id");
-
-                    b.HasIndex("AmbulanceId", "StaffMemberId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_ambulance_crew_assignments_current_ambulance_staff")
-                        .HasFilter("unassigned_at IS NULL");
-
-                    b.ToTable("ambulance_crew_assignments", (string)null);
-                });
-
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.Dispatch", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
-
-                    b.Property<DateTimeOffset?>("AcknowledgedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("acknowledged_at");
-
-                    b.Property<Guid?>("AcknowledgedByStaffId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("acknowledged_by_staff_id");
 
                     b.Property<Guid>("AmbulanceId")
                         .HasColumnType("uuid")
@@ -376,11 +316,6 @@ namespace CareLanka.Api.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
-
-                    b.Property<string>("DeclinedReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("declined_reason");
 
                     b.Property<Guid?>("DestinationWardId")
                         .HasColumnType("uuid")
@@ -396,17 +331,13 @@ namespace CareLanka.Api.Data.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
                         .HasColumnName("status");
 
                     b.Property<Guid?>("SupersededByDispatchId")
                         .HasColumnType("uuid")
                         .HasColumnName("superseded_by_dispatch_id");
-
-                    b.Property<DateTimeOffset?>("UnacknowledgedAlertedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("unacknowledged_alerted_at");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -418,15 +349,13 @@ namespace CareLanka.Api.Data.Migrations
                     b.HasIndex("AmbulanceId")
                         .IsUnique()
                         .HasDatabaseName("ux_dispatches_active_ambulance")
-                        .HasFilter("status IN ('assigned', 'acknowledged', 'en_route_to_scene', 'at_scene', 'transporting_to_hospital')");
+                        .HasFilter("status IN ('assigned', 'en_route')");
 
                     b.HasIndex("DestinationWardId")
                         .HasDatabaseName("ix_dispatches_destination_ward_id");
 
                     b.HasIndex("EmergencyCallId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_dispatches_active_emergency_call")
-                        .HasFilter("status IN ('assigned', 'acknowledged', 'en_route_to_scene', 'at_scene', 'transporting_to_hospital')");
+                        .HasDatabaseName("ix_dispatches_emergency_call_id");
 
                     b.HasIndex("SupersededByDispatchId")
                         .HasDatabaseName("ix_dispatches_superseded_by_dispatch_id");
@@ -436,7 +365,7 @@ namespace CareLanka.Api.Data.Migrations
 
                     b.ToTable("dispatches", null, t =>
                         {
-                            t.HasCheckConstraint("ck_dispatches_status", "status IN ('assigned', 'acknowledged', 'en_route_to_scene', 'at_scene', 'transporting_to_hospital', 'handed_over', 'declined', 'cancelled', 'reassigned')");
+                            t.HasCheckConstraint("ck_dispatches_status", "status IN ('assigned', 'en_route', 'completed', 'cancelled', 'reassigned')");
                         });
                 });
 
@@ -498,33 +427,6 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("caller_user_id");
 
-                    b.Property<string>("CancellationRequestReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("cancellation_request_reason");
-
-                    b.Property<string>("CancellationRequestStatus")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("cancellation_request_status");
-
-                    b.Property<DateTimeOffset?>("CancellationRequestedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("cancellation_requested_at");
-
-                    b.Property<string>("CancellationReviewNotes")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("cancellation_review_notes");
-
-                    b.Property<DateTimeOffset?>("CancellationReviewedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("cancellation_reviewed_at");
-
-                    b.Property<Guid?>("CancellationReviewedByStaffId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("cancellation_reviewed_by_staff_id");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -534,23 +436,10 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("details");
 
-                    b.Property<Guid>("IdempotencyKey")
-                        .HasColumnType("uuid")
-                        .HasColumnName("idempotency_key");
-
                     b.Property<decimal>("Latitude")
                         .HasPrecision(9, 6)
                         .HasColumnType("numeric(9,6)")
                         .HasColumnName("latitude");
-
-                    b.Property<decimal>("LocationAccuracyMetres")
-                        .HasPrecision(10, 2)
-                        .HasColumnType("numeric(10,2)")
-                        .HasColumnName("location_accuracy_metres");
-
-                    b.Property<DateTimeOffset>("LocationCapturedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("location_captured_at");
 
                     b.Property<decimal>("Longitude")
                         .HasPrecision(9, 6)
@@ -595,13 +484,6 @@ namespace CareLanka.Api.Data.Migrations
 
                     b.HasIndex("CallerUserId")
                         .HasDatabaseName("ix_emergency_calls_caller_user_id");
-
-                    b.HasIndex("CancellationReviewedByStaffId")
-                        .HasDatabaseName("ix_emergency_calls_cancellation_reviewed_by_staff_id");
-
-                    b.HasIndex("IdempotencyKey")
-                        .IsUnique()
-                        .HasDatabaseName("ux_emergency_calls_idempotency_key");
 
                     b.HasIndex("PatientId")
                         .HasDatabaseName("ix_emergency_calls_patient_id");
@@ -843,21 +725,9 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("assigned_to_admission_id");
 
-                    b.Property<bool>("AwaitingConfirmation")
-                        .HasColumnType("boolean")
-                        .HasColumnName("awaiting_confirmation");
-
                     b.Property<Guid>("CategoryId")
                         .HasColumnType("uuid")
                         .HasColumnName("category_id");
-
-                    b.Property<DateTimeOffset?>("ConfirmedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("confirmed_at");
-
-                    b.Property<Guid?>("ConfirmedByStaffId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("confirmed_by_staff_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -923,10 +793,6 @@ namespace CareLanka.Api.Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_equipment_items_asset_tag")
                         .HasFilter("is_active");
-
-                    b.HasIndex("AwaitingConfirmation")
-                        .HasDatabaseName("ix_equipment_items_awaiting_confirmation")
-                        .HasFilter("awaiting_confirmation");
 
                     b.HasIndex("CategoryId")
                         .HasDatabaseName("ix_equipment_items_category_id");
@@ -1280,117 +1146,6 @@ namespace CareLanka.Api.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("CareLanka.Api.Data.Entities.Equipment.Prescription", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<int>("ByteSize")
-                        .HasColumnType("integer")
-                        .HasColumnName("byte_size");
-
-                    b.Property<byte[]>("Content")
-                        .IsRequired()
-                        .HasColumnType("bytea")
-                        .HasColumnName("content");
-
-                    b.Property<string>("ContentType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("content_type");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTimeOffset?>("DeliveredAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("delivered_at");
-
-                    b.Property<Guid?>("DeliveredByStaffId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("delivered_by_staff_id");
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("file_name");
-
-                    b.Property<string>("Note")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("note");
-
-                    b.Property<Guid>("PatientId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("patient_id");
-
-                    b.Property<DateTimeOffset?>("ReadyAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("ready_at");
-
-                    b.Property<Guid?>("ReadyByStaffId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("ready_by_staff_id");
-
-                    b.Property<DateTimeOffset?>("RejectedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("rejected_at");
-
-                    b.Property<Guid?>("RejectedByStaffId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("rejected_by_staff_id");
-
-                    b.Property<string>("RejectionReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("rejection_reason");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("status");
-
-                    b.Property<DateOnly?>("TokenDate")
-                        .HasColumnType("date")
-                        .HasColumnName("token_date");
-
-                    b.Property<int?>("TokenNumber")
-                        .HasColumnType("integer")
-                        .HasColumnName("token_number");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_prescriptions");
-
-                    b.HasIndex("PatientId", "CreatedAt")
-                        .IsDescending(false, true)
-                        .HasDatabaseName("ix_prescriptions_patient_id_created_at");
-
-                    b.HasIndex("Status", "CreatedAt")
-                        .HasDatabaseName("ix_prescriptions_status_created_at");
-
-                    b.HasIndex("TokenDate", "TokenNumber")
-                        .IsUnique()
-                        .HasDatabaseName("ux_prescriptions_token")
-                        .HasFilter("token_number IS NOT NULL");
-
-                    b.ToTable("prescriptions", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_prescriptions_byte_size", "byte_size > 0");
-
-                            t.HasCheckConstraint("ck_prescriptions_status", "status IN ('submitted', 'ready', 'delivered', 'rejected')");
-                        });
-                });
-
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Equipment.Warning", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1697,23 +1452,6 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("booked_by_staff_member_id");
 
-                    b.Property<string>("CancellationReason")
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)")
-                        .HasColumnName("cancellation_reason");
-
-                    b.Property<Guid?>("CancelledByStaffMemberId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("cancelled_by_staff_member_id");
-
-                    b.Property<DateTimeOffset?>("ConfirmedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("confirmed_at");
-
-                    b.Property<Guid?>("ConfirmedByStaffMemberId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("confirmed_by_staff_member_id");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -1750,12 +1488,6 @@ namespace CareLanka.Api.Data.Migrations
                     b.HasIndex("BookedByStaffMemberId")
                         .HasDatabaseName("ix_appointments_booked_by_staff_member_id");
 
-                    b.HasIndex("CancelledByStaffMemberId")
-                        .HasDatabaseName("ix_appointments_cancelled_by_staff_member_id");
-
-                    b.HasIndex("ConfirmedByStaffMemberId")
-                        .HasDatabaseName("ix_appointments_confirmed_by_staff_member_id");
-
                     b.HasIndex("PatientId")
                         .HasDatabaseName("ix_appointments_patient_id");
 
@@ -1764,7 +1496,7 @@ namespace CareLanka.Api.Data.Migrations
 
                     b.ToTable("appointments", null, t =>
                         {
-                            t.HasCheckConstraint("ck_appointments_status", "status IN ('scheduled', 'confirmed', 'completed', 'cancelled', 'no_show')");
+                            t.HasCheckConstraint("ck_appointments_status", "status IN ('scheduled', 'checked_in', 'completed', 'cancelled', 'no_show')");
                         });
                 });
 
@@ -1880,13 +1612,9 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<Guid?>("AdmissionId")
+                    b.Property<Guid>("AdmissionId")
                         .HasColumnType("uuid")
                         .HasColumnName("admission_id");
-
-                    b.Property<Guid?>("AppointmentId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("appointment_id");
 
                     b.Property<string>("BillNumber")
                         .IsRequired()
@@ -1924,13 +1652,7 @@ namespace CareLanka.Api.Data.Migrations
 
                     b.HasIndex("AdmissionId")
                         .IsUnique()
-                        .HasDatabaseName("ux_bills_admission_id")
-                        .HasFilter("admission_id IS NOT NULL");
-
-                    b.HasIndex("AppointmentId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_bills_appointment_id")
-                        .HasFilter("appointment_id IS NOT NULL");
+                        .HasDatabaseName("ux_bills_admission_id");
 
                     b.HasIndex("BillNumber")
                         .IsUnique()
@@ -1939,10 +1661,7 @@ namespace CareLanka.Api.Data.Migrations
                     b.HasIndex("SettledByStaffMemberId")
                         .HasDatabaseName("ix_bills_settled_by_staff_member_id");
 
-                    b.ToTable("bills", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_bills_one_owner", "(admission_id IS NULL) <> (appointment_id IS NULL)");
-                        });
+                    b.ToTable("bills", (string)null);
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.BillLineItem", b =>
@@ -2000,7 +1719,7 @@ namespace CareLanka.Api.Data.Migrations
                         {
                             t.HasCheckConstraint("ck_bill_line_items_quantity", "quantity > 0");
 
-                            t.HasCheckConstraint("ck_bill_line_items_source", "source IN ('admission_fee', 'bed_stay', 'consultation_fee', 'manual')");
+                            t.HasCheckConstraint("ck_bill_line_items_source", "source IN ('admission_fee', 'bed_stay', 'manual')");
 
                             t.HasCheckConstraint("ck_bill_line_items_unit_price", "unit_price >= 0");
                         });
@@ -2754,38 +2473,6 @@ namespace CareLanka.Api.Data.Migrations
                     b.Navigation("StaffMember");
                 });
 
-            modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.AmbulanceCrewAssignment", b =>
-                {
-                    b.HasOne("CareLanka.Api.Data.Entities.Emergency.Ambulance", "Ambulance")
-                        .WithMany("CrewAssignments")
-                        .HasForeignKey("AmbulanceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_ambulance_crew_assignments_ambulances_ambulance_id");
-
-                    b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", null)
-                        .WithMany()
-                        .HasForeignKey("AssignedByStaffId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_ambulance_crew_assignments_staff_members_assigned_by_staff_");
-
-                    b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", null)
-                        .WithMany()
-                        .HasForeignKey("StaffMemberId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_ambulance_crew_assignments_staff_members_staff_member_id");
-
-                    b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", null)
-                        .WithMany()
-                        .HasForeignKey("UnassignedByStaffId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_ambulance_crew_assignments_staff_members_unassigned_by_staf");
-
-                    b.Navigation("Ambulance");
-                });
-
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.Dispatch", b =>
                 {
                     b.HasOne("CareLanka.Api.Data.Entities.Emergency.Ambulance", "Ambulance")
@@ -2847,12 +2534,6 @@ namespace CareLanka.Api.Data.Migrations
                         .HasForeignKey("CallerUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_emergency_calls_patient_accounts_caller_user_id");
-
-                    b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", null)
-                        .WithMany()
-                        .HasForeignKey("CancellationReviewedByStaffId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_emergency_calls_staff_members_cancellation_reviewed_by_staf");
 
                     b.HasOne("CareLanka.Api.Data.Entities.Patient.Patient", null)
                         .WithMany()
@@ -2946,18 +2627,6 @@ namespace CareLanka.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_appointments_staff_members_booked_by_staff_member_id");
 
-                    b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", null)
-                        .WithMany()
-                        .HasForeignKey("CancelledByStaffMemberId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_appointments_staff_members_cancelled_by_staff_member_id");
-
-                    b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", null)
-                        .WithMany()
-                        .HasForeignKey("ConfirmedByStaffMemberId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_appointments_staff_members_confirmed_by_staff_member_id");
-
                     b.HasOne("CareLanka.Api.Data.Entities.Patient.Patient", "Patient")
                         .WithMany("Appointments")
                         .HasForeignKey("PatientId")
@@ -2994,13 +2663,8 @@ namespace CareLanka.Api.Data.Migrations
                         .WithOne()
                         .HasForeignKey("CareLanka.Api.Data.Entities.Patient.Bill", "AdmissionId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
                         .HasConstraintName("fk_bills_admissions_admission_id");
-
-                    b.HasOne("CareLanka.Api.Data.Entities.Patient.Appointment", "Appointment")
-                        .WithOne("Bill")
-                        .HasForeignKey("CareLanka.Api.Data.Entities.Patient.Bill", "AppointmentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_bills_appointments_appointment_id");
 
                     b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", null)
                         .WithMany()
@@ -3009,8 +2673,6 @@ namespace CareLanka.Api.Data.Migrations
                         .HasConstraintName("fk_bills_staff_members_settled_by_staff_member_id");
 
                     b.Navigation("Admission");
-
-                    b.Navigation("Appointment");
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.BillLineItem", b =>
@@ -3186,8 +2848,6 @@ namespace CareLanka.Api.Data.Migrations
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.Ambulance", b =>
                 {
-                    b.Navigation("CrewAssignments");
-
                     b.Navigation("Dispatches");
                 });
 
@@ -3223,11 +2883,6 @@ namespace CareLanka.Api.Data.Migrations
                     b.Navigation("BedAssignments");
 
                     b.Navigation("Discharge");
-                });
-
-            modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.Appointment", b =>
-                {
-                    b.Navigation("Bill");
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.Bill", b =>

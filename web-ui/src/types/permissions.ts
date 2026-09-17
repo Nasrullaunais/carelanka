@@ -101,6 +101,10 @@ export function canSetHighCareLevel(role: PrincipalRole | undefined): boolean {
   return role === 'duty_manager';
 }
 
+export function canManageEmergency(role: PrincipalRole | undefined): boolean {
+  return role === 'duty_manager';
+}
+
 export function canAssignBed(role: PrincipalRole | undefined): boolean {
   return role === 'general_staff' || role === 'ward_nurse' || role === 'duty_manager';
 }

@@ -18,9 +18,9 @@ class AmbulanceCrewAssignment {
     this.unassignedAt,
     this.unassignedByStaffId,
   });
-  
+
   factory AmbulanceCrewAssignment.fromJson(Map<String, Object?> json) => _$AmbulanceCrewAssignmentFromJson(json);
-  
+
   final String? id;
   @JsonKey(name: 'ambulance_id')
   final String? ambulanceId;

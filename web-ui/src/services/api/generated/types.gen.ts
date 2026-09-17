@@ -365,6 +365,10 @@ export type CancelAdmissionRequest = {
     note?: string | null;
 };
 
+export type CancelDispatchRequest = {
+    reason?: string | null;
+};
+
 export type CancelAppointmentRequest = {
     reason: string;
 };
@@ -537,6 +541,10 @@ export type CurrentPrincipal = {
     patient_id?: string | null;
 };
 
+export type DeclineDispatchRequest = {
+    reason?: string | null;
+};
+
 export type Discharge = {
     id: string;
     admission_id: string;
@@ -575,7 +583,24 @@ export type DischargeCandidatePagedResult = {
     total_pages: number;
 };
 
-export type DispatchStatus = 'assigned' | 'en_route' | 'completed' | 'cancelled' | 'reassigned';
+export type DispatchDetail = {
+    id?: string;
+    emergency_call_id?: string;
+    ambulance_registration?: string | null;
+    call_priority?: CallPriority;
+    status?: DispatchStatus;
+    destination_ward_name?: string | null;
+    crew_count?: number;
+    dispatched_at?: string;
+    completed_at?: string | null;
+    ambulance_id?: string;
+    acknowledged_at?: string | null;
+    acknowledged_by_staff_id?: string | null;
+    declined_reason?: string | null;
+    crew_staff_ids?: Array<string> | null;
+};
+
+export type DispatchStatus = 'assigned' | 'acknowledged' | 'en_route_to_scene' | 'at_scene' | 'transporting_to_hospital' | 'handed_over' | 'declined' | 'cancelled' | 'reassigned';
 
 export type DispatchSummary = {
     id?: string;
@@ -632,6 +657,24 @@ export type EmergencyCallSummary = {
 
 export type EmergencyCallSummaryPagedResult = {
     items: Array<EmergencyCallSummary>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
+export type EmergencyCancellationRequest = {
+    emergency_call_id?: string;
+    status?: CancellationRequestStatus;
+    reason?: string | null;
+    requested_at?: string;
+    reviewed_at?: string | null;
+    reviewed_by_staff_id?: string | null;
+    review_notes?: string | null;
+};
+
+export type EmergencyCancellationRequestPagedResult = {
+    items: Array<EmergencyCancellationRequest>;
     page: number;
     page_size: number;
     total_items: number;
@@ -783,6 +826,10 @@ export type MaintenanceStatus = 'scheduled' | 'in_progress' | 'completed' | 'ove
 
 export type MaintenanceType = 'routine_service' | 'calibration' | 'repair';
 
+export type ManualDispatchRequest = {
+    ambulance_id?: string | null;
+};
+
 export type MyAdmission = {
     admission_id: string;
     status: AdmissionStatus;
@@ -822,6 +869,18 @@ export type MyAppointmentPagedResult = {
     page_size: number;
     total_items: number;
     total_pages: number;
+};
+
+export type MyCallTracking = {
+    emergency_call_id?: string;
+    call_status?: CallStatus;
+    ambulance_is_on_the_way?: boolean;
+    ambulance_latitude?: number | null;
+    ambulance_longitude?: number | null;
+    ambulance_location_is_stale?: boolean;
+    estimated_minutes_to_arrival?: number | null;
+    cancellation_request_status?: CancellationRequestStatus;
+    updated_at?: string;
 };
 
 export type MyBill = {
@@ -1118,6 +1177,11 @@ export type ProblemDetails = {
 
 export type RaisedBy = 'agent' | 'user';
 
+export type ReassignDispatchRequest = {
+    replacement_ambulance_id?: string | null;
+    reason?: string | null;
+};
+
 export type RefreshTokenRequest = {
     refresh_token: string;
 };
@@ -1130,12 +1194,25 @@ export type RelatedEntityType = 'pharmacy_item' | 'equipment_item' | 'bed';
 
 export type ReleaseReason = 'discharged' | 'hold_expired' | 'cancelled' | 'transferred' | 'rejected' | 'corrected';
 
+export type ReportAmbulanceLocationRequest = {
+    latitude?: number | null;
+    longitude?: number | null;
+};
+
 export type ReportFaultRequest = {
     description: string;
 };
 
+export type RequestCancellationRequest = {
+    reason?: string | null;
+};
+
 export type RetireAmbulanceRequest = {
     reason: string | null;
+};
+
+export type ReviewCancellationRequest = {
+    notes?: string | null;
 };
 
 export type SettleBillRequest = {
@@ -1183,6 +1260,12 @@ export type UpdateEquipmentItemRequest = {
     status?: EquipmentStatus;
     ward_id?: string | null;
     next_maintenance_due?: string | null;
+};
+
+export type UpdateMyDispatchStatusRequest = {
+    status?: DispatchStatus;
+    latitude?: number | null;
+    longitude?: number | null;
 };
 
 export type UpdatePatientRequest = {
@@ -2373,6 +2456,45 @@ export type ReinstateAmbulanceResponses = {
 
 export type ReinstateAmbulanceResponse = ReinstateAmbulanceResponses[keyof ReinstateAmbulanceResponses];
 
+export type ReportAmbulanceLocationData = {
+    body?: ReportAmbulanceLocationRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/ambulances/{id}/location';
+};
+
+export type ReportAmbulanceLocationErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type ReportAmbulanceLocationError = ReportAmbulanceLocationErrors[keyof ReportAmbulanceLocationErrors];
+
+export type ReportAmbulanceLocationResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type ReportAmbulanceLocationResponse = ReportAmbulanceLocationResponses[keyof ReportAmbulanceLocationResponses];
+
 export type LoginData = {
     body?: StaffLoginRequest;
     path?: never;
@@ -3363,6 +3485,172 @@ export type UpdateEmergencyCallResponses = {
 
 export type UpdateEmergencyCallResponse = UpdateEmergencyCallResponses[keyof UpdateEmergencyCallResponses];
 
+export type DispatchEmergencyCallData = {
+    body?: ManualDispatchRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/emergency-calls/{id}/dispatch';
+};
+
+export type DispatchEmergencyCallErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type DispatchEmergencyCallError = DispatchEmergencyCallErrors[keyof DispatchEmergencyCallErrors];
+
+export type DispatchEmergencyCallResponses = {
+    /**
+     * Created
+     */
+    201: DispatchDetail;
+};
+
+export type DispatchEmergencyCallResponse = DispatchEmergencyCallResponses[keyof DispatchEmergencyCallResponses];
+
+export type ListEmergencyCancellationRequestsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        Status?: CancellationRequestStatus;
+        Page?: number;
+        PageSize?: number;
+    };
+    url: '/emergency-cancellation-requests';
+};
+
+export type ListEmergencyCancellationRequestsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListEmergencyCancellationRequestsError = ListEmergencyCancellationRequestsErrors[keyof ListEmergencyCancellationRequestsErrors];
+
+export type ListEmergencyCancellationRequestsResponses = {
+    /**
+     * OK
+     */
+    200: EmergencyCancellationRequestPagedResult;
+};
+
+export type ListEmergencyCancellationRequestsResponse = ListEmergencyCancellationRequestsResponses[keyof ListEmergencyCancellationRequestsResponses];
+
+export type ApproveEmergencyCancellationRequestData = {
+    body?: ReviewCancellationRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/emergency-calls/{id}/cancellation-request/approve';
+};
+
+export type ApproveEmergencyCancellationRequestErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ApproveEmergencyCancellationRequestError = ApproveEmergencyCancellationRequestErrors[keyof ApproveEmergencyCancellationRequestErrors];
+
+export type ApproveEmergencyCancellationRequestResponses = {
+    /**
+     * OK
+     */
+    200: EmergencyCancellationRequest;
+};
+
+export type ApproveEmergencyCancellationRequestResponse = ApproveEmergencyCancellationRequestResponses[keyof ApproveEmergencyCancellationRequestResponses];
+
+export type RejectEmergencyCancellationRequestData = {
+    body?: ReviewCancellationRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/emergency-calls/{id}/cancellation-request/reject';
+};
+
+export type RejectEmergencyCancellationRequestErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RejectEmergencyCancellationRequestError = RejectEmergencyCancellationRequestErrors[keyof RejectEmergencyCancellationRequestErrors];
+
+export type RejectEmergencyCancellationRequestResponses = {
+    /**
+     * OK
+     */
+    200: EmergencyCancellationRequest;
+};
+
+export type RejectEmergencyCancellationRequestResponse = RejectEmergencyCancellationRequestResponses[keyof RejectEmergencyCancellationRequestResponses];
+
 export type ListDischargeCandidatesData = {
     body?: never;
     path?: never;
@@ -3486,6 +3774,92 @@ export type ConfirmDischargeResponses = {
 };
 
 export type ConfirmDischargeResponse = ConfirmDischargeResponses[keyof ConfirmDischargeResponses];
+
+export type CancelDispatchData = {
+    body?: CancelDispatchRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/dispatches/{id}/cancel';
+};
+
+export type CancelDispatchErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CancelDispatchError = CancelDispatchErrors[keyof CancelDispatchErrors];
+
+export type CancelDispatchResponses = {
+    /**
+     * OK
+     */
+    200: DispatchDetail;
+};
+
+export type CancelDispatchResponse = CancelDispatchResponses[keyof CancelDispatchResponses];
+
+export type ReassignDispatchData = {
+    body?: ReassignDispatchRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/dispatches/{id}/reassign';
+};
+
+export type ReassignDispatchErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ReassignDispatchError = ReassignDispatchErrors[keyof ReassignDispatchErrors];
+
+export type ReassignDispatchResponses = {
+    /**
+     * OK
+     */
+    200: DispatchDetail;
+};
+
+export type ReassignDispatchResponse = ReassignDispatchResponses[keyof ReassignDispatchResponses];
 
 export type ListEquipmentCategoriesData = {
     body?: never;
@@ -4415,6 +4789,296 @@ export type GetMyEmergencyCallsResponses = {
 };
 
 export type GetMyEmergencyCallsResponse = GetMyEmergencyCallsResponses[keyof GetMyEmergencyCallsResponses];
+
+export type TrackMyEmergencyCallData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/emergency-calls/{id}/tracking';
+};
+
+export type TrackMyEmergencyCallErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type TrackMyEmergencyCallError = TrackMyEmergencyCallErrors[keyof TrackMyEmergencyCallErrors];
+
+export type TrackMyEmergencyCallResponses = {
+    /**
+     * OK
+     */
+    200: MyCallTracking;
+};
+
+export type TrackMyEmergencyCallResponse = TrackMyEmergencyCallResponses[keyof TrackMyEmergencyCallResponses];
+
+export type CancelMyEmergencyCallData = {
+    body?: RequestCancellationRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/emergency-calls/{id}/cancel';
+};
+
+export type CancelMyEmergencyCallErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CancelMyEmergencyCallError = CancelMyEmergencyCallErrors[keyof CancelMyEmergencyCallErrors];
+
+export type CancelMyEmergencyCallResponses = {
+    /**
+     * OK
+     */
+    200: MyEmergencyCallSummary;
+};
+
+export type CancelMyEmergencyCallResponse = CancelMyEmergencyCallResponses[keyof CancelMyEmergencyCallResponses];
+
+export type RequestMyEmergencyCallCancellationData = {
+    body?: RequestCancellationRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/emergency-calls/{id}/cancellation-request';
+};
+
+export type RequestMyEmergencyCallCancellationErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RequestMyEmergencyCallCancellationError = RequestMyEmergencyCallCancellationErrors[keyof RequestMyEmergencyCallCancellationErrors];
+
+export type RequestMyEmergencyCallCancellationResponses = {
+    /**
+     * Created
+     */
+    201: EmergencyCancellationRequest;
+};
+
+export type RequestMyEmergencyCallCancellationResponse = RequestMyEmergencyCallCancellationResponses[keyof RequestMyEmergencyCallCancellationResponses];
+
+export type GetMyActiveDispatchData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/me/dispatches/active';
+};
+
+export type GetMyActiveDispatchErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetMyActiveDispatchError = GetMyActiveDispatchErrors[keyof GetMyActiveDispatchErrors];
+
+export type GetMyActiveDispatchResponses = {
+    /**
+     * OK
+     */
+    200: DispatchDetail;
+};
+
+export type GetMyActiveDispatchResponse = GetMyActiveDispatchResponses[keyof GetMyActiveDispatchResponses];
+
+export type AcknowledgeMyDispatchData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/dispatches/{id}/acknowledge';
+};
+
+export type AcknowledgeMyDispatchErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type AcknowledgeMyDispatchError = AcknowledgeMyDispatchErrors[keyof AcknowledgeMyDispatchErrors];
+
+export type AcknowledgeMyDispatchResponses = {
+    /**
+     * OK
+     */
+    200: DispatchDetail;
+};
+
+export type AcknowledgeMyDispatchResponse = AcknowledgeMyDispatchResponses[keyof AcknowledgeMyDispatchResponses];
+
+export type DeclineMyDispatchData = {
+    body?: DeclineDispatchRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/dispatches/{id}/decline';
+};
+
+export type DeclineMyDispatchErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type DeclineMyDispatchError = DeclineMyDispatchErrors[keyof DeclineMyDispatchErrors];
+
+export type DeclineMyDispatchResponses = {
+    /**
+     * OK
+     */
+    200: DispatchDetail;
+};
+
+export type DeclineMyDispatchResponse = DeclineMyDispatchResponses[keyof DeclineMyDispatchResponses];
+
+export type UpdateMyDispatchStatusData = {
+    body?: UpdateMyDispatchStatusRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/dispatches/{id}/status';
+};
+
+export type UpdateMyDispatchStatusErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type UpdateMyDispatchStatusError = UpdateMyDispatchStatusErrors[keyof UpdateMyDispatchStatusErrors];
+
+export type UpdateMyDispatchStatusResponses = {
+    /**
+     * OK
+     */
+    200: DispatchDetail;
+};
+
+export type UpdateMyDispatchStatusResponse = UpdateMyDispatchStatusResponses[keyof UpdateMyDispatchStatusResponses];
+
+export type RecordHandoverData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/dispatches/{id}/handover';
+};
+
+export type RecordHandoverErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RecordHandoverError = RecordHandoverErrors[keyof RecordHandoverErrors];
+
+export type RecordHandoverResponses = {
+    /**
+     * OK
+     */
+    200: DispatchDetail;
+};
+
+export type RecordHandoverResponse = RecordHandoverResponses[keyof RecordHandoverResponses];
 
 export type PreRegisterSelfData = {
     body?: PreRegisterRequest;

@@ -38,6 +38,7 @@ dependencies:
 
   # `tel:` links — calling the hospital or your own emergency contact.
   url_launcher: ^6.3.2
+  geolocator: ^14.0.2
 
   # OPD lab reports: photograph a printed report, or attach its PDF.
   image_picker: ^1.1.2

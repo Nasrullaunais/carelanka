@@ -327,7 +327,7 @@ decide the winner.
 **Exit criteria:** a Duty Manager can manually dispatch an eligible ambulance and the
 assigned crew can take it through handover using API tests.
 
-### Phase 4 — Dispatcher React vertical slice
+### Phase 4 — Dispatcher React vertical slice — **COMPLETE 2026-09-14**
 
 **Goal:** operate the manual workflow without Swagger or direct database access.
 
@@ -365,7 +365,7 @@ Screens and behaviour:
 **Exit criteria:** a crew member can acknowledge, navigate, progress and hand over; a
 different crew member receives `403` for the same dispatch.
 
-### Phase 6 — Live location and patient tracking
+### Phase 6 — Live location and patient tracking — **COMPLETE 2026-09-14**
 
 **Goal:** answer the waiting caller's two questions: “Is it coming?” and “How long?”
 

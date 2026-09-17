@@ -337,6 +337,8 @@ builder.Services.AddSingleton<IAmbulanceEligibilityService, AmbulanceEligibility
 builder.Services.AddScoped<IAmbulanceService, AmbulanceService>();
 builder.Services.AddScoped<IAmbulanceCrewService, AmbulanceCrewService>();
 builder.Services.AddScoped<IEmergencyCallService, EmergencyCallService>();
+builder.Services.AddScoped<IDispatchService, DispatchService>();
+builder.Services.AddHostedService<UnacknowledgedDispatchAlertWorker>();
 builder.Services.AddScoped<IStaffLookupService, StubStaffLookupService>();
 builder.Services.AddSingleton<IAmbulanceDistanceService, StubAmbulanceDistanceService>();
 

@@ -7,6 +7,7 @@ using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Emergency;
 using CareLanka.Api.Services.Common;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Npgsql;
 using EmergencyCallEntity = CareLanka.Api.Data.Entities.Emergency.EmergencyCall;
 
@@ -17,15 +18,21 @@ public sealed class EmergencyCallService : IEmergencyCallService
     private readonly CareLankaDbContext _db;
     private readonly ICurrentUser _currentUser;
     private readonly TimeProvider _timeProvider;
+    private readonly EmergencyOptions _options;
+    private readonly IDispatchService _dispatches;
 
     public EmergencyCallService(
         CareLankaDbContext db,
         ICurrentUser currentUser,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IOptions<EmergencyOptions> options,
+        IDispatchService dispatches)
     {
         _db = db;
         _currentUser = currentUser;
         _timeProvider = timeProvider;
+        _options = options.Value;
+        _dispatches = dispatches;
     }
 
     public async Task<EmergencyCallDetail> CreateAsync(
@@ -134,7 +141,7 @@ public sealed class EmergencyCallService : IEmergencyCallService
         if (request.UnassignedOnly)
         {
             query = query.Where(call => !call.Dispatches.Any(dispatch =>
-                dispatch.Status == DispatchStatus.Assigned || dispatch.Status == DispatchStatus.EnRoute));
+                DispatchStatusExtensions.LiveStatuses.Contains(dispatch.Status)));
         }
 
         var totalItems = await query.CountAsync(cancellationToken);
@@ -145,8 +152,7 @@ public sealed class EmergencyCallService : IEmergencyCallService
             {
                 Call = call,
                 ActiveDispatchId = call.Dispatches
-                    .Where(dispatch => dispatch.Status == DispatchStatus.Assigned
-                        || dispatch.Status == DispatchStatus.EnRoute)
+                    .Where(dispatch => DispatchStatusExtensions.LiveStatuses.Contains(dispatch.Status))
                     .Select(dispatch => (Guid?)dispatch.Id)
                     .FirstOrDefault()
             })
@@ -178,6 +184,7 @@ public sealed class EmergencyCallService : IEmergencyCallService
                 PatientIsCaller = call.PatientIsCaller,
                 Priority = call.Priority,
                 Status = call.Status,
+                CancellationRequestStatus = call.CancellationRequestStatus,
                 CreatedAt = call.CreatedAt
             })
             .ToListAsync(cancellationToken);
@@ -244,6 +251,100 @@ public sealed class EmergencyCallService : IEmergencyCallService
         return await DetailAsync(id, cancellationToken);
     }
 
+    public async Task<MyCallTracking> TrackMineAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var callerId = PatientCallerId();
+        var call = await _db.EmergencyCalls.AsNoTracking()
+            .Where(item => item.Id == id)
+            .Select(item => new
+            {
+                item.Id, item.CallerUserId, item.Status, item.CancellationRequestStatus,
+                Dispatch = item.Dispatches.Where(dispatch => DispatchStatusExtensions.LiveStatuses.Contains(dispatch.Status))
+                    .Select(dispatch => new { dispatch.Status, dispatch.DispatchedAt, dispatch.Ambulance.CurrentLatitude, dispatch.Ambulance.CurrentLongitude, dispatch.Ambulance.LocationUpdatedAt })
+                    .FirstOrDefault()
+            }).SingleOrDefaultAsync(cancellationToken)
+            ?? throw new NotFoundException("Emergency call", id);
+        if (call.CallerUserId != callerId) throw new ForbiddenException(MessageCode.Forbidden);
+        if (call.Dispatch is null) throw new NotFoundException("Live emergency tracking", id);
+        var updatedAt = call.Dispatch.LocationUpdatedAt ?? call.Dispatch.DispatchedAt;
+        var stale = _timeProvider.GetUtcNow() - updatedAt > TimeSpan.FromMinutes(_options.LocationMaxAgeMinutes);
+        return new MyCallTracking
+        {
+            EmergencyCallId = call.Id,
+            CallStatus = call.Status,
+            AmbulanceIsOnTheWay = call.Dispatch.Status is DispatchStatus.Assigned or DispatchStatus.Acknowledged or DispatchStatus.EnRouteToScene,
+            AmbulanceLatitude = call.Dispatch.CurrentLatitude,
+            AmbulanceLongitude = call.Dispatch.CurrentLongitude,
+            AmbulanceLocationIsStale = stale,
+            EstimatedMinutesToArrival = null,
+            CancellationRequestStatus = call.CancellationRequestStatus,
+            UpdatedAt = updatedAt
+        };
+    }
+
+    public async Task<MyEmergencyCallSummary> CancelMineAsync(Guid id, RequestCancellationRequest request, CancellationToken cancellationToken = default)
+    {
+        var call = await MineAsync(id, cancellationToken);
+        if (call.Dispatches.Any()) throw new ConflictException(MessageCode.IllegalTransition);
+        if (call.Status != CallStatus.Received) throw new ConflictException(MessageCode.IllegalTransition);
+        call.Status = CallStatus.Cancelled;
+        await _db.SaveChangesAsync(cancellationToken);
+        return ToMine(call);
+    }
+
+    public async Task<EmergencyCancellationRequest> RequestCancellationAsync(Guid id, RequestCancellationRequest request, CancellationToken cancellationToken = default)
+    {
+        var call = await MineAsync(id, cancellationToken);
+        if (!call.Dispatches.Any(dispatch => DispatchStatusExtensions.LiveStatuses.Contains(dispatch.Status)))
+            throw new ConflictException(MessageCode.IllegalTransition);
+        if (call.CancellationRequestStatus == CancellationRequestStatus.Pending)
+            throw new ConflictException(MessageCode.Conflict);
+        call.CancellationRequestStatus = CancellationRequestStatus.Pending;
+        call.CancellationRequestReason = request.Reason!.Trim();
+        call.CancellationRequestedAt = _timeProvider.GetUtcNow();
+        await _db.SaveChangesAsync(cancellationToken);
+        return ToCancellationRequest(call);
+    }
+
+    public async Task<PagedResult<EmergencyCancellationRequest>> ListCancellationRequestsAsync(
+        CancellationRequestListRequest request, CancellationToken cancellationToken = default)
+    {
+        var query = _db.EmergencyCalls.AsNoTracking()
+            .Where(call => call.CancellationRequestStatus != null);
+        if (request.Status is { } status) query = query.Where(call => call.CancellationRequestStatus == status);
+        var totalItems = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderBy(call => call.CancellationRequestStatus == CancellationRequestStatus.Pending ? 0 : 1)
+            .ThenByDescending(call => call.CancellationRequestedAt)
+            .ThenBy(call => call.Id)
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .ToListAsync(cancellationToken);
+        return PagedResult<EmergencyCancellationRequest>.From(
+            items.Select(ToCancellationRequest).ToList(), request.Page, request.PageSize, totalItems);
+    }
+
+    public async Task<EmergencyCancellationRequest> ApproveCancellationRequestAsync(
+        Guid id, ReviewCancellationRequest request, CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        var call = await LoadPendingCancellationAsync(id, cancellationToken);
+        await _dispatches.CancelForApprovedCancellationRequestAsync(id, cancellationToken);
+        ReviewCancellation(call, CancellationRequestStatus.Approved, request.Notes);
+        await _db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return ToCancellationRequest(call);
+    }
+
+    public async Task<EmergencyCancellationRequest> RejectCancellationRequestAsync(
+        Guid id, ReviewCancellationRequest request, CancellationToken cancellationToken = default)
+    {
+        var call = await LoadPendingCancellationAsync(id, cancellationToken);
+        ReviewCancellation(call, CancellationRequestStatus.Rejected, request.Notes);
+        await _db.SaveChangesAsync(cancellationToken);
+        return ToCancellationRequest(call);
+    }
+
     private async Task<EmergencyCallDetail> DetailAsync(Guid id, CancellationToken cancellationToken)
     {
         var call = await _db.EmergencyCalls.AsNoTracking()
@@ -266,6 +367,49 @@ public sealed class EmergencyCallService : IEmergencyCallService
             .ToList();
         return response;
     }
+
+    private async Task<EmergencyCallEntity> MineAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var call = await _db.EmergencyCalls.Include(call => call.Dispatches)
+            .SingleOrDefaultAsync(call => call.Id == id, cancellationToken)
+            ?? throw new NotFoundException("Emergency call", id);
+        if (call.CallerUserId != PatientCallerId()) throw new ForbiddenException(MessageCode.Forbidden);
+        return call;
+    }
+
+    private async Task<EmergencyCallEntity> LoadPendingCancellationAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var call = await _db.EmergencyCalls.SingleOrDefaultAsync(call => call.Id == id, cancellationToken)
+            ?? throw new NotFoundException("Emergency call", id);
+        if (call.CancellationRequestStatus != CancellationRequestStatus.Pending)
+            throw new ConflictException(MessageCode.IllegalTransition);
+        return call;
+    }
+
+    private void ReviewCancellation(EmergencyCallEntity call, CancellationRequestStatus status, string? notes)
+    {
+        call.CancellationRequestStatus = status;
+        call.CancellationReviewedAt = _timeProvider.GetUtcNow();
+        call.CancellationReviewedByStaffId = _currentUser.Id;
+        call.CancellationReviewNotes = Clean(notes);
+    }
+
+    private static MyEmergencyCallSummary ToMine(EmergencyCallEntity call) => new()
+    {
+        Id = call.Id, PatientIsCaller = call.PatientIsCaller, Priority = call.Priority,
+        Status = call.Status, CancellationRequestStatus = call.CancellationRequestStatus, CreatedAt = call.CreatedAt
+    };
+
+    private static EmergencyCancellationRequest ToCancellationRequest(EmergencyCallEntity call) => new()
+    {
+        EmergencyCallId = call.Id,
+        Status = call.CancellationRequestStatus!.Value,
+        Reason = call.CancellationRequestReason!,
+        RequestedAt = call.CancellationRequestedAt!.Value,
+        ReviewedAt = call.CancellationReviewedAt,
+        ReviewedByStaffId = call.CancellationReviewedByStaffId,
+        ReviewNotes = call.CancellationReviewNotes
+    };
 
     private async Task EnsurePatientLinkBelongsToCallerAsync(
         CreateEmergencyCallRequest request,
@@ -349,6 +493,7 @@ public sealed class EmergencyCallService : IEmergencyCallService
         Status = call.Status,
         Outcome = call.Outcome,
         Transported = call.Transported,
+        CancellationRequestStatus = call.CancellationRequestStatus,
         CreatedAt = call.CreatedAt,
         UpdatedAt = call.UpdatedAt
     };

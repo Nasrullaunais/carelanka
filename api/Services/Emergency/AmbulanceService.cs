@@ -73,8 +73,7 @@ public sealed class AmbulanceService : IAmbulanceService
             : new Dictionary<Guid, double?>();
         var activeDispatches = await _db.Dispatches
             .AsNoTracking()
-            .Where(dispatch => dispatch.Status == DispatchStatus.Assigned
-                || dispatch.Status == DispatchStatus.EnRoute)
+            .Where(dispatch => DispatchStatusExtensions.LiveStatuses.Contains(dispatch.Status))
             .Select(dispatch => new { dispatch.AmbulanceId, dispatch.Id })
             .ToDictionaryAsync(dispatch => dispatch.AmbulanceId, dispatch => dispatch.Id, cancellationToken);
         var crewCounts = await _db.AmbulanceCrewAssignments
@@ -269,6 +268,20 @@ public sealed class AmbulanceService : IAmbulanceService
         return ToResponse(ambulance);
     }
 
+    public async Task ReportLocationAsync(Guid id, ReportAmbulanceLocationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var ambulance = await GetEntityAsync(id, cancellationToken);
+        var ownsLiveRun = await _db.DispatchCrew.AnyAsync(crew =>
+            crew.StaffMemberId == _currentUser.Id && crew.Dispatch.AmbulanceId == id
+            && DispatchStatusExtensions.LiveStatuses.Contains(crew.Dispatch.Status), cancellationToken);
+        if (!ownsLiveRun) throw new ForbiddenException(MessageCode.Forbidden);
+        ambulance.CurrentLatitude = request.Latitude!.Value;
+        ambulance.CurrentLongitude = request.Longitude!.Value;
+        ambulance.LocationUpdatedAt = _timeProvider.GetUtcNow();
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+
     private static AmbulanceResponse ToResponse(AmbulanceEntity ambulance) => new()
     {
         Id = ambulance.Id,
@@ -299,8 +312,7 @@ public sealed class AmbulanceService : IAmbulanceService
         var assigned = await _db.DispatchCrew.AnyAsync(crew =>
             crew.StaffMemberId == _currentUser.Id
             && crew.Dispatch.AmbulanceId == ambulanceId
-            && (crew.Dispatch.Status == DispatchStatus.Assigned
-                || crew.Dispatch.Status == DispatchStatus.EnRoute), cancellationToken);
+            && DispatchStatusExtensions.LiveStatuses.Contains(crew.Dispatch.Status), cancellationToken);
 
         if (!assigned)
         {
@@ -312,8 +324,7 @@ public sealed class AmbulanceService : IAmbulanceService
     {
         var active = await _db.Dispatches.AnyAsync(dispatch =>
             dispatch.AmbulanceId == ambulanceId
-            && (dispatch.Status == DispatchStatus.Assigned
-                || dispatch.Status == DispatchStatus.EnRoute), cancellationToken);
+            && DispatchStatusExtensions.LiveStatuses.Contains(dispatch.Status), cancellationToken);
 
         if (active)
         {

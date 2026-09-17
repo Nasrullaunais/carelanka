@@ -357,6 +357,14 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTimeOffset?>("AcknowledgedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("acknowledged_at");
+
+                    b.Property<Guid?>("AcknowledgedByStaffId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("acknowledged_by_staff_id");
+
                     b.Property<Guid>("AmbulanceId")
                         .HasColumnType("uuid")
                         .HasColumnName("ambulance_id");
@@ -368,6 +376,11 @@ namespace CareLanka.Api.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<string>("DeclinedReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("declined_reason");
 
                     b.Property<Guid?>("DestinationWardId")
                         .HasColumnType("uuid")
@@ -383,13 +396,17 @@ namespace CareLanka.Api.Data.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
                         .HasColumnName("status");
 
                     b.Property<Guid?>("SupersededByDispatchId")
                         .HasColumnType("uuid")
                         .HasColumnName("superseded_by_dispatch_id");
+
+                    b.Property<DateTimeOffset?>("UnacknowledgedAlertedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("unacknowledged_alerted_at");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -401,13 +418,15 @@ namespace CareLanka.Api.Data.Migrations
                     b.HasIndex("AmbulanceId")
                         .IsUnique()
                         .HasDatabaseName("ux_dispatches_active_ambulance")
-                        .HasFilter("status IN ('assigned', 'en_route')");
+                        .HasFilter("status IN ('assigned', 'acknowledged', 'en_route_to_scene', 'at_scene', 'transporting_to_hospital')");
 
                     b.HasIndex("DestinationWardId")
                         .HasDatabaseName("ix_dispatches_destination_ward_id");
 
                     b.HasIndex("EmergencyCallId")
-                        .HasDatabaseName("ix_dispatches_emergency_call_id");
+                        .IsUnique()
+                        .HasDatabaseName("ux_dispatches_active_emergency_call")
+                        .HasFilter("status IN ('assigned', 'acknowledged', 'en_route_to_scene', 'at_scene', 'transporting_to_hospital')");
 
                     b.HasIndex("SupersededByDispatchId")
                         .HasDatabaseName("ix_dispatches_superseded_by_dispatch_id");
@@ -417,7 +436,7 @@ namespace CareLanka.Api.Data.Migrations
 
                     b.ToTable("dispatches", null, t =>
                         {
-                            t.HasCheckConstraint("ck_dispatches_status", "status IN ('assigned', 'en_route', 'completed', 'cancelled', 'reassigned')");
+                            t.HasCheckConstraint("ck_dispatches_status", "status IN ('assigned', 'acknowledged', 'en_route_to_scene', 'at_scene', 'transporting_to_hospital', 'handed_over', 'declined', 'cancelled', 'reassigned')");
                         });
                 });
 
@@ -478,6 +497,33 @@ namespace CareLanka.Api.Data.Migrations
                     b.Property<Guid?>("CallerUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("caller_user_id");
+
+                    b.Property<string>("CancellationRequestReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("cancellation_request_reason");
+
+                    b.Property<string>("CancellationRequestStatus")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("cancellation_request_status");
+
+                    b.Property<DateTimeOffset?>("CancellationRequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cancellation_requested_at");
+
+                    b.Property<string>("CancellationReviewNotes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("cancellation_review_notes");
+
+                    b.Property<DateTimeOffset?>("CancellationReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cancellation_reviewed_at");
+
+                    b.Property<Guid?>("CancellationReviewedByStaffId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cancellation_reviewed_by_staff_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -549,6 +595,9 @@ namespace CareLanka.Api.Data.Migrations
 
                     b.HasIndex("CallerUserId")
                         .HasDatabaseName("ix_emergency_calls_caller_user_id");
+
+                    b.HasIndex("CancellationReviewedByStaffId")
+                        .HasDatabaseName("ix_emergency_calls_cancellation_reviewed_by_staff_id");
 
                     b.HasIndex("IdempotencyKey")
                         .IsUnique()
@@ -2409,6 +2458,12 @@ namespace CareLanka.Api.Data.Migrations
                         .HasForeignKey("CallerUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_emergency_calls_patient_accounts_caller_user_id");
+
+                    b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", null)
+                        .WithMany()
+                        .HasForeignKey("CancellationReviewedByStaffId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_emergency_calls_staff_members_cancellation_reviewed_by_staf");
 
                     b.HasOne("CareLanka.Api.Data.Entities.Patient.Patient", null)
                         .WithMany()

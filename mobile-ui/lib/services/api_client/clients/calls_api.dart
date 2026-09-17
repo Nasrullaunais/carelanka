@@ -8,9 +8,11 @@ import 'package:retrofit/retrofit.dart';
 import '../models/call_priority.dart';
 import '../models/call_status.dart';
 import '../models/create_emergency_call_request.dart';
+import '../models/dispatch_detail.dart';
 import '../models/emergency_call_detail.dart';
 import '../models/emergency_call_sort_field.dart';
 import '../models/emergency_call_summary_paged_result.dart';
+import '../models/manual_dispatch_request.dart';
 import '../models/sort_dir.dart';
 import '../models/update_emergency_call_request.dart';
 
@@ -48,5 +50,11 @@ abstract class CallsApi {
   Future<EmergencyCallDetail> updateEmergencyCall({
     @Path('id') required String id,
     @Body() required UpdateEmergencyCallRequest body,
+  });
+
+  @POST('/emergency-calls/{id}/dispatch')
+  Future<DispatchDetail> dispatchEmergencyCall({
+    @Path('id') required String id,
+    @Body() ManualDispatchRequest? body,
   });
 }

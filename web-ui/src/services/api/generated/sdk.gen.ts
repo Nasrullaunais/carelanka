@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddAppointmentBillChargeData, AddAppointmentBillChargeErrors, AddAppointmentBillChargeResponses, AddBillChargeData, AddBillChargeErrors, AddBillChargeResponses, AssignBedManuallyData, AssignBedManuallyErrors, AssignBedManuallyResponses, AssignCurrentAmbulanceCrewData, AssignCurrentAmbulanceCrewErrors, AssignCurrentAmbulanceCrewResponses, AssignEquipmentItemData, AssignEquipmentItemErrors, AssignEquipmentItemResponses, BookMyAppointmentData, BookMyAppointmentErrors, BookMyAppointmentResponses, CancelAdmissionData, CancelAdmissionErrors, CancelAdmissionResponses, CancelAppointmentAtTheDeskData, CancelAppointmentAtTheDeskErrors, CancelAppointmentAtTheDeskResponses, CancelMyAppointmentData, CancelMyAppointmentErrors, CancelMyAppointmentResponses, CheckInAppointmentData, CheckInAppointmentErrors, CheckInAppointmentResponses, ClaimMyRecordData, ClaimMyRecordErrors, ClaimMyRecordResponses, CompleteAdmissionDetailsData, CompleteAdmissionDetailsErrors, CompleteAdmissionDetailsResponses, CompleteAppointmentData, CompleteAppointmentErrors, CompleteAppointmentResponses, CompleteVisitData, CompleteVisitErrors, CompleteVisitResponses, ConfirmAppointmentData, ConfirmAppointmentErrors, ConfirmAppointmentResponses, ConfirmDischargeData, ConfirmDischargeErrors, ConfirmDischargeResponses, ConfirmEquipmentItemData, ConfirmEquipmentItemErrors, ConfirmEquipmentItemResponses, ConfirmMaintenanceScheduleData, ConfirmMaintenanceScheduleErrors, ConfirmMaintenanceScheduleResponses, CorrectBedData, CorrectBedErrors, CorrectBedResponses, CountEquipmentItemsAwaitingConfirmationData, CountEquipmentItemsAwaitingConfirmationErrors, CountEquipmentItemsAwaitingConfirmationResponses, CountMaintenanceSchedulesAwaitingConfirmationData, CountMaintenanceSchedulesAwaitingConfirmationErrors, CountMaintenanceSchedulesAwaitingConfirmationResponses, CreateAdmissionData, CreateAdmissionErrors, CreateAdmissionResponses, CreateAmbulanceData, CreateAmbulanceErrors, CreateAmbulanceResponses, CreateAppointmentData, CreateAppointmentErrors, CreateAppointmentResponses, CreateBedData, CreateBedErrors, CreateBedResponses, CreateEmergencyCallData, CreateEmergencyCallErrors, CreateEmergencyCallResponses, CreateEquipmentCategoryData, CreateEquipmentCategoryErrors, CreateEquipmentCategoryResponses, CreateEquipmentItemData, CreateEquipmentItemErrors, CreateEquipmentItemResponses, CreateMaintenanceScheduleData, CreateMaintenanceScheduleErrors, CreateMaintenanceScheduleResponses, CreatePatientData, CreatePatientErrors, CreatePatientResponses, CreatePharmacyCategoryData, CreatePharmacyCategoryErrors, CreatePharmacyCategoryResponses, CreatePharmacyItemData, CreatePharmacyItemErrors, CreatePharmacyItemResponses, CreateWardData, CreateWardErrors, CreateWardResponses, DownloadLabReportData, DownloadLabReportErrors, DownloadLabReportResponses, DownloadMyLabReportData, DownloadMyLabReportErrors, DownloadMyLabReportResponses, DownloadPrescriptionData, DownloadPrescriptionErrors, DownloadPrescriptionResponses, GetAdmissionBillData, GetAdmissionBillErrors, GetAdmissionBillResponses, GetAdmissionData, GetAdmissionErrors, GetAdmissionResponses, GetAmbulanceData, GetAmbulanceErrors, GetAmbulanceResponses, GetAppointmentBillData, GetAppointmentBillErrors, GetAppointmentBillResponses, GetBedOccupancyData, GetBedOccupancyErrors, GetBedOccupancyResponses, GetBillingRatesData, GetBillingRatesErrors, GetBillingRatesResponses, GetCurrentAmbulanceCrewData, GetCurrentAmbulanceCrewErrors, GetCurrentAmbulanceCrewResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetEmergencyCallData, GetEmergencyCallErrors, GetEmergencyCallResponses, GetEquipmentItemByTagData, GetEquipmentItemByTagErrors, GetEquipmentItemByTagResponses, GetEquipmentItemData, GetEquipmentItemErrors, GetEquipmentItemResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetMyAdmissionData, GetMyAdmissionErrors, GetMyAdmissionResponses, GetMyAppointmentBillData, GetMyAppointmentBillErrors, GetMyAppointmentBillResponses, GetMyBillData, GetMyBillErrors, GetMyBillResponses, GetMyEmergencyCallsData, GetMyEmergencyCallsErrors, GetMyEmergencyCallsResponses, GetMyHistoryData, GetMyHistoryErrors, GetMyHistoryResponses, GetMyLabReportsData, GetMyLabReportsErrors, GetMyLabReportsResponses, GetMyProfileData, GetMyProfileErrors, GetMyProfileResponses, GetPatientData, GetPatientErrors, GetPatientResponses, GetPharmacyItemData, GetPharmacyItemErrors, GetPharmacyItemResponses, GetWardCapacityData, GetWardCapacityErrors, GetWardCapacityResponses, GetWardOccupancyData, GetWardOccupancyErrors, GetWardOccupancyResponses, LinkPatientAccountData, LinkPatientAccountErrors, LinkPatientAccountResponses, ListAdmissionsData, ListAdmissionsErrors, ListAdmissionsResponses, ListAmbulancesData, ListAmbulancesErrors, ListAmbulancesResponses, ListAppointmentsData, ListAppointmentsErrors, ListAppointmentsResponses, ListBedAvailabilityData, ListBedAvailabilityErrors, ListBedAvailabilityResponses, ListBedsData, ListBedsErrors, ListBedsResponses, ListDischargeCandidatesData, ListDischargeCandidatesErrors, ListDischargeCandidatesResponses, ListEmergencyCallsData, ListEmergencyCallsErrors, ListEmergencyCallsResponses, ListEquipmentCategoriesData, ListEquipmentCategoriesErrors, ListEquipmentCategoriesResponses, ListEquipmentItemsAwaitingConfirmationData, ListEquipmentItemsAwaitingConfirmationErrors, ListEquipmentItemsAwaitingConfirmationResponses, ListEquipmentItemsData, ListEquipmentItemsErrors, ListEquipmentItemsResponses, ListLabReportsData, ListLabReportsErrors, ListLabReportsResponses, ListMaintenanceSchedulesAwaitingConfirmationData, ListMaintenanceSchedulesAwaitingConfirmationErrors, ListMaintenanceSchedulesAwaitingConfirmationResponses, ListMaintenanceSchedulesData, ListMaintenanceSchedulesErrors, ListMaintenanceSchedulesResponses, ListMyAppointmentsData, ListMyAppointmentsErrors, ListMyAppointmentsResponses, ListMyPrescriptionsData, ListMyPrescriptionsErrors, ListMyPrescriptionsResponses, ListOutstandingBillsData, ListOutstandingBillsErrors, ListOutstandingBillsResponses, ListPatientsData, ListPatientsErrors, ListPatientsResponses, ListPatientWorklistData, ListPatientWorklistErrors, ListPatientWorklistResponses, ListPharmacyCategoriesData, ListPharmacyCategoriesErrors, ListPharmacyCategoriesResponses, ListPharmacyItemsData, ListPharmacyItemsErrors, ListPharmacyItemsResponses, ListPharmacyTransactionsData, ListPharmacyTransactionsErrors, ListPharmacyTransactionsResponses, ListPrescriptionsData, ListPrescriptionsErrors, ListPrescriptionsResponses, ListWardPatientsData, ListWardPatientsErrors, ListWardPatientsResponses, ListWardsData, ListWardsErrors, ListWardsResponses, LoginData, LoginErrors, LoginPatientData, LoginPatientErrors, LoginPatientResponses, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, LookupPatientData, LookupPatientErrors, LookupPatientResponses, MarkAppointmentNoShowData, MarkAppointmentNoShowErrors, MarkAppointmentNoShowResponses, MarkArrivedData, MarkArrivedErrors, MarkArrivedResponses, MarkPrescriptionDeliveredData, MarkPrescriptionDeliveredErrors, MarkPrescriptionDeliveredResponses, MarkPrescriptionReadyData, MarkPrescriptionReadyErrors, MarkPrescriptionReadyResponses, PrepareAdmissionBillData, PrepareAdmissionBillErrors, PrepareAdmissionBillResponses, PrepareAppointmentBillData, PrepareAppointmentBillErrors, PrepareAppointmentBillResponses, PreRegisterSelfData, PreRegisterSelfErrors, PreRegisterSelfResponses, PreviewMyClaimData, PreviewMyClaimErrors, PreviewMyClaimResponses, RecordPharmacyTransactionData, RecordPharmacyTransactionErrors, RecordPharmacyTransactionResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RegisterPatientAccountData, RegisterPatientAccountErrors, RegisterPatientAccountResponses, ReinstateAmbulanceData, ReinstateAmbulanceErrors, ReinstateAmbulanceResponses, RejectEquipmentItemData, RejectEquipmentItemErrors, RejectEquipmentItemResponses, RejectPrescriptionData, RejectPrescriptionErrors, RejectPrescriptionResponses, ReleaseEquipmentItemData, ReleaseEquipmentItemErrors, ReleaseEquipmentItemResponses, RemoveAppointmentBillChargeData, RemoveAppointmentBillChargeErrors, RemoveAppointmentBillChargeResponses, RemoveBillChargeData, RemoveBillChargeErrors, RemoveBillChargeResponses, ReportEquipmentFaultData, ReportEquipmentFaultErrors, ReportEquipmentFaultResponses, RetireAmbulanceData, RetireAmbulanceErrors, RetireAmbulanceResponses, RetireBedData, RetireBedErrors, RetireBedResponses, SettleAppointmentBillData, SettleAppointmentBillErrors, SettleAppointmentBillResponses, SettleBillData, SettleBillErrors, SettleBillResponses, UnassignCurrentAmbulanceCrewData, UnassignCurrentAmbulanceCrewErrors, UnassignCurrentAmbulanceCrewResponses, UpdateAmbulanceData, UpdateAmbulanceErrors, UpdateAmbulanceResponses, UpdateBedData, UpdateBedErrors, UpdateBedResponses, UpdateBillingRatesData, UpdateBillingRatesErrors, UpdateBillingRatesResponses, UpdateDischargeChecklistData, UpdateDischargeChecklistErrors, UpdateDischargeChecklistResponses, UpdateEmergencyCallData, UpdateEmergencyCallErrors, UpdateEmergencyCallResponses, UpdateEquipmentItemData, UpdateEquipmentItemErrors, UpdateEquipmentItemResponses, UpdatePatientData, UpdatePatientErrors, UpdatePatientResponses, UploadLabReportData, UploadLabReportErrors, UploadLabReportResponses, UploadMyPrescriptionData, UploadMyPrescriptionErrors, UploadMyPrescriptionResponses } from './types.gen';
+import type { AcknowledgeMyDispatchData, AcknowledgeMyDispatchErrors, AcknowledgeMyDispatchResponses, AddBillChargeData, AddBillChargeErrors, AddBillChargeResponses, ApproveEmergencyCancellationRequestData, ApproveEmergencyCancellationRequestErrors, ApproveEmergencyCancellationRequestResponses, AssignBedManuallyData, AssignBedManuallyErrors, AssignBedManuallyResponses, AssignCurrentAmbulanceCrewData, AssignCurrentAmbulanceCrewErrors, AssignCurrentAmbulanceCrewResponses, AssignEquipmentItemData, AssignEquipmentItemErrors, AssignEquipmentItemResponses, BookMyAppointmentData, BookMyAppointmentErrors, BookMyAppointmentResponses, CancelAdmissionData, CancelAdmissionErrors, CancelAdmissionResponses, CancelDispatchData, CancelDispatchErrors, CancelDispatchResponses, CancelMyAppointmentData, CancelMyAppointmentErrors, CancelMyAppointmentResponses, CancelMyEmergencyCallData, CancelMyEmergencyCallErrors, CancelMyEmergencyCallResponses, CheckInAppointmentData, CheckInAppointmentErrors, CheckInAppointmentResponses, CompleteAdmissionDetailsData, CompleteAdmissionDetailsErrors, CompleteAdmissionDetailsResponses, CompleteVisitData, CompleteVisitErrors, CompleteVisitResponses, ConfirmDischargeData, ConfirmDischargeErrors, ConfirmDischargeResponses, CorrectBedData, CorrectBedErrors, CorrectBedResponses, CreateAdmissionData, CreateAdmissionErrors, CreateAdmissionResponses, CreateAmbulanceData, CreateAmbulanceErrors, CreateAmbulanceResponses, CreateAppointmentData, CreateAppointmentErrors, CreateAppointmentResponses, CreateBedData, CreateBedErrors, CreateBedResponses, CreateEmergencyCallData, CreateEmergencyCallErrors, CreateEmergencyCallResponses, CreateEquipmentCategoryData, CreateEquipmentCategoryErrors, CreateEquipmentCategoryResponses, CreateEquipmentItemData, CreateEquipmentItemErrors, CreateEquipmentItemResponses, CreateMaintenanceScheduleData, CreateMaintenanceScheduleErrors, CreateMaintenanceScheduleResponses, CreatePatientData, CreatePatientErrors, CreatePatientResponses, CreatePharmacyCategoryData, CreatePharmacyCategoryErrors, CreatePharmacyCategoryResponses, CreatePharmacyItemData, CreatePharmacyItemErrors, CreatePharmacyItemResponses, CreateWardData, CreateWardErrors, CreateWardResponses, DeclineMyDispatchData, DeclineMyDispatchErrors, DeclineMyDispatchResponses, DispatchEmergencyCallData, DispatchEmergencyCallErrors, DispatchEmergencyCallResponses, DownloadLabReportData, DownloadLabReportErrors, DownloadLabReportResponses, GetAdmissionBillData, GetAdmissionBillErrors, GetAdmissionBillResponses, GetAdmissionData, GetAdmissionErrors, GetAdmissionResponses, GetAmbulanceData, GetAmbulanceErrors, GetAmbulanceResponses, GetBedOccupancyData, GetBedOccupancyErrors, GetBedOccupancyResponses, GetBillingRatesData, GetBillingRatesErrors, GetBillingRatesResponses, GetCurrentAmbulanceCrewData, GetCurrentAmbulanceCrewErrors, GetCurrentAmbulanceCrewResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetEmergencyCallData, GetEmergencyCallErrors, GetEmergencyCallResponses, GetEquipmentItemByTagData, GetEquipmentItemByTagErrors, GetEquipmentItemByTagResponses, GetEquipmentItemData, GetEquipmentItemErrors, GetEquipmentItemResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetMyActiveDispatchData, GetMyActiveDispatchErrors, GetMyActiveDispatchResponses, GetMyAdmissionData, GetMyAdmissionErrors, GetMyAdmissionResponses, GetMyEmergencyCallsData, GetMyEmergencyCallsErrors, GetMyEmergencyCallsResponses, GetMyHistoryData, GetMyHistoryErrors, GetMyHistoryResponses, GetMyProfileData, GetMyProfileErrors, GetMyProfileResponses, GetPatientData, GetPatientErrors, GetPatientResponses, GetPharmacyItemData, GetPharmacyItemErrors, GetPharmacyItemResponses, GetWardCapacityData, GetWardCapacityErrors, GetWardCapacityResponses, GetWardOccupancyData, GetWardOccupancyErrors, GetWardOccupancyResponses, LinkPatientAccountData, LinkPatientAccountErrors, LinkPatientAccountResponses, ListAdmissionsData, ListAdmissionsErrors, ListAdmissionsResponses, ListAmbulancesData, ListAmbulancesErrors, ListAmbulancesResponses, ListAppointmentsData, ListAppointmentsErrors, ListAppointmentsResponses, ListBedAvailabilityData, ListBedAvailabilityErrors, ListBedAvailabilityResponses, ListBedsData, ListBedsErrors, ListBedsResponses, ListDischargeCandidatesData, ListDischargeCandidatesErrors, ListDischargeCandidatesResponses, ListEmergencyCallsData, ListEmergencyCallsErrors, ListEmergencyCallsResponses, ListEmergencyCancellationRequestsData, ListEmergencyCancellationRequestsErrors, ListEmergencyCancellationRequestsResponses, ListEquipmentCategoriesData, ListEquipmentCategoriesErrors, ListEquipmentCategoriesResponses, ListEquipmentItemsData, ListEquipmentItemsErrors, ListEquipmentItemsResponses, ListLabReportsData, ListLabReportsErrors, ListLabReportsResponses, ListMaintenanceSchedulesData, ListMaintenanceSchedulesErrors, ListMaintenanceSchedulesResponses, ListMyAppointmentsData, ListMyAppointmentsErrors, ListMyAppointmentsResponses, ListOutstandingBillsData, ListOutstandingBillsErrors, ListOutstandingBillsResponses, ListPatientsData, ListPatientsErrors, ListPatientsResponses, ListPatientWorklistData, ListPatientWorklistErrors, ListPatientWorklistResponses, ListPharmacyCategoriesData, ListPharmacyCategoriesErrors, ListPharmacyCategoriesResponses, ListPharmacyItemsData, ListPharmacyItemsErrors, ListPharmacyItemsResponses, ListPharmacyTransactionsData, ListPharmacyTransactionsErrors, ListPharmacyTransactionsResponses, ListWardPatientsData, ListWardPatientsErrors, ListWardPatientsResponses, ListWardsData, ListWardsErrors, ListWardsResponses, LoginData, LoginErrors, LoginPatientData, LoginPatientErrors, LoginPatientResponses, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, LookupPatientData, LookupPatientErrors, LookupPatientResponses, MarkArrivedData, MarkArrivedErrors, MarkArrivedResponses, PrepareAdmissionBillData, PrepareAdmissionBillErrors, PrepareAdmissionBillResponses, PreRegisterSelfData, PreRegisterSelfErrors, PreRegisterSelfResponses, ReassignDispatchData, ReassignDispatchErrors, ReassignDispatchResponses, RecordHandoverData, RecordHandoverErrors, RecordHandoverResponses, RecordPharmacyTransactionData, RecordPharmacyTransactionErrors, RecordPharmacyTransactionResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RegisterPatientAccountData, RegisterPatientAccountErrors, RegisterPatientAccountResponses, ReinstateAmbulanceData, ReinstateAmbulanceErrors, ReinstateAmbulanceResponses, RejectEmergencyCancellationRequestData, RejectEmergencyCancellationRequestErrors, RejectEmergencyCancellationRequestResponses, ReleaseEquipmentItemData, ReleaseEquipmentItemErrors, ReleaseEquipmentItemResponses, RemoveBillChargeData, RemoveBillChargeErrors, RemoveBillChargeResponses, ReportAmbulanceLocationData, ReportAmbulanceLocationErrors, ReportAmbulanceLocationResponses, ReportEquipmentFaultData, ReportEquipmentFaultErrors, ReportEquipmentFaultResponses, RequestMyEmergencyCallCancellationData, RequestMyEmergencyCallCancellationErrors, RequestMyEmergencyCallCancellationResponses, RetireAmbulanceData, RetireAmbulanceErrors, RetireAmbulanceResponses, RetireBedData, RetireBedErrors, RetireBedResponses, SettleBillData, SettleBillErrors, SettleBillResponses, TrackMyEmergencyCallData, TrackMyEmergencyCallErrors, TrackMyEmergencyCallResponses, UnassignCurrentAmbulanceCrewData, UnassignCurrentAmbulanceCrewErrors, UnassignCurrentAmbulanceCrewResponses, UpdateAmbulanceData, UpdateAmbulanceErrors, UpdateAmbulanceResponses, UpdateBedData, UpdateBedErrors, UpdateBedResponses, UpdateBillingRatesData, UpdateBillingRatesErrors, UpdateBillingRatesResponses, UpdateDischargeChecklistData, UpdateDischargeChecklistErrors, UpdateDischargeChecklistResponses, UpdateEmergencyCallData, UpdateEmergencyCallErrors, UpdateEmergencyCallResponses, UpdateEquipmentItemData, UpdateEquipmentItemErrors, UpdateEquipmentItemResponses, UpdateMyDispatchStatusData, UpdateMyDispatchStatusErrors, UpdateMyDispatchStatusResponses, UpdatePatientData, UpdatePatientErrors, UpdatePatientResponses, UploadLabReportData, UploadLabReportErrors, UploadLabReportResponses, AddAppointmentBillChargeData, AddAppointmentBillChargeErrors, AddAppointmentBillChargeResponses, CancelAppointmentAtTheDeskData, CancelAppointmentAtTheDeskErrors, CancelAppointmentAtTheDeskResponses, CompleteAppointmentData, CompleteAppointmentErrors, CompleteAppointmentResponses, ConfirmAppointmentData, ConfirmAppointmentErrors, ConfirmAppointmentResponses, GetAppointmentBillData, GetAppointmentBillErrors, GetAppointmentBillResponses, MarkAppointmentNoShowData, MarkAppointmentNoShowErrors, MarkAppointmentNoShowResponses, PrepareAppointmentBillData, PrepareAppointmentBillErrors, PrepareAppointmentBillResponses, RemoveAppointmentBillChargeData, RemoveAppointmentBillChargeErrors, RemoveAppointmentBillChargeResponses, SettleAppointmentBillData, SettleAppointmentBillErrors, SettleAppointmentBillResponses, ClaimMyRecordData, ClaimMyRecordErrors, ClaimMyRecordResponses, ConfirmEquipmentItemData, ConfirmEquipmentItemErrors, ConfirmEquipmentItemResponses, ConfirmMaintenanceScheduleData, ConfirmMaintenanceScheduleErrors, ConfirmMaintenanceScheduleResponses, CountEquipmentItemsAwaitingConfirmationData, CountEquipmentItemsAwaitingConfirmationErrors, CountEquipmentItemsAwaitingConfirmationResponses, CountMaintenanceSchedulesAwaitingConfirmationData, CountMaintenanceSchedulesAwaitingConfirmationErrors, CountMaintenanceSchedulesAwaitingConfirmationResponses, DownloadMyLabReportData, DownloadMyLabReportErrors, DownloadMyLabReportResponses, DownloadPrescriptionData, DownloadPrescriptionErrors, DownloadPrescriptionResponses, GetMyAppointmentBillData, GetMyAppointmentBillErrors, GetMyAppointmentBillResponses, GetMyBillData, GetMyBillErrors, GetMyBillResponses, GetMyLabReportsData, GetMyLabReportsErrors, GetMyLabReportsResponses, ListEquipmentItemsAwaitingConfirmationData, ListEquipmentItemsAwaitingConfirmationErrors, ListEquipmentItemsAwaitingConfirmationResponses, ListMaintenanceSchedulesAwaitingConfirmationData, ListMaintenanceSchedulesAwaitingConfirmationErrors, ListMaintenanceSchedulesAwaitingConfirmationResponses, ListMyPrescriptionsData, ListMyPrescriptionsErrors, ListMyPrescriptionsResponses, ListPrescriptionsData, ListPrescriptionsErrors, ListPrescriptionsResponses, MarkPrescriptionDeliveredData, MarkPrescriptionDeliveredErrors, MarkPrescriptionDeliveredResponses, MarkPrescriptionReadyData, MarkPrescriptionReadyErrors, MarkPrescriptionReadyResponses, PreviewMyClaimData, PreviewMyClaimErrors, PreviewMyClaimResponses, RejectEquipmentItemData, RejectEquipmentItemErrors, RejectEquipmentItemResponses, RejectPrescriptionData, RejectPrescriptionErrors, RejectPrescriptionResponses, UploadMyPrescriptionData, UploadMyPrescriptionErrors, UploadMyPrescriptionResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -222,6 +222,16 @@ export const reinstateAmbulance = <ThrowOnError extends boolean = false>(options
     ...options
 });
 
+export const reportAmbulanceLocation = <ThrowOnError extends boolean = false>(options: Options<ReportAmbulanceLocationData, ThrowOnError>): RequestResult<ReportAmbulanceLocationResponses, ReportAmbulanceLocationErrors, ThrowOnError> => (options.client ?? client).post<ReportAmbulanceLocationResponses, ReportAmbulanceLocationErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/ambulances/{id}/location',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
 export const login = <ThrowOnError extends boolean = false>(options?: Options<LoginData, ThrowOnError>): RequestResult<LoginResponses, LoginErrors, ThrowOnError> => (options?.client ?? client).post<LoginResponses, LoginErrors, ThrowOnError>({
     url: '/auth/login',
     ...options,
@@ -436,6 +446,42 @@ export const updateEmergencyCall = <ThrowOnError extends boolean = false>(option
     }
 });
 
+export const dispatchEmergencyCall = <ThrowOnError extends boolean = false>(options: Options<DispatchEmergencyCallData, ThrowOnError>): RequestResult<DispatchEmergencyCallResponses, DispatchEmergencyCallErrors, ThrowOnError> => (options.client ?? client).post<DispatchEmergencyCallResponses, DispatchEmergencyCallErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/emergency-calls/{id}/dispatch',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const listEmergencyCancellationRequests = <ThrowOnError extends boolean = false>(options?: Options<ListEmergencyCancellationRequestsData, ThrowOnError>): RequestResult<ListEmergencyCancellationRequestsResponses, ListEmergencyCancellationRequestsErrors, ThrowOnError> => (options?.client ?? client).get<ListEmergencyCancellationRequestsResponses, ListEmergencyCancellationRequestsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/emergency-cancellation-requests',
+    ...options
+});
+
+export const approveEmergencyCancellationRequest = <ThrowOnError extends boolean = false>(options: Options<ApproveEmergencyCancellationRequestData, ThrowOnError>): RequestResult<ApproveEmergencyCancellationRequestResponses, ApproveEmergencyCancellationRequestErrors, ThrowOnError> => (options.client ?? client).post<ApproveEmergencyCancellationRequestResponses, ApproveEmergencyCancellationRequestErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/emergency-calls/{id}/cancellation-request/approve',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const rejectEmergencyCancellationRequest = <ThrowOnError extends boolean = false>(options: Options<RejectEmergencyCancellationRequestData, ThrowOnError>): RequestResult<RejectEmergencyCancellationRequestResponses, RejectEmergencyCancellationRequestErrors, ThrowOnError> => (options.client ?? client).post<RejectEmergencyCancellationRequestResponses, RejectEmergencyCancellationRequestErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/emergency-calls/{id}/cancellation-request/reject',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
 export const listDischargeCandidates = <ThrowOnError extends boolean = false>(options?: Options<ListDischargeCandidatesData, ThrowOnError>): RequestResult<ListDischargeCandidatesResponses, ListDischargeCandidatesErrors, ThrowOnError> => (options?.client ?? client).get<ListDischargeCandidatesResponses, ListDischargeCandidatesErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/discharges/candidates',
@@ -455,6 +501,26 @@ export const updateDischargeChecklist = <ThrowOnError extends boolean = false>(o
 export const confirmDischarge = <ThrowOnError extends boolean = false>(options: Options<ConfirmDischargeData, ThrowOnError>): RequestResult<ConfirmDischargeResponses, ConfirmDischargeErrors, ThrowOnError> => (options.client ?? client).post<ConfirmDischargeResponses, ConfirmDischargeErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/discharges/{admissionId}/confirm',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const cancelDispatch = <ThrowOnError extends boolean = false>(options: Options<CancelDispatchData, ThrowOnError>): RequestResult<CancelDispatchResponses, CancelDispatchErrors, ThrowOnError> => (options.client ?? client).post<CancelDispatchResponses, CancelDispatchErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/dispatches/{id}/cancel',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const reassignDispatch = <ThrowOnError extends boolean = false>(options: Options<ReassignDispatchData, ThrowOnError>): RequestResult<ReassignDispatchResponses, ReassignDispatchErrors, ThrowOnError> => (options.client ?? client).post<ReassignDispatchResponses, ReassignDispatchErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/dispatches/{id}/reassign',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -640,6 +706,70 @@ export const confirmMaintenanceSchedule = <ThrowOnError extends boolean = false>
 export const getMyEmergencyCalls = <ThrowOnError extends boolean = false>(options?: Options<GetMyEmergencyCallsData, ThrowOnError>): RequestResult<GetMyEmergencyCallsResponses, GetMyEmergencyCallsErrors, ThrowOnError> => (options?.client ?? client).get<GetMyEmergencyCallsResponses, GetMyEmergencyCallsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/me/emergency-calls',
+    ...options
+});
+
+export const trackMyEmergencyCall = <ThrowOnError extends boolean = false>(options: Options<TrackMyEmergencyCallData, ThrowOnError>): RequestResult<TrackMyEmergencyCallResponses, TrackMyEmergencyCallErrors, ThrowOnError> => (options.client ?? client).get<TrackMyEmergencyCallResponses, TrackMyEmergencyCallErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/emergency-calls/{id}/tracking',
+    ...options
+});
+
+export const cancelMyEmergencyCall = <ThrowOnError extends boolean = false>(options: Options<CancelMyEmergencyCallData, ThrowOnError>): RequestResult<CancelMyEmergencyCallResponses, CancelMyEmergencyCallErrors, ThrowOnError> => (options.client ?? client).post<CancelMyEmergencyCallResponses, CancelMyEmergencyCallErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/emergency-calls/{id}/cancel',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const requestMyEmergencyCallCancellation = <ThrowOnError extends boolean = false>(options: Options<RequestMyEmergencyCallCancellationData, ThrowOnError>): RequestResult<RequestMyEmergencyCallCancellationResponses, RequestMyEmergencyCallCancellationErrors, ThrowOnError> => (options.client ?? client).post<RequestMyEmergencyCallCancellationResponses, RequestMyEmergencyCallCancellationErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/emergency-calls/{id}/cancellation-request',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const getMyActiveDispatch = <ThrowOnError extends boolean = false>(options?: Options<GetMyActiveDispatchData, ThrowOnError>): RequestResult<GetMyActiveDispatchResponses, GetMyActiveDispatchErrors, ThrowOnError> => (options?.client ?? client).get<GetMyActiveDispatchResponses, GetMyActiveDispatchErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/dispatches/active',
+    ...options
+});
+
+export const acknowledgeMyDispatch = <ThrowOnError extends boolean = false>(options: Options<AcknowledgeMyDispatchData, ThrowOnError>): RequestResult<AcknowledgeMyDispatchResponses, AcknowledgeMyDispatchErrors, ThrowOnError> => (options.client ?? client).post<AcknowledgeMyDispatchResponses, AcknowledgeMyDispatchErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/dispatches/{id}/acknowledge',
+    ...options
+});
+
+export const declineMyDispatch = <ThrowOnError extends boolean = false>(options: Options<DeclineMyDispatchData, ThrowOnError>): RequestResult<DeclineMyDispatchResponses, DeclineMyDispatchErrors, ThrowOnError> => (options.client ?? client).post<DeclineMyDispatchResponses, DeclineMyDispatchErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/dispatches/{id}/decline',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const updateMyDispatchStatus = <ThrowOnError extends boolean = false>(options: Options<UpdateMyDispatchStatusData, ThrowOnError>): RequestResult<UpdateMyDispatchStatusResponses, UpdateMyDispatchStatusErrors, ThrowOnError> => (options.client ?? client).post<UpdateMyDispatchStatusResponses, UpdateMyDispatchStatusErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/dispatches/{id}/status',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const recordHandover = <ThrowOnError extends boolean = false>(options: Options<RecordHandoverData, ThrowOnError>): RequestResult<RecordHandoverResponses, RecordHandoverErrors, ThrowOnError> => (options.client ?? client).post<RecordHandoverResponses, RecordHandoverErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/dispatches/{id}/handover',
     ...options
 });
 

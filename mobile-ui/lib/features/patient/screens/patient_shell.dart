@@ -5,6 +5,7 @@ import '../../../core/widgets/async_data.dart';
 import '../../../core/widgets/async_view.dart';
 import '../../../core/widgets/phone_width.dart';
 import '../../../services/api_client/models/my_profile.dart';
+import '../../equipment/screens/my_prescriptions_screen.dart';
 import '../state/appointments_controller.dart';
 import '../state/my_stay_controller.dart';
 import '../state/profile_controller.dart';
@@ -29,6 +30,9 @@ class _PatientShellState extends State<PatientShell> {
 
   final _appointmentsKey = GlobalKey<AppointmentsScreenState>();
 
+  // The tab itself is Equipment Management's - the pharmacy is theirs.
+  final _prescriptionsKey = GlobalKey<MyPrescriptionsTabState>();
+
   static const _bar = [
     (tab: PatientTab.home, icon: Icons.home_outlined, on: Icons.home, label: 'Home'),
     (
@@ -42,6 +46,12 @@ class _PatientShellState extends State<PatientShell> {
       icon: Icons.monitor_heart_outlined,
       on: Icons.monitor_heart,
       label: 'My stay'
+    ),
+    (
+      tab: PatientTab.prescriptions,
+      icon: Icons.medication_outlined,
+      on: Icons.medication,
+      label: 'Prescriptions'
     ),
     (tab: PatientTab.profile, icon: Icons.person_outline, on: Icons.person, label: 'Profile'),
   ];
@@ -97,6 +107,8 @@ class _PatientShellState extends State<PatientShell> {
         context.read<AppointmentsController>().load(showLoading: false);
       case PatientTab.myStay:
         context.read<MyStayController>().load(showLoading: false);
+      case PatientTab.prescriptions:
+        _prescriptionsKey.currentState?.refresh();
       case PatientTab.profile:
         context.read<ProfileController>().load(showLoading: false);
     }
@@ -127,6 +139,7 @@ class _PatientShellState extends State<PatientShell> {
                   HomeScreen(onOpenTab: _openTab),
                   AppointmentsScreen(key: _appointmentsKey),
                   MyStayScreen(onBookVisit: _bookVisit),
+                  MyPrescriptionsTab(key: _prescriptionsKey),
                   const ProfileScreen(),
                 ],
               ),

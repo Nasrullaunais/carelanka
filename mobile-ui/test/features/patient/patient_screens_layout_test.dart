@@ -3,6 +3,7 @@ import 'package:carelanka_mobile/core/auth/session_expiry.dart';
 import 'package:carelanka_mobile/core/auth/token_store.dart';
 import 'package:carelanka_mobile/core/network/api_exception.dart';
 import 'package:carelanka_mobile/core/theme/app_theme.dart';
+import 'package:carelanka_mobile/features/equipment/services/prescription_service.dart';
 import 'package:carelanka_mobile/features/patient/screens/home_screen.dart';
 import 'package:carelanka_mobile/features/patient/screens/my_stay_screen.dart';
 import 'package:carelanka_mobile/features/patient/screens/profile_screen.dart';
@@ -21,6 +22,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
+import '../equipment/fake_prescriptions.dart';
 import 'fake_patient_service.dart';
 
 /// Renders the patient screens at real phone sizes, in both themes.
@@ -123,6 +125,7 @@ void main() {
           ChangeNotifierProvider.value(value: stayController),
           ChangeNotifierProvider.value(value: appointmentsController),
           ChangeNotifierProvider.value(value: auth),
+          Provider<PrescriptionService>.value(value: FakePrescriptionService()),
         ],
         child: MaterialApp(theme: theme, home: screen),
       ),

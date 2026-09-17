@@ -1011,6 +1011,205 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
 
   # ------------------------------------------------------------------
+  # Pharmacy - prescriptions sent from the patient app
+  # ------------------------------------------------------------------
+
+  /me/prescriptions:
+    get:
+      tags: [Pharmacy]
+      summary: List my prescriptions
+      description: |
+        Roles: Patient (own only).
+
+        Newest first. Owned by Equipment Management even though it sits under `/me`: the
+        pharmacy is this component's. A login not yet linked to a hospital record answers 404
+        `cl_pat_033`, the same as every other `/me` read.
+      operationId: listMyPrescriptions
+      responses:
+        '200':
+          description: Every prescription this patient has sent
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MyPrescription' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: This login is not linked to a hospital record yet.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+    post:
+      tags: [Pharmacy]
+      summary: Send a prescription to the pharmacy
+      description: |
+        Roles: Patient.
+
+        A photo (JPEG or PNG) or PDF of a doctor's prescription, up to 10 MB, with an optional
+        note. The patient comes from the token, never the form. It arrives as `submitted`, and
+        the pharmacy gets the medicine ready and issues a collection token.
+      operationId: uploadMyPrescription
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [File]
+              properties:
+                File: { type: string, format: binary }
+                Note: { type: string, maxLength: 500 }
+      responses:
+        '201':
+          description: Sent, status `submitted`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyPrescription' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: This login is not linked to a hospital record yet.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /prescriptions:
+    get:
+      tags: [Pharmacy]
+      summary: The pharmacy's prescription list
+      description: |
+        Roles: EquipmentManager (the pharmacy - StaffRole has no pharmacist value).
+
+        One status at a time. `submitted` and `ready` are the work still to do, oldest first and
+        never cut short. `delivered` and `rejected` are history, newest first, the most recent 100.
+      operationId: listPrescriptions
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/PrescriptionStatus' }
+          description: Defaults to `submitted`.
+      responses:
+        '200':
+          description: Prescriptions in that status, with the patient's code and name
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Prescription' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /prescriptions/{id}/file:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Pharmacy]
+      summary: Open the uploaded prescription
+      description: 'Roles: EquipmentManager. Served inline with the stored content type.'
+      operationId: downloadPrescription
+      responses:
+        '200':
+          description: The photo or PDF
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /prescriptions/{id}/ready:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Pharmacy]
+      summary: Mark the medicine ready and issue a collection token
+      description: |
+        Roles: EquipmentManager.
+
+        Business operation beyond CRUD. `submitted -> ready`. Issues the next token number for
+        today, counted in Sri Lanka time (Asia/Colombo) and restarting at 1 each day. The pair
+        `token_date` + `token_number` is unique; two pharmacists pressing Ready together each get
+        their own number. The patient sees the token in the app.
+      operationId: markPrescriptionReady
+      responses:
+        '200':
+          description: Ready, token issued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Prescription' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This prescription is not waiting (`cl_equ_020`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /prescriptions/{id}/deliver:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Pharmacy]
+      summary: Mark the medicine collected
+      description: |
+        Roles: EquipmentManager.
+
+        Business operation beyond CRUD. `ready -> delivered`, when the patient shows their token
+        at the counter. The patient sees it as delivered.
+      operationId: markPrescriptionDelivered
+      responses:
+        '200':
+          description: Delivered
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Prescription' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This prescription is not ready (`cl_equ_020`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /prescriptions/{id}/reject:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Pharmacy]
+      summary: Say a prescription cannot be filled
+      description: |
+        Roles: EquipmentManager.
+
+        Business operation beyond CRUD. `submitted` or `ready` -> `rejected`, with a reason the
+        patient reads in the app - an unreadable photo, a medicine the pharmacy does not stock.
+      operationId: rejectPrescription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RejectPrescriptionRequest' }
+      responses:
+        '200':
+          description: Rejected
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Prescription' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This prescription is already delivered or rejected (`cl_equ_020`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  # ------------------------------------------------------------------
   # Maintenance
   # ------------------------------------------------------------------
 
@@ -1651,6 +1850,11 @@ components:
       type: string
       enum: [received, dispensed, adjusted, expired_removed]
 
+    PrescriptionStatus:
+      type: string
+      description: '`submitted` waiting for the pharmacy, `ready` with a token, `delivered` collected, `rejected` cannot be filled.'
+      enum: [submitted, ready, delivered, rejected]
+
     # ---------- common ----------
 
     PagedResult:
@@ -1932,6 +2136,54 @@ components:
             completed_at: { type: string, format: date-time, nullable: true }
             notes: { type: string, nullable: true }
             created_by: { $ref: '#/components/schemas/RaisedBy' }
+
+    # ---------- prescriptions ----------
+
+    MyPrescription:
+      type: object
+      description: What a patient sees of their own prescription. No staff ids.
+      required: [id, file_name, content_type, byte_size, status, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        note: { type: string, nullable: true }
+        file_name: { type: string }
+        content_type: { type: string }
+        byte_size: { type: integer }
+        status: { $ref: '#/components/schemas/PrescriptionStatus' }
+        token_date: { type: string, format: date, nullable: true, description: 'The day the token belongs to, in Sri Lanka time.' }
+        token_number: { type: integer, nullable: true, description: 'Set when the pharmacy marks it ready. Restarts at 1 each day.' }
+        ready_at: { type: string, format: date-time, nullable: true }
+        delivered_at: { type: string, format: date-time, nullable: true }
+        rejection_reason: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    Prescription:
+      type: object
+      description: The pharmacy's view - who sent it, so the medicine goes to the right person.
+      required: [id, patient_id, patient_code, patient_name, file_name, content_type, byte_size, status, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        patient_id: { type: string, format: uuid, description: "Patient Management's patient, id only." }
+        patient_code: { type: string }
+        patient_name: { type: string }
+        note: { type: string, nullable: true }
+        file_name: { type: string }
+        content_type: { type: string }
+        byte_size: { type: integer }
+        status: { $ref: '#/components/schemas/PrescriptionStatus' }
+        token_date: { type: string, format: date, nullable: true }
+        token_number: { type: integer, nullable: true }
+        ready_at: { type: string, format: date-time, nullable: true }
+        delivered_at: { type: string, format: date-time, nullable: true }
+        rejection_reason: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    RejectPrescriptionRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
 
     # ---------- laboratory ----------
 

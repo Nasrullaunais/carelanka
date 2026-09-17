@@ -341,6 +341,7 @@ builder.Services.AddScoped<IPharmacyItemService, PharmacyItemService>();
 builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();
 builder.Services.AddSingleton<IEquipmentConfirmationCode, EquipmentConfirmationCode>();
 builder.Services.AddScoped<ILabReportService, LabReportService>();
+builder.Services.AddScoped<IPrescriptionService, PrescriptionService>();
 builder.Services.AddScoped<IWardService, WardService>();
 builder.Services.AddScoped<IPatientService, PatientService>();
 builder.Services.AddScoped<IAdmissionService, AdmissionService>();

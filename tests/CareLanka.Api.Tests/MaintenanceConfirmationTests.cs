@@ -59,7 +59,7 @@ public sealed class MaintenanceConfirmationTests
     public async Task The_code_is_needed_and_the_equipment_manager_cannot_confirm()
     {
         using var equipment = await ClientAsync(ApiApplication.EquipmentEmail);
-        var jobId = await ScheduleAsync(equipment, await NewConfirmedItemAsync(equipment));
+        var jobId = await ScheduleAsync(await NewConfirmedItemAsync(equipment));
 
         using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
         var withoutCode = await administrator.GetAsync("/api/maintenance-schedules/pending-confirmation");
@@ -81,7 +81,7 @@ public sealed class MaintenanceConfirmationTests
     public async Task There_is_no_longer_a_way_to_complete_a_job_from_the_equipment_side()
     {
         using var equipment = await ClientAsync(ApiApplication.EquipmentEmail);
-        var jobId = await ScheduleAsync(equipment, await NewConfirmedItemAsync(equipment));
+        var jobId = await ScheduleAsync(await NewConfirmedItemAsync(equipment));
 
         var response = await equipment.PostAsJsonAsync(
             $"/api/maintenance-schedules/{jobId}/complete", new { notes = "Done." });
@@ -93,7 +93,7 @@ public sealed class MaintenanceConfirmationTests
     public async Task A_finished_job_leaves_the_list_and_cannot_be_confirmed_again()
     {
         using var equipment = await ClientAsync(ApiApplication.EquipmentEmail);
-        var jobId = await ScheduleAsync(equipment, await NewConfirmedItemAsync(equipment));
+        var jobId = await ScheduleAsync(await NewConfirmedItemAsync(equipment));
 
         using var administrator = await AdministratorAsync();
         await administrator.PostAsync($"/api/maintenance-schedules/{jobId}/confirm", null);
@@ -114,7 +114,7 @@ public sealed class MaintenanceConfirmationTests
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
 
         var before = await CountAsync(equipment);
-        var jobId = await ScheduleAsync(equipment, await NewConfirmedItemAsync(equipment));
+        var jobId = await ScheduleAsync(await NewConfirmedItemAsync(equipment));
         var scheduled = await CountAsync(equipment);
 
         using var administrator = await AdministratorAsync();
@@ -136,9 +136,11 @@ public sealed class MaintenanceConfirmationTests
         return body.RootElement.GetProperty("count").GetInt32();
     }
 
-    private static async Task<Guid> ScheduleAsync(HttpClient client, Guid itemId)
+    // Booking maintenance is the hospital administrator's.
+    private async Task<Guid> ScheduleAsync(Guid itemId)
     {
-        using var body = await ReadJsonAsync(await client.PostAsJsonAsync("/api/maintenance-schedules", new
+        using var administrator = await AdministratorAsync();
+        using var body = await ReadJsonAsync(await administrator.PostAsJsonAsync("/api/maintenance-schedules", new
         {
             asset_type = "equipment_item",
             asset_id = itemId,

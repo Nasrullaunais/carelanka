@@ -141,7 +141,8 @@ public sealed class EquipmentItemConfirmationTests
             $"/api/equipment-items/{id}/assign", new { admission_id = Guid.NewGuid() });
         var faulted = await equipment.PostAsJsonAsync(
             $"/api/equipment-items/{id}/report-fault", new { description = "Will not start." });
-        var serviced = await equipment.PostAsJsonAsync("/api/maintenance-schedules", new
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
+        var serviced = await administrator.PostAsJsonAsync("/api/maintenance-schedules", new
         {
             asset_type = "equipment_item",
             asset_id = id,

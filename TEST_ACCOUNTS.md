@@ -77,7 +77,8 @@ board. **Confirms new equipment** in the mobile app or on the web Equipment page
 equipment manager registers only reaches the web register once the administrator confirms it.
 Both ask for the confirmation code first: `equipment2026`. **Confirms maintenance done** the same way, in the
 mobile app or on the web Maintenance unit page — every reported fault and scheduled job is listed
-there, and confirming it puts the item back into service.
+there, and confirming it puts the item back into service. **Runs the maintenance unit** on the web:
+books maintenance, sees the open jobs, and retires a machine beyond repair.
 **Cannot:** register, admit, bed, or discharge anyone.
 
 ### Equipment manager
@@ -85,8 +86,8 @@ Beds, equipment items, pharmacy and maintenance. **Files lab reports** — the o
 can. Reads patient details and lab reports.
 **Runs the pharmacy's prescription queue** on the web Pharmacy page: marks one ready (which issues
 the patient's token), delivered, or can't fill.
-**Cannot:** confirm an item they registered, or confirm maintenance done — the hospital
-administrator does both. Schedules maintenance on the web Maintenance unit page.
+**Cannot:** confirm an item they registered, or run the maintenance unit (booking, confirming or
+retiring) — the hospital administrator does those. Reports a fault from the Equipment page.
 
 ### Ambulance crew
 Emergency calls and ambulances.

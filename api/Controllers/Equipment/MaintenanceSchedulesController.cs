@@ -19,7 +19,7 @@ public class MaintenanceSchedulesController : ControllerBase
     public MaintenanceSchedulesController(IMaintenanceService maintenance)
         => _maintenance = maintenance;
 
-    [Authorize(Policy = Policies.EquipmentManager)]
+    [Authorize(Policy = Policies.MaintenanceDesk)]
     [HttpGet(Name = "listMaintenanceSchedules")]
     [ProducesResponseType(typeof(PagedResult<MaintenanceSchedule>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
@@ -35,7 +35,7 @@ public class MaintenanceSchedulesController : ControllerBase
         => Ok(await _maintenance.ListAsync(
             new MaintenanceQuery(status, assetType, overdue, page, pageSize), ct));
 
-    [Authorize(Policy = Policies.EquipmentManager)]
+    [Authorize(Policy = Policies.MaintenanceDesk)]
     [HttpPost(Name = "createMaintenanceSchedule")]
     [ProducesResponseType(typeof(MaintenanceSchedule), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]

@@ -78,4 +78,12 @@ public static class Policies
     public const string EquipmentConfirmer = nameof(EquipmentConfirmer);
 
     public const string EquipmentConfirmationTracker = nameof(EquipmentConfirmationTracker);
+
+    // The maintenance unit is run by the hospital administrator: booking work, reading the work
+    // list, and confirming it done. The equipment manager reports faults and nothing more here.
+    public const string MaintenanceDesk = nameof(MaintenanceDesk);
+
+    // Editing an item stays with the equipment manager; the administrator also needs it to retire a
+    // machine the maintenance unit cannot fix.
+    public const string EquipmentItemEditor = nameof(EquipmentItemEditor);
 }

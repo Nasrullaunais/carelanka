@@ -283,6 +283,13 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.EquipmentConfirmationTracker, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.EquipmentManager),
         EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
+    options.AddPolicy(Policies.MaintenanceDesk, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
+    options.AddPolicy(Policies.EquipmentItemEditor, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.EquipmentManager),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
 });
 
 var authRequestsPerMinute = builder.Configuration.GetValue("RateLimits:AuthPerMinute", 20);

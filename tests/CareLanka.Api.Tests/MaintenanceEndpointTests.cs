@@ -24,9 +24,10 @@ public sealed class MaintenanceEndpointTests
     public async Task A_booked_service_names_the_asset_rather_than_printing_its_id()
     {
         using var client = await EquipmentClientAsync();
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
         var item = await NewItemAsync(client);
 
-        var response = await ScheduleAsync(client, item.Id, DateTime.UtcNow.AddDays(30));
+        var response = await ScheduleAsync(administrator, item.Id, DateTime.UtcNow.AddDays(30));
         using var body = await ReadJsonAsync(response);
         var schedule = body.RootElement;
 
@@ -44,10 +45,11 @@ public sealed class MaintenanceEndpointTests
     public async Task A_service_whose_date_has_passed_reads_as_overdue_without_being_stored_that_way()
     {
         using var client = await EquipmentClientAsync();
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
         var item = await NewItemAsync(client);
 
         using var body = await ReadJsonAsync(
-            await ScheduleAsync(client, item.Id, DateTime.UtcNow.AddDays(-3)));
+            await ScheduleAsync(administrator, item.Id, DateTime.UtcNow.AddDays(-3)));
 
         Assert.Equal("overdue", body.RootElement.GetProperty("status").GetString());
     }
@@ -56,29 +58,31 @@ public sealed class MaintenanceEndpointTests
     public async Task The_overdue_filter_finds_it_and_the_not_overdue_filter_does_not()
     {
         using var client = await EquipmentClientAsync();
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
         var item = await NewItemAsync(client);
 
         using var created = await ReadJsonAsync(
-            await ScheduleAsync(client, item.Id, DateTime.UtcNow.AddDays(-3)));
+            await ScheduleAsync(administrator, item.Id, DateTime.UtcNow.AddDays(-3)));
         var id = created.RootElement.GetProperty("id").GetGuid();
 
-        Assert.Contains(id, await ScheduleIdsAsync(client, "?overdue=true&pageSize=100"));
-        Assert.DoesNotContain(id, await ScheduleIdsAsync(client, "?overdue=false&pageSize=100"));
+        Assert.Contains(id, await ScheduleIdsAsync(administrator, "?overdue=true&pageSize=100"));
+        Assert.DoesNotContain(id, await ScheduleIdsAsync(administrator, "?overdue=false&pageSize=100"));
 
-        Assert.Contains(id, await ScheduleIdsAsync(client, "?status=overdue&pageSize=100"));
+        Assert.Contains(id, await ScheduleIdsAsync(administrator, "?status=overdue&pageSize=100"));
     }
 
     [Fact]
     public async Task Confirming_a_service_done_puts_the_item_back_to_work_and_books_the_next_one()
     {
         using var client = await EquipmentClientAsync();
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
         var item = await NewItemAsync(client);
 
         await client.PostAsJsonAsync(
             $"/api/equipment-items/{item.Id}/report-fault", new { description = "Rattling fan." });
 
         using var created = await ReadJsonAsync(
-            await ScheduleAsync(client, item.Id, DateTime.UtcNow, type: "repair"));
+            await ScheduleAsync(administrator, item.Id, DateTime.UtcNow, type: "repair"));
         var scheduleId = created.RootElement.GetProperty("id").GetGuid();
 
         var response = await ConfirmDoneAsync(scheduleId);
@@ -101,15 +105,16 @@ public sealed class MaintenanceEndpointTests
     public async Task A_routine_service_advances_the_next_due_date_and_a_repair_does_not()
     {
         using var client = await EquipmentClientAsync();
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
 
         var serviced = await NewItemAsync(client);
         using var a = await ReadJsonAsync(
-            await ScheduleAsync(client, serviced.Id, DateTime.UtcNow, type: "routine_service"));
+            await ScheduleAsync(administrator, serviced.Id, DateTime.UtcNow, type: "routine_service"));
         await ConfirmDoneAsync(a.RootElement.GetProperty("id").GetGuid());
 
         var repaired = await NewItemAsync(client);
         using var b = await ReadJsonAsync(
-            await ScheduleAsync(client, repaired.Id, DateTime.UtcNow, type: "repair"));
+            await ScheduleAsync(administrator, repaired.Id, DateTime.UtcNow, type: "repair"));
         await ConfirmDoneAsync(b.RootElement.GetProperty("id").GetGuid());
 
         using var servicedDetail = await ReadJsonAsync(
@@ -130,10 +135,11 @@ public sealed class MaintenanceEndpointTests
     public async Task Finishing_the_same_task_twice_is_refused()
     {
         using var client = await EquipmentClientAsync();
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
         var item = await NewItemAsync(client);
 
         using var created = await ReadJsonAsync(
-            await ScheduleAsync(client, item.Id, DateTime.UtcNow));
+            await ScheduleAsync(administrator, item.Id, DateTime.UtcNow));
         var id = created.RootElement.GetProperty("id").GetGuid();
 
         await ConfirmDoneAsync(id);
@@ -148,6 +154,7 @@ public sealed class MaintenanceEndpointTests
     public async Task Booking_a_service_on_an_occupied_bed_is_refused_and_writes_nothing()
     {
         using var client = await EquipmentClientAsync();
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
 
         using var bed = await ReadJsonAsync(await client.PostAsJsonAsync("/api/beds", new
         {
@@ -159,7 +166,7 @@ public sealed class MaintenanceEndpointTests
         var bedId = bed.RootElement.GetProperty("id").GetGuid();
         await OccupyAsync(bedId);
 
-        var response = await client.PostAsJsonAsync("/api/maintenance-schedules", new
+        var response = await administrator.PostAsJsonAsync("/api/maintenance-schedules", new
         {
             asset_type = "bed",
             asset_id = bedId,
@@ -173,15 +180,16 @@ public sealed class MaintenanceEndpointTests
 
         Assert.DoesNotContain(
             bedId,
-            await AssetIdsAsync(client, "?assetType=bed&pageSize=100"));
+            await AssetIdsAsync(administrator, "?assetType=bed&pageSize=100"));
     }
 
     [Fact]
     public async Task Booking_against_an_asset_that_does_not_exist_is_a_404()
     {
         using var client = await EquipmentClientAsync();
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
 
-        var response = await ScheduleAsync(client, Guid.NewGuid(), DateTime.UtcNow);
+        var response = await ScheduleAsync(administrator, Guid.NewGuid(), DateTime.UtcNow);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -194,6 +202,37 @@ public sealed class MaintenanceEndpointTests
         var read = await nurse.GetAsync("/api/maintenance-schedules");
 
         Assert.Equal(HttpStatusCode.Forbidden, read.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_equipment_manager_reports_faults_but_does_not_run_the_maintenance_unit()
+    {
+        using var equipment = await EquipmentClientAsync();
+        var item = await NewItemAsync(equipment);
+
+        var read = await equipment.GetAsync("/api/maintenance-schedules");
+        var booked = await ScheduleAsync(equipment, item.Id, DateTime.UtcNow.AddDays(7));
+        var faulted = await equipment.PostAsJsonAsync(
+            $"/api/equipment-items/{item.Id}/report-fault", new { description = "Will not power on." });
+
+        Assert.Equal(HttpStatusCode.Forbidden, read.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, booked.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, faulted.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_administrator_can_retire_a_machine_beyond_repair()
+    {
+        using var equipment = await EquipmentClientAsync();
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
+        var item = await NewItemAsync(equipment);
+        await equipment.PostAsJsonAsync(
+            $"/api/equipment-items/{item.Id}/report-fault", new { description = "Cracked frame." });
+
+        var retired = await administrator.PutAsJsonAsync(
+            $"/api/equipment-items/{item.Id}", new { status = "retired" });
+
+        Assert.Equal(HttpStatusCode.OK, retired.StatusCode);
     }
 
     private async Task OccupyAsync(Guid bedId)

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../theme/app_theme.dart';
 import 'async_data.dart';
@@ -38,6 +39,7 @@ class ErrorView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
     return Center(
       child: Padding(
@@ -46,39 +48,67 @@ class ErrorView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: theme.colorScheme.errorContainer,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    scheme.errorContainer,
+                    scheme.errorContainer.withValues(alpha: 0.6),
+                  ],
+                ),
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: scheme.error.withValues(alpha: 0.15),
+                    blurRadius: 20,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
               child: Icon(
                 Icons.cloud_off_rounded,
-                size: 28,
-                color: theme.colorScheme.onErrorContainer,
+                size: 32,
+                color: scheme.onErrorContainer,
               ),
-            ),
-            const SizedBox(height: 16),
+            )
+                .animate(onPlay: (c) => c.repeat(reverse: true))
+                .scale(
+                  begin: const Offset(1, 1),
+                  end: const Offset(1.05, 1.05),
+                  duration: 1200.ms,
+                  curve: Curves.easeInOut,
+                ),
+            const SizedBox(height: 24),
             Text(
               'Something went wrong',
-              style: theme.textTheme.titleMedium,
+              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+                height: 1.5,
+              ),
             ),
-            const SizedBox(height: 20),
-            FilledButton.tonalIcon(
+            const SizedBox(height: 28),
+            FilledButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
+              icon: const Icon(Icons.refresh_rounded),
               label: const Text('Try again'),
-              style: FilledButton.styleFrom(minimumSize: const Size(160, 48)),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(180, 52),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppTheme.radiusL),
+                ),
+              ),
             ),
           ],
-        ),
+        ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.15),
       ),
     );
   }
@@ -101,6 +131,7 @@ class EmptyView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
     return Center(
       child: Padding(
@@ -109,30 +140,50 @@ class EmptyView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    scheme.primaryContainer.withValues(alpha: 0.7),
+                    scheme.surfaceContainerHighest,
+                  ],
+                ),
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: scheme.primary.withValues(alpha: 0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              child: Icon(icon, size: 30, color: theme.colorScheme.onSurfaceVariant),
+              child: Icon(icon, size: 32, color: scheme.primary),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             if (title != null) ...[
-              Text(title!, style: theme.textTheme.titleMedium, textAlign: TextAlign.center),
-              const SizedBox(height: 6),
+              Text(
+                title!,
+                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
             ],
             Text(
               message,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+                height: 1.5,
+              ),
             ),
             if (action != null) ...[
-              const SizedBox(height: 20),
+              const SizedBox(height: 28),
               action!,
             ],
           ],
-        ),
+        ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1),
       ),
     );
   }
@@ -177,31 +228,40 @@ class Skeleton extends StatefulWidget {
 }
 
 class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin {
-  late final AnimationController _pulse = AnimationController(
+  late final AnimationController _shimmer = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1100),
-  )..repeat(reverse: true);
+    duration: const Duration(milliseconds: 1500),
+  )..repeat();
 
   @override
   void dispose() {
-    _pulse.dispose();
+    _shimmer.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final base = Theme.of(context).colorScheme.surfaceContainerHighest;
+    final scheme = Theme.of(context).colorScheme;
+    final base = scheme.surfaceContainerHighest;
+    final highlight = scheme.surfaceContainerHighest.withValues(alpha: 0.3);
 
-    return FadeTransition(
-      opacity: Tween<double>(begin: 0.45, end: 1).animate(_pulse),
-      child: Container(
-        height: widget.height,
-        width: widget.width,
-        decoration: BoxDecoration(
-          color: base,
-          borderRadius: BorderRadius.circular(widget.radius),
-        ),
-      ),
+    return AnimatedBuilder(
+      animation: _shimmer,
+      builder: (context, child) {
+        return Container(
+          height: widget.height,
+          width: widget.width,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(widget.radius),
+            gradient: LinearGradient(
+              begin: Alignment(-1 + 2 * _shimmer.value, 0),
+              end: Alignment(1 + 2 * _shimmer.value, 0),
+              colors: [base, highlight, base],
+              stops: const [0.0, 0.5, 1.0],
+            ),
+          ),
+        );
+      },
     );
   }
 }

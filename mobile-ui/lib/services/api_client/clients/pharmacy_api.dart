@@ -68,6 +68,12 @@ abstract class PharmacyApi {
     @Path('id') required String id,
   });
 
+  @DELETE('/pharmacy-items/{id}')
+  Future<void> removePharmacyItem({
+    @Path('id') required String id,
+    @Header('X-Confirmation-Code') required String xConfirmationCode,
+  });
+
   @GET('/pharmacy-items/{id}/batches')
   Future<List<PharmacyBatch>> listPharmacyBatches({
     @Path('id') required String id,

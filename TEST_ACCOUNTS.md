@@ -87,7 +87,9 @@ item then has **Remove**, which asks for the code again and takes it off the reg
 Beds, equipment items, pharmacy and maintenance. **Files lab reports** — the only role that
 can. Reads patient details and lab reports.
 **Runs the pharmacy's prescription queue** on the web Pharmacy page: marks one ready (which issues
-the patient's token), delivered, or can't fill.
+the patient's token), delivered, or can't fill. **Adds a batch** when a delivery arrives, and
+**removes** a medicine the hospital no longer stocks - that one asks for the same confirmation code,
+`equipment2026`, and only once the shelf is empty.
 **Cannot:** confirm an item they registered, or run the maintenance unit (booking, confirming or
 retiring) — the hospital administrator does those. Reports a fault from the Equipment page.
 

@@ -6194,6 +6194,48 @@ export type CreatePharmacyItemResponses = {
 
 export type CreatePharmacyItemResponse = CreatePharmacyItemResponses[keyof CreatePharmacyItemResponses];
 
+export type RemovePharmacyItemData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/pharmacy-items/{id}';
+};
+
+export type RemovePharmacyItemErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RemovePharmacyItemError = RemovePharmacyItemErrors[keyof RemovePharmacyItemErrors];
+
+export type RemovePharmacyItemResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type RemovePharmacyItemResponse = RemovePharmacyItemResponses[keyof RemovePharmacyItemResponses];
+
 export type GetPharmacyItemData = {
     body?: never;
     path: {

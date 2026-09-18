@@ -15,6 +15,7 @@ import { Dialog } from './EquipmentPage';
 import { StockDialog } from './pharmacy/StockDialog';
 import { ItemHistoryCard } from './pharmacy/ItemHistoryCard';
 import { AddBatchDialog, BatchList } from './pharmacy/BatchList';
+import { RemoveMedicineDialog } from './pharmacy/RemoveMedicineDialog';
 import { PrescriptionsCard } from './pharmacy/PrescriptionsCard';
 
 const PAGE_SIZE = 10;
@@ -355,6 +356,7 @@ function Expiry({ date }: { date: string | null | undefined }) {
 function MoveStockButton({ item, onChanged }: { item: PharmacyItem; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [removing, setRemoving] = useState(false);
 
   return (
     <>
@@ -363,12 +365,35 @@ function MoveStockButton({ item, onChanged }: { item: PharmacyItem; onChanged: (
       </button>{' '}
       <button type="button" className="secondary" onClick={() => setOpen(true)}>
         Record movement
+      </button>{' '}
+      <button
+        type="button"
+        className="secondary danger"
+        title={
+          item.quantity_on_hand > 0
+            ? 'Dispense or write off the rest of the stock first'
+            : undefined
+        }
+        disabled={item.quantity_on_hand > 0}
+        onClick={() => setRemoving(true)}
+      >
+        Remove
       </button>
       {open && (
         <StockDialog item={item} onClose={() => setOpen(false)} onChanged={onChanged} />
       )}
       {adding && (
         <AddBatchDialog item={item} onClose={() => setAdding(false)} onChanged={onChanged} />
+      )}
+      {removing && (
+        <RemoveMedicineDialog
+          item={item}
+          onClose={() => setRemoving(false)}
+          onDone={() => {
+            setRemoving(false);
+            onChanged();
+          }}
+        />
       )}
     </>
   );

@@ -129,6 +129,58 @@ public sealed class PharmacyEndpointTests
     }
 
     [Fact]
+    public async Task A_medicine_the_hospital_no_longer_stocks_is_removed_once_the_shelf_is_empty()
+    {
+        using var client = await EquipmentClientAsync();
+        var id = await NewItemIdAsync(client, quantity: 4);
+
+        var withStock = await RemoveAsync(client, id, ApiApplication.EquipmentConfirmationCode);
+        using var refused = await ReadJsonAsync(withStock);
+
+        await MoveAsync(client, id, "dispensed", 4);
+        var removed = await RemoveAsync(client, id, ApiApplication.EquipmentConfirmationCode);
+        var afterwards = await client.GetAsync($"/api/pharmacy-items/{id}");
+
+        Assert.Equal(HttpStatusCode.Conflict, withStock.StatusCode);
+        Assert.Equal("cl_equ_027", refused.RootElement.GetProperty("code").GetString());
+        Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, afterwards.StatusCode);
+    }
+
+    [Fact]
+    public async Task Removing_a_medicine_needs_the_confirmation_code_and_pharmacy_staff()
+    {
+        using var client = await EquipmentClientAsync();
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var id = await NewItemIdAsync(client, quantity: 0);
+
+        var wrongCode = await RemoveAsync(client, id, "not-the-code");
+        var noCode = await client.DeleteAsync($"/api/pharmacy-items/{id}");
+        var byNurse = await RemoveAsync(nurse, id, ApiApplication.EquipmentConfirmationCode);
+
+        Assert.Equal(HttpStatusCode.Forbidden, wrongCode.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, noCode.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, byNurse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/api/pharmacy-items/{id}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_name_of_a_removed_medicine_can_be_used_again()
+    {
+        using var client = await EquipmentClientAsync();
+        var name = $"Item {Guid.NewGuid():N}"[..20];
+
+        using var first = await ReadJsonAsync(await CreateItemAsync(client, 0, name: name));
+        await RemoveAsync(
+            client, first.RootElement.GetProperty("id").GetGuid(),
+            ApiApplication.EquipmentConfirmationCode);
+
+        var again = await CreateItemAsync(client, 0, name: name);
+
+        Assert.Equal(HttpStatusCode.Created, again.StatusCode);
+    }
+
+    [Fact]
     public async Task A_movement_can_name_the_batch_it_comes_out_of()
     {
         using var client = await EquipmentClientAsync();
@@ -350,6 +402,14 @@ public sealed class PharmacyEndpointTests
         HttpClient client, Guid id, string type, int quantity, string? note = null)
         => client.PostAsJsonAsync(
             $"/api/pharmacy-items/{id}/transactions", new { type, quantity, note });
+
+    private static Task<HttpResponseMessage> RemoveAsync(HttpClient client, Guid id, string code)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Delete, $"/api/pharmacy-items/{id}");
+        request.Headers.Add("X-Confirmation-Code", code);
+
+        return client.SendAsync(request);
+    }
 
     private static Task<HttpResponseMessage> MoveBatchAsync(
         HttpClient client, Guid id, Guid batchId, string type, int quantity, string? note = null)

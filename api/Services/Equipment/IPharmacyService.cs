@@ -30,6 +30,8 @@ public interface IPharmacyItemService
     Task<PharmacyItem> RecordTransactionAsync(
         Guid id, CreatePharmacyTransactionRequest request, CancellationToken cancellationToken = default);
 
+    Task RemoveAsync(Guid id, string? confirmationCode, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<PharmacyBatch>> ListBatchesAsync(
         Guid id, CancellationToken cancellationToken = default);
 

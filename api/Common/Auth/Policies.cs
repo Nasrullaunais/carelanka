@@ -93,6 +93,10 @@ public static class Policies
 
     public const string EquipmentConfirmationTracker = nameof(EquipmentConfirmationTracker);
 
+    // Removing a medicine from the register hides it from every list, so it takes the confirmation
+    // code on top of the role - the pharmacy's own staff, or the administrator.
+    public const string PharmacyRemover = nameof(PharmacyRemover);
+
     // The maintenance unit is run by the hospital administrator: booking work, reading the work
     // list, and confirming it done. The equipment manager reports faults and nothing more here.
     public const string MaintenanceDesk = nameof(MaintenanceDesk);

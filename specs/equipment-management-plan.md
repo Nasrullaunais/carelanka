@@ -354,6 +354,24 @@ Quantities are never edited directly. Every change is a `PharmacyTransaction`, a
 | `adjusted` | Inventory Administrator, with a mandatory note | `±quantity` — stocktake corrections |
 | `expired_removed` | Inventory Administrator, usually following a `dispose_expired_stock` action | `-quantity` |
 
+### 5.1a Batches — one medicine, many deliveries *(Rev 3, 2026-09-18)*
+
+A medicine is registered once, with its name, category and unit. Every delivery of it after that is a **batch**, numbered 1, 2, 3 for that medicine, with its own expiry date and its own count of boxes.
+
+```
+Amoxicillin 250mg          on hand 58, expires first 2026-10-01
+  1st batch   18 boxes     expires 2026-10-01
+  2nd batch   40 boxes     expires 2027-03-31
+```
+
+- **Stock lives on the batch.** `PharmacyItem.QuantityOnHand` is every batch added up, kept in step inside the same transaction, so the register and the batch list can never disagree.
+- **Arriving stock is `POST /pharmacy-items/{id}/batches`**, never a `received` movement — a delivery has an expiry date and a plain quantity cannot carry one. That movement type answers 400 `cl_equ_026`.
+- **Dispensing empties the batch that expires first**, spilling into the next when one is not enough, and writes one movement per batch it touches. That is what stops stock going out of date on the shelf while newer boxes are handed out.
+- **A movement can name its batch.** `POST /pharmacy-items/{id}/batches/{batchId}/transactions` does the same movements out of one named delivery — stock expiring in that box, or a stocktake correction on it. It is refused if that batch alone does not hold enough, even when the shelf does.
+- **An adjustment with no batch named lands on the newest batch** — the one somebody has just been counting.
+- **A used-up batch is kept**, at zero, because it is part of the history of what was dispensed.
+- **Registering a medicine can include the first delivery** (`quantity_on_hand` + `expiry_date`), which becomes batch 1, or leave it out for a medicine stocked but not held.
+
 ### 5.2 Search and availability — the literal requirement
 
 `GET /api/pharmacy-items?search=&availableOnly=` is open to **any authenticated staff role**, per §2. It matches name or category, and `availableOnly=true` filters to `quantity_on_hand > 0` — exactly "search for pharmacy items and check whether they are currently available."
@@ -456,7 +474,10 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 | `POST` | `/api/pharmacy-items` | Inventory Administrator | |
 | `GET` | `/api/pharmacy-items` | **Any authenticated staff** | `?search=`, `?categoryId=`, `?availableOnly=`. The literal requirement from §5.2. |
 | `GET` | `/api/pharmacy-items/{id}` | Any staff | |
-| `POST` | `/api/pharmacy-items/{id}/transactions` | Role depends on `type` — see §5.1 | **Business op.** The atomic conditional update from §3.3. |
+| `GET` | `/api/pharmacy-items/{id}/batches` | Any staff | *(Rev 3, 2026-09-18)* Every delivery of this medicine. §5.1a |
+| `POST` | `/api/pharmacy-items/{id}/batches` | Inventory Administrator | *(Rev 3, 2026-09-18)* **Business op.** A delivery: the next batch, with its expiry date |
+| `POST` | `/api/pharmacy-items/{id}/batches/{batchId}/transactions` | Inventory Administrator | *(Rev 3, 2026-09-18)* **Business op.** A movement out of one named batch. §5.1a |
+| `POST` | `/api/pharmacy-items/{id}/transactions` | Role depends on `type` — see §5.1 | **Business op.** The atomic conditional update from §3.3. `received` answers 400 — it is a batch |
 | `GET` | `/api/pharmacy-items/{id}/transactions` | Inventory Administrator | History, paginated |
 | `GET` | `/api/me/prescriptions` | Patient | *(Rev 3)* Own prescriptions, newest first. §5.4 |
 | `POST` | `/api/me/prescriptions` | Patient | *(Rev 3)* Send a photo or PDF, multipart |
@@ -629,7 +650,7 @@ Per the assignment: workflow id, objective, plan, completed steps, tool calls wi
 | :--- | :--- |
 | **Equipment inventory** | Search, filter by category/ward/status, sort, paginate. *(Rev 3, 2026-09-16.)* Lists confirmed items only, and tells the equipment manager and administrator how many registered items are still awaiting confirmation. *(Rev 3, 2026-09-17.)* The hospital administrator also gets a **Confirm new equipment** card: enter the confirmation code, then Confirm or Reject each waiting item — the same queue as the mobile app, §4.3. *(Rev 3, 2026-09-18.)* Every item carries a **Retire** button for the administrator, which asks for the confirmation code; a retired one carries **Remove**, which takes it off the register after the same code — §4.1 |
 | **Equipment detail** | Item info, maintenance history, current warnings, assign/release. *(Rev 2, 2026-09-13.)* Assigning picks the patient by ward rather than taking a pasted admission id |
-| **Pharmacy inventory** | Search, filter by category, below-threshold and expiring-soon highlighted. *(Rev 3, 2026-09-17.)* A **Prescriptions from the app** card: waiting, ready, delivered and can't-fill tabs, view the photo, Ready (issues a token), Mark delivered, Can't fill with a reason — §5.4 |
+| **Pharmacy inventory** | Search, filter by category, below-threshold and expiring-soon highlighted. *(Rev 3, 2026-09-18.)* An arrow under each medicine opens its batches — number, expiry, boxes left, batch code — with **Record movement** on each one, and **Add batch** records a delivery. §5.1a. *(Rev 3, 2026-09-17.)* A **Prescriptions from the app** card: waiting, ready, delivered and can't-fill tabs, view the photo, Ready (issues a token), Mark delivered, Can't fill with a reason — §5.4 |
 | **Maintenance calendar** | Scheduled and overdue, by asset type |
 | **Maintenance unit** | *(Rev 3, 2026-09-17 — the hospital administrator's page only.)* Book a service, calibration or repair; the open-jobs list with Beyond repair (retires the item, asking for the confirmation code — §4.1); and Confirm maintenance done, after the confirmation code — §6.1. The equipment manager does not see it: they report faults from the Equipment page |
 | **Laboratory** | *(Rev 2, 2026-09-13.)* Pick a ward, read down who is in it, and file a result against whoever the specimen came from. Search by code, name or NIC is the second way in, for an outpatient in no ward. Clinical staff see the same screen without the upload form — see §7.5 |

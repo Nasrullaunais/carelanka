@@ -9,10 +9,12 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
+import '../models/add_pharmacy_batch_request.dart';
 import '../models/create_pharmacy_category_request.dart';
 import '../models/create_pharmacy_item_request.dart';
 import '../models/create_pharmacy_transaction_request.dart';
 import '../models/my_prescription.dart';
+import '../models/pharmacy_batch.dart';
 import '../models/pharmacy_category.dart';
 import '../models/pharmacy_item.dart';
 import '../models/pharmacy_item_paged_result.dart';
@@ -66,6 +68,17 @@ abstract class PharmacyApi {
     @Path('id') required String id,
   });
 
+  @GET('/pharmacy-items/{id}/batches')
+  Future<List<PharmacyBatch>> listPharmacyBatches({
+    @Path('id') required String id,
+  });
+
+  @POST('/pharmacy-items/{id}/batches')
+  Future<PharmacyBatch> addPharmacyBatch({
+    @Path('id') required String id,
+    @Body() AddPharmacyBatchRequest? body,
+  });
+
   @POST('/pharmacy-items/{id}/transactions')
   Future<PharmacyItem> recordPharmacyTransaction({
     @Path('id') required String id,
@@ -77,6 +90,13 @@ abstract class PharmacyApi {
     @Path('id') required String id,
     @Query('page') int? page = 1,
     @Query('pageSize') int? pageSize = 20,
+  });
+
+  @POST('/pharmacy-items/{id}/batches/{batchId}/transactions')
+  Future<PharmacyItem> recordPharmacyBatchTransaction({
+    @Path('id') required String id,
+    @Path('batchId') required String batchId,
+    @Body() CreatePharmacyTransactionRequest? body,
   });
 
   @GET('/prescriptions')

@@ -782,6 +782,24 @@ so it cannot go negative and two people dispensing at once cannot both succeed p
 The check constraint is the last line of defence under that. The expiry index is filtered
 because the expiry sweep never asks about bandages.
 
+#### PharmacyBatch extends AuditedEntity *(Rev 4.2 — new, 2026-09-18)*
+```
++ PharmacyItemId: Guid (non-null) FK → PharmacyItem.Id, cascade
++ BatchNumber: int (non-null) -- 1 for the first delivery of that medicine, 2 for the next
++ Reference: string (nullable, max 50) -- the manufacturer's batch code on the box
++ ExpiryDate: DateOnly (nullable)
++ QuantityOnHand: int (non-null) -- >= 0
++ Note: string (nullable, max 300)
+```
+**Table:** `pharmacy_batches`
+**Constraints:** CHECK(quantity_on_hand >= 0) · UNIQUE(PharmacyItemId, BatchNumber)
+**Indexes:** `(PharmacyItemId, ExpiryDate) WHERE quantity_on_hand > 0`
+**Note:** One delivery of a medicine. Stock moved here from `PharmacyItem` because two deliveries
+of the same medicine expire on different days, and the one expiring first has to be dispensed
+first. `PharmacyItem.QuantityOnHand` is now the batches added up, kept in step in the same
+transaction. Migration `Equipment_AddPharmacyBatches` turned each item's existing quantity and
+expiry into its batch 1. See `equipment-management-plan.md` §5.1a.
+
 #### PharmacyTransaction extends Entity *(Rev 3 — new)*
 ```
 + PharmacyItemId: Guid (non-null) FK → PharmacyItem.Id

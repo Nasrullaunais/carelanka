@@ -17,6 +17,8 @@ class PharmacyTransaction {
     required this.quantity,
     required this.performedByStaffId,
     required this.createdAt,
+    this.pharmacyBatchId,
+    this.batchNumber,
     this.note,
   });
   
@@ -25,6 +27,10 @@ class PharmacyTransaction {
   final String id;
   @JsonKey(name: 'pharmacy_item_id')
   final String pharmacyItemId;
+  @JsonKey(name: 'pharmacy_batch_id')
+  final String? pharmacyBatchId;
+  @JsonKey(name: 'batch_number')
+  final int? batchNumber;
   final PharmacyTransactionType type;
   final int quantity;
   @JsonKey(name: 'performed_by_staff_id')

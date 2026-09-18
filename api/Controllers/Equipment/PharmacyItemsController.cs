@@ -59,6 +59,30 @@ public class PharmacyItemsController : ControllerBase
         return CreatedAtRoute("getPharmacyItem", new { id = item.Id }, item);
     }
 
+    [Authorize(Policy = Policies.AnyStaff)]
+    [HttpGet("{id:guid}/batches", Name = "listPharmacyBatches")]
+    [ProducesResponseType(typeof(List<PharmacyBatch>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<ActionResult<IReadOnlyList<PharmacyBatch>>> ListPharmacyBatches(
+        Guid id, CancellationToken ct)
+        => Ok(await _items.ListBatchesAsync(id, ct));
+
+    [Authorize(Policy = Policies.EquipmentManager)]
+    [HttpPost("{id:guid}/batches", Name = "addPharmacyBatch")]
+    [ProducesResponseType(typeof(PharmacyBatch), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<ActionResult<PharmacyBatch>> AddPharmacyBatch(
+        Guid id, [FromBody] AddPharmacyBatchRequest request, CancellationToken ct)
+    {
+        var batch = await _items.AddBatchAsync(id, request, ct);
+
+        return CreatedAtRoute("listPharmacyBatches", new { id }, batch);
+    }
+
     [Authorize(Policy = Policies.EquipmentManager)]
     [HttpPost("{id:guid}/transactions", Name = "recordPharmacyTransaction")]
     [ProducesResponseType(typeof(PharmacyItem), StatusCodes.Status201Created)]
@@ -71,6 +95,25 @@ public class PharmacyItemsController : ControllerBase
         Guid id, [FromBody] CreatePharmacyTransactionRequest request, CancellationToken ct)
     {
         var item = await _items.RecordTransactionAsync(id, request, ct);
+
+        return Created((string?)null, item);
+    }
+
+    [Authorize(Policy = Policies.EquipmentManager)]
+    [HttpPost("{id:guid}/batches/{batchId:guid}/transactions", Name = "recordPharmacyBatchTransaction")]
+    [ProducesResponseType(typeof(PharmacyItem), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<PharmacyItem>> RecordPharmacyBatchTransaction(
+        Guid id,
+        Guid batchId,
+        [FromBody] CreatePharmacyTransactionRequest request,
+        CancellationToken ct)
+    {
+        var item = await _items.RecordBatchTransactionAsync(id, batchId, request, ct);
 
         return Created((string?)null, item);
     }

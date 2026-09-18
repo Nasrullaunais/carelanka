@@ -11,9 +11,9 @@ class ReviewCancellationRequest {
   const ReviewCancellationRequest({
     this.notes,
   });
-
+  
   factory ReviewCancellationRequest.fromJson(Map<String, Object?> json) => _$ReviewCancellationRequestFromJson(json);
-
+  
   final String? notes;
 
   Map<String, Object?> toJson() => _$ReviewCancellationRequestToJson(this);

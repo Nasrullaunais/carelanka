@@ -1030,6 +1030,12 @@ warning. `POST /maintenance-schedules/{id}/complete` was **removed**. No schema 
 no new `MaintenanceStatus` value. Design is `equipment-management-plan.md` §6.1.
 
 **What it means for the others.**
+- **Since 2026-09-18 retiring an item is `POST /equipment-items/{id}/retire`**, hospital
+  administrator plus the confirmation code. `PUT /equipment-items/{id}` now refuses
+  `status = retired` (409 `cl_equ_024`). A retired item can then be taken off the register with
+  `DELETE /equipment-items/{id}` (same person, same code) - a soft delete, so nothing is lost and
+  the asset tag is free again. Nothing outside Equipment retires or removes an item, so this is a
+  note rather than a request.
 - **Since 2026-09-17 the maintenance unit is the hospital administrator's alone.**
   `GET`/`POST /maintenance-schedules` moved from `EquipmentManager` to the new `MaintenanceDesk`
   policy (hospital administrator), and `PUT /equipment-items/{id}` accepts the administrator too, so

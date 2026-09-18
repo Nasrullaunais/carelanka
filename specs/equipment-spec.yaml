@@ -343,9 +343,9 @@ paths:
 
         A `status` of `maintenance` cannot be edited back to `available` here. The item is with
         the maintenance unit and returns to service only when they complete the repair, so this
-        answers 409. `retired` is still reachable from `maintenance`: scrapping a machine nobody
-        can fix is the other real outcome of a fault, and it closes that item's open work order
-        and fault warning with it.
+        answers 409. `retired` cannot be set here either *(Rev 3, 2026-09-18)*: retiring is
+        irreversible, so it has its own endpoint that asks for the confirmation code
+        (`POST /equipment-items/{id}/retire`, `cl_equ_024`).
       operationId: updateEquipmentItem
       requestBody:
         required: true
@@ -369,6 +369,38 @@ paths:
             awaiting confirmation.
           content:
             application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+    delete:
+      tags: [Equipment]
+      summary: Remove a retired item from the register
+      description: |
+        Roles: HospitalAdministrator, with the confirmation code.
+
+        Only after `POST /equipment-items/{id}/retire`: an item still in use answers 409
+        `cl_equ_025`. Two steps on purpose - retiring is the decision, removing only tidies the
+        list afterwards.
+
+        A soft delete. The row and its history stay in the database; it leaves every list, and its
+        asset tag and serial number are free for a new item, because both unique indexes are
+        scoped to live rows.
+      operationId: removeEquipmentItem
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
+      responses:
+        '204':
+          description: Removed from the register
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: This role may not remove equipment, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This item is not retired yet.
+          content:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /equipment-items/by-tag/{assetTag}:
@@ -464,6 +496,43 @@ paths:
           description: This item is not currently assigned.
           content:
             application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /equipment-items/{id}/retire:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Equipment]
+      summary: Retire an equipment item for good
+      description: |
+        Roles: HospitalAdministrator, with the confirmation code.
+
+        Business operation beyond CRUD, and the only way an item reaches `retired`. Use it when a
+        machine is beyond repair or is no longer used in the hospital. `retired` is terminal: the
+        item can never be assigned again and a replacement is registered as a new item. Any open
+        repair job is cancelled and any open fault warning closed with it.
+
+        An item a patient is currently using cannot be retired - release it first.
+      operationId: retireEquipmentItem
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
+      responses:
+        '200':
+          description: Retired
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EquipmentItem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: This role may not retire equipment, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This item is assigned to a patient, or is already retired.
+          content:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /equipment-items/{id}/report-fault:

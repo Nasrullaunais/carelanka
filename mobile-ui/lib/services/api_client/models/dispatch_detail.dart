@@ -27,9 +27,9 @@ class DispatchDetail {
     this.declinedReason,
     this.crewStaffIds,
   });
-
+  
   factory DispatchDetail.fromJson(Map<String, Object?> json) => _$DispatchDetailFromJson(json);
-
+  
   final String? id;
   @JsonKey(name: 'emergency_call_id')
   final String? emergencyCallId;

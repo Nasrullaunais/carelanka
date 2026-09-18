@@ -19,9 +19,9 @@ class EmergencyCancellationRequest {
     this.reviewedByStaffId,
     this.reviewNotes,
   });
-
+  
   factory EmergencyCancellationRequest.fromJson(Map<String, Object?> json) => _$EmergencyCancellationRequestFromJson(json);
-
+  
   @JsonKey(name: 'emergency_call_id')
   final String? emergencyCallId;
   final CancellationRequestStatus? status;

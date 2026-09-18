@@ -30,6 +30,7 @@ import {
 import { equipmentStatusLabels, equipmentStatuses } from '../types/equipment';
 import { ItemDetailCard } from './equipment/ItemDetailCard';
 import { ConfirmNewEquipmentCard } from './equipment/ConfirmNewEquipmentCard';
+import { RemoveItemDialog, RetireItemDialog } from './equipment/RetireItemDialog';
 
 const PAGE_SIZE = 10;
 
@@ -338,9 +339,12 @@ function LifecycleActions({
 }) {
   const [assigning, setAssigning] = useState(false);
   const [reporting, setReporting] = useState(false);
+  const [retiring, setRetiring] = useState(false);
+  const [removing, setRemoving] = useState(false);
 
   const manage = canManageEquipment(role);
   const report = canReportFault(role);
+  const retire = canConfirmEquipment(role);
 
   const release = useMutation({
     ...releaseEquipmentItemMutation(),
@@ -375,6 +379,18 @@ function LifecycleActions({
             Report fault
           </button>
         )}
+
+        {retire && item.status !== 'retired' && (
+          <button type="button" className="secondary danger" onClick={() => setRetiring(true)}>
+            Retire
+          </button>
+        )}
+
+        {retire && item.status === 'retired' && (
+          <button type="button" className="secondary danger" onClick={() => setRemoving(true)}>
+            Remove
+          </button>
+        )}
       </div>
 
       {assigning && (
@@ -382,6 +398,30 @@ function LifecycleActions({
       )}
       {reporting && (
         <FaultDialog item={item} onClose={() => setReporting(false)} onChanged={onChanged} />
+      )}
+      {removing && (
+        <RemoveItemDialog
+          itemId={item.id}
+          itemName={item.name}
+          assetTag={item.asset_tag}
+          onClose={() => setRemoving(false)}
+          onDone={() => {
+            setRemoving(false);
+            onChanged();
+          }}
+        />
+      )}
+      {retiring && (
+        <RetireItemDialog
+          itemId={item.id}
+          itemName={item.name}
+          assetTag={item.asset_tag}
+          onClose={() => setRetiring(false)}
+          onDone={() => {
+            setRetiring(false);
+            onChanged();
+          }}
+        />
       )}
     </>
   );

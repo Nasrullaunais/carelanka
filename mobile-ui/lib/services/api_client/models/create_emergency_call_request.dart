@@ -23,9 +23,9 @@ class CreateEmergencyCallRequest {
     this.details,
     this.priority,
   });
-
+  
   factory CreateEmergencyCallRequest.fromJson(Map<String, Object?> json) => _$CreateEmergencyCallRequestFromJson(json);
-
+  
   @JsonKey(name: 'patient_is_caller')
   final bool patientIsCaller;
   @JsonKey(name: 'patient_id')

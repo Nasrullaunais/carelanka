@@ -15,9 +15,9 @@ class UpdateMyDispatchStatusRequest {
     this.latitude,
     this.longitude,
   });
-
+  
   factory UpdateMyDispatchStatusRequest.fromJson(Map<String, Object?> json) => _$UpdateMyDispatchStatusRequestFromJson(json);
-
+  
   final DispatchStatus? status;
   final double? latitude;
   final double? longitude;

@@ -229,8 +229,9 @@ public sealed class MaintenanceEndpointTests
         await equipment.PostAsJsonAsync(
             $"/api/equipment-items/{item.Id}/report-fault", new { description = "Cracked frame." });
 
-        var retired = await administrator.PutAsJsonAsync(
-            $"/api/equipment-items/{item.Id}", new { status = "retired" });
+        administrator.DefaultRequestHeaders.Add(
+            "X-Confirmation-Code", ApiApplication.EquipmentConfirmationCode);
+        var retired = await administrator.PostAsync($"/api/equipment-items/{item.Id}/retire", null);
 
         Assert.Equal(HttpStatusCode.OK, retired.StatusCode);
     }

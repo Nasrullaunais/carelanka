@@ -340,6 +340,31 @@ class _EquipmentApi implements EquipmentApi {
   }
 
   @override
+  Future<void> removeEquipmentItem({
+    required String id,
+    required String xConfirmationCode,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{
+      r'X-Confirmation-Code': xConfirmationCode,
+    };
+    _headers.removeWhere((k, v) => v == null);
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<void>(
+      Options(method: 'DELETE', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/equipment-items/${id}',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    await _dio.fetch<void>(_options);
+  }
+
+  @override
   Future<EquipmentItemDetail> getEquipmentItemByTag({
     required String assetTag,
   }) async {
@@ -411,6 +436,39 @@ class _EquipmentApi implements EquipmentApi {
           .compose(
             _dio.options,
             '/equipment-items/${id}/release',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, Object?>>(_options);
+    late EquipmentItem _value;
+    try {
+      _value = EquipmentItem.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
+  Future<EquipmentItem> retireEquipmentItem({
+    required String id,
+    required String xConfirmationCode,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{
+      r'X-Confirmation-Code': xConfirmationCode,
+    };
+    _headers.removeWhere((k, v) => v == null);
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<EquipmentItem>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/equipment-items/${id}/retire',
             queryParameters: queryParameters,
             data: _data,
           )

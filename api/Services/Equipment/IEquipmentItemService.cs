@@ -26,6 +26,11 @@ public interface IEquipmentItemService
 
     Task<EquipmentItem> ReleaseAsync(Guid id, CancellationToken cancellationToken = default);
 
+    Task<EquipmentItem> RetireAsync(
+        Guid id, string? confirmationCode, CancellationToken cancellationToken = default);
+
+    Task RemoveAsync(Guid id, string? confirmationCode, CancellationToken cancellationToken = default);
+
     Task<EquipmentItem> ReportFaultAsync(
         Guid id, string description, CancellationToken cancellationToken = default);
 

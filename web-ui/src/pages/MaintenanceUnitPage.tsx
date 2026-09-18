@@ -6,7 +6,6 @@ import {
   createMaintenanceScheduleMutation,
   listEquipmentItemsOptions,
   listMaintenanceSchedulesOptions,
-  updateEquipmentItemMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
 import type { MaintenanceSchedule, MaintenanceType } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
@@ -16,12 +15,13 @@ import {
   maintenanceTypeLabels,
   schedulableMaintenanceTypes,
 } from '../types/maintenance';
-import { Dialog } from './EquipmentPage';
 import { ConfirmMaintenanceCard } from './equipment/ConfirmMaintenanceCard';
+import { RetireItemDialog } from './equipment/RetireItemDialog';
 
 const PAGE_SIZE = 10;
 
 export function MaintenanceUnitPage() {
+  const queryClient = useQueryClient();
   const session = useSession();
   const role = session?.principal.role;
   const manage = canRunMaintenance(role);
@@ -146,7 +146,18 @@ export function MaintenanceUnitPage() {
         )}
       </div>
 
-      {scrapping && <ScrapDialog job={scrapping} onClose={() => setScrapping(null)} />}
+      {scrapping && (
+        <RetireItemDialog
+          itemId={scrapping.asset_id}
+          itemName={scrapping.asset_label}
+          reason="Use this when the item cannot be fixed."
+          onClose={() => setScrapping(null)}
+          onDone={() => {
+            setScrapping(null);
+            queryClient.invalidateQueries();
+          }}
+        />
+      )}
     </>
   );
 }
@@ -283,41 +294,5 @@ function ScheduleMaintenanceCard() {
         </div>
       </form>
     </div>
-  );
-}
-
-function ScrapDialog({ job, onClose }: { job: MaintenanceSchedule; onClose: () => void }) {
-  const queryClient = useQueryClient();
-
-  const retire = useMutation({
-    ...updateEquipmentItemMutation(),
-    onSuccess: () => {
-      toast.success(`${job.asset_label} has been retired.`);
-      queryClient.invalidateQueries();
-      onClose();
-    },
-  });
-
-  return (
-    <Dialog title={`Retire ${job.asset_label}`} onClose={onClose}>
-      <p className="muted">
-        Use this when the item cannot be fixed. Retiring is permanent: a replacement is
-        registered as a new item, never by bringing this one back. The open job and the
-        reported fault are closed with it.
-      </p>
-
-      <div className="actions">
-        <button
-          type="button"
-          disabled={retire.isPending}
-          onClick={() => retire.mutate({ path: { id: job.asset_id }, body: { status: 'retired' } })}
-        >
-          {retire.isPending ? 'Retiring…' : 'Retire it'}
-        </button>
-        <button type="button" className="secondary" onClick={onClose}>
-          Cancel
-        </button>
-      </div>
-    </Dialog>
   );
 }

@@ -150,6 +150,13 @@ public sealed class EquipmentItemService : IEquipmentItemService
                 throw new BadRequestException(MessageCode.ValidationFailed);
             }
 
+            // Retiring is its own endpoint, because it is irreversible and needs the confirmation
+            // code. Allowing it here would be a way round that.
+            if (status == EquipmentStatus.Retired)
+            {
+                throw new ConflictException(MessageCode.EquipmentRetireNeedsCode, item.Name);
+            }
+
             EnsureTransitionAllowed(item, status, TransitionReason.Update);
 
             if (status != EquipmentStatus.Assigned)
@@ -158,11 +165,6 @@ public sealed class EquipmentItemService : IEquipmentItemService
             }
 
             item.Status = status;
-
-            if (status == EquipmentStatus.Retired)
-            {
-                await CloseOpenRepairWorkAsync(item.Id, cancellationToken);
-            }
         }
 
         if (request.Name is { } name)
@@ -223,6 +225,47 @@ public sealed class EquipmentItemService : IEquipmentItemService
         await _db.SaveChangesAsync(cancellationToken);
 
         return await ToItemAsync(item, cancellationToken);
+    }
+
+    public async Task<EquipmentItem> RetireAsync(
+        Guid id, string? confirmationCode, CancellationToken cancellationToken = default)
+    {
+        _confirmationCode.Ensure(confirmationCode);
+
+        var item = await GetConfirmedAsync(id, cancellationToken);
+
+        EnsureTransitionAllowed(item, EquipmentStatus.Retired, TransitionReason.Update);
+
+        item.Status = EquipmentStatus.Retired;
+        item.AssignedToAdmissionId = null;
+
+        // A retired machine leaves the maintenance unit's queue with it: nobody should be holding
+        // a work order for something that no longer exists.
+        await CloseOpenRepairWorkAsync(item.Id, cancellationToken);
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return await ToItemAsync(item, cancellationToken);
+    }
+
+    public async Task RemoveAsync(
+        Guid id, string? confirmationCode, CancellationToken cancellationToken = default)
+    {
+        _confirmationCode.Ensure(confirmationCode);
+
+        var item = await GetByIdAsync(id, cancellationToken);
+
+        // Retiring is the decision and is recorded; removing only takes the row off the register
+        // afterwards. Doing it in one step would let a live machine vanish in a single click.
+        if (item.Status != EquipmentStatus.Retired)
+        {
+            throw new ConflictException(MessageCode.EquipmentRemoveNeedsRetired, item.Name);
+        }
+
+        item.IsActive = false;
+        item.DeletedAt = DateTimeOffset.UtcNow;
+
+        await _db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<EquipmentItem> ReportFaultAsync(

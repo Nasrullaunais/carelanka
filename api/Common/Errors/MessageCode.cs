@@ -60,6 +60,12 @@ public enum MessageCode
 
     PrescriptionFileType,
 
+    EquipmentRetireNeedsCode,
+
+    EquipmentRemoveNeedsRetired,
+
+    PharmacyReceiveIsABatch,
+
     PharmacyCategoryNameTaken,
 
     PharmacyItemNameTaken,

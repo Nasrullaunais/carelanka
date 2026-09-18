@@ -78,7 +78,9 @@ equipment manager registers only reaches the web register once the administrator
 Both ask for the confirmation code first: `equipment2026`. **Confirms maintenance done** the same way, in the
 mobile app or on the web Maintenance unit page — every reported fault and scheduled job is listed
 there, and confirming it puts the item back into service. **Runs the maintenance unit** on the web:
-books maintenance, sees the open jobs, and retires a machine beyond repair.
+books maintenance and sees the open jobs. **Retires equipment** — the Retire button on any item, and
+Beyond repair in the maintenance unit, both ask for the same code. Retiring is permanent. A retired
+item then has **Remove**, which asks for the code again and takes it off the register for good.
 **Cannot:** register, admit, bed, or discharge anyone.
 
 ### Equipment manager

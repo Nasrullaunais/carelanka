@@ -53,14 +53,149 @@ public sealed class PharmacyEndpointTests
     }
 
     [Fact]
-    public async Task Receiving_a_delivery_puts_stock_back()
+    public async Task A_delivery_is_a_new_batch_and_not_a_plain_movement()
     {
         using var client = await EquipmentClientAsync();
         var id = await NewItemIdAsync(client, quantity: 2);
 
-        using var body = await ReadJsonAsync(await MoveAsync(client, id, "received", 12));
+        var asMovement = await MoveAsync(client, id, "received", 12);
+        using var refused = await ReadJsonAsync(asMovement);
 
-        Assert.Equal(14, body.RootElement.GetProperty("quantity_on_hand").GetInt32());
+        using var added = await ReadJsonAsync(await AddBatchAsync(client, id, 12, "2027-01-31"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, asMovement.StatusCode);
+        Assert.Equal("cl_equ_026", refused.RootElement.GetProperty("code").GetString());
+        Assert.Equal(2, added.RootElement.GetProperty("batch_number").GetInt32());
+        Assert.Equal(12, added.RootElement.GetProperty("quantity_on_hand").GetInt32());
+        Assert.Equal(14, await QuantityAsync(client, id));
+    }
+
+    [Fact]
+    public async Task The_opening_stock_of_a_new_item_is_its_first_batch()
+    {
+        using var client = await EquipmentClientAsync();
+        var id = await NewItemIdAsync(client, quantity: 6);
+
+        using var body = await ReadJsonAsync(await client.GetAsync($"/api/pharmacy-items/{id}/batches"));
+        var batch = Assert.Single(body.RootElement.EnumerateArray());
+
+        Assert.Equal(1, batch.GetProperty("batch_number").GetInt32());
+        Assert.Equal(6, batch.GetProperty("quantity_on_hand").GetInt32());
+    }
+
+    [Fact]
+    public async Task Dispensing_empties_the_batch_that_expires_first_before_touching_the_next()
+    {
+        using var client = await EquipmentClientAsync();
+        var id = await NewItemIdAsync(client, quantity: 0);
+
+        await AddBatchAsync(client, id, 4, "2027-06-30");
+        await AddBatchAsync(client, id, 10, "2026-12-31");
+
+        await MoveAsync(client, id, "dispensed", 12);
+
+        using var body = await ReadJsonAsync(await client.GetAsync($"/api/pharmacy-items/{id}/batches"));
+        var batches = body.RootElement.EnumerateArray()
+            .ToDictionary(b => b.GetProperty("batch_number").GetInt32(),
+                          b => b.GetProperty("quantity_on_hand").GetInt32());
+
+        // Batch 2 expires first, so it goes first and batch 1 covers the rest.
+        Assert.Equal(0, batches[2]);
+        Assert.Equal(2, batches[1]);
+        Assert.Equal(2, await QuantityAsync(client, id));
+    }
+
+    [Fact]
+    public async Task The_history_says_which_batch_each_movement_came_from()
+    {
+        using var client = await EquipmentClientAsync();
+        var id = await NewItemIdAsync(client, quantity: 0);
+
+        await AddBatchAsync(client, id, 3, "2026-11-30");
+        await AddBatchAsync(client, id, 5, "2027-11-30");
+        await MoveAsync(client, id, "dispensed", 4);
+
+        using var body = await ReadJsonAsync(
+            await client.GetAsync($"/api/pharmacy-items/{id}/transactions?pageSize=10"));
+        var rows = body.RootElement.GetProperty("items").EnumerateArray().ToList();
+
+        var dispensed = rows.Where(r => r.GetProperty("type").GetString() == "dispensed").ToList();
+
+        Assert.Equal(2, dispensed.Count);
+        Assert.Contains(dispensed, r => r.GetProperty("batch_number").GetInt32() == 1
+                                        && r.GetProperty("quantity").GetInt32() == 3);
+        Assert.Contains(dispensed, r => r.GetProperty("batch_number").GetInt32() == 2
+                                        && r.GetProperty("quantity").GetInt32() == 1);
+    }
+
+    [Fact]
+    public async Task A_movement_can_name_the_batch_it_comes_out_of()
+    {
+        using var client = await EquipmentClientAsync();
+        var id = await NewItemIdAsync(client, quantity: 0);
+
+        await AddBatchAsync(client, id, 5, "2026-12-31");
+        var second = await BatchIdAsync(client, id, 2, () => AddBatchAsync(client, id, 9, "2027-12-31"));
+
+        // The first batch expires sooner, so this is stock the earliest-expiry rule would not have
+        // touched.
+        var response = await MoveBatchAsync(client, id, second, "dispensed", 4);
+
+        using var batches = await ReadJsonAsync(await client.GetAsync($"/api/pharmacy-items/{id}/batches"));
+        var quantities = batches.RootElement.EnumerateArray()
+            .ToDictionary(b => b.GetProperty("batch_number").GetInt32(),
+                          b => b.GetProperty("quantity_on_hand").GetInt32());
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(5, quantities[1]);
+        Assert.Equal(5, quantities[2]);
+        Assert.Equal(10, await QuantityAsync(client, id));
+    }
+
+    [Fact]
+    public async Task A_batch_movement_cannot_take_more_than_that_batch_holds()
+    {
+        using var client = await EquipmentClientAsync();
+        var id = await NewItemIdAsync(client, quantity: 0);
+
+        var first = await BatchIdAsync(client, id, 1, () => AddBatchAsync(client, id, 2, "2026-12-31"));
+        await AddBatchAsync(client, id, 50, "2027-12-31");
+
+        var response = await MoveBatchAsync(client, id, first, "dispensed", 6);
+        using var body = await ReadJsonAsync(response);
+
+        // The shelf holds 52 in total; this batch holds 2, and that is what the message says.
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("cl_equ_010", body.RootElement.GetProperty("code").GetString());
+        Assert.Equal(52, await QuantityAsync(client, id));
+    }
+
+    [Fact]
+    public async Task A_batch_movement_against_an_unknown_batch_is_a_404()
+    {
+        using var client = await EquipmentClientAsync();
+        var id = await NewItemIdAsync(client, quantity: 3);
+
+        var response = await MoveBatchAsync(client, id, Guid.NewGuid(), "dispensed", 1);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task An_item_and_its_batches_always_add_up_to_the_same_number()
+    {
+        using var client = await EquipmentClientAsync();
+        var id = await NewItemIdAsync(client, quantity: 5);
+
+        await AddBatchAsync(client, id, 7, "2027-02-28");
+        await MoveAsync(client, id, "dispensed", 6);
+        await MoveAsync(client, id, "adjusted", 2, "Stocktake found two extra boxes.");
+
+        using var body = await ReadJsonAsync(await client.GetAsync($"/api/pharmacy-items/{id}/batches"));
+        var batched = body.RootElement.EnumerateArray()
+            .Sum(b => b.GetProperty("quantity_on_hand").GetInt32());
+
+        Assert.Equal(await QuantityAsync(client, id), batched);
     }
 
     [Fact]
@@ -215,6 +350,28 @@ public sealed class PharmacyEndpointTests
         HttpClient client, Guid id, string type, int quantity, string? note = null)
         => client.PostAsJsonAsync(
             $"/api/pharmacy-items/{id}/transactions", new { type, quantity, note });
+
+    private static Task<HttpResponseMessage> MoveBatchAsync(
+        HttpClient client, Guid id, Guid batchId, string type, int quantity, string? note = null)
+        => client.PostAsJsonAsync(
+            $"/api/pharmacy-items/{id}/batches/{batchId}/transactions", new { type, quantity, note });
+
+    private static async Task<Guid> BatchIdAsync(
+        HttpClient client, Guid id, int batchNumber, Func<Task<HttpResponseMessage>> add)
+    {
+        (await add()).EnsureSuccessStatusCode();
+
+        using var body = await ReadJsonAsync(await client.GetAsync($"/api/pharmacy-items/{id}/batches"));
+
+        return body.RootElement.EnumerateArray()
+            .Single(b => b.GetProperty("batch_number").GetInt32() == batchNumber)
+            .GetProperty("id").GetGuid();
+    }
+
+    private static Task<HttpResponseMessage> AddBatchAsync(
+        HttpClient client, Guid id, int quantity, string? expiryDate = null)
+        => client.PostAsJsonAsync(
+            $"/api/pharmacy-items/{id}/batches", new { quantity, expiry_date = expiryDate });
 
     private static async Task<int> QuantityAsync(HttpClient client, Guid id)
     {

@@ -6,10 +6,10 @@ import { recordPharmacyTransactionMutation } from '../../services/api/generated/
 import type { PharmacyItem, PharmacyTransactionType } from '../../services/api/generated';
 import { Dialog } from '../EquipmentPage';
 import {
+  movementTypes,
   needsNote,
   takesStock,
   transactionTypeLabels,
-  transactionTypes,
 } from '../../types/pharmacy';
 
 export function StockDialog({
@@ -58,7 +58,9 @@ export function StockDialog({
     <Dialog title={`Record a movement for ${item.name}`} onClose={onClose}>
       <p className="muted">
         The quantity is never edited directly. Every change is a movement, so the shelf and
-        the history can never tell different stories.
+        the history can never tell different stories. Dispensing comes out of the batch that
+        expires first. A delivery is not recorded here: it is a new batch, with its own expiry
+        date, added with <strong>Add batch</strong>.
       </p>
 
       <form onSubmit={submit}>
@@ -70,7 +72,7 @@ export function StockDialog({
               value={type}
               onChange={(event) => setType(event.target.value as PharmacyTransactionType)}
             >
-              {transactionTypes.map((value) => (
+              {movementTypes.map((value) => (
                 <option key={value} value={value}>
                   {transactionTypeLabels[value]}
                 </option>

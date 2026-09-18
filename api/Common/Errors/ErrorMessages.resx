@@ -172,6 +172,18 @@
     <value>A prescription has to be a photo (JPEG or PNG) or a PDF. This one is {0}.</value>
     <comment>Names what is allowed and what arrived.</comment>
   </data>
+  <data name="cl_equ_024" xml:space="preserve">
+    <value>Retiring {0} is done from Retire, by the hospital administrator with the confirmation code.</value>
+    <comment>Taking a machine off the register for good is a second pair of eyes plus the code, so it cannot be an accidental edit.</comment>
+  </data>
+  <data name="cl_equ_025" xml:space="preserve">
+    <value>{0} has to be retired before it can be removed from the register.</value>
+    <comment>Two steps on purpose: retiring is the decision, removing only tidies the list afterwards.</comment>
+  </data>
+  <data name="cl_equ_026" xml:space="preserve">
+    <value>Stock arriving is a new batch of {0}, with its own expiry date. Use Add batch.</value>
+    <comment>Received stock has to say when it expires, which a plain quantity cannot.</comment>
+  </data>
   <data name="cl_equ_013" xml:space="preserve">
     <value>{0} is with the maintenance unit. It comes back into service when they complete the repair, not by editing its status.</value>
     <comment>Says where the item is and who releases it, because the caller's next move is to go and look at the repair queue.</comment>

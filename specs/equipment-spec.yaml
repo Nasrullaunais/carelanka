@@ -343,9 +343,9 @@ paths:
 
         A `status` of `maintenance` cannot be edited back to `available` here. The item is with
         the maintenance unit and returns to service only when they complete the repair, so this
-        answers 409. `retired` is still reachable from `maintenance`: scrapping a machine nobody
-        can fix is the other real outcome of a fault, and it closes that item's open work order
-        and fault warning with it.
+        answers 409. `retired` cannot be set here either *(Rev 3, 2026-09-18)*: retiring is
+        irreversible, so it has its own endpoint that asks for the confirmation code
+        (`POST /equipment-items/{id}/retire`, `cl_equ_024`).
       operationId: updateEquipmentItem
       requestBody:
         required: true
@@ -369,6 +369,38 @@ paths:
             awaiting confirmation.
           content:
             application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+    delete:
+      tags: [Equipment]
+      summary: Remove a retired item from the register
+      description: |
+        Roles: HospitalAdministrator, with the confirmation code.
+
+        Only after `POST /equipment-items/{id}/retire`: an item still in use answers 409
+        `cl_equ_025`. Two steps on purpose - retiring is the decision, removing only tidies the
+        list afterwards.
+
+        A soft delete. The row and its history stay in the database; it leaves every list, and its
+        asset tag and serial number are free for a new item, because both unique indexes are
+        scoped to live rows.
+      operationId: removeEquipmentItem
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
+      responses:
+        '204':
+          description: Removed from the register
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: This role may not remove equipment, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This item is not retired yet.
+          content:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /equipment-items/by-tag/{assetTag}:
@@ -464,6 +496,43 @@ paths:
           description: This item is not currently assigned.
           content:
             application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /equipment-items/{id}/retire:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Equipment]
+      summary: Retire an equipment item for good
+      description: |
+        Roles: HospitalAdministrator, with the confirmation code.
+
+        Business operation beyond CRUD, and the only way an item reaches `retired`. Use it when a
+        machine is beyond repair or is no longer used in the hospital. `retired` is terminal: the
+        item can never be assigned again and a replacement is registered as a new item. Any open
+        repair job is cancelled and any open fault warning closed with it.
+
+        An item a patient is currently using cannot be retired - release it first.
+      operationId: retireEquipmentItem
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
+      responses:
+        '200':
+          description: Retired
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EquipmentItem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: This role may not retire equipment, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This item is assigned to a patient, or is already retired.
+          content:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /equipment-items/{id}/report-fault:
@@ -778,6 +847,105 @@ paths:
               schema: { $ref: '#/components/schemas/PharmacyItem' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /pharmacy-items/{id}/batches:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Pharmacy]
+      summary: The deliveries of one medicine
+      description: |
+        Roles: any authenticated staff.
+
+        Every batch of this medicine, oldest first. A batch with `quantity_on_hand = 0` is used up
+        and kept for the record.
+      operationId: listPharmacyBatches
+      responses:
+        '200':
+          description: Every batch, batch 1 first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PharmacyBatch' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Pharmacy]
+      summary: Record a delivery as the next batch
+      description: |
+        Roles: InventoryAdministrator.
+
+        Business operation beyond CRUD, and the only way stock comes in. The batch takes the next
+        number for this medicine - 2 after the first delivery, and so on - and carries its own
+        expiry date, so two deliveries never share one. Adds to the item's total and writes a
+        `received` movement against the batch.
+
+        `POST /pharmacy-items/{id}/transactions` with `type = received` answers 400 `cl_equ_026`:
+        stock arriving has an expiry date, which that shape cannot carry.
+      operationId: addPharmacyBatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddPharmacyBatchRequest' }
+      responses:
+        '201':
+          description: The new batch
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PharmacyBatch' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /pharmacy-items/{id}/batches/{batchId}/transactions:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+      - name: batchId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Pharmacy]
+      summary: Record a movement against one named batch
+      description: |
+        Roles: InventoryAdministrator.
+
+        Business operation beyond CRUD. The same movements as
+        `POST /pharmacy-items/{id}/transactions`, but out of the batch named in the path rather
+        than whichever expires first - for stock expiring in one delivery, or a stocktake
+        correction on the box in front of you. `received` answers 400 `cl_equ_026` here too: a
+        delivery is a new batch.
+
+        Refused with 409 when that batch does not hold enough, even if the shelf does in total.
+        The message names the batch.
+      operationId: recordPharmacyBatchTransaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePharmacyTransactionRequest' }
+      responses:
+        '201':
+          description: Recorded; the item with its new total
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PharmacyItem' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: No such pharmacy item, or no such batch of it.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '409':
+          description: This batch does not hold that much.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /pharmacy-items/{id}/transactions:
     parameters:
@@ -2066,6 +2234,33 @@ components:
         reorder_threshold: { type: integer, minimum: 0, default: 10 }
         unit_price: { type: number, format: float, nullable: true }
 
+    PharmacyBatch:
+      type: object
+      description: |
+        One delivery of a medicine: the boxes that arrived together and the expiry date on them.
+        Stock lives here rather than on the item, because two deliveries expire on different days
+        and the one expiring first has to leave the shelf first.
+      required: [id, pharmacy_item_id, batch_number, quantity_on_hand, received_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        pharmacy_item_id: { type: string, format: uuid }
+        batch_number: { type: integer, description: '1 for the first delivery of this medicine, 2 for the next.' }
+        reference: { type: string, nullable: true, description: "The manufacturer's batch code from the box." }
+        expiry_date: { type: string, format: date, nullable: true }
+        quantity_on_hand: { type: integer, minimum: 0 }
+        note: { type: string, nullable: true }
+        received_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    AddPharmacyBatchRequest:
+      type: object
+      required: [quantity]
+      properties:
+        quantity: { type: integer, minimum: 1, description: 'How many units arrived.' }
+        expiry_date: { type: string, format: date, nullable: true }
+        reference: { type: string, maxLength: 50, nullable: true }
+        note: { type: string, maxLength: 300, nullable: true }
+
     PharmacyItem:
       allOf:
         - $ref: '#/components/schemas/AuditFields'
@@ -2076,9 +2271,13 @@ components:
             category_id: { type: string, format: uuid }
             category_name: { type: string }
             manufacturer: { type: string, nullable: true }
-            batch_number: { type: string, nullable: true }
-            expiry_date: { type: string, format: date, nullable: true }
             unit: { type: string }
+            batch_count: { type: integer, description: 'How many deliveries of this medicine are on the shelf.' }
+            earliest_expiry:
+              type: string
+              format: date
+              nullable: true
+              description: The soonest expiry date among batches that still have stock - what is dispensed next.
             quantity_on_hand: { type: integer }
             reorder_threshold: { type: integer }
             unit_price: { type: number, format: float, nullable: true }

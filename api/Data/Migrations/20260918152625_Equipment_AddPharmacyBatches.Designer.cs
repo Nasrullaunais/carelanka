@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using CareLanka.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CareLanka.Api.Data.Migrations
 {
     [DbContext(typeof(CareLankaDbContext))]
-    partial class CareLankaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260918152625_Equipment_AddPharmacyBatches")]
+    partial class Equipment_AddPharmacyBatches
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2338,62 +2341,6 @@ namespace CareLanka.Api.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.PatientMedicalProfile", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Allergies")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("allergies");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("CurrentSymptoms")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("current_symptoms");
-
-                    b.Property<string>("KnownConditions")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("known_conditions");
-
-                    b.Property<Guid>("PatientId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("patient_id");
-
-                    b.Property<string>("RecentSituation")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("recent_situation");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UpdatedByStaffMemberId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("updated_by_staff_member_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_patient_medical_profiles");
-
-                    b.HasIndex("PatientId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_patient_medical_profiles_patient_id");
-
-                    b.HasIndex("UpdatedByStaffMemberId")
-                        .HasDatabaseName("ix_patient_medical_profiles_updated_by_staff_member_id");
-
-                    b.ToTable("patient_medical_profiles", (string)null);
-                });
-
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.Ward", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2796,25 +2743,6 @@ namespace CareLanka.Api.Data.Migrations
                         .HasForeignKey("UserAccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_patients_patient_accounts_user_account_id");
-                });
-
-            modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.PatientMedicalProfile", b =>
-                {
-                    b.HasOne("CareLanka.Api.Data.Entities.Patient.Patient", "Patient")
-                        .WithOne()
-                        .HasForeignKey("CareLanka.Api.Data.Entities.Patient.PatientMedicalProfile", "PatientId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_patient_medical_profiles_patients_patient_id");
-
-                    b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", null)
-                        .WithMany()
-                        .HasForeignKey("UpdatedByStaffMemberId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_patient_medical_profiles_staff_members_updated_by_staff_mem");
-
-                    b.Navigation("Patient");
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Common.PatientAccount", b =>

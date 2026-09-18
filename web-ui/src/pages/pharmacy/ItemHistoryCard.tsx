@@ -7,6 +7,7 @@ import {
 import { useSession } from '../../services/auth/useSession';
 import { canManageEquipment } from '../../types/permissions';
 import { takesStock, transactionTypeLabels } from '../../types/pharmacy';
+import { ordinal } from './BatchList';
 
 export function ItemHistoryCard({ id, onClose }: { id: string; onClose: () => void }) {
   const session = useSession();
@@ -60,8 +61,14 @@ export function ItemHistoryCard({ id, onClose }: { id: string; onClose: () => vo
       <dl className="detail-grid">
         <Field label="Category" value={it.category_name} />
         <Field label="Manufacturer" value={it.manufacturer ?? <Muted>Not recorded</Muted>} />
-        <Field label="Batch" value={it.batch_number ?? <Muted>Not tracked</Muted>} />
-        <Field label="Expires" value={it.expiry_date ?? <Muted>Does not expire</Muted>} />
+        <Field
+          label="Batches"
+          value={it.batch_count === 0 ? <Muted>None yet</Muted> : `${it.batch_count} on the shelf`}
+        />
+        <Field
+          label="Expires first"
+          value={it.earliest_expiry ?? <Muted>Nothing expiring</Muted>}
+        />
         <Field label="Reorder at" value={`${it.reorder_threshold} ${it.unit}`} />
         <Field
           label="Unit price"
@@ -90,6 +97,7 @@ export function ItemHistoryCard({ id, onClose }: { id: string; onClose: () => vo
               <tr>
                 <th>When</th>
                 <th>What happened</th>
+                <th>Batch</th>
                 <th>Change</th>
                 <th>Note</th>
               </tr>
@@ -101,6 +109,13 @@ export function ItemHistoryCard({ id, onClose }: { id: string; onClose: () => vo
                     {new Date(row.created_at).toLocaleString()}
                   </td>
                   <td>{transactionTypeLabels[row.type]}</td>
+                  <td>
+                    {row.batch_number == null ? (
+                      <Muted>Before batches</Muted>
+                    ) : (
+                      `${ordinal(row.batch_number)} batch`
+                    )}
+                  </td>
                   <td>
 
                     <strong>

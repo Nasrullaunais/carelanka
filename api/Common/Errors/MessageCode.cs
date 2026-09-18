@@ -66,6 +66,8 @@ public enum MessageCode
 
     PharmacyReceiveIsABatch,
 
+    PharmacyRemoveNeedsEmpty,
+
     PharmacyCategoryNameTaken,
 
     PharmacyItemNameTaken,

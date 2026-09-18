@@ -48,6 +48,7 @@ public static class MessageCodes
             [MessageCode.EquipmentRetireNeedsCode] = "cl_equ_024",
             [MessageCode.EquipmentRemoveNeedsRetired] = "cl_equ_025",
             [MessageCode.PharmacyReceiveIsABatch] = "cl_equ_026",
+            [MessageCode.PharmacyRemoveNeedsEmpty] = "cl_equ_027",
             [MessageCode.WardNameTaken] = "cl_pat_001",
             [MessageCode.PatientNicTaken] = "cl_pat_002",
             [MessageCode.PatientAlreadyHasAccount] = "cl_pat_003",

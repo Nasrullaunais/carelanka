@@ -59,6 +59,23 @@ public class PharmacyItemsController : ControllerBase
         return CreatedAtRoute("getPharmacyItem", new { id = item.Id }, item);
     }
 
+    [Authorize(Policy = Policies.PharmacyRemover)]
+    [HttpDelete("{id:guid}", Name = "removePharmacyItem")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<IActionResult> RemovePharmacyItem(
+        Guid id,
+        [FromHeader(Name = EquipmentOptions.ConfirmationCodeHeader)] string? confirmationCode,
+        CancellationToken ct)
+    {
+        await _items.RemoveAsync(id, confirmationCode, ct);
+
+        return NoContent();
+    }
+
     [Authorize(Policy = Policies.AnyStaff)]
     [HttpGet("{id:guid}/batches", Name = "listPharmacyBatches")]
     [ProducesResponseType(typeof(List<PharmacyBatch>), StatusCodes.Status200OK)]

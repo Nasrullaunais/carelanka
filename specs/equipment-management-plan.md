@@ -372,6 +372,12 @@ Amoxicillin 250mg          on hand 58, expires first 2026-10-01
 - **A used-up batch is kept**, at zero, because it is part of the history of what was dispensed.
 - **Registering a medicine can include the first delivery** (`quantity_on_hand` + `expiry_date`), which becomes batch 1, or leave it out for a medicine stocked but not held.
 
+### 5.1b Removing a medicine *(Rev 3, 2026-09-18)*
+
+`DELETE /pharmacy-items/{id}` takes a medicine the hospital no longer stocks off the register: a soft delete, so its batches and movement history stay in the database while it leaves every list and search, and its name is free again.
+
+It asks for the confirmation code — the same one as equipment confirmation, checked by the API — on top of the role, and it is **refused while any stock is left** (409 `cl_equ_027`). Boxes on the shelf must be dispensed or written off first, otherwise stock would disappear from the register with nothing in the history to say where it went.
+
 ### 5.2 Search and availability — the literal requirement
 
 `GET /api/pharmacy-items?search=&availableOnly=` is open to **any authenticated staff role**, per §2. It matches name or category, and `availableOnly=true` filters to `quantity_on_hand > 0` — exactly "search for pharmacy items and check whether they are currently available."
@@ -474,6 +480,7 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 | `POST` | `/api/pharmacy-items` | Inventory Administrator | |
 | `GET` | `/api/pharmacy-items` | **Any authenticated staff** | `?search=`, `?categoryId=`, `?availableOnly=`. The literal requirement from §5.2. |
 | `GET` | `/api/pharmacy-items/{id}` | Any staff | |
+| `DELETE` | `/api/pharmacy-items/{id}` | Inventory Administrator, Hospital Administrator + code *(Rev 3, 2026-09-18)* | Soft-deletes a medicine with an empty shelf. §5.1b |
 | `GET` | `/api/pharmacy-items/{id}/batches` | Any staff | *(Rev 3, 2026-09-18)* Every delivery of this medicine. §5.1a |
 | `POST` | `/api/pharmacy-items/{id}/batches` | Inventory Administrator | *(Rev 3, 2026-09-18)* **Business op.** A delivery: the next batch, with its expiry date |
 | `POST` | `/api/pharmacy-items/{id}/batches/{batchId}/transactions` | Inventory Administrator | *(Rev 3, 2026-09-18)* **Business op.** A movement out of one named batch. §5.1a |
@@ -650,7 +657,7 @@ Per the assignment: workflow id, objective, plan, completed steps, tool calls wi
 | :--- | :--- |
 | **Equipment inventory** | Search, filter by category/ward/status, sort, paginate. *(Rev 3, 2026-09-16.)* Lists confirmed items only, and tells the equipment manager and administrator how many registered items are still awaiting confirmation. *(Rev 3, 2026-09-17.)* The hospital administrator also gets a **Confirm new equipment** card: enter the confirmation code, then Confirm or Reject each waiting item — the same queue as the mobile app, §4.3. *(Rev 3, 2026-09-18.)* Every item carries a **Retire** button for the administrator, which asks for the confirmation code; a retired one carries **Remove**, which takes it off the register after the same code — §4.1 |
 | **Equipment detail** | Item info, maintenance history, current warnings, assign/release. *(Rev 2, 2026-09-13.)* Assigning picks the patient by ward rather than taking a pasted admission id |
-| **Pharmacy inventory** | Search, filter by category, below-threshold and expiring-soon highlighted. *(Rev 3, 2026-09-18.)* An arrow under each medicine opens its batches — number, expiry, boxes left, batch code — with **Record movement** on each one, and **Add batch** records a delivery. §5.1a. *(Rev 3, 2026-09-17.)* A **Prescriptions from the app** card: waiting, ready, delivered and can't-fill tabs, view the photo, Ready (issues a token), Mark delivered, Can't fill with a reason — §5.4 |
+| **Pharmacy inventory** | Search, filter by category, below-threshold and expiring-soon highlighted. *(Rev 3, 2026-09-18.)* An arrow under each medicine opens its batches — number, expiry, boxes left, batch code — with **Record movement** on each one, and **Add batch** records a delivery. §5.1a. **Remove** takes a medicine off the register once its shelf is empty, after the confirmation code — §5.1b. *(Rev 3, 2026-09-17.)* A **Prescriptions from the app** card: waiting, ready, delivered and can't-fill tabs, view the photo, Ready (issues a token), Mark delivered, Can't fill with a reason — §5.4 |
 | **Maintenance calendar** | Scheduled and overdue, by asset type |
 | **Maintenance unit** | *(Rev 3, 2026-09-17 — the hospital administrator's page only.)* Book a service, calibration or repair; the open-jobs list with Beyond repair (retires the item, asking for the confirmation code — §4.1); and Confirm maintenance done, after the confirmation code — §6.1. The equipment manager does not see it: they report faults from the Equipment page |
 | **Laboratory** | *(Rev 2, 2026-09-13.)* Pick a ward, read down who is in it, and file a result against whoever the specimen came from. Search by code, name or NIC is the second way in, for an outpatient in no ward. Clinical staff see the same screen without the upload form — see §7.5 |

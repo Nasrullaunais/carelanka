@@ -848,6 +848,39 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+    delete:
+      tags: [Pharmacy]
+      summary: Remove a medicine the hospital no longer stocks
+      description: |
+        Roles: InventoryAdministrator or HospitalAdministrator, with the confirmation code
+        (`X-Confirmation-Code`, checked against `Equipment:ConfirmationCode` - the same code as
+        equipment confirmation). A missing or wrong code answers 403 `cl_equ_017`.
+
+        Refused with 409 `cl_equ_027` while any stock is left, so boxes cannot disappear from the
+        register with the medicine: dispense or write off the rest first.
+
+        A soft delete. Batches and movement history stay in the database; the medicine leaves every
+        list and search, and its name is free to be registered again, because the unique index on
+        the name is scoped to live rows.
+      operationId: removePharmacyItem
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
+      responses:
+        '204':
+          description: Removed from the register
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: This role may not remove medicines, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: There is still stock on the shelf.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
   /pharmacy-items/{id}/batches:
     parameters:
       - $ref: '#/components/parameters/PathId'

@@ -184,6 +184,10 @@
     <value>Stock arriving is a new batch of {0}, with its own expiry date. Use Add batch.</value>
     <comment>Received stock has to say when it expires, which a plain quantity cannot.</comment>
   </data>
+  <data name="cl_equ_027" xml:space="preserve">
+    <value>{0} still has {1} {2} on the shelf. Dispense or write off the rest before removing it.</value>
+    <comment>Removing hides the medicine from every list, so stock must not disappear with it.</comment>
+  </data>
   <data name="cl_equ_013" xml:space="preserve">
     <value>{0} is with the maintenance unit. It comes back into service when they complete the repair, not by editing its status.</value>
     <comment>Says where the item is and who releases it, because the caller's next move is to go and look at the repair queue.</comment>

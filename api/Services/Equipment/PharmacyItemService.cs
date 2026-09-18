@@ -16,11 +16,16 @@ public sealed class PharmacyItemService : IPharmacyItemService
 {
     private readonly CareLankaDbContext _db;
     private readonly ICurrentUser _currentUser;
+    private readonly IEquipmentConfirmationCode _confirmationCode;
 
-    public PharmacyItemService(CareLankaDbContext db, ICurrentUser currentUser)
+    public PharmacyItemService(
+        CareLankaDbContext db,
+        ICurrentUser currentUser,
+        IEquipmentConfirmationCode confirmationCode)
     {
         _db = db;
         _currentUser = currentUser;
+        _confirmationCode = confirmationCode;
     }
 
     public async Task<PagedResult<PharmacyItem>> ListAsync(
@@ -120,6 +125,29 @@ public sealed class PharmacyItemService : IPharmacyItemService
         await _db.SaveChangesAsync(cancellationToken);
 
         return ToDto(item);
+    }
+
+    public async Task RemoveAsync(
+        Guid id, string? confirmationCode, CancellationToken cancellationToken = default)
+    {
+        _confirmationCode.Ensure(confirmationCode);
+
+        var item = await _db.PharmacyItems
+            .FirstOrDefaultAsync(i => i.Id == id, cancellationToken)
+            ?? throw new NotFoundException("Pharmacy item", id);
+
+        // Removing hides the medicine from every list, so the shelf has to be empty first:
+        // otherwise stock would disappear with it and the consumption history would not say where.
+        if (item.QuantityOnHand > 0)
+        {
+            throw new ConflictException(
+                MessageCode.PharmacyRemoveNeedsEmpty, item.Name, item.QuantityOnHand, item.Unit);
+        }
+
+        item.IsActive = false;
+        item.DeletedAt = DateTimeOffset.UtcNow;
+
+        await _db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<PharmacyBatch>> ListBatchesAsync(

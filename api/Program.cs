@@ -1,5 +1,7 @@
 using System.Text;
 using System.Text.Json;
+using CareLanka.Api.Agents;
+using CareLanka.Api.Agents.Patient;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using CareLanka.Api.Common.Auth;
@@ -110,6 +112,15 @@ builder.Services
     .ValidateOnStart();
 
 builder.Services
+    .AddOptions<LanguageModelOptions>()
+    .Bind(builder.Configuration.GetSection(LanguageModelOptions.SectionName))
+    .Validate(options => options.TimeoutSeconds > 0,
+        "LanguageModel:TimeoutSeconds must be greater than zero.")
+    .Validate(options => options.MaxRetries >= 0,
+        "LanguageModel:MaxRetries cannot be negative.")
+    .ValidateOnStart();
+
+builder.Services
     .AddOptions<EquipmentOptions>()
     .Bind(builder.Configuration.GetSection(EquipmentOptions.SectionName))
     .Validate(options => !string.IsNullOrWhiteSpace(options.ConfirmationCode),
@@ -206,6 +217,15 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.GeneralStaff),
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
+
+    options.AddPolicy(Policies.MedicalProfileReader, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.Doctor),
+        EnumWire.ToWire(StaffRole.DutyManager)));
+
+    options.AddPolicy(Policies.MedicalProfileAuthor, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.Doctor)));
 
     options.AddPolicy(Policies.AdmissionEditor, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.WardNurse),
@@ -353,6 +373,7 @@ builder.Services.AddScoped<ILabReportService, LabReportService>();
 builder.Services.AddScoped<IPrescriptionService, PrescriptionService>();
 builder.Services.AddScoped<IWardService, WardService>();
 builder.Services.AddScoped<IPatientService, PatientService>();
+builder.Services.AddScoped<IMedicalProfileService, MedicalProfileService>();
 builder.Services.AddScoped<IAdmissionService, AdmissionService>();
 builder.Services.AddScoped<ICapacityService, CapacityService>();
 builder.Services.AddScoped<IAppointmentService, AppointmentService>();
@@ -365,6 +386,28 @@ builder.Services.AddScoped<IBillingRateService, BillingRateService>();
 builder.Services.AddScoped<IMeService, MeService>();
 
 builder.Services.AddScoped<IBedRegistryService, BedRegistryService>();
+
+// ---- Agents ----
+// The provider is one registration and nothing in an agent knows which model answered (ADR 2).
+// With no key the API still starts and the bed agent still answers, on its deterministic ranking.
+builder.Services.AddHttpClient(GeminiLanguageModel.HttpClientName);
+
+if (string.IsNullOrWhiteSpace(
+        builder.Configuration[$"{LanguageModelOptions.SectionName}:ApiKey"]))
+{
+    builder.Services.AddSingleton<ILanguageModel, NoLanguageModel>();
+}
+else
+{
+    builder.Services.AddSingleton<ILanguageModel, GeminiLanguageModel>();
+}
+
+builder.Services.AddSingleton<IAgentRunQueue, AgentRunQueue>();
+builder.Services.AddHostedService<BedAgentWorker>();
+builder.Services.AddScoped<IBedAgentTools, BedAgentTools>();
+builder.Services.AddScoped<BedAgent>();
+builder.Services.AddScoped<BedAgentExecutor>();
+builder.Services.AddScoped<IBedSuggestionService, BedSuggestionService>();
 
 builder.Services.AddSingleton<IWardDirectory, StubWardDirectory>();
 

@@ -334,4 +334,8 @@
     <value>That patient code and NIC do not match. Check the slip the hospital gave you, or call the desk.</value>
     <comment>Patient self-service. Deliberately one message for every failure - no such code, wrong NIC, no NIC on file, already claimed. Saying which would confirm to a stranger holding a slip that the code is real, which is the thing the NIC is there to stop.</comment>
   </data>
+  <data name="cl_pat_039" xml:space="preserve">
+    <value>This visit is at {0} and is not waiting for a bed, so there is nothing to suggest one for.</value>
+    <comment>Bed agent entry point. Only a visit at awaiting_bed can receive a suggestion. An outpatient is the exception and is answered by the agent with visit_needs_no_bed rather than refused here, because "they do not need a bed" is a different answer from "the hospital is full".</comment>
+  </data>
 </root>

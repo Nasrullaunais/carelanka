@@ -84,7 +84,8 @@ public static class MessageCodes
             [MessageCode.NoCurrentAdmission] = "cl_pat_034",
             [MessageCode.AppointmentBilledOnItsAdmission] = "cl_pat_035",
             [MessageCode.NoBillRaised] = "cl_pat_036",
-            [MessageCode.PatientCodeNotClaimable] = "cl_pat_037"
+            [MessageCode.PatientCodeNotClaimable] = "cl_pat_037",
+            [MessageCode.AdmissionNotAwaitingBed] = "cl_pat_039"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

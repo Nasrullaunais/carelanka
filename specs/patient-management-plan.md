@@ -908,7 +908,7 @@ From the patients board, where the admission is already open:
 ```json
 {
   "workflow_id": "uuid",
-  "objective": "suggest_bed",
+  "objective": "assign_bed",
   "admission_id": "uuid"
 }
 ```
@@ -918,7 +918,7 @@ From the desk, where all the nurse has is a slip of paper:
 ```json
 {
   "workflow_id": "uuid",
-  "objective": "suggest_bed",
+  "objective": "assign_bed",
   "patient_identifier": "200012345678"
 }
 ```
@@ -989,10 +989,25 @@ Three things here are new as of 2026-09-16, and each came from asking what a nur
 | :--- | :--- | :--- |
 | `find_patient(identifier)` | read | NIC or patient code → the patient, their open admission if any. No match is an answer, not an error. |
 | `get_admission_requirements(admission_id)` | read | Category, gender, date of birth, infectious flag, urgency, expected arrival |
-| `list_available_beds(ward_type, gender, needs_isolation)` | read | Candidate beds: Equipment's register joined with our assignments, hold expiry applied. Only free, usable beds come back. |
+| `list_available_beds(ward_type)` | read | Candidate beds: Equipment's register joined with our assignments, hold expiry applied. Only free, usable beds in active wards come back. |
 | `get_ward_occupancy()` | read | Load per ward, for the balancing rule |
+| `list_previous_wards(patient_id)` | read | Wards this patient has stayed in before, for soft rule S2 |
 
-**Four tools. All four read. Not one of them writes anything.**
+**Five tools. All five read. Not one of them writes anything.**
+
+*(Corrected 2026-09-18, while building it. Two changes, both found by writing the thing.)*
+
+**`list_available_beds` lost its `gender` and `needs_isolation` arguments**, and that is a fix
+rather than a simplification. A bed filtered away inside the tool is a bed the agent never sees —
+so the sentence §8.6 promises, *"three general beds are free, but all are in female-only wards
+and this patient is male"*, could not be built, because nothing had counted them. Narrowing by
+rule now happens exactly once, in the FILTER step, through `BedPlacementRules.EnsurePlaceable`.
+The tool answers "what is free", the filter answers "what will do", and only the second one has
+an opinion about the patient.
+
+**`list_previous_wards` is new, and it is the fifth tool.** S2 says prefer a ward the patient has
+been in before, and none of the other four returns that. It reads and nothing else, so the
+property the allow-list exists for is unchanged — it is five read-only tools instead of four.
 
 This is stronger than the original design, and simpler. The agent used to be allowed to create a `reserved` hold, on the reasoning that a hold is not an admission so it is low-impact. That reasoning was wrong in a small way that matters: a hold takes a real bed out of circulation for thirty minutes, and an agent that runs twice on a busy morning can quietly make a ward look full to everybody else. Now nothing at all happens to the database until a human presses a button.
 
@@ -1071,7 +1086,14 @@ Every blocked outcome carries a `blocker` with a machine code and one plain sent
 | `no_bed_available` | `pediatric_only` | "The only free beds are in the children's ward, and this patient is 34." |
 | `visit_needs_no_bed` | `no_bed_required` | "This is an outpatient visit. They do not need a bed." |
 | `patient_not_found` | `no_such_patient` | "No patient matches that NIC or patient code." |
+| `no_bed_available` | `no_open_admission` | "Lochana Dahanayake has no open visit. Open one before asking where to put them." |
 | `failed` | `agent_failed` | "The suggestion could not be completed. Assign a bed by hand." |
+
+*(The `no_open_admission` row was added 2026-09-18.* `BedSuggestionBlockerCode` had always
+published the code and no outcome was paired with it. It rides on `no_bed_available` because
+that is true — there is no bed for this patient — and the blocker sentence carries the part
+that is actually useful. A new outcome value would have been a five-spec change to a
+group-owned enum to say something the blocker already says.)
 
 The sentence is **built in C# from the rule that actually blocked, not written by the model** — same instinct as the hard rules themselves. A model asked to explain why it failed will write something plausible; a counter is a filter result.
 
@@ -1347,13 +1369,42 @@ Steps 1, 3 and 6 are the safety net, and none of them involves the LLM — the s
 
 Same fields as §8.8: workflow id, objective, plan, completed steps, tool calls with inputs/outputs/timings, validation results, errors and retries, approval status, final outcome. Links to `CareRecommendation` the same way `AgentWorkflow` links to `BedAssignment` — via `(EntityType, EntityId)`, per `entity_diagram.md`'s `AgentWorkflow` note. No new shared table, no new column on `AgentWorkflow` or `AgentProposedChange`.
 
-### 8.20 What both agents still need, and nobody has built
+### 8.20 What both agents still need, and what was done about it
 
-**`AgentWorkflow` and `AgentProposedChange` do not exist.** No entity, no configuration, no migration, no `/workflows` controller — checked against the tree on 2026-09-16, not remembered.
+**`AgentWorkflow` and `AgentProposedChange` were common, group-owned (ADR 3) and unbuilt**, and
+the bed agent could not run without somewhere to persist a run. *(Updated 2026-09-18 — the bed
+agent is built; §8.10 onward, the care advisory agent, is not.)*
 
-They are **common, group-owned** (ADR 3, `specs/common-spec.yaml`), and all five agents need them. `BedAssignment.workflow_id` is already a column pointing at a table that is not there.
+**`AgentWorkflow` is stubbed, locally, and the row is in `STUBS.md`.** It is a real table with a
+real migration, copied field for field from `entity_diagram.md` and `common-spec.yaml` so the
+group's version replaces it without this component moving. Not an in-memory fake: a workflow
+record quietly discarded looks exactly like one that was persisted, and §9.1 scores persistence.
+None of `/api/workflows*` is built — this is the table, read through the Patient-specific
+`GET /api/bed-workflows/{workflowId}`.
 
-This is the only thing standing between this component and both agents, and it is not one member's to decide. Until it is built, either agent can be developed against a stub recorded in `STUBS.md` — but the stub has to be written down, because a workflow record that is quietly discarded looks exactly like one that was persisted, and §9.1 scores persistence.
+**`AgentProposedChange` is deliberately not stubbed, and that follows from §8.6b.** The agent
+holds no write tool, so it produces no proposal rows and there was nothing to copy honestly.
+Its own answer lives in **`bed_suggestions` and `bed_suggestion_candidates`, which are this
+component's tables**, not a private copy of the group's. The difference is the whole 2026-09-16
+redesign in one line: an `AgentProposedChange` is a domain write waiting to be applied, and a
+`bed_suggestion_candidate` is a bed somebody may press a button on. Nothing here is ever applied.
+
+Typed columns rather than a `jsonb` blob, for the reason ADR 3 gives about the group's own
+table: a bed id inside a blob can point at a bed the register retired an hour ago and nothing
+would notice. `ward_name` and `bed_number` are **not** stored — they are read live at
+`GET` time, because a label that was right when the agent ran and is wrong on the screen is
+worse than one join.
+
+**Three things for the group to rule on when they build the real pair**, all flagged in code and
+in `STUBS.md`:
+
+1. `Objective` is stored as the `WorkflowObjective` enum with `HasConversion<string>` (ADR 5),
+   where `entity_diagram.md` says plain `string`. Same column, typed differently.
+2. The bed agent's runs set `EntityType = "BedSuggestion"`, not `"Admission"`. A run started
+   from an NIC has no admission yet and `EntityId` is non-null, so pointing at the suggestion is
+   the one target that is stable for the life of the row. The admission is one join away.
+3. `RequiredApproverRole` is stored **only** on the workflow row, never copied onto the
+   suggestion. Two copies of one fact is two ways for it to disagree.
 
 ---
 

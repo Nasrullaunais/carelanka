@@ -917,11 +917,13 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
-        '503':
-          description: The agent service is unavailable. Use the manual assignment path instead.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        # 503 WITHDRAWN 2026-09-18, never built. There is no unavailable state to report: the agent
+        # only calls a model to rank beds that have already passed every hard rule and to write the
+        # sentence next to each, so a dead key, an exhausted quota or a timeout degrades to the
+        # deterministic ranking rather than failing. A run that does fail ends as a persisted
+        # workflow at `failed` with outcome `failed` and blocker `agent_failed`, which is the
+        # recorded safe failure §9.1 asks for - an endpoint declaring a 503 it cannot produce just
+        # generates a client branch nothing reaches.
 
   /bed-workflows/{workflowId}:
     parameters:
@@ -3240,7 +3242,7 @@ components:
 
     BedSuggestionPatient:
       type: object
-      required: [patient_id, patient_code, full_name]
+      required: [patient_id, patient_code, full_name, gender]
       description: |
         Who the suggestion is for. Part of the answer rather than a second lookup - a bed
         suggestion with no name on it is how the right bed gets given to the wrong person.
@@ -3259,7 +3261,14 @@ components:
           allOf:
             - $ref: '#/components/schemas/AdmissionUrgency'
           nullable: true
-        is_infectious: { type: boolean }
+        is_infectious:
+          type: boolean
+          nullable: true
+          description: >-
+            Nullable since 2026-09-18, for the same reason the three fields above it are: it is
+            read off the admission, and a patient the agent resolved with no open visit has none.
+            Sending false there would be a claim about infection control made from the absence of
+            a record.
         status:
           allOf:
             - $ref: '#/components/schemas/AdmissionStatus'
@@ -3936,16 +3945,30 @@ components:
       properties:
         workflow_id: { type: string, format: uuid }
         admission_id: { type: string, format: uuid, nullable: true }
-        objective: { type: string, example: suggest_bed }
+        objective:
+          allOf:
+            - $ref: '#/components/schemas/WorkflowObjective'
+          description: >-
+            Corrected 2026-09-18. This used to publish a free string with the example
+            `suggest_bed`, which was a second name for a value the group-owned allow-list in
+            common-spec.yaml already calls `assign_bed`. One vocabulary, so the example was the
+            thing that was wrong.
         status:
-          type: string
-          enum: [running, awaiting_approval, completed, failed]
+          allOf:
+            - $ref: '#/components/schemas/AgentWorkflowStatus'
+          description: >-
+            Widened 2026-09-18 from a four-value inline enum to the group-owned one, byte-identical
+            to common-spec.yaml. The bed agent only ever reaches running, awaiting_approval,
+            completed and failed - it has no approve endpoint - but the column is the shared enum
+            and publishing a narrower copy of a shared name is the collision the naming rule exists
+            to stop.
         outcome:
           allOf:
             - $ref: '#/components/schemas/BedAgentOutcome'
           nullable: true
         plan:
           type: array
+          description: The ordered plan, persisted before the first step runs.
           items: { type: string }
         steps:
           type: array
@@ -3958,6 +3981,30 @@ components:
               duration_ms: { type: integer }
               ok: { type: boolean }
               error: { type: string, nullable: true }
+        tool_calls:
+          type: array
+          description: >-
+            Added 2026-09-18. §9.1 Observability names tool calls with their INPUTS and OUTPUTS,
+            not just their timings, and `steps` carried neither. `output` is a summary - counts and
+            ids - never the whole payload and never the model's reasoning.
+          items:
+            type: object
+            properties:
+              tool: { type: string }
+              input: { type: string }
+              output: { type: string }
+              started_at: { type: string, format: date-time }
+              duration_ms: { type: integer }
+              ok: { type: boolean }
+              error: { type: string, nullable: true }
+        errors:
+          type: array
+          items: { type: string }
+        attempt_count:
+          type: integer
+          description: Added 2026-09-18. §9.1 names retries explicitly and nothing published them.
+        started_at: { type: string, format: date-time, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
         patient:
           allOf:
             - $ref: '#/components/schemas/BedSuggestionPatient'
@@ -3990,10 +4037,52 @@ components:
               type: array
               items: { type: string }
         requires_approval_by:
-          type: string
-          enum: [ward_nurse, duty_manager]
+          allOf:
+            - $ref: '#/components/schemas/BedApproverRole'
           nullable: true
-        retries: { type: integer }
+          description: >-
+            Which button to show, and nothing more - the real check runs again at
+            /admissions/{id}/assign-bed against the caller's own role. A ward nurse who is shown a
+            downgrade still cannot commit it.
+        # `retries` REMOVED 2026-09-18 - renamed `attempt_count` above, matching the group-owned
+        # field name in common-spec.yaml and the column in entity_diagram.md. It was never built
+        # under either name.
+
+    BedApproverRole:
+      type: string
+      description: >-
+        Named 2026-09-18, replacing an inline enum on BedWorkflowSummary. A component-specific
+        vocabulary gets a component-specific name: publishing the whole group-owned StaffRole to
+        say one of two things would have put a shared schema name in this file for no gain.
+      enum: [ward_nurse, duty_manager]
+
+    # The next two are GROUP-OWNED and byte-identical to common-spec.yaml, comments included.
+    # Changed in all five specs in the same commit, or not at all - check:specs fails on any
+    # difference, which is how a well-meant extra sentence here gets caught.
+
+    AgentWorkflowStatus:
+      type: string
+      enum:
+        - running
+        - awaiting_approval
+        - approved
+        - rejected
+        - revision_requested
+        - completed
+        - failed
+
+    WorkflowObjective:
+      type: string
+      description: |
+        The allow-list. Objectives are chosen from this enum, never free text - an
+        objective that reached the planner as an arbitrary string is a prompt-injection
+        surface, and §9.1 requires validated tool inputs.
+      enum:
+        - emergency_response
+        - assign_bed
+        - fill_roster_gap
+        - monitor_stock_and_maintenance
+        - check_ward_readiness
 
     # ---------- discharge ----------
 

@@ -23,6 +23,156 @@ namespace CareLanka.Api.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Common.AgentWorkflow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AgentType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("agent_type");
+
+                    b.Property<int>("AttemptCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("attempt_count");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<string>("CompletedSteps")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("completed_steps")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
+                    b.Property<Guid>("CorrelationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<string>("Errors")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("errors")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
+                    b.Property<string>("FinalOutcome")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("final_outcome");
+
+                    b.Property<string>("Objective")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("objective");
+
+                    b.Property<Guid?>("ParentWorkflowId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_workflow_id");
+
+                    b.Property<string>("Plan")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("plan")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
+                    b.Property<string>("RequiredApproverRole")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("required_approver_role");
+
+                    b.Property<string>("ReviewNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("review_notes");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reviewed_at");
+
+                    b.Property<Guid?>("ReviewedByStaffMemberId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reviewed_by_staff_member_id");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("ToolResults")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("tool_results")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("ValidationResults")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("validation_results")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
+                    b.HasKey("Id")
+                        .HasName("pk_agent_workflows");
+
+                    b.HasIndex("CorrelationId")
+                        .HasDatabaseName("ix_agent_workflows_correlation_id");
+
+                    b.HasIndex("ParentWorkflowId")
+                        .HasDatabaseName("ix_agent_workflows_parent_workflow_id");
+
+                    b.HasIndex("ReviewedByStaffMemberId")
+                        .HasDatabaseName("ix_agent_workflows_reviewed_by_staff_member_id");
+
+                    b.HasIndex("EntityType", "EntityId")
+                        .HasDatabaseName("ix_agent_workflows_entity");
+
+                    b.ToTable("agent_workflows", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_agent_workflows_agent_type", "agent_type IN ('coordinator', 'dispatch_routing', 'patient_admission_bed', 'staff_allocation', 'equipment_monitoring')");
+
+                            t.HasCheckConstraint("ck_agent_workflows_objective", "objective IN ('emergency_response', 'assign_bed', 'fill_roster_gap', 'monitor_stock_and_maintenance', 'check_ward_readiness')");
+
+                            t.HasCheckConstraint("ck_agent_workflows_required_approver_role", "required_approver_role IS NULL OR required_approver_role IN ('ward_nurse', 'doctor', 'ambulance_crew', 'general_staff', 'duty_manager', 'hospital_administrator', 'equipment_manager')");
+
+                            t.HasCheckConstraint("ck_agent_workflows_status", "status IN ('running', 'awaiting_approval', 'approved', 'rejected', 'revision_requested', 'completed', 'failed')");
+                        });
+                });
+
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Common.PatientAccount", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1863,6 +2013,9 @@ namespace CareLanka.Api.Data.Migrations
                         .HasDatabaseName("ix_bed_assignments_reserved_until")
                         .HasFilter("status = 'reserved'");
 
+                    b.HasIndex("WorkflowId")
+                        .HasDatabaseName("ix_bed_assignments_workflow_id");
+
                     b.ToTable("bed_assignments", null, t =>
                         {
                             t.HasCheckConstraint("ck_bed_assignments_assigned_by", "assigned_by IN ('agent', 'user')");
@@ -1871,6 +2024,141 @@ namespace CareLanka.Api.Data.Migrations
 
                             t.HasCheckConstraint("ck_bed_assignments_status", "status IN ('reserved', 'occupied', 'released')");
                         });
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.BedSuggestion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AdmissionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("admission_id");
+
+                    b.Property<string>("BlockerCode")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("blocker_code");
+
+                    b.Property<string>("BlockerMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("blocker_message");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Outcome")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("outcome");
+
+                    b.Property<Guid?>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<string>("RequestedIdentifier")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("requested_identifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<bool>("ValidationPassed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("validation_passed");
+
+                    b.Property<Guid>("WorkflowId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workflow_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_bed_suggestions");
+
+                    b.HasIndex("AdmissionId")
+                        .HasDatabaseName("ix_bed_suggestions_admission_id");
+
+                    b.HasIndex("PatientId")
+                        .HasDatabaseName("ix_bed_suggestions_patient_id");
+
+                    b.HasIndex("WorkflowId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_bed_suggestions_workflow_id");
+
+                    b.ToTable("bed_suggestions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_bed_suggestions_blocker_code", "blocker_code IS NULL OR blocker_code IN ('downgrade_needed', 'upgrade_only', 'ward_full', 'gender_policy', 'needs_isolation', 'pediatric_only', 'no_bed_required', 'no_such_patient', 'no_open_admission', 'agent_failed')");
+
+                            t.HasCheckConstraint("ck_bed_suggestions_outcome", "outcome IS NULL OR outcome IN ('proposed', 'proposed_with_downgrade', 'needs_duty_manager', 'no_bed_available', 'visit_needs_no_bed', 'patient_not_found', 'failed')");
+                        });
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.BedSuggestionCandidate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BedId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("bed_id");
+
+                    b.Property<Guid>("BedSuggestionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("bed_suggestion_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("IsDowngrade")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_downgrade");
+
+                    b.Property<int>("Rank")
+                        .HasColumnType("integer")
+                        .HasColumnName("rank");
+
+                    b.Property<string>("Rationale")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("rationale");
+
+                    b.Property<bool>("RequiresDutyManager")
+                        .HasColumnType("boolean")
+                        .HasColumnName("requires_duty_manager");
+
+                    b.Property<List<string>>("RulesSatisfied")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text[]")
+                        .HasColumnName("rules_satisfied")
+                        .HasDefaultValueSql("'{}'::text[]");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("WardId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ward_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_bed_suggestion_candidates");
+
+                    b.HasIndex("BedSuggestionId", "Rank")
+                        .IsUnique()
+                        .HasDatabaseName("ux_bed_suggestion_candidates_rank");
+
+                    b.ToTable("bed_suggestion_candidates", (string)null);
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.Bill", b =>
@@ -2289,6 +2577,62 @@ namespace CareLanka.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.PatientMedicalProfile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Allergies")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("allergies");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CurrentSymptoms")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("current_symptoms");
+
+                    b.Property<string>("KnownConditions")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("known_conditions");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<string>("RecentSituation")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("recent_situation");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UpdatedByStaffMemberId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_staff_member_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_patient_medical_profiles");
+
+                    b.HasIndex("PatientId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_patient_medical_profiles_patient_id");
+
+                    b.HasIndex("UpdatedByStaffMemberId")
+                        .HasDatabaseName("ix_patient_medical_profiles_updated_by_staff_member_id");
+
+                    b.ToTable("patient_medical_profiles", (string)null);
+                });
+
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.Ward", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2344,6 +2688,21 @@ namespace CareLanka.Api.Data.Migrations
 
                             t.HasCheckConstraint("ck_wards_type", "ward_type IN ('icu', 'hdu', 'general', 'maternity', 'pediatric', 'isolation', 'surgical', 'emergency', 'mental_health')");
                         });
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Common.AgentWorkflow", b =>
+                {
+                    b.HasOne("CareLanka.Api.Data.Entities.Common.AgentWorkflow", null)
+                        .WithMany()
+                        .HasForeignKey("ParentWorkflowId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_agent_workflows_agent_workflows_parent_workflow_id");
+
+                    b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewedByStaffMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_agent_workflows_staff_members_reviewed_by_staff_member_id");
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Common.RefreshToken", b =>
@@ -2596,7 +2955,51 @@ namespace CareLanka.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_bed_assignments_staff_members_approved_by_staff_member_id");
 
+                    b.HasOne("CareLanka.Api.Data.Entities.Common.AgentWorkflow", null)
+                        .WithMany()
+                        .HasForeignKey("WorkflowId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_bed_assignments_agent_workflows_workflow_id");
+
                     b.Navigation("Admission");
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.BedSuggestion", b =>
+                {
+                    b.HasOne("CareLanka.Api.Data.Entities.Patient.Admission", "Admission")
+                        .WithMany()
+                        .HasForeignKey("AdmissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_bed_suggestions_admissions_admission_id");
+
+                    b.HasOne("CareLanka.Api.Data.Entities.Patient.Patient", "Patient")
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_bed_suggestions_patients_patient_id");
+
+                    b.HasOne("CareLanka.Api.Data.Entities.Common.AgentWorkflow", null)
+                        .WithMany()
+                        .HasForeignKey("WorkflowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_bed_suggestions_agent_workflows_workflow_id");
+
+                    b.Navigation("Admission");
+
+                    b.Navigation("Patient");
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.BedSuggestionCandidate", b =>
+                {
+                    b.HasOne("CareLanka.Api.Data.Entities.Patient.BedSuggestion", "BedSuggestion")
+                        .WithMany("Candidates")
+                        .HasForeignKey("BedSuggestionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_bed_suggestion_candidates_bed_suggestions_bed_suggestion_id");
+
+                    b.Navigation("BedSuggestion");
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.Bill", b =>
@@ -2681,6 +3084,25 @@ namespace CareLanka.Api.Data.Migrations
                         .HasConstraintName("fk_patients_patient_accounts_user_account_id");
                 });
 
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.PatientMedicalProfile", b =>
+                {
+                    b.HasOne("CareLanka.Api.Data.Entities.Patient.Patient", "Patient")
+                        .WithOne()
+                        .HasForeignKey("CareLanka.Api.Data.Entities.Patient.PatientMedicalProfile", "PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_patient_medical_profiles_patients_patient_id");
+
+                    b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByStaffMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_patient_medical_profiles_staff_members_updated_by_staff_mem");
+
+                    b.Navigation("Patient");
+                });
+
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Common.PatientAccount", b =>
                 {
                     b.Navigation("RefreshTokens");
@@ -2735,6 +3157,11 @@ namespace CareLanka.Api.Data.Migrations
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.Appointment", b =>
                 {
                     b.Navigation("Bill");
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.BedSuggestion", b =>
+                {
+                    b.Navigation("Candidates");
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.Bill", b =>

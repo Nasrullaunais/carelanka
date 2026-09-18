@@ -17,6 +17,9 @@ public class CareLankaDbContext : DbContext
     public DbSet<PatientAccount> PatientAccounts => Set<PatientAccount>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+    // STUB - see STUBS.md. Group-owned (ADR 3); here only so the bed agent can persist a run.
+    public DbSet<AgentWorkflow> AgentWorkflows => Set<AgentWorkflow>();
+
     public DbSet<EmergencyCall> EmergencyCalls => Set<EmergencyCall>();
     public DbSet<Ambulance> Ambulances => Set<Ambulance>();
     public DbSet<AmbulanceCrewAssignment> AmbulanceCrewAssignments => Set<AmbulanceCrewAssignment>();
@@ -47,6 +50,9 @@ public class CareLankaDbContext : DbContext
     public DbSet<BillLineItem> BillLineItems => Set<BillLineItem>();
     public DbSet<BillingRate> BillingRates => Set<BillingRate>();
     public DbSet<AdmissionFeeRate> AdmissionFeeRates => Set<AdmissionFeeRate>();
+    public DbSet<PatientMedicalProfile> PatientMedicalProfiles => Set<PatientMedicalProfile>();
+    public DbSet<BedSuggestion> BedSuggestions => Set<BedSuggestion>();
+    public DbSet<BedSuggestionCandidate> BedSuggestionCandidates => Set<BedSuggestionCandidate>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
         => modelBuilder.ApplyConfigurationsFromAssembly(typeof(CareLankaDbContext).Assembly);

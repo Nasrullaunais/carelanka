@@ -24,9 +24,9 @@ class EmergencyCallSummary {
     this.waitingMinutes,
     this.createdAt,
   });
-
+  
   factory EmergencyCallSummary.fromJson(Map<String, Object?> json) => _$EmergencyCallSummaryFromJson(json);
-
+  
   final String? id;
   final CallPriority? priority;
   final CallStatus? status;

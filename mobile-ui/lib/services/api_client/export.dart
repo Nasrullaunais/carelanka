@@ -148,6 +148,7 @@ export 'models/patient_detail.dart';
 export 'models/patient_login_request.dart';
 export 'models/patient_lookup_request.dart';
 export 'models/patient_lookup_result.dart';
+export 'models/patient_medical_profile.dart';
 export 'models/patient_register_request.dart';
 export 'models/patient_sort_field.dart';
 export 'models/patient_summary.dart';
@@ -184,6 +185,7 @@ export 'models/update_bed_request.dart';
 export 'models/update_billing_rates_request.dart';
 export 'models/update_emergency_call_request.dart';
 export 'models/update_equipment_item_request.dart';
+export 'models/update_medical_profile_request.dart';
 export 'models/update_my_dispatch_status_request.dart';
 export 'models/update_patient_request.dart';
 export 'models/validation_problem_details.dart';
@@ -200,10 +202,10 @@ export 'models/warning.dart';
 export 'models/warning_severity.dart';
 export 'models/warning_status.dart';
 export 'models/warning_type.dart';
-export 'models/worklist_kind.dart';
 export 'models/worklist_row.dart';
 export 'models/worklist_row_paged_result.dart';
 export 'models/worklist_status.dart';
 export 'models/sort_dir.dart';
 // Root client
 export 'care_lanka_api.dart';
+

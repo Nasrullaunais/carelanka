@@ -20,9 +20,9 @@ class MyEmergencyCallSummary {
     this.cancellationRequestStatus,
     this.createdAt,
   });
-
+  
   factory MyEmergencyCallSummary.fromJson(Map<String, Object?> json) => _$MyEmergencyCallSummaryFromJson(json);
-
+  
   final String? id;
   @JsonKey(name: 'patient_is_caller')
   final bool? patientIsCaller;

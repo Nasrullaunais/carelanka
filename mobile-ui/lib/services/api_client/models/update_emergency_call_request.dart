@@ -18,9 +18,9 @@ class UpdateEmergencyCallRequest {
     this.latitude,
     this.longitude,
   });
-
+  
   factory UpdateEmergencyCallRequest.fromJson(Map<String, Object?> json) => _$UpdateEmergencyCallRequestFromJson(json);
-
+  
   final CallPriority? priority;
   final String? details;
   @JsonKey(name: 'caller_name')

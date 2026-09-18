@@ -148,5 +148,9 @@ public enum MessageCode
 
     NoBillRaised,
 
-    PatientCodeNotClaimable
+    PatientCodeNotClaimable,
+
+    // cl_pat_038 is reserved for the care advisory agent (patient-management-plan.md §8.10b).
+
+    AdmissionNotAwaitingBed
 }

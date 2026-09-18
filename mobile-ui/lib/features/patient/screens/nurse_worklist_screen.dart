@@ -4,9 +4,13 @@ import 'package:provider/provider.dart';
 import '../../../core/auth/auth_controller.dart';
 import '../../../core/widgets/async_view.dart';
 import '../../../core/widgets/phone_width.dart';
+import '../../../services/api_client/care_lanka_api.dart';
 import '../../../services/api_client/models/worklist_row.dart';
+import '../services/patient_service.dart';
+import '../state/medical_profile_controller.dart';
 import '../state/worklist_controller.dart';
 import '../widgets/worklist_status_chip.dart';
+import 'medical_profile_screen.dart';
 
 class NurseWorklistScreen extends StatefulWidget {
   const NurseWorklistScreen({super.key});
@@ -113,6 +117,18 @@ class _WorklistTile extends StatelessWidget {
       ),
       trailing: WorklistStatusChip(status: row.status),
       isThreeLine: place.isNotEmpty,
+      onTap: () => _openMedicalProfile(context),
     );
+  }
+
+  void _openMedicalProfile(BuildContext context) {
+    final service = PatientService(context.read<CareLankaApi>());
+
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => ChangeNotifierProvider(
+        create: (_) => MedicalProfileController(service, row.patient.id),
+        child: MedicalProfileScreen(patientName: row.patient.fullName),
+      ),
+    ));
   }
 }

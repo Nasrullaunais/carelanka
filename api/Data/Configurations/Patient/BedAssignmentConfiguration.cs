@@ -57,6 +57,13 @@ public class BedAssignmentConfiguration : IEntityTypeConfiguration<BedAssignment
             .HasForeignKey(b => b.ApprovedByStaffMemberId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // The column has existed since step 2 with nothing behind it. Now that agent_workflows
+        // exists the key is real, so a run cannot be deleted out from under the bed it suggested.
+        builder.HasOne<Entities.Common.AgentWorkflow>()
+            .WithMany()
+            .HasForeignKey(b => b.WorkflowId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(b => b.BedId)
             .HasDatabaseName(LiveBedUniqueIndex)
             .IsUnique()

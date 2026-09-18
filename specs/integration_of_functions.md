@@ -1067,6 +1067,59 @@ code and name read through `IPatientService` at display time.
 
 ---
 
+**11.21 (OPEN — announced by M4 on 2026-09-18) — the Patient Management bed agent is built, and
+it had to borrow the group's `AgentWorkflow` table to do it. Whoever takes the common agent
+track, this section is for you.**
+
+**Why this is here and not just in `STUBS.md`.** `AgentWorkflow` and `AgentProposedChange` are
+group-owned (ADR 3) and nobody has built them. The bed agent cannot run without somewhere to
+persist a run, and §9.1 scores persistence. So one member has written a table that is not theirs,
+and that is exactly the situation this document exists to stop happening silently.
+
+**What was built, and where.** `api/Data/Entities/Common/AgentWorkflow.cs`, its configuration,
+and the tables in migration `Patient_AddBedAgent`. Every field is copied from
+`docs/entity_diagram.md` and `specs/common-spec.yaml`. **It is local and unpushed**, so nothing on
+`main` depends on it — the bed agent cannot be merged until the real one lands, which is the
+price that was accepted for not waiting.
+
+**What was deliberately NOT built, and this is the useful half:**
+
+- **`AgentProposedChange`.** The bed agent holds no write tool (`patient-management-plan.md`
+  §8.6b), so it produces zero proposal rows and there was nothing to copy honestly. It is still
+  entirely unbuilt and still entirely the group's.
+- **Every `/api/workflows*` route.** `GET /workflows`, `GET /workflows/{id}` and the
+  approve / reject / request-revision gate in `common-spec.yaml` do not exist. Patient Management
+  reads its own runs through `GET /api/bed-workflows/{workflowId}`, which was always the
+  component-specific view ADR 3 kept alongside the shared one.
+
+**Three decisions taken under time pressure that are the group's to confirm or overrule.** All
+three are one-line changes today and are flagged in code:
+
+1. **`Objective` is stored as the `WorkflowObjective` enum** with `HasConversion<string>` per
+   ADR 5, where `entity_diagram.md` says plain `string`. Same column in PostgreSQL, typed in C#.
+2. **`EntityType` is `"BedSuggestion"`, not `"Admission"`**, for this agent's runs. A run started
+   from an NIC has not resolved a patient yet and `EntityId` is non-null, so the alternative was
+   writing a placeholder and rewriting it mid-run. The admission is one join away, on
+   `bed_suggestions.admission_id`. **If the §10 cross-component trace wants `"Admission"` there,
+   say so** — it is a real trade and the trace is the group's requirement, not ours.
+3. **`RequiredApproverRole` is stored only on the workflow row.** Nothing copies it onto Patient
+   Management's own tables.
+
+**Two Patient-owned tables came with it and are NOT copies of yours:** `bed_suggestions` and
+`bed_suggestion_candidates` hold the agent's answer — the patient it resolved, the outcome, the
+blocker, and the ranked beds a human may press a button on. An `AgentProposedChange` is a domain
+write waiting to be applied; nothing in these two is ever applied, because confirming a
+suggestion runs `POST /admissions/{id}/assign-bed`, the manual endpoint, with its own row lock
+and its own hard-rule check.
+
+**One thing that changed on a shared file.** `bed_assignments.workflow_id` has been a column with
+no foreign key behind it since step 2. It now has one, pointing at `agent_workflows`. When the
+real table lands, that key should survive the swap.
+
+**`Policies.cs` is untouched.** The two new endpoints sit on the existing `BedAssigner`.
+
+---
+
 ## 12. For the other three members
 
 This file originally described every boundary **from the Patient Management side**, because that was the first component designed. Equipment Management (§13–§16) added its own sections, written against `equipment-management-plan.md` and `equipment-spec.yaml`. Staff Management (§17–§21) and Emergency (§22–§26) now have theirs too, written against `staff-spec.yaml` and `emergency-management-plan.md`/`emergency-spec.yaml` respectively. If something here is wrong about your component, raise it in §11 rather than working around it.

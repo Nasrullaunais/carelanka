@@ -111,9 +111,40 @@ public sealed class BedAssignmentService : IBedAssignmentService
             bed,
             IsDutyManager);
 
-        var assignment = await WriteAsync(admissionId, bed, request.OverrideReason, ct);
+        var workflowId = await ResolveWorkflowAsync(admissionId, bed.Id, request.WorkflowId, ct);
+
+        var assignment = await WriteAsync(
+            admissionId, bed, request.OverrideReason, workflowId, ct);
 
         return await ToResponseAsync(assignment, ward!.Name, bed.BedNumber, ct);
+    }
+
+    /// <summary>
+    /// Keeps the workflow id only if that run really did offer this bed for this visit.
+    /// </summary>
+    /// <remarks>
+    /// An id that matches nothing is dropped and the assignment is recorded as a manual one,
+    /// which is what <c>patient-spec.yaml</c> publishes. Refusing instead was the other option and
+    /// is worse: a stale id from a screen somebody left open would stop a nurse bedding a patient
+    /// at all, where recording it as manual costs an attribution and is true - that bed was not
+    /// suggested by any run.
+    /// </remarks>
+    private async Task<Guid?> ResolveWorkflowAsync(
+        Guid admissionId, Guid bedId, Guid? workflowId, CancellationToken ct)
+    {
+        if (workflowId is not { } id)
+        {
+            return null;
+        }
+
+        var suggested = await _db.BedSuggestions
+            .AsNoTracking()
+            .Where(suggestion => suggestion.WorkflowId == id)
+            .Where(suggestion => suggestion.AdmissionId == admissionId)
+            .SelectMany(suggestion => suggestion.Candidates)
+            .AnyAsync(candidate => candidate.BedId == bedId, ct);
+
+        return suggested ? id : null;
     }
 
     public async Task<BedAssignmentResponse> CorrectBedAsync(
@@ -236,6 +267,7 @@ public sealed class BedAssignmentService : IBedAssignmentService
         Guid admissionId,
         RegisteredBed bed,
         string? overrideReason,
+        Guid? workflowId,
         CancellationToken ct)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
@@ -286,9 +318,11 @@ public sealed class BedAssignmentService : IBedAssignmentService
             Status = AssignmentStatus.Reserved,
             ReservedUntil = BedHold.ExpiresAt(admission.ExpectedArrivalAt, now),
 
-            AssignedBy = AssignedBy.User,
+            // The agent suggested it; the person pressing the button still approved it, and is
+            // still the one stamped below. assigned_by records where the idea came from.
+            AssignedBy = workflowId is null ? AssignedBy.User : AssignedBy.Agent,
 
-            WorkflowId = null,
+            WorkflowId = workflowId,
 
             IsDowngrade = isDowngrade,
 

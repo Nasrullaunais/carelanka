@@ -22,9 +22,9 @@ class MyCallTracking {
     this.cancellationRequestStatus,
     this.updatedAt,
   });
-
+  
   factory MyCallTracking.fromJson(Map<String, Object?> json) => _$MyCallTrackingFromJson(json);
-
+  
   @JsonKey(name: 'emergency_call_id')
   final String? emergencyCallId;
   @JsonKey(name: 'call_status')

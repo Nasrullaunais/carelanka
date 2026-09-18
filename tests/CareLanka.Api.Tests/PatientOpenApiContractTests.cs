@@ -25,6 +25,13 @@ public sealed class PatientOpenApiContractTests
     [InlineData("ReleaseReason")]
     [InlineData("WorklistStatus")]
     [InlineData("BillLineSource")]
+    [InlineData("BedAgentOutcome")]
+    [InlineData("BedSuggestionBlockerCode")]
+    [InlineData("BedApproverRole")]
+    // Group-owned and byte-identical to common-spec.yaml. Held here too, because this component
+    // publishes them and a change made in common has to reach this file or the clients drift.
+    [InlineData("AgentWorkflowStatus")]
+    [InlineData("WorkflowObjective")]
     public async Task Published_enum_values_match_the_contract_in_order(string enumName)
     {
         var generated = await GenerateAsync();
@@ -45,6 +52,7 @@ public sealed class PatientOpenApiContractTests
     [InlineData("PatientSummary")]
     [InlineData("Patient")]
     [InlineData("PatientDetail")]
+    [InlineData("PatientMedicalProfile")]
     [InlineData("CreateAdmissionRequest")]
     [InlineData("Admission")]
     [InlineData("AdmissionDetail")]
@@ -74,6 +82,9 @@ public sealed class PatientOpenApiContractTests
     [InlineData("MyBillLine")]
     [InlineData("PatientClaimPreview")]
     [InlineData("BookAppointmentRequest")]
+    [InlineData("SuggestedBed")]
+    [InlineData("BedSuggestionPatient")]
+    [InlineData("BedSuggestionBlocker")]
     public async Task Published_schema_required_members_match_the_contract(string schemaName)
     {
         var generated = await GenerateAsync();

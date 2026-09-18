@@ -47,18 +47,23 @@
 | 9 | React: admissions dashboard, bed board, occupancy report | **Done.** `DashboardPage`, `PatientsPage` (the board, with assign / correct bed on the row), `IntakePage`, `AppointmentsPage`, `CapacityPage`, `DischargePage`, `WardsPage`, `BillingSettingsPage` |
 | 9b | **The `/me/*` backend** | **Done 2026-09-12.** Seven routes: `pre-register`, `profile`, `admission`, `history`, book / list / cancel appointments. Not one takes a patient id - all scoped by the `sub` claim. `pre-register` creates no admission; see `patient-management-plan.md` §7.6 |
 | 10 | Flutter: nurse screens, then the patient's own-stay screens | **Done.** `mobile-ui/` is a real Flutter app with `android/` and `ios/`, the generated `api_client`, and the patient feature under `lib/features/patient/`. Local notifications on status change is the device feature |
-| 11 | **`PatientMedicalProfile` entity + configuration + migration + seed** | *(New 2026-09-16, and it moved to the front.)* One table, one row per patient, `UNIQUE(patient_id)`, plus `GET`/`PUT /patients/{id}/medical-profile` and the nurse screen. **Do this first of the six**: it is ordinary CRUD with no agent in it, it is what makes step 15 an agent rather than a rephraser, and the seed data has to exist before either agent can be demonstrated |
-| 12 | **The bed agent** | Hard rules H0–H6 are **already built** — `BedPlacementRules.cs`, step 6. The agent calls them, it does not get its own copy. Four **read-only** tools (§8.4), best + selectable alternatives, and a `blocker` sentence built in C# naming the rule that stopped it (§8.6). **It writes nothing** |
+| 11 | **`PatientMedicalProfile` entity + configuration + migration + seed** | **Done 2026-09-18.** One table, one row per patient, `UNIQUE(patient_id)`, `GET`/`PUT /patients/{id}/medical-profile` behind `MedicalProfileReader` / `MedicalProfileAuthor`, the editor in the React patients drawer and a Flutter screen off the nurse worklist. Seeded in `docs/seed/005_patient_medical_profiles.sql` — two patients are deliberately left without a profile so the agent's empty-profile path can be demonstrated |
+| 12 | **The bed agent** | **Done 2026-09-18.** `POST /api/bed-suggestions` and `GET /api/bed-workflows/{workflowId}`, plus one optional `workflow_id` on `assign-bed`. Hard rules H0–H6 run through the **same** `BedPlacementRules.EnsurePlaceable` a manual pick runs — the agent got no copy of the rulebook. Five read-only tools, best + selectable alternatives, and a `blocker` sentence built in C# naming the rule that stopped it. **It writes nothing.** 39 new tests |
 | 13 | React + Flutter: the suggestion panel | Who the patient is, the suggested bed, every alternative with its own button. Confirming calls `POST /admissions/{id}/assign-bed` with the `workflow_id` — the endpoint from step 6, with one new optional field. **There is no approval screen and no approval endpoint** (§8.6b) |
 | 14 | `CareRecommendation` entity + configuration + migration | Independent of the bed workflow — no dependency on steps 1–13 beyond `Patient`, `Admission` and step 11 existing |
 | 15 | **The care advisory agent, last** | Deterministic red-flag keyword screen (§8.13) runs *before* the model, not after. Rules CR1–CR5 (§8.15) validated the same way H0–H6 are. CR5 is the new one and needs step 11. Entry point refuses anybody not admitted, `409 cl_pat_038` |
 | 16 | React + Flutter: the review queue, and the patient's side | Queue is **Doctor or Ward Nurse** (§8.16), and shows the profile the agent read. Patient side is a card inside My Stay, never a top-level screen; never renders `agent_message` or `rejection_reason` |
 
-**Steps 11–16 all sit behind one thing that is not yours.** `AgentWorkflow` and
-`AgentProposedChange` are group-owned (ADR 3) and **do not exist anywhere in `api/`** — swept
-2026-09-16. `BedAssignment.WorkflowId` is already a column pointing at a missing table. Either
-build them as a group or stub them and write the stub into `STUBS.md`; a workflow record that
-is quietly dropped looks exactly like one that was persisted, and §9.1 scores persistence.
+**Steps 11–16 all sat behind one thing that is not yours, and it is now stubbed locally.**
+`AgentWorkflow` and `AgentProposedChange` are group-owned (ADR 3) and still do not exist on
+`main`. *(2026-09-18)* `AgentWorkflow` now exists **locally and unpushed**, as a real table with
+a real migration copied from `entity_diagram.md`, with the row in `STUBS.md` and the reasoning in
+`patient-management-plan.md` §8.20. `AgentProposedChange` is **not** stubbed and should not be:
+the bed agent holds no write tool, so it makes no proposal rows.
+
+**So the bed agent cannot be pushed until common lands.** That is the deal that was taken
+knowingly — waiting would have cost more than merging will. When the group builds the real pair,
+`git grep AgentWorkflow` finds every file to delete.
 
 **Steps 1, 2 and 3 are done.** `Ward` landed in `Patient_AddWard` (PR #12). `Patient`,
 `Admission`, `Appointment`, `BedAssignment`, `Discharge` and `DischargeChecklistItem`
@@ -406,6 +411,50 @@ ends up being a model rephrasing a sentence.
 
 ---
 
+**Step 12 is complete.** Two endpoints, three new tables, and 39 tests. Migration
+`Patient_AddBedAgent`: `agent_workflows` (the borrowed common one), `bed_suggestions`,
+`bed_suggestion_candidates`, and the foreign key `bed_assignments.workflow_id` had been missing
+since step 2. Things settled while building it:
+
+- **The tools cannot filter by rule, and finding that out changed the tool list.** §8.4 had
+  `list_available_beds(ward_type, gender, needs_isolation)`. Written that way, a bed dropped
+  inside the tool is a bed the agent never sees — so the blocker sentence the whole of §8.6
+  exists for, "three beds are free but all are female-only wards", has nothing to count. The
+  arguments are gone. The tool answers *what is free*; `BedPlacementRules.EnsurePlaceable`
+  answers *what will do*, once, and counts why each bed lost.
+- **The model reorders within a tier and never across one.** A matching ward cannot be demoted
+  below a downgrade by the ranking, because spending a rung of somebody's care is a human's
+  decision, not a preference. Partition, rank inside each part, concatenate. There is a test.
+- **The patient's name is never in the model payload.** Not escaped, not quoted — absent. The
+  payload carries bed numbers, ward names, ward types, occupancy and the care level, and a bed
+  cannot be ranked by whose it is. A patient called `ignore previous instructions` changes
+  nothing, and the test asserts the string does not appear.
+- **A missing API key is not a failure.** With none configured the deterministic S1/S2 ranking is
+  the answer, the rationale is built in C#, and "there was no model" is written to `errors` on
+  the run. So the suite is deterministic, CI never burns quota, and a dead key on demo day costs
+  the sentences rather than the suggestion. `ILanguageModel` is one registration (ADR 2).
+- **A blocked run must not pause.** Only `proposed` and `proposed_with_downgrade` end at
+  `awaiting_approval`; everything else ends `completed` or `failed`. Leaving a blocked run
+  waiting would put a row in an approval queue that no button can ever clear.
+- **The queue is at-least-once, so the executor checks the status first.** A second delivery of
+  the same workflow would otherwise write a second set of candidate rows against the same unique
+  rank and throw inside a background worker, where nobody is watching.
+- **A stale `workflow_id` on `assign-bed` is recorded as a manual pick, not refused.** This was
+  built as a 409 first, on the reasoning that `assigned_by` must not lie. The contract already
+  said otherwise and the contract is right: a stale id from a screen somebody left open would
+  stop a nurse bedding a patient, and `assigned_by = user` is *true* — no run suggested that bed.
+- **Two endpoint tests cannot exist.** The agent reads every free bed in the hospital, so another
+  test's ward is a bed it would rightly offer, and no integration test can pin *which* bed comes
+  back or assert a blocked outcome. Those live in `BedAgentTests` with the tools faked; the
+  endpoint tests assert the contract, the persistence and the write path.
+- **The 503 on `/bed-suggestions` was withdrawn, never built.** There is no unavailable state to
+  report — a dead model degrades to the deterministic ranking. An endpoint declaring a response
+  it cannot produce generates a client branch nothing reaches.
+
+**Left in step 12's wake:** the React and Flutter suggestion panels are step 13 and are not
+built, and `web-ui`'s generated client has not been regenerated — `bun run check:codegen` will
+fail until it is.
+
 ## Things that will bite
 
 **The concurrency guarantee is the index, not your code** — *and the index cannot read a
@@ -491,7 +540,7 @@ Two things your Flutter screens must handle:
 | ~~`GET /beds` — the bed register~~ | M3 | **Real since 2026-09-10.** Read it through `IBedRegistryService`, which is the one file in this component that knows Equipment's bed table exists. Never write it |
 | `POST /staff/lookup` | M2 | Rendering "Approved by …" |
 | Dispatch notification | M1 | Triggers your pre-admission |
-| **`AgentWorkflow` / `AgentProposedChange`** | **Common — the group** | **Both agents need it and it does not exist.** ADR 3 settled the design on 2026-09-07; nobody has built it. Not yours to write (`CLAUDE.md`, "Common vs. yours") — raise it with the group, and stub it in the meantime with the row recorded in `STUBS.md` |
+| **`AgentWorkflow`** | **Common — the group** | **Stubbed locally 2026-09-18, row in `STUBS.md`, not pushed.** ADR 3 settled the design on 2026-09-07; nobody has built it. Still not yours to write (`CLAUDE.md`, "Common vs. yours") — raise it with the group. `AgentProposedChange` is deliberately not stubbed: no write tool, no proposal rows |
 
 **Others are waiting on you for:** ~~`Ward` (all three)~~ **built**,
 ~~`GET /capacity/wards` (M1)~~ **built 2026-09-11**,

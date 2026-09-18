@@ -12,9 +12,9 @@ class ReportAmbulanceLocationRequest {
     this.latitude,
     this.longitude,
   });
-
+  
   factory ReportAmbulanceLocationRequest.fromJson(Map<String, Object?> json) => _$ReportAmbulanceLocationRequestFromJson(json);
-
+  
   final double? latitude;
   final double? longitude;
 

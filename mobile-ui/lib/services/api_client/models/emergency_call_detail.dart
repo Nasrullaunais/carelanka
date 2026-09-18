@@ -37,9 +37,9 @@ class EmergencyCallDetail {
     this.dispatches,
     this.openProposalId,
   });
-
+  
   factory EmergencyCallDetail.fromJson(Map<String, Object?> json) => _$EmergencyCallDetailFromJson(json);
-
+  
   final String? id;
   @JsonKey(name: 'patient_id')
   final String? patientId;

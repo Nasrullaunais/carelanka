@@ -365,12 +365,12 @@ export type CancelAdmissionRequest = {
     note?: string | null;
 };
 
-export type CancelDispatchRequest = {
-    reason?: string | null;
-};
-
 export type CancelAppointmentRequest = {
     reason: string;
+};
+
+export type CancelDispatchRequest = {
+    reason?: string | null;
 };
 
 export type CancelReason = 'diverted_to_other_hospital' | 'false_alarm' | 'died_en_route' | 'patient_refused' | 'no_show';
@@ -871,18 +871,6 @@ export type MyAppointmentPagedResult = {
     total_pages: number;
 };
 
-export type MyCallTracking = {
-    emergency_call_id?: string;
-    call_status?: CallStatus;
-    ambulance_is_on_the_way?: boolean;
-    ambulance_latitude?: number | null;
-    ambulance_longitude?: number | null;
-    ambulance_location_is_stale?: boolean;
-    estimated_minutes_to_arrival?: number | null;
-    cancellation_request_status?: CancellationRequestStatus;
-    updated_at?: string;
-};
-
 export type MyBill = {
     admission_id?: string | null;
     appointment_id?: string | null;
@@ -902,6 +890,18 @@ export type MyBillLine = {
     quantity: number;
     unit_price: number;
     line_total: number;
+};
+
+export type MyCallTracking = {
+    emergency_call_id?: string;
+    call_status?: CallStatus;
+    ambulance_is_on_the_way?: boolean;
+    ambulance_latitude?: number | null;
+    ambulance_longitude?: number | null;
+    ambulance_location_is_stale?: boolean;
+    estimated_minutes_to_arrival?: number | null;
+    cancellation_request_status?: CancellationRequestStatus;
+    updated_at?: string;
 };
 
 export type MyEmergencyCallSummary = {
@@ -1045,6 +1045,17 @@ export type PatientLookupResult = {
     found: boolean;
     patient?: PatientSummary;
     has_open_admission: boolean;
+};
+
+export type PatientMedicalProfile = {
+    patient_id: string;
+    known_conditions?: string | null;
+    allergies?: string | null;
+    current_symptoms?: string | null;
+    recent_situation?: string | null;
+    updated_by_staff_id?: string | null;
+    updated_by_staff_name?: string | null;
+    updated_at?: string | null;
 };
 
 export type PatientRegisterRequest = {
@@ -1260,6 +1271,13 @@ export type UpdateEquipmentItemRequest = {
     status?: EquipmentStatus;
     ward_id?: string | null;
     next_maintenance_due?: string | null;
+};
+
+export type UpdateMedicalProfileRequest = {
+    known_conditions?: string | null;
+    allergies?: string | null;
+    current_symptoms?: string | null;
+    recent_situation?: string | null;
 };
 
 export type UpdateMyDispatchStatusRequest = {
@@ -5740,6 +5758,80 @@ export type LookupPatientResponses = {
 };
 
 export type LookupPatientResponse = LookupPatientResponses[keyof LookupPatientResponses];
+
+export type GetPatientMedicalProfileData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/patients/{id}/medical-profile';
+};
+
+export type GetPatientMedicalProfileErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetPatientMedicalProfileError = GetPatientMedicalProfileErrors[keyof GetPatientMedicalProfileErrors];
+
+export type GetPatientMedicalProfileResponses = {
+    /**
+     * OK
+     */
+    200: PatientMedicalProfile;
+};
+
+export type GetPatientMedicalProfileResponse = GetPatientMedicalProfileResponses[keyof GetPatientMedicalProfileResponses];
+
+export type ReplacePatientMedicalProfileData = {
+    body?: UpdateMedicalProfileRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/patients/{id}/medical-profile';
+};
+
+export type ReplacePatientMedicalProfileErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type ReplacePatientMedicalProfileError = ReplacePatientMedicalProfileErrors[keyof ReplacePatientMedicalProfileErrors];
+
+export type ReplacePatientMedicalProfileResponses = {
+    /**
+     * OK
+     */
+    200: PatientMedicalProfile;
+};
+
+export type ReplacePatientMedicalProfileResponse = ReplacePatientMedicalProfileResponses[keyof ReplacePatientMedicalProfileResponses];
 
 export type LinkPatientAccountData = {
     body?: LinkPatientAccountRequest;

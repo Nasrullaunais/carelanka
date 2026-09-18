@@ -17,9 +17,9 @@ class EmergencyCancellationRequestPagedResult {
     required this.totalItems,
     required this.totalPages,
   });
-
+  
   factory EmergencyCancellationRequestPagedResult.fromJson(Map<String, Object?> json) => _$EmergencyCancellationRequestPagedResultFromJson(json);
-
+  
   final List<EmergencyCancellationRequest> items;
   final int page;
   @JsonKey(name: 'page_size')

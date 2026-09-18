@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+
+import '../theme/app_theme.dart';
 
 class AuthScaffold extends StatelessWidget {
   const AuthScaffold({
@@ -17,34 +20,110 @@ class AuthScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final mq = MediaQuery.of(context);
 
     return Scaffold(
-      appBar: showBack ? AppBar(backgroundColor: Colors.transparent) : null,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(title, style: theme.textTheme.headlineMedium),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      subtitle!,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
+      extendBodyBehindAppBar: true,
+      appBar: showBack
+          ? AppBar(
+              backgroundColor: Colors.transparent,
+              iconTheme: IconThemeData(color: scheme.onPrimary),
+            )
+          : null,
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Gradient Hero Header
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.fromLTRB(
+                24,
+                mq.padding.top + (showBack ? kToolbarHeight : 40),
+                24,
+                60, // Extra bottom padding to blend into the card overlap
+              ),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    scheme.primary,
+                    scheme.primary.withValues(alpha: 0.8),
                   ],
-                  const SizedBox(height: 28),
-                  ...children,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: scheme.primary.withValues(alpha: 0.2),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
                 ],
               ),
+              child: SafeArea(
+                bottom: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Icon(Icons.favorite_rounded, color: Colors.white, size: 32),
+                    ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.2),
+                    const SizedBox(height: 24),
+                    Text(
+                      title,
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
+                    ).animate().fadeIn(delay: 100.ms, duration: 400.ms).slideY(begin: 0.2),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        subtitle!,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          height: 1.5,
+                        ),
+                      ).animate().fadeIn(delay: 200.ms, duration: 400.ms).slideY(begin: 0.2),
+                    ],
+                  ],
+                ),
+              ),
             ),
-          ),
+            
+            // Glassmorphic Form Card overlapping the header
+            Transform.translate(
+              offset: const Offset(0, -32),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  decoration: BoxDecoration(
+                    color: theme.scaffoldBackgroundColor,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusL),
+                    boxShadow: [
+                      BoxShadow(
+                        color: scheme.shadow.withValues(alpha: 0.1),
+                        blurRadius: 30,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(28),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: children,
+                  ),
+                ).animate().fadeIn(delay: 300.ms, duration: 500.ms).slideY(begin: 0.1),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -79,8 +158,11 @@ class AuthTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 20),
       child: TextFormField(
         controller: controller,
         enabled: enabled,
@@ -88,9 +170,33 @@ class AuthTextField extends StatelessWidget {
         keyboardType: keyboardType,
         textInputAction: textInputAction,
         onFieldSubmitted: onSubmitted,
+        style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
         decoration: InputDecoration(
           labelText: label,
-          border: const OutlineInputBorder(),
+          labelStyle: TextStyle(color: scheme.onSurfaceVariant),
+          floatingLabelStyle: TextStyle(
+            color: scheme.primary,
+            fontWeight: FontWeight.w600,
+          ),
+          filled: true,
+          fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.3),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppTheme.radiusM),
+            borderSide: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppTheme.radiusM),
+            borderSide: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppTheme.radiusM),
+            borderSide: BorderSide(color: scheme.primary, width: 2),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppTheme.radiusM),
+            borderSide: BorderSide(color: scheme.error),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
           suffixIcon: suffix,
           errorText: (serverErrors?.isNotEmpty ?? false) ? serverErrors!.first : null,
         ),
@@ -116,10 +222,22 @@ class AuthSubmitButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return FilledButton(
       onPressed: busy ? null : onPressed,
-      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+      style: FilledButton.styleFrom(
+        minimumSize: const Size.fromHeight(56),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppTheme.radiusM),
+        ),
+      ),
       child: busy
-          ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-          : Text(label),
+          ? const SizedBox(
+              height: 24, 
+              width: 24, 
+              child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white)
+            )
+          : Text(
+              label,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 0.5),
+            ),
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../services/api_client/models/admission_status.dart';
@@ -55,21 +56,20 @@ class StayJourneyTracker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     if (journey.cancelled) {
       return const SizedBox.shrink();
     }
 
     return Column(
       children: [
-        for (final step in JourneyStep.values)
+        for (var i = 0; i < JourneyStep.values.length; i++)
           _Stop(
-            step: step,
-            done: journey.isDone(step),
-            current: journey.isCurrent(step),
-            isLast: step == JourneyStep.values.last,
-            scheme: theme.colorScheme,
+            step: JourneyStep.values[i],
+            done: journey.isDone(JourneyStep.values[i]),
+            current: journey.isCurrent(JourneyStep.values[i]),
+            isLast: i == JourneyStep.values.length - 1,
+            scheme: Theme.of(context).colorScheme,
+            index: i,
           ),
       ],
     );
@@ -83,6 +83,7 @@ class _Stop extends StatelessWidget {
     required this.current,
     required this.isLast,
     required this.scheme,
+    required this.index,
   });
 
   final JourneyStep step;
@@ -90,17 +91,12 @@ class _Stop extends StatelessWidget {
   final bool current;
   final bool isLast;
   final ColorScheme scheme;
+  final int index;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final reached = done || current;
-
-    final dotColor = current
-        ? scheme.primary
-        : done
-            ? scheme.primary.withValues(alpha: 0.35)
-            : scheme.surfaceContainerHighest;
 
     return IntrinsicHeight(
       child: Row(
@@ -108,46 +104,52 @@ class _Stop extends StatelessWidget {
         children: [
           Column(
             children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
-                child: Icon(
-                  done ? Icons.check : step.icon,
-                  size: 18,
-                  color: reached ? scheme.onPrimary : scheme.onSurfaceVariant,
-                ),
-              ),
+              _buildDot(theme),
               if (!isLast)
                 Expanded(
                   child: Container(
-                    width: 2,
+                    width: 3,
                     margin: const EdgeInsets.symmetric(vertical: 4),
-                    color: done ? scheme.primary.withValues(alpha: 0.35) : scheme.outlineVariant,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(2),
+                      gradient: done
+                          ? LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                scheme.primary.withValues(alpha: 0.5),
+                                scheme.primary.withValues(alpha: 0.2),
+                              ],
+                            )
+                          : null,
+                      color: done ? null : scheme.outlineVariant.withValues(alpha: 0.3),
+                    ),
                   ),
                 ),
             ],
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 16),
           Expanded(
             child: Padding(
-              padding: EdgeInsets.only(top: 5, bottom: isLast ? 0 : 22),
+              padding: EdgeInsets.only(top: 8, bottom: isLast ? 0 : 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     step.label,
                     style: theme.textTheme.titleSmall?.copyWith(
-                      color: reached ? scheme.onSurface : scheme.onSurfaceVariant,
-                      fontWeight: current ? FontWeight.w700 : FontWeight.w600,
+                      color: reached ? scheme.onSurface : scheme.onSurfaceVariant.withValues(alpha: 0.6),
+                      fontWeight: current ? FontWeight.w800 : FontWeight.w600,
                     ),
                   ),
                   if (current) ...[
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
                     Text(
                       step.detail,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: scheme.onSurfaceVariant),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        height: 1.4,
+                      ),
                     ),
                   ],
                 ],
@@ -156,22 +158,91 @@ class _Stop extends StatelessWidget {
           ),
           if (current)
             Container(
-              margin: const EdgeInsets.only(top: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              margin: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
-                color: scheme.primaryContainer,
+                gradient: LinearGradient(
+                  colors: [scheme.primary, scheme.primary.withValues(alpha: 0.8)],
+                ),
                 borderRadius: BorderRadius.circular(AppTheme.radiusS),
+                boxShadow: [
+                  BoxShadow(
+                    color: scheme.primary.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Text(
                 'You are here',
                 style: theme.textTheme.labelSmall?.copyWith(
-                  color: scheme.onPrimaryContainer,
+                  color: scheme.onPrimary,
                   fontWeight: FontWeight.w700,
                 ),
               ),
-            ),
+            )
+                .animate(onPlay: (c) => c.repeat(reverse: true))
+                .scale(
+                  begin: const Offset(1, 1),
+                  end: const Offset(1.03, 1.03),
+                  duration: 1500.ms,
+                  curve: Curves.easeInOut,
+                ),
         ],
       ),
+    ).animate().fadeIn(delay: (80 * index).ms, duration: 350.ms).slideX(begin: 0.05);
+  }
+
+  Widget _buildDot(ThemeData theme) {
+    final size = current ? 42.0 : 38.0;
+
+    if (current) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [scheme.primary, scheme.primary.withValues(alpha: 0.7)],
+          ),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: scheme.primary.withValues(alpha: 0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Icon(step.icon, size: 20, color: scheme.onPrimary),
+      );
+    }
+
+    if (done) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: scheme.primaryContainer,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(Icons.check_rounded, size: 20, color: scheme.primary),
+      );
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.3),
+          width: 1.5,
+        ),
+      ),
+      child: Icon(step.icon, size: 18, color: scheme.onSurfaceVariant.withValues(alpha: 0.5)),
     );
   }
 }

@@ -119,16 +119,23 @@ class StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: compact ? 9 : 12, vertical: compact ? 5 : 7),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 10 : 14,
+        vertical: compact ? 5 : 7,
+      ),
       decoration: BoxDecoration(
-        color: look.surface,
+        color: look.surface.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: look.color.withValues(alpha: 0.15),
+          width: 1,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(look.icon, size: compact ? 13 : 16, color: look.color),
-          SizedBox(width: compact ? 6 : 7),
+          SizedBox(width: compact ? 6 : 8),
           Flexible(
             child: Text(
               label,
@@ -136,7 +143,7 @@ class StatusChip extends StatelessWidget {
               style: TextStyle(
                 color: look.color,
                 fontSize: compact ? 11.5 : 13,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),

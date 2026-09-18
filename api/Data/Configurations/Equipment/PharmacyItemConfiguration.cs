@@ -20,7 +20,6 @@ public class PharmacyItemConfiguration : IEntityTypeConfiguration<PharmacyItem>
 
         builder.Property(i => i.Name).HasMaxLength(200).IsRequired();
         builder.Property(i => i.Manufacturer).HasMaxLength(150);
-        builder.Property(i => i.BatchNumber).HasMaxLength(50);
         builder.Property(i => i.Unit).HasMaxLength(20).IsRequired();
         builder.Property(i => i.QuantityOnHand).IsRequired();
         builder.Property(i => i.ReorderThreshold).IsRequired();
@@ -38,8 +37,6 @@ public class PharmacyItemConfiguration : IEntityTypeConfiguration<PharmacyItem>
             .HasFilter("is_active");
 
         builder.HasIndex(i => i.CategoryId);
-
-        builder.HasIndex(i => i.ExpiryDate).HasFilter("expiry_date IS NOT NULL");
 
         builder.HasQueryFilter(i => i.IsActive);
     }

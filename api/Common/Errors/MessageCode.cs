@@ -64,6 +64,8 @@ public enum MessageCode
 
     EquipmentRemoveNeedsRetired,
 
+    PharmacyReceiveIsABatch,
+
     PharmacyCategoryNameTaken,
 
     PharmacyItemNameTaken,

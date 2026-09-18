@@ -180,6 +180,10 @@
     <value>{0} has to be retired before it can be removed from the register.</value>
     <comment>Two steps on purpose: retiring is the decision, removing only tidies the list afterwards.</comment>
   </data>
+  <data name="cl_equ_026" xml:space="preserve">
+    <value>Stock arriving is a new batch of {0}, with its own expiry date. Use Add batch.</value>
+    <comment>Received stock has to say when it expires, which a plain quantity cannot.</comment>
+  </data>
   <data name="cl_equ_013" xml:space="preserve">
     <value>{0} is with the maintenance unit. It comes back into service when they complete the repair, not by editing its status.</value>
     <comment>Says where the item is and who releases it, because the caller's next move is to go and look at the repair queue.</comment>

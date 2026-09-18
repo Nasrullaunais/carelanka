@@ -10,6 +10,13 @@ export type AddBillChargeRequest = {
     unit_price: number;
 };
 
+export type AddPharmacyBatchRequest = {
+    quantity: number;
+    expiry_date?: string | null;
+    reference?: string | null;
+    note?: string | null;
+};
+
 export type Admission = {
     id: string;
     patient?: PatientSummary;
@@ -1076,6 +1083,18 @@ export type PendingEquipmentCount = {
     count: number;
 };
 
+export type PharmacyBatch = {
+    id: string;
+    pharmacy_item_id: string;
+    batch_number: number;
+    reference?: string | null;
+    expiry_date?: string | null;
+    quantity_on_hand: number;
+    note?: string | null;
+    received_at: string;
+    updated_at: string;
+};
+
 export type PharmacyCategory = {
     id: string;
     name: string;
@@ -1090,9 +1109,9 @@ export type PharmacyItem = {
     category_id: string;
     category_name: string;
     manufacturer?: string | null;
-    batch_number?: string | null;
-    expiry_date?: string | null;
     unit: string;
+    batch_count: number;
+    earliest_expiry?: string | null;
     quantity_on_hand: number;
     reorder_threshold: number;
     unit_price?: number | null;
@@ -1113,6 +1132,8 @@ export type PharmacyItemPagedResult = {
 export type PharmacyTransaction = {
     id: string;
     pharmacy_item_id: string;
+    pharmacy_batch_id?: string | null;
+    batch_number?: number | null;
     type: PharmacyTransactionType;
     quantity: number;
     performed_by_staff_id: string;
@@ -6112,6 +6133,76 @@ export type GetPharmacyItemResponses = {
 
 export type GetPharmacyItemResponse = GetPharmacyItemResponses[keyof GetPharmacyItemResponses];
 
+export type ListPharmacyBatchesData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/pharmacy-items/{id}/batches';
+};
+
+export type ListPharmacyBatchesErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type ListPharmacyBatchesError = ListPharmacyBatchesErrors[keyof ListPharmacyBatchesErrors];
+
+export type ListPharmacyBatchesResponses = {
+    /**
+     * OK
+     */
+    200: Array<PharmacyBatch>;
+};
+
+export type ListPharmacyBatchesResponse = ListPharmacyBatchesResponses[keyof ListPharmacyBatchesResponses];
+
+export type AddPharmacyBatchData = {
+    body?: AddPharmacyBatchRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/pharmacy-items/{id}/batches';
+};
+
+export type AddPharmacyBatchErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type AddPharmacyBatchError = AddPharmacyBatchErrors[keyof AddPharmacyBatchErrors];
+
+export type AddPharmacyBatchResponses = {
+    /**
+     * Created
+     */
+    201: PharmacyBatch;
+};
+
+export type AddPharmacyBatchResponse = AddPharmacyBatchResponses[keyof AddPharmacyBatchResponses];
+
 export type ListPharmacyTransactionsData = {
     body?: never;
     path: {
@@ -6196,6 +6287,50 @@ export type RecordPharmacyTransactionResponses = {
 };
 
 export type RecordPharmacyTransactionResponse = RecordPharmacyTransactionResponses[keyof RecordPharmacyTransactionResponses];
+
+export type RecordPharmacyBatchTransactionData = {
+    body?: CreatePharmacyTransactionRequest;
+    path: {
+        id: string;
+        batchId: string;
+    };
+    query?: never;
+    url: '/pharmacy-items/{id}/batches/{batchId}/transactions';
+};
+
+export type RecordPharmacyBatchTransactionErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RecordPharmacyBatchTransactionError = RecordPharmacyBatchTransactionErrors[keyof RecordPharmacyBatchTransactionErrors];
+
+export type RecordPharmacyBatchTransactionResponses = {
+    /**
+     * Created
+     */
+    201: PharmacyItem;
+};
+
+export type RecordPharmacyBatchTransactionResponse = RecordPharmacyBatchTransactionResponses[keyof RecordPharmacyBatchTransactionResponses];
 
 export type ListPrescriptionsData = {
     body?: never;

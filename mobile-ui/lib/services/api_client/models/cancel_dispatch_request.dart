@@ -11,9 +11,9 @@ class CancelDispatchRequest {
   const CancelDispatchRequest({
     this.reason,
   });
-
+  
   factory CancelDispatchRequest.fromJson(Map<String, Object?> json) => _$CancelDispatchRequestFromJson(json);
-
+  
   final String? reason;
 
   Map<String, Object?> toJson() => _$CancelDispatchRequestToJson(this);

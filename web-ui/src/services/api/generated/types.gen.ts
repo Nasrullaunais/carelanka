@@ -365,12 +365,12 @@ export type CancelAdmissionRequest = {
     note?: string | null;
 };
 
-export type CancelDispatchRequest = {
-    reason?: string | null;
-};
-
 export type CancelAppointmentRequest = {
     reason: string;
+};
+
+export type CancelDispatchRequest = {
+    reason?: string | null;
 };
 
 export type CancelReason = 'diverted_to_other_hospital' | 'false_alarm' | 'died_en_route' | 'patient_refused' | 'no_show';
@@ -871,18 +871,6 @@ export type MyAppointmentPagedResult = {
     total_pages: number;
 };
 
-export type MyCallTracking = {
-    emergency_call_id?: string;
-    call_status?: CallStatus;
-    ambulance_is_on_the_way?: boolean;
-    ambulance_latitude?: number | null;
-    ambulance_longitude?: number | null;
-    ambulance_location_is_stale?: boolean;
-    estimated_minutes_to_arrival?: number | null;
-    cancellation_request_status?: CancellationRequestStatus;
-    updated_at?: string;
-};
-
 export type MyBill = {
     admission_id?: string | null;
     appointment_id?: string | null;
@@ -902,6 +890,18 @@ export type MyBillLine = {
     quantity: number;
     unit_price: number;
     line_total: number;
+};
+
+export type MyCallTracking = {
+    emergency_call_id?: string;
+    call_status?: CallStatus;
+    ambulance_is_on_the_way?: boolean;
+    ambulance_latitude?: number | null;
+    ambulance_longitude?: number | null;
+    ambulance_location_is_stale?: boolean;
+    estimated_minutes_to_arrival?: number | null;
+    cancellation_request_status?: CancellationRequestStatus;
+    updated_at?: string;
 };
 
 export type MyEmergencyCallSummary = {
@@ -4147,6 +4147,48 @@ export type RejectEquipmentItemResponses = {
 
 export type RejectEquipmentItemResponse = RejectEquipmentItemResponses[keyof RejectEquipmentItemResponses];
 
+export type RemoveEquipmentItemData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/equipment-items/{id}';
+};
+
+export type RemoveEquipmentItemErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RemoveEquipmentItemError = RemoveEquipmentItemErrors[keyof RemoveEquipmentItemErrors];
+
+export type RemoveEquipmentItemResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type RemoveEquipmentItemResponse = RemoveEquipmentItemResponses[keyof RemoveEquipmentItemResponses];
+
 export type GetEquipmentItemData = {
     body?: never;
     path: {
@@ -4333,6 +4375,48 @@ export type ReleaseEquipmentItemResponses = {
 };
 
 export type ReleaseEquipmentItemResponse = ReleaseEquipmentItemResponses[keyof ReleaseEquipmentItemResponses];
+
+export type RetireEquipmentItemData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/equipment-items/{id}/retire';
+};
+
+export type RetireEquipmentItemErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RetireEquipmentItemError = RetireEquipmentItemErrors[keyof RetireEquipmentItemErrors];
+
+export type RetireEquipmentItemResponses = {
+    /**
+     * OK
+     */
+    200: EquipmentItem;
+};
+
+export type RetireEquipmentItemResponse = RetireEquipmentItemResponses[keyof RetireEquipmentItemResponses];
 
 export type ReportEquipmentFaultData = {
     body?: ReportFaultRequest;

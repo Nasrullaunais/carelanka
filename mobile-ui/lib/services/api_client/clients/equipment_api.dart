@@ -79,6 +79,12 @@ abstract class EquipmentApi {
     @Body() UpdateEquipmentItemRequest? body,
   });
 
+  @DELETE('/equipment-items/{id}')
+  Future<void> removeEquipmentItem({
+    @Path('id') required String id,
+    @Header('X-Confirmation-Code') required String xConfirmationCode,
+  });
+
   @GET('/equipment-items/by-tag/{assetTag}')
   Future<EquipmentItemDetail> getEquipmentItemByTag({
     @Path('assetTag') required String assetTag,
@@ -93,6 +99,12 @@ abstract class EquipmentApi {
   @POST('/equipment-items/{id}/release')
   Future<EquipmentItem> releaseEquipmentItem({
     @Path('id') required String id,
+  });
+
+  @POST('/equipment-items/{id}/retire')
+  Future<EquipmentItem> retireEquipmentItem({
+    @Path('id') required String id,
+    @Header('X-Confirmation-Code') required String xConfirmationCode,
   });
 
   @POST('/equipment-items/{id}/report-fault')

@@ -11,9 +11,9 @@ class ManualDispatchRequest {
   const ManualDispatchRequest({
     this.ambulanceId,
   });
-
+  
   factory ManualDispatchRequest.fromJson(Map<String, Object?> json) => _$ManualDispatchRequestFromJson(json);
-
+  
   @JsonKey(name: 'ambulance_id')
   final String? ambulanceId;
 

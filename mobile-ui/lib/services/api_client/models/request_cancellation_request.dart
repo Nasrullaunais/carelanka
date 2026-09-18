@@ -11,9 +11,9 @@ class RequestCancellationRequest {
   const RequestCancellationRequest({
     this.reason,
   });
-
+  
   factory RequestCancellationRequest.fromJson(Map<String, Object?> json) => _$RequestCancellationRequestFromJson(json);
-
+  
   final String? reason;
 
   Map<String, Object?> toJson() => _$RequestCancellationRequestToJson(this);

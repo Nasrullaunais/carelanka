@@ -306,6 +306,10 @@ available ──> retired                     (planned decommission, rare)
 
 `retired` is terminal. A replacement is a new `EquipmentItem` row, never a reactivated one.
 
+**Removing a retired item.** *(Rev 3, 2026-09-18.)* `DELETE /equipment-items/{id}` — the administrator, with the same code — takes a retired item off the register altogether: a soft delete, so the row and its history stay in the database while every list stops showing it and its asset tag is free again. An item that is not retired answers 409 `cl_equ_025`, so the decision and the tidying stay two separate steps.
+
+**Retiring is the hospital administrator's, with the confirmation code.** *(Rev 3, 2026-09-18.)* `POST /equipment-items/{id}/retire` is the only way in: `PUT /equipment-items/{id}` refuses `status = retired` with 409 `cl_equ_024`, so taking a machine off the register for good cannot be an accidental edit by whoever happens to be editing items. It is the same code and the same person as §4.3 and §6.1. An item a patient is using has to be released first; any open repair job and fault warning are closed with the item.
+
 **Assigning an item** (`available -> assigned`) requires `assigned_to_admission_id`. **Releasing it** (`assigned -> available`) clears that field. Unlike Patient Management's `BedAssignment`, this component does not keep a full assignment history table — only the current assignment is stored, which is a deliberate simplification flagged in §15.
 
 **Marking maintenance** (`available -> maintenance`) can happen two ways: the Administrator does it manually, or a Technician's fault report (§7.1) does it automatically — a broken defibrillator changes status the moment it's reported, not on the next scheduled sweep.
@@ -423,10 +427,12 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 | `GET` | `/api/equipment-items` | Any staff | `?search=`, `?categoryId=`, `?wardId=`, `?status=`. Paginated, sortable. |
 | `GET` | `/api/equipment-items/{id}` | Any staff | Includes maintenance history |
 | `GET` | `/api/equipment-items/by-tag/{assetTag}` | Equipment Technician | **Business op.** What the QR scan resolves to. |
-| `PUT` | `/api/equipment-items/{id}` | Inventory Administrator; Hospital Administrator *(Rev 3, 2026-09-17)* | The administrator retires a machine beyond repair through it |
+| `PUT` | `/api/equipment-items/{id}` | Inventory Administrator; Hospital Administrator | Edits only — `status = retired` answers 409 *(Rev 3, 2026-09-18)* |
 | `POST` | `/api/equipment-items/{id}/assign` | Inventory Administrator, Equipment Technician | **Business op.** Requires `admission_id`. `available -> assigned`. |
 | `POST` | `/api/equipment-items/{id}/release` | Inventory Administrator, Equipment Technician | **Business op.** `assigned -> available`, clears the admission link. |
 | `POST` | `/api/equipment-items/{id}/report-fault` | Equipment Technician, any staff | **Business op.** §6, last paragraph. |
+| `POST` | `/api/equipment-items/{id}/retire` | Hospital Administrator + code *(Rev 3, 2026-09-18)* | **Business op.** The only route to `retired`. §4.1 |
+| `DELETE` | `/api/equipment-items/{id}` | Hospital Administrator + code *(Rev 3, 2026-09-18)* | Soft-deletes a retired item off the register. §4.1 |
 | `GET` | `/api/equipment-items/pending-confirmation` | Hospital Administrator + code | *(Rev 3)* Items awaiting confirmation, oldest first. §4.3 |
 | `GET` | `/api/equipment-items/pending-confirmation/count` | Equipment Manager, Hospital Administrator | *(Rev 3)* How many are waiting — no code, a number only |
 | `POST` | `/api/equipment-items/{id}/confirm` | Hospital Administrator + code | *(Rev 3)* **Business op.** Joins the register |
@@ -621,11 +627,11 @@ Per the assignment: workflow id, objective, plan, completed steps, tool calls wi
 
 | Screen | Contents |
 | :--- | :--- |
-| **Equipment inventory** | Search, filter by category/ward/status, sort, paginate. *(Rev 3, 2026-09-16.)* Lists confirmed items only, and tells the equipment manager and administrator how many registered items are still awaiting confirmation. *(Rev 3, 2026-09-17.)* The hospital administrator also gets a **Confirm new equipment** card: enter the confirmation code, then Confirm or Reject each waiting item — the same queue as the mobile app, §4.3 |
+| **Equipment inventory** | Search, filter by category/ward/status, sort, paginate. *(Rev 3, 2026-09-16.)* Lists confirmed items only, and tells the equipment manager and administrator how many registered items are still awaiting confirmation. *(Rev 3, 2026-09-17.)* The hospital administrator also gets a **Confirm new equipment** card: enter the confirmation code, then Confirm or Reject each waiting item — the same queue as the mobile app, §4.3. *(Rev 3, 2026-09-18.)* Every item carries a **Retire** button for the administrator, which asks for the confirmation code; a retired one carries **Remove**, which takes it off the register after the same code — §4.1 |
 | **Equipment detail** | Item info, maintenance history, current warnings, assign/release. *(Rev 2, 2026-09-13.)* Assigning picks the patient by ward rather than taking a pasted admission id |
 | **Pharmacy inventory** | Search, filter by category, below-threshold and expiring-soon highlighted. *(Rev 3, 2026-09-17.)* A **Prescriptions from the app** card: waiting, ready, delivered and can't-fill tabs, view the photo, Ready (issues a token), Mark delivered, Can't fill with a reason — §5.4 |
 | **Maintenance calendar** | Scheduled and overdue, by asset type |
-| **Maintenance unit** | *(Rev 3, 2026-09-17 — the hospital administrator's page only.)* Book a service, calibration or repair; the open-jobs list with Beyond repair (retires the item); and Confirm maintenance done, after the confirmation code — §6.1. The equipment manager does not see it: they report faults from the Equipment page |
+| **Maintenance unit** | *(Rev 3, 2026-09-17 — the hospital administrator's page only.)* Book a service, calibration or repair; the open-jobs list with Beyond repair (retires the item, asking for the confirmation code — §4.1); and Confirm maintenance done, after the confirmation code — §6.1. The equipment manager does not see it: they report faults from the Equipment page |
 | **Laboratory** | *(Rev 2, 2026-09-13.)* Pick a ward, read down who is in it, and file a result against whoever the specimen came from. Search by code, name or NIC is the second way in, for an outpatient in no ward. Clinical staff see the same screen without the upload form — see §7.5 |
 | **Bed register admin** | Create beds, mark out of service, retire — occupancy block surfaced as a clear error |
 | **Warnings & recommendations queue** | Everything open, recommended action, urgency, cost. Approve / Reject / auto-approved badge. **This is the demo screen.** |

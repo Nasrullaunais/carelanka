@@ -45,6 +45,7 @@ public sealed class PatientOpenApiContractTests
     [InlineData("PatientSummary")]
     [InlineData("Patient")]
     [InlineData("PatientDetail")]
+    [InlineData("PatientMedicalProfile")]
     [InlineData("CreateAdmissionRequest")]
     [InlineData("Admission")]
     [InlineData("AdmissionDetail")]

@@ -22,6 +22,20 @@ public static class Policies
 
     public const string PatientEditor = nameof(PatientEditor);
 
+    /// <summary>
+    /// Reading what the hospital knows about a patient's health. The duty manager is on it
+    /// because they work the patients board; reception and the billing desk are not, and that is
+    /// the whole point of it being a separate policy from <see cref="PatientDetails"/>.
+    /// </summary>
+    public const string MedicalProfileReader = nameof(MedicalProfileReader);
+
+    /// <summary>
+    /// Writing it - the nurse at the bed and the doctor, and nobody else. Narrower than
+    /// <see cref="MedicalProfileReader"/> by the duty manager, who reads a ward board rather
+    /// than taking a clinical history.
+    /// </summary>
+    public const string MedicalProfileAuthor = nameof(MedicalProfileAuthor);
+
     public const string AdmissionEditor = nameof(AdmissionEditor);
 
     public const string BedAssigner = nameof(BedAssigner);

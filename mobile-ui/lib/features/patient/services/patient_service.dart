@@ -10,6 +10,8 @@ import '../../../services/api_client/models/my_bill.dart';
 import '../../../services/api_client/models/my_lab_report_paged_result.dart';
 import '../../../services/api_client/models/my_profile.dart';
 import '../../../services/api_client/models/patient_claim_preview.dart';
+import '../../../services/api_client/models/patient_medical_profile.dart';
+import '../../../services/api_client/models/update_medical_profile_request.dart';
 import '../../../services/api_client/models/pre_register_request.dart';
 import '../../../services/api_client/models/worklist_row_paged_result.dart';
 
@@ -110,6 +112,21 @@ class PatientService {
   /// The relative path for [downloadBytes] — the generated client's own
   /// `downloadMyLabReport` corrupts binary content, see [downloadBytes].
   static String labReportFilePath(String reportId) => '/me/lab-reports/$reportId/file';
+
+  /// The four free-text fields the care advisory agent reads. Returns a profile with every
+  /// field null when nobody has written one — an empty profile is ordinary, not a 404.
+  Future<PatientMedicalProfile> loadMedicalProfile(String patientId) {
+    return callApi(() => _api.patients.getPatientMedicalProfile(id: patientId));
+  }
+
+  /// A full replace: whatever is left out of [request] is cleared on the record.
+  Future<PatientMedicalProfile> saveMedicalProfile(
+    String patientId,
+    UpdateMedicalProfileRequest request,
+  ) {
+    return callApi(
+        () => _api.patients.replacePatientMedicalProfile(id: patientId, body: request));
+  }
 
   Future<WorklistRowPagedResult> loadWorklist({
     String? search,

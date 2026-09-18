@@ -13,12 +13,14 @@ import {
   listWardsOptions,
   markArrivedMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
-import type { WorklistRow } from '../services/api/generated';
+import type { PrincipalRole, WorklistRow } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
+import { MedicalProfilePanel } from '../components/MedicalProfilePanel';
 import {
   canAssignBed,
   canCompleteVisit,
   canMarkArrived,
+  canReadMedicalProfile,
   canReadPatientDetails,
 } from '../types/permissions';
 import { localDateTime } from '../types/datetime';
@@ -268,7 +270,7 @@ export function PatientsPage() {
                   {openId === row.id && (
                     <tr className="drawer">
                       <td colSpan={5}>
-                        <DetailsPanel row={row} onClose={() => setOpenId(null)} />
+                        <DetailsPanel row={row} role={role} onClose={() => setOpenId(null)} />
                       </td>
                     </tr>
                   )}
@@ -677,7 +679,15 @@ function AssignBedPanel({
   );
 }
 
-function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void }) {
+function DetailsPanel({
+  row,
+  role,
+  onClose,
+}: {
+  row: WorklistRow;
+  role: PrincipalRole | undefined;
+  onClose: () => void;
+}) {
   const patient = useQuery(getPatientOptions({ path: { id: row.patient.id } }));
 
   const visit = useQuery(getAdmissionOptions({ path: { id: row.id } }));
@@ -782,6 +792,19 @@ function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void 
             </>
           )}
       </>
+
+      {canReadMedicalProfile(role) && (
+        <>
+          <h4 style={{ marginTop: '1.25rem', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+            Medical details
+          </h4>
+          <MedicalProfilePanel
+            patientId={row.patient.id}
+            patientName={row.patient.full_name}
+            role={role}
+          />
+        </>
+      )}
 
       <button
         type="button"

@@ -1054,6 +1054,17 @@ export type PatientLookupResult = {
     has_open_admission: boolean;
 };
 
+export type PatientMedicalProfile = {
+    patient_id: string;
+    known_conditions?: string | null;
+    allergies?: string | null;
+    current_symptoms?: string | null;
+    recent_situation?: string | null;
+    updated_by_staff_id?: string | null;
+    updated_by_staff_name?: string | null;
+    updated_at?: string | null;
+};
+
 export type PatientRegisterRequest = {
     username: string;
     password: string;
@@ -1281,6 +1292,13 @@ export type UpdateEquipmentItemRequest = {
     status?: EquipmentStatus;
     ward_id?: string | null;
     next_maintenance_due?: string | null;
+};
+
+export type UpdateMedicalProfileRequest = {
+    known_conditions?: string | null;
+    allergies?: string | null;
+    current_symptoms?: string | null;
+    recent_situation?: string | null;
 };
 
 export type UpdateMyDispatchStatusRequest = {
@@ -5845,6 +5863,80 @@ export type LookupPatientResponses = {
 };
 
 export type LookupPatientResponse = LookupPatientResponses[keyof LookupPatientResponses];
+
+export type GetPatientMedicalProfileData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/patients/{id}/medical-profile';
+};
+
+export type GetPatientMedicalProfileErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetPatientMedicalProfileError = GetPatientMedicalProfileErrors[keyof GetPatientMedicalProfileErrors];
+
+export type GetPatientMedicalProfileResponses = {
+    /**
+     * OK
+     */
+    200: PatientMedicalProfile;
+};
+
+export type GetPatientMedicalProfileResponse = GetPatientMedicalProfileResponses[keyof GetPatientMedicalProfileResponses];
+
+export type ReplacePatientMedicalProfileData = {
+    body?: UpdateMedicalProfileRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/patients/{id}/medical-profile';
+};
+
+export type ReplacePatientMedicalProfileErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type ReplacePatientMedicalProfileError = ReplacePatientMedicalProfileErrors[keyof ReplacePatientMedicalProfileErrors];
+
+export type ReplacePatientMedicalProfileResponses = {
+    /**
+     * OK
+     */
+    200: PatientMedicalProfile;
+};
+
+export type ReplacePatientMedicalProfileResponse = ReplacePatientMedicalProfileResponses[keyof ReplacePatientMedicalProfileResponses];
 
 export type LinkPatientAccountData = {
     body?: LinkPatientAccountRequest;

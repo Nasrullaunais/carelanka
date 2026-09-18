@@ -79,6 +79,19 @@ export function canReadPatientDetails(role: PrincipalRole | undefined): boolean 
   return isStaff(role) && role !== 'ambulance_crew';
 }
 
+/// The medical profile the care advisory agent reads. The duty manager is on it because they
+/// work the patients board; reception and the billing desk are not, and that is the whole point
+/// of it being separate from canReadPatientDetails.
+export function canReadMedicalProfile(role: PrincipalRole | undefined): boolean {
+  return role === 'ward_nurse' || role === 'doctor' || role === 'duty_manager';
+}
+
+/// Narrower than canReadMedicalProfile by the duty manager, who reads a ward board rather than
+/// taking a clinical history.
+export function canWriteMedicalProfile(role: PrincipalRole | undefined): boolean {
+  return role === 'ward_nurse' || role === 'doctor';
+}
+
 export function canEditAdmissions(role: PrincipalRole | undefined): boolean {
   return role === 'ward_nurse' || role === 'duty_manager';
 }

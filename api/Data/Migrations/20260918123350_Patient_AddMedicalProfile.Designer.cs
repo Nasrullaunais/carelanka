@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using CareLanka.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CareLanka.Api.Data.Migrations
 {
     [DbContext(typeof(CareLankaDbContext))]
-    partial class CareLankaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260918123350_Patient_AddMedicalProfile")]
+    partial class Patient_AddMedicalProfile
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1098,64 +1101,6 @@ namespace CareLanka.Api.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("CareLanka.Api.Data.Entities.Equipment.PharmacyBatch", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<int>("BatchNumber")
-                        .HasColumnType("integer")
-                        .HasColumnName("batch_number");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateOnly?>("ExpiryDate")
-                        .HasColumnType("date")
-                        .HasColumnName("expiry_date");
-
-                    b.Property<string>("Note")
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)")
-                        .HasColumnName("note");
-
-                    b.Property<Guid>("PharmacyItemId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("pharmacy_item_id");
-
-                    b.Property<int>("QuantityOnHand")
-                        .HasColumnType("integer")
-                        .HasColumnName("quantity_on_hand");
-
-                    b.Property<string>("Reference")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("reference");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_pharmacy_batches");
-
-                    b.HasIndex("PharmacyItemId", "BatchNumber")
-                        .IsUnique()
-                        .HasDatabaseName("ux_pharmacy_batches_item_number");
-
-                    b.HasIndex("PharmacyItemId", "ExpiryDate")
-                        .HasDatabaseName("ix_pharmacy_batches_pharmacy_item_id_expiry_date")
-                        .HasFilter("quantity_on_hand > 0");
-
-                    b.ToTable("pharmacy_batches", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_pharmacy_batches_quantity", "quantity_on_hand >= 0");
-                        });
-                });
-
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Equipment.PharmacyCategory", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1207,6 +1152,11 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("BatchNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("batch_number");
+
                     b.Property<Guid>("CategoryId")
                         .HasColumnType("uuid")
                         .HasColumnName("category_id");
@@ -1218,6 +1168,10 @@ namespace CareLanka.Api.Data.Migrations
                     b.Property<DateTimeOffset?>("DeletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
+
+                    b.Property<DateOnly?>("ExpiryDate")
+                        .HasColumnType("date")
+                        .HasColumnName("expiry_date");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
@@ -1263,6 +1217,10 @@ namespace CareLanka.Api.Data.Migrations
                     b.HasIndex("CategoryId")
                         .HasDatabaseName("ix_pharmacy_items_category_id");
 
+                    b.HasIndex("ExpiryDate")
+                        .HasDatabaseName("ix_pharmacy_items_expiry_date")
+                        .HasFilter("expiry_date IS NOT NULL");
+
                     b.HasIndex("Name")
                         .IsUnique()
                         .HasDatabaseName("ux_pharmacy_items_name")
@@ -1295,10 +1253,6 @@ namespace CareLanka.Api.Data.Migrations
                     b.Property<Guid>("PerformedByStaffId")
                         .HasColumnType("uuid")
                         .HasColumnName("performed_by_staff_id");
-
-                    b.Property<Guid?>("PharmacyBatchId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("pharmacy_batch_id");
 
                     b.Property<Guid>("PharmacyItemId")
                         .HasColumnType("uuid")
@@ -2601,18 +2555,6 @@ namespace CareLanka.Api.Data.Migrations
                     b.Navigation("Category");
                 });
 
-            modelBuilder.Entity("CareLanka.Api.Data.Entities.Equipment.PharmacyBatch", b =>
-                {
-                    b.HasOne("CareLanka.Api.Data.Entities.Equipment.PharmacyItem", "Item")
-                        .WithMany("Batches")
-                        .HasForeignKey("PharmacyItemId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_pharmacy_batches_pharmacy_items_pharmacy_item_id");
-
-                    b.Navigation("Item");
-                });
-
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Equipment.PharmacyItem", b =>
                 {
                     b.HasOne("CareLanka.Api.Data.Entities.Equipment.PharmacyCategory", "Category")
@@ -2858,8 +2800,6 @@ namespace CareLanka.Api.Data.Migrations
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Equipment.PharmacyItem", b =>
                 {
-                    b.Navigation("Batches");
-
                     b.Navigation("Transactions");
                 });
 

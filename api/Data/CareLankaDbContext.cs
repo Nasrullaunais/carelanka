@@ -49,6 +49,7 @@ public class CareLankaDbContext : DbContext
     public DbSet<BillLineItem> BillLineItems => Set<BillLineItem>();
     public DbSet<BillingRate> BillingRates => Set<BillingRate>();
     public DbSet<AdmissionFeeRate> AdmissionFeeRates => Set<AdmissionFeeRate>();
+    public DbSet<PatientMedicalProfile> PatientMedicalProfiles => Set<PatientMedicalProfile>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
         => modelBuilder.ApplyConfigurationsFromAssembly(typeof(CareLankaDbContext).Assembly);

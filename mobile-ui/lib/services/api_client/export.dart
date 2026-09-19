@@ -112,6 +112,7 @@ export 'models/emergency_call_summary_paged_result.dart';
 export 'models/emergency_cancellation_request.dart';
 export 'models/emergency_cancellation_request_paged_result.dart';
 export 'models/equipment_category.dart';
+export 'models/equipment_category_usage.dart';
 export 'models/equipment_item.dart';
 export 'models/equipment_item_detail.dart';
 export 'models/equipment_item_summary.dart';

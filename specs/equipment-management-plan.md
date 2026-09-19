@@ -461,6 +461,8 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/equipment-categories` | Any staff | |
 | `POST` | `/api/equipment-categories` | Inventory Administrator | |
+| `GET` | `/api/equipment-categories/for-removal` | Hospital Administrator + code *(Rev 3, 2026-09-19)* | Every category with `item_count` |
+| `DELETE` | `/api/equipment-categories/{id}` | Hospital Administrator + code *(Rev 3, 2026-09-19)* | Soft-deletes an unused category; in use → 409 `cl_equ_030` |
 | `POST` | `/api/equipment-items` | Inventory Administrator | Register a new item under a category. It awaits confirmation — §4.3 |
 | `GET` | `/api/equipment-items` | Any staff | `?search=`, `?categoryId=`, `?wardId=`, `?status=`. Paginated, sortable. |
 | `GET` | `/api/equipment-items/{id}` | Any staff | Includes maintenance history |
@@ -671,7 +673,7 @@ Per the assignment: workflow id, objective, plan, completed steps, tool calls wi
 
 | Screen | Contents |
 | :--- | :--- |
-| **Equipment inventory** | Search, filter by category/ward/status, sort, paginate. *(Rev 3, 2026-09-16.)* Lists confirmed items only, and tells the equipment manager and administrator how many registered items are still awaiting confirmation. *(Rev 3, 2026-09-17.)* The hospital administrator also gets a **Confirm new equipment** card: enter the confirmation code, then Confirm or Reject each waiting item — the same queue as the mobile app, §4.3. *(Rev 3, 2026-09-18.)* Every item carries a **Retire** button for the administrator, which asks for the confirmation code; a retired one carries **Remove**, which takes it off the register after the same code — §4.1 |
+| **Equipment inventory** | Search, filter by category/ward/status, sort, paginate. *(Rev 3, 2026-09-16.)* Lists confirmed items only, and tells the equipment manager and administrator how many registered items are still awaiting confirmation. *(Rev 3, 2026-09-17.)* The hospital administrator also gets a **Confirm new equipment** card: enter the confirmation code, then Confirm or Reject each waiting item — the same queue as the mobile app, §4.3. *(Rev 3, 2026-09-18.)* Every item carries a **Retire** button for the administrator, which asks for the confirmation code; a retired one carries **Remove**, which takes it off the register after the same code — §4.1. *(Rev 3, 2026-09-19.)* Below it, a **Remove categories** card for the administrator: the code unlocks every category with how many items use it, and **Remove** takes an unused one off the list |
 | **Equipment detail** | Item info, maintenance history, current warnings, assign/release. *(Rev 2, 2026-09-13.)* Assigning picks the patient by ward rather than taking a pasted admission id |
 | **Pharmacy inventory** | Search, filter by category, below-threshold and expiring-soon highlighted. *(Rev 3, 2026-09-18.)* An arrow under each medicine opens its batches — number, expiry, boxes left, batch code — with **Record movement** on each one, and **Add batch** records a delivery. §5.1a. **Remove** takes a medicine off the register once its shelf is empty, after the confirmation code — §5.1b. *(Rev 3, 2026-09-17.)* A **Prescriptions from the app** card: waiting, ready, delivered and can't-fill tabs, view the photo, Ready (issues a token), Mark delivered, Can't fill with a reason — §5.4 |
 | **Maintenance calendar** | Scheduled and overdue, by asset type |

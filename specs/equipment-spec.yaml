@@ -113,6 +113,66 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
+  /equipment-categories/for-removal:
+    get:
+      tags: [Equipment]
+      summary: Categories with how many items use each, for removing unwanted ones
+      description: |
+        Roles: HospitalAdministrator, with the confirmation code (`X-Confirmation-Code`, the same
+        code as equipment confirmation). A missing or wrong code answers 403 `cl_equ_017`.
+        *(Rev 3, 2026-09-19.)*
+
+        `item_count` counts items on the register - retired ones and ones awaiting confirmation
+        included, removed ones not. Only a category at 0 can be removed.
+      operationId: listEquipmentCategoriesForRemoval
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
+      responses:
+        '200':
+          description: Every category, by name
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/EquipmentCategoryUsage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Not the hospital administrator, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /equipment-categories/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    delete:
+      tags: [Equipment]
+      summary: Remove an unwanted equipment category
+      description: |
+        Roles: HospitalAdministrator, with the confirmation code. *(Rev 3, 2026-09-19.)*
+
+        Refused with 409 `cl_equ_030` while any item on the register uses it: remove those items
+        first. A soft delete - the category leaves every list and picker, and its name is free
+        to be used again.
+      operationId: removeEquipmentCategory
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
+      responses:
+        '204':
+          description: Removed
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Not the hospital administrator, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Items still use this category.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
   /equipment-items:
     post:
       tags: [Equipment]
@@ -2262,6 +2322,17 @@ components:
               nullable: true
               description: The hospital administrator who confirmed it. Null for items registered before confirmation existed.
             confirmed_at: { type: string, format: date-time, nullable: true }
+
+    EquipmentCategoryUsage:
+      type: object
+      required: [id, name, item_count]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        item_count:
+          type: integer
+          minimum: 0
+          description: Items on the register in this category. Removable only at 0.
 
     PendingEquipmentCount:
       type: object

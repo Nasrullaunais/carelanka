@@ -30,6 +30,7 @@ import {
 import { equipmentStatusLabels, equipmentStatuses } from '../types/equipment';
 import { ItemDetailCard } from './equipment/ItemDetailCard';
 import { ConfirmNewEquipmentCard } from './equipment/ConfirmNewEquipmentCard';
+import { RemoveCategoriesCard } from './equipment/RemoveCategoriesCard';
 import { RemoveItemDialog, RetireItemDialog } from './equipment/RetireItemDialog';
 
 const PAGE_SIZE = 10;
@@ -169,6 +170,8 @@ export function EquipmentPage() {
       </div>
 
       {canConfirmEquipment(role) && <ConfirmNewEquipmentCard />}
+
+      {canConfirmEquipment(role) && <RemoveCategoriesCard />}
 
       {canManageEquipment(role) && (
         <RegisterItemCard

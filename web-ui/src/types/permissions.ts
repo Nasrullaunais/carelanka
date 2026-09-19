@@ -48,6 +48,12 @@ export function canRunMaintenance(role: PrincipalRole | undefined): boolean {
   return role === 'hospital_administrator';
 }
 
+// Low stock, expiring medicine and overdue maintenance: the equipment manager runs the pharmacy
+// and the register, and the administrator runs the maintenance unit.
+export function canReadWarnings(role: PrincipalRole | undefined): boolean {
+  return role === 'equipment_manager' || role === 'hospital_administrator';
+}
+
 export function canReportFault(role: PrincipalRole | undefined): boolean {
   return isStaff(role);
 }

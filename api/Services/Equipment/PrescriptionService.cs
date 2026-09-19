@@ -29,13 +29,6 @@ public sealed class PrescriptionService : IPrescriptionService
         "image/png"
     };
 
-    // Tokens restart each day at the hospital, not at midnight UTC, which in Sri Lanka is 5:30am.
-    // The Windows name is the fallback for a Windows host without ICU time zone data.
-    private static readonly TimeZoneInfo HospitalTimeZone =
-        TimeZoneInfo.TryFindSystemTimeZoneById("Asia/Colombo", out var colombo)
-            ? colombo
-            : TimeZoneInfo.FindSystemTimeZoneById("Sri Lanka Standard Time");
-
     private readonly CareLankaDbContext _db;
     private readonly IPatientDirectory _patients;
     private readonly ICurrentUser _currentUser;
@@ -175,7 +168,8 @@ public sealed class PrescriptionService : IPrescriptionService
     {
         var prescription = await GetInStatusAsync(id, "ready", cancellationToken, PrescriptionStatus.Submitted);
         var now = _clock.GetUtcNow();
-        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, HospitalTimeZone).DateTime);
+        // Tokens restart each day at the hospital, not at midnight UTC.
+        var today = HospitalTime.Today(now);
 
         prescription.Status = PrescriptionStatus.Ready;
         prescription.ReadyAt = now;

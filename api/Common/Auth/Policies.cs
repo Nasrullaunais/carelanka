@@ -104,4 +104,8 @@ public static class Policies
     // Editing an item stays with the equipment manager; the administrator also needs it to retire a
     // machine the maintenance unit cannot fix.
     public const string EquipmentItemEditor = nameof(EquipmentItemEditor);
+
+    // The warnings list: low stock, expiring medicine and overdue maintenance. The equipment manager
+    // runs the pharmacy and the register it is about; the administrator runs the maintenance unit.
+    public const string WarningDesk = nameof(WarningDesk);
 }

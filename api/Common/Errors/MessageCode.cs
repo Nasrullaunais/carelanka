@@ -68,6 +68,10 @@ public enum MessageCode
 
     PharmacyRemoveNeedsEmpty,
 
+    WarningClosed,
+
+    WarningNotResolved,
+
     PharmacyCategoryNameTaken,
 
     PharmacyItemNameTaken,

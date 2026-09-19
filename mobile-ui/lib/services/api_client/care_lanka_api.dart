@@ -18,6 +18,7 @@ import 'clients/health_api.dart';
 import 'clients/integration_api.dart';
 import 'clients/laboratory_api.dart';
 import 'clients/maintenance_api.dart';
+import 'clients/monitoring_api.dart';
 import 'clients/my_calls_api.dart';
 import 'clients/my_run_api.dart';
 import 'clients/patient_self_service_api.dart';
@@ -52,6 +53,7 @@ class CareLankaApi {
   IntegrationApi? _integration;
   LaboratoryApi? _laboratory;
   MaintenanceApi? _maintenance;
+  MonitoringApi? _monitoring;
   MyCallsApi? _myCalls;
   MyRunApi? _myRun;
   PatientSelfServiceApi? _patientSelfService;
@@ -86,6 +88,8 @@ class CareLankaApi {
   LaboratoryApi get laboratory => _laboratory ??= LaboratoryApi(_dio, baseUrl: _baseUrl);
 
   MaintenanceApi get maintenance => _maintenance ??= MaintenanceApi(_dio, baseUrl: _baseUrl);
+
+  MonitoringApi get monitoring => _monitoring ??= MonitoringApi(_dio, baseUrl: _baseUrl);
 
   MyCallsApi get myCalls => _myCalls ??= MyCallsApi(_dio, baseUrl: _baseUrl);
 

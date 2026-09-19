@@ -220,6 +220,44 @@ public sealed class DispatchEndpointTests
     }
 
     [Fact]
+    public async Task History_lists_only_my_finished_runs_newest_first()
+    {
+        var first = await SeedRunAsync();
+        var second = await SeedRunAsync();
+        var firstDispatch = await DispatchAsync(first);
+        var secondDispatch = await DispatchAsync(second);
+        using var crew = await ClientAsync(first.CrewEmails[0]);
+        using var otherCrew = await ClientAsync(second.CrewEmails[0]);
+        Assert.Equal(0, (await crew.GetFromJsonAsync<JsonElement>("/api/me/dispatches/history")).GetProperty("total_items").GetInt32());
+
+        await crew.PostAsJsonAsync($"/api/me/dispatches/{firstDispatch}/decline", new { reason = "Flat tyre" });
+        await otherCrew.PostAsJsonAsync($"/api/me/dispatches/{secondDispatch}/decline", new { reason = "Sick" });
+
+        var mine = await crew.GetFromJsonAsync<JsonElement>("/api/me/dispatches/history");
+        Assert.Equal(1, mine.GetProperty("total_items").GetInt32());
+        Assert.Equal(firstDispatch, mine.GetProperty("items")[0].GetProperty("id").GetGuid());
+        Assert.Equal("declined", mine.GetProperty("items")[0].GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task History_filters_by_date_and_rejects_a_backwards_range()
+    {
+        var run = await SeedRunAsync();
+        var dispatchId = await DispatchAsync(run);
+        using var crew = await ClientAsync(run.CrewEmails[0]);
+        await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/decline", new { reason = "Flat tyre" });
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var inRange = await crew.GetFromJsonAsync<JsonElement>($"/api/me/dispatches/history?from={today:O}&to={today:O}");
+        var past = await crew.GetFromJsonAsync<JsonElement>($"/api/me/dispatches/history?to={today.AddDays(-2):O}");
+        var backwards = await crew.GetAsync($"/api/me/dispatches/history?from={today:O}&to={today.AddDays(-1):O}");
+
+        Assert.Equal(1, inRange.GetProperty("total_items").GetInt32());
+        Assert.Equal(0, past.GetProperty("total_items").GetInt32());
+        Assert.Equal(HttpStatusCode.BadRequest, backwards.StatusCode);
+    }
+
+    [Fact]
     public async Task Navigation_points_to_the_scene_then_the_hospital_and_only_for_the_assigned_crew()
     {
         var run = await SeedRunAsync();

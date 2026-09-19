@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -30,10 +29,8 @@ class HomeScreen extends StatelessWidget {
     final profile = context.watch<ProfileController>().profile.valueOrNull;
     final stay = context.watch<MyStayController>();
     final appointments = context.watch<AppointmentsController>();
-    final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
       body: RefreshIndicator(
         onRefresh: () async {
           await Future.wait([
@@ -42,55 +39,42 @@ class HomeScreen extends StatelessWidget {
             appointments.load(showLoading: false),
           ]);
         },
-        child: CustomScrollView(
-          slivers: [
-            SliverAppBar(
-              floating: true,
-              backgroundColor: theme.scaffoldBackgroundColor.withValues(alpha: 0.9),
-              surfaceTintColor: Colors.transparent,
-              elevation: 0,
-              expandedHeight: 20,
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(AppTheme.gutter, 0, AppTheme.gutter, 40),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  if (profile == null)
-                    const _NotLinkedYet().animate().fadeIn(duration: 400.ms).slideY(begin: 0.1)
-                  else ...[
-                    _Greeting(profile: profile).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1),
-                    const SizedBox(height: 24),
-                    _WhatsNext(
-                      stay: stay.state,
-                      nextVisit: appointments.upcoming.isEmpty ? null : appointments.upcoming.first,
-                      onOpenTab: onOpenTab,
-                    ).animate().fadeIn(delay: 100.ms, duration: 400.ms).slideY(begin: 0.1),
-                    const SizedBox(height: 24),
-                    PatientIdCard(
-                      patientCode: profile.patientCode,
-                      fullName: profile.fullName,
-                    ).animate().fadeIn(delay: 200.ms, duration: 400.ms).slideY(begin: 0.1),
-                    if (!profile.detailsComplete) ...[
-                      const SizedBox(height: 16),
-                      _CompleteDetailsBanner(missing: profile.missingFields)
-                          .animate().fadeIn(delay: 300.ms, duration: 400.ms).scale(begin: const Offset(0.95, 0.95)),
-                    ],
-                    const SizedBox(height: 32),
-                    Text(
-                      'Quick Actions',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
-                        letterSpacing: 0.5,
-                      ),
-                    ).animate().fadeIn(delay: 400.ms, duration: 400.ms),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(
+            AppTheme.gutter,
+            0,
+            AppTheme.gutter,
+            32,
+          ),
+          children: profile == null
+              ? const [_NotLinkedYet()]
+              : [
+                  _Greeting(profile: profile),
+                  const SizedBox(height: 20),
+                  _WhatsNext(
+                    stay: stay.state,
+                    nextVisit: appointments.upcoming.isEmpty
+                        ? null
+                        : appointments.upcoming.first,
+                    onOpenTab: onOpenTab,
+                  ),
+                  const SizedBox(height: 16),
+                  PatientIdCard(
+                    patientCode: profile.patientCode,
+                    fullName: profile.fullName,
+                  ),
+                  if (!profile.detailsComplete) ...[
                     const SizedBox(height: 16),
-                    _QuickActions(profile: profile, onOpenTab: onOpenTab)
-                        .animate().fadeIn(delay: 500.ms, duration: 400.ms).slideY(begin: 0.1),
+                    _CompleteDetailsBanner(missing: profile.missingFields),
                   ],
-                ]),
-              ),
-            ),
-          ],
+                  const SizedBox(height: 24),
+                  Text(
+                    'Quick actions',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 12),
+                  _QuickActions(profile: profile, onOpenTab: onOpenTab),
+                ],
         ),
       ),
     );
@@ -107,28 +91,30 @@ class _NotLinkedYet extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(_timeOfDayGreeting(), style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
-        const SizedBox(height: 24),
+        Text(_timeOfDayGreeting(), style: theme.textTheme.headlineSmall),
+        const SizedBox(height: 20),
         NoticeBanner(
           icon: Icons.badge_outlined,
-          accent: theme.colorScheme.primary,
+          accent: theme.colorScheme.warning,
           title: 'Complete your registration',
           body:
               'Add your details to book visits and view your stay. If the hospital has '
               'already registered you at the desk, use your patient code instead so your '
               'stay and history come with you.',
           action: Wrap(
-            spacing: 12,
-            runSpacing: 12,
+            spacing: 10,
+            runSpacing: 8,
             children: [
               FilledButton(
-                onPressed: () => openMyDetails(context, context.read<ProfileController>()),
-                style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+                onPressed: () =>
+                    openMyDetails(context, context.read<ProfileController>()),
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
                 child: const Text('Add my details'),
               ),
               OutlinedButton(
-                onPressed: () => openClaimRecord(context, context.read<ProfileController>()),
-                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+                onPressed: () =>
+                    openClaimRecord(context, context.read<ProfileController>()),
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
                 child: const Text('I have a patient code'),
               ),
             ],
@@ -158,45 +144,27 @@ class _Greeting extends StatelessWidget {
             children: [
               Text(
                 _timeOfDayGreeting(),
-                style: theme.textTheme.titleMedium?.copyWith(
+                style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w500,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 _firstName(profile.fullName),
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                  color: theme.colorScheme.onSurface,
-                ),
+                style: theme.textTheme.headlineSmall,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
         ),
-        Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: theme.colorScheme.primary.withValues(alpha: 0.2),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: CircleAvatar(
-            radius: 26,
-            backgroundColor: theme.colorScheme.primary,
-            child: Text(
-              initialsOf(profile.fullName),
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: theme.colorScheme.onPrimary,
-                fontWeight: FontWeight.w700,
-              ),
+        CircleAvatar(
+          radius: 22,
+          backgroundColor: theme.colorScheme.primaryContainer,
+          child: Text(
+            initialsOf(profile.fullName),
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: theme.colorScheme.onPrimaryContainer,
             ),
           ),
         ),
@@ -212,9 +180,9 @@ class _Greeting extends StatelessWidget {
 
 String _timeOfDayGreeting() {
   final hour = DateTime.now().hour;
-  if (hour < 12) return 'Good morning,';
-  if (hour < 17) return 'Good afternoon,';
-  return 'Good evening,';
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
 }
 
 class _WhatsNext extends StatelessWidget {
@@ -231,7 +199,7 @@ class _WhatsNext extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (stay) {
-      AsyncLoading<MyStay>() => const Skeleton.card(height: 180),
+      AsyncLoading<MyStay>() => const Skeleton.card(height: 150),
       AsyncFailed<MyStay>() => _NextVisitOrNothing(
         nextVisit: nextVisit,
         onOpenTab: onOpenTab,
@@ -262,96 +230,74 @@ class _CurrentStayCard extends StatelessWidget {
 
     return _HeroCard(
       onTap: () => onOpenTab(PatientTab.myStay),
-      gradientColors: [
-        theme.colorScheme.primary,
-        theme.colorScheme.tertiary, // A subtle shift in color
-      ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  'YOUR STAY',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: Colors.white,
-                    letterSpacing: 1.2,
-                    fontWeight: FontWeight.w800,
-                  ),
+              Text(
+                'YOUR STAY',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.75),
+                  letterSpacing: 1,
                 ),
               ),
               const Spacer(),
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.15),
-                ),
-                child: const Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: Colors.white,
-                  size: 14,
-                ),
+              Icon(
+                Icons.chevron_right,
+                color: Colors.white.withValues(alpha: 0.8),
+                size: 20,
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           Text(
             admission.statusText,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-            ),
+            style: theme.textTheme.headlineSmall?.copyWith(color: Colors.white),
           ),
           if (place.isNotEmpty) ...[
             const SizedBox(height: 8),
             Row(
               children: [
                 Icon(
-                  Icons.place_rounded,
-                  size: 18,
-                  color: Colors.white.withValues(alpha: 0.9),
+                  Icons.place_outlined,
+                  size: 16,
+                  color: Colors.white.withValues(alpha: 0.85),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Text(
                   place,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: Colors.white,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.9),
                   ),
                 ),
               ],
             ),
           ],
           if (!admission.detailsComplete) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: theme.colorScheme.errorContainer.withValues(alpha: 0.9),
-                borderRadius: BorderRadius.circular(AppTheme.radiusM),
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(999),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.warning_amber_rounded, size: 16, color: theme.colorScheme.onErrorContainer),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${admission.missingFields.length} detail${admission.missingFields.length == 1 ? '' : 's'} missing',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: theme.colorScheme.onErrorContainer,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+              child: Text(
+                '${admission.missingFields.length} detail'
+                '${admission.missingFields.length == 1 ? '' : 's'} missing',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: Colors.white,
+                ),
               ),
             ),
           ],
+          const SizedBox(height: 12),
+          Text(
+            'View your progress',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: Colors.white.withValues(alpha: 0.75),
+            ),
+          ),
         ],
       ),
     );
@@ -371,45 +317,30 @@ class _NextVisitOrNothing extends StatelessWidget {
 
     if (visit == null) {
       return Card(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppTheme.radiusL),
-          side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.1), width: 1.5),
-        ),
-        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(22),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.calendar_month_rounded,
-                  size: 28,
-                  color: theme.colorScheme.primary,
-                ),
+              Icon(
+                Icons.event_available_outlined,
+                size: 26,
+                color: theme.colorScheme.primary,
               ),
-              const SizedBox(height: 16),
-              Text('No upcoming visits', style: theme.textTheme.titleLarge),
-              const SizedBox(height: 6),
+              const SizedBox(height: 12),
+              Text('No upcoming visits', style: theme.textTheme.titleMedium),
+              const SizedBox(height: 4),
               Text(
-                'Book a visit when you need to be seen by a doctor.',
-                style: theme.textTheme.bodyMedium?.copyWith(
+                'Book a visit when you need to be seen.',
+                style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               FilledButton.icon(
                 onPressed: () => onOpenTab(PatientTab.appointments),
-                icon: const Icon(Icons.add_rounded),
+                icon: const Icon(Icons.add),
                 label: const Text('Book a visit'),
-                style: FilledButton.styleFrom(
-                  elevation: 0,
-                ),
               ),
             ],
           ),
@@ -419,111 +350,72 @@ class _NextVisitOrNothing extends StatelessWidget {
 
     return _HeroCard(
       onTap: () => onOpenTab(PatientTab.appointments),
-      gradientColors: [
-        const Color(0xFF0F172A),
-        const Color(0xFF1E293B),
-      ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  'YOUR NEXT VISIT',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: Colors.white,
-                    letterSpacing: 1.2,
-                    fontWeight: FontWeight.w800,
-                  ),
+              Text(
+                'YOUR NEXT VISIT',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.75),
+                  letterSpacing: 1,
                 ),
               ),
               const Spacer(),
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.1),
-                ),
-                child: const Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: Colors.white,
-                  size: 14,
-                ),
+              Icon(
+                Icons.chevron_right,
+                color: Colors.white.withValues(alpha: 0.8),
+                size: 20,
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           Text(
             FriendlyDate.relativeDayAndTime(visit.scheduledAt),
-            style: theme.textTheme.headlineSmall?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-            ),
+            style: theme.textTheme.headlineSmall?.copyWith(color: Colors.white),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Row(
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
+                  horizontal: 10,
+                  vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primary,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusM),
+                  color: Colors.white.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  FriendlyDate.countdown(visit.scheduledAt).toUpperCase(),
+                  FriendlyDate.countdown(visit.scheduledAt),
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onPrimary,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.5,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   visit.statusText,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.9),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.85),
                   ),
                 ),
               ),
             ],
           ),
           if (visit.reason != null) ...[
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(AppTheme.radiusM),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.notes_rounded, size: 16, color: Colors.white.withValues(alpha: 0.5)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      visit.reason!,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.8),
-                      ),
-                    ),
-                  ),
-                ],
+            const SizedBox(height: 12),
+            Text(
+              visit.reason!,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Colors.white.withValues(alpha: 0.9),
               ),
             ),
           ],
@@ -534,41 +426,33 @@ class _NextVisitOrNothing extends StatelessWidget {
 }
 
 class _HeroCard extends StatelessWidget {
-  const _HeroCard({required this.child, required this.onTap, required this.gradientColors});
+  const _HeroCard({required this.child, required this.onTap});
 
   final Widget child;
   final VoidCallback onTap;
-  final List<Color> gradientColors;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
+    final scheme = Theme.of(context).colorScheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(AppTheme.radiusL),
-        boxShadow: [
-          BoxShadow(
-            color: gradientColors.first.withValues(alpha: 0.25),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(AppTheme.radiusL),
-          child: Ink(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(AppTheme.radiusL),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: gradientColors,
-              ),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppTheme.radiusL),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                scheme.primary,
+                Color.lerp(scheme.primary, Colors.black, 0.3)!,
+              ],
             ),
-            child: Padding(padding: const EdgeInsets.all(24), child: child),
           ),
+          child: Padding(padding: const EdgeInsets.all(20), child: child),
         ),
       ),
     );
@@ -586,18 +470,16 @@ class _CompleteDetailsBanner extends StatelessWidget {
     final controller = context.read<ProfileController>();
 
     return NoticeBanner(
-      icon: Icons.info_rounded,
-      accent: scheme.error,
-      title: 'Incomplete Details',
+      icon: Icons.info_outline,
+      accent: scheme.warning,
+      title: 'Incomplete details',
       body: 'The hospital requires the following before your next visit.',
       bullets: missing.map(prettyFieldName).toList(),
-      action: FilledButton(
+      action: OutlinedButton(
         onPressed: () => openMyDetails(context, controller),
-        style: FilledButton.styleFrom(
-          backgroundColor: scheme.error,
-          foregroundColor: scheme.onError,
-          minimumSize: const Size(0, 48),
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, 42),
+          padding: const EdgeInsets.symmetric(horizontal: 18),
         ),
         child: const Text('Add them now'),
       ),
@@ -619,37 +501,41 @@ class _QuickActions extends StatelessWidget {
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 16,
-      crossAxisSpacing: 16,
-      childAspectRatio: 1.1, // Taller cards for better tap targets and layout
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
+      childAspectRatio: 1.55,
       children: [
         _ActionTile(
-          icon: Icons.add_circle_rounded,
+          icon: Icons.add_circle_outline,
           label: 'Book a visit',
-          caption: 'Choose date & time',
+          caption: 'Choose a date and time',
           onTap: () => onOpenTab(PatientTab.appointments),
         ),
         _ActionTile(
-          icon: Icons.monitor_heart_rounded,
+          icon: Icons.monitor_heart_outlined,
           label: 'My stay',
           caption: 'Current admission',
           onTap: () => onOpenTab(PatientTab.myStay),
         ),
         _ActionTile(
-          icon: Icons.history_rounded,
+          icon: Icons.history,
           label: 'Past visits',
           caption: 'Completed stays',
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PastVisitsScreen())),
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const PastVisitsScreen())),
         ),
         _ActionTile(
-          icon: Icons.description_rounded,
+          icon: Icons.description_outlined,
           label: 'My reports',
           caption: 'Lab results',
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyReportsScreen())),
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const MyReportsScreen())),
         ),
         if (emergencyPhone != null)
           _ActionTile(
-            icon: Icons.phone_in_talk_rounded,
+            icon: Icons.phone_in_talk_outlined,
             label: 'Call ${profile.emergencyContactName ?? 'contact'}',
             caption: emergencyPhone,
             tone: _ActionTone.urgent,
@@ -657,10 +543,11 @@ class _QuickActions extends StatelessWidget {
           )
         else
           _ActionTile(
-            icon: Icons.contact_phone_rounded,
+            icon: Icons.contact_phone_outlined,
             label: 'Emergency contact',
             caption: 'Not added yet',
-            onTap: () => openMyDetails(context, context.read<ProfileController>()),
+            onTap: () =>
+                openMyDetails(context, context.read<ProfileController>()),
           ),
       ],
     );
@@ -691,15 +578,9 @@ class _ActionTile extends StatelessWidget {
     final urgent = tone == _ActionTone.urgent;
 
     return Card(
-      elevation: 0,
-      color: theme.colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppTheme.radiusM),
-        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.2)),
-      ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppTheme.radiusM),
+        borderRadius: BorderRadius.circular(AppTheme.radiusL),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -707,32 +588,31 @@ class _ActionTile extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: urgent
-                      ? scheme.errorContainer.withValues(alpha: 0.5)
-                      : scheme.primaryContainer.withValues(alpha: 0.5),
-                  shape: BoxShape.circle,
+                      ? scheme.errorContainer
+                      : scheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusS),
                 ),
                 child: Icon(
                   icon,
-                  size: 24,
+                  size: 18,
                   color: urgent
-                      ? scheme.error
-                      : scheme.primary,
+                      ? scheme.onErrorContainer
+                      : scheme.onPrimaryContainer,
                 ),
               ),
-              const Spacer(),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     label,
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    style: theme.textTheme.titleSmall,
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 1),
                   Text(
                     caption,
                     maxLines: 1,

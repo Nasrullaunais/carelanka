@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/async_data.dart';
 import '../../../core/widgets/async_view.dart';
 import '../../../core/widgets/phone_width.dart';
@@ -36,26 +34,26 @@ class _PatientShellState extends State<PatientShell> {
   final _prescriptionsKey = GlobalKey<MyPrescriptionsTabState>();
 
   static const _bar = [
-    (tab: PatientTab.home, icon: Icons.home_outlined, on: Icons.home_rounded, label: 'Home'),
+    (tab: PatientTab.home, icon: Icons.home_outlined, on: Icons.home, label: 'Home'),
     (
       tab: PatientTab.appointments,
       icon: Icons.event_outlined,
-      on: Icons.event_rounded,
-      label: 'Visits'
+      on: Icons.event,
+      label: 'Appointments'
     ),
     (
       tab: PatientTab.myStay,
       icon: Icons.monitor_heart_outlined,
-      on: Icons.monitor_heart_rounded,
-      label: 'My Stay'
+      on: Icons.monitor_heart,
+      label: 'My stay'
     ),
     (
       tab: PatientTab.prescriptions,
       icon: Icons.medication_outlined,
-      on: Icons.medication_rounded,
-      label: 'Rx'
+      on: Icons.medication,
+      label: 'Prescriptions'
     ),
-    (tab: PatientTab.profile, icon: Icons.person_outline, on: Icons.person_rounded, label: 'Profile'),
+    (tab: PatientTab.profile, icon: Icons.person_outline, on: Icons.person, label: 'Profile'),
   ];
 
   @override
@@ -126,8 +124,6 @@ class _PatientShellState extends State<PatientShell> {
   @override
   Widget build(BuildContext context) {
     final profile = context.watch<ProfileController>();
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
 
     return PhoneWidth(
       child: AsyncView<MyProfile?>(
@@ -135,7 +131,6 @@ class _PatientShellState extends State<PatientShell> {
         onRetry: profile.load,
         builder: (context, _) {
           return Scaffold(
-            extendBody: true, // Content flows behind the floating bar
             body: SafeArea(
               bottom: false,
               child: IndexedStack(
@@ -149,95 +144,20 @@ class _PatientShellState extends State<PatientShell> {
                 ],
               ),
             ),
-            bottomNavigationBar: SafeArea(
-              child: Container(
-                margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                decoration: BoxDecoration(
-                  color: scheme.surface,
-                  borderRadius: BorderRadius.circular(36),
-                  boxShadow: [
-                    BoxShadow(
-                      color: scheme.shadow.withValues(alpha: 0.1),
-                      blurRadius: 24,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                  border: Border.all(
-                    color: scheme.outlineVariant.withValues(alpha: 0.2),
+            bottomNavigationBar: NavigationBar(
+              selectedIndex: _tab.index,
+              onDestinationSelected: (index) => _openTab(PatientTab.values[index]),
+              destinations: [
+                for (final item in _bar)
+                  NavigationDestination(
+                    icon: Icon(item.icon),
+                    selectedIcon: Icon(item.on),
+                    label: item.label,
                   ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    for (final item in _bar)
-                      _NavItem(
-                        item: item,
-                        isSelected: _tab == item.tab,
-                        onTap: () => _openTab(item.tab),
-                      ),
-                  ],
-                ),
-              ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.5, curve: Curves.easeOutCubic),
+              ],
             ),
           );
         },
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.item,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final ({PatientTab tab, IconData icon, IconData on, String label}) item;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOutQuint,
-        padding: EdgeInsets.symmetric(
-          horizontal: isSelected ? 16 : 12,
-          vertical: 10,
-        ),
-        decoration: BoxDecoration(
-          color: isSelected ? scheme.primaryContainer : Colors.transparent,
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isSelected ? item.on : item.icon,
-              color: isSelected ? scheme.primary : scheme.onSurfaceVariant,
-              size: 24,
-            ),
-            if (isSelected) ...[
-              const SizedBox(width: 6),
-              Text(
-                item.label,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: scheme.primary,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.2,
-                ),
-              ).animate().fadeIn(duration: 200.ms).slideX(begin: -0.2),
-            ],
-          ],
-        ),
       ),
     );
   }

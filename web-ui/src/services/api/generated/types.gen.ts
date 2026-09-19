@@ -598,12 +598,17 @@ export type DispatchDetail = {
     status?: DispatchStatus;
     destination_ward_name?: string | null;
     crew_count?: number;
+    acknowledgement_overdue?: boolean;
     dispatched_at?: string;
     completed_at?: string | null;
     ambulance_id?: string;
     acknowledged_at?: string | null;
     acknowledged_by_staff_id?: string | null;
     declined_reason?: string | null;
+    cancellation_reason?: string | null;
+    reassignment_reason?: string | null;
+    handover_notes?: string | null;
+    patient_condition?: string | null;
     crew_staff_ids?: Array<string> | null;
 };
 
@@ -617,6 +622,7 @@ export type DispatchSummary = {
     status?: DispatchStatus;
     destination_ward_name?: string | null;
     crew_count?: number;
+    acknowledgement_overdue?: boolean;
     dispatched_at?: string;
     completed_at?: string | null;
 };
@@ -981,6 +987,17 @@ export type MyProfile = {
     missing_fields: Array<string>;
 };
 
+export type NavigationTarget = {
+    dispatch_id?: string;
+    waypoint_type?: NavigationWaypoint;
+    destination_latitude?: number;
+    destination_longitude?: number;
+    destination_label?: string | null;
+    google_maps_url?: string | null;
+};
+
+export type NavigationWaypoint = 'scene' | 'hospital_emergency_entrance';
+
 export type OutstandingBill = {
     admission_id: string;
     patient: PatientSummary;
@@ -1218,6 +1235,11 @@ export type RaisedBy = 'agent' | 'user' | 'system';
 export type ReassignDispatchRequest = {
     replacement_ambulance_id?: string | null;
     reason?: string | null;
+};
+
+export type RecordHandoverRequest = {
+    notes?: string | null;
+    patient_condition?: string | null;
 };
 
 export type RefreshTokenRequest = {
@@ -5285,6 +5307,45 @@ export type GetMyActiveDispatchResponses = {
 
 export type GetMyActiveDispatchResponse = GetMyActiveDispatchResponses[keyof GetMyActiveDispatchResponses];
 
+export type GetMyDispatchNavigationTargetData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/dispatches/{id}/navigation';
+};
+
+export type GetMyDispatchNavigationTargetErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type GetMyDispatchNavigationTargetError = GetMyDispatchNavigationTargetErrors[keyof GetMyDispatchNavigationTargetErrors];
+
+export type GetMyDispatchNavigationTargetResponses = {
+    /**
+     * OK
+     */
+    200: NavigationTarget;
+};
+
+export type GetMyDispatchNavigationTargetResponse = GetMyDispatchNavigationTargetResponses[keyof GetMyDispatchNavigationTargetResponses];
+
 export type AcknowledgeMyDispatchData = {
     body?: never;
     path: {
@@ -5411,7 +5472,7 @@ export type UpdateMyDispatchStatusResponses = {
 export type UpdateMyDispatchStatusResponse = UpdateMyDispatchStatusResponses[keyof UpdateMyDispatchStatusResponses];
 
 export type RecordHandoverData = {
-    body?: never;
+    body?: RecordHandoverRequest;
     path: {
         id: string;
     };
@@ -5420,6 +5481,10 @@ export type RecordHandoverData = {
 };
 
 export type RecordHandoverErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
     /**
      * Unauthorized
      */

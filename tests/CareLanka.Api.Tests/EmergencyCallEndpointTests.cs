@@ -76,7 +76,7 @@ public sealed class EmergencyCallEndpointTests
         Assert.Equal(HttpStatusCode.OK, (await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status = "en_route_to_scene" })).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status = "at_scene" })).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status = "transporting_to_hospital" })).StatusCode);
-        using var handover = await crew.PostAsync($"/api/me/dispatches/{dispatchId}/handover", null);
+        using var handover = await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/handover", new { notes = "Handed to triage" });
         Assert.Equal(HttpStatusCode.OK, handover.StatusCode);
         using var handoverBody = JsonDocument.Parse(await handover.Content.ReadAsStringAsync());
         Assert.Equal("handed_over", handoverBody.RootElement.GetProperty("status").GetString());

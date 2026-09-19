@@ -2,7 +2,7 @@
 
 **Owner:** Nasrulla Unais (Member 1)
 
-**Status:** Phases 0–2 complete 2026-09-14; Phase 3 is next
+**Status:** Phases 0–4 and 6 complete; Phase 3 hardened 2026-09-19; Phase 5 (crew Flutter app) built except run history
 
 **Contract:** `specs/emergency-spec.yaml`
 
@@ -302,7 +302,7 @@ JWT caller and idempotency key, and the Duty Manager sees the received call thro
 tested call-board API. Patient Management's screen handoff is documented in
 `patient-emergency-intake.md`; the screen remains M4's integration-checkpoint work.
 
-### Phase 3 — Manual dispatch and the state machine
+### Phase 3 — Manual dispatch and the state machine — **COMPLETE 2026-09-19**
 
 **Goal:** make the complete backend workflow work without AI.
 
@@ -324,8 +324,17 @@ Concurrency tests must attempt two dispatches against the same ambulance and two
 confirmations against the same call. Database constraints, not timing assumptions, must
 decide the winner.
 
-**Exit criteria:** a Duty Manager can manually dispatch an eligible ambulance and the
-assigned crew can take it through handover using API tests.
+**Exit criteria met:** `DispatchEndpointTests` and `EmergencyCallEndpointTests` take a manual
+dispatch through handover, refuse an ineligible ambulance with its block reasons, and prove
+that racing dispatches leave exactly one winner. Details settled while finishing it:
+
+- The unacknowledged alert is **computed, not stored**: `acknowledgement_overdue` is true while a
+  dispatch is `assigned` past `Emergency:AcknowledgementTimeoutSeconds` (30). The polling worker and
+  its column were removed; the dispatcher page reads the flag.
+- `Dispatch` carries an optimistic-concurrency version (`xmin`), so a decline racing an acknowledge
+  ends in one `409` rather than two writes.
+- Cancel and reassign reasons, and the handover `notes` and `patient_condition` (both optional),
+  are stored. Identity details at handover were left out; add them with Patient Management.
 
 ### Phase 4 — Dispatcher React vertical slice — **COMPLETE 2026-09-14**
 
@@ -346,7 +355,7 @@ handling; a `409` caused by another dispatcher refreshes the affected call and f
 
 **Exit criteria:** the Duty Manager can crew an ambulance and dispatch it from React.
 
-### Phase 5 — Crew Flutter vertical slice
+### Phase 5 — Crew Flutter vertical slice — **BUILT 2026-09-19, history still open**
 
 **Goal:** let the assigned crew complete a run from their phone.
 
@@ -359,8 +368,9 @@ Screens and behaviour:
 - Status buttons appear only for the next legal transition.
 - “Open in Google Maps” launches scene coordinates while travelling outward and the
   configured CareLanka Hospital emergency entrance while transporting.
-- Handover captures concise notes, condition on arrival and optional identity details.
-- History shows the immutable responding crew snapshot.
+- Handover captures concise notes and condition on arrival (both optional; identity details are out of scope).
+- History shows the immutable responding crew snapshot. **Not built:** `getMyDispatchHistory` is in the spec but has no endpoint yet, so there is no history screen.
+- Settled: the navigation endpoint (`GET /me/dispatches/{id}/navigation`) is built; the hospital entrance comes from `Emergency:HospitalEntrance` in settings, which must hold a real place or the API refuses to start. The current value is a placeholder near the National Hospital in Colombo.
 
 **Exit criteria:** a crew member can acknowledge, navigate, progress and hand over; a
 different crew member receives `403` for the same dispatch.
@@ -579,12 +589,15 @@ Already present:
 - Emergency-call create, caller-scoped list, Duty Manager board/detail/update endpoints,
   generated web client, and Patient Management's intake handoff example.
 
+- Manual dispatch, acknowledge, decline, progress, handover, cancel and reassign, with a
+  version check and stored reasons; caller tracking and crew location reporting.
+- One React page (`EmergencyPage.tsx`): call board, detail, priority, dispatch, fleet list and
+  crew assignment, polling the selected call every 5 seconds.
+- Flutter: only the location reporter and a placeholder `my_run_screen.dart`.
+
 Not yet present:
 
-- Manual or agent-assisted dispatch.
-- Crew acknowledgement and progress transitions.
-- Emergency React or Flutter screens.
-- Real Maps, live tracking, Firebase delivery, pre-admission or reports.
+- The crew's Flutter run screens (acknowledge, decline, status buttons, handover, history).
+- Real Maps, Firebase delivery, pre-admission, the AI agent, reports.
 
-With call intake now truthful and caller-scoped, Phase 3 manual dispatch is next rather
-than the AI agent or mobile UI.
+Phase 5 (the crew's phone app) is next.

@@ -11,6 +11,7 @@ public class DispatchSummary
     public DispatchStatus Status { get; set; }
     public string? DestinationWardName { get; set; }
     public int CrewCount { get; set; }
+    public bool AcknowledgementOverdue { get; set; }
     public DateTimeOffset DispatchedAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }
 }

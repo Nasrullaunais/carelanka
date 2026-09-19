@@ -150,6 +150,10 @@ public enum MessageCode
 
     CrewMemberAlreadyAssigned,
 
+    AmbulanceNotEligible,
+
+    CallNotAwaitingDispatch,
+
     NicLinkedToAnotherAccount,
 
     NicDoesNotMatchYourRecord,

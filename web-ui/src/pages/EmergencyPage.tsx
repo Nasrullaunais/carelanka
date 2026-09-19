@@ -15,7 +15,7 @@ import { useSession } from '../services/auth/useSession';
 import { canManageEmergency } from '../types/permissions';
 
 const PAGE_SIZE = 50;
-const acknowledgementWindowMs = 30_000;
+const CALL_REFRESH_MS = 5_000;
 
 const priorityLabels: Record<CallPriority, string> = {
   critical: 'Critical',
@@ -46,6 +46,7 @@ export function EmergencyPage() {
   const selectedCall = useQuery({
     ...getEmergencyCallOptions({ path: { id: selectedCallId ?? '' } }),
     enabled: Boolean(selectedCallId),
+    refetchInterval: CALL_REFRESH_MS,
   });
   const ambulances = useQuery(listAmbulancesOptions({
     query: {
@@ -151,7 +152,7 @@ export function EmergencyPage() {
                 pending={priorityUpdate.isPending}
                 onSave={(priority) => priorityUpdate.mutate({ path: { id: selectedCallId }, body: { priority } })}
               />
-              {assignedDispatch && <AcknowledgementCountdown dispatch={assignedDispatch} />}
+              {assignedDispatch && <AcknowledgementStatus dispatch={assignedDispatch} />}
               <EligibleAmbulances
                 ambulances={ambulances.data?.items ?? []}
                 isLoading={ambulances.isLoading}
@@ -261,12 +262,10 @@ function CrewAssignment({ crew, isLoading, isError, staffId, pending, onStaffIdC
   </div>;
 }
 
-function AcknowledgementCountdown({ dispatch }: { dispatch: DispatchSummary }) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
-  const sentAt = dispatch.dispatched_at ? new Date(dispatch.dispatched_at).getTime() : now;
-  const remaining = Math.max(0, Math.ceil((acknowledgementWindowMs - (now - sentAt)) / 1000));
-  return <p className={remaining === 0 ? 'emergency-warning' : 'emergency-countdown'} role="status">{remaining === 0 ? 'Crew has not acknowledged. Dispatcher attention required.' : `Crew acknowledgement warning in ${remaining}s.`}</p>;
+function AcknowledgementStatus({ dispatch }: { dispatch: DispatchSummary }) {
+  return dispatch.acknowledgement_overdue
+    ? <p className="emergency-warning" role="alert">Crew has not acknowledged. Dispatcher attention required.</p>
+    : <p className="emergency-countdown" role="status">Waiting for crew acknowledgement.</p>;
 }
 
 function Retry({ text, onRetry }: { text: string; onRetry: () => void }) {

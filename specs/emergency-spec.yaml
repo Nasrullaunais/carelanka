@@ -1415,6 +1415,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
 
   /me/dispatches/{id}/handover:
     parameters:
@@ -1439,12 +1440,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [notes]
               properties:
-                notes: { type: string, maxLength: 1000 }
-                patient_condition: { type: string, maxLength: 500 }
-                identified_patient_name: { type: string, maxLength: 200, nullable: true }
-                identified_patient_phone: { type: string, maxLength: 20, nullable: true }
+                notes: { type: string, maxLength: 1000, nullable: true }
+                patient_condition: { type: string, maxLength: 500, nullable: true }
       responses:
         '200':
           description: Recorded
@@ -2339,6 +2337,14 @@ components:
         acknowledged_at: { type: string, format: date-time, nullable: true }
         acknowledged_by_staff_id: { type: string, format: uuid, nullable: true }
         declined_reason: { type: string, nullable: true }
+        cancellation_reason: { type: string, nullable: true }
+        reassignment_reason: { type: string, nullable: true }
+        acknowledgement_overdue:
+          type: boolean
+          description: |
+            Server-computed. True while the dispatch is still `assigned` and the configured
+            acknowledgement window (30 seconds by default) has passed. Nothing is stored;
+            the dispatcher board reads it and shows the warning.
         completed_at: { type: string, format: date-time, nullable: true }
         dispatch_proposal_id: { type: string, format: uuid, nullable: true }
         superseded_by_dispatch_id:
@@ -2356,6 +2362,7 @@ components:
         ambulance_registration: { type: string }
         call_priority: { $ref: '#/components/schemas/CallPriority' }
         status: { $ref: '#/components/schemas/DispatchStatus' }
+        acknowledgement_overdue: { type: boolean }
         crew_count: { type: integer }
         dispatched_at: { type: string, format: date-time }
         completed_at: { type: string, format: date-time, nullable: true }

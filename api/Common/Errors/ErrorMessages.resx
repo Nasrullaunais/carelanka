@@ -224,6 +224,12 @@
   <data name="cl_emg_004" xml:space="preserve">
     <value>Crew member {0} already has a current ambulance assignment.</value>
   </data>
+  <data name="cl_emg_005" xml:space="preserve">
+    <value>This ambulance cannot be dispatched: {0}.</value>
+  </data>
+  <data name="cl_emg_006" xml:space="preserve">
+    <value>This emergency call is not waiting for an ambulance.</value>
+  </data>
   <data name="cl_pat_002" xml:space="preserve">
     <value>A patient with NIC {0} is already registered, as record {1}.</value>
     <comment>Look the existing patient up instead of creating a second record for the same person.</comment>

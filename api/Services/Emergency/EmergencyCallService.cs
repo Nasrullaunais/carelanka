@@ -361,6 +361,8 @@ public sealed class EmergencyCallService : IEmergencyCallService
                 CallPriority = call.Priority,
                 Status = dispatch.Status,
                 CrewCount = dispatch.Crew.Count,
+                AcknowledgementOverdue = dispatch.IsAcknowledgementOverdue(
+                    _timeProvider.GetUtcNow(), _options.AcknowledgementTimeoutSeconds),
                 DispatchedAt = dispatch.DispatchedAt,
                 CompletedAt = dispatch.CompletedAt
             })

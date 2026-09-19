@@ -598,12 +598,17 @@ export type DispatchDetail = {
     status?: DispatchStatus;
     destination_ward_name?: string | null;
     crew_count?: number;
+    acknowledgement_overdue?: boolean;
     dispatched_at?: string;
     completed_at?: string | null;
     ambulance_id?: string;
     acknowledged_at?: string | null;
     acknowledged_by_staff_id?: string | null;
     declined_reason?: string | null;
+    cancellation_reason?: string | null;
+    reassignment_reason?: string | null;
+    handover_notes?: string | null;
+    patient_condition?: string | null;
     crew_staff_ids?: Array<string> | null;
 };
 
@@ -617,6 +622,7 @@ export type DispatchSummary = {
     status?: DispatchStatus;
     destination_ward_name?: string | null;
     crew_count?: number;
+    acknowledgement_overdue?: boolean;
     dispatched_at?: string;
     completed_at?: string | null;
 };
@@ -1218,6 +1224,11 @@ export type RaisedBy = 'agent' | 'user' | 'system';
 export type ReassignDispatchRequest = {
     replacement_ambulance_id?: string | null;
     reason?: string | null;
+};
+
+export type RecordHandoverRequest = {
+    notes?: string | null;
+    patient_condition?: string | null;
 };
 
 export type RefreshTokenRequest = {
@@ -5411,7 +5422,7 @@ export type UpdateMyDispatchStatusResponses = {
 export type UpdateMyDispatchStatusResponse = UpdateMyDispatchStatusResponses[keyof UpdateMyDispatchStatusResponses];
 
 export type RecordHandoverData = {
-    body?: never;
+    body?: RecordHandoverRequest;
     path: {
         id: string;
     };
@@ -5420,6 +5431,10 @@ export type RecordHandoverData = {
 };
 
 export type RecordHandoverErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
     /**
      * Unauthorized
      */

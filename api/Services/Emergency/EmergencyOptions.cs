@@ -7,4 +7,6 @@ public sealed class EmergencyOptions
     public int MinimumReadyCrew { get; set; } = 2;
 
     public int LocationMaxAgeMinutes { get; set; } = 5;
+
+    public int AcknowledgementTimeoutSeconds { get; set; } = 30;
 }

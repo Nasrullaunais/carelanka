@@ -818,7 +818,11 @@ export const updateMyDispatchStatus = <ThrowOnError extends boolean = false>(opt
 export const recordHandover = <ThrowOnError extends boolean = false>(options: Options<RecordHandoverData, ThrowOnError>): RequestResult<RecordHandoverResponses, RecordHandoverErrors, ThrowOnError> => (options.client ?? client).post<RecordHandoverResponses, RecordHandoverErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/me/dispatches/{id}/handover',
-    ...options
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 export const preRegisterSelf = <ThrowOnError extends boolean = false>(options?: Options<PreRegisterSelfData, ThrowOnError>): RequestResult<PreRegisterSelfResponses, PreRegisterSelfErrors, ThrowOnError> => (options?.client ?? client).post<PreRegisterSelfResponses, PreRegisterSelfErrors, ThrowOnError>({

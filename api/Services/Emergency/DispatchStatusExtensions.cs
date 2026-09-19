@@ -1,3 +1,4 @@
+using CareLanka.Api.Data.Entities.Emergency;
 using CareLanka.Api.Data.Enums;
 
 namespace CareLanka.Api.Services.Emergency;
@@ -16,4 +17,7 @@ public static class DispatchStatusExtensions
 
     public static bool IsPrePickup(this DispatchStatus status) => status is
         DispatchStatus.Assigned or DispatchStatus.Acknowledged or DispatchStatus.EnRouteToScene;
+
+    public static bool IsAcknowledgementOverdue(this Dispatch dispatch, DateTimeOffset now, int timeoutSeconds)
+        => dispatch.Status == DispatchStatus.Assigned && now - dispatch.DispatchedAt >= TimeSpan.FromSeconds(timeoutSeconds);
 }

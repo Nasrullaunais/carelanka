@@ -85,6 +85,8 @@ public static class MessageCodes
             [MessageCode.AmbulanceHasActiveDispatch] = "cl_emg_002",
             [MessageCode.StaffNotAmbulanceCrew] = "cl_emg_003",
             [MessageCode.CrewMemberAlreadyAssigned] = "cl_emg_004",
+            [MessageCode.AmbulanceNotEligible] = "cl_emg_005",
+            [MessageCode.CallNotAwaitingDispatch] = "cl_emg_006",
             [MessageCode.NicLinkedToAnotherAccount] = "cl_pat_031",
             [MessageCode.NicDoesNotMatchYourRecord] = "cl_pat_032",
             [MessageCode.AccountHasNoPatientRecord] = "cl_pat_033",

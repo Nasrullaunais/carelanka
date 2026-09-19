@@ -1207,7 +1207,7 @@ export type ProblemDetails = {
     [key: string]: unknown;
 };
 
-export type RaisedBy = 'agent' | 'user';
+export type RaisedBy = 'agent' | 'user' | 'system';
 
 export type ReassignDispatchRequest = {
     replacement_ambulance_id?: string | null;
@@ -1406,6 +1406,7 @@ export type Warning = {
     severity: WarningSeverity;
     related_entity_type: RelatedEntityType;
     related_entity_id: string;
+    related_entity_label?: string | null;
     ward_id?: string | null;
     recommended_action: string;
     status: WarningStatus;
@@ -1418,9 +1419,25 @@ export type Warning = {
     updated_at: string;
 };
 
+export type WarningPagedResult = {
+    items: Array<Warning>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
 export type WarningSeverity = 'low' | 'medium' | 'high' | 'critical';
 
 export type WarningStatus = 'open' | 'acknowledged' | 'action_taken' | 'dismissed';
+
+export type WarningSweepResult = {
+    raised: number;
+    updated: number;
+    resolved: number;
+    still_open: number;
+    ran_at: string;
+};
 
 export type WarningType = 'low_stock' | 'medicine_expiring' | 'maintenance_overdue' | 'equipment_faulty';
 
@@ -4879,6 +4896,155 @@ export type ConfirmMaintenanceScheduleResponses = {
 };
 
 export type ConfirmMaintenanceScheduleResponse = ConfirmMaintenanceScheduleResponses[keyof ConfirmMaintenanceScheduleResponses];
+
+export type ListWarningsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: WarningStatus;
+        severity?: WarningSeverity;
+        type?: WarningType;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/warnings';
+};
+
+export type ListWarningsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListWarningsError = ListWarningsErrors[keyof ListWarningsErrors];
+
+export type ListWarningsResponses = {
+    /**
+     * OK
+     */
+    200: WarningPagedResult;
+};
+
+export type ListWarningsResponse = ListWarningsResponses[keyof ListWarningsResponses];
+
+export type RunWarningSweepData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/warnings/sweep';
+};
+
+export type RunWarningSweepErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type RunWarningSweepError = RunWarningSweepErrors[keyof RunWarningSweepErrors];
+
+export type RunWarningSweepResponses = {
+    /**
+     * OK
+     */
+    200: WarningSweepResult;
+};
+
+export type RunWarningSweepResponse = RunWarningSweepResponses[keyof RunWarningSweepResponses];
+
+export type AcknowledgeWarningData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/warnings/{id}/acknowledge';
+};
+
+export type AcknowledgeWarningErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type AcknowledgeWarningError = AcknowledgeWarningErrors[keyof AcknowledgeWarningErrors];
+
+export type AcknowledgeWarningResponses = {
+    /**
+     * OK
+     */
+    200: Warning;
+};
+
+export type AcknowledgeWarningResponse = AcknowledgeWarningResponses[keyof AcknowledgeWarningResponses];
+
+export type ClearWarningData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/warnings/{id}/clear';
+};
+
+export type ClearWarningErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ClearWarningError = ClearWarningErrors[keyof ClearWarningErrors];
+
+export type ClearWarningResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type ClearWarningResponse = ClearWarningResponses[keyof ClearWarningResponses];
 
 export type GetMyEmergencyCallsData = {
     body?: never;

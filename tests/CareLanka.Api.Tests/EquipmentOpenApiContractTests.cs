@@ -47,6 +47,10 @@ public sealed class EquipmentOpenApiContractTests
     [InlineData("/maintenance-schedules/pending-confirmation", "get", "listMaintenanceSchedulesAwaitingConfirmation")]
     [InlineData("/maintenance-schedules/pending-confirmation/count", "get", "countMaintenanceSchedulesAwaitingConfirmation")]
     [InlineData("/maintenance-schedules/{id}/confirm", "post", "confirmMaintenanceSchedule")]
+    [InlineData("/warnings", "get", "listWarnings")]
+    [InlineData("/warnings/sweep", "post", "runWarningSweep")]
+    [InlineData("/warnings/{id}/acknowledge", "post", "acknowledgeWarning")]
+    [InlineData("/warnings/{id}/clear", "post", "clearWarning")]
     public async Task Bed_operation_ids_match_the_contract(string path, string method, string operationId)
     {
         using var document = await GenerateAsync();
@@ -95,6 +99,10 @@ public sealed class EquipmentOpenApiContractTests
     [InlineData("/maintenance-schedules/pending-confirmation", "get")]
     [InlineData("/maintenance-schedules/pending-confirmation/count", "get")]
     [InlineData("/maintenance-schedules/{id}/confirm", "post")]
+    [InlineData("/warnings", "get")]
+    [InlineData("/warnings/sweep", "post")]
+    [InlineData("/warnings/{id}/acknowledge", "post")]
+    [InlineData("/warnings/{id}/clear", "post")]
     public async Task Every_outcome_the_contract_publishes_is_declared_by_the_code(string path, string method)
     {
         using var document = await GenerateAsync();

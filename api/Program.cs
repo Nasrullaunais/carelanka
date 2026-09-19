@@ -114,6 +114,10 @@ builder.Services
     .Bind(builder.Configuration.GetSection(EquipmentOptions.SectionName))
     .Validate(options => !string.IsNullOrWhiteSpace(options.ConfirmationCode),
         "Equipment:ConfirmationCode must be set.")
+    .Validate(options => options.WarningSweepIntervalMinutes >= 0,
+        "Equipment:WarningSweepIntervalMinutes must be zero (off) or more.")
+    .Validate(options => options.ExpiryWarningDays > 0,
+        "Equipment:ExpiryWarningDays must be greater than zero.")
     .ValidateOnStart();
 
 var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
@@ -303,6 +307,10 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.EquipmentItemEditor, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.EquipmentManager),
         EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
+    options.AddPolicy(Policies.WarningDesk, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.EquipmentManager),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
 });
 
 var authRequestsPerMinute = builder.Configuration.GetValue("RateLimits:AuthPerMinute", 20);
@@ -364,6 +372,8 @@ builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();
 builder.Services.AddSingleton<IEquipmentConfirmationCode, EquipmentConfirmationCode>();
 builder.Services.AddScoped<ILabReportService, LabReportService>();
 builder.Services.AddScoped<IPrescriptionService, PrescriptionService>();
+builder.Services.AddScoped<IWarningService, WarningService>();
+builder.Services.AddHostedService<WarningSweepWorker>();
 builder.Services.AddScoped<IWardService, WardService>();
 builder.Services.AddScoped<IPatientService, PatientService>();
 builder.Services.AddScoped<IMedicalProfileService, MedicalProfileService>();

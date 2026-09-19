@@ -4,6 +4,7 @@ import {
   canReadCapacity,
   canReadEquipment,
   canRunMaintenance,
+  canReadWarnings,
   canReadLabReports,
   canReadWards,
   canRegisterPatient,
@@ -75,6 +76,12 @@ export const destinations: Destination[] = [
     label: 'Maintenance unit',
     description: 'Book maintenance, confirm repairs done, and retire machines beyond repair.',
     canAccess: canRunMaintenance,
+  },
+  {
+    to: '/warnings',
+    label: 'Warnings',
+    description: 'Medicine running low or about to expire, and machines overdue for service.',
+    canAccess: canReadWarnings,
   },
   {
     to: '/laboratory',

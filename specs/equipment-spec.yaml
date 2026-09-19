@@ -1648,7 +1648,11 @@ paths:
     get:
       tags: [Monitoring]
       summary: List warnings
-      description: 'Roles: InventoryAdministrator.'
+      description: |
+        Roles: EquipmentManager or HospitalAdministrator. *(Rev 3, 2026-09-19.)*
+
+        Worst first (critical, high, medium, low), then newest. Holds the sweep's warnings
+        (`raised_by = system`), reported faults (`user`) and, later, the agent's (`agent`).
       operationId: listWarnings
       parameters:
         - name: status
@@ -1675,6 +1679,7 @@ paths:
                       items:
                         type: array
                         items: { $ref: '#/components/schemas/Warning' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
@@ -1684,7 +1689,10 @@ paths:
     post:
       tags: [Monitoring]
       summary: Acknowledge a warning
-      description: 'Roles: InventoryAdministrator. Records who has seen it, without closing it.'
+      description: |
+        Roles: EquipmentManager or HospitalAdministrator. Records who has seen it, without
+        closing it. Acknowledging again changes nothing; a closed warning (`action_taken` or
+        `dismissed`) answers 409 `cl_equ_028`.
       operationId: acknowledgeWarning
       responses:
         '200':
@@ -1695,6 +1703,80 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The warning is already closed.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /warnings/{id}/clear:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Monitoring]
+      summary: Mark a resolved warning done
+      description: |
+        Roles: HospitalAdministrator, with the confirmation code (`X-Confirmation-Code`, the
+        same code as equipment confirmation). A missing or wrong code answers 403 `cl_equ_017`.
+        *(Rev 3, 2026-09-19.)*
+
+        Only an `action_taken` (resolved) warning; anything else answers 409 `cl_equ_029`. It
+        leaves every warnings list for good, and the row stays in the database with
+        `cleared_at` and who cleared it.
+      operationId: clearWarning
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
+      responses:
+        '204':
+          description: Marked done and taken off the list
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Not the hospital administrator, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The warning is not resolved.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /warnings/sweep:
+    post:
+      tags: [Monitoring]
+      summary: Run the deterministic warning sweep now
+      description: |
+        Roles: EquipmentManager or HospitalAdministrator. *(Rev 3, 2026-09-19.)*
+
+        Build step 7. Fixed rules in code, no model: the agent reads these warnings, it never
+        decides whether one exists. The same sweep also runs on a timer every
+        `Equipment:WarningSweepIntervalMinutes` (default 60; 0 turns the timer off).
+
+        - `low_stock` - `quantity_on_hand <= reorder_threshold`, or under 3 days of supply at
+          the last 14 days' dispensing rate. Critical when out, high at half the threshold or
+          less, otherwise medium.
+        - `medicine_expiring` - a batch with stock expiring within `Equipment:ExpiryWarningDays`
+          (default 30), or already expired. One warning per medicine naming each batch;
+          critical once expired, high within 7 days, medium within 14, otherwise low.
+        - `maintenance_overdue` - a machine past `next_maintenance_due` with nothing booked, or
+          a routine service or calibration booked for a day gone by (equipment or bed). Repairs
+          are left out: an open repair already has its `equipment_faulty` warning. High after
+          30 days late, otherwise medium.
+
+        One live warning per problem: running it again updates the wording and severity of the
+        open one rather than adding another, and a warning whose problem is gone moves to
+        `action_taken`. A severity that rises re-opens an acknowledged warning. Only the sweep's
+        own warnings (`raised_by = system`) are touched.
+      operationId: runWarningSweep
+      responses:
+        '200':
+          description: What this run changed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarningSweepResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /action-requests:
     get:
@@ -2036,7 +2118,8 @@ components:
 
     RaisedBy:
       type: string
-      enum: [agent, user]
+      description: '`system` is the deterministic warning sweep *(Rev 3, 2026-09-19)*.'
+      enum: [agent, user, system]
 
     ActionType:
       type: string
@@ -2185,6 +2268,16 @@ components:
       required: [count]
       properties:
         count: { type: integer, minimum: 0 }
+
+    WarningSweepResult:
+      type: object
+      required: [raised, updated, resolved, still_open, ran_at]
+      properties:
+        raised: { type: integer, minimum: 0, description: New warnings raised }
+        updated: { type: integer, minimum: 0, description: Open warnings whose wording or severity moved on }
+        resolved: { type: integer, minimum: 0, description: Warnings closed because the problem is gone }
+        still_open: { type: integer, minimum: 0, description: Sweep warnings open or acknowledged after this run }
+        ran_at: { type: string, format: date-time }
 
     EquipmentItemDetail:
       allOf:
@@ -2519,7 +2612,10 @@ components:
               type: string
               enum: [pharmacy_item, equipment_item, bed]
             related_entity_id: { type: string, format: uuid }
-            related_entity_label: { type: string }
+            related_entity_label:
+              type: string
+              nullable: true
+              description: The medicine, machine or bed by name. Filled on the warnings list.
             ward_id: { type: string, format: uuid, nullable: true }
             recommended_action:
               type: string

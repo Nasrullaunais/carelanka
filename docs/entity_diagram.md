@@ -883,7 +883,7 @@ for why a laboratory result lives in this component and not in Patient Managemen
 + PerformedByStaffId: Guid (nullable)
 + CompletedAt: DateTimeOffset (nullable)
 + Notes: string (nullable)
-+ CreatedBy: RaisedBy (non-null) -- agent | user
++ CreatedBy: RaisedBy (non-null) -- agent | user | system
 ```
 **Table:** `maintenance_schedules`
 **Indexes:** `(AssetType, AssetId)` · `(ScheduledDate) WHERE status IN ('scheduled','overdue')`
@@ -904,11 +904,13 @@ revised)*
 + WardId: Guid (nullable)
 + RecommendedAction: string (non-null)
 + Status: WarningStatus (non-null)
-+ RaisedBy: RaisedBy (non-null) -- agent | user
++ RaisedBy: RaisedBy (non-null) -- agent | user | system
 + WorkflowId: Guid (nullable) FK → AgentWorkflow.Id
 + AcknowledgedByStaffId: Guid (nullable)
 + AcknowledgedAt: DateTimeOffset (nullable)
 + ResolvedAt: DateTimeOffset (nullable)
++ ClearedAt: DateTimeOffset (nullable) -- Done: off every list, kept as a record
++ ClearedByStaffId: Guid (nullable)
 ```
 **Table:** `warnings`
 **Index:** `(Status)` — every dashboard filters on open warnings
@@ -917,10 +919,12 @@ gained `pharmacy_item`. `RecommendedAction` is a short human sentence, never the
 reasoning. `RaisedBy` distinguishes the threshold sweep and a person reporting a fault from
 anything the agent infers; a reported fault starts at `high` severity because a person
 saying the machine is broken outranks what a sweep guesses.
-*(Rev 3)* The Rev 2 partial UNIQUE on `(EntityType, EntityId, Type) WHERE Status = 'Open'`
-is **not** in the shipped schema. It was written for a sweep that inserts on every tick, and
-that sweep does not exist yet. It has to come back with it, or the first run will duplicate
-every open warning. Tracked in `docs/build/equipment.md` step 7.
+*(Rev 3, 2026-09-19)* The sweep is built, and the partial UNIQUE came back with it:
+`ux_warnings_sweep_live` on `(Type, RelatedEntityType, RelatedEntityId) WHERE raised_by = 'system'
+AND status IN ('open','acknowledged')`. One live sweep warning per problem, however often it
+runs; reported faults are outside it, because two people can report the same machine. `RaisedBy`
+gained `system` for the sweep, so it is no longer confused with the agent
+(`Equipment_AddWarningSweep`).
 
 #### ActionRequest extends AuditedEntity *(Rev 3 — new; **not built yet**)*
 ```

@@ -203,7 +203,7 @@ Constraint: `UNIQUE(ward_id, bed_number)`.
 | `ward_id` | uuid, nullable | |
 | `recommended_action` | text | Short human-readable summary, not the model's raw reasoning |
 | `status` | enum | `open` `acknowledged` `action_taken` `dismissed` |
-| `raised_by` | enum | `agent` `user` |
+| `raised_by` | enum | `agent` `user` `system` — `system` is the deterministic sweep *(Rev 3, 2026-09-19)* |
 | `workflow_id` | uuid, nullable | |
 | `acknowledged_by_staff_id` | uuid, FK, nullable | |
 | `acknowledged_at` | timestamptz, nullable | |
@@ -391,6 +391,20 @@ Two independent triggers, both checked by the same sweep:
 | `quantity_on_hand` below `reorder_threshold`, or projected days-of-supply under 3 at the current dispensing rate | `low_stock` |
 | `expiry_date` within 30 days, and `quantity_on_hand > 0` | `medicine_expiring` |
 
+**Built — the deterministic sweep** *(Rev 3, 2026-09-19, build step 7)*. `WarningService.SweepAsync`, fixed rules in C#, no model. It runs every `Equipment:WarningSweepIntervalMinutes` (60; 0 turns the timer off) and on demand from **Run check** (`POST /warnings/sweep`). Warnings carry `raised_by = system`.
+
+| Rule | Type | Severity |
+| :--- | :--- | :--- |
+| On hand `<=` reorder level (the same test the pharmacy page highlights), or under 3 days left at the last 14 days' dispensing | `low_stock` | critical when out, high at half the level or less (or under 3 days), otherwise medium |
+| A batch with stock expiring within `Equipment:ExpiryWarningDays` (30), or already expired. One warning per medicine naming every such batch | `medicine_expiring` | critical once expired, high within 7 days, medium within 14, otherwise low |
+| A machine past `next_maintenance_due` with nothing booked, or a routine service or calibration booked for a day gone by (equipment or bed) | `maintenance_overdue` | high after 30 days late, otherwise medium |
+
+Repairs are left out of the overdue rule on purpose: an open repair already has its `equipment_faulty` warning, and one problem should be one warning. "Today" is the hospital's day in Sri Lanka, not UTC's.
+
+Each run reconciles against the sweep's live warnings: a problem still there updates the open warning's wording and severity rather than adding another (a partial unique index backs this up); a problem that is gone closes its warning as `action_taken`; a severity that rises re-opens a warning somebody had acknowledged. Reported faults (`raised_by = user`) are never touched — they close when the administrator confirms the repair. The agent (step 11) reads these warnings; it never decides whether one exists.
+
+**Done** *(Rev 3, 2026-09-19)*. A resolved warning stays on the Resolved tab until the hospital administrator presses **Done** and enters the confirmation code (`POST /warnings/{id}/clear`). That takes it off every list; the row stays in the database with `cleared_at` and who cleared it. Only a resolved warning can be marked done (409 `cl_equ_029` otherwise).
+
 ---
 
 ### 5.4 Prescriptions from the patient app *(Rev 3, 2026-09-17)*
@@ -521,8 +535,10 @@ Two policies, not one: a nurse reads a result and acts on it, while issuing one 
 | :--- | :--- | :--- | :--- |
 | `POST` | `/api/equipment/monitor` | Inventory Administrator, or the group orchestrator | **Agent entry point.** Runs a sweep, returns `workflow_id`. |
 | `GET` | `/api/workflows/{workflowId}` | Inventory Administrator | Plan, steps, tool calls, validation, outcome |
-| `GET` | `/api/warnings` | Inventory Administrator | `?status=`, `?severity=`, `?type=` |
-| `POST` | `/api/warnings/{id}/acknowledge` | Inventory Administrator | |
+| `GET` | `/api/warnings` | Equipment Manager, Hospital Administrator *(Rev 3, 2026-09-19)* | `?status=`, `?severity=`, `?type=`. Worst first, then newest |
+| `POST` | `/api/warnings/sweep` | Equipment Manager, Hospital Administrator *(Rev 3, 2026-09-19)* | **Run check** — the deterministic sweep, §5.3. Returns raised / updated / resolved / still open |
+| `POST` | `/api/warnings/{id}/acknowledge` | Equipment Manager, Hospital Administrator *(Rev 3, 2026-09-19)* | Records who saw it. A closed warning answers 409 `cl_equ_028` |
+| `POST` | `/api/warnings/{id}/clear` | Hospital Administrator + code *(Rev 3, 2026-09-19)* | **Done** — takes a resolved warning off the list. Not resolved: 409 `cl_equ_029` |
 | `GET` | `/api/action-requests` | Inventory Administrator | The approvals queue — **this is the demo screen** |
 | `POST` | `/api/action-requests/{id}/approve` | Inventory Administrator | **High-impact gate.** Executes the action per §3.3. |
 | `POST` | `/api/action-requests/{id}/reject` | Inventory Administrator | Requires a reason |

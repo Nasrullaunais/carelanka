@@ -188,6 +188,14 @@
     <value>{0} still has {1} {2} on the shelf. Dispense or write off the rest before removing it.</value>
     <comment>Removing hides the medicine from every list, so stock must not disappear with it.</comment>
   </data>
+  <data name="cl_equ_028" xml:space="preserve">
+    <value>This warning is already closed ({0}), so there is nothing to acknowledge.</value>
+    <comment>Only an open warning can be acknowledged; a closed one stays as it was.</comment>
+  </data>
+  <data name="cl_equ_029" xml:space="preserve">
+    <value>This warning is {0}, not resolved. Only a resolved warning can be marked done.</value>
+    <comment>Done takes a fixed problem off the list; an open one must be fixed first.</comment>
+  </data>
   <data name="cl_equ_013" xml:space="preserve">
     <value>{0} is with the maintenance unit. It comes back into service when they complete the repair, not by editing its status.</value>
     <comment>Says where the item is and who releases it, because the caller's next move is to go and look at the repair queue.</comment>

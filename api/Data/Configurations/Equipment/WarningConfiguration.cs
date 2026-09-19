@@ -42,5 +42,11 @@ public class WarningConfiguration : IEntityTypeConfiguration<Warning>
 
         builder.HasIndex(w => new { w.RelatedEntityType, w.RelatedEntityId });
 
+        // The sweep keeps one live warning per problem, however often it runs.
+        builder.HasIndex(w => new { w.Type, w.RelatedEntityType, w.RelatedEntityId })
+            .IsUnique()
+            .HasFilter("raised_by = 'system' AND status IN ('open', 'acknowledged')")
+            .HasDatabaseName("ux_warnings_sweep_live");
+
     }
 }

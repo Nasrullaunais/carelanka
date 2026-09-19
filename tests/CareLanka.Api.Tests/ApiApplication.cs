@@ -52,6 +52,8 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
 
         builder.UseSetting("RateLimits:AuthPerMinute", "1000");
         builder.UseSetting("Equipment:ConfirmationCode", EquipmentConfirmationCode);
+        // Tests run the sweep themselves; a timer sweeping mid-test would only add noise.
+        builder.UseSetting("Equipment:WarningSweepIntervalMinutes", "0");
 
         builder.ConfigureLogging(logging => logging.AddProvider(new CapturingLoggerProvider(Logs)));
         builder.ConfigureServices(services =>

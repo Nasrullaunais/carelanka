@@ -81,6 +81,8 @@ there, and confirming it puts the item back into service. **Runs the maintenance
 books maintenance and sees the open jobs. **Retires equipment** — the Retire button on any item, and
 Beyond repair in the maintenance unit, both ask for the same code. Retiring is permanent. A retired
 item then has **Remove**, which asks for the code again and takes it off the register for good.
+Sees the **Warnings** page too (below), and is the one who presses **Done** on a resolved warning
+to take it off the list - that asks for the same code, `equipment2026`.
 **Cannot:** register, admit, bed, or discharge anyone.
 
 ### Equipment manager
@@ -90,6 +92,9 @@ can. Reads patient details and lab reports.
 the patient's token), delivered, or can't fill. **Adds a batch** when a delivery arrives, and
 **removes** a medicine the hospital no longer stocks - that one asks for the same confirmation code,
 `equipment2026`, and only once the shelf is empty.
+**Warnings page** (web): medicine at or below its reorder level, batches expiring within 30 days,
+and machines overdue for service. An automatic check raises them every hour; **Run check** does it
+now. **Acknowledge** records that you have seen one; it closes by itself once the problem is fixed.
 **Cannot:** confirm an item they registered, or run the maintenance unit (booking, confirming or
 retiring) — the hospital administrator does those. Reports a fault from the Equipment page.
 

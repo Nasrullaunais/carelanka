@@ -4,17 +4,27 @@ import 'package:provider/provider.dart';
 import '../../services/api_client/care_lanka_api.dart';
 import '../../services/api_client/models/principal_role.dart';
 import 'screens/my_run_screen.dart';
+import 'screens/run_history_screen.dart';
 import 'services/crew_location_reporter.dart';
 import 'services/crew_run_service.dart';
 import 'state/my_run_controller.dart';
+import 'state/run_history_controller.dart';
 
 class EmergencyPaths {
   const EmergencyPaths._();
 
   static const myRun = '/crew/run';
+  static const history = '/crew/run/history';
 }
 
 final List<RouteBase> emergencyRoutes = [
+  GoRoute(
+    path: EmergencyPaths.history,
+    builder: (context, _) => ChangeNotifierProvider(
+      create: (context) => RunHistoryController(GeneratedCrewRunService(context.read<CareLankaApi>())),
+      child: const RunHistoryScreen(),
+    ),
+  ),
   GoRoute(
     path: EmergencyPaths.myRun,
     builder: (context, _) => MultiProvider(

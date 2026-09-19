@@ -5,6 +5,7 @@ using CareLanka.Api.Data;
 using CareLanka.Api.Data.Configurations.Emergency;
 using CareLanka.Api.Data.Entities.Emergency;
 using CareLanka.Api.Data.Enums;
+using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Emergency;
 using CareLanka.Api.Services.Common;
 using Microsoft.EntityFrameworkCore;
@@ -52,6 +53,43 @@ public sealed class DispatchService : IDispatchService
             .OrderByDescending(x => x.DispatchedAt)
             .FirstOrDefaultAsync(ct);
         return dispatch is null ? throw new NotFoundException("Live dispatch", _currentUser.Id) : ToDetail(dispatch);
+    }
+
+    public async Task<PagedResult<DispatchSummary>> ListMyHistoryAsync(MyDispatchHistoryRequest request, CancellationToken ct = default)
+    {
+        var query = _db.Dispatches.AsNoTracking()
+            .Where(x => !DispatchStatusExtensions.LiveStatuses.Contains(x.Status)
+                && x.Crew.Any(crew => crew.StaffMemberId == _currentUser.Id));
+
+        if (request.From is { } from)
+        {
+            var start = new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            query = query.Where(x => x.DispatchedAt >= start);
+        }
+
+        if (request.To is { } to)
+        {
+            var end = new DateTimeOffset(to.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            query = query.Where(x => x.DispatchedAt < end);
+        }
+
+        var totalItems = await query.CountAsync(ct);
+        var items = await query.OrderByDescending(x => x.DispatchedAt).ThenBy(x => x.Id)
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .Select(x => new DispatchSummary
+            {
+                Id = x.Id,
+                EmergencyCallId = x.EmergencyCallId,
+                AmbulanceRegistration = x.Ambulance.RegistrationNumber,
+                CallPriority = x.EmergencyCall.Priority,
+                Status = x.Status,
+                CrewCount = x.Crew.Count,
+                DispatchedAt = x.DispatchedAt,
+                CompletedAt = x.CompletedAt
+            })
+            .ToListAsync(ct);
+        return PagedResult<DispatchSummary>.From(items, request.Page, request.PageSize, totalItems);
     }
 
     public async Task<NavigationTarget> GetMyNavigationTargetAsync(Guid id, CancellationToken ct = default)

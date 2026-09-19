@@ -2,7 +2,7 @@
 
 **Owner:** Nasrulla Unais (Member 1)
 
-**Status:** Phases 0–4 and 6 complete; Phase 3 hardened 2026-09-19; Phase 5 (crew Flutter app) built except run history
+**Status:** Phases 0–4 and 6 complete; Phase 3 hardened 2026-09-19; Phase 5 (crew Flutter app) complete
 
 **Contract:** `specs/emergency-spec.yaml`
 
@@ -355,7 +355,7 @@ handling; a `409` caused by another dispatcher refreshes the affected call and f
 
 **Exit criteria:** the Duty Manager can crew an ambulance and dispatch it from React.
 
-### Phase 5 — Crew Flutter vertical slice — **BUILT 2026-09-19, history still open**
+### Phase 5 — Crew Flutter vertical slice — **COMPLETE 2026-09-19**
 
 **Goal:** let the assigned crew complete a run from their phone.
 
@@ -369,7 +369,7 @@ Screens and behaviour:
 - “Open in Google Maps” launches scene coordinates while travelling outward and the
   configured CareLanka Hospital emergency entrance while transporting.
 - Handover captures concise notes and condition on arrival (both optional; identity details are out of scope).
-- History shows the immutable responding crew snapshot. **Not built:** `getMyDispatchHistory` is in the spec but has no endpoint yet, so there is no history screen.
+- History shows the immutable responding crew snapshot. Built: `GET /me/dispatches/history` (finished runs, newest first, paged) and a "Past runs" screen. The list shows the run summary and crew count; the crew identities stay on the dispatch detail.
 - Settled: the navigation endpoint (`GET /me/dispatches/{id}/navigation`) is built; the hospital entrance comes from `Emergency:HospitalEntrance` in settings, which must hold a real place or the API refuses to start. The current value is a placeholder near the National Hospital in Colombo.
 
 **Exit criteria:** a crew member can acknowledge, navigate, progress and hand over; a

@@ -7,6 +7,7 @@ import 'package:retrofit/retrofit.dart';
 
 import '../models/decline_dispatch_request.dart';
 import '../models/dispatch_detail.dart';
+import '../models/dispatch_summary_paged_result.dart';
 import '../models/navigation_target.dart';
 import '../models/record_handover_request.dart';
 import '../models/update_my_dispatch_status_request.dart';
@@ -19,6 +20,14 @@ abstract class MyRunApi {
 
   @GET('/me/dispatches/active')
   Future<DispatchDetail> getMyActiveDispatch();
+
+  @GET('/me/dispatches/history')
+  Future<DispatchSummaryPagedResult> getMyDispatchHistory({
+    @Query('from') DateTime? from,
+    @Query('to') DateTime? to,
+    @Query('page') int? page,
+    @Query('pageSize') int? pageSize,
+  });
 
   @GET('/me/dispatches/{id}/navigation')
   Future<NavigationTarget> getMyDispatchNavigationTarget({

@@ -54,6 +54,28 @@ public sealed class DispatchService : IDispatchService
         return dispatch is null ? throw new NotFoundException("Live dispatch", _currentUser.Id) : ToDetail(dispatch);
     }
 
+    public async Task<NavigationTarget> GetMyNavigationTargetAsync(Guid id, CancellationToken ct = default)
+    {
+        var dispatch = await OwnedAsync(id, ct);
+        if (!dispatch.Status.IsLive()) throw new ConflictException(MessageCode.Conflict);
+
+        var entrance = _options.HospitalEntrance;
+        var (waypoint, latitude, longitude, label) = dispatch.Status == DispatchStatus.TransportingToHospital
+            ? (NavigationWaypoint.HospitalEmergencyEntrance, entrance.Latitude, entrance.Longitude, entrance.Label)
+            : (NavigationWaypoint.Scene, (double)dispatch.EmergencyCall.Latitude, (double)dispatch.EmergencyCall.Longitude, dispatch.EmergencyCall.AddressLabel);
+
+        return new NavigationTarget
+        {
+            DispatchId = dispatch.Id,
+            WaypointType = waypoint,
+            DestinationLatitude = latitude,
+            DestinationLongitude = longitude,
+            DestinationLabel = label,
+            GoogleMapsUrl = FormattableString.Invariant(
+                $"https://www.google.com/maps/dir/?api=1&destination={latitude},{longitude}&travelmode=driving")
+        };
+    }
+
     public async Task<DispatchDetail> AcknowledgeAsync(Guid id, CancellationToken ct = default)
     {
         var dispatch = await OwnedAsync(id, ct);

@@ -987,6 +987,17 @@ export type MyProfile = {
     missing_fields: Array<string>;
 };
 
+export type NavigationTarget = {
+    dispatch_id?: string;
+    waypoint_type?: NavigationWaypoint;
+    destination_latitude?: number;
+    destination_longitude?: number;
+    destination_label?: string | null;
+    google_maps_url?: string | null;
+};
+
+export type NavigationWaypoint = 'scene' | 'hospital_emergency_entrance';
+
 export type OutstandingBill = {
     admission_id: string;
     patient: PatientSummary;
@@ -5295,6 +5306,45 @@ export type GetMyActiveDispatchResponses = {
 };
 
 export type GetMyActiveDispatchResponse = GetMyActiveDispatchResponses[keyof GetMyActiveDispatchResponses];
+
+export type GetMyDispatchNavigationTargetData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/dispatches/{id}/navigation';
+};
+
+export type GetMyDispatchNavigationTargetErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type GetMyDispatchNavigationTargetError = GetMyDispatchNavigationTargetErrors[keyof GetMyDispatchNavigationTargetErrors];
+
+export type GetMyDispatchNavigationTargetResponses = {
+    /**
+     * OK
+     */
+    200: NavigationTarget;
+};
+
+export type GetMyDispatchNavigationTargetResponse = GetMyDispatchNavigationTargetResponses[keyof GetMyDispatchNavigationTargetResponses];
 
 export type AcknowledgeMyDispatchData = {
     body?: never;

@@ -220,6 +220,34 @@ public sealed class DispatchEndpointTests
     }
 
     [Fact]
+    public async Task Navigation_points_to_the_scene_then_the_hospital_and_only_for_the_assigned_crew()
+    {
+        var run = await SeedRunAsync();
+        var outsider = await SeedCrewAsync();
+        var dispatchId = await DispatchAsync(run);
+        var url = $"/api/me/dispatches/{dispatchId}/navigation";
+        using var crew = await ClientAsync(run.CrewEmails[0]);
+        using var other = await ClientAsync(outsider.Email);
+        await PostStatusAsync(crew, $"/api/me/dispatches/{dispatchId}/acknowledge");
+        await ProgressAsync(crew, dispatchId, "en_route_to_scene");
+
+        var toScene = await crew.GetFromJsonAsync<JsonElement>(url);
+        Assert.Equal("scene", toScene.GetProperty("waypoint_type").GetString());
+        Assert.Equal(6.9271, toScene.GetProperty("destination_latitude").GetDouble(), 4);
+        Assert.Contains("destination=6.9271,79.8612", toScene.GetProperty("google_maps_url").GetString());
+
+        await ProgressAsync(crew, dispatchId, "at_scene");
+        await ProgressAsync(crew, dispatchId, "transporting_to_hospital");
+        var toHospital = await crew.GetFromJsonAsync<JsonElement>(url);
+        Assert.Equal("hospital_emergency_entrance", toHospital.GetProperty("waypoint_type").GetString());
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await other.GetAsync(url)).StatusCode);
+
+        await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/handover", new { });
+        Assert.Equal(HttpStatusCode.Conflict, (await crew.GetAsync(url)).StatusCode);
+    }
+
+    [Fact]
     public async Task Nothing_can_divert_a_crew_that_has_reached_the_scene()
     {
         var run = await SeedRunAsync();

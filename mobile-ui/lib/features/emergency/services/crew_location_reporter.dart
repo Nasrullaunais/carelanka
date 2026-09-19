@@ -9,6 +9,7 @@ import '../../../services/api_client/care_lanka_api.dart';
 import '../../../services/api_client/models/dispatch_detail.dart';
 import '../../../services/api_client/models/dispatch_status.dart';
 import '../../../services/api_client/models/report_ambulance_location_request.dart';
+import '../models/run_step.dart';
 
 enum CrewLocationPermission { granted, denied, permanentlyDenied, unavailable }
 
@@ -34,14 +35,7 @@ final class CrewDispatch {
   final String ambulanceId;
   final DispatchStatus status;
 
-  bool get isLive => switch (status) {
-        DispatchStatus.assigned ||
-        DispatchStatus.acknowledged ||
-        DispatchStatus.enRouteToScene ||
-        DispatchStatus.atScene ||
-        DispatchStatus.transportingToHospital => true,
-        _ => false,
-      };
+  bool get isLive => status.isLive;
 }
 
 abstract interface class CrewLocationGateway {

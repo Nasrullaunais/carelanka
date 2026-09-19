@@ -107,6 +107,10 @@ builder.Services
         "Emergency:MinimumReadyCrew must be greater than zero.")
     .Validate(options => options.LocationMaxAgeMinutes > 0,
         "Emergency:LocationMaxAgeMinutes must be greater than zero.")
+    .Validate(options => options.HospitalEntrance.Latitude is >= -90 and <= 90
+            && options.HospitalEntrance.Longitude is >= -180 and <= 180
+            && (options.HospitalEntrance.Latitude != 0 || options.HospitalEntrance.Longitude != 0),
+        "Emergency:HospitalEntrance must have a real latitude and longitude.")
     .ValidateOnStart();
 
 builder.Services

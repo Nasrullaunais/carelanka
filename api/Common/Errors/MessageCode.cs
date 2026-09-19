@@ -72,6 +72,8 @@ public enum MessageCode
 
     WarningNotResolved,
 
+    EquipmentCategoryInUse,
+
     PharmacyCategoryNameTaken,
 
     PharmacyItemNameTaken,

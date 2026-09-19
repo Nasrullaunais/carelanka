@@ -695,6 +695,12 @@ export type EquipmentCategory = {
     updated_at: string;
 };
 
+export type EquipmentCategoryUsage = {
+    id: string;
+    name: string;
+    item_count: number;
+};
+
 export type EquipmentItem = {
     id: string;
     name: string;
@@ -3978,6 +3984,80 @@ export type CreateEquipmentCategoryResponses = {
 };
 
 export type CreateEquipmentCategoryResponse = CreateEquipmentCategoryResponses[keyof CreateEquipmentCategoryResponses];
+
+export type ListEquipmentCategoriesForRemovalData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/equipment-categories/for-removal';
+};
+
+export type ListEquipmentCategoriesForRemovalErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListEquipmentCategoriesForRemovalError = ListEquipmentCategoriesForRemovalErrors[keyof ListEquipmentCategoriesForRemovalErrors];
+
+export type ListEquipmentCategoriesForRemovalResponses = {
+    /**
+     * OK
+     */
+    200: Array<EquipmentCategoryUsage>;
+};
+
+export type ListEquipmentCategoriesForRemovalResponse = ListEquipmentCategoriesForRemovalResponses[keyof ListEquipmentCategoriesForRemovalResponses];
+
+export type RemoveEquipmentCategoryData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/equipment-categories/{id}';
+};
+
+export type RemoveEquipmentCategoryErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RemoveEquipmentCategoryError = RemoveEquipmentCategoryErrors[keyof RemoveEquipmentCategoryErrors];
+
+export type RemoveEquipmentCategoryResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type RemoveEquipmentCategoryResponse = RemoveEquipmentCategoryResponses[keyof RemoveEquipmentCategoryResponses];
 
 export type ListEquipmentItemsData = {
     body?: never;

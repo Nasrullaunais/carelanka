@@ -196,6 +196,10 @@
     <value>This warning is {0}, not resolved. Only a resolved warning can be marked done.</value>
     <comment>Done takes a fixed problem off the list; an open one must be fixed first.</comment>
   </data>
+  <data name="cl_equ_030" xml:space="preserve">
+    <value>{0} still has {1} item(s) on the register. Remove those items first, then the category.</value>
+    <comment>Removing a category in use would leave machines with no category.</comment>
+  </data>
   <data name="cl_equ_013" xml:space="preserve">
     <value>{0} is with the maintenance unit. It comes back into service when they complete the repair, not by editing its status.</value>
     <comment>Says where the item is and who releases it, because the caller's next move is to go and look at the repair queue.</comment>

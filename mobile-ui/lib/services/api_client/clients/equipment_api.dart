@@ -9,6 +9,7 @@ import '../models/assign_equipment_item_request.dart';
 import '../models/create_equipment_category_request.dart';
 import '../models/create_equipment_item_request.dart';
 import '../models/equipment_category.dart';
+import '../models/equipment_category_usage.dart';
 import '../models/equipment_item.dart';
 import '../models/equipment_item_detail.dart';
 import '../models/equipment_item_summary_paged_result.dart';
@@ -29,6 +30,17 @@ abstract class EquipmentApi {
   @POST('/equipment-categories')
   Future<EquipmentCategory> createEquipmentCategory({
     @Body() CreateEquipmentCategoryRequest? body,
+  });
+
+  @GET('/equipment-categories/for-removal')
+  Future<List<EquipmentCategoryUsage>> listEquipmentCategoriesForRemoval({
+    @Header('X-Confirmation-Code') required String xConfirmationCode,
+  });
+
+  @DELETE('/equipment-categories/{id}')
+  Future<void> removeEquipmentCategory({
+    @Path('id') required String id,
+    @Header('X-Confirmation-Code') required String xConfirmationCode,
   });
 
   @GET('/equipment-items')

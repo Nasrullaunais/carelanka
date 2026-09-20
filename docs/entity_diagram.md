@@ -586,6 +586,24 @@ crew changes do not alter the snapshot. *(Decision 30; Rev 3.1)*
 **Note:** Single summary row per `Dispatch` (1:1) — not a GPS waypoint trail.
 *(Decision 23)*
 
+#### PreAdmissionNotice extends AuditedEntity *(Rev 2.15 — new)*
+```
++ EmergencyCallId: Guid (unique, non-null) FK → EmergencyCall.Id
++ DispatchId: Guid (non-null) FK → Dispatch.Id
++ Status: PreAdmissionStatus (non-null)   // queued | sent | failed
++ AttemptCount: int (non-null)
++ NextAttemptAt: DateTimeOffset (non-null)
++ SentAt: DateTimeOffset (nullable)
++ FailureReason: string (nullable)        // gave_up | rejected | call_cancelled
+```
+**Table:** `pre_admission_notices`
+**Index:** partial `ix_pre_admission_notices_due` on `status = 'queued'`
+**Note:** One row per emergency call, not per dispatch. A reassign creates a new dispatch for
+the same patient, and a second row would open a second admission for them. `DispatchId` is
+the first dispatch, the id Patient Management is given. Written in the dispatch transaction
+and sent afterwards by `PreAdmissionWorker`, so a Patient Management outage never undoes a
+dispatch.
+
 ---
 
 ### Staff Management
@@ -2417,6 +2435,7 @@ CREATE INDEX ix_admissions_missing_fields ON admissions USING gin (missing_field
 | Ambulance | Dispatch | 1:N | Dispatch.AmbulanceId |
 | Ambulance | AmbulanceCrewAssignment | 1:N | AmbulanceCrewAssignment.AmbulanceId |
 | Dispatch | RouteLog | 1:1 | RouteLog.DispatchId |
+| EmergencyCall | PreAdmissionNotice | 1:1 | PreAdmissionNotice.EmergencyCallId |
 | Ward | Bed | 1:N | Bed.WardId |
 | Ward | Shift | 1:N | Shift.WardId |
 | Ward | WardStaffingRule | 1:N | WardStaffingRule.WardId |
@@ -2486,6 +2505,7 @@ rows are mutated after insert; pure join/append-only tables (`DispatchCrew`,
 | Dispatch | dispatches | | changed |
 | DispatchCrew | dispatch_crew | | |
 | RouteLog | route_logs | | |
+| PreAdmissionNotice | pre_admission_notices | | **new** |
 | WardStaffingRule | ward_staffing_rules | | **new** |
 | Shift | shifts | | changed |
 | Allocation | allocations | | changed |
@@ -2520,7 +2540,7 @@ rows are mutated after insert; pure join/append-only tables (`DispatchCrew`,
 
 | Component | Owner | Entities |
 |-----------|-------|----------|
-| Emergency / Ambulance | Member 1 | EmergencyCall, Ambulance, AmbulanceCrewAssignment, Dispatch, DispatchCrew, RouteLog |
+| Emergency / Ambulance | Member 1 | EmergencyCall, Ambulance, AmbulanceCrewAssignment, Dispatch, DispatchCrew, RouteLog, PreAdmissionNotice |
 | Staff Management | Member 2 | Shift, Allocation, LeaveRequest, Skill, StaffMemberSkill, WardStaffingRule |
 | Health Equipment | Member 3 | EquipmentCategory, EquipmentItem, **Bed**, PharmacyCategory, PharmacyItem, PharmacyTransaction, MaintenanceSchedule, Warning, ActionRequest |
 | Patient Management | Member 4 | Patient, **PatientAccount**, Admission, BedAssignment, Discharge, DischargeChecklistItem, Appointment, Ward |

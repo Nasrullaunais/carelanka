@@ -17,7 +17,7 @@ public sealed class FirebasePushSender : IPushSender
         _logger = logger;
         var app = FirebaseApp.DefaultInstance ?? FirebaseApp.Create(new AppOptions
         {
-            Credential = GoogleCredential.FromFile(options.Value.CredentialsPath)
+            Credential = CredentialFactory.FromFile<ServiceAccountCredential>(options.Value.CredentialsPath).ToGoogleCredential()
         });
         _messaging = FirebaseMessaging.GetMessaging(app);
     }
@@ -26,7 +26,9 @@ public sealed class FirebasePushSender : IPushSender
     {
         var request = new Message
         {
+#pragma warning disable CS0618 // Fid needs the phone to send installation ids, which it does not yet.
             Token = deviceToken,
+#pragma warning restore CS0618
             Notification = new Notification { Title = message.Title, Body = message.Body },
             Data = message.Data.ToDictionary(pair => pair.Key, pair => pair.Value),
             Android = new AndroidConfig

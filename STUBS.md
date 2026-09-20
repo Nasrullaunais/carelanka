@@ -74,6 +74,7 @@ Equipment waiting on Patient Management, while rows 4 and 5 are Emergency depend
 | :-- | :--- | :--- | :--- | :--- | :--- |
 | 2 | Ward names on a bed — every ward is called `Stub ward <id fragment>` | `api/Services/Equipment/Stubs/StubWardDirectory.cs` | `GET /wards` — `patient-spec.yaml` | **M4 Lochana** | 2026-09-09 |
 | 5 | Staff name, active state and role lookup from the existing auth staff records | `api/Services/Emergency/Stubs/StubStaffLookupService.cs` | `POST /staff/lookup` — `staff-spec.yaml` | **M2 Kaveesha** | 2026-09-13 |
+| 6 | Pre-admission from a dispatch — logs a warning and reports success; no admission is created | `api/Services/Emergency/Stubs/StubPreAdmissionGateway.cs` | `POST /admissions/pre-admit` — `patient-spec.yaml` | **M4 Lochana** | 2026-09-20 |
 
 **Row 5** matches Staff Management's published batch lookup shape and fails closed for unknown
 or inactive staff. Replace its DI registration when `POST /staff/lookup` is built; Emergency

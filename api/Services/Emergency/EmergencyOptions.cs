@@ -15,6 +15,21 @@ public sealed class EmergencyOptions
     public RoutingOptions Routing { get; set; } = new();
 
     public GeocodingOptions Geocoding { get; set; } = new();
+
+    public PreAdmissionOptions PreAdmission { get; set; } = new();
+}
+
+public sealed class PreAdmissionOptions
+{
+    public int ArrivalAllowanceMinutes { get; set; } = 30;
+
+    public int PollSeconds { get; set; } = 5;
+
+    public int MaxAttempts { get; set; } = 8;
+
+    public int RetryBaseSeconds { get; set; } = 10;
+
+    public int BatchSize { get; set; } = 20;
 }
 
 public sealed class GeocodingOptions

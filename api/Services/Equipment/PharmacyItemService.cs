@@ -169,6 +169,7 @@ public sealed class PharmacyItemService : IPharmacyItemService
         var item = await ReadAsync(id, cancellationToken);
 
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        await LockAsync(id, cancellationToken);
 
         var lastNumber = await _db.PharmacyBatches
             .Where(b => b.PharmacyItemId == item.Id)
@@ -223,6 +224,7 @@ public sealed class PharmacyItemService : IPharmacyItemService
             or PharmacyTransactionType.ExpiredRemoved;
 
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        await LockAsync(id, cancellationToken);
 
         if (takesStock)
         {
@@ -255,6 +257,7 @@ public sealed class PharmacyItemService : IPharmacyItemService
         }
 
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        await LockAsync(id, cancellationToken);
 
         var batch = await _db.PharmacyBatches
             .FirstOrDefaultAsync(b => b.Id == batchId && b.PharmacyItemId == id, cancellationToken)
@@ -357,11 +360,13 @@ public sealed class PharmacyItemService : IPharmacyItemService
             .ThenBy(b => b.BatchNumber)
             .ToListAsync(cancellationToken);
 
-        if (batches.Sum(b => b.QuantityOnHand) < request.Quantity)
+        var onHand = batches.Sum(b => b.QuantityOnHand);
+
+        if (onHand < request.Quantity)
         {
             throw new ConflictException(
                 MessageCode.InsufficientStock,
-                item.Name, item.QuantityOnHand, item.Unit, request.Quantity);
+                item.Name, onHand, item.Unit, request.Quantity);
         }
 
         var left = request.Quantity;
@@ -431,6 +436,12 @@ public sealed class PharmacyItemService : IPharmacyItemService
 
         await AddAsync(item.Id, request.Quantity, cancellationToken);
     }
+
+    // Every stock movement on an item takes this row lock first, so two people moving the same
+    // medicine queue up instead of both reading the same count and both spending it.
+    private Task LockAsync(Guid id, CancellationToken cancellationToken)
+        => _db.Database.ExecuteSqlAsync(
+            $"SELECT id FROM pharmacy_items WHERE id = {id} FOR UPDATE", cancellationToken);
 
     // The item's total is the batches added up. It moves by the same amount they do, inside the
     // same transaction, so the register and the batch list can never disagree.

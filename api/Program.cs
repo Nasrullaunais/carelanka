@@ -14,6 +14,7 @@ using CareLanka.Api.Services.Equipment.Stubs;
 using CareLanka.Api.Services.Emergency;
 using CareLanka.Api.Services.Emergency.Stubs;
 using CareLanka.Api.Services.Patient;
+using CareLanka.Api.Services.Staff;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Formatters;
@@ -297,6 +298,8 @@ builder.Services.AddScoped<IBillingRateService, BillingRateService>();
 builder.Services.AddScoped<IMeService, MeService>();
 
 builder.Services.AddScoped<IBedRegistryService, BedRegistryService>();
+
+builder.Services.AddScoped<IStaffLookupService, StaffLookupService>();
 
 builder.Services.AddSingleton<IWardDirectory, StubWardDirectory>();
 

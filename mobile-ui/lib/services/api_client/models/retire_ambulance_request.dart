@@ -14,7 +14,7 @@ class RetireAmbulanceRequest {
   
   factory RetireAmbulanceRequest.fromJson(Map<String, Object?> json) => _$RetireAmbulanceRequestFromJson(json);
   
-  final String reason;
+  final String? reason;
 
   Map<String, Object?> toJson() => _$RetireAmbulanceRequestToJson(this);
 }

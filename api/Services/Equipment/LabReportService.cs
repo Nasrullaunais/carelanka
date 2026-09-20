@@ -131,6 +131,16 @@ public sealed class LabReportService : ILabReportService
         return new LabReportFile(report.Content, report.ContentType, report.FileName);
     }
 
+    public async Task<LabReportFile> GetFileForPatientAsync(
+        Guid id, Guid patientId, CancellationToken cancellationToken = default)
+    {
+        var report = await _db.LabReports.AsNoTracking()
+            .FirstOrDefaultAsync(r => r.Id == id && r.PatientId == patientId, cancellationToken)
+            ?? throw new NotFoundException("Lab report", id);
+
+        return new LabReportFile(report.Content, report.ContentType, report.FileName);
+    }
+
     private static LabReport ToDto(ReportEntity report) => new()
     {
         Id = report.Id,

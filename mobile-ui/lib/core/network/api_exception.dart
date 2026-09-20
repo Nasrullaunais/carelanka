@@ -1,10 +1,6 @@
 import 'package:dio/dio.dart';
 
-/// A failed API call, already turned into something a screen can display.
-///
-/// The API answers with `application/problem+json`, carrying a stable
-/// machine-readable code in `code` (`cl_pat_033`, `cl_adm_003`, …). Branch on
-/// [code], never on [message] — the text is translatable and will change.
+// Branch on `code`, never on `message` — the text is translatable and will change.
 class ApiException implements Exception {
   const ApiException({
     required this.message,
@@ -23,9 +19,7 @@ class ApiException implements Exception {
   bool get isNotFound => statusCode == 404;
   bool get isConflict => statusCode == 409;
 
-  /// True when the request never reached the server, so there is no response
-  /// to classify — a screen must handle this or it will report a write that
-  /// never happened as a success.
+  // Screens must handle this explicitly or a failed write reads as a success.
   bool get isNetworkFailure => statusCode == null;
 
   factory ApiException.from(DioException error) {
@@ -52,12 +46,23 @@ class ApiException implements Exception {
     );
   }
 
+  // Keys arrive as either a field name (`full_name`) or a JSON path (`$.date_of_birth`) when the body failed to deserialize — the `$.` prefix is stripped so both map to the same field.
   static Map<String, List<String>> _readFieldErrors(Object? errors) {
     if (errors is! Map) return const {};
-    return {
-      for (final entry in errors.entries)
-        entry.key.toString(): (entry.value as List?)?.map((e) => e.toString()).toList() ?? const [],
-    };
+
+    final byField = <String, List<String>>{};
+
+    for (final entry in errors.entries) {
+      final field = entry.key.toString().replaceFirst(RegExp(r'^\$\.'), '');
+      final messages = (entry.value as List?)?.map((e) => e.toString()).toList() ?? const [];
+
+      // `request` refers to the whole body, not a form field — already reported against the field that caused it.
+      if (field.isEmpty || field == 'request') continue;
+
+      byField.putIfAbsent(field, () => []).addAll(messages);
+    }
+
+    return byField;
   }
 
   @override

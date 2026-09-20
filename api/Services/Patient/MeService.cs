@@ -5,9 +5,12 @@ using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Patient;
 using CareLanka.Api.Services.Common;
+using CareLanka.Api.Services.Equipment;
 using Microsoft.EntityFrameworkCore;
 using AdmissionEntity = CareLanka.Api.Data.Entities.Patient.Admission;
 using AppointmentEntity = CareLanka.Api.Data.Entities.Patient.Appointment;
+using BillEntity = CareLanka.Api.Data.Entities.Patient.Bill;
+using LabReportDto = CareLanka.Api.DTOs.Equipment.LabReport;
 using PatientEntity = CareLanka.Api.Data.Entities.Patient.Patient;
 
 namespace CareLanka.Api.Services.Patient;
@@ -25,19 +28,22 @@ public sealed class MeService : IMeService
     private readonly IPatientService _patients;
     private readonly IAppointmentService _appointments;
     private readonly IBedRegistryService _beds;
+    private readonly ILabReportService _labReports;
 
     public MeService(
         CareLankaDbContext db,
         ICurrentUser currentUser,
         IPatientService patients,
         IAppointmentService appointments,
-        IBedRegistryService beds)
+        IBedRegistryService beds,
+        ILabReportService labReports)
     {
         _db = db;
         _currentUser = currentUser;
         _patients = patients;
         _appointments = appointments;
         _beds = beds;
+        _labReports = labReports;
     }
 
     public async Task<MyProfile> PreRegisterAsync(
@@ -60,8 +66,76 @@ public sealed class MeService : IMeService
             : await CreateAndLinkRecordAsync(accountId, nic, request, ct);
     }
 
+    public async Task<PatientClaimPreview> PreviewClaimAsync(
+        ClaimByPatientCodeRequest request, CancellationToken ct = default)
+    {
+        var patient = await FindClaimableAsync(request, ct);
+
+        return new PatientClaimPreview
+        {
+            PatientCode = patient.PatientCode,
+            MaskedFullName = MaskedIdentity.Name(patient.FullName),
+            MaskedPhone = MaskedIdentity.Phone(patient.Phone)
+        };
+    }
+
+    public async Task<MyProfile> ClaimAsync(
+        ClaimByPatientCodeRequest request, CancellationToken ct = default)
+    {
+        var patient = await FindClaimableAsync(request, ct);
+
+        await _patients.LinkAccountAsync(patient.Id, _currentUser.Id, ct);
+
+        return ToProfile(patient);
+    }
+
     public async Task<MyProfile> GetProfileAsync(CancellationToken ct = default)
         => ToProfile(await GetMyRecordAsync(ct));
+
+    public async Task<MyBill> GetBillAsync(Guid admissionId, CancellationToken ct = default)
+    {
+        var patient = await GetMyRecordAsync(ct);
+
+        var admission = await _db.Admissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Id == admissionId && a.PatientId == patient.Id, ct)
+            ?? throw new NotFoundException("Admission", admissionId);
+
+        var bill = await _db.Bills
+            .AsNoTracking()
+            .Include(b => b.LineItems)
+            .FirstOrDefaultAsync(b => b.AdmissionId == admissionId, ct)
+            ?? throw new NotFoundException(MessageCode.NoBillRaised);
+
+        return ToMyBill(bill, ClosedStatuses.Contains(admission.Status));
+    }
+
+    public async Task<MyBill> GetAppointmentBillAsync(Guid appointmentId, CancellationToken ct = default)
+    {
+        var patient = await GetMyRecordAsync(ct);
+
+        var appointment = await _db.Appointments
+            .AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Id == appointmentId && a.PatientId == patient.Id, ct)
+            ?? throw new NotFoundException("Appointment", appointmentId);
+
+        // Set means the visit ended in an admission, so the bill lives there instead -
+        // same rule the staff billing endpoint enforces on the way in.
+        if (appointment.AdmissionId is not null)
+        {
+            throw new NotFoundException(MessageCode.AppointmentBilledOnItsAdmission);
+        }
+
+        var bill = await _db.Bills
+            .AsNoTracking()
+            .Include(b => b.LineItems)
+            .FirstOrDefaultAsync(b => b.AppointmentId == appointmentId, ct)
+            ?? throw new NotFoundException(MessageCode.NoBillRaised);
+
+        // An appointment bill is a one-off consultation charge, never a running total that
+        // grows day over day like a stay's does, so it reads as final as soon as it exists.
+        return ToMyBill(bill, isFinal: true);
+    }
 
     public async Task<MyAdmission> GetCurrentAdmissionAsync(CancellationToken ct = default)
     {
@@ -80,6 +154,24 @@ public sealed class MeService : IMeService
         var instructions = await InstructionsByAdmissionAsync([admission.Id], ct);
 
         return ToMyAdmission(admission, beds, instructions);
+    }
+
+    public async Task<PagedResult<MyLabReport>> GetLabReportsAsync(
+        int page, int pageSize, CancellationToken ct = default)
+    {
+        var patient = await GetMyRecordAsync(ct);
+
+        var reports = await _labReports.ListForPatientAsync(patient.Id, page, pageSize, ct);
+
+        return PagedResult<MyLabReport>.From(
+            reports.Items.Select(ToMyLabReport).ToList(), page, pageSize, reports.TotalItems);
+    }
+
+    public async Task<LabReportFile> GetLabReportFileAsync(Guid reportId, CancellationToken ct = default)
+    {
+        var patient = await GetMyRecordAsync(ct);
+
+        return await _labReports.GetFileForPatientAsync(reportId, patient.Id, ct);
     }
 
     public async Task<PagedResult<MyAdmission>> GetHistoryAsync(
@@ -250,6 +342,32 @@ public sealed class MeService : IMeService
         }
     }
 
+    private async Task<PatientEntity> FindClaimableAsync(
+        ClaimByPatientCodeRequest request, CancellationToken ct)
+    {
+        if (await FindMyRecordAsync(ct) is not null)
+        {
+            throw new ConflictException(MessageCode.AccountAlreadyLinked);
+        }
+
+        var code = request.PatientCode.Trim().ToUpperInvariant();
+        var nic = request.Nic.Trim();
+
+        var patient = await _db.Patients.FirstOrDefaultAsync(p => p.PatientCode == code, ct);
+
+        // One message for every way this fails. A distinct "wrong NIC" would tell a stranger
+        // holding the slip that the code is real, which is what the NIC is there to stop.
+        if (patient is null
+            || patient.UserAccountId is not null
+            || patient.Nic is null
+            || patient.Nic != nic)
+        {
+            throw new NotFoundException(MessageCode.PatientCodeNotClaimable);
+        }
+
+        return patient;
+    }
+
     private Task<PatientEntity?> FindMyRecordAsync(CancellationToken ct)
         => _db.Patients.FirstOrDefaultAsync(p => p.UserAccountId == _currentUser.Id, ct);
 
@@ -298,17 +416,62 @@ public sealed class MeService : IMeService
         };
     }
 
+    private static MyBill ToMyBill(BillEntity bill, bool isFinal)
+    {
+        var lines = bill.LineItems
+            .OrderBy(line => line.Source)
+            .ThenBy(line => line.CreatedAt)
+            .ThenBy(line => line.Description)
+            .Select(line => new MyBillLine
+            {
+                Source = line.Source,
+                Description = line.Description,
+                Quantity = line.Quantity,
+                UnitPrice = line.UnitPrice,
+                LineTotal = line.LineTotal
+            })
+            .ToList();
+
+        return new MyBill
+        {
+            AdmissionId = bill.AdmissionId,
+            AppointmentId = bill.AppointmentId,
+            BillNumber = bill.BillNumber,
+            Currency = BillingRates.Currency,
+            Lines = lines,
+            Total = decimal.Round(lines.Sum(line => line.LineTotal), 2),
+            IsFinal = isFinal,
+            Settled = bill.IsSettled,
+            SettledAt = bill.SettledAt,
+            UpdatedAt = bill.UpdatedAt
+        };
+    }
+
     private static MyAppointment ToMyAppointment(AppointmentEntity appointment)
         => new()
         {
             AppointmentId = appointment.Id,
             ScheduledAt = appointment.ScheduledAt,
             Status = appointment.Status,
-            StatusText = PatientStatusText.For(appointment.Status),
+            StatusText = PatientStatusText.For(
+                appointment.Status, appointment.CancelledByStaffMemberId is not null),
             Reason = appointment.Reason,
 
-            CanCancel = appointment.Status == AppointmentStatus.Scheduled
+            CanCancel = appointment.Status == AppointmentStatus.Scheduled,
+            CancellationReason = appointment.CancellationReason,
+            CancelledByHospital = appointment.CancelledByStaffMemberId is not null
         };
+
+    private static MyLabReport ToMyLabReport(LabReportDto report) => new()
+    {
+        Id = report.Id,
+        TestName = report.TestName,
+        Summary = report.Summary,
+        FileName = report.FileName,
+        ContentType = report.ContentType,
+        ByteSize = report.ByteSize,
+        CreatedAt = report.CreatedAt
+    };
 
     private static MyProfile ToProfile(PatientEntity patient)
     {

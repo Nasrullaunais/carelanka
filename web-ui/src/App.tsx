@@ -6,10 +6,12 @@ import { CapacityPage } from './pages/CapacityPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DischargePage } from './pages/DischargePage';
 import { EquipmentPage } from './pages/EquipmentPage';
+import { EmergencyPage } from './pages/EmergencyPage';
 import { IntakePage } from './pages/IntakePage';
 import { LaboratoryPage } from './pages/LaboratoryPage';
 import { LoginPage } from './pages/LoginPage';
 import { MaintenanceUnitPage } from './pages/MaintenanceUnitPage';
+import { WarningsPage } from './pages/WarningsPage';
 import { PatientsPage } from './pages/PatientsPage';
 import { PharmacyPage } from './pages/PharmacyPage';
 import { WardsPage } from './pages/WardsPage';
@@ -59,7 +61,9 @@ export function App() {
         <Route path="/capacity" element={<CapacityPage />} />
         <Route path="/wards" element={<WardsPage />} />
         <Route path="/equipment" element={<EquipmentPage />} />
+        <Route path="/emergency" element={<EmergencyPage />} />
         <Route path="/maintenance-unit" element={<MaintenanceUnitPage />} />
+        <Route path="/warnings" element={<WarningsPage />} />
         <Route path="/laboratory" element={<LaboratoryPage />} />
         <Route path="/pharmacy" element={<PharmacyPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

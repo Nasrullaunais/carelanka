@@ -13,6 +13,7 @@ public class Ambulance
 
     public decimal? CurrentLatitude { get; set; }
     public decimal? CurrentLongitude { get; set; }
+    public DateTimeOffset? LocationUpdatedAt { get; set; }
 
     [Required]
     public AmbulanceStatus Status { get; set; }

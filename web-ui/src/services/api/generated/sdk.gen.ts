@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddBillChargeData, AddBillChargeErrors, AddBillChargeResponses, AssignBedManuallyData, AssignBedManuallyErrors, AssignBedManuallyResponses, AssignEquipmentItemData, AssignEquipmentItemErrors, AssignEquipmentItemResponses, BookMyAppointmentData, BookMyAppointmentErrors, BookMyAppointmentResponses, CancelAdmissionData, CancelAdmissionErrors, CancelAdmissionResponses, CancelMyAppointmentData, CancelMyAppointmentErrors, CancelMyAppointmentResponses, CheckInAppointmentData, CheckInAppointmentErrors, CheckInAppointmentResponses, CompleteAdmissionDetailsData, CompleteAdmissionDetailsErrors, CompleteAdmissionDetailsResponses, CompleteMaintenanceScheduleData, CompleteMaintenanceScheduleErrors, CompleteMaintenanceScheduleResponses, CompleteVisitData, CompleteVisitErrors, CompleteVisitResponses, ConfirmDischargeData, ConfirmDischargeErrors, ConfirmDischargeResponses, CorrectBedData, CorrectBedErrors, CorrectBedResponses, CreateAdmissionData, CreateAdmissionErrors, CreateAdmissionResponses, CreateAmbulanceData, CreateAmbulanceErrors, CreateAmbulanceResponses, CreateAppointmentData, CreateAppointmentErrors, CreateAppointmentResponses, CreateBedData, CreateBedErrors, CreateBedResponses, CreateEquipmentCategoryData, CreateEquipmentCategoryErrors, CreateEquipmentCategoryResponses, CreateEquipmentItemData, CreateEquipmentItemErrors, CreateEquipmentItemResponses, CreateMaintenanceScheduleData, CreateMaintenanceScheduleErrors, CreateMaintenanceScheduleResponses, CreatePatientData, CreatePatientErrors, CreatePatientResponses, CreatePharmacyCategoryData, CreatePharmacyCategoryErrors, CreatePharmacyCategoryResponses, CreatePharmacyItemData, CreatePharmacyItemErrors, CreatePharmacyItemResponses, CreateWardData, CreateWardErrors, CreateWardResponses, DownloadLabReportData, DownloadLabReportErrors, DownloadLabReportResponses, GetAdmissionBillData, GetAdmissionBillErrors, GetAdmissionBillResponses, GetAdmissionData, GetAdmissionErrors, GetAdmissionResponses, GetAmbulanceData, GetAmbulanceErrors, GetAmbulanceResponses, GetBedOccupancyData, GetBedOccupancyErrors, GetBedOccupancyResponses, GetBillingRatesData, GetBillingRatesErrors, GetBillingRatesResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetEquipmentItemByTagData, GetEquipmentItemByTagErrors, GetEquipmentItemByTagResponses, GetEquipmentItemData, GetEquipmentItemErrors, GetEquipmentItemResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetMyAdmissionData, GetMyAdmissionErrors, GetMyAdmissionResponses, GetMyHistoryData, GetMyHistoryErrors, GetMyHistoryResponses, GetMyProfileData, GetMyProfileErrors, GetMyProfileResponses, GetPatientData, GetPatientErrors, GetPatientResponses, GetPharmacyItemData, GetPharmacyItemErrors, GetPharmacyItemResponses, GetWardCapacityData, GetWardCapacityErrors, GetWardCapacityResponses, GetWardOccupancyData, GetWardOccupancyErrors, GetWardOccupancyResponses, LinkPatientAccountData, LinkPatientAccountErrors, LinkPatientAccountResponses, ListAdmissionsData, ListAdmissionsErrors, ListAdmissionsResponses, ListAmbulancesData, ListAmbulancesErrors, ListAmbulancesResponses, ListAppointmentsData, ListAppointmentsErrors, ListAppointmentsResponses, ListBedAvailabilityData, ListBedAvailabilityErrors, ListBedAvailabilityResponses, ListBedsData, ListBedsErrors, ListBedsResponses, ListDischargeCandidatesData, ListDischargeCandidatesErrors, ListDischargeCandidatesResponses, ListEquipmentCategoriesData, ListEquipmentCategoriesErrors, ListEquipmentCategoriesResponses, ListEquipmentItemsData, ListEquipmentItemsErrors, ListEquipmentItemsResponses, ListLabReportsData, ListLabReportsErrors, ListLabReportsResponses, ListMaintenanceSchedulesData, ListMaintenanceSchedulesErrors, ListMaintenanceSchedulesResponses, ListMyAppointmentsData, ListMyAppointmentsErrors, ListMyAppointmentsResponses, ListOutstandingBillsData, ListOutstandingBillsErrors, ListOutstandingBillsResponses, ListPatientsData, ListPatientsErrors, ListPatientsResponses, ListPatientWorklistData, ListPatientWorklistErrors, ListPatientWorklistResponses, ListPharmacyCategoriesData, ListPharmacyCategoriesErrors, ListPharmacyCategoriesResponses, ListPharmacyItemsData, ListPharmacyItemsErrors, ListPharmacyItemsResponses, ListPharmacyTransactionsData, ListPharmacyTransactionsErrors, ListPharmacyTransactionsResponses, ListWardPatientsData, ListWardPatientsErrors, ListWardPatientsResponses, ListWardsData, ListWardsErrors, ListWardsResponses, LoginData, LoginErrors, LoginPatientData, LoginPatientErrors, LoginPatientResponses, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, LookupPatientData, LookupPatientErrors, LookupPatientResponses, MarkArrivedData, MarkArrivedErrors, MarkArrivedResponses, PrepareAdmissionBillData, PrepareAdmissionBillErrors, PrepareAdmissionBillResponses, PreRegisterSelfData, PreRegisterSelfErrors, PreRegisterSelfResponses, RecordPharmacyTransactionData, RecordPharmacyTransactionErrors, RecordPharmacyTransactionResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RegisterPatientAccountData, RegisterPatientAccountErrors, RegisterPatientAccountResponses, ReinstateAmbulanceData, ReinstateAmbulanceErrors, ReinstateAmbulanceResponses, ReleaseEquipmentItemData, ReleaseEquipmentItemErrors, ReleaseEquipmentItemResponses, RemoveBillChargeData, RemoveBillChargeErrors, RemoveBillChargeResponses, ReportEquipmentFaultData, ReportEquipmentFaultErrors, ReportEquipmentFaultResponses, RetireAmbulanceData, RetireAmbulanceErrors, RetireAmbulanceResponses, RetireBedData, RetireBedErrors, RetireBedResponses, SettleBillData, SettleBillErrors, SettleBillResponses, UpdateAmbulanceData, UpdateAmbulanceErrors, UpdateAmbulanceResponses, UpdateBedData, UpdateBedErrors, UpdateBedResponses, UpdateBillingRatesData, UpdateBillingRatesErrors, UpdateBillingRatesResponses, UpdateDischargeChecklistData, UpdateDischargeChecklistErrors, UpdateDischargeChecklistResponses, UpdateEquipmentItemData, UpdateEquipmentItemErrors, UpdateEquipmentItemResponses, UpdatePatientData, UpdatePatientErrors, UpdatePatientResponses, UploadLabReportData, UploadLabReportErrors, UploadLabReportResponses } from './types.gen';
+import type { AcknowledgeMyDispatchData, AcknowledgeMyDispatchErrors, AcknowledgeMyDispatchResponses, AcknowledgeWarningData, AcknowledgeWarningErrors, AcknowledgeWarningResponses, AddAppointmentBillChargeData, AddAppointmentBillChargeErrors, AddAppointmentBillChargeResponses, AddBillChargeData, AddBillChargeErrors, AddBillChargeResponses, AddPharmacyBatchData, AddPharmacyBatchErrors, AddPharmacyBatchResponses, ApproveEmergencyCancellationRequestData, ApproveEmergencyCancellationRequestErrors, ApproveEmergencyCancellationRequestResponses, AssignBedManuallyData, AssignBedManuallyErrors, AssignBedManuallyResponses, AssignCurrentAmbulanceCrewData, AssignCurrentAmbulanceCrewErrors, AssignCurrentAmbulanceCrewResponses, AssignEquipmentItemData, AssignEquipmentItemErrors, AssignEquipmentItemResponses, BookMyAppointmentData, BookMyAppointmentErrors, BookMyAppointmentResponses, CancelAdmissionData, CancelAdmissionErrors, CancelAdmissionResponses, CancelAppointmentAtTheDeskData, CancelAppointmentAtTheDeskErrors, CancelAppointmentAtTheDeskResponses, CancelDispatchData, CancelDispatchErrors, CancelDispatchResponses, CancelMyAppointmentData, CancelMyAppointmentErrors, CancelMyAppointmentResponses, CancelMyEmergencyCallData, CancelMyEmergencyCallErrors, CancelMyEmergencyCallResponses, CheckInAppointmentData, CheckInAppointmentErrors, CheckInAppointmentResponses, ClaimMyRecordData, ClaimMyRecordErrors, ClaimMyRecordResponses, ClearWarningData, ClearWarningErrors, ClearWarningResponses, CompleteAdmissionDetailsData, CompleteAdmissionDetailsErrors, CompleteAdmissionDetailsResponses, CompleteAppointmentData, CompleteAppointmentErrors, CompleteAppointmentResponses, CompleteVisitData, CompleteVisitErrors, CompleteVisitResponses, ConfirmAppointmentData, ConfirmAppointmentErrors, ConfirmAppointmentResponses, ConfirmDischargeData, ConfirmDischargeErrors, ConfirmDischargeResponses, ConfirmEquipmentItemData, ConfirmEquipmentItemErrors, ConfirmEquipmentItemResponses, ConfirmMaintenanceScheduleData, ConfirmMaintenanceScheduleErrors, ConfirmMaintenanceScheduleResponses, CorrectBedData, CorrectBedErrors, CorrectBedResponses, CountEquipmentItemsAwaitingConfirmationData, CountEquipmentItemsAwaitingConfirmationErrors, CountEquipmentItemsAwaitingConfirmationResponses, CountMaintenanceSchedulesAwaitingConfirmationData, CountMaintenanceSchedulesAwaitingConfirmationErrors, CountMaintenanceSchedulesAwaitingConfirmationResponses, CreateAdmissionData, CreateAdmissionErrors, CreateAdmissionResponses, CreateAmbulanceData, CreateAmbulanceErrors, CreateAmbulanceResponses, CreateAppointmentData, CreateAppointmentErrors, CreateAppointmentResponses, CreateBedData, CreateBedErrors, CreateBedResponses, CreateEmergencyCallData, CreateEmergencyCallErrors, CreateEmergencyCallResponses, CreateEquipmentCategoryData, CreateEquipmentCategoryErrors, CreateEquipmentCategoryResponses, CreateEquipmentItemData, CreateEquipmentItemErrors, CreateEquipmentItemResponses, CreateMaintenanceScheduleData, CreateMaintenanceScheduleErrors, CreateMaintenanceScheduleResponses, CreatePatientData, CreatePatientErrors, CreatePatientResponses, CreatePharmacyCategoryData, CreatePharmacyCategoryErrors, CreatePharmacyCategoryResponses, CreatePharmacyItemData, CreatePharmacyItemErrors, CreatePharmacyItemResponses, CreateWardData, CreateWardErrors, CreateWardResponses, DeclineMyDispatchData, DeclineMyDispatchErrors, DeclineMyDispatchResponses, DispatchEmergencyCallData, DispatchEmergencyCallErrors, DispatchEmergencyCallResponses, DownloadLabReportData, DownloadLabReportErrors, DownloadLabReportResponses, DownloadMyLabReportData, DownloadMyLabReportErrors, DownloadMyLabReportResponses, DownloadPrescriptionData, DownloadPrescriptionErrors, DownloadPrescriptionResponses, GetAdmissionBillData, GetAdmissionBillErrors, GetAdmissionBillResponses, GetAdmissionData, GetAdmissionErrors, GetAdmissionResponses, GetAmbulanceData, GetAmbulanceErrors, GetAmbulanceResponses, GetAppointmentBillData, GetAppointmentBillErrors, GetAppointmentBillResponses, GetBedOccupancyData, GetBedOccupancyErrors, GetBedOccupancyResponses, GetBillingRatesData, GetBillingRatesErrors, GetBillingRatesResponses, GetCurrentAmbulanceCrewData, GetCurrentAmbulanceCrewErrors, GetCurrentAmbulanceCrewResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetEmergencyCallData, GetEmergencyCallErrors, GetEmergencyCallResponses, GetEquipmentItemByTagData, GetEquipmentItemByTagErrors, GetEquipmentItemByTagResponses, GetEquipmentItemData, GetEquipmentItemErrors, GetEquipmentItemResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetMyActiveDispatchData, GetMyActiveDispatchErrors, GetMyActiveDispatchResponses, GetMyAdmissionData, GetMyAdmissionErrors, GetMyAdmissionResponses, GetMyAppointmentBillData, GetMyAppointmentBillErrors, GetMyAppointmentBillResponses, GetMyBillData, GetMyBillErrors, GetMyBillResponses, GetMyDispatchNavigationTargetData, GetMyDispatchNavigationTargetErrors, GetMyDispatchNavigationTargetResponses, GetMyEmergencyCallsData, GetMyEmergencyCallsErrors, GetMyEmergencyCallsResponses, GetMyHistoryData, GetMyHistoryErrors, GetMyHistoryResponses, GetMyLabReportsData, GetMyLabReportsErrors, GetMyLabReportsResponses, GetMyProfileData, GetMyProfileErrors, GetMyProfileResponses, GetPatientData, GetPatientErrors, GetPatientMedicalProfileData, GetPatientMedicalProfileErrors, GetPatientMedicalProfileResponses, GetPatientResponses, GetPharmacyItemData, GetPharmacyItemErrors, GetPharmacyItemResponses, GetWardCapacityData, GetWardCapacityErrors, GetWardCapacityResponses, GetWardOccupancyData, GetWardOccupancyErrors, GetWardOccupancyResponses, LinkPatientAccountData, LinkPatientAccountErrors, LinkPatientAccountResponses, ListAdmissionsData, ListAdmissionsErrors, ListAdmissionsResponses, ListAmbulancesData, ListAmbulancesErrors, ListAmbulancesResponses, ListAppointmentsData, ListAppointmentsErrors, ListAppointmentsResponses, ListBedAvailabilityData, ListBedAvailabilityErrors, ListBedAvailabilityResponses, ListBedsData, ListBedsErrors, ListBedsResponses, ListDischargeCandidatesData, ListDischargeCandidatesErrors, ListDischargeCandidatesResponses, ListEmergencyCallsData, ListEmergencyCallsErrors, ListEmergencyCallsResponses, ListEmergencyCancellationRequestsData, ListEmergencyCancellationRequestsErrors, ListEmergencyCancellationRequestsResponses, ListEquipmentCategoriesData, ListEquipmentCategoriesErrors, ListEquipmentCategoriesForRemovalData, ListEquipmentCategoriesForRemovalErrors, ListEquipmentCategoriesForRemovalResponses, ListEquipmentCategoriesResponses, ListEquipmentItemsAwaitingConfirmationData, ListEquipmentItemsAwaitingConfirmationErrors, ListEquipmentItemsAwaitingConfirmationResponses, ListEquipmentItemsData, ListEquipmentItemsErrors, ListEquipmentItemsResponses, ListLabReportsData, ListLabReportsErrors, ListLabReportsResponses, ListMaintenanceSchedulesAwaitingConfirmationData, ListMaintenanceSchedulesAwaitingConfirmationErrors, ListMaintenanceSchedulesAwaitingConfirmationResponses, ListMaintenanceSchedulesData, ListMaintenanceSchedulesErrors, ListMaintenanceSchedulesResponses, ListMyAppointmentsData, ListMyAppointmentsErrors, ListMyAppointmentsResponses, ListMyPrescriptionsData, ListMyPrescriptionsErrors, ListMyPrescriptionsResponses, ListOutstandingBillsData, ListOutstandingBillsErrors, ListOutstandingBillsResponses, ListPatientsData, ListPatientsErrors, ListPatientsResponses, ListPatientWorklistData, ListPatientWorklistErrors, ListPatientWorklistResponses, ListPharmacyBatchesData, ListPharmacyBatchesErrors, ListPharmacyBatchesResponses, ListPharmacyCategoriesData, ListPharmacyCategoriesErrors, ListPharmacyCategoriesResponses, ListPharmacyItemsData, ListPharmacyItemsErrors, ListPharmacyItemsResponses, ListPharmacyTransactionsData, ListPharmacyTransactionsErrors, ListPharmacyTransactionsResponses, ListPrescriptionsData, ListPrescriptionsErrors, ListPrescriptionsResponses, ListWardPatientsData, ListWardPatientsErrors, ListWardPatientsResponses, ListWardsData, ListWardsErrors, ListWardsResponses, ListWarningsData, ListWarningsErrors, ListWarningsResponses, LoginData, LoginErrors, LoginPatientData, LoginPatientErrors, LoginPatientResponses, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, LookupPatientData, LookupPatientErrors, LookupPatientResponses, MarkAppointmentNoShowData, MarkAppointmentNoShowErrors, MarkAppointmentNoShowResponses, MarkArrivedData, MarkArrivedErrors, MarkArrivedResponses, MarkPrescriptionDeliveredData, MarkPrescriptionDeliveredErrors, MarkPrescriptionDeliveredResponses, MarkPrescriptionReadyData, MarkPrescriptionReadyErrors, MarkPrescriptionReadyResponses, PrepareAdmissionBillData, PrepareAdmissionBillErrors, PrepareAdmissionBillResponses, PrepareAppointmentBillData, PrepareAppointmentBillErrors, PrepareAppointmentBillResponses, PreRegisterSelfData, PreRegisterSelfErrors, PreRegisterSelfResponses, PreviewMyClaimData, PreviewMyClaimErrors, PreviewMyClaimResponses, ReassignDispatchData, ReassignDispatchErrors, ReassignDispatchResponses, RecordHandoverData, RecordHandoverErrors, RecordHandoverResponses, RecordPharmacyBatchTransactionData, RecordPharmacyBatchTransactionErrors, RecordPharmacyBatchTransactionResponses, RecordPharmacyTransactionData, RecordPharmacyTransactionErrors, RecordPharmacyTransactionResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RegisterPatientAccountData, RegisterPatientAccountErrors, RegisterPatientAccountResponses, ReinstateAmbulanceData, ReinstateAmbulanceErrors, ReinstateAmbulanceResponses, RejectEmergencyCancellationRequestData, RejectEmergencyCancellationRequestErrors, RejectEmergencyCancellationRequestResponses, RejectEquipmentItemData, RejectEquipmentItemErrors, RejectEquipmentItemResponses, RejectPrescriptionData, RejectPrescriptionErrors, RejectPrescriptionResponses, ReleaseEquipmentItemData, ReleaseEquipmentItemErrors, ReleaseEquipmentItemResponses, RemoveAppointmentBillChargeData, RemoveAppointmentBillChargeErrors, RemoveAppointmentBillChargeResponses, RemoveBillChargeData, RemoveBillChargeErrors, RemoveBillChargeResponses, RemoveEquipmentCategoryData, RemoveEquipmentCategoryErrors, RemoveEquipmentCategoryResponses, RemoveEquipmentItemData, RemoveEquipmentItemErrors, RemoveEquipmentItemResponses, RemovePharmacyItemData, RemovePharmacyItemErrors, RemovePharmacyItemResponses, ReplacePatientMedicalProfileData, ReplacePatientMedicalProfileErrors, ReplacePatientMedicalProfileResponses, ReportAmbulanceLocationData, ReportAmbulanceLocationErrors, ReportAmbulanceLocationResponses, ReportEquipmentFaultData, ReportEquipmentFaultErrors, ReportEquipmentFaultResponses, RequestMyEmergencyCallCancellationData, RequestMyEmergencyCallCancellationErrors, RequestMyEmergencyCallCancellationResponses, RetireAmbulanceData, RetireAmbulanceErrors, RetireAmbulanceResponses, RetireBedData, RetireBedErrors, RetireBedResponses, RetireEquipmentItemData, RetireEquipmentItemErrors, RetireEquipmentItemResponses, RunWarningSweepData, RunWarningSweepErrors, RunWarningSweepResponses, SettleAppointmentBillData, SettleAppointmentBillErrors, SettleAppointmentBillResponses, SettleBillData, SettleBillErrors, SettleBillResponses, TrackMyEmergencyCallData, TrackMyEmergencyCallErrors, TrackMyEmergencyCallResponses, UnassignCurrentAmbulanceCrewData, UnassignCurrentAmbulanceCrewErrors, UnassignCurrentAmbulanceCrewResponses, UpdateAmbulanceData, UpdateAmbulanceErrors, UpdateAmbulanceResponses, UpdateBedData, UpdateBedErrors, UpdateBedResponses, UpdateBillingRatesData, UpdateBillingRatesErrors, UpdateBillingRatesResponses, UpdateDischargeChecklistData, UpdateDischargeChecklistErrors, UpdateDischargeChecklistResponses, UpdateEmergencyCallData, UpdateEmergencyCallErrors, UpdateEmergencyCallResponses, UpdateEquipmentItemData, UpdateEquipmentItemErrors, UpdateEquipmentItemResponses, UpdateMyDispatchStatusData, UpdateMyDispatchStatusErrors, UpdateMyDispatchStatusResponses, UpdatePatientData, UpdatePatientErrors, UpdatePatientResponses, UploadLabReportData, UploadLabReportErrors, UploadLabReportResponses, UploadMyPrescriptionData, UploadMyPrescriptionErrors, UploadMyPrescriptionResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -108,6 +108,18 @@ export const createAppointment = <ThrowOnError extends boolean = false>(options?
     }
 });
 
+export const confirmAppointment = <ThrowOnError extends boolean = false>(options: Options<ConfirmAppointmentData, ThrowOnError>): RequestResult<ConfirmAppointmentResponses, ConfirmAppointmentErrors, ThrowOnError> => (options.client ?? client).post<ConfirmAppointmentResponses, ConfirmAppointmentErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/appointments/{id}/confirm',
+    ...options
+});
+
+export const markAppointmentNoShow = <ThrowOnError extends boolean = false>(options: Options<MarkAppointmentNoShowData, ThrowOnError>): RequestResult<MarkAppointmentNoShowResponses, MarkAppointmentNoShowErrors, ThrowOnError> => (options.client ?? client).post<MarkAppointmentNoShowResponses, MarkAppointmentNoShowErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/appointments/{id}/no-show',
+    ...options
+});
+
 export const checkInAppointment = <ThrowOnError extends boolean = false>(options: Options<CheckInAppointmentData, ThrowOnError>): RequestResult<CheckInAppointmentResponses, CheckInAppointmentErrors, ThrowOnError> => (options.client ?? client).post<CheckInAppointmentResponses, CheckInAppointmentErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/appointments/{id}/check-in',
@@ -118,9 +130,47 @@ export const checkInAppointment = <ThrowOnError extends boolean = false>(options
     }
 });
 
+export const cancelAppointmentAtTheDesk = <ThrowOnError extends boolean = false>(options: Options<CancelAppointmentAtTheDeskData, ThrowOnError>): RequestResult<CancelAppointmentAtTheDeskResponses, CancelAppointmentAtTheDeskErrors, ThrowOnError> => (options.client ?? client).post<CancelAppointmentAtTheDeskResponses, CancelAppointmentAtTheDeskErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/appointments/{id}/cancel',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const completeAppointment = <ThrowOnError extends boolean = false>(options: Options<CompleteAppointmentData, ThrowOnError>): RequestResult<CompleteAppointmentResponses, CompleteAppointmentErrors, ThrowOnError> => (options.client ?? client).post<CompleteAppointmentResponses, CompleteAppointmentErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/appointments/{id}/complete',
+    ...options
+});
+
 export const listPatientWorklist = <ThrowOnError extends boolean = false>(options?: Options<ListPatientWorklistData, ThrowOnError>): RequestResult<ListPatientWorklistResponses, ListPatientWorklistErrors, ThrowOnError> => (options?.client ?? client).get<ListPatientWorklistResponses, ListPatientWorklistErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/patient-worklist',
+    ...options
+});
+
+export const getCurrentAmbulanceCrew = <ThrowOnError extends boolean = false>(options: Options<GetCurrentAmbulanceCrewData, ThrowOnError>): RequestResult<GetCurrentAmbulanceCrewResponses, GetCurrentAmbulanceCrewErrors, ThrowOnError> => (options.client ?? client).get<GetCurrentAmbulanceCrewResponses, GetCurrentAmbulanceCrewErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/ambulances/{id}/crew',
+    ...options
+});
+
+export const assignCurrentAmbulanceCrew = <ThrowOnError extends boolean = false>(options: Options<AssignCurrentAmbulanceCrewData, ThrowOnError>): RequestResult<AssignCurrentAmbulanceCrewResponses, AssignCurrentAmbulanceCrewErrors, ThrowOnError> => (options.client ?? client).post<AssignCurrentAmbulanceCrewResponses, AssignCurrentAmbulanceCrewErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/ambulances/{id}/crew',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const unassignCurrentAmbulanceCrew = <ThrowOnError extends boolean = false>(options: Options<UnassignCurrentAmbulanceCrewData, ThrowOnError>): RequestResult<UnassignCurrentAmbulanceCrewResponses, UnassignCurrentAmbulanceCrewErrors, ThrowOnError> => (options.client ?? client).delete<UnassignCurrentAmbulanceCrewResponses, UnassignCurrentAmbulanceCrewErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/ambulances/{ambulanceId}/crew/{staffMemberId}',
     ...options
 });
 
@@ -170,6 +220,16 @@ export const reinstateAmbulance = <ThrowOnError extends boolean = false>(options
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/ambulances/{id}/reinstate',
     ...options
+});
+
+export const reportAmbulanceLocation = <ThrowOnError extends boolean = false>(options: Options<ReportAmbulanceLocationData, ThrowOnError>): RequestResult<ReportAmbulanceLocationResponses, ReportAmbulanceLocationErrors, ThrowOnError> => (options.client ?? client).post<ReportAmbulanceLocationResponses, ReportAmbulanceLocationErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/ambulances/{id}/location',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 export const login = <ThrowOnError extends boolean = false>(options?: Options<LoginData, ThrowOnError>): RequestResult<LoginResponses, LoginErrors, ThrowOnError> => (options?.client ?? client).post<LoginResponses, LoginErrors, ThrowOnError>({
@@ -300,6 +360,44 @@ export const listOutstandingBills = <ThrowOnError extends boolean = false>(optio
     ...options
 });
 
+export const getAppointmentBill = <ThrowOnError extends boolean = false>(options: Options<GetAppointmentBillData, ThrowOnError>): RequestResult<GetAppointmentBillResponses, GetAppointmentBillErrors, ThrowOnError> => (options.client ?? client).get<GetAppointmentBillResponses, GetAppointmentBillErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/appointments/{appointmentId}/bill',
+    ...options
+});
+
+export const prepareAppointmentBill = <ThrowOnError extends boolean = false>(options: Options<PrepareAppointmentBillData, ThrowOnError>): RequestResult<PrepareAppointmentBillResponses, PrepareAppointmentBillErrors, ThrowOnError> => (options.client ?? client).post<PrepareAppointmentBillResponses, PrepareAppointmentBillErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/appointments/{appointmentId}/bill',
+    ...options
+});
+
+export const addAppointmentBillCharge = <ThrowOnError extends boolean = false>(options: Options<AddAppointmentBillChargeData, ThrowOnError>): RequestResult<AddAppointmentBillChargeResponses, AddAppointmentBillChargeErrors, ThrowOnError> => (options.client ?? client).post<AddAppointmentBillChargeResponses, AddAppointmentBillChargeErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/appointments/{appointmentId}/bill/charges',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const removeAppointmentBillCharge = <ThrowOnError extends boolean = false>(options: Options<RemoveAppointmentBillChargeData, ThrowOnError>): RequestResult<RemoveAppointmentBillChargeResponses, RemoveAppointmentBillChargeErrors, ThrowOnError> => (options.client ?? client).delete<RemoveAppointmentBillChargeResponses, RemoveAppointmentBillChargeErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/appointments/{appointmentId}/bill/charges/{lineId}',
+    ...options
+});
+
+export const settleAppointmentBill = <ThrowOnError extends boolean = false>(options: Options<SettleAppointmentBillData, ThrowOnError>): RequestResult<SettleAppointmentBillResponses, SettleAppointmentBillErrors, ThrowOnError> => (options.client ?? client).post<SettleAppointmentBillResponses, SettleAppointmentBillErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/appointments/{appointmentId}/bill/settle',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
 export const getBillingRates = <ThrowOnError extends boolean = false>(options?: Options<GetBillingRatesData, ThrowOnError>): RequestResult<GetBillingRatesResponses, GetBillingRatesErrors, ThrowOnError> => (options?.client ?? client).get<GetBillingRatesResponses, GetBillingRatesErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/billing/rates',
@@ -313,6 +411,74 @@ export const updateBillingRates = <ThrowOnError extends boolean = false>(options
     headers: {
         'Content-Type': 'application/json',
         ...options?.headers
+    }
+});
+
+export const listEmergencyCalls = <ThrowOnError extends boolean = false>(options?: Options<ListEmergencyCallsData, ThrowOnError>): RequestResult<ListEmergencyCallsResponses, ListEmergencyCallsErrors, ThrowOnError> => (options?.client ?? client).get<ListEmergencyCallsResponses, ListEmergencyCallsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/emergency-calls',
+    ...options
+});
+
+export const createEmergencyCall = <ThrowOnError extends boolean = false>(options: Options<CreateEmergencyCallData, ThrowOnError>): RequestResult<CreateEmergencyCallResponses, CreateEmergencyCallErrors, ThrowOnError> => (options.client ?? client).post<CreateEmergencyCallResponses, CreateEmergencyCallErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/emergency-calls',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const getEmergencyCall = <ThrowOnError extends boolean = false>(options: Options<GetEmergencyCallData, ThrowOnError>): RequestResult<GetEmergencyCallResponses, GetEmergencyCallErrors, ThrowOnError> => (options.client ?? client).get<GetEmergencyCallResponses, GetEmergencyCallErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/emergency-calls/{id}',
+    ...options
+});
+
+export const updateEmergencyCall = <ThrowOnError extends boolean = false>(options: Options<UpdateEmergencyCallData, ThrowOnError>): RequestResult<UpdateEmergencyCallResponses, UpdateEmergencyCallErrors, ThrowOnError> => (options.client ?? client).patch<UpdateEmergencyCallResponses, UpdateEmergencyCallErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/emergency-calls/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const dispatchEmergencyCall = <ThrowOnError extends boolean = false>(options: Options<DispatchEmergencyCallData, ThrowOnError>): RequestResult<DispatchEmergencyCallResponses, DispatchEmergencyCallErrors, ThrowOnError> => (options.client ?? client).post<DispatchEmergencyCallResponses, DispatchEmergencyCallErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/emergency-calls/{id}/dispatch',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const listEmergencyCancellationRequests = <ThrowOnError extends boolean = false>(options?: Options<ListEmergencyCancellationRequestsData, ThrowOnError>): RequestResult<ListEmergencyCancellationRequestsResponses, ListEmergencyCancellationRequestsErrors, ThrowOnError> => (options?.client ?? client).get<ListEmergencyCancellationRequestsResponses, ListEmergencyCancellationRequestsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/emergency-cancellation-requests',
+    ...options
+});
+
+export const approveEmergencyCancellationRequest = <ThrowOnError extends boolean = false>(options: Options<ApproveEmergencyCancellationRequestData, ThrowOnError>): RequestResult<ApproveEmergencyCancellationRequestResponses, ApproveEmergencyCancellationRequestErrors, ThrowOnError> => (options.client ?? client).post<ApproveEmergencyCancellationRequestResponses, ApproveEmergencyCancellationRequestErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/emergency-calls/{id}/cancellation-request/approve',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const rejectEmergencyCancellationRequest = <ThrowOnError extends boolean = false>(options: Options<RejectEmergencyCancellationRequestData, ThrowOnError>): RequestResult<RejectEmergencyCancellationRequestResponses, RejectEmergencyCancellationRequestErrors, ThrowOnError> => (options.client ?? client).post<RejectEmergencyCancellationRequestResponses, RejectEmergencyCancellationRequestErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/emergency-calls/{id}/cancellation-request/reject',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
     }
 });
 
@@ -342,6 +508,26 @@ export const confirmDischarge = <ThrowOnError extends boolean = false>(options: 
     }
 });
 
+export const cancelDispatch = <ThrowOnError extends boolean = false>(options: Options<CancelDispatchData, ThrowOnError>): RequestResult<CancelDispatchResponses, CancelDispatchErrors, ThrowOnError> => (options.client ?? client).post<CancelDispatchResponses, CancelDispatchErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/dispatches/{id}/cancel',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const reassignDispatch = <ThrowOnError extends boolean = false>(options: Options<ReassignDispatchData, ThrowOnError>): RequestResult<ReassignDispatchResponses, ReassignDispatchErrors, ThrowOnError> => (options.client ?? client).post<ReassignDispatchResponses, ReassignDispatchErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/dispatches/{id}/reassign',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
 export const listEquipmentCategories = <ThrowOnError extends boolean = false>(options?: Options<ListEquipmentCategoriesData, ThrowOnError>): RequestResult<ListEquipmentCategoriesResponses, ListEquipmentCategoriesErrors, ThrowOnError> => (options?.client ?? client).get<ListEquipmentCategoriesResponses, ListEquipmentCategoriesErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/equipment-categories',
@@ -358,6 +544,18 @@ export const createEquipmentCategory = <ThrowOnError extends boolean = false>(op
     }
 });
 
+export const listEquipmentCategoriesForRemoval = <ThrowOnError extends boolean = false>(options: Options<ListEquipmentCategoriesForRemovalData, ThrowOnError>): RequestResult<ListEquipmentCategoriesForRemovalResponses, ListEquipmentCategoriesForRemovalErrors, ThrowOnError> => (options.client ?? client).get<ListEquipmentCategoriesForRemovalResponses, ListEquipmentCategoriesForRemovalErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/equipment-categories/for-removal',
+    ...options
+});
+
+export const removeEquipmentCategory = <ThrowOnError extends boolean = false>(options: Options<RemoveEquipmentCategoryData, ThrowOnError>): RequestResult<RemoveEquipmentCategoryResponses, RemoveEquipmentCategoryErrors, ThrowOnError> => (options.client ?? client).delete<RemoveEquipmentCategoryResponses, RemoveEquipmentCategoryErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/equipment-categories/{id}',
+    ...options
+});
+
 export const listEquipmentItems = <ThrowOnError extends boolean = false>(options?: Options<ListEquipmentItemsData, ThrowOnError>): RequestResult<ListEquipmentItemsResponses, ListEquipmentItemsErrors, ThrowOnError> => (options?.client ?? client).get<ListEquipmentItemsResponses, ListEquipmentItemsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/equipment-items',
@@ -372,6 +570,36 @@ export const createEquipmentItem = <ThrowOnError extends boolean = false>(option
         'Content-Type': 'application/json',
         ...options?.headers
     }
+});
+
+export const listEquipmentItemsAwaitingConfirmation = <ThrowOnError extends boolean = false>(options: Options<ListEquipmentItemsAwaitingConfirmationData, ThrowOnError>): RequestResult<ListEquipmentItemsAwaitingConfirmationResponses, ListEquipmentItemsAwaitingConfirmationErrors, ThrowOnError> => (options.client ?? client).get<ListEquipmentItemsAwaitingConfirmationResponses, ListEquipmentItemsAwaitingConfirmationErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/equipment-items/pending-confirmation',
+    ...options
+});
+
+export const countEquipmentItemsAwaitingConfirmation = <ThrowOnError extends boolean = false>(options?: Options<CountEquipmentItemsAwaitingConfirmationData, ThrowOnError>): RequestResult<CountEquipmentItemsAwaitingConfirmationResponses, CountEquipmentItemsAwaitingConfirmationErrors, ThrowOnError> => (options?.client ?? client).get<CountEquipmentItemsAwaitingConfirmationResponses, CountEquipmentItemsAwaitingConfirmationErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/equipment-items/pending-confirmation/count',
+    ...options
+});
+
+export const confirmEquipmentItem = <ThrowOnError extends boolean = false>(options: Options<ConfirmEquipmentItemData, ThrowOnError>): RequestResult<ConfirmEquipmentItemResponses, ConfirmEquipmentItemErrors, ThrowOnError> => (options.client ?? client).post<ConfirmEquipmentItemResponses, ConfirmEquipmentItemErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/equipment-items/{id}/confirm',
+    ...options
+});
+
+export const rejectEquipmentItem = <ThrowOnError extends boolean = false>(options: Options<RejectEquipmentItemData, ThrowOnError>): RequestResult<RejectEquipmentItemResponses, RejectEquipmentItemErrors, ThrowOnError> => (options.client ?? client).post<RejectEquipmentItemResponses, RejectEquipmentItemErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/equipment-items/{id}/reject',
+    ...options
+});
+
+export const removeEquipmentItem = <ThrowOnError extends boolean = false>(options: Options<RemoveEquipmentItemData, ThrowOnError>): RequestResult<RemoveEquipmentItemResponses, RemoveEquipmentItemErrors, ThrowOnError> => (options.client ?? client).delete<RemoveEquipmentItemResponses, RemoveEquipmentItemErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/equipment-items/{id}',
+    ...options
 });
 
 export const getEquipmentItem = <ThrowOnError extends boolean = false>(options: Options<GetEquipmentItemData, ThrowOnError>): RequestResult<GetEquipmentItemResponses, GetEquipmentItemErrors, ThrowOnError> => (options.client ?? client).get<GetEquipmentItemResponses, GetEquipmentItemErrors, ThrowOnError>({
@@ -409,6 +637,12 @@ export const assignEquipmentItem = <ThrowOnError extends boolean = false>(option
 export const releaseEquipmentItem = <ThrowOnError extends boolean = false>(options: Options<ReleaseEquipmentItemData, ThrowOnError>): RequestResult<ReleaseEquipmentItemResponses, ReleaseEquipmentItemErrors, ThrowOnError> => (options.client ?? client).post<ReleaseEquipmentItemResponses, ReleaseEquipmentItemErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/equipment-items/{id}/release',
+    ...options
+});
+
+export const retireEquipmentItem = <ThrowOnError extends boolean = false>(options: Options<RetireEquipmentItemData, ThrowOnError>): RequestResult<RetireEquipmentItemResponses, RetireEquipmentItemErrors, ThrowOnError> => (options.client ?? client).post<RetireEquipmentItemResponses, RetireEquipmentItemErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/equipment-items/{id}/retire',
     ...options
 });
 
@@ -475,9 +709,121 @@ export const createMaintenanceSchedule = <ThrowOnError extends boolean = false>(
     }
 });
 
-export const completeMaintenanceSchedule = <ThrowOnError extends boolean = false>(options: Options<CompleteMaintenanceScheduleData, ThrowOnError>): RequestResult<CompleteMaintenanceScheduleResponses, CompleteMaintenanceScheduleErrors, ThrowOnError> => (options.client ?? client).post<CompleteMaintenanceScheduleResponses, CompleteMaintenanceScheduleErrors, ThrowOnError>({
+export const listMaintenanceSchedulesAwaitingConfirmation = <ThrowOnError extends boolean = false>(options: Options<ListMaintenanceSchedulesAwaitingConfirmationData, ThrowOnError>): RequestResult<ListMaintenanceSchedulesAwaitingConfirmationResponses, ListMaintenanceSchedulesAwaitingConfirmationErrors, ThrowOnError> => (options.client ?? client).get<ListMaintenanceSchedulesAwaitingConfirmationResponses, ListMaintenanceSchedulesAwaitingConfirmationErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/maintenance-schedules/{id}/complete',
+    url: '/maintenance-schedules/pending-confirmation',
+    ...options
+});
+
+export const countMaintenanceSchedulesAwaitingConfirmation = <ThrowOnError extends boolean = false>(options?: Options<CountMaintenanceSchedulesAwaitingConfirmationData, ThrowOnError>): RequestResult<CountMaintenanceSchedulesAwaitingConfirmationResponses, CountMaintenanceSchedulesAwaitingConfirmationErrors, ThrowOnError> => (options?.client ?? client).get<CountMaintenanceSchedulesAwaitingConfirmationResponses, CountMaintenanceSchedulesAwaitingConfirmationErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/maintenance-schedules/pending-confirmation/count',
+    ...options
+});
+
+export const confirmMaintenanceSchedule = <ThrowOnError extends boolean = false>(options: Options<ConfirmMaintenanceScheduleData, ThrowOnError>): RequestResult<ConfirmMaintenanceScheduleResponses, ConfirmMaintenanceScheduleErrors, ThrowOnError> => (options.client ?? client).post<ConfirmMaintenanceScheduleResponses, ConfirmMaintenanceScheduleErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/maintenance-schedules/{id}/confirm',
+    ...options
+});
+
+export const listWarnings = <ThrowOnError extends boolean = false>(options?: Options<ListWarningsData, ThrowOnError>): RequestResult<ListWarningsResponses, ListWarningsErrors, ThrowOnError> => (options?.client ?? client).get<ListWarningsResponses, ListWarningsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warnings',
+    ...options
+});
+
+export const runWarningSweep = <ThrowOnError extends boolean = false>(options?: Options<RunWarningSweepData, ThrowOnError>): RequestResult<RunWarningSweepResponses, RunWarningSweepErrors, ThrowOnError> => (options?.client ?? client).post<RunWarningSweepResponses, RunWarningSweepErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warnings/sweep',
+    ...options
+});
+
+export const acknowledgeWarning = <ThrowOnError extends boolean = false>(options: Options<AcknowledgeWarningData, ThrowOnError>): RequestResult<AcknowledgeWarningResponses, AcknowledgeWarningErrors, ThrowOnError> => (options.client ?? client).post<AcknowledgeWarningResponses, AcknowledgeWarningErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warnings/{id}/acknowledge',
+    ...options
+});
+
+export const clearWarning = <ThrowOnError extends boolean = false>(options: Options<ClearWarningData, ThrowOnError>): RequestResult<ClearWarningResponses, ClearWarningErrors, ThrowOnError> => (options.client ?? client).post<ClearWarningResponses, ClearWarningErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warnings/{id}/clear',
+    ...options
+});
+
+export const getMyEmergencyCalls = <ThrowOnError extends boolean = false>(options?: Options<GetMyEmergencyCallsData, ThrowOnError>): RequestResult<GetMyEmergencyCallsResponses, GetMyEmergencyCallsErrors, ThrowOnError> => (options?.client ?? client).get<GetMyEmergencyCallsResponses, GetMyEmergencyCallsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/emergency-calls',
+    ...options
+});
+
+export const trackMyEmergencyCall = <ThrowOnError extends boolean = false>(options: Options<TrackMyEmergencyCallData, ThrowOnError>): RequestResult<TrackMyEmergencyCallResponses, TrackMyEmergencyCallErrors, ThrowOnError> => (options.client ?? client).get<TrackMyEmergencyCallResponses, TrackMyEmergencyCallErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/emergency-calls/{id}/tracking',
+    ...options
+});
+
+export const cancelMyEmergencyCall = <ThrowOnError extends boolean = false>(options: Options<CancelMyEmergencyCallData, ThrowOnError>): RequestResult<CancelMyEmergencyCallResponses, CancelMyEmergencyCallErrors, ThrowOnError> => (options.client ?? client).post<CancelMyEmergencyCallResponses, CancelMyEmergencyCallErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/emergency-calls/{id}/cancel',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const requestMyEmergencyCallCancellation = <ThrowOnError extends boolean = false>(options: Options<RequestMyEmergencyCallCancellationData, ThrowOnError>): RequestResult<RequestMyEmergencyCallCancellationResponses, RequestMyEmergencyCallCancellationErrors, ThrowOnError> => (options.client ?? client).post<RequestMyEmergencyCallCancellationResponses, RequestMyEmergencyCallCancellationErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/emergency-calls/{id}/cancellation-request',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const getMyActiveDispatch = <ThrowOnError extends boolean = false>(options?: Options<GetMyActiveDispatchData, ThrowOnError>): RequestResult<GetMyActiveDispatchResponses, GetMyActiveDispatchErrors, ThrowOnError> => (options?.client ?? client).get<GetMyActiveDispatchResponses, GetMyActiveDispatchErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/dispatches/active',
+    ...options
+});
+
+export const getMyDispatchNavigationTarget = <ThrowOnError extends boolean = false>(options: Options<GetMyDispatchNavigationTargetData, ThrowOnError>): RequestResult<GetMyDispatchNavigationTargetResponses, GetMyDispatchNavigationTargetErrors, ThrowOnError> => (options.client ?? client).get<GetMyDispatchNavigationTargetResponses, GetMyDispatchNavigationTargetErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/dispatches/{id}/navigation',
+    ...options
+});
+
+export const acknowledgeMyDispatch = <ThrowOnError extends boolean = false>(options: Options<AcknowledgeMyDispatchData, ThrowOnError>): RequestResult<AcknowledgeMyDispatchResponses, AcknowledgeMyDispatchErrors, ThrowOnError> => (options.client ?? client).post<AcknowledgeMyDispatchResponses, AcknowledgeMyDispatchErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/dispatches/{id}/acknowledge',
+    ...options
+});
+
+export const declineMyDispatch = <ThrowOnError extends boolean = false>(options: Options<DeclineMyDispatchData, ThrowOnError>): RequestResult<DeclineMyDispatchResponses, DeclineMyDispatchErrors, ThrowOnError> => (options.client ?? client).post<DeclineMyDispatchResponses, DeclineMyDispatchErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/dispatches/{id}/decline',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const updateMyDispatchStatus = <ThrowOnError extends boolean = false>(options: Options<UpdateMyDispatchStatusData, ThrowOnError>): RequestResult<UpdateMyDispatchStatusResponses, UpdateMyDispatchStatusErrors, ThrowOnError> => (options.client ?? client).post<UpdateMyDispatchStatusResponses, UpdateMyDispatchStatusErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/dispatches/{id}/status',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const recordHandover = <ThrowOnError extends boolean = false>(options: Options<RecordHandoverData, ThrowOnError>): RequestResult<RecordHandoverResponses, RecordHandoverErrors, ThrowOnError> => (options.client ?? client).post<RecordHandoverResponses, RecordHandoverErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/dispatches/{id}/handover',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -488,6 +834,26 @@ export const completeMaintenanceSchedule = <ThrowOnError extends boolean = false
 export const preRegisterSelf = <ThrowOnError extends boolean = false>(options?: Options<PreRegisterSelfData, ThrowOnError>): RequestResult<PreRegisterSelfResponses, PreRegisterSelfErrors, ThrowOnError> => (options?.client ?? client).post<PreRegisterSelfResponses, PreRegisterSelfErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/me/pre-register',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
+
+export const previewMyClaim = <ThrowOnError extends boolean = false>(options?: Options<PreviewMyClaimData, ThrowOnError>): RequestResult<PreviewMyClaimResponses, PreviewMyClaimErrors, ThrowOnError> => (options?.client ?? client).post<PreviewMyClaimResponses, PreviewMyClaimErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/claim/preview',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
+
+export const claimMyRecord = <ThrowOnError extends boolean = false>(options?: Options<ClaimMyRecordData, ThrowOnError>): RequestResult<ClaimMyRecordResponses, ClaimMyRecordErrors, ThrowOnError> => (options?.client ?? client).post<ClaimMyRecordResponses, ClaimMyRecordErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/claim',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -510,6 +876,30 @@ export const getMyAdmission = <ThrowOnError extends boolean = false>(options?: O
 export const getMyHistory = <ThrowOnError extends boolean = false>(options?: Options<GetMyHistoryData, ThrowOnError>): RequestResult<GetMyHistoryResponses, GetMyHistoryErrors, ThrowOnError> => (options?.client ?? client).get<GetMyHistoryResponses, GetMyHistoryErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/me/history',
+    ...options
+});
+
+export const getMyBill = <ThrowOnError extends boolean = false>(options: Options<GetMyBillData, ThrowOnError>): RequestResult<GetMyBillResponses, GetMyBillErrors, ThrowOnError> => (options.client ?? client).get<GetMyBillResponses, GetMyBillErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/admissions/{admissionId}/bill',
+    ...options
+});
+
+export const getMyAppointmentBill = <ThrowOnError extends boolean = false>(options: Options<GetMyAppointmentBillData, ThrowOnError>): RequestResult<GetMyAppointmentBillResponses, GetMyAppointmentBillErrors, ThrowOnError> => (options.client ?? client).get<GetMyAppointmentBillResponses, GetMyAppointmentBillErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/appointments/{appointmentId}/bill',
+    ...options
+});
+
+export const getMyLabReports = <ThrowOnError extends boolean = false>(options?: Options<GetMyLabReportsData, ThrowOnError>): RequestResult<GetMyLabReportsResponses, GetMyLabReportsErrors, ThrowOnError> => (options?.client ?? client).get<GetMyLabReportsResponses, GetMyLabReportsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/lab-reports',
+    ...options
+});
+
+export const downloadMyLabReport = <ThrowOnError extends boolean = false>(options: Options<DownloadMyLabReportData, ThrowOnError>): RequestResult<DownloadMyLabReportResponses, DownloadMyLabReportErrors, ThrowOnError> => (options.client ?? client).get<DownloadMyLabReportResponses, DownloadMyLabReportErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/lab-reports/{reportId}/file',
     ...options
 });
 
@@ -577,6 +967,22 @@ export const lookupPatient = <ThrowOnError extends boolean = false>(options?: Op
     }
 });
 
+export const getPatientMedicalProfile = <ThrowOnError extends boolean = false>(options: Options<GetPatientMedicalProfileData, ThrowOnError>): RequestResult<GetPatientMedicalProfileResponses, GetPatientMedicalProfileErrors, ThrowOnError> => (options.client ?? client).get<GetPatientMedicalProfileResponses, GetPatientMedicalProfileErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/patients/{id}/medical-profile',
+    ...options
+});
+
+export const replacePatientMedicalProfile = <ThrowOnError extends boolean = false>(options: Options<ReplacePatientMedicalProfileData, ThrowOnError>): RequestResult<ReplacePatientMedicalProfileResponses, ReplacePatientMedicalProfileErrors, ThrowOnError> => (options.client ?? client).put<ReplacePatientMedicalProfileResponses, ReplacePatientMedicalProfileErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/patients/{id}/medical-profile',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
 export const linkPatientAccount = <ThrowOnError extends boolean = false>(options: Options<LinkPatientAccountData, ThrowOnError>): RequestResult<LinkPatientAccountResponses, LinkPatientAccountErrors, ThrowOnError> => (options.client ?? client).post<LinkPatientAccountResponses, LinkPatientAccountErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/patients/{id}/link-account',
@@ -584,6 +990,23 @@ export const linkPatientAccount = <ThrowOnError extends boolean = false>(options
     headers: {
         'Content-Type': 'application/json',
         ...options.headers
+    }
+});
+
+export const listMyPrescriptions = <ThrowOnError extends boolean = false>(options?: Options<ListMyPrescriptionsData, ThrowOnError>): RequestResult<ListMyPrescriptionsResponses, ListMyPrescriptionsErrors, ThrowOnError> => (options?.client ?? client).get<ListMyPrescriptionsResponses, ListMyPrescriptionsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/prescriptions',
+    ...options
+});
+
+export const uploadMyPrescription = <ThrowOnError extends boolean = false>(options?: Options<UploadMyPrescriptionData, ThrowOnError>): RequestResult<UploadMyPrescriptionResponses, UploadMyPrescriptionErrors, ThrowOnError> => (options?.client ?? client).post<UploadMyPrescriptionResponses, UploadMyPrescriptionErrors, ThrowOnError>({
+    ...formDataBodySerializer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/me/prescriptions',
+    ...options,
+    headers: {
+        'Content-Type': null,
+        ...options?.headers
     }
 });
 
@@ -619,10 +1042,32 @@ export const createPharmacyItem = <ThrowOnError extends boolean = false>(options
     }
 });
 
+export const removePharmacyItem = <ThrowOnError extends boolean = false>(options: Options<RemovePharmacyItemData, ThrowOnError>): RequestResult<RemovePharmacyItemResponses, RemovePharmacyItemErrors, ThrowOnError> => (options.client ?? client).delete<RemovePharmacyItemResponses, RemovePharmacyItemErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/pharmacy-items/{id}',
+    ...options
+});
+
 export const getPharmacyItem = <ThrowOnError extends boolean = false>(options: Options<GetPharmacyItemData, ThrowOnError>): RequestResult<GetPharmacyItemResponses, GetPharmacyItemErrors, ThrowOnError> => (options.client ?? client).get<GetPharmacyItemResponses, GetPharmacyItemErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/pharmacy-items/{id}',
     ...options
+});
+
+export const listPharmacyBatches = <ThrowOnError extends boolean = false>(options: Options<ListPharmacyBatchesData, ThrowOnError>): RequestResult<ListPharmacyBatchesResponses, ListPharmacyBatchesErrors, ThrowOnError> => (options.client ?? client).get<ListPharmacyBatchesResponses, ListPharmacyBatchesErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/pharmacy-items/{id}/batches',
+    ...options
+});
+
+export const addPharmacyBatch = <ThrowOnError extends boolean = false>(options: Options<AddPharmacyBatchData, ThrowOnError>): RequestResult<AddPharmacyBatchResponses, AddPharmacyBatchErrors, ThrowOnError> => (options.client ?? client).post<AddPharmacyBatchResponses, AddPharmacyBatchErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/pharmacy-items/{id}/batches',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 export const listPharmacyTransactions = <ThrowOnError extends boolean = false>(options: Options<ListPharmacyTransactionsData, ThrowOnError>): RequestResult<ListPharmacyTransactionsResponses, ListPharmacyTransactionsErrors, ThrowOnError> => (options.client ?? client).get<ListPharmacyTransactionsResponses, ListPharmacyTransactionsErrors, ThrowOnError>({
@@ -634,6 +1079,50 @@ export const listPharmacyTransactions = <ThrowOnError extends boolean = false>(o
 export const recordPharmacyTransaction = <ThrowOnError extends boolean = false>(options: Options<RecordPharmacyTransactionData, ThrowOnError>): RequestResult<RecordPharmacyTransactionResponses, RecordPharmacyTransactionErrors, ThrowOnError> => (options.client ?? client).post<RecordPharmacyTransactionResponses, RecordPharmacyTransactionErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/pharmacy-items/{id}/transactions',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const recordPharmacyBatchTransaction = <ThrowOnError extends boolean = false>(options: Options<RecordPharmacyBatchTransactionData, ThrowOnError>): RequestResult<RecordPharmacyBatchTransactionResponses, RecordPharmacyBatchTransactionErrors, ThrowOnError> => (options.client ?? client).post<RecordPharmacyBatchTransactionResponses, RecordPharmacyBatchTransactionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/pharmacy-items/{id}/batches/{batchId}/transactions',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const listPrescriptions = <ThrowOnError extends boolean = false>(options?: Options<ListPrescriptionsData, ThrowOnError>): RequestResult<ListPrescriptionsResponses, ListPrescriptionsErrors, ThrowOnError> => (options?.client ?? client).get<ListPrescriptionsResponses, ListPrescriptionsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/prescriptions',
+    ...options
+});
+
+export const downloadPrescription = <ThrowOnError extends boolean = false>(options: Options<DownloadPrescriptionData, ThrowOnError>): RequestResult<DownloadPrescriptionResponses, DownloadPrescriptionErrors, ThrowOnError> => (options.client ?? client).get<DownloadPrescriptionResponses, DownloadPrescriptionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/prescriptions/{id}/file',
+    ...options
+});
+
+export const markPrescriptionReady = <ThrowOnError extends boolean = false>(options: Options<MarkPrescriptionReadyData, ThrowOnError>): RequestResult<MarkPrescriptionReadyResponses, MarkPrescriptionReadyErrors, ThrowOnError> => (options.client ?? client).post<MarkPrescriptionReadyResponses, MarkPrescriptionReadyErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/prescriptions/{id}/ready',
+    ...options
+});
+
+export const markPrescriptionDelivered = <ThrowOnError extends boolean = false>(options: Options<MarkPrescriptionDeliveredData, ThrowOnError>): RequestResult<MarkPrescriptionDeliveredResponses, MarkPrescriptionDeliveredErrors, ThrowOnError> => (options.client ?? client).post<MarkPrescriptionDeliveredResponses, MarkPrescriptionDeliveredErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/prescriptions/{id}/deliver',
+    ...options
+});
+
+export const rejectPrescription = <ThrowOnError extends boolean = false>(options: Options<RejectPrescriptionData, ThrowOnError>): RequestResult<RejectPrescriptionResponses, RejectPrescriptionErrors, ThrowOnError> => (options.client ?? client).post<RejectPrescriptionResponses, RejectPrescriptionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/prescriptions/{id}/reject',
     ...options,
     headers: {
         'Content-Type': 'application/json',

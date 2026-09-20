@@ -2,9 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/auth/auth_controller.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/friendly_date.dart';
 import '../../../services/api_client/models/my_profile.dart';
 import '../state/profile_controller.dart';
+import '../widgets/dialer.dart';
+import '../widgets/panels.dart';
+import 'claim_record_screen.dart';
 import 'my_details_screen.dart';
+import 'my_reports_screen.dart';
 import 'past_visits_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -14,55 +20,166 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final profileController = context.watch<ProfileController>();
     final profile = profileController.profile.valueOrNull;
-
-    if (profile == null) return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
       body: ListView(
+        padding: const EdgeInsets.fromLTRB(AppTheme.gutter, 4, AppTheme.gutter, 32),
         children: [
-          _Header(profile: profile),
-          if (!profile.detailsComplete) _MissingDetails(missing: profile.missingFields),
-          const Divider(height: 32),
-          ListTile(
-            leading: const Icon(Icons.edit_outlined),
-            title: const Text('My details'),
-            subtitle: const Text('Name, NIC, address, emergency contact'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _openDetails(context, profileController),
-          ),
-          ListTile(
-            leading: const Icon(Icons.history),
-            title: const Text('Past visits'),
-            subtitle: const Text('Stays that have finished'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const PastVisitsScreen()),
+          if (profile == null) ...[
+            const _AccountOnlyHeader(),
+            const SizedBox(height: 20),
+            NoticeBanner(
+              icon: Icons.badge_outlined,
+              accent: scheme.warning,
+              title: 'No hospital record',
+              body: 'Add your details to create your hospital record. If the hospital has '
+                  'already registered you at the desk, use your patient code instead so '
+                  'your stay and history come with you.',
+              action: Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                children: [
+                  FilledButton(
+                    onPressed: () => openMyDetails(context, profileController),
+                    style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+                    child: const Text('Add my details'),
+                  ),
+                  OutlinedButton(
+                    onPressed: () => openClaimRecord(context, profileController),
+                    style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+                    child: const Text('I have a patient code'),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const Divider(height: 32),
-          ListTile(
-            leading: Icon(Icons.logout, color: Theme.of(context).colorScheme.error),
-            title: Text(
-              'Sign out',
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            const SizedBox(height: 16),
+          ] else ...[
+            _Header(profile: profile),
+            const SizedBox(height: 20),
+            if (!profile.detailsComplete) ...[
+              NoticeBanner(
+                icon: Icons.info_outline,
+                accent: scheme.warning,
+                title: 'Incomplete details',
+                bullets: profile.missingFields.map(prettyFieldName).toList(),
+                action: OutlinedButton(
+                  onPressed: () => openMyDetails(context, profileController),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 42),
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                  ),
+                  child: const Text('Add them now'),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+            SectionCard(
+              title: 'Your details',
+              icon: Icons.badge_outlined,
+              trailing: TextButton(
+                onPressed: () => openMyDetails(context, profileController),
+                child: const Text('Edit'),
+              ),
+              child: Column(
+                children: [
+                  DetailRow(label: 'NIC', value: profile.nic, icon: Icons.pin_outlined),
+                  DetailRow(
+                    label: 'Gender',
+                    value: genderLabel(profile.gender),
+                    icon: Icons.wc_outlined,
+                  ),
+                  DetailRow(
+                    label: 'Born',
+                    value: profile.dateOfBirth == null
+                        ? null
+                        : FriendlyDate.date(profile.dateOfBirth!),
+                    icon: Icons.cake_outlined,
+                  ),
+                  DetailRow(label: 'Phone', value: profile.phone, icon: Icons.phone_outlined),
+                  DetailRow(label: 'Address', value: profile.address, icon: Icons.home_outlined),
+                ],
+              ),
             ),
-            onTap: context.read<AuthController>().signOut,
+            const SizedBox(height: 16),
+            _EmergencyContact(profile: profile),
+            const SizedBox(height: 16),
+          ],
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.history),
+                  title: const Text('Past visits'),
+                  subtitle: const Text('Completed stays'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute(builder: (_) => const PastVisitsScreen())),
+                ),
+                const Divider(indent: 20, endIndent: 20),
+                ListTile(
+                  leading: const Icon(Icons.description_outlined),
+                  title: const Text('My reports'),
+                  subtitle: const Text('Lab results'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute(builder: (_) => const MyReportsScreen())),
+                ),
+                const Divider(indent: 20, endIndent: 20),
+                ListTile(
+                  leading: Icon(Icons.logout, color: scheme.error),
+                  title: Text('Sign out', style: TextStyle(color: scheme.error)),
+                  onTap: context.read<AuthController>().signOut,
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
+}
 
-  /// The details form reads and writes the same controller this screen watches,
-  /// so it has to be carried across into the pushed route.
-  void _openDetails(BuildContext context, ProfileController controller) {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => ChangeNotifierProvider<ProfileController>.value(
-        value: controller,
-        child: const MyDetailsScreen(),
-      ),
-    ));
+class _AccountOnlyHeader extends StatelessWidget {
+  const _AccountOnlyHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final username = context.watch<AuthController>().principal?.displayName ?? '';
+
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 30,
+          backgroundColor: scheme.surfaceContainerHighest,
+          child: Icon(Icons.person_outline, size: 30, color: scheme.onSurfaceVariant),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                username,
+                style: theme.textTheme.titleLarge,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Signed in',
+                style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -74,80 +191,115 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: theme.colorScheme.primaryContainer,
-            child: Text(
-              _initials(profile.fullName),
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(color: theme.colorScheme.onPrimaryContainer),
-            ),
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 30,
+          backgroundColor: scheme.primaryContainer,
+          child: Text(
+            initialsOf(profile.fullName),
+            style: theme.textTheme.titleLarge?.copyWith(color: scheme.onPrimaryContainer),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(profile.fullName, style: theme.textTheme.titleLarge),
-                const SizedBox(height: 2),
-                Text(
-                  profile.patientCode,
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static String _initials(String name) {
-    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
-    if (parts.isEmpty) return '?';
-    if (parts.length == 1) return parts.first.characters.first.toUpperCase();
-    return (parts.first.characters.first + parts.last.characters.first).toUpperCase();
-  }
-}
-
-class _MissingDetails extends StatelessWidget {
-  const _MissingDetails({required this.missing});
-
-  final List<String> missing;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Card(
-        color: theme.colorScheme.tertiaryContainer,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Some details are still missing',
-                style: theme.textTheme.titleSmall
-                    ?.copyWith(color: theme.colorScheme.onTertiaryContainer),
+                profile.fullName,
+                style: theme.textTheme.titleLarge,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 8),
-              ...missing.map((field) => Text(
-                    '• $field',
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: theme.colorScheme.onTertiaryContainer),
-                  )),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  profile.patientCode,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
+      ],
+    );
+  }
+}
+
+class _EmergencyContact extends StatelessWidget {
+  const _EmergencyContact({required this.profile});
+
+  final MyProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final phone = profile.emergencyContactPhone;
+    final name = profile.emergencyContactName;
+
+    if (phone == null && name == null) {
+      return SectionCard(
+        title: 'Emergency contact',
+        icon: Icons.emergency_outlined,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'No emergency contact has been added.',
+              style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              onPressed: () => openMyDetails(context, context.read<ProfileController>()),
+              icon: const Icon(Icons.add),
+              label: const Text('Add a contact'),
+              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return SectionCard(
+      title: 'Emergency contact',
+      icon: Icons.emergency_outlined,
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name ?? 'Contact', style: theme.textTheme.titleSmall),
+                if (phone != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    phone,
+                    style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (phone != null)
+            FilledButton.tonalIcon(
+              onPressed: () => callNumber(context, phone),
+              icon: const Icon(Icons.call, size: 18),
+              label: const Text('Call'),
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+            ),
+        ],
       ),
     );
   }

@@ -5,6 +5,7 @@ using CareLanka.Api.DTOs.Patient;
 using CareLanka.Api.Services.Patient;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MedicalProfileResponse = CareLanka.Api.DTOs.Patient.PatientMedicalProfile;
 using PatientResponse = CareLanka.Api.DTOs.Patient.Patient;
 
 namespace CareLanka.Api.Controllers.Patient;
@@ -15,8 +16,13 @@ namespace CareLanka.Api.Controllers.Patient;
 public class PatientsController : ControllerBase
 {
     private readonly IPatientService _patients;
+    private readonly IMedicalProfileService _medicalProfiles;
 
-    public PatientsController(IPatientService patients) => _patients = patients;
+    public PatientsController(IPatientService patients, IMedicalProfileService medicalProfiles)
+    {
+        _patients = patients;
+        _medicalProfiles = medicalProfiles;
+    }
 
     [Authorize(Policy = Policies.PatientDetails)]
     [HttpGet(Name = "listPatients")]
@@ -78,6 +84,27 @@ public class PatientsController : ControllerBase
     public async Task<ActionResult<PatientLookupResult>> LookupPatient(
         [FromBody] PatientLookupRequest request, CancellationToken ct)
         => Ok(await _patients.LookupByNicAsync(request.Nic, ct));
+
+    [Authorize(Policy = Policies.MedicalProfileReader)]
+    [HttpGet("{id:guid}/medical-profile", Name = "getPatientMedicalProfile")]
+    [ProducesResponseType(typeof(MedicalProfileResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<ActionResult<MedicalProfileResponse>> GetPatientMedicalProfile(
+        Guid id, CancellationToken ct)
+        => Ok(await _medicalProfiles.GetAsync(id, ct));
+
+    [Authorize(Policy = Policies.MedicalProfileAuthor)]
+    [HttpPut("{id:guid}/medical-profile", Name = "replacePatientMedicalProfile")]
+    [ProducesResponseType(typeof(MedicalProfileResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<ActionResult<MedicalProfileResponse>> ReplacePatientMedicalProfile(
+        Guid id, [FromBody] UpdateMedicalProfileRequest request, CancellationToken ct)
+        => Ok(await _medicalProfiles.ReplaceAsync(id, request, ct));
 
     [Authorize(Policy = Policies.DutyManager)]
     [HttpPost("{id:guid}/link-account", Name = "linkPatientAccount")]

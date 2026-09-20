@@ -4,6 +4,7 @@ import { logoutMutation } from '../services/api/generated/@tanstack/react-query.
 import { clearSession, getSession } from '../services/auth/session';
 import { useSession } from '../services/auth/useSession';
 import { roleLabels } from '../types/permissions';
+import { canManageEmergency } from '../types/permissions';
 
 export function AppShell() {
   const session = useSession();
@@ -30,6 +31,7 @@ export function AppShell() {
           <NavLink to="/" end>
             Dashboard
           </NavLink>
+          {canManageEmergency(session?.principal.role) && <NavLink to="/emergency">Emergency</NavLink>}
         </nav>
 
         {session && (

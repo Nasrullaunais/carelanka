@@ -37,6 +37,55 @@ public class EquipmentItemsController : ControllerBase
             new EquipmentItemQuery(search, categoryId, wardId, status, page, pageSize, sortBy, sortDir),
             ct));
 
+    [Authorize(Policy = Policies.EquipmentConfirmer)]
+    [HttpGet("pending-confirmation", Name = "listEquipmentItemsAwaitingConfirmation")]
+    [ProducesResponseType(typeof(List<EquipmentItem>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    public async Task<ActionResult<IReadOnlyList<EquipmentItem>>> ListEquipmentItemsAwaitingConfirmation(
+        [FromHeader(Name = EquipmentOptions.ConfirmationCodeHeader)] string? confirmationCode,
+        CancellationToken ct)
+        => Ok(await _items.ListAwaitingConfirmationAsync(confirmationCode, ct));
+
+    [Authorize(Policy = Policies.EquipmentConfirmationTracker)]
+    [HttpGet("pending-confirmation/count", Name = "countEquipmentItemsAwaitingConfirmation")]
+    [ProducesResponseType(typeof(PendingEquipmentCount), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    public async Task<ActionResult<PendingEquipmentCount>> CountEquipmentItemsAwaitingConfirmation(
+        CancellationToken ct)
+        => Ok(await _items.CountAwaitingConfirmationAsync(ct));
+
+    [Authorize(Policy = Policies.EquipmentConfirmer)]
+    [HttpPost("{id:guid}/confirm", Name = "confirmEquipmentItem")]
+    [ProducesResponseType(typeof(EquipmentItem), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<EquipmentItem>> ConfirmEquipmentItem(
+        Guid id,
+        [FromHeader(Name = EquipmentOptions.ConfirmationCodeHeader)] string? confirmationCode,
+        CancellationToken ct)
+        => Ok(await _items.ConfirmAsync(id, confirmationCode, ct));
+
+    [Authorize(Policy = Policies.EquipmentConfirmer)]
+    [HttpPost("{id:guid}/reject", Name = "rejectEquipmentItem")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<IActionResult> RejectEquipmentItem(
+        Guid id,
+        [FromHeader(Name = EquipmentOptions.ConfirmationCodeHeader)] string? confirmationCode,
+        CancellationToken ct)
+    {
+        await _items.RejectAsync(id, confirmationCode, ct);
+
+        return NoContent();
+    }
+
     [Authorize(Policy = Policies.EquipmentManager)]
     [HttpPost(Name = "createEquipmentItem")]
     [ProducesResponseType(typeof(EquipmentItem), StatusCodes.Status201Created)]
@@ -70,7 +119,7 @@ public class EquipmentItemsController : ControllerBase
         string assetTag, CancellationToken ct)
         => Ok(await _items.GetDetailByTagAsync(assetTag, ct));
 
-    [Authorize(Policy = Policies.EquipmentManager)]
+    [Authorize(Policy = Policies.EquipmentItemEditor)]
     [HttpPut("{id:guid}", Name = "updateEquipmentItem")]
     [ProducesResponseType(typeof(EquipmentItem), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
@@ -103,6 +152,36 @@ public class EquipmentItemsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
     public async Task<ActionResult<EquipmentItem>> ReleaseEquipmentItem(Guid id, CancellationToken ct)
         => Ok(await _items.ReleaseAsync(id, ct));
+
+    [Authorize(Policy = Policies.EquipmentConfirmer)]
+    [HttpPost("{id:guid}/retire", Name = "retireEquipmentItem")]
+    [ProducesResponseType(typeof(EquipmentItem), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<EquipmentItem>> RetireEquipmentItem(
+        Guid id,
+        [FromHeader(Name = EquipmentOptions.ConfirmationCodeHeader)] string? confirmationCode,
+        CancellationToken ct)
+        => Ok(await _items.RetireAsync(id, confirmationCode, ct));
+
+    [Authorize(Policy = Policies.EquipmentConfirmer)]
+    [HttpDelete("{id:guid}", Name = "removeEquipmentItem")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<IActionResult> RemoveEquipmentItem(
+        Guid id,
+        [FromHeader(Name = EquipmentOptions.ConfirmationCodeHeader)] string? confirmationCode,
+        CancellationToken ct)
+    {
+        await _items.RemoveAsync(id, confirmationCode, ct);
+
+        return NoContent();
+    }
 
     [Authorize(Policy = Policies.AnyStaff)]
     [HttpPost("{id:guid}/report-fault", Name = "reportEquipmentFault")]

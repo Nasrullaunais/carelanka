@@ -2,15 +2,21 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, unused_import, invalid_annotation_target, unnecessary_import
 
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
 import '../models/book_appointment_request.dart';
+import '../models/claim_by_patient_code_request.dart';
 import '../models/my_admission.dart';
 import '../models/my_admission_paged_result.dart';
 import '../models/my_appointment.dart';
 import '../models/my_appointment_paged_result.dart';
+import '../models/my_bill.dart';
+import '../models/my_lab_report_paged_result.dart';
 import '../models/my_profile.dart';
+import '../models/patient_claim_preview.dart';
 import '../models/pre_register_request.dart';
 
 part 'patient_self_service_api.g.dart';
@@ -24,6 +30,16 @@ abstract class PatientSelfServiceApi {
     @Body() PreRegisterRequest? body,
   });
 
+  @POST('/me/claim/preview')
+  Future<PatientClaimPreview> previewMyClaim({
+    @Body() ClaimByPatientCodeRequest? body,
+  });
+
+  @POST('/me/claim')
+  Future<MyProfile> claimMyRecord({
+    @Body() ClaimByPatientCodeRequest? body,
+  });
+
   @GET('/me/profile')
   Future<MyProfile> getMyProfile();
 
@@ -34,6 +50,28 @@ abstract class PatientSelfServiceApi {
   Future<MyAdmissionPagedResult> getMyHistory({
     @Query('page') int? page = 1,
     @Query('pageSize') int? pageSize = 20,
+  });
+
+  @GET('/me/admissions/{admissionId}/bill')
+  Future<MyBill> getMyBill({
+    @Path('admissionId') required String admissionId,
+  });
+
+  @GET('/me/appointments/{appointmentId}/bill')
+  Future<MyBill> getMyAppointmentBill({
+    @Path('appointmentId') required String appointmentId,
+  });
+
+  @GET('/me/lab-reports')
+  Future<MyLabReportPagedResult> getMyLabReports({
+    @Query('page') int? page = 1,
+    @Query('pageSize') int? pageSize = 20,
+  });
+
+  @GET('/me/lab-reports/{reportId}/file')
+  @DioResponseType(ResponseType.stream)
+  Stream<String> downloadMyLabReport({
+    @Path('reportId') required String reportId,
   });
 
   @POST('/me/appointments')

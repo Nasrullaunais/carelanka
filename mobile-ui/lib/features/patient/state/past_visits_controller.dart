@@ -5,8 +5,6 @@ import '../../../core/widgets/async_data.dart';
 import '../../../services/api_client/models/my_admission.dart';
 import '../services/patient_service.dart';
 
-/// Finished stays only. The open one lives on the My stay tab, so it is not
-/// listed twice.
 class PastVisitsController extends ChangeNotifier {
   PastVisitsController(this._service);
 

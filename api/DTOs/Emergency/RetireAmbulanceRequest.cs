@@ -1,10 +1,9 @@
-using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace CareLanka.Api.DTOs.Emergency;
 
 public sealed class RetireAmbulanceRequest
 {
-    [Required]
-    [MaxLength(500)]
+    [JsonRequired]
     public string Reason { get; set; } = string.Empty;
 }

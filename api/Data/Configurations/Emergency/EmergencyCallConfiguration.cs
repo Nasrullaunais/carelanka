@@ -10,6 +10,8 @@ namespace CareLanka.Api.Data.Configurations.Emergency;
 
 public sealed class EmergencyCallConfiguration : IEntityTypeConfiguration<EmergencyCall>
 {
+    public const string IdempotencyKeyUniqueIndex = "ux_emergency_calls_idempotency_key";
+
     public void Configure(EntityTypeBuilder<EmergencyCall> builder)
     {
         builder.ToTable("emergency_calls", table =>
@@ -26,8 +28,13 @@ public sealed class EmergencyCallConfiguration : IEntityTypeConfiguration<Emerge
         builder.Property(call => call.AddressLabel).HasMaxLength(500);
         builder.Property(call => call.Details).HasMaxLength(1000);
         builder.Property(call => call.Outcome).HasMaxLength(1000);
+        builder.Property(call => call.CancellationRequestReason).HasMaxLength(500);
+        builder.Property(call => call.CancellationReviewNotes).HasMaxLength(500);
         builder.Property(call => call.Latitude).HasPrecision(9, 6).IsRequired();
         builder.Property(call => call.Longitude).HasPrecision(9, 6).IsRequired();
+        builder.Property(call => call.LocationAccuracyMetres).HasPrecision(10, 2).IsRequired();
+        builder.Property(call => call.LocationCapturedAt).IsRequired();
+        builder.Property(call => call.IdempotencyKey).IsRequired();
         builder.Property(call => call.Priority)
             .HasConversion(new SnakeCaseEnumConverter<CallPriority>())
             .HasMaxLength(20)
@@ -36,6 +43,9 @@ public sealed class EmergencyCallConfiguration : IEntityTypeConfiguration<Emerge
             .HasConversion(new SnakeCaseEnumConverter<CallStatus>())
             .HasMaxLength(20)
             .IsRequired();
+        builder.Property(call => call.CancellationRequestStatus)
+            .HasConversion(new SnakeCaseEnumConverter<CancellationRequestStatus>())
+            .HasMaxLength(20);
 
         builder.HasOne<PatientEntity>()
             .WithMany()
@@ -45,8 +55,15 @@ public sealed class EmergencyCallConfiguration : IEntityTypeConfiguration<Emerge
             .WithMany()
             .HasForeignKey(call => call.CallerUserId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<StaffMember>()
+            .WithMany()
+            .HasForeignKey(call => call.CancellationReviewedByStaffId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(call => new { call.Status, call.CreatedAt });
         builder.HasIndex(call => new { call.Priority, call.CreatedAt });
+        builder.HasIndex(call => call.IdempotencyKey)
+            .HasDatabaseName(IdempotencyKeyUniqueIndex)
+            .IsUnique();
     }
 }

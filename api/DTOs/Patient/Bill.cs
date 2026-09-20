@@ -7,8 +7,13 @@ public class Bill
     [Required]
     public Guid Id { get; set; }
 
-    [Required]
-    public Guid AdmissionId { get; set; }
+    /// <summary>
+    /// Exactly one of this and <see cref="AppointmentId"/> is set. An
+    /// appointment bill belongs to a patient who was seen and sent home.
+    /// </summary>
+    public Guid? AdmissionId { get; set; }
+
+    public Guid? AppointmentId { get; set; }
 
     [Required]
     public string BillNumber { get; set; } = string.Empty;

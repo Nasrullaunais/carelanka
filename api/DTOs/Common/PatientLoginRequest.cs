@@ -1,12 +1,13 @@
 using System.ComponentModel.DataAnnotations;
+using CareLanka.Api.Common.Auth;
 
 namespace CareLanka.Api.DTOs.Common;
 
 public class PatientLoginRequest
 {
     [Required]
-    [MaxLength(20)]
-    public string PhoneNumber { get; set; } = string.Empty;
+    [MaxLength(UsernameRules.MaxLength)]
+    public string Username { get; set; } = string.Empty;
 
     [Required]
     [MinLength(8)]

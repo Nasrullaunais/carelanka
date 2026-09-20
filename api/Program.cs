@@ -14,6 +14,8 @@ using CareLanka.Api.Services.Equipment.Stubs;
 using CareLanka.Api.Services.Emergency;
 using CareLanka.Api.Services.Emergency.Stubs;
 using CareLanka.Api.Services.Patient;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Formatters;
@@ -22,6 +24,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
+using CareLanka.Api.Common.Serialization;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -31,11 +34,19 @@ static void ConfigureJson(JsonSerializerOptions json)
     json.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
     json.DictionaryKeyPolicy = JsonNamingPolicy.SnakeCaseLower;
     json.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower));
+    json.Converters.Add(new DateOnlyJsonConverter());
 }
 
 builder.Services
-    .AddControllers()
+    .AddControllers(options =>
+    {
+        options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
+        options.ModelMetadataDetailsProviders.Add(new EmergencyQueryBindingMetadataProvider());
+    })
     .AddJsonOptions(options => ConfigureJson(options.JsonSerializerOptions));
+
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 builder.Services.ConfigureHttpJsonOptions(options => ConfigureJson(options.SerializerOptions));
 
@@ -87,6 +98,30 @@ builder.Services
     .AddOptions<JwtOptions>()
     .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))
     .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+builder.Services
+    .AddOptions<EmergencyOptions>()
+    .Bind(builder.Configuration.GetSection(EmergencyOptions.SectionName))
+    .Validate(options => options.MinimumReadyCrew > 0,
+        "Emergency:MinimumReadyCrew must be greater than zero.")
+    .Validate(options => options.LocationMaxAgeMinutes > 0,
+        "Emergency:LocationMaxAgeMinutes must be greater than zero.")
+    .Validate(options => options.HospitalEntrance.Latitude is >= -90 and <= 90
+            && options.HospitalEntrance.Longitude is >= -180 and <= 180
+            && (options.HospitalEntrance.Latitude != 0 || options.HospitalEntrance.Longitude != 0),
+        "Emergency:HospitalEntrance must have a real latitude and longitude.")
+    .ValidateOnStart();
+
+builder.Services
+    .AddOptions<EquipmentOptions>()
+    .Bind(builder.Configuration.GetSection(EquipmentOptions.SectionName))
+    .Validate(options => !string.IsNullOrWhiteSpace(options.ConfirmationCode),
+        "Equipment:ConfirmationCode must be set.")
+    .Validate(options => options.WarningSweepIntervalMinutes >= 0,
+        "Equipment:WarningSweepIntervalMinutes must be zero (off) or more.")
+    .Validate(options => options.ExpiryWarningDays > 0,
+        "Equipment:ExpiryWarningDays must be greater than zero.")
     .ValidateOnStart();
 
 var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
@@ -180,11 +215,25 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
 
+    options.AddPolicy(Policies.MedicalProfileReader, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.Doctor),
+        EnumWire.ToWire(StaffRole.DutyManager)));
+
+    options.AddPolicy(Policies.MedicalProfileAuthor, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.Doctor)));
+
     options.AddPolicy(Policies.AdmissionEditor, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
 
     options.AddPolicy(Policies.BedAssigner, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.GeneralStaff),
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager)));
+
+    options.AddPolicy(Policies.ArrivalConfirmer, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.GeneralStaff),
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
@@ -211,9 +260,22 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.HospitalAdministrator),
         EnumWire.ToWire(StaffRole.DutyManager)));
 
+    options.AddPolicy(Policies.AppointmentBillingDesk, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.GeneralStaff),
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator),
+        EnumWire.ToWire(StaffRole.DutyManager)));
+
     options.AddPolicy(Policies.AppointmentDesk, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.GeneralStaff),
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
+
+    options.AddPolicy(Policies.AppointmentBoard, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager),
+        EnumWire.ToWire(StaffRole.GeneralStaff),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
 
     // Narrower than AnyStaff on purpose: a result is clinical information about a named person,
     // so ambulance crew and general staff are off it even though they hold a staff login.
@@ -231,6 +293,28 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager),
         EnumWire.ToWire(StaffRole.EquipmentManager)));
+
+    options.AddPolicy(Policies.EquipmentConfirmer, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
+    options.AddPolicy(Policies.EquipmentConfirmationTracker, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.EquipmentManager),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
+    options.AddPolicy(Policies.PharmacyRemover, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.EquipmentManager),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
+    options.AddPolicy(Policies.MaintenanceDesk, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
+    options.AddPolicy(Policies.EquipmentItemEditor, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.EquipmentManager),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
+    options.AddPolicy(Policies.WarningDesk, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.EquipmentManager),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
 });
 
 var authRequestsPerMinute = builder.Configuration.GetValue("RateLimits:AuthPerMinute", 20);
@@ -273,7 +357,13 @@ builder.Services.AddSingleton<ILoginThrottle, LoginThrottle>();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IHealthService, HealthService>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<IAmbulanceEligibilityService, AmbulanceEligibilityService>();
 builder.Services.AddScoped<IAmbulanceService, AmbulanceService>();
+builder.Services.AddScoped<IAmbulanceCrewService, AmbulanceCrewService>();
+builder.Services.AddScoped<IEmergencyCallService, EmergencyCallService>();
+builder.Services.AddScoped<IDispatchService, DispatchService>();
+builder.Services.AddScoped<IStaffLookupService, StubStaffLookupService>();
 builder.Services.AddSingleton<IAmbulanceDistanceService, StubAmbulanceDistanceService>();
 
 builder.Services.AddScoped<IBedService, BedService>();
@@ -282,9 +372,14 @@ builder.Services.AddScoped<IEquipmentItemService, EquipmentItemService>();
 builder.Services.AddScoped<IPharmacyCategoryService, PharmacyCategoryService>();
 builder.Services.AddScoped<IPharmacyItemService, PharmacyItemService>();
 builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();
+builder.Services.AddSingleton<IEquipmentConfirmationCode, EquipmentConfirmationCode>();
 builder.Services.AddScoped<ILabReportService, LabReportService>();
+builder.Services.AddScoped<IPrescriptionService, PrescriptionService>();
+builder.Services.AddScoped<IWarningService, WarningService>();
+builder.Services.AddHostedService<WarningSweepWorker>();
 builder.Services.AddScoped<IWardService, WardService>();
 builder.Services.AddScoped<IPatientService, PatientService>();
+builder.Services.AddScoped<IMedicalProfileService, MedicalProfileService>();
 builder.Services.AddScoped<IAdmissionService, AdmissionService>();
 builder.Services.AddScoped<ICapacityService, CapacityService>();
 builder.Services.AddScoped<IAppointmentService, AppointmentService>();
@@ -329,6 +424,10 @@ builder.Services.AddSwaggerGen(options =>
 
     options.DocumentFilter<ApiPrefixAsServerFilter>();
     options.OperationFilter<AnonymousOperationFilter>();
+    options.OperationFilter<EmergencyCallOperationFilter>();
+    options.OperationFilter<ConfirmationCodeHeaderOperationFilter>();
+    options.SchemaFilter<JsonRequiredSchemaFilter>();
+    options.SchemaFilter<EmergencyCallSchemaFilter>();
 
 });
 

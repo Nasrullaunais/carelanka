@@ -6,11 +6,11 @@ import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
 import '../models/asset_type.dart';
-import '../models/complete_maintenance_schedule_request.dart';
 import '../models/create_maintenance_schedule_request.dart';
 import '../models/maintenance_schedule.dart';
 import '../models/maintenance_schedule_paged_result.dart';
 import '../models/maintenance_status.dart';
+import '../models/pending_equipment_count.dart';
 
 part 'maintenance_api.g.dart';
 
@@ -32,9 +32,17 @@ abstract class MaintenanceApi {
     @Body() CreateMaintenanceScheduleRequest? body,
   });
 
-  @POST('/maintenance-schedules/{id}/complete')
-  Future<MaintenanceSchedule> completeMaintenanceSchedule({
+  @GET('/maintenance-schedules/pending-confirmation')
+  Future<List<MaintenanceSchedule>> listMaintenanceSchedulesAwaitingConfirmation({
+    @Header('X-Confirmation-Code') required String xConfirmationCode,
+  });
+
+  @GET('/maintenance-schedules/pending-confirmation/count')
+  Future<PendingEquipmentCount> countMaintenanceSchedulesAwaitingConfirmation();
+
+  @POST('/maintenance-schedules/{id}/confirm')
+  Future<MaintenanceSchedule> confirmMaintenanceSchedule({
     @Path('id') required String id,
-    @Body() CompleteMaintenanceScheduleRequest? body,
+    @Header('X-Confirmation-Code') required String xConfirmationCode,
   });
 }

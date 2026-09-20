@@ -18,6 +18,11 @@ class FakePatientService extends PatientService {
   Object? appointmentsResult;
   Object? bookResult;
 
+  /// What the details form last sent, so a test can assert the form refused to
+  /// submit at all rather than submitting something incomplete.
+  PreRegisterRequest? savedDetails;
+  Object? savedProfileResult;
+
   int bookCalls = 0;
 
   @override
@@ -27,7 +32,10 @@ class FakePatientService extends PatientService {
   Future<MyProfile> loadMyProfile() async => _unwrap(profileResult);
 
   @override
-  Future<MyProfile> saveMyDetails(PreRegisterRequest request) async => _unwrap(profileResult);
+  Future<MyProfile> saveMyDetails(PreRegisterRequest request) async {
+    savedDetails = request;
+    return _unwrap(savedProfileResult ?? profileResult);
+  }
 
   @override
   Future<MyAppointmentPagedResult> loadMyAppointments({int page = 1, int pageSize = 50}) async =>

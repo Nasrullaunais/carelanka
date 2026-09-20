@@ -3,14 +3,23 @@
 **Owner: Lochana (Member 4)** · **Index:** `docs/BUILD_PLAN.md`
 
 **Owns:** `Patient`, `PatientAccount`, `Admission`, **`Ward`**, `BedAssignment`,
-`Discharge`, `DischargeChecklistItem`, `Appointment`, **`CareRecommendation`**
-**Contract:** `specs/patient-spec.yaml` (40 paths) · **Design:** `specs/patient-management-plan.md`
+`Discharge`, `DischargeChecklistItem`, `Appointment`, `Bill`, `BillLineItem`, `BillingRate`,
+`AdmissionFeeRate`, **`CareRecommendation`**, **`PatientMedicalProfile`**
+**Contract:** `specs/patient-spec.yaml` (63 paths, 73 operations) · **Design:** `specs/patient-management-plan.md`
 **Boundaries:** `specs/integration_of_functions.md` §4–§11
 
-> **Two agents, not one** — see steps 13–16. Added on the lecturer's direction at topic
-> finalization; §8.10 of the design doc has the full reasoning. The bed agent decides
-> *where to put someone*; the care advisory agent *drafts a note for a doctor to check*.
-> Neither decides what care a patient needs.
+> **Two agents, not one** — see steps 11–16. Added on the lecturer's direction at topic
+> finalization; §8.10 of the design doc has the full reasoning. The bed agent *suggests where
+> to put someone and who they are*; the care advisory agent *drafts a note for a nurse or
+> doctor to check*. Neither decides what care a patient needs.
+>
+> **Both were redesigned on 2026-09-16, after everything else was built and tested.** Read
+> §8 of the design doc before writing a line of either — the step table below is the plan,
+> §8 is the reasoning. Three things changed that make the build smaller than it looks:
+> **the bed agent now holds no write tool at all** (confirming a suggestion runs the manual
+> `assign-bed` endpoint that already exists), **`/bed-assignments/{id}/approve` and
+> `/reject` are withdrawn from the contract**, and **the care agent reads a new
+> `PatientMedicalProfile` table** so it has something real to reason over.
 
 > **`Ward` is the most-depended-on table in the system.** All four components reference it
 > (`Shift.WardId`, `EquipmentItem.WardId`, `Dispatch.DestinationWardId`). Build it first
@@ -29,7 +38,7 @@
 | 1 | **`Ward` first** | Three other components are blocked behind it. Then freeze the schema |
 | 2 | Remaining entities + configurations + migration | Including `PatientAccount` (Rev 2.5) and the optional link `Patient.UserAccountId` |
 | 3 | Patient + Admission CRUD | Including `temp_reference` for unidentified arrivals |
-| 4 | **The 7-state admission status machine** | **Done.** `awaiting_bed → awaiting_approval → bed_reserved → admitted → ready_for_discharge → discharged`, plus `cancelled`. Illegal transitions → 409 |
+| 4 | **The 7-state admission status machine** | **Done.** `awaiting_bed → bed_reserved → admitted → ready_for_discharge → discharged`, plus `cancelled`. Illegal transitions → 409. *(`awaiting_approval` is still in the enum and the machine but **nothing sets it** since 2026-09-16 — the agent writes no proposal, so the pause lives on the workflow row. §8.6b)* |
 | 5 | `GET /capacity/wards` + `GET /wards/{id}/occupancy` | **Done.** M1 and M2 are unblocked. Hold expiry lives in `CapacityService` and nowhere else |
 | 6 | **Manual bed assignment, no AI** | **Done.** Pick a bed by hand, with the 30-minute hold. The concurrency guarantee lives in the partial unique index, not in code |
 | 6b | **Visits that need no bed (H0) + the patients board** | **Done.** An `outpatient` never enters `awaiting_bed`. `GET /api/patient-worklist` unions bookings and visits so the board can say "not arrived". **No migration** |
@@ -37,13 +46,19 @@
 | 8 | Codegen gate | **Done.** `bun run check:codegen` in `web-ui/` regenerates and fails on any diff under `src/services/api/generated`. Reads the document off a **running** API on `:5231` |
 | 9 | React: admissions dashboard, bed board, occupancy report | **Done.** `DashboardPage`, `PatientsPage` (the board, with assign / correct bed on the row), `IntakePage`, `AppointmentsPage`, `CapacityPage`, `DischargePage`, `WardsPage`, `BillingSettingsPage` |
 | 9b | **The `/me/*` backend** | **Done 2026-09-12.** Seven routes: `pre-register`, `profile`, `admission`, `history`, book / list / cancel appointments. Not one takes a patient id - all scoped by the `sub` claim. `pre-register` creates no admission; see `patient-management-plan.md` §7.6 |
-| 10 | Flutter: nurse screens, then the patient's own-stay screens | **Next.** Backend is step 9b, done. `mobile-ui/` is still a skeleton and Flutter is not installed on Lochana's machine. Local notifications on status change is your device feature |
-| 11 | **The bed agent** | Hard rules H1–H5 in deterministic C#, soft rules rank. Re-check every hard rule under a row lock at approval time |
-| 12 | React: bed approval + downgrade approval | The two human gates |
-| 13 | `CareRecommendation` entity + configuration + migration | Independent of the bed workflow — no dependency on steps 1–12 beyond `Patient` and `Admission` existing |
-| 14 | **The care advisory agent, last** | Deterministic red-flag keyword screen (§8.13) runs *before* the model, not after. Rules CR1–CR4 (§8.15) validated the same way H1–H5 are |
-| 15 | React: Doctor's care recommendation queue, approve/reject | The third human gate in this component |
-| 16 | Flutter: "ask about a symptom" + "my care recommendations" | Patient-facing; never renders `agent_message` or `rejection_reason` |
+| 10 | Flutter: nurse screens, then the patient's own-stay screens | **Done.** `mobile-ui/` is a real Flutter app with `android/` and `ios/`, the generated `api_client`, and the patient feature under `lib/features/patient/`. Local notifications on status change is the device feature |
+| 11 | **`PatientMedicalProfile` entity + configuration + migration + seed** | **Done 2026-09-18.** One table, one row per patient, `UNIQUE(patient_id)`, `GET`/`PUT /patients/{id}/medical-profile` behind `MedicalProfileReader` / `MedicalProfileAuthor`, the editor in the React patients drawer and a Flutter screen off the nurse worklist. Seeded in `docs/seed/005_patient_medical_profiles.sql` — two patients are deliberately left without a profile so the agent's empty-profile path can be demonstrated |
+| 12 | **The bed agent** | Hard rules H0–H6 are **already built** — `BedPlacementRules.cs`, step 6. The agent calls them, it does not get its own copy. Four **read-only** tools (§8.4), best + selectable alternatives, and a `blocker` sentence built in C# naming the rule that stopped it (§8.6). **It writes nothing** |
+| 13 | React + Flutter: the suggestion panel | Who the patient is, the suggested bed, every alternative with its own button. Confirming calls `POST /admissions/{id}/assign-bed` with the `workflow_id` — the endpoint from step 6, with one new optional field. **There is no approval screen and no approval endpoint** (§8.6b) |
+| 14 | `CareRecommendation` entity + configuration + migration | Independent of the bed workflow — no dependency on steps 1–13 beyond `Patient`, `Admission` and step 11 existing |
+| 15 | **The care advisory agent, last** | Deterministic red-flag keyword screen (§8.13) runs *before* the model, not after. Rules CR1–CR5 (§8.15) validated the same way H0–H6 are. CR5 is the new one and needs step 11. Entry point refuses anybody not admitted, `409 cl_pat_038` |
+| 16 | React + Flutter: the review queue, and the patient's side | Queue is **Doctor or Ward Nurse** (§8.16), and shows the profile the agent read. Patient side is a card inside My Stay, never a top-level screen; never renders `agent_message` or `rejection_reason` |
+
+**Steps 11–16 all sit behind one thing that is not yours.** `AgentWorkflow` and
+`AgentProposedChange` are group-owned (ADR 3) and **do not exist anywhere in `api/`** — swept
+2026-09-16. `BedAssignment.WorkflowId` is already a column pointing at a missing table. Either
+build them as a group or stub them and write the stub into `STUBS.md`; a workflow record that
+is quietly dropped looks exactly like one that was persisted, and §9.1 scores persistence.
 
 **Steps 1, 2 and 3 are done.** `Ward` landed in `Patient_AddWard` (PR #12). `Patient`,
 `Admission`, `Appointment`, `BedAssignment`, `Discharge` and `DischargeChecklistItem`
@@ -377,10 +392,17 @@ the group as `integration_of_functions.md` §11.14.
   not allow this" from the walk-in `/arrive` chain that only a ward nurse may call, and an ICU
   bed for an ICU patient was wrongly coloured as an override when it is simply the right bed.
 
-**Steps 13–16 are self-contained.** Nothing else in the group depends on the care advisory
-agent, and it depends on nothing outside this component beyond the `doctor` role claim,
-which auth already issues. Build it in parallel with the bed-agent track or after it — it
-does not gate anyone and nobody gates it.
+**Steps 11, 14, 15 and 16 are self-contained.** Nothing else in the group depends on the care
+advisory agent or the medical profile, and they depend on nothing outside this component
+beyond the `doctor` and `ward_nurse` role claims, which auth already issues, and the shared
+workflow tables that neither agent can do without. Build this track in parallel with the
+bed-agent one or after it — it does not gate anyone, and the only thing gating it is
+`AgentWorkflow`.
+
+**Step 11 is the exception and is worth starting today.** A table, a migration, two endpoints
+and a form — no agent, no LLM, no workflow tables, nothing blocked. It is also the step that
+decides whether the care agent has anything to reason over, so doing it late is how step 15
+ends up being a model rephrasing a sentence.
 
 ---
 
@@ -469,6 +491,7 @@ Two things your Flutter screens must handle:
 | ~~`GET /beds` — the bed register~~ | M3 | **Real since 2026-09-10.** Read it through `IBedRegistryService`, which is the one file in this component that knows Equipment's bed table exists. Never write it |
 | `POST /staff/lookup` | M2 | Rendering "Approved by …" |
 | Dispatch notification | M1 | Triggers your pre-admission |
+| **`AgentWorkflow` / `AgentProposedChange`** | **Common — the group** | **Both agents need it and it does not exist.** ADR 3 settled the design on 2026-09-07; nobody has built it. Not yours to write (`CLAUDE.md`, "Common vs. yours") — raise it with the group, and stub it in the meantime with the row recorded in `STUBS.md` |
 
 **Others are waiting on you for:** ~~`Ward` (all three)~~ **built**,
 ~~`GET /capacity/wards` (M1)~~ **built 2026-09-11**,

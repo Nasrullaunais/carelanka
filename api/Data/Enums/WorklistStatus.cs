@@ -6,8 +6,6 @@ namespace CareLanka.Api.Data.Enums;
 [TypeConverter(typeof(SnakeCaseEnumTypeConverter<WorklistStatus>))]
 public enum WorklistStatus
 {
-    NotArrived,
-
     AwaitingBed,
 
     BedReady,

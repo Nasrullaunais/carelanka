@@ -10,6 +10,8 @@ enum RaisedBy {
   agent('agent'),
   @JsonValue('user')
   user('user'),
+  @JsonValue('system')
+  system('system'),
   /// Default value for all unparsed values, allows backward compatibility when adding new values on the backend.
   $unknown(null);
 

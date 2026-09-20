@@ -3,8 +3,12 @@ namespace CareLanka.Api.Data.Enums;
 public enum DispatchStatus
 {
     Assigned,
-    EnRoute,
-    Completed,
+    Acknowledged,
+    EnRouteToScene,
+    AtScene,
+    TransportingToHospital,
+    HandedOver,
+    Declined,
     Cancelled,
     Reassigned
 }

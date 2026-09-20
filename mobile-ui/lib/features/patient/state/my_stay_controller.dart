@@ -3,31 +3,29 @@ import 'package:flutter/foundation.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/widgets/async_data.dart';
 import '../../../services/api_client/models/my_admission.dart';
+import '../../../services/api_client/models/my_bill.dart';
 import '../services/patient_service.dart';
 
-/// What the patient's own-stay screen is showing.
 sealed class MyStay {
   const MyStay();
 }
 
-/// The account has no hospital record behind it yet — the ordinary state for a
-/// new signup, not an error.
 final class MyStayNotLinked extends MyStay {
   const MyStayNotLinked();
 }
 
-/// Linked, but not currently admitted.
 final class MyStayNoAdmission extends MyStay {
   const MyStayNoAdmission();
 }
 
 final class MyStayCurrent extends MyStay {
-  const MyStayCurrent(this.admission);
+  const MyStayCurrent(this.admission, {this.bill});
   final MyAdmission admission;
+
+  /// Null when the billing desk has not raised one, which is most of a stay.
+  final MyBill? bill;
 }
 
-/// The patient's own admission — read-only, and scoped by the `sub` claim, so
-/// no patient id is ever sent.
 class MyStayController extends ChangeNotifier {
   MyStayController(this._service);
 
@@ -37,15 +35,20 @@ class MyStayController extends ChangeNotifier {
 
   AsyncData<MyStay> get state => _state;
 
-  Future<void> load() async {
-    _state = const AsyncData.loading();
-    notifyListeners();
+  Future<void> load({bool showLoading = true}) async {
+    if (showLoading) {
+      _state = const AsyncData.loading();
+      notifyListeners();
+    }
 
     try {
-      _state = AsyncData.ready(MyStayCurrent(await _service.loadMyAdmission()));
+      final admission = await _service.loadMyAdmission();
+
+      _state = AsyncData.ready(
+        MyStayCurrent(admission, bill: await _loadBill(admission.admissionId)),
+      );
     } on ApiException catch (error) {
-      // Both of these arrive as 404 and mean completely different things, so
-      // the code decides and the status never does.
+      // Both arrive as 404 but mean different things — branch on the code, not the status.
       _state = switch (error.code) {
         PatientService.notLinkedCode => const AsyncData.ready(MyStayNotLinked()),
         PatientService.noCurrentStayCode => const AsyncData.ready(MyStayNoAdmission()),
@@ -54,5 +57,15 @@ class MyStayController extends ChangeNotifier {
       };
     }
     notifyListeners();
+  }
+
+  // The bill is an extra panel on the stay, not the stay itself. A stay that renders
+  // without its bill beats a stay that fails to render because the bill would not load.
+  Future<MyBill?> _loadBill(String admissionId) async {
+    try {
+      return await _service.loadMyBill(admissionId);
+    } on ApiException {
+      return null;
+    }
   }
 }

@@ -3,10 +3,12 @@ import {
   canReadPatientDetails,
   canReadCapacity,
   canReadEquipment,
+  canRunMaintenance,
+  canReadWarnings,
   canReadLabReports,
   canReadWards,
   canRegisterPatient,
-  canWorkAppointmentDesk,
+  canOpenAppointmentBoard,
   canOpenDischargeBoard,
   canSetBillingRates,
 } from './permissions';
@@ -35,8 +37,8 @@ export const destinations: Destination[] = [
   {
     to: '/appointments',
     label: 'Expected visits',
-    description: 'Who has booked to come in. Take a booking, or check someone in.',
-    canAccess: canWorkAppointmentDesk,
+    description: 'Who has booked to come in, and when they are expected.',
+    canAccess: canOpenAppointmentBoard,
   },
   {
     to: '/discharge',
@@ -72,8 +74,14 @@ export const destinations: Destination[] = [
   {
     to: '/maintenance-unit',
     label: 'Maintenance unit',
-    description: 'Machines waiting to be fixed. Confirm a repair and the item goes back into service.',
-    canAccess: canReadEquipment,
+    description: 'Book maintenance, confirm repairs done, and retire machines beyond repair.',
+    canAccess: canRunMaintenance,
+  },
+  {
+    to: '/warnings',
+    label: 'Warnings',
+    description: 'Medicine running low or about to expire, and machines overdue for service.',
+    canAccess: canReadWarnings,
   },
   {
     to: '/laboratory',

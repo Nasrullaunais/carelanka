@@ -30,6 +30,30 @@ export function canManageEquipment(role: PrincipalRole | undefined): boolean {
   return role === 'equipment_manager';
 }
 
+// The equipment manager registers an item and the hospital administrator confirms it on the
+// mobile app. Both need to know how many are still waiting.
+export function canTrackEquipmentConfirmations(role: PrincipalRole | undefined): boolean {
+  return role === 'equipment_manager' || role === 'hospital_administrator';
+}
+
+// Only the hospital administrator, so nobody confirms an item they registered themselves. The API
+// also wants the confirmation code on top of the role.
+export function canConfirmEquipment(role: PrincipalRole | undefined): boolean {
+  return role === 'hospital_administrator';
+}
+
+// The maintenance unit is the hospital administrator's: booking work, the open-jobs list, confirming
+// repairs and retiring what cannot be fixed. The equipment manager only reports faults.
+export function canRunMaintenance(role: PrincipalRole | undefined): boolean {
+  return role === 'hospital_administrator';
+}
+
+// Low stock, expiring medicine and overdue maintenance: the equipment manager runs the pharmacy
+// and the register, and the administrator runs the maintenance unit.
+export function canReadWarnings(role: PrincipalRole | undefined): boolean {
+  return role === 'equipment_manager' || role === 'hospital_administrator';
+}
+
 export function canReportFault(role: PrincipalRole | undefined): boolean {
   return isStaff(role);
 }
@@ -61,15 +85,42 @@ export function canReadPatientDetails(role: PrincipalRole | undefined): boolean 
   return isStaff(role) && role !== 'ambulance_crew';
 }
 
+/// The medical profile the care advisory agent reads. The duty manager is on it because they
+/// work the patients board; reception and the billing desk are not, and that is the whole point
+/// of it being separate from canReadPatientDetails.
+export function canReadMedicalProfile(role: PrincipalRole | undefined): boolean {
+  return role === 'ward_nurse' || role === 'doctor' || role === 'duty_manager';
+}
+
+/// Narrower than canReadMedicalProfile by the duty manager, who reads a ward board rather than
+/// taking a clinical history.
+export function canWriteMedicalProfile(role: PrincipalRole | undefined): boolean {
+  return role === 'ward_nurse' || role === 'doctor';
+}
+
 export function canEditAdmissions(role: PrincipalRole | undefined): boolean {
   return role === 'ward_nurse' || role === 'duty_manager';
 }
 
+/// Reception is on this on purpose: booking, checking in, calling off and
+/// recording a visit as seen is front-desk work, and the desk is who the
+/// patient walks up to.
 export function canWorkAppointmentDesk(role: PrincipalRole | undefined): boolean {
-  return role === 'ward_nurse' || role === 'duty_manager';
+  return role === 'ward_nurse' || role === 'general_staff' || role === 'duty_manager';
+}
+
+/// Who may open the bookings list. Wider than who may act on a booking: the
+/// billing desk has to reach a finished appointment to bill it, but cannot
+/// check anyone in. Mirrors `canOpenDischargeBoard`.
+export function canOpenAppointmentBoard(role: PrincipalRole | undefined): boolean {
+  return canWorkAppointmentDesk(role) || canWorkBillingDesk(role);
 }
 
 export function canSetHighCareLevel(role: PrincipalRole | undefined): boolean {
+  return role === 'duty_manager';
+}
+
+export function canManageEmergency(role: PrincipalRole | undefined): boolean {
   return role === 'duty_manager';
 }
 
@@ -104,12 +155,20 @@ export function canWorkBillingDesk(role: PrincipalRole | undefined): boolean {
   );
 }
 
+/// An outpatient bill, not an admission one. Wider by the ward nurse: the
+/// patient walks in and out the same day, so whoever records the visit as seen
+/// is who takes the money for it. Settling an admission bill ticks the
+/// discharge checklist and stays reception's alone.
+export function canBillAppointment(role: PrincipalRole | undefined): boolean {
+  return canWorkBillingDesk(role) || role === 'ward_nurse';
+}
+
 export function canCompleteVisit(role: PrincipalRole | undefined): boolean {
   return role === 'ward_nurse' || role === 'duty_manager';
 }
 
 export function canMarkArrived(role: PrincipalRole | undefined): boolean {
-  return role === 'ward_nurse';
+  return role === 'ward_nurse' || role === 'general_staff' || role === 'duty_manager';
 }
 
 export function canReadCapacity(role: PrincipalRole | undefined): boolean {

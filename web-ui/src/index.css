@@ -208,8 +208,14 @@ table {
   font-size: 0.9rem;
 }
 
+/* Rows wrap unevenly the moment one column's text runs to a second line — a status
+   badge with a note under it, say, next to a plain one-line date. Top-aligning every
+   cell keeps every row's first line on one shared baseline regardless of how tall its
+   neighbours grow, instead of the action button drifting to the middle of a tall row
+   while the row's own text sits at the top. */
 th {
   text-align: left;
+  vertical-align: top;
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -219,8 +225,17 @@ th {
 }
 
 td {
+  vertical-align: top;
   padding: 0.6rem;
   border-bottom: 1px solid var(--line);
+}
+
+/* A handful of columns are always one short, fixed word or two ("At the desk", "Ready") —
+   wrapping those to a second line only because their column happens to be narrow makes
+   the row taller than its content needs, which is what throws neighbouring rows out of
+   rhythm. */
+td.nowrap {
+  white-space: nowrap;
 }
 
 tr:last-child td {
@@ -252,10 +267,54 @@ tr:last-child td {
   margin: 0 0 1rem;
 }
 
+.info-note {
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  padding: 0.6rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  color: var(--ink);
+  margin: 0 0 1rem;
+}
+
 .empty {
   text-align: center;
   color: var(--ink-soft);
   padding: 2rem 1rem;
+}
+
+/* ---------- emergency dispatch ---------- */
+
+.emergency-notice,
+.emergency-countdown,
+.emergency-warning {
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+
+.emergency-notice,
+.emergency-countdown {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.emergency-warning,
+.emergency-block {
+  color: var(--warn);
+}
+
+.emergency-warning { background: #fdf6e7; }
+.emergency-section { border-top: 1px solid var(--line); margin-top: 1rem; padding-top: 1rem; }
+.emergency-ambulance { display: flex; justify-content: space-between; align-items: center; gap: 1rem; border-bottom: 1px solid var(--line); padding: 0.75rem 0; }
+.emergency-ambulance:last-child { border-bottom: none; }
+.emergency-block { font-size: 0.8rem; margin: 0.25rem 0 0; }
+.emergency-crew { margin: 0 0 0.8rem; padding-left: 1.25rem; }
+.emergency-form { align-items: end; }
+.emergency-action { flex: 0 0 auto; }
+
+@media (max-width: 640px) {
+  .emergency-ambulance { align-items: stretch; flex-direction: column; }
 }
 
 .login-page {
@@ -419,6 +478,22 @@ tr.selected {
 
 .detail-grid dd {
   margin: 0.15rem 0 0;
+}
+
+/* The sign-off list borrows `.field`'s label-plus-hint look for what is not a form field,
+   so giving it its own grid keeps the label, the status and the action lined up on one row
+   each instead of stacking at whatever height each one's own text happens to need. */
+.checklist-row {
+  display: grid;
+  grid-template-columns: minmax(12rem, 2fr) minmax(10rem, 1.5fr) auto;
+  align-items: start;
+  gap: 0.85rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.checklist-row:last-of-type {
+  border-bottom: none;
 }
 
 .dialog-head {

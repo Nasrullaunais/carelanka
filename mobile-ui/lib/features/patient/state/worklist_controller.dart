@@ -5,7 +5,6 @@ import '../../../core/widgets/async_data.dart';
 import '../../../services/api_client/models/worklist_row.dart';
 import '../services/patient_service.dart';
 
-/// The ward nurse's board: every booking and visit for today, in one list.
 class WorklistController extends ChangeNotifier {
   WorklistController(this._service);
 

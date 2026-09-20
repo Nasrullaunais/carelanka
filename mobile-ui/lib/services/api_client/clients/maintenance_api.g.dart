@@ -92,21 +92,88 @@ class _MaintenanceApi implements MaintenanceApi {
   }
 
   @override
-  Future<MaintenanceSchedule> completeMaintenanceSchedule({
-    required String id,
-    CompleteMaintenanceScheduleRequest? body,
+  Future<List<MaintenanceSchedule>>
+  listMaintenanceSchedulesAwaitingConfirmation({
+    required String xConfirmationCode,
   }) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
-    queryParameters.removeWhere((k, v) => v == null);
+    final _headers = <String, dynamic>{
+      r'X-Confirmation-Code': xConfirmationCode,
+    };
+    _headers.removeWhere((k, v) => v == null);
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<List<MaintenanceSchedule>>(
+      Options(method: 'GET', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/maintenance-schedules/pending-confirmation',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<List<dynamic>>(_options);
+    late List<MaintenanceSchedule> _value;
+    try {
+      _value = _result.data!
+          .map(
+            (dynamic i) =>
+                MaintenanceSchedule.fromJson(i as Map<String, dynamic>),
+          )
+          .toList();
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
+  Future<PendingEquipmentCount>
+  countMaintenanceSchedulesAwaitingConfirmation() async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
-    final _data = <String, dynamic>{};
-    _data.addAll(body?.toJson() ?? <String, dynamic>{});
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<PendingEquipmentCount>(
+      Options(method: 'GET', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/maintenance-schedules/pending-confirmation/count',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, Object?>>(_options);
+    late PendingEquipmentCount _value;
+    try {
+      _value = PendingEquipmentCount.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
+  Future<MaintenanceSchedule> confirmMaintenanceSchedule({
+    required String id,
+    required String xConfirmationCode,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{
+      r'X-Confirmation-Code': xConfirmationCode,
+    };
+    _headers.removeWhere((k, v) => v == null);
+    const Map<String, dynamic>? _data = null;
     final _options = _setStreamType<MaintenanceSchedule>(
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            '/maintenance-schedules/${id}/complete',
+            '/maintenance-schedules/${id}/confirm',
             queryParameters: queryParameters,
             data: _data,
           )

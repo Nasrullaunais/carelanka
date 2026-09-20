@@ -66,14 +66,11 @@ public sealed class AuthService : IAuthService
 
     public async Task<AuthTokens> RegisterPatientAsync(PatientRegisterRequest request, CancellationToken ct = default)
     {
-        var phone = request.PhoneNumber.Trim();
-
         var account = new PatientAccount
         {
             Id = Guid.NewGuid(),
-            PhoneNumber = phone,
+            Username = UsernameRules.Normalise(request.Username),
             PasswordHash = _passwords.Hash(request.Password),
-            FullName = request.FullName.Trim(),
             LastLoginAt = DateTimeOffset.UtcNow
         };
 
@@ -83,23 +80,23 @@ public sealed class AuthService : IAuthService
         {
             return await IssueAsync(ToPrincipal(account), account.Id, PrincipalType.Patient, ct);
         }
-        catch (DbUpdateException exception) when (IsDuplicatePhoneNumber(exception))
+        catch (DbUpdateException exception) when (IsDuplicateUsername(exception))
         {
-            throw new ConflictException(MessageCode.PhoneNumberAlreadyRegistered);
+            throw new ConflictException(MessageCode.UsernameAlreadyTaken);
         }
     }
 
     public async Task<AuthTokens> LoginPatientAsync(PatientLoginRequest request, CancellationToken ct = default)
     {
-        var phone = request.PhoneNumber.Trim();
+        var username = UsernameRules.Normalise(request.Username);
 
-        _throttle.EnsureNotLockedOut(phone);
+        _throttle.EnsureNotLockedOut(username);
 
-        var account = await _db.PatientAccounts.FirstOrDefaultAsync(p => p.PhoneNumber == phone, ct);
+        var account = await _db.PatientAccounts.FirstOrDefaultAsync(p => p.Username == username, ct);
 
         if (!VerifyOrDecoy(account?.PasswordHash, request.Password, out var needsRehash))
         {
-            _throttle.RecordFailure(phone);
+            _throttle.RecordFailure(username);
             throw new UnauthorizedException();
         }
 
@@ -109,7 +106,7 @@ public sealed class AuthService : IAuthService
         }
 
         account!.LastLoginAt = DateTimeOffset.UtcNow;
-        _throttle.RecordSuccess(phone);
+        _throttle.RecordSuccess(username);
 
         return await IssueAsync(ToPrincipal(account), account.Id, PrincipalType.Patient, ct);
     }
@@ -261,10 +258,11 @@ public sealed class AuthService : IAuthService
         Id = account.Id,
         PrincipalType = PrincipalType.Patient,
         Role = PrincipalRole.Patient,
-        DisplayName = account.FullName,
+        // The username, not a person's name: the account is created before any
+        // medical record exists, so there is no full name to show yet.
+        DisplayName = account.Username,
         Email = null,
-        PhoneNumber = account.PhoneNumber,
-
+        PhoneNumber = null,
         PatientId = null
     };
 
@@ -277,10 +275,10 @@ public sealed class AuthService : IAuthService
     private static PrincipalRole ToPrincipalRole(StaffRole role)
         => Enum.Parse<PrincipalRole>(role.ToString());
 
-    private static bool IsDuplicatePhoneNumber(DbUpdateException exception)
+    private static bool IsDuplicateUsername(DbUpdateException exception)
         => exception.InnerException is PostgresException
         {
             SqlState: PostgresErrorCodes.UniqueViolation,
-            ConstraintName: PatientAccountConfiguration.PhoneNumberUniqueIndex
+            ConstraintName: PatientAccountConfiguration.UsernameUniqueIndex
         };
 }

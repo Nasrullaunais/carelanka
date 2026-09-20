@@ -45,7 +45,10 @@ tags:
       The ward register (ours) and bed availability. The beds themselves belong to Equipment
       Management; endpoints here read their register and join it with our assignments.
   - name: Bed Assignment
-    description: Agent proposals, human approval, and manual override.
+    description: >-
+      Agent suggestions and the one endpoint that actually places a patient in a bed. The
+      agent writes nothing; a human pressing "Use this bed" runs the same manual endpoint,
+      with the same hard rules and the same row lock, that has always been there.
   - name: Discharge
     description: Discharge checklist and confirmation.
   - name: Billing
@@ -54,9 +57,10 @@ tags:
       2026-09-11 - see integration_of_functions.md section 11.10.
   - name: Care Recommendations
     description: |
-      The second agent. A patient describes a symptom or concern; the agent drafts a
-      decision-support note; a Doctor must approve, edit or reject it before the patient
-      ever sees it. Never a diagnosis - see patient-management-plan.md section 8.10.
+      The second agent. An ADMITTED patient describes how they are feeling; the agent reads
+      their medical profile and the administrative shape of their past visits and drafts a
+      decision-support note; a Doctor or a Ward Nurse must approve, edit or reject it before
+      the patient ever sees it. Never a diagnosis - see patient-management-plan.md 8.10.
   - name: Patient Self-Service
     description: What a logged-in patient may see about themselves. Deliberately narrow.
   - name: Reports
@@ -275,6 +279,70 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
+  /patients/{id}/medical-profile:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Patients]
+      summary: What the hospital knows about this person's health
+      description: |
+        Roles: WardNurse, Doctor, DutyManager.
+
+        Added 2026-09-16. Four free-text fields a clinician typed: known conditions, allergies,
+        current symptoms, recent situation. This is what the Patient Care Advisory Agent reads,
+        and before it existed that agent had nothing to reason over but demographics.
+
+        It is NOT an electronic health record and does not pretend to be one. No vitals, no lab
+        results, no coded diagnosis, no clinical assessment, no history of changes beyond who
+        last wrote it and when. Recording that a patient is asthmatic is not diagnosing asthma,
+        which is why this does not move the project's clinical scope line.
+
+        Returns 200 with every field null when nobody has written one. An empty profile is the
+        ordinary state of a patient nobody has got to yet, not a 404 - and the agent handles it
+        by drafting from the patient's own words and saying it had no history to work from.
+
+        There is deliberately no /me/ equivalent. Showing somebody their own clinical record
+        raises correction rights and wording questions that are a feature in their own right.
+      operationId: getPatientMedicalProfile
+      responses:
+        '200':
+          description: The profile, possibly empty
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatientMedicalProfile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Patients]
+      summary: Create or replace the medical profile
+      description: |
+        Roles: WardNurse, Doctor. Reception and the billing desk are deliberately not on that
+        list - they take names and money, not clinical history.
+
+        A full replace, not a patch. With four free-text fields a partial update cannot tell
+        "clear this field" from "I did not send it", and a clinical note silently kept alive by
+        an omitted key is the wrong way round.
+
+        Creates the row on first write. One profile per patient, enforced by a unique index
+        rather than a check-then-insert that two requests can both pass.
+      operationId: replacePatientMedicalProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateMedicalProfileRequest' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatientMedicalProfile' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   # ------------------------------------------------------------------
   # Admissions
   # ------------------------------------------------------------------
@@ -442,7 +510,7 @@ paths:
       tags: [Admissions]
       summary: Mark the patient as physically present in the bed
       description: |
-        Roles: WardNurse.
+        Roles: WardNurse, GeneralStaff, DutyManager.
 
         Business operation beyond CRUD. Moves `bed_reserved` -> `admitted`, sets `admitted_at`,
         and flips the bed assignment from `reserved` to `occupied` so the hold can no longer
@@ -793,47 +861,59 @@ paths:
   # Bed assignment and the agent
   # ------------------------------------------------------------------
 
-  /admissions/{id}/bed-suggestion:
-    parameters:
-      - $ref: '#/components/parameters/PathId'
+  /bed-suggestions:
     post:
       tags: [Bed Assignment]
-      summary: Ask the Patient Admission and Bed Agent for a bed
+      summary: Ask the Bed and Patient Details Agent who this is and where they go
       description: |
-        Roles: WardNurse, DutyManager.
+        Roles: WardNurse, DutyManager, Reception.
 
         Agent entry point. Starts the workflow and returns immediately with a `workflow_id`;
         poll `/bed-workflows/{workflowId}` for progress.
 
-        What the agent does, in order: reads the admission's requirements, lists candidate beds,
-        discards every bed failing a hard rule, ranks the survivors on soft rules, and proposes
-        one - placing a 30 minute hold so nobody else takes it while a human decides.
+        Replaced `POST /admissions/{id}/bed-suggestion` on 2026-09-16. That route could only be
+        reached from a record somebody had already found, which is not the situation at a desk.
+        The body now takes EITHER an `admission_id` - from a row on the patients board - OR a
+        `patient_identifier`, which is an NIC or a patient code off the hospital slip. The agent
+        is not told which kind it was given; `PatientIdentifierFormats` already tells them apart.
 
-        Its proposal is then re-checked by a deterministic validator written in ordinary C#,
-        not by the model. A proposal that breaks a hard rule never reaches a human.
+        What the agent does, in order: resolves the patient, reads the admission's requirements,
+        lists candidate beds, discards every bed failing a hard rule H0-H6, ranks the survivors
+        on soft rules, and returns a best bed plus every other bed that passed, each one
+        selectable.
 
-        The agent has four tools: three read-only, and one that can only create a proposal
-        awaiting approval. There is no tool that admits a patient, confirms a discharge, changes
-        an admission category, or frees an occupied bed. Least privilege is enforced by the tool
-        list, not by prompt wording.
+        THE AGENT WRITES NOTHING. Changed 2026-09-16: it used to place a 30 minute hold on its
+        chosen bed before a human saw anything. All four of its tools are now read-only, so a
+        run nobody acts on leaves the database exactly as it found it and takes no bed out of
+        circulation. The workflow pauses at `awaiting_approval`; the admission stays at
+        `awaiting_bed` and the bed stays free for anybody.
 
-        When no bed of the requested category is free, the agent tries one step down the ladder
-        (icu -> hdu -> inpatient) and returns `proposed_with_downgrade`, which always requires
-        DutyManager approval. When nothing on the ladder is free either, it returns
-        `no_bed_available` and the admission stays in `awaiting_bed` - a safe, recorded failure
-        rather than a guess.
+        Committing a suggestion is `POST /admissions/{id}/assign-bed` with the `workflow_id` -
+        the same endpoint, the same row lock and the same hard rules a manual pick has always
+        run through. There is no agent-only write path, and no separate approve endpoint.
+
+        When it cannot suggest a bed it says which wall it hit rather than returning a bare
+        "none available": every blocked outcome carries a `blocker` with a machine code and one
+        plain sentence built in C# from the rule that actually stopped it, never written by the
+        model.
       operationId: requestBedSuggestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BedSuggestionRequest' }
       responses:
         '202':
           description: Workflow started
           content:
             application/json:
               schema: { $ref: '#/components/schemas/BedWorkflowAccepted' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: This admission is not in a status that can receive a bed proposal.
+          description: This admission is not in a status that can receive a bed suggestion.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -853,12 +933,13 @@ paths:
       tags: [Bed Assignment]
       summary: Agent execution summary
       description: |
-        Roles: WardNurse, DutyManager.
+        Roles: WardNurse, DutyManager, Reception.
 
         Plan, completed steps, tool calls with timings, validation results, errors, retries,
-        approval status and final outcome.
+        approval status and final outcome - plus the answer itself: who the patient is, the
+        suggested bed, every selectable alternative, and the blocker when there is one.
 
-        `rationale` is a short human-readable summary shown in React. The model's raw internal
+        `rationale` is a short human-readable summary shown on screen. The model's raw internal
         reasoning is NOT stored - the assignment requires persisting only the workflow state the
         design needs, not hidden reasoning.
       operationId: getBedWorkflow
@@ -872,86 +953,17 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
-  /bed-assignments/{id}/approve:
-    parameters:
-      - $ref: '#/components/parameters/PathId'
-    post:
-      tags: [Bed Assignment]
-      summary: Approve a proposed bed - the high-impact human gate
-      description: |
-        Roles: WardNurse for a matching general, maternity or pediatric bed.
-        DutyManager only for ICU, HDU, or any downgrade.
-
-        ICU beds are the scarcest resource in a hospital, so neither the AI nor a ward nurse can
-        commit one alone. This is one of the two actions in this component that pause for
-        authorised human approval.
-
-        Before committing, the server re-checks that the bed is still free, inside a transaction
-        holding a row lock on the bed. This matters: the agent may propose bed 12 at 14:00 and
-        the nurse approve at 14:04, while someone else took it at 14:02. Without the lock, two
-        concurrent approvals both pass their check and both write. With it, the second waits,
-        re-reads, sees the bed taken, and fails cleanly with 409.
-
-        That re-check IS the deterministic validation the assignment requires before a
-        high-impact action. It is plain C# testing a fact against the database, with no model
-        involved. On 409, the client re-runs the agent and shows the nurse a fresh proposal.
-      operationId: approveBedAssignment
-      responses:
-        '200':
-          description: Approved. Admission moves to `bed_reserved`.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/BedAssignment' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403':
-          description: This role may not approve this bed. ICU, HDU and downgrades need a DutyManager.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ProblemDetails' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409':
-          description: The bed is no longer available, or the hold expired. Re-run the agent.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ProblemDetails' }
-
-  /bed-assignments/{id}/reject:
-    parameters:
-      - $ref: '#/components/parameters/PathId'
-    post:
-      tags: [Bed Assignment]
-      summary: Reject a proposed bed
-      description: |
-        Roles: WardNurse, DutyManager.
-
-        Releases the hold and returns the admission to `awaiting_bed` - the same place an expired
-        hold lands. One waiting state for every failure path, rather than a separate error state
-        for each thing that can go wrong.
-
-        The rejected assignment row is kept with `release_reason: rejected`. Nothing is deleted,
-        so the audit trail shows what was proposed and refused, not only what was accepted. The
-        reason also feeds the agent-performance report.
-      operationId: rejectBedAssignment
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [reason]
-              properties:
-                reason: { type: string, maxLength: 500 }
-      responses:
-        '200':
-          description: Rejected, hold released, admission back to `awaiting_bed`
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Admission' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-
+  # WITHDRAWN 2026-09-16, never built: /bed-assignments/{id}/approve and
+  # /bed-assignments/{id}/reject.
+  #
+  # Both existed to approve or release a bed hold the agent had already written. The agent no
+  # longer writes one - see /bed-suggestions above - so there is nothing to approve after the
+  # fact and nothing to release. Pressing "Use this bed" IS the approval, and it runs
+  # /admissions/{id}/assign-bed with every check that endpoint has always had: H0-H6, the role
+  # gate, and a row lock. Rejecting a suggestion is closing the panel.
+  #
+  # Recorded here rather than deleted silently, because patient-management-plan.md 5.2 and the
+  # React screens both referred to them by name for two weeks.
   /admissions/{id}/assign-bed:
     parameters:
       - $ref: '#/components/parameters/PathId'
@@ -1516,6 +1528,92 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
+  /me/claim/preview:
+    post:
+      tags: [Patient Self-Service]
+      summary: Check a patient code before claiming it
+      description: |
+        Roles: Patient. Resolved from the JWT.
+
+        For the patient who was registered at the desk - a walk-in, an emergency arrival -
+        and only afterwards installed the app. Staff already hold their record; this joins
+        their new login to it, matching on the patient code printed on their hospital slip
+        plus the NIC on file for that record.
+
+        **Answers the "is this you?" step, and answers it masked.** Holding a code and a
+        matching NIC is enough to be shown `L••••a D•••••••e`; it is not enough to be handed
+        the record. A slip of paper gets photographed, dropped and left on trolleys, so the
+        reply carries nothing a stranger could use and nothing a patient could not recognise.
+
+        Both the code and the NIC must match. 404 `cl_pat_037` covers every failure with one
+        message - no such code, wrong NIC, no NIC on file, already claimed. Naming which one
+        would confirm to whoever holds the slip that the code is real, and that is precisely
+        what the NIC is there to prevent.
+
+        Nothing is written. Call `POST /me/claim` with the same body to commit.
+      operationId: previewMyClaim
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClaimByPatientCodeRequest' }
+      responses:
+        '200':
+          description: A masked summary of the record that code belongs to
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatientClaimPreview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This login is already linked to a patient record (`cl_pat_004`)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /me/claim:
+    post:
+      tags: [Patient Self-Service]
+      summary: Link your login to the record the hospital already holds
+      description: |
+        Roles: Patient. Resolved from the JWT.
+
+        Commits what `POST /me/claim/preview` showed, taking the same body. From here the
+        login owns that record: `/me/admission` starts answering with the stay staff created
+        at the desk, ward and bed and all, and `/me/history` with everything before it.
+
+        **The account must exist first.** Registration is `POST /auth/patient/register` and is
+        not part of this. Claiming from a real login rather than from an anonymous caller is
+        what makes the claim attributable, and it keeps this endpoint out of common auth.
+
+        One record per login, one login per record. 409 `cl_pat_004` when this login already
+        has a record - claiming a second would orphan the first patient's history, so the app
+        sends them to the desk. The same 404 `cl_pat_037` as the preview covers every other
+        failure.
+      operationId: claimMyRecord
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClaimByPatientCodeRequest' }
+      responses:
+        '200':
+          description: The record, now yours
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyProfile' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This login is already linked to a patient record (`cl_pat_004`)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
   /me/profile:
     get:
       tags: [Patient Self-Service]
@@ -1590,6 +1688,112 @@ paths:
                         items: { $ref: '#/components/schemas/MyAdmission' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+
+  /me/admissions/{admissionId}/bill:
+    parameters:
+      - name: admissionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+        description: One of your own admissions, from /me/admission or /me/history.
+    get:
+      tags: [Patient Self-Service]
+      summary: The bill for one of your stays
+      description: |
+        Roles: Patient. Resolved from the JWT, and the admission must be one of yours -
+        another patient's id answers 404, the same as an id that does not exist.
+
+        Returns `MyBill`, a separate narrow shape on the same principle as `MyAdmission`.
+        The staff `Bill` carries who raised it, who settled it, the settlement note and a
+        `PatientSummary` with the NIC in it. None of that is a patient's business, and a
+        separate shape cannot leak what it does not contain.
+
+        **`is_final` is the field that matters.** While the admission is still open, bed
+        nights are still accruing and the total will grow, so `is_final` is false and the app
+        must label the number as a running total rather than the amount due. It turns true
+        once the admission is discharged or cancelled.
+
+        404 `cl_pat_036` when the billing desk has not raised a bill for the stay yet, which
+        is the ordinary state for a patient who was admitted this morning. The app reads that
+        as "nothing to show yet", not as an error.
+
+        Serves both screens: My Stay reads it for the current admission, Past Visits for a
+        discharged one. One bill per admission, so the admission id is the whole key.
+      operationId: getMyBill
+      responses:
+        '200':
+          description: The bill for that stay
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyBill' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /me/lab-reports:
+    get:
+      tags: [Patient Self-Service]
+      summary: Your own laboratory results, newest first
+      description: |
+        Roles: Patient. Resolved from the JWT - there is no patient id to pass, unlike the
+        staff `GET /lab-reports`, so being handed somebody else's is impossible rather than
+        merely checked.
+
+        Metadata only, same reasoning as the staff route: each row says what the test was and
+        how big the file is, so opening this screen does not pull every PDF down the wire.
+        The file itself is `GET /me/lab-reports/{reportId}/file`.
+
+        Reads through Equipment's laboratory service, never Patient Management's own tables -
+        `lab_reports` is theirs (`integration_of_functions.md` §3). An empty list is the
+        ordinary state for a patient with no results yet, not an error.
+      operationId: getMyLabReports
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of your own results
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/MyLabReport' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /me/lab-reports/{reportId}/file:
+    parameters:
+      - name: reportId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+        description: One of your own results, from /me/lab-reports.
+    get:
+      tags: [Patient Self-Service]
+      summary: The file behind one of your own results
+      description: |
+        Roles: Patient. A wrong id and a right id that belongs to somebody else both answer
+        404 identically, so neither answer confirms the other id exists.
+
+        `Content-Disposition: inline` - a patient reading a result on their own phone is the
+        normal case, not a forced download.
+      operationId: downloadMyLabReport
+      responses:
+        '200':
+          description: The file
+          content:
+            application/pdf: { schema: { type: string, format: binary } }
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/png: { schema: { type: string, format: binary } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /me/appointments:
     post:
@@ -1690,6 +1894,40 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
+  /me/appointments/{appointmentId}/bill:
+    parameters:
+      - name: appointmentId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+        description: One of your own appointments, from /me/appointments.
+    get:
+      tags: [Patient Self-Service]
+      summary: The bill for a visit you were seen at and sent home from
+      description: |
+        Roles: Patient. Resolved from the JWT, and the appointment must be one of yours -
+        another patient's id answers 404, the same as an id that does not exist.
+
+        Returns `MyBill`, the same shape `GET /me/admissions/{admissionId}/bill` returns,
+        with `appointment_id` set instead of `admission_id`. `is_final` is always true - a
+        consultation charge is raised once, not accrued like bed nights are.
+
+        404 `cl_pat_036` when the billing desk has not raised a bill for the visit yet.
+
+        404 `cl_pat_035` when the visit ended in an admission instead of the patient going
+        straight home - the bill is on that admission, not this appointment. The app reads
+        that as "look in Past visits", not as an error.
+      operationId: getMyAppointmentBill
+      responses:
+        '200':
+          description: The bill for that visit
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyBill' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   # ------------------------------------------------------------------
   # Appointments - staff side
   # ------------------------------------------------------------------
@@ -1697,32 +1935,26 @@ paths:
   /patient-worklist:
     get:
       tags: [Admissions]
-      summary: The ward board - bookings and visits in one list
+      summary: The ward board - everyone in the hospital's care
       description: |
         Roles: GeneralStaff, WardNurse, DutyManager, HospitalAdministrator, Doctor, EquipmentManager. The same as `GET /admissions`, because it is the same data read a different way.
 
-        **Two tables, one list.** A row is either a booking nobody has checked in yet
-        (`kind: booking`, `status: not_arrived`) or a visit that has started (`kind: visit`).
+        **Everyone physically here**: waiting for a bed, in a bed, or just finished.
 
-        **Why this exists and `GET /admissions` cannot do it.** An `Admission` is created by
-        arriving, so a list of admissions can never say "not arrived" about anybody. The
-        patient booked in for a scan at eleven was invisible until she walked through the
-        door, and the desk had to read a second screen to find her.
+        **Bookings are not on it - changed 2026-09-15.** They used to appear as
+        `kind: booking` / `status: not_arrived` rows, which put the same patient on two
+        screens and let them fall off this one halfway through: the moment a booking was
+        completed it stopped being `scheduled`, had no admission behind it, and vanished. A
+        booking now lives on `GET /appointments` until the patient walks in, and `kind`,
+        `reason` and `not_arrived` are gone with it.
 
-        **One row per person's business, never two.** A booking that has been checked in is
-        terminal at `checked_in` and is left out; its admission stands for it. So a booking
-        becomes a visit on this list rather than appearing beside it.
-
-        **Read-only and derived.** `status` is a reading of `AppointmentStatus` or
-        `AdmissionStatus`, not a fourth stored status - see `WorklistStatus`. Nothing
-        transitions between its values, and every write still goes to the endpoint that owns
-        the row: `/appointments/{id}/check-in`, `/admissions/{id}/assign-bed`,
+        **Read-only and derived.** `status` is a reading of `AdmissionStatus`, not a second
+        stored status - see `WorklistStatus`. Nothing transitions between its values, and
+        every write goes to the endpoint that owns the row: `/admissions/{id}/assign-bed`,
         `/admissions/{id}/arrive`, `/admissions/{id}/complete`. There is no PATCH here and
         there will not be one.
 
-        No `sortBy`. It is a worklist read top to bottom, newest first - not a report. One
-        sort key across two tables whose time columns mean different things would order it by
-        a column nobody asked for.
+        No `sortBy`. It is a worklist read top to bottom, newest first - not a report.
       operationId: listPatientWorklist
       parameters:
         - name: search
@@ -1759,11 +1991,17 @@ paths:
       tags: [Admissions]
       summary: Expected visits worklist
       description: |
-        Roles: WardNurse, DutyManager.
+        Roles: WardNurse, DutyManager, GeneralStaff, HospitalAdministrator.
 
         Who is expected in, so the desk knows before they walk up. This is the React screen
         a nurse works from; the patient's own view of the same booking is
         `GET /me/appointments`, and the two are deliberately different shapes.
+
+        **Reading the list is wider than acting on a booking** (widened 2026-09-15). Booking,
+        checking in, cancelling and completing are WardNurse, GeneralStaff and DutyManager -
+        the front desk does this work day to day - while HospitalAdministrator reads the list
+        without acting on it. Same split as `GET /discharges/candidates` against the checklist
+        endpoints.
       operationId: listAppointments
       parameters:
         - $ref: '#/components/parameters/Page'
@@ -1793,7 +2031,7 @@ paths:
       tags: [Admissions]
       summary: Book a visit on a patient's behalf
       description: |
-        Roles: WardNurse, DutyManager.
+        Roles: WardNurse, GeneralStaff, DutyManager.
 
         The desk equivalent of `POST /me/appointments`, for someone who phoned in or walked
         up without the app. Records `booked_by_staff_id`; that field is null for a
@@ -1820,6 +2058,294 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
+  /appointments/{id}/confirm:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Admissions]
+      summary: Confirm a booking at the desk
+      description: |
+        Roles: WardNurse, GeneralStaff, DutyManager.
+
+        The desk reads the booking and accepts it. `scheduled` -> `confirmed`, and nothing
+        physical happens - the patient may not be due for weeks.
+
+        **This is why it is not the same click as admitting them.** Before it existed the desk
+        had one button, "check in and admit", sitting next to a booking three weeks out.
+        Pressing it created an admission and started a bed search for somebody who was not in
+        the building. Reviewing a booking and taking delivery of a patient are days apart, so
+        they are two actions.
+
+        Confirming is the gate on all three day-of endings. Records who confirmed and when.
+      operationId: confirmAppointment
+      responses:
+        '200':
+          description: The booking, now confirmed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Appointment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
+  /appointments/{id}/no-show:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Admissions]
+      summary: Mark that the patient never came
+      description: |
+        Roles: WardNurse, GeneralStaff, DutyManager.
+
+        They were expected, the time has passed, and they did not come. `confirmed` ->
+        `no_show`, and 409 from anywhere else.
+
+        **A separate ending from `cancelled`**, which somebody chose and can explain. Nobody
+        chose this one, so there is no reason field and nothing is shown to the patient beyond
+        the status itself.
+
+        **The desk presses this**; nothing flips it overnight. Doing that automatically needs
+        a scheduled job, and this application has none - a status that changed by itself with
+        no process behind it would be a lie in the audit trail.
+      operationId: markAppointmentNoShow
+      responses:
+        '200':
+          description: The booking, now marked as not attended
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Appointment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
+  /appointments/{id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Admissions]
+      summary: Call off a booking from the desk
+      description: |
+        Roles: WardNurse, DutyManager, GeneralStaff.
+
+        The reason is required, because the patient reads it in their app. It is also where
+        the desk names a time the clinic can actually see them - "Clinic full at 09:00, please
+        rebook after 14:00" - which is why there is no separate propose-a-time flow. The
+        patient books again themselves.
+
+        A `scheduled` or `confirmed` booking can be called off. Once it is `completed` the
+        patient has already been seen or admitted, and 409 says so.
+
+        **The patient's own cancel is a different route**, `POST /me/appointments/{id}/cancel`,
+        and records no reason and no staff id. That difference is what
+        `MyAppointment.cancelled_by_hospital` reports.
+      operationId: cancelAppointmentAtTheDesk
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CancelAppointmentRequest' }
+      responses:
+        '200':
+          description: The booking, now cancelled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Appointment' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
+  /appointments/{id}/complete:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Admissions]
+      summary: Record that the patient was seen and went home
+      description: |
+        Roles: WardNurse, DutyManager, GeneralStaff.
+
+        The outpatient path. The patient came in for their booking, was seen, and left without
+        being admitted - so there is no admission, no bed and no discharge. What is left is the
+        bill, raised against the appointment at `POST /appointments/{id}/bill`.
+
+        **Check in is the other path**, and the two are exclusive: checking in creates an
+        `Admission` and is for a patient who is staying. Both land the booking on `completed`;
+        `admission_id` is what says which happened.
+
+        **Needs a `confirmed` booking.** 409 otherwise - see `AppointmentStatus`.
+      operationId: completeAppointment
+      responses:
+        '200':
+          description: The booking, now completed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Appointment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
+  /appointments/{appointmentId}/bill:
+    parameters:
+      - name: appointmentId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Billing]
+      summary: The bill for an appointment
+      description: |
+        Roles: GeneralStaff, WardNurse, DutyManager, HospitalAdministrator, Doctor, EquipmentManager.
+
+        404 until somebody prepares one, same as the admission bill.
+      operationId: getAppointmentBill
+      responses:
+        '200':
+          description: The bill
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bill' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Billing]
+      summary: Raise or re-price an appointment bill
+      description: |
+        Roles: GeneralStaff, WardNurse, HospitalAdministrator, DutyManager.
+
+        Wider than the admission bill by the ward nurse (widened 2026-09-15): an outpatient
+        walks in and out the same day, so whoever records the visit as seen is who takes the
+        money for it. An admission bill is settled at discharge and stays reception's.
+
+        Writes the bill if it does not exist, then replaces its generated line with a single
+        `consultation_fee`. Typed `manual` lines are left alone. 409 once settled.
+
+        **409 `cl_pat_035` when the visit ended in an admission.** A `completed` booking with
+        `admission_id` set is billed on the admission at discharge, and charging it here as
+        well would charge the same visit twice. All four appointment-bill endpoints refuse it.
+      operationId: prepareAppointmentBill
+      responses:
+        '200':
+          description: The bill
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bill' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The bill is already settled and cannot be changed (`cl_pat_026`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /appointments/{appointmentId}/bill/charges:
+    parameters:
+      - name: appointmentId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Billing]
+      summary: Add a typed charge to an appointment bill
+      description: |
+        Roles: GeneralStaff, WardNurse, HospitalAdministrator, DutyManager. 409 once settled.
+      operationId: addAppointmentBillCharge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddBillChargeRequest' }
+      responses:
+        '200':
+          description: The bill, with the charge on it
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bill' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The bill is already settled and cannot be changed (`cl_pat_026`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /appointments/{appointmentId}/bill/charges/{lineId}:
+    parameters:
+      - name: appointmentId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: lineId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      tags: [Billing]
+      summary: Remove a typed charge from an appointment bill
+      description: |
+        Roles: GeneralStaff, WardNurse, HospitalAdministrator, DutyManager.
+
+        Only a `manual` line can be removed. Removing a generated one is 409.
+      operationId: removeAppointmentBillCharge
+      responses:
+        '200':
+          description: The bill, without that charge
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bill' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The bill is already settled and cannot be changed (`cl_pat_026`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /appointments/{appointmentId}/bill/settle:
+    parameters:
+      - name: appointmentId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Billing]
+      summary: Settle an appointment bill
+      description: |
+        Roles: GeneralStaff, WardNurse, HospitalAdministrator, DutyManager.
+
+        Freezes the bill. **Ticks no discharge checklist item**, unlike settling an admission
+        bill - nobody was admitted, so there is no discharge to tick. That is exactly why the
+        ward nurse is on this one and not on `POST /admissions/{admissionId}/bill/settle`.
+      operationId: settleAppointmentBill
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SettleBillRequest' }
+      responses:
+        '200':
+          description: The settled bill
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bill' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The bill is already settled and cannot be changed (`cl_pat_026`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
   /appointments/{id}/check-in:
     parameters:
       - $ref: '#/components/parameters/PathId'
@@ -1827,22 +2353,28 @@ paths:
       tags: [Admissions]
       summary: Check in an expected patient
       description: |
-        Roles: WardNurse for outpatient, day_case and inpatient. DutyManager for ICU and HDU.
+        Roles: WardNurse and GeneralStaff for outpatient, day_case and inpatient. DutyManager
+        for ICU and HDU.
 
         **Business op.** Turns an `Appointment` into an `Admission` with
-        `source = pre_registered`, in one transaction: the appointment moves to `checked_in`
-        and the admission is created.
+        `source = pre_registered`, in one transaction: the appointment moves to `completed`
+        with its `admission_id` set, and the admission is created.
+
+        **Needs a `confirmed` booking.** 409 otherwise. This is the desk saying the patient is
+        standing in front of them, so it must not be reachable on a booking three weeks out.
 
         The care level is set here, by the staff member checking them in - not by the patient
         at booking time and not by the agent. Same rule every other admission path follows,
         and `category_set_by_staff_id` records who chose it.
 
-        **The role split depends on the body, not the route.** A WardNurse may check somebody
-        in as `outpatient`, `day_case` or `inpatient`; `icu` and `hdu` are the DutyManager's
-        alone, and a nurse asking for either is a 403 carrying `cl_pat_011`.
+        **The role split depends on the body, not the route.** A WardNurse or GeneralStaff may
+        check somebody in as `outpatient`, `day_case` or `inpatient`; `icu` and `hdu` are the
+        DutyManager's alone, and anyone else asking for either is a 403 carrying `cl_pat_011`.
 
         Returns the **admission**, not the appointment - the admission is what the desk works
-        from next, and the booking is finished with.
+        from next, and the booking is finished with. From here the patient is on
+        `GET /patient-worklist`, and their bill is the admission's, settled at discharge.
+        Billing the appointment as well is 409 `cl_pat_035`.
 
         From this point the admission behaves like any other: it needs a bed, so the bed
         agent runs on it exactly as it would for a walk-in.
@@ -1965,23 +2497,32 @@ paths:
   /me/care-queries:
     post:
       tags: [Patient Self-Service]
-      summary: Describe a new symptom or concern, in your own words
+      summary: Tell us how you are feeling, in your own words
       description: |
-        Roles: Patient.
+        Roles: Patient, AND ONLY WHILE ADMITTED.
 
         Agent entry point for the Patient Care Advisory Agent. Starts the workflow and
         returns immediately with a workflow_id; poll /care-workflows/{workflowId} for
-        progress, or wait for /me/care-recommendations to show it once a doctor has acted.
+        progress, or wait for /me/care-recommendations to show it once a reviewer has acted.
 
-        The agent reads your stored history (age, gender, past admissions, past reports -
-        never a diagnosis, this system does not store one) and drafts a note. That draft
-        is NOT returned here and is never shown to you directly. It is doctor-facing only,
-        held on the record until a Doctor approves, edits or rejects it. See
-        patient-management-plan.md section 8.10.
+        Restricted to admitted patients on 2026-09-16, returning 409 cl_pat_038 otherwise.
+        Three reasons, in order of weight. Somebody is responsible for an admitted patient -
+        a ward, a bed, staff on shift - so the draft lands in a queue with a name on it. The
+        medical profile the agent reads is current during a stay and stale between them. And
+        a patient at home describing chest pain should be calling an ambulance, which is a
+        screen that already exists. In Flutter this is a card inside My Stay, so the 409 is a
+        backstop rather than something ordinary use can reach.
+
+        The agent reads your medical profile (conditions, allergies, current symptoms, recent
+        situation - all typed by staff, never concluded by this system), your current
+        admission, and the administrative shape of past visits. It then drafts a note. That
+        draft is NOT returned here and is never shown to you directly. It is staff-facing
+        only, held on the record until a Doctor or Ward Nurse approves, edits or rejects it.
+        See patient-management-plan.md section 8.10.
 
         A fixed keyword screen runs before the agent does. If your text matches a
         red-flag pattern (chest pain, can't breathe, severe bleeding, and similar), the
-        report is escalated to a doctor immediately rather than waiting in the ordinary
+        report is escalated to the ward immediately rather than waiting in the ordinary
         queue - but a human still decides what you are told.
       operationId: submitCareQuery
       requestBody:
@@ -1998,6 +2539,13 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: >-
+            cl_pat_038 - you are not currently admitted. Nothing runs: no workflow row is
+            created, the model is never called, and no quota is spent.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /care-workflows/{workflowId}:
     parameters:
@@ -2009,11 +2557,12 @@ paths:
       tags: [Care Recommendations]
       summary: Agent execution summary for a care recommendation
       description: |
-        Roles: Doctor, DutyManager.
+        Roles: WardNurse, Doctor, DutyManager.
 
         Same shape and purpose as /bed-workflows/{workflowId}: plan, completed steps,
-        tool calls, the red-flag screen result, validation, status and outcome. The
-        model's raw internal reasoning is not stored, only the summary.
+        tool calls, the red-flag screen result, what the agent read from the medical
+        profile, validation, status and outcome. The model's raw internal reasoning is not
+        stored, only the summary.
       operationId: getCareWorkflow
       responses:
         '200':
@@ -2028,8 +2577,11 @@ paths:
   /care-recommendations:
     get:
       tags: [Care Recommendations]
-      summary: The doctor's review queue
-      description: 'Roles: Doctor, DutyManager. Filter by status. Paginated, sortable.'
+      summary: The care draft review queue
+      description: >-
+        Roles: WardNurse, Doctor, DutyManager. Filter by status. Paginated, sortable.
+        Widened to WardNurse on 2026-09-16 - the person who will walk over and look at an
+        admitted patient is the nurse on shift.
       operationId: listCareRecommendations
       parameters:
         - name: status
@@ -2061,10 +2613,11 @@ paths:
       tags: [Care Recommendations]
       summary: Full detail for one care recommendation
       description: |
-        Roles: Doctor, DutyManager.
+        Roles: WardNurse, Doctor, DutyManager.
 
         The patient's own text, the agent's draft message, red_flag / urgency_flag, and
-        the patient history the agent read when drafting it.
+        the medical profile and history the agent read when drafting it - so the reviewer
+        can see what it was working from rather than taking the draft on trust.
       operationId: getCareRecommendation
       responses:
         '200':
@@ -2083,13 +2636,21 @@ paths:
       tags: [Care Recommendations]
       summary: Approve a care recommendation - the high-impact human gate
       description: |
-        Roles: Doctor only.
+        Roles: Doctor OR WardNurse.
 
-        The one action in this component gated on the Doctor role alone, the same wall as
-        the clinical_clearance discharge checklist item. Optionally edit the message before
-        it becomes visible to the patient - doctor_message is either the doctor's own edit
-        or the agent's draft unchanged. Either way, nothing reaches the patient until this
-        call succeeds.
+        Widened from Doctor-only on 2026-09-16. The patient is admitted and on a ward, and
+        Doctor-only meant a draft about a headache waited for a ward round - the delay this
+        agent exists to remove. What holds the line instead is deterministic: CR1 means the
+        text can never name a drug or a dose whoever approves it, and CR5 means it can never
+        contradict a recorded allergy.
+
+        clinical_clearance on the discharge checklist did NOT move and is still Doctor-only.
+        Letting somebody leave the hospital and telling somebody a nurse will look in on them
+        are not the same weight of decision.
+
+        Optionally edit the message before it becomes visible to the patient - doctor_message
+        is either the reviewer's own edit or the agent's draft unchanged. Either way, nothing
+        reaches the patient until this call succeeds.
       operationId: approveCareRecommendation
       requestBody:
         required: false
@@ -2104,7 +2665,7 @@ paths:
               schema: { $ref: '#/components/schemas/CareRecommendation' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403':
-          description: Only a Doctor may approve a care recommendation.
+          description: Only a Doctor or a WardNurse may approve a care recommendation.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -2122,10 +2683,10 @@ paths:
       tags: [Care Recommendations]
       summary: Reject a care recommendation
       description: |
-        Roles: Doctor only.
+        Roles: Doctor OR WardNurse. Widened on 2026-09-16 alongside approve.
 
         Requires a reason. The reason is staff-facing only and is never sent to the
-        patient - their own view shows a generic "reviewed, your doctor will follow up"
+        patient - their own view shows a generic "reviewed, a nurse will follow up"
         note instead. See patient-management-plan.md section 7.7.
       operationId: rejectCareRecommendation
       requestBody:
@@ -2142,7 +2703,7 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403':
-          description: Only a Doctor may reject a care recommendation.
+          description: Only a Doctor or a WardNurse may reject a care recommendation.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -2271,16 +2832,38 @@ components:
     AppointmentStatus:
       type: string
       description: |
-        `checked_in` is terminal for the appointment - from there the record of what happens
-        next is the `Admission`, not this row.
-      enum: [scheduled, checked_in, completed, cancelled, no_show]
+        Where a booking is up to. **Reworked 2026-09-15**, and `checked_in` was removed.
+
+        | Value | Shown as | What it means |
+        | :--- | :--- | :--- |
+        | `scheduled` | Needs confirming | Booked in the app. Nobody at the desk has read it. |
+        | `confirmed` | Expected | The desk accepted it. Not arrived; the date may be weeks out. |
+        | `completed` | Finished | Over, either way - see below. |
+        | `cancelled` | Cancelled | The patient or the desk called it off. |
+        | `no_show` | Did not come | Was expected, the time passed, they never came. |
+
+        **Confirming is never skipped.** Admitting, recording the patient as seen, and marking
+        them as never having come all require `confirmed` and 409 otherwise. Without that step
+        the desk could press "admit" on a booking three weeks out and start a bed search for
+        somebody who is not in the building.
+
+        **`completed` has two endings, and `admission_id` tells them apart.** Null means the
+        patient was seen and went home, and the bill is on this appointment. Set means they
+        were admitted; the `Admission` carries the story from there and the bill is settled at
+        discharge. Billing the appointment in that case is 409 `cl_pat_035` - the same visit
+        must not be charged twice.
+
+        `checked_in` used to be a status of its own. It said nothing `admission_id` did not
+        already say, and it made a two-ending list read as six states instead of five.
+      enum: [scheduled, confirmed, completed, cancelled, no_show]
 
     Appointment:
       description: A booked visit, as staff see it.
       allOf:
         - $ref: '#/components/schemas/AuditFields'
         - type: object
-          required: [id, patient, scheduled_at, status]
+          required: [id, patient, scheduled_at, status, can_confirm, can_cancel,
+                     can_complete]
           properties:
             id: { type: string, format: uuid }
             patient: { $ref: '#/components/schemas/PatientSummary' }
@@ -2297,11 +2880,47 @@ components:
               format: uuid
               nullable: true
               description: Null for a self-booking from the patient app.
+            confirmed_at:
+              type: string
+              format: date-time
+              nullable: true
+              description: When the desk confirmed it. Null while `scheduled`.
+            confirmed_by_staff_id:
+              type: string
+              format: uuid
+              nullable: true
             admission_id:
               type: string
               format: uuid
               nullable: true
-              description: Set once checked in.
+              description: |
+                Set when the visit ended in an admission rather than the patient going home.
+                The status reads `completed` either way, so this is what tells the two apart.
+            cancellation_reason:
+              type: string
+              nullable: true
+              maxLength: 300
+              description: |
+                Why the desk called it off, shown to the patient word for word. It is also
+                where staff name a time the clinic can see them instead, which is why there
+                is no separate "proposed time" field to keep in step with it.
+            cancelled_by_staff_id:
+              type: string
+              format: uuid
+              nullable: true
+              description: Null when the patient cancelled it themselves from the app.
+            can_confirm:
+              type: boolean
+              description: True only while `scheduled`.
+            can_cancel:
+              type: boolean
+              description: True while `scheduled` or `confirmed`.
+            can_complete:
+              type: boolean
+              description: |
+                True only while `confirmed`, and the gate on all three day-of endings: admit
+                the patient, record them as seen and gone home, or mark them as never having
+                come. One flag rather than three because they share the one precondition.
 
     MyAppointment:
       type: object
@@ -2309,7 +2928,8 @@ components:
         What a patient may see about their own booking. A separate shape, not a filtered
         staff object - same reasoning as `MyAdmission`. It carries neither who took the
         booking nor which admission it became.
-      required: [appointment_id, scheduled_at, status, status_text, can_cancel]
+      required: [appointment_id, scheduled_at, status, status_text, can_cancel,
+                 cancelled_by_hospital]
       properties:
         appointment_id: { type: string, format: uuid }
         scheduled_at: { type: string, format: date-time }
@@ -2325,6 +2945,33 @@ components:
         can_cancel:
           type: boolean
           description: True only while `scheduled`. Saves the app re-implementing the rule.
+        cancellation_reason:
+          type: string
+          nullable: true
+          maxLength: 300
+          description: |
+            What the desk typed when they called it off, shown to the patient as written.
+            Null when the patient cancelled it themselves, and null while it is still on.
+        cancelled_by_hospital:
+          type: boolean
+          description: |
+            False when the patient cancelled it themselves, so the app can say which of them
+            did it rather than inferring it from whether a reason is present.
+
+    CancelAppointmentRequest:
+      type: object
+      description: |
+        Why the desk is calling a booking off. The patient reads this, so it is required - a
+        cancellation with no explanation is the thing this endpoint exists to prevent.
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 300
+          description: |
+            Shown to the patient word for word. Name a time the clinic can see them if there
+            is one, e.g. "Clinic full at 09:00, please rebook after 14:00."
 
     BookAppointmentRequest:
       type: object
@@ -2391,28 +3038,17 @@ components:
         same word, one shared app - so the names have to differ.
       enum: [routine, urgent, emergency]
 
-    WorklistKind:
-      type: string
-      description: |
-        Which table a ward-board row came out of, and therefore what can be done to it. A
-        `booking` is checked in; a `visit` gets a bed, arrives, or is completed. A screen that
-        cannot tell the two apart offers the wrong button.
-      enum: [booking, visit]
-
     WorklistStatus:
       type: string
       description: |
         What the ward board says about one person, in the words a nurse uses.
 
-        **Derived, never stored.** It is a reading of two other stored statuses -
-        `AppointmentStatus` for a booking and `AdmissionStatus` for a visit - and it exists
-        because neither on its own answers "what is happening with this patient". Nothing
-        transitions between these values; the transition rules live on `AdmissionStatus`,
-        which is the authoritative one.
+        **Derived, never stored.** It is a reading of `AdmissionStatus` in the words a nurse
+        uses, and nothing transitions between these values; the transition rules live on
+        `AdmissionStatus`, which is the authoritative one.
 
         | Value | What it means | Read from |
         | :--- | :--- | :--- |
-        | `not_arrived` | Booked in, not here yet | appointment `scheduled` |
         | `awaiting_bed` | Here, needs a bed, has not got one | `awaiting_bed`, `awaiting_approval` |
         | `bed_ready` | A bed is held; nobody has marked them as being in it | `bed_reserved` |
         | `admitted` | In the hospital and being treated | `admitted`, `ready_for_discharge` |
@@ -2427,44 +3063,39 @@ components:
         `bed_ready` is deliberately not folded into `awaiting_bed`, because the hold expires
         after thirty minutes: "a bed is waiting, go and collect them" is a different job from
         "find them a bed", and it is the one with a clock on it.
-      enum: [not_arrived, awaiting_bed, bed_ready, admitted, completed, cancelled]
+
+        `not_arrived` was removed on 2026-09-15 with the bookings themselves - see
+        `GET /patient-worklist`.
+      enum: [awaiting_bed, bed_ready, admitted, completed, cancelled]
 
     WorklistRow:
       type: object
       description: |
         One line of the ward board: one patient, and what is happening with them right now.
 
-        Deliberately not `AdmissionSummary` with extra nullable fields. Half the columns on a
-        booking are genuinely unknown rather than null-as-in-empty - nobody has chosen a care
-        level for a patient who has not arrived - and making the admission schema pretend
-        otherwise would turn every one of its fields optional for every caller.
-      required: [id, kind, patient, status, requires_bed, when]
+        Deliberately not `AdmissionSummary`. This is the board a nurse reads top to bottom,
+        and it carries only what that reading needs; the admission schema answers a different
+        question and is free to grow without widening every row here.
+      required: [id, patient, status, requires_bed, when]
       properties:
         id:
           type: string
           format: uuid
-          description: The appointment id or the admission id, depending on `kind`.
-        kind: { $ref: '#/components/schemas/WorklistKind' }
+          description: The admission id.
         patient: { $ref: '#/components/schemas/PatientSummary' }
         status: { $ref: '#/components/schemas/WorklistStatus' }
         requires_bed:
           type: boolean
-          description: >-
-            False for a booking as well as for an outpatient. Nobody has chosen a care level
-            for somebody who has not arrived, so "does this need a bed" has no answer yet -
-            and a screen must not offer to assign one on a guess.
+          description: False for an outpatient, who is seen and goes home.
         source:
           allOf:
             - $ref: '#/components/schemas/AdmissionSource'
           nullable: true
-          description: How they came in. Null on a booking - they have not come in.
+          description: How they came in.
         admission_category:
           allOf:
             - $ref: '#/components/schemas/AdmissionCategory'
           nullable: true
-          description: >-
-            Null on a booking. The care level is set by staff at check-in, never at booking
-            time.
         urgency:
           allOf:
             - $ref: '#/components/schemas/AdmissionUrgency'
@@ -2478,17 +3109,8 @@ components:
           type: string
           format: date-time
           description: |
-            The one time that matters for this row: when a booking is due, or when a visit
-            started. Two different facts under one name on purpose - the board is read top to
-            bottom as a chronology, and a column that was `scheduled_at` on some rows and
-            blank on others could not be read that way at all. A visit not yet marked as
-            arrived falls back to when its record was opened, which is the closest true thing.
-        reason:
-          type: string
-          nullable: true
-          description: >-
-            Why they are coming, as the desk or the patient typed it - "Scan", "Blood test".
-            Null on a visit: the reason is not carried onto the admission.
+            When the visit started. A visit not yet marked as arrived falls back to when its
+            record was opened, which is the closest true thing.
 
     AdmissionStatus:
       type: string
@@ -2550,7 +3172,163 @@ components:
         What the bed agent decided. Called BedAgentOutcome rather than AgentOutcome
         because staff-spec.yaml has its own AgentOutcome for what the staffing agent
         decided. Different thing, same word, one shared app - so the names have to differ.
-      enum: [proposed, proposed_with_downgrade, no_bed_available, failed]
+        Extended 2026-09-16. `needs_duty_manager` is an upgrade-only ward, which the agent
+        refuses to rank as its best pick even though a duty manager may place one by hand.
+        `visit_needs_no_bed` is an outpatient, which is a different answer from "the hospital
+        is full" and must not render as an empty list. `patient_not_found` is a lookup by NIC
+        or patient code that matched nothing - an answer, not an error.
+      enum:
+        - proposed
+        - proposed_with_downgrade
+        - needs_duty_manager
+        - no_bed_available
+        - visit_needs_no_bed
+        - patient_not_found
+        - failed
+
+    BedSuggestionBlockerCode:
+      type: string
+      description: |
+        Which wall the agent hit. Paired with one plain sentence in `BedSuggestionBlocker`,
+        built in C# from the filter result - never written by the model, because a model asked
+        to explain its own failure writes something plausible rather than something true.
+      enum:
+        - downgrade_needed
+        - upgrade_only
+        - ward_full
+        - gender_policy
+        - needs_isolation
+        - pediatric_only
+        - no_bed_required
+        - no_such_patient
+        - no_open_admission
+        - agent_failed
+
+    BedSuggestionBlocker:
+      type: object
+      required: [code, message]
+      description: Null when nothing is in the way.
+      properties:
+        code: { $ref: '#/components/schemas/BedSuggestionBlockerCode' }
+        message:
+          type: string
+          example: No ICU beds are free. The nearest option is HDU-02, one level down, and a Duty Manager has to approve a downgrade.
+
+    SuggestedBed:
+      type: object
+      required: [bed_id, ward_name, bed_number, is_downgrade, requires_duty_manager]
+      description: |
+        One selectable bed. The best pick and every alternative use this same shape, on purpose:
+        alternatives used to be `{ bed_id, reason_not_chosen }`, which a nurse could read and
+        could not act on. Every entry here is committed the same way, with the same one button.
+      properties:
+        bed_id: { type: string, format: uuid }
+        ward_name: { type: string, example: ICU }
+        bed_number: { type: string, example: ICU-04 }
+        is_downgrade: { type: boolean }
+        requires_duty_manager:
+          type: boolean
+          description: True for ICU, HDU or any downgrade. The button is hidden for a ward nurse.
+        rules_satisfied:
+          type: array
+          items: { type: string }
+          example: [requires_bed, category_match, gender_policy, isolation, age_policy]
+        rationale:
+          type: string
+          nullable: true
+          description: Short human-readable summary. Not the model's raw reasoning.
+
+    BedSuggestionPatient:
+      type: object
+      required: [patient_id, patient_code, full_name]
+      description: |
+        Who the suggestion is for. Part of the answer rather than a second lookup - a bed
+        suggestion with no name on it is how the right bed gets given to the wrong person.
+      properties:
+        patient_id: { type: string, format: uuid }
+        patient_code: { type: string, example: PT-7K4M2Q }
+        full_name: { type: string, example: Lochana Dahanayake }
+        age: { type: integer, nullable: true }
+        gender: { $ref: '#/components/schemas/Gender' }
+        admission_id: { type: string, format: uuid, nullable: true }
+        admission_category:
+          allOf:
+            - $ref: '#/components/schemas/AdmissionCategory'
+          nullable: true
+        urgency:
+          allOf:
+            - $ref: '#/components/schemas/AdmissionUrgency'
+          nullable: true
+        is_infectious: { type: boolean }
+        status:
+          allOf:
+            - $ref: '#/components/schemas/AdmissionStatus'
+          nullable: true
+
+    PatientMedicalProfile:
+      type: object
+      required: [patient_id]
+      description: |
+        Added 2026-09-16. Staff-facing only - there is no patient-facing equivalent and no
+        /me/ route. Every field is nullable because an empty profile is ordinary.
+      properties:
+        patient_id: { type: string, format: uuid }
+        known_conditions:
+          type: string
+          nullable: true
+          example: Type 2 diabetes, diagnosed 2019. Hypertension, on medication.
+        allergies:
+          type: string
+          nullable: true
+          example: Penicillin
+          description: >-
+            Read by CR5 - a care advisory draft naming a substance recorded here is rejected
+            deterministically, before any reviewer sees it. That check is only possible because
+            this is a stored field rather than a sentence buried in a note.
+        current_symptoms:
+          type: string
+          nullable: true
+          example: Headache since admission, mild fever on arrival.
+        recent_situation:
+          type: string
+          nullable: true
+          example: Admitted after two days of dizziness at home.
+        updated_by_staff_id: { type: string, format: uuid, nullable: true }
+        updated_by_staff_name: { type: string, nullable: true }
+        updated_at: { type: string, format: date-time, nullable: true }
+
+    UpdateMedicalProfileRequest:
+      type: object
+      description: All four fields optional; sending null or omitting one clears it.
+      properties:
+        known_conditions: { type: string, maxLength: 2000, nullable: true }
+        allergies: { type: string, maxLength: 1000, nullable: true }
+        current_symptoms: { type: string, maxLength: 2000, nullable: true }
+        recent_situation: { type: string, maxLength: 2000, nullable: true }
+
+    BedSuggestionRequest:
+      type: object
+      description: |
+        Exactly one of `admission_id` or `patient_identifier`. Supplying both, or neither, is a
+        400 - "either of these" is a rule a validator can state and a caller can read, where a
+        silent precedence rule is one neither can.
+
+        Note what is NOT here: `admission_category`. A caller who could supply the care level
+        could lie about it, and that is the one field this agent must never influence. It is
+        read from the database through a read-only tool.
+      properties:
+        admission_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: From a row already on the patients board.
+        patient_identifier:
+          type: string
+          maxLength: 32
+          nullable: true
+          description: >-
+            An NIC or a patient code, off the hospital slip. The caller does not say which and
+            the agent does not need to be told.
 
     # ---------- common ----------
 
@@ -2817,14 +3595,25 @@ components:
         It was inline while nothing implemented it.
       properties:
         bed_id: { type: string, format: uuid }
+        workflow_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: >-
+            Added 2026-09-16. Present when the nurse pressed "Use this bed" on an agent
+            suggestion; absent when they picked the bed themselves. It is what stamps the
+            resulting BedAssignment `assigned_by = agent` and links it back to the run, and it
+            is the ONLY thing that differs between the two paths - there is no agent-only
+            endpoint. A workflow_id that does not exist, or that suggested a different bed, is
+            recorded as a manual assignment rather than trusted.
         override_reason:
           type: string
           maxLength: 500
           nullable: true
           description: >-
-            Why a human ignored what the agent proposed. Nothing requires it yet: there are no
-            proposals to override until the agent lands, and this endpoint is also the ordinary
-            path when nobody asked the agent at all.
+            Why a human chose a bed the agent did not suggest, or an off-path bed a duty
+            manager is overruling H2 to take. Never required: this endpoint is also the
+            ordinary path when nobody asked the agent at all.
 
     AdmissionSummary:
       type: object
@@ -3128,7 +3917,13 @@ components:
       type: object
       properties:
         workflow_id: { type: string, format: uuid }
-        admission_id: { type: string, format: uuid }
+        admission_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: >-
+            Null when the run was started from an NIC or patient code and the agent has not
+            resolved the patient yet. Populated once it has.
         status: { type: string, example: running }
         poll_url: { type: string, example: /api/bed-workflows/3fa85f64-5717-4562-b3fc-2c963f66afa6 }
 
@@ -3140,8 +3935,8 @@ components:
         stored.
       properties:
         workflow_id: { type: string, format: uuid }
-        admission_id: { type: string, format: uuid }
-        objective: { type: string, example: assign_bed }
+        admission_id: { type: string, format: uuid, nullable: true }
+        objective: { type: string, example: suggest_bed }
         status:
           type: string
           enum: [running, awaiting_approval, completed, failed]
@@ -3163,26 +3958,32 @@ components:
               duration_ms: { type: integer }
               ok: { type: boolean }
               error: { type: string, nullable: true }
-        proposed_bed_id: { type: string, format: uuid, nullable: true }
-        is_downgrade: { type: boolean }
-        rules_satisfied:
-          type: array
-          items: { type: string }
-          example: [category_match, gender_policy, isolation]
-        rationale:
-          type: string
+        patient:
+          allOf:
+            - $ref: '#/components/schemas/BedSuggestionPatient'
           nullable: true
-          description: Short human-readable summary shown to the approver. Not the model's raw reasoning.
+          description: Null only when the identifier matched nobody.
+        best:
+          allOf:
+            - $ref: '#/components/schemas/SuggestedBed'
+          nullable: true
+          description: The agent's top pick. Null on every blocked outcome.
         alternatives:
           type: array
-          items:
-            type: object
-            properties:
-              bed_id: { type: string, format: uuid }
-              reason_not_chosen: { type: string }
+          description: >-
+            Every other bed that passed all seven hard rules, ranked below `best` and each one
+            selectable with the same button. Empty when there was only one, or none.
+          items: { $ref: '#/components/schemas/SuggestedBed' }
+        blocker:
+          allOf:
+            - $ref: '#/components/schemas/BedSuggestionBlocker'
+          nullable: true
         validation:
           type: object
-          description: Result of the deterministic C# validator, run after the agent proposes and again at approval.
+          description: >-
+            Result of the deterministic C# validator, run over `best` and every alternative
+            before any of them reach a human. Anything failing here is removed from the answer.
+            It runs a second time, under a row lock, at /admissions/{id}/assign-bed.
           properties:
             passed: { type: boolean }
             failed_rules:
@@ -3300,11 +4101,13 @@ components:
         Where a line came from, and what may be done to it.
 
         `admission_fee` and `bed_stay` are worked out from the visit and are replaced every time
-        the bill is prepared. `manual` is what somebody at the desk typed, is never touched by
-        preparing, and is the only kind that can be removed.
+        the bill is prepared. `consultation_fee` is the generated line on an appointment bill,
+        where there is no admission and no bed to price. `manual` is what somebody at the desk
+        typed, is never touched by preparing, and is the only kind that can be removed.
       enum:
         - admission_fee
         - bed_stay
+        - consultation_fee
         - manual
 
     BillLine:
@@ -3333,11 +4136,27 @@ components:
         rest. The rate is copied onto the line when the line is written, so changing a price
         later never rewrites a bill already raised.
       required:
-        [id, admission_id, bill_number, currency, lines, total, settled, patient,
+        [id, bill_number, currency, lines, total, settled, patient,
          created_at, updated_at]
       properties:
         id: { type: string, format: uuid }
-        admission_id: { type: string, format: uuid }
+        admission_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: |
+            Set when the bill belongs to an admission. **Exactly one of this and
+            `appointment_id` is set** (a database check constraint, not a convention), so a
+            reader never has to guess which visit a bill is for.
+        appointment_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: |
+            Set when the patient was seen at a booked appointment and went home without being
+            admitted. Such a bill carries a `consultation_fee` line instead of an admission
+            fee and bed nights, and settling it ticks no discharge checklist - there is no
+            discharge.
         bill_number:
           type: string
           description: The handle a patient quotes at the counter, e.g. B7K2X9Q.
@@ -3524,6 +4343,7 @@ components:
         nic:
           type: string
           maxLength: 20
+          pattern: '^(\d{9}[VvXx]|\d{12}|(?=.*[A-Za-z])[A-Za-z0-9]{6,15})$'
           description: |
             Required here, unlike at the desk, because it is the only thing that can match this
             signup to a record the hospital already holds.
@@ -3531,13 +4351,30 @@ components:
             **NIC alone is not proof of identity.** Nothing verifies that the person typing it
             owns it, so linking to an existing record never overwrites what is already on that
             record. A production system puts an OTP or a desk check in front of this.
-        full_name: { type: string, maxLength: 200 }
+
+            **Same shape as `CreatePatientRequest.nic` (tightened 2026-09-15.)** This endpoint
+            previously took any string up to 20 characters, so the app could store an NIC the
+            desk would have rejected - and `MeService` builds a `CreatePatientRequest` in code,
+            where data annotations never run.
+        full_name: { type: string, minLength: 1, maxLength: 200 }
         gender: { $ref: '#/components/schemas/Gender' }
-        date_of_birth: { type: string, format: date, nullable: true }
-        phone: { type: string, maxLength: 20, nullable: true }
-        address: { type: string, maxLength: 500, nullable: true }
+        date_of_birth:
+          type: string
+          format: date
+          nullable: true
+          description: Not in the future, and not more than 120 years ago.
+        phone:
+          type: string
+          maxLength: 20
+          nullable: true
+          pattern: '^(0\d{9}|\+94\d{9})$'
+        address: { type: string, maxLength: 300, nullable: true }
         emergency_contact_name: { type: string, maxLength: 200, nullable: true }
-        emergency_contact_phone: { type: string, maxLength: 20, nullable: true }
+        emergency_contact_phone:
+          type: string
+          maxLength: 20
+          nullable: true
+          pattern: '^(0\d{9}|\+94\d{9})$'
 
     MyProfile:
       type: object
@@ -3602,6 +4439,117 @@ components:
           type: array
           items: { type: string }
           description: So the patient can be asked to supply what is still outstanding.
+
+    MyBillLine:
+      type: object
+      description: |
+        One line of a patient's own bill. Carries no id: a patient cannot add, remove or
+        query a single line, so the id would be noise on the wire.
+      required: [source, description, quantity, unit_price, line_total]
+      properties:
+        source: { $ref: '#/components/schemas/BillLineSource' }
+        description: { type: string }
+        quantity: { type: number, format: double }
+        unit_price: { type: number, format: double }
+        line_total: { type: number, format: double }
+
+    MyBill:
+      type: object
+      description: |
+        What a patient may see of their own bill. A separate shape, not a filtered staff
+        `Bill` - it carries no `raised_by`, no `settled_by`, no settlement note and no
+        `PatientSummary`, because it does not contain them.
+
+        Served by two routes: `GET /me/admissions/{admissionId}/bill` for a stay, and
+        `GET /me/appointments/{appointmentId}/bill` for a visit the patient was seen at and
+        sent home from without ever being admitted. Exactly one of `admission_id` and
+        `appointment_id` is set, matching which route answered.
+      required:
+        [bill_number, currency, lines, total, is_final, settled, updated_at]
+      properties:
+        admission_id: { type: string, format: uuid, nullable: true }
+        appointment_id: { type: string, format: uuid, nullable: true }
+        bill_number:
+          type: string
+          description: The handle a patient quotes at the counter, e.g. B7K2X9Q.
+        currency: { type: string, example: LKR }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/MyBillLine' }
+        total: { type: number, format: double }
+        is_final:
+          type: boolean
+          description: |
+            False while an admission is still open. Bed nights keep accruing, so the total
+            will grow and the app must show it as a running total rather than the amount due.
+            True once the admission is discharged or cancelled. Always true for an
+            `appointment_id` bill - a consultation charge is raised once, not accrued.
+
+            Named `is_final` rather than `final` because `final` is a reserved word in Dart,
+            and the generator would otherwise rename it to `finalValue` in the mobile client.
+        settled: { type: boolean }
+        settled_at: { type: string, format: date-time, nullable: true }
+        updated_at: { type: string, format: date-time }
+
+    MyLabReport:
+      type: object
+      description: |
+        What a patient may see of their own laboratory result. A separate shape, not a
+        filtered `LabReport` (Equipment's, in equipment-spec.yaml) - same reasoning as
+        `MyBill`. It carries no `patient_id` and no `uploaded_by_staff_id`, because a patient
+        reading their own list already knows both and neither is their business regardless.
+
+        Metadata only, same as the staff shape - the file itself is
+        `GET /me/lab-reports/{reportId}/file`.
+      required: [id, test_name, file_name, content_type, byte_size, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        test_name:
+          type: string
+          description: 'What was tested, in the lab''s own words: "Full blood count".'
+        summary: { type: string, nullable: true }
+        file_name: { type: string }
+        content_type: { type: string, example: application/pdf }
+        byte_size: { type: integer }
+        created_at: { type: string, format: date-time }
+
+    ClaimByPatientCodeRequest:
+      type: object
+      description: |
+        Both fields are required and both must match. The code alone is a slip of paper, and
+        paper gets photographed and dropped; the NIC is the second factor that stops a found
+        slip from being enough on its own.
+      required: [patient_code, nic]
+      properties:
+        patient_code:
+          type: string
+          description: |
+            The code on the patient's hospital slip - a P and seven characters from a
+            31-letter alphabet with the ambiguous ones (I, L, O, 0, 1) left out. Matched
+            case-insensitively.
+          example: PK4M9XB2
+        nic:
+          type: string
+          description: The NIC on file for the record that code belongs to. Matched exactly.
+          example: 199534501V
+
+    PatientClaimPreview:
+      type: object
+      description: |
+        The "is this you?" step, masked. The caller has proved they hold a code and a
+        matching date of birth, which earns them enough to recognise themselves and no more.
+      required: [patient_code, masked_full_name]
+      properties:
+        patient_code: { type: string }
+        masked_full_name:
+          type: string
+          description: First and last letter of each word, the rest bulleted.
+          example: "L••••a D•••••••e"
+        masked_phone:
+          type: string
+          nullable: true
+          description: Last three digits only. Null when the record holds no phone number.
+          example: "•••••••567"
 
     # ---------- reports ----------
 
@@ -3742,7 +4690,10 @@ components:
         agent_message:
           type: string
           nullable: true
-          description: The agent's draft. Doctor-facing only.
+          description: >-
+            The agent's draft. Staff-facing only - a patient never receives this field on any
+            route, which is enforced by MyCareRecommendation being a different shape rather
+            than by filtering this one.
         status: { $ref: '#/components/schemas/CareRecommendationStatus' }
         workflow_id: { type: string, format: uuid, nullable: true }
         reviewed_by_staff_id: { type: string, format: uuid, nullable: true }

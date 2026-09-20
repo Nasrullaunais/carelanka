@@ -81,7 +81,7 @@ public class AdmissionsController : ControllerBase
         Guid id, [FromBody] CompleteDetailsRequest request, CancellationToken ct)
         => Ok(await _admissions.CompleteDetailsAsync(id, request, ct));
 
-    [Authorize(Policy = Policies.WardNurse)]
+    [Authorize(Policy = Policies.ArrivalConfirmer)]
     [HttpPost("{id:guid}/arrive", Name = "markArrived")]
     [ProducesResponseType(typeof(AdmissionResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]

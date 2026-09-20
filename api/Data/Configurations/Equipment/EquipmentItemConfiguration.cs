@@ -48,6 +48,9 @@ public class EquipmentItemConfiguration : IEntityTypeConfiguration<EquipmentItem
         builder.HasIndex(i => i.WardId);
         builder.HasIndex(i => i.Status);
 
+        builder.HasIndex(i => i.AwaitingConfirmation)
+            .HasFilter("awaiting_confirmation");
+
         builder.HasIndex(i => i.NextMaintenanceDue)
             .HasFilter("status <> 'retired'");
 

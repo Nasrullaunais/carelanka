@@ -22,9 +22,30 @@ public static class Policies
 
     public const string PatientEditor = nameof(PatientEditor);
 
+    /// <summary>
+    /// Reading what the hospital knows about a patient's health. The duty manager is on it
+    /// because they work the patients board; reception and the billing desk are not, and that is
+    /// the whole point of it being a separate policy from <see cref="PatientDetails"/>.
+    /// </summary>
+    public const string MedicalProfileReader = nameof(MedicalProfileReader);
+
+    /// <summary>
+    /// Writing it - the nurse at the bed and the doctor, and nobody else. Narrower than
+    /// <see cref="MedicalProfileReader"/> by the duty manager, who reads a ward board rather
+    /// than taking a clinical history.
+    /// </summary>
+    public const string MedicalProfileAuthor = nameof(MedicalProfileAuthor);
+
     public const string AdmissionEditor = nameof(AdmissionEditor);
 
     public const string BedAssigner = nameof(BedAssigner);
+
+    /// <summary>
+    /// Confirming the patient is physically in the bed. The desk and the ward both see them
+    /// arrive, so this is the same three roles as <see cref="BedAssigner"/> rather than the
+    /// nurse alone.
+    /// </summary>
+    public const string ArrivalConfirmer = nameof(ArrivalConfirmer);
 
     public const string DischargeConfirmer = nameof(DischargeConfirmer);
 
@@ -34,7 +55,24 @@ public static class Policies
 
     public const string BillingDesk = nameof(BillingDesk);
 
+    /// <summary>
+    /// Working an outpatient bill - the visit the patient walks in and out of on the same day.
+    /// Wider than <see cref="BillingDesk"/> by the ward nurse, because the nurse who records
+    /// the visit as seen is standing in front of the patient and is who takes the money for it.
+    /// An admission bill stays on <see cref="BillingDesk"/>: it is settled at discharge, which
+    /// ticks the discharge checklist, and that tick is reception's alone.
+    /// </summary>
+    public const string AppointmentBillingDesk = nameof(AppointmentBillingDesk);
+
     public const string AppointmentDesk = nameof(AppointmentDesk);
+
+    /// <summary>
+    /// Reading the bookings list. Wider than <see cref="AppointmentDesk"/>, which is who may
+    /// act on a booking, because the billing desk has to reach a finished appointment to bill
+    /// it and cannot check anyone in. Same split as
+    /// <see cref="DischargeBoard"/> against <see cref="DischargeChecklist"/>.
+    /// </summary>
+    public const string AppointmentBoard = nameof(AppointmentBoard);
 
     // The laboratory stands on equipment_manager in both of these, because StaffRole has no
     // laboratory value. Adding one changes staff-spec.yaml and common-spec.yaml together, which
@@ -48,4 +86,26 @@ public static class Policies
     // which ward somebody is in is what the laboratory and the equipment register both need to
     // offer a patient to pick, and neither of those is reading a test result.
     public const string PatientLocationReader = nameof(PatientLocationReader);
+
+    // Somebody other than the equipment manager who registered an item, so nobody approves
+    // their own entry. The confirmation code is checked by the service on top of this.
+    public const string EquipmentConfirmer = nameof(EquipmentConfirmer);
+
+    public const string EquipmentConfirmationTracker = nameof(EquipmentConfirmationTracker);
+
+    // Removing a medicine from the register hides it from every list, so it takes the confirmation
+    // code on top of the role - the pharmacy's own staff, or the administrator.
+    public const string PharmacyRemover = nameof(PharmacyRemover);
+
+    // The maintenance unit is run by the hospital administrator: booking work, reading the work
+    // list, and confirming it done. The equipment manager reports faults and nothing more here.
+    public const string MaintenanceDesk = nameof(MaintenanceDesk);
+
+    // Editing an item stays with the equipment manager; the administrator also needs it to retire a
+    // machine the maintenance unit cannot fix.
+    public const string EquipmentItemEditor = nameof(EquipmentItemEditor);
+
+    // The warnings list: low stock, expiring medicine and overdue maintenance. The equipment manager
+    // runs the pharmacy and the register it is about; the administrator runs the maintenance unit.
+    public const string WarningDesk = nameof(WarningDesk);
 }

@@ -15,6 +15,7 @@ class SuggestedBed {
     required this.isDowngrade,
     required this.requiresDutyManager,
     this.rulesSatisfied,
+    this.fitFactors,
     this.rationale,
   });
   
@@ -32,6 +33,8 @@ class SuggestedBed {
   final bool requiresDutyManager;
   @JsonKey(name: 'rules_satisfied')
   final List<String>? rulesSatisfied;
+  @JsonKey(name: 'fit_factors')
+  final List<String>? fitFactors;
   final String? rationale;
 
   Map<String, Object?> toJson() => _$SuggestedBedToJson(this);

@@ -6,20 +6,14 @@ using CareLanka.Api.Services.Patient;
 namespace CareLanka.Api.Agents.Patient;
 
 /// <summary>
-/// Steps 4, 5 and 6 of the run: drop every bed that fails a hard rule, rank what survives on the
-/// soft rules, and decide a best pick with selectable alternatives - or, when nothing survives,
-/// say which wall the run hit. All of it is ordinary C# against the database. The model's only job
-/// is the sentence on the end of a choice that has already been made and checked.
+/// Steps 4, 5 and 6 of the run: drop every bed that fails a hard rule, weigh what survives against
+/// this patient, and decide a best pick with selectable alternatives - or, when nothing survives,
+/// say which wall the run hit. All of it is ordinary C# against the database, so the ranking is
+/// reproducible and every position in it can be explained. What the weights are is
+/// <see cref="BedFitScoring"/>; the model never sees this step.
 /// </summary>
 public static class BedSuggestionPlanner
 {
-    /// <summary>
-    /// How much continuity is worth against ward load. A quarter of a ward's fill: enough that a
-    /// ward the patient has been in before wins between two comparably busy wards, not enough to
-    /// send them back to a ward that is nearly full.
-    /// </summary>
-    private const double ContinuityBonus = 0.25;
-
     public static BedFilterResult Filter(
         AdmissionRequirements requirements, IReadOnlyList<CandidateBed> candidates)
     {
@@ -49,32 +43,36 @@ public static class BedSuggestionPlanner
         return new BedFilterResult(survivors, dropped, candidates.Count);
     }
 
+    /// <summary>
+    /// Best first. A higher score is a better fit, which is the opposite of the old ordering and
+    /// worth saying out loud: the number now reads the way the screen does.
+    /// </summary>
     public static IReadOnlyList<RankedBed> Rank(
+        AdmissionRequirements requirements,
         IReadOnlyList<PlacedBed> survivors,
         IReadOnlyDictionary<Guid, WardLoad> load,
         IReadOnlyCollection<Guid> previousWards)
         => survivors
-            .Select(placed => new RankedBed(
-                placed.Candidate,
-                placed.IsDowngrade,
-                Score(placed, load, previousWards),
-                previousWards.Contains(placed.Candidate.Ward.Id),
-                load.TryGetValue(placed.Candidate.Ward.Id, out var wardLoad) ? wardLoad : null))
-            .OrderBy(ranked => ranked.Score)
+            .Select(placed =>
+            {
+                var wardLoad = load.TryGetValue(placed.Candidate.Ward.Id, out var found)
+                    ? found
+                    : null;
+                var seenBefore = previousWards.Contains(placed.Candidate.Ward.Id);
+                var factors = BedFitScoring.Weigh(requirements, placed, wardLoad, seenBefore);
+
+                return new RankedBed(
+                    placed.Candidate,
+                    placed.IsDowngrade,
+                    BedFitScoring.Total(factors),
+                    seenBefore,
+                    wardLoad,
+                    factors);
+            })
+            .OrderByDescending(ranked => ranked.Score)
             .ThenBy(ranked => ranked.Candidate.Ward.Name, StringComparer.Ordinal)
             .ThenBy(ranked => ranked.Candidate.Bed.BedNumber, StringComparer.Ordinal)
             .ToList();
-
-    private static double Score(
-        PlacedBed placed,
-        IReadOnlyDictionary<Guid, WardLoad> load,
-        IReadOnlyCollection<Guid> previousWards)
-    {
-        var wardLoad = load.TryGetValue(placed.Candidate.Ward.Id, out var found) ? found.Load : 1d;
-        var continuity = previousWards.Contains(placed.Candidate.Ward.Id) ? ContinuityBonus : 0d;
-
-        return wardLoad - continuity;
-    }
 
     public static BedSuggestionAnswer Decide(
         AdmissionRequirements requirements,
@@ -86,7 +84,7 @@ public static class BedSuggestionPlanner
         var downgrades = ranked
             .Where(bed => bed.IsDowngrade)
             .OrderBy(bed => RungsBelow(requirements.Category, bed.Candidate.Ward.WardType))
-            .ThenBy(bed => bed.Score)
+            .ThenByDescending(bed => bed.Score)
             .ToList();
 
         if (matches.Count > 0)
@@ -147,7 +145,8 @@ public sealed record RankedBed(
     bool IsDowngrade,
     double Score,
     bool SeenThisWardBefore,
-    WardLoad? Load)
+    WardLoad? Load,
+    IReadOnlyList<BedFitFactor> Factors)
 {
     /// <summary>
     /// A downgrade is the duty manager's whoever suggested it. An upgrade never reaches here - the
@@ -157,10 +156,14 @@ public sealed record RankedBed(
     public bool RequiresDutyManager => IsDowngrade;
 
     /// <summary>
-    /// Filled in after the decision, by the one part of the run a model is allowed to touch. Null
-    /// is an ordinary answer: a bed with no sentence on it is still a bed the nurse can pick.
+    /// Filled in after the decision. Null is an ordinary answer: a bed with no sentence on it is
+    /// still a bed the nurse can pick.
     /// </summary>
     public string? Rationale { get; set; }
+
+    /// <summary>The plain sentences behind <see cref="Score"/>, best reason first.</summary>
+    public IReadOnlyList<string> Reasons
+        => Factors.OrderByDescending(factor => factor.Weight).Select(factor => factor.Detail).ToList();
 }
 
 public sealed record BedFilterResult(

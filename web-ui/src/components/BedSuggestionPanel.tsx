@@ -7,11 +7,27 @@ import {
   getBedWorkflowOptions,
   requestBedSuggestionMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
-import type { PrincipalRole, SuggestedBed } from '../services/api/generated';
+import type { BedAgentStep, PrincipalRole, SuggestedBed } from '../services/api/generated';
 import { canSetHighCareLevel } from '../types/permissions';
 import { admissionCategoryLabels, admissionUrgencyLabels, genderLabels } from '../types/patients';
 
-const POLL_INTERVAL_MS = 1500;
+const POLL_INTERVAL_MS = 800;
+
+/**
+ * The plan is fixed and known before a single tool runs (§8.7), so the caption for each step is
+ * decided once here rather than guessed at from whatever text a model might have written.
+ */
+const STEP_CAPTIONS: Record<string, string> = {
+  resolve_patient: 'Looking up the patient',
+  read_admission_requirements: 'Reading their admission details',
+  list_candidate_beds: 'Checking which beds are free',
+  apply_hard_rules: "Applying the hospital's placement rules",
+  rank_on_soft_rules: 'Ranking beds by fit',
+  decide_best_and_alternatives: 'Shortlisting the best options',
+  weigh_patient_notes: "Reading the clinician's notes",
+  validate_deterministically: 'Double-checking the suggestion',
+  pause_for_approval: 'Wrapping up',
+};
 
 /**
  * The bed agent's suggestion, from either a row already on the board or an NIC/patient code
@@ -34,6 +50,7 @@ export function BedSuggestionPanel({
   const [identifier, setIdentifier] = useState('');
   const [workflowId, setWorkflowId] = useState<string | null>(null);
   const [reason, setReason] = useState('');
+  const [showAlternatives, setShowAlternatives] = useState(false);
 
   const start = useMutation({
     ...requestBedSuggestionMutation(),
@@ -141,13 +158,14 @@ export function BedSuggestionPanel({
   }
 
   const running = workflow.data?.status === 'running' || workflow.data === undefined;
+  const alternatives = workflow.data?.alternatives ?? [];
 
   return (
     <div className="drawer-body">
       <h3>Bed suggestion</h3>
 
       {(workflow.isLoading || running) && (
-        <p className="empty">The agent is working on this — usually a few seconds.</p>
+        <AgentProgress plan={workflow.data?.plan} steps={workflow.data?.steps} />
       )}
 
       {workflow.isError && (
@@ -204,47 +222,39 @@ export function BedSuggestionPanel({
             </p>
           ) : (
             <>
-              {[
-                workflow.data.best ? { ...workflow.data.best, label: 'Suggested' } : null,
-                ...(workflow.data.alternatives ?? []).map((bed) => ({
-                  ...bed,
-                  label: 'Alternative',
-                })),
-              ]
-                .filter((bed): bed is SuggestedBed & { label: string } => bed !== null)
-                .map((bed) => {
-                  const hidden = bed.requires_duty_manager && !canSetHighCareLevel(role);
+              {workflow.data.best && (
+                <BedCard
+                  bed={workflow.data.best}
+                  headline="The agent suggests"
+                  role={role}
+                  assigning={assign.isPending}
+                  onUse={confirm}
+                />
+              )}
 
-                  return (
-                    <div
-                      key={bed.bed_id}
-                      className="card"
-                      style={{ marginTop: '0.75rem', padding: '0.75rem' }}
-                    >
-                      <p style={{ margin: 0 }}>
-                        <strong>{bed.label}:</strong> {bed.ward_name} · {bed.bed_number}
-                        {bed.is_downgrade && (
-                          <span className="muted"> — a downgrade from the requested level</span>
-                        )}
-                      </p>
-                      {bed.rationale && (
-                        <p className="muted" style={{ marginTop: '0.25rem' }}>
-                          {bed.rationale}
-                        </p>
-                      )}
-                      {!hidden && (
-                        <button
-                          type="button"
-                          style={{ marginTop: '0.5rem' }}
-                          disabled={assign.isPending}
-                          onClick={() => confirm(bed)}
-                        >
-                          {assign.isPending ? 'Assigning…' : 'Use this bed'}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
+              {alternatives.length > 0 && !showAlternatives && (
+                <button
+                  type="button"
+                  className="secondary"
+                  style={{ marginTop: '0.75rem' }}
+                  onClick={() => setShowAlternatives(true)}
+                >
+                  Choose another bed ({alternatives.length} other{' '}
+                  {alternatives.length === 1 ? 'bed fits' : 'beds fit'})
+                </button>
+              )}
+
+              {showAlternatives &&
+                alternatives.map((bed) => (
+                  <BedCard
+                    key={bed.bed_id}
+                    bed={bed}
+                    headline="Also fits"
+                    role={role}
+                    assigning={assign.isPending}
+                    onUse={confirm}
+                  />
+                ))}
             </>
           )}
 
@@ -265,5 +275,113 @@ export function BedSuggestionPanel({
         Close
       </button>
     </div>
+  );
+}
+
+/**
+ * One selectable bed. The suggested bed and every alternative use the same card on purpose — the
+ * agent's pick is committed by exactly the same button as a bed a nurse picked themselves.
+ */
+function BedCard({
+  bed,
+  headline,
+  role,
+  assigning,
+  onUse,
+}: {
+  bed: SuggestedBed;
+  headline: string;
+  role: PrincipalRole | undefined;
+  assigning: boolean;
+  onUse: (bed: SuggestedBed) => void;
+}) {
+  // A ward nurse cannot commit an ICU, HDU or downgraded bed, so they are not offered the button.
+  const hidden = bed.requires_duty_manager && !canSetHighCareLevel(role);
+
+  return (
+    <div className="card" style={{ marginTop: '0.75rem', padding: '0.75rem' }}>
+      <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+        {headline}
+      </p>
+      <p style={{ margin: '0.15rem 0 0', fontSize: '1.05rem' }}>
+        <strong>
+          {bed.ward_name} · {bed.bed_number}
+        </strong>
+        {bed.is_downgrade && (
+          <span className="muted"> — a downgrade from the requested level</span>
+        )}
+      </p>
+
+      {bed.rationale && <p style={{ marginTop: '0.35rem' }}>{bed.rationale}</p>}
+
+      {(bed.fit_factors ?? []).length > 0 && (
+        <ul className="muted" style={{ marginTop: '0.35rem', paddingLeft: '1.1rem' }}>
+          {bed.fit_factors!.map((factor) => (
+            <li key={factor}>{factor}</li>
+          ))}
+        </ul>
+      )}
+
+      {hidden ? (
+        <p className="muted" style={{ marginTop: '0.5rem' }}>
+          A Duty Manager has to place this one.
+        </p>
+      ) : (
+        <button
+          type="button"
+          style={{ marginTop: '0.5rem' }}
+          disabled={assigning}
+          onClick={() => onUse(bed)}
+        >
+          {assigning ? 'Assigning…' : 'Use this bed'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * What the agent has worked out so far, not a spinner with a caption bolted on. The plan comes
+ * back the instant the run starts (§8.7), and `steps` fills in as the run actually completes
+ * them, so this reads the real state of the run rather than a guess timed to feel about right.
+ */
+function AgentProgress({
+  plan,
+  steps,
+}: {
+  plan: string[] | null | undefined;
+  steps: BedAgentStep[] | null | undefined;
+}) {
+  const order = plan && plan.length > 0 ? plan : Object.keys(STEP_CAPTIONS);
+  const done = new Set((steps ?? []).filter((step) => step.ok !== false).map((step) => step.step));
+  const currentIndex = order.findIndex((step) => !done.has(step));
+
+  return (
+    <ul className="agent-progress" style={{ listStyle: 'none', margin: '0.5rem 0 0', padding: 0 }}>
+      {order.map((step, index) => {
+        const isDone = done.has(step);
+        const isCurrent = !isDone && index === currentIndex;
+        const caption = STEP_CAPTIONS[step] ?? step;
+
+        return (
+          <li
+            key={step}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.2rem 0',
+              opacity: isDone || isCurrent ? 1 : 0.45,
+            }}
+          >
+            <span aria-hidden="true">{isDone ? '✓' : isCurrent ? '…' : '·'}</span>
+            <span className={isCurrent ? '' : 'muted'}>
+              {caption}
+              {isCurrent ? '…' : ''}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

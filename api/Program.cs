@@ -446,11 +446,11 @@ builder.Services.AddScoped<IMeService, MeService>();
 builder.Services.AddScoped<IBedRegistryService, BedRegistryService>();
 
 // The Bed and Patient Details Agent. The tools are the allow-list, so they are registered as one
-// interface and nothing else can widen them. The rationale writer is the only seam a language
-// model plugs into - see STUBS.md row M4b.
+// interface and nothing else can widen them. The advisor is the only seam a language model plugs
+// into, and it may only choose between beds the rules have already allowed.
 builder.Services.AddScoped<IBedAgentTools, BedAgentTools>();
-builder.Services.AddScoped<DeterministicBedRationaleWriter>();
-builder.Services.AddScoped<IBedRationaleWriter, GeminiBedRationaleWriter>();
+builder.Services.AddScoped<IBedRationaleWriter, DeterministicBedRationaleWriter>();
+builder.Services.AddScoped<IBedAdvisor, GeminiBedAdvisor>();
 builder.Services.AddScoped<IBedAgent, BedAgent>();
 builder.Services.AddScoped<IBedWorkflowRecorder, BedWorkflowRecorder>();
 builder.Services.AddScoped<IBedSuggestionService, BedSuggestionService>();

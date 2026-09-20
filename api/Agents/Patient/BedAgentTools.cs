@@ -9,7 +9,7 @@ using PatientEntity = CareLanka.Api.Data.Entities.Patient.Patient;
 namespace CareLanka.Api.Agents.Patient;
 
 /// <summary>
-/// The Bed and Patient Details Agent's entire allow-list. Four tools, all four read-only: there is
+/// The Bed and Patient Details Agent's entire allow-list. Five tools, all five read-only: there is
 /// no tool here that admits a patient, reserves a bed, changes a care level or touches another
 /// component's data, so the agent physically cannot perform an action whatever the model decides.
 /// Least privilege is the tool list, not a sentence in a prompt.
@@ -20,6 +20,7 @@ public sealed class BedAgentTools : IBedAgentTools
     public const string GetAdmissionRequirements = "get_admission_requirements";
     public const string ListAvailableBeds = "list_available_beds";
     public const string GetWardOccupancy = "get_ward_occupancy";
+    public const string GetPatientNotes = "get_patient_notes";
 
     private static readonly Regex PatientCodeFormat =
         new(PatientIdentifierFormats.PatientCode, RegexOptions.Compiled);
@@ -207,6 +208,25 @@ public sealed class BedAgentTools : IBedAgentTools
         var beds = await _beds.ListBedsByIdAsync(bedIds, ct);
 
         return beds.Select(bed => bed.WardId).Distinct().ToList();
+    }
+
+    /// <summary>
+    /// The four free-text fields on the patient's medical profile. A patient with no profile is
+    /// an ordinary answer - most have none - and the run carries on without one.
+    /// </summary>
+    public async Task<PatientNotes> GetPatientNotesAsync(
+        Guid patientId, CancellationToken ct = default)
+    {
+        var profile = await _db.PatientMedicalProfiles.AsNoTracking()
+            .FirstOrDefaultAsync(row => row.PatientId == patientId, ct);
+
+        return profile is null
+            ? PatientNotes.None
+            : new PatientNotes(
+                profile.KnownConditions,
+                profile.Allergies,
+                profile.CurrentSymptoms,
+                profile.RecentSituation);
     }
 
     private async Task<HashSet<Guid>> ClaimedBedsAsync(

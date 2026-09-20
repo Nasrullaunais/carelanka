@@ -46,7 +46,7 @@ logins are in `TEST_ACCOUNTS.md`.
 
 | Component | Where it is |
 | :--- | :--- |
-| **Patient** (Lochana) | 12 controllers, 43 routes. Wards, patients, admissions and the 7-state machine, capacity, bed assignment, the worklist, discharge, billing, and the `/api/me/*` patient routes. React screens and a real Flutter patient app for all of it. `PatientMedicalProfile` and its two screens landed 2026-09-18. Left: the two AI agents and their screens (steps 12–16), the reports, and `POST /admissions/pre-admit` |
+| **Patient** (Lochana) | 12 controllers, 43 routes. Wards, patients, admissions and the 7-state machine, capacity, bed assignment, the worklist, discharge, billing, and the `/api/me/*` patient routes. React screens for staff, a real Flutter app for the patient only — mobile has no nurse/reception/duty-manager/admin screens, reversed 2026-09-21. `PatientMedicalProfile` landed 2026-09-18 (React editor only, since the reversal). The bed agent and its React suggestion panel (steps 12–13) are done and now rank on seven weighted soft rules with a model choosing between wards, not just captioning the ranked pick. Left: the care advisory agent and its review queue (steps 14–16), the reports, and `POST /admissions/pre-admit` |
 | **Equipment** (Sethmin) | 8 controllers. Beds, equipment items and categories, pharmacy, maintenance, and the laboratory (`/lab-reports`, `/ward-patients`) |
 | **Emergency** (Nasrulla Unais) | Phases 0–2: aligned contract, ambulance/current-crew readiness, and patient/staff emergency-call intake with caller-scoped APIs |
 | **Staff** (Kaveesha) | Not started — no entities, no controllers, and no `staff-management-plan.md` |

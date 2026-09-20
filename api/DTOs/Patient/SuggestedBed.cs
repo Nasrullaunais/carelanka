@@ -25,5 +25,12 @@ public sealed class SuggestedBed
 
     public IReadOnlyList<string> RulesSatisfied { get; set; } = Array.Empty<string>();
 
+    /// <summary>
+    /// Why this bed ranked where it did, in plain sentences, best reason first. The hard rules say
+    /// a bed is allowed; these say why it was a good idea, which is the part a nurse can argue
+    /// with. Empty is possible for an answer restored from an older run.
+    /// </summary>
+    public IReadOnlyList<string> FitFactors { get; set; } = Array.Empty<string>();
+
     public string? Rationale { get; set; }
 }

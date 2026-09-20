@@ -100,6 +100,7 @@ public sealed class BedWorkflowRecorder : IBedWorkflowRecorder
                 IsDowngrade = bed.IsDowngrade,
                 RequiresDutyManager = bed.RequiresDutyManager,
                 RulesSatisfied = BedRuleNames.Satisfied(bed.IsDowngrade),
+                FitFactors = bed.Reasons,
                 Rationale = bed.Rationale
             }),
             ValidationStatus = ProposedChangeValidationStatus.Passed
@@ -145,6 +146,8 @@ public sealed class PersistedBed
     public bool RequiresDutyManager { get; set; }
 
     public IReadOnlyList<string> RulesSatisfied { get; set; } = Array.Empty<string>();
+
+    public IReadOnlyList<string> FitFactors { get; set; } = Array.Empty<string>();
 
     public string? Rationale { get; set; }
 }

@@ -46,7 +46,7 @@ It answers five questions:
 
 | Role | App | What they can do here |
 | :--- | :--- | :--- |
-| **Ward Nurse** | Flutter | Register patients, admit, complete missing details, update status, place a patient in a normal-ward bed (by hand or by confirming an agent suggestion), maintain the medical profile, tick discharge checklist items, request discharge. *(Rev 2026-09-16)* Review, edit, approve or reject a care advisory draft — see §8.16 |
+| **Ward Nurse** | React | Register patients, admit, complete missing details, update status, place a patient in a normal-ward bed (by hand or by confirming an agent suggestion), maintain the medical profile, tick discharge checklist items, request discharge, and review/edit/approve/reject a care advisory draft (§8.16). *(Reversed 2026-09-21 — was Flutter. Patient Management has no staff-facing screen on mobile: reception, the ward nurse, the duty manager and the administrator all work through the web app, full stop. The `NurseWorklistScreen`, its bed-suggestion screen and its medical-profile editor were removed from `mobile-ui/` the same day; §10 below no longer lists a nurse table.)* |
 | **Duty / Dispatch Manager** | React | Everything a nurse can do, plus approve ICU/HDU beds, approve downgrades, confirm ICU discharges, cancel admissions, view all wards |
 | **Hospital Administrator** | React | Manage the ward register (create and deactivate wards). Beds belong to Equipment. Read-only on patients. May settle a bill, though reception usually does. |
 | **General Staff (reception)** | React | The front desk. Register patients and open an admission, read the patient register and the ward board, and **settle bills** — the only role whose day is mostly money. *Added 2026-09-11.* |
@@ -1052,10 +1052,29 @@ Six things worth knowing:
 
 **Soft rules — the agent ranks candidates by these.** Breaking one is fine; it just makes for a worse choice.
 
-| | Rule |
-| :--- | :--- |
-| S1 | Prefer the ward with lower current occupancy — spread the load |
-| S2 | Prefer a ward the patient has been in before, if any — continuity |
+*(S3–S7 added 2026-09-20. Two rules were not enough to be worth running: with only load and
+continuity, every free bed in the emptiest ward scored identically, so the panel showed a list
+that looked exactly like the manual "assign bed" list and the agent looked pointless. The weights
+live in one table in `BedFitScoring`, and each one carries the sentence shown on screen.)*
+
+| | Rule | Weight |
+| :--- | :--- | :--- |
+| S1 | Prefer the ward with lower current occupancy — spread the load | +0 to +1.5 |
+| S2 | Prefer a ward the patient has been in before, if any — continuity | +0.75 |
+| S3 | A ward at the patient's own care level, over one rung down | +2.0 / −3.0 |
+| S4 | A child in the children's ward, not on an adult general ward | +2.5 / −1.5 |
+| S5 | An isolation bed for an infectious patient; not for anybody else | +1.5 / −1.0 |
+| S6 | A single-sex ward matching the patient, over an open mixed bay | +0.5 |
+| S7 | Do not take a ward's last free bed unless this is an emergency | −0.5 |
+
+**Every sentence behind the score is published as `fit_factors` on `SuggestedBed`.** A score on
+its own tells a nurse nothing and cannot be argued with; "3 of 8 beds on ICU are free" can.
+
+**S4 and S5 are preferences, not rules, and that is deliberate.** H6 already refuses an adult a
+paediatric bed. Nothing refuses a child a general bed — a 6-year-old needing intensive care must
+be able to get it — so "put the child in the children's ward" is a weight, not a wall. Same for
+isolation: H4 refuses a non-isolation bed to an infectious patient, and S5 is the other direction,
+which is about stock rather than safety.
 
 Note that gender separation is a **property of the ward**, not an exception the agent makes in a hurry. ICU and pediatric wards are `mixed` because real ICUs are open bays; general wards are `male` or `female`. The agent applies one rule to every ward and never has a special case for emergencies.
 
@@ -1134,9 +1153,13 @@ What the nurse sees is one button on the suggested bed, and the same button on e
 2. RESOLVE   find_patient (if started from an NIC or patient code)
 3. GATHER    get_admission_requirements + list_available_beds + get_ward_occupancy
 4. FILTER    drop every bed failing a hard rule H0..H6
-5. RANK      score survivors on soft rules S1..S2
+5. RANK      score survivors on soft rules S1..S7, keeping the sentence behind each
 6. DECIDE    best + alternatives; if empty, try the downgrade ladder;
              if still empty, build the blocker sentence from the rule that stopped it
+6b. ADVISE   <- the model, and the only step that is. Shortlist the best bed in each of
+                up to five wards, hand it the clinician's notes on this patient, and let
+                it pick one of them and say why. Skipped when there are no notes or
+                nothing to choose between. See 8.6c.
 7. VALIDATE  <- deterministic C#, not the model. Re-check H0..H6 on best and on
                 every alternative. Anything failing here is removed from the answer
                 before a human sees it.
@@ -1149,6 +1172,42 @@ What the nurse sees is one button on the suggested bed, and the same button on e
 ```
 
 Steps 7 and 10 are the safety net, and neither involves the LLM. Step 8 is the pause the assignment asks for by name.
+
+### 8.6c What the model actually decides
+
+*(Added 2026-09-20.)*
+
+**The problem in one sentence: a model that only writes a caption is not doing anything, and the
+screen showed it.** The panel listed every free bed with a sentence under each — which is what the
+bed board already does. Pressing "Suggest a bed" and getting a list back is not a suggestion.
+
+So the run now narrows to one bed, and the model earns the narrowing:
+
+- **The rules shortlist.** `BedFitScoring` ranks every bed that passed H0–H6, and the shortlist is
+  the top bed from each of up to five different wards, all at the same care level as the top pick.
+  Five beds in one ward is not a choice — they differ by a number on a door.
+- **The model chooses inside it.** It is handed the care level, age, gender, urgency, infection
+  flag and the four free-text fields off `PatientMedicalProfile` — the one input no weight can
+  read — and returns a `bed_number` from the shortlist plus one sentence.
+- **Anything else is ignored.** A bed number that is not on the shortlist, a malformed answer, a
+  dead key, a spent quota: all of them leave the deterministically ranked pick standing, with the
+  written sentence under it. The run never fails because a model did.
+
+**What it cannot reach.** The shortlist only ever holds beds the hard rules already allowed, at
+the same care level as the ranked pick, so the approver role and the downgrade flag are the same
+whichever one comes back. It cannot upgrade a patient, downgrade one, change a care level, reach a
+bed a rule refused, or write anything at all. Step 7 re-checks its answer in C# regardless, and a
+human still presses the button.
+
+**The notes are data, never instructions.** They go to the model as JSON values under their own
+keys, and the instruction says so. A record containing "ignore previous instructions" changes
+nothing about what comes back. The patient's name, NIC and patient code are not sent at all — the
+choice does not depend on them.
+
+A worked example, from a real run: a general-ward patient whose notes said *"productive cough,
+fever, suspected tuberculosis awaiting sputum results"* was moved off the general ward onto
+`ISO-01`, with *"the clinician notes indicate suspected tuberculosis"* as the reason. No rule in
+the table could have done that — `is_infectious` on the admission was still false.
 
 ### 8.8 Persisted workflow state
 
@@ -1379,7 +1438,7 @@ Same fields as §8.8: workflow id, objective, plan, completed steps, tool calls 
 | Screen | Contents |
 | :--- | :--- |
 | **Bed board** | Live grid of every ward and bed, colour-coded free / reserved / occupied / out-of-service. The centrepiece. |
-| **Bed suggestion panel** | *(Rewritten 2026-09-16 — it was an "approvals queue" over `awaiting_approval`, and that status is no longer used; §8.6b.)* Opened from a row on the patients board, or from the desk by typing an NIC or patient code. Shows **who the patient is**, the suggested bed with its rationale and the rules it satisfies, and **every alternative as its own row with its own "Use this bed" button**. A blocked run shows `blocker.message` in plain words and offers manual assignment instead. **This is the demo screen.** |
+| **Bed suggestion panel** | *(Rewritten 2026-09-16 — it was an "approvals queue" over `awaiting_approval`, and that status is no longer used; §8.6b.)* Opened from a row on the patients board, or from the desk by typing an NIC or patient code. Shows **who the patient is** and **one bed**, with the agent's reason and the sentences behind its score underneath it. *(Rewritten 2026-09-20 — it used to list every alternative straight away, which made it a second copy of the bed board.)* **"Choose another bed" reveals every alternative**, each still its own row with its own "Use this bed" button. A blocked run shows `blocker.message` in plain words and offers manual assignment instead. **This is the demo screen.** |
 | **Admissions list** | Search, filter by status/ward/category, sort, paginate |
 | **Admission detail** | Timeline of every status change, every bed assignment, every agent run and human decision |
 | **Discharge review** | Flagged candidates, checklist state, confirm |
@@ -1415,21 +1474,13 @@ document-generation dependency in a project with no other use for it.
 
 ---
 
-## 10. Flutter (Ward Nurse, Patient)
+## 10. Flutter (Patient)
 
-**Nurse:**
-
-| Screen | Contents |
-| :--- | :--- |
-| My ward | Patients in my ward with status badges, and a warning badge on anyone with `details_complete = false` |
-| Register patient | Form with validation; NIC lookup first to avoid duplicates |
-| Complete details | Fill in `missing_fields` for an incomplete record |
-| Admit / arrive | Confirm the reserved bed, mark arrived |
-| Complete details | Fill in `missing_fields` |
-| **Suggest a bed** *(§8.1)* | Type an NIC or patient code, or open it from a patient on the ward list. Shows who they are, the suggested bed and the alternatives, each with one button. A blocked run shows `blocker.message` |
-| **Medical profile** *(§8.10c)* | Four free-text boxes on the patient — conditions, allergies, current symptoms, recent situation. This is where the care advisory agent's input actually comes from, so it is a nurse screen, not an admin one |
-| **Care drafts to review** *(§8.16)* | Drafts from patients on my ward, awaiting review. Approve with an optional edit, or reject with a reason |
-| Discharge request | Tick checklist items, request discharge |
+*(Reversed 2026-09-21 — this section used to be "Flutter (Ward Nurse, Patient)" with a full
+nurse table: my ward, register patient, complete details, admit/arrive, suggest a bed,
+medical profile, care drafts to review, discharge request. Every one of those is now a React
+screen, alongside the Duty Manager and the Administrator. Mobile is the patient's app and
+nothing else — nobody on staff has a reason to open it.)*
 
 **Patient:**
 
@@ -1557,7 +1608,7 @@ This matches the group plan, which already states that Emergency and Staff read 
 | **React** | The suggestion panel renders the patient, the best bed and every alternative; "Use this bed" calls `assign-bed` with the `workflow_id`; a blocked outcome renders `blocker.message` and offers manual assignment instead; error state on 409; protected routes redirect; the care recommendation queue renders approve/reject for `Doctor` **and** `WardNurse` and for nobody else |
 | **Flutter** | Registration form validation; notification fires on bed assignment and on discharge; date picker sets `expected_arrival`; secure token storage; patient sees only their own data; **the "how are you feeling" card only renders inside My Stay, and only while admitted**; a patient never receives `agent_message` or `rejection_reason` over the wire, checked at the DTO level not just the UI |
 | **Agent** | Golden cases — see below, for both agents |
-| **End to end** | Nurse types an NIC → agent returns the patient and a bed → nurse presses one button → the patient's phone shows the ward and bed. Second flow: admitted patient describes a symptom in Flutter → agent drafts → nurse approves in React → Flutter shows the approved message. |
+| **End to end** | Nurse types an NIC into the web app → agent returns the patient and a bed → nurse presses one button → the patient's phone shows the ward and bed. Second flow: admitted patient describes a symptom in Flutter → agent drafts → nurse approves in React → Flutter shows the approved message. |
 
 ### Agent golden cases
 

@@ -36,11 +36,11 @@ public static class BedPlacementRules
 
     public const int PediatricAgeLimit = 18;
 
-    public static bool IsChild(DateOnly? dateOfBirth, DateOnly asOf)
+    public static int? AgeOn(DateOnly? dateOfBirth, DateOnly asOf)
     {
         if (dateOfBirth is not { } born)
         {
-            return false;
+            return null;
         }
 
         var age = asOf.Year - born.Year;
@@ -50,8 +50,11 @@ public static class BedPlacementRules
             age--;
         }
 
-        return age < PediatricAgeLimit;
+        return age;
     }
+
+    public static bool IsChild(DateOnly? dateOfBirth, DateOnly asOf)
+        => AgeOn(dateOfBirth, asOf) is { } age && age < PediatricAgeLimit;
 
     public static bool EnsurePlaceable(
         AdmissionCategory category,

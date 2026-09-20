@@ -20,6 +20,15 @@ public static class BedRuleNames
     public const string WardActive = "ward_active";
     public const string AgePolicy = "age_policy";
 
+    // The soft rules. Breaking one of these is allowed - it only makes for a worse choice - so
+    // they name a weight in BedFitScoring rather than a refusal in BedPlacementRules.
+    public const string CareLevelFit = "care_level_fit";
+    public const string AgeFit = "age_fit";
+    public const string GenderPrivacy = "gender_privacy";
+    public const string WardLoad = "ward_load";
+    public const string Continuity = "continuity";
+    public const string Headroom = "headroom";
+
     public static string ForRefusal(MessageCode code) => code switch
     {
         MessageCode.BedWardNotInService => WardActive,

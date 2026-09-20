@@ -70,6 +70,9 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
             services.Remove(services.Single(service =>
                 service.ServiceType == typeof(IHostedService) && service.ImplementationType == typeof(PushDeliveryWorker)));
             services.Replace(ServiceDescriptor.Singleton<IPushSender, RecordingPushSender>());
+            // Tests run the pre-admission pass themselves and never call Patient Management.
+            services.Remove(services.Single(service =>
+                service.ServiceType == typeof(IHostedService) && service.ImplementationType == typeof(PreAdmissionWorker)));
         });
     }
 

@@ -44,6 +44,11 @@ kotlin {
     }
 }
 
+// google-services.json is not committed; without it the app builds with push switched off.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 flutter {
     source = "../.."
 }

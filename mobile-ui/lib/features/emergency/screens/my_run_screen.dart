@@ -19,11 +19,23 @@ class MyRunScreen extends StatefulWidget {
   State<MyRunScreen> createState() => _MyRunScreenState();
 }
 
-class _MyRunScreenState extends State<MyRunScreen> {
+class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     context.read<MyRunController>().startPolling();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) context.read<MyRunController>().load(showLoading: false);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   @override

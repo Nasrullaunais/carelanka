@@ -20,15 +20,18 @@ class AuthController extends ChangeNotifier {
     required CareLankaApi api,
     required TokenStore tokens,
     required SessionExpiry sessionExpiry,
+    Future<void> Function()? beforeSignOut,
   })  : _api = api,
         _tokens = tokens,
-        _sessionExpiry = sessionExpiry {
+        _sessionExpiry = sessionExpiry,
+        _beforeSignOut = beforeSignOut {
     _sessionExpiry.addListener(_onSessionExpired);
   }
 
   final CareLankaApi _api;
   final TokenStore _tokens;
   final SessionExpiry _sessionExpiry;
+  final Future<void> Function()? _beforeSignOut;
 
   AuthStatus _status = AuthStatus.restoring;
   CurrentPrincipal? _principal;
@@ -79,6 +82,7 @@ class AuthController extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    await _beforeSignOut?.call();
     final refreshToken = await _tokens.readRefreshToken();
     if (refreshToken != null) {
       try {

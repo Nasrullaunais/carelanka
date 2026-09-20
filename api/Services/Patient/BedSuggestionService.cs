@@ -77,7 +77,9 @@ public sealed class BedSuggestionService : IBedSuggestionService
             // Nobody to suggest a bed for. That answer is one read and no model call, so it is
             // settled here rather than queued - there is no work for a worker to do.
             _recorder.Record(
-                workflow, await _agent.RunAsync(new BedAgentRequest(null, identifier), ct), null);
+                workflow,
+                await _agent.RunAsync(new BedAgentRequest(null, identifier), ct: ct),
+                null);
 
             await _db.SaveChangesAsync(ct);
         }
@@ -196,6 +198,7 @@ public sealed class BedSuggestionService : IBedSuggestionService
             IsDowngrade = stored.IsDowngrade,
             RequiresDutyManager = stored.RequiresDutyManager,
             RulesSatisfied = stored.RulesSatisfied,
+            FitFactors = stored.FitFactors,
             Rationale = stored.Rationale
         };
     }

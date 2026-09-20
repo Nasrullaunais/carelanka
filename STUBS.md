@@ -169,14 +169,21 @@ contract as the port it was replacing, so the swap is an adapter and a DI line.
 
 **Row 7 — the bed agent's `rationale` sentence.** *Opened and replaced 2026-09-20.* It was
 composed in C# for a few hours while `ILanguageModel` did not exist. `api/Agents/ILanguageModel.cs`
-and `GeminiLanguageModel.cs` are now built (ADR 2), so `GeminiBedRationaleWriter` writes the
-sentence and `DeterministicBedRationaleWriter` stays registered underneath it.
+and `GeminiLanguageModel.cs` are now built (ADR 2).
+
+**What the model does changed the same day.** Writing a sentence under a choice already made is
+not work, and it showed: the panel offered a list of beds a nurse could already see. The model is
+now asked one question per run — of the shortlisted beds, which suits this patient, and why
+(`GeminiBedAdvisor`). It reads the clinician's notes on the patient's medical profile, which is
+the one input no rule in `BedFitScoring` can weigh. `DeterministicBedRationaleWriter` stays
+registered and writes the sentence under every bed the advisor did not speak for.
 
 **That fallback is not a stub, and the distinction matters.** A stub stands in for work nobody has
 done. This stands in for a key that is missing, a quota that is spent or wifi that is down on the
 day — conditions ADR 2 says out loud will happen. With no key configured the API starts normally
-and every run still answers; the sentence is just written from the facts rather than by the model.
-Nothing else in the agent was ever the model's to decide.
+and every run still answers, with the deterministically ranked bed and a written sentence. The
+model can only reorder a shortlist the rules already approved; the hard rules, the blocker and the
+deterministic re-check were never its to decide.
 
 ## Cross-component dependencies that will probably need stubbing
 

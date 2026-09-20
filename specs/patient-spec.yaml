@@ -3233,6 +3233,16 @@ components:
           type: array
           items: { type: string }
           example: [requires_bed, category_match, gender_policy, isolation, age_policy]
+        fit_factors:
+          type: array
+          description: >-
+            Why this bed ranked where it did, in plain sentences, best reason first. The hard rules
+            say a bed is allowed; these say why it was a good idea - the part a nurse can argue
+            with. Built in C# from the soft rules, never written by the model.
+          items: { type: string }
+          example:
+            - ICU is the right ward for an ICU patient.
+            - 3 of 8 beds on ICU are free.
         rationale:
           type: string
           nullable: true

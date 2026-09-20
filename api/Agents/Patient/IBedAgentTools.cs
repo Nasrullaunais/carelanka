@@ -23,6 +23,28 @@ public interface IBedAgentTools
 
     Task<IReadOnlyCollection<Guid>> ListPreviousWardsAsync(
         Guid patientId, CancellationToken ct = default);
+
+    Task<PatientNotes> GetPatientNotesAsync(Guid patientId, CancellationToken ct = default);
+}
+
+/// <summary>
+/// What a clinician typed about this patient, read straight off their medical profile. Four free
+/// text fields and nothing derived: this is the only thing in the run that a rule cannot weigh,
+/// which is why it is the only thing handed to a model.
+/// </summary>
+public sealed record PatientNotes(
+    string? KnownConditions,
+    string? Allergies,
+    string? CurrentSymptoms,
+    string? RecentSituation)
+{
+    public static readonly PatientNotes None = new(null, null, null, null);
+
+    public bool IsEmpty
+        => string.IsNullOrWhiteSpace(KnownConditions)
+            && string.IsNullOrWhiteSpace(Allergies)
+            && string.IsNullOrWhiteSpace(CurrentSymptoms)
+            && string.IsNullOrWhiteSpace(RecentSituation);
 }
 
 public sealed record PatientLookup(

@@ -15,6 +15,9 @@ SuggestedBed _$SuggestedBedFromJson(Map<String, dynamic> json) => SuggestedBed(
   rulesSatisfied: (json['rules_satisfied'] as List<dynamic>?)
       ?.map((e) => e as String)
       .toList(),
+  fitFactors: (json['fit_factors'] as List<dynamic>?)
+      ?.map((e) => e as String)
+      .toList(),
   rationale: json['rationale'] as String?,
 );
 
@@ -26,5 +29,6 @@ Map<String, dynamic> _$SuggestedBedToJson(SuggestedBed instance) =>
       'is_downgrade': instance.isDowngrade,
       'requires_duty_manager': instance.requiresDutyManager,
       'rules_satisfied': instance.rulesSatisfied,
+      'fit_factors': instance.fitFactors,
       'rationale': instance.rationale,
     };

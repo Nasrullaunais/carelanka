@@ -53,7 +53,17 @@ public sealed class BedAgentExecutor
 
         try
         {
-            var run = await _agent.RunAsync(new BedAgentRequest(workflow.EntityId, null), ct);
+            var run = await _agent.RunAsync(
+                new BedAgentRequest(workflow.EntityId, null),
+                onProgress: async (steps, progressCt) =>
+                {
+                    // The one mid-run checkpoint: everything fast is done, the model call is
+                    // about to start. Saved now so a nurse's poll sees it before the run finishes,
+                    // rather than nothing until it does.
+                    workflow.CompletedSteps = BedWorkflowJson.Write(steps);
+                    await _db.SaveChangesAsync(progressCt);
+                },
+                ct);
 
             _recorder.Record(workflow, run, workflow.EntityId);
         }

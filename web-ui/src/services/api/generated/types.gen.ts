@@ -1399,6 +1399,7 @@ export type SuggestedBed = {
     is_downgrade: boolean;
     requires_duty_manager: boolean;
     rules_satisfied?: Array<string> | null;
+    fit_factors?: Array<string> | null;
     rationale?: string | null;
 };
 

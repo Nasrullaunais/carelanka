@@ -1,10 +1,5 @@
 import '../../../core/network/api.dart';
 import '../../../services/api_client/care_lanka_api.dart';
-import '../../../services/api_client/models/assign_bed_request.dart';
-import '../../../services/api_client/models/bed_assignment.dart';
-import '../../../services/api_client/models/bed_suggestion_request.dart';
-import '../../../services/api_client/models/bed_workflow_accepted.dart';
-import '../../../services/api_client/models/bed_workflow_summary.dart';
 import '../../../services/api_client/models/book_appointment_request.dart';
 import '../../../services/api_client/models/claim_by_patient_code_request.dart';
 import '../../../services/api_client/models/my_admission.dart';
@@ -15,10 +10,7 @@ import '../../../services/api_client/models/my_bill.dart';
 import '../../../services/api_client/models/my_lab_report_paged_result.dart';
 import '../../../services/api_client/models/my_profile.dart';
 import '../../../services/api_client/models/patient_claim_preview.dart';
-import '../../../services/api_client/models/patient_medical_profile.dart';
-import '../../../services/api_client/models/update_medical_profile_request.dart';
 import '../../../services/api_client/models/pre_register_request.dart';
-import '../../../services/api_client/models/worklist_row_paged_result.dart';
 
 class PatientService {
   const PatientService(this._api);
@@ -117,69 +109,4 @@ class PatientService {
   /// The relative path for [downloadBytes] — the generated client's own
   /// `downloadMyLabReport` corrupts binary content, see [downloadBytes].
   static String labReportFilePath(String reportId) => '/me/lab-reports/$reportId/file';
-
-  /// The four free-text fields the care advisory agent reads. Returns a profile with every
-  /// field null when nobody has written one — an empty profile is ordinary, not a 404.
-  Future<PatientMedicalProfile> loadMedicalProfile(String patientId) {
-    return callApi(() => _api.patients.getPatientMedicalProfile(id: patientId));
-  }
-
-  /// A full replace: whatever is left out of [request] is cleared on the record.
-  Future<PatientMedicalProfile> saveMedicalProfile(
-    String patientId,
-    UpdateMedicalProfileRequest request,
-  ) {
-    return callApi(
-        () => _api.patients.replacePatientMedicalProfile(id: patientId, body: request));
-  }
-
-  Future<WorklistRowPagedResult> loadWorklist({
-    String? search,
-    bool includeFinished = false,
-    int page = 1,
-    int pageSize = 20,
-  }) {
-    return callApi(() => _api.admissions.listPatientWorklist(
-          search: (search == null || search.isEmpty) ? null : search,
-          includeFinished: includeFinished,
-          page: page,
-          pageSize: pageSize,
-        ));
-  }
-
-  /// Starts the bed agent. Either [admissionId] (already on the worklist) or
-  /// [patientIdentifier] (an NIC or patient code typed at the desk) — never both.
-  Future<BedWorkflowAccepted> requestBedSuggestion({
-    String? admissionId,
-    String? patientIdentifier,
-  }) {
-    return callApi(() => _api.bedAssignment.requestBedSuggestion(
-          body: BedSuggestionRequest(
-            admissionId: admissionId,
-            patientIdentifier: patientIdentifier,
-          ),
-        ));
-  }
-
-  Future<BedWorkflowSummary> getBedWorkflow(String workflowId) {
-    return callApi(() => _api.bedAssignment.getBedWorkflow(workflowId: workflowId));
-  }
-
-  /// The only way a bed is ever claimed — by hand or by confirming a suggestion. Passing
-  /// [workflowId] stamps the resulting assignment as the agent's, not a manual pick.
-  Future<BedAssignment> assignBed({
-    required String admissionId,
-    required String bedId,
-    String? workflowId,
-    String? overrideReason,
-  }) {
-    return callApi(() => _api.admissions.assignBedManually(
-          id: admissionId,
-          body: AssignBedRequest(
-            bedId: bedId,
-            workflowId: workflowId,
-            overrideReason: overrideReason,
-          ),
-        ));
-  }
 }

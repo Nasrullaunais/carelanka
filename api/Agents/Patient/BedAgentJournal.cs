@@ -18,6 +18,13 @@ public sealed class BedAgentJournal
     public BedWorkflowValidation Validation { get; } = new() { Passed = true };
 
     /// <summary>
+    /// Every step recorded so far, mid-run. This is what lets a poll made while the run is still
+    /// going show something better than "working on it" - see <see cref="BedAgent.RunAsync"/>'s
+    /// progress callback.
+    /// </summary>
+    public IReadOnlyList<BedAgentStep> StepsSoFar => _steps;
+
+    /// <summary>
     /// A retry starts its steps again. The errors stay - they are why there was a second attempt.
     /// </summary>
     public void Restart()
@@ -34,6 +41,29 @@ public sealed class BedAgentJournal
         try
         {
             var result = work();
+            Record(step, tool: null, startedAt, clock, ok: true, error: null);
+
+            return result;
+        }
+        catch (Exception failure)
+        {
+            Record(step, tool: null, startedAt, clock, ok: false, failure.Message);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Timed like <see cref="Step{TResult}"/>, for a step that waits on something - the model call
+    /// being the one that can actually take a while, and so the one worth having a timing for.
+    /// </summary>
+    public async Task<TResult> StepAsync<TResult>(string step, Func<Task<TResult>> work)
+    {
+        var startedAt = DateTimeOffset.UtcNow;
+        var clock = Stopwatch.StartNew();
+
+        try
+        {
+            var result = await work();
             Record(step, tool: null, startedAt, clock, ok: true, error: null);
 
             return result;

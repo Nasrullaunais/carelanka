@@ -1594,6 +1594,7 @@ export type WorklistRow = {
     source?: AdmissionSource;
     admission_category?: AdmissionCategory;
     urgency?: AdmissionUrgency;
+    is_infectious?: boolean;
     ward_name?: string | null;
     bed_number?: string | null;
     when: string;

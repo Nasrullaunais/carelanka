@@ -57,6 +57,7 @@ export function BedSuggestionPanel({
     onSuccess: (accepted) => {
       if (accepted.workflow_id) {
         setWorkflowId(accepted.workflow_id);
+        setShowAlternatives(false);
       }
     },
   });
@@ -212,6 +213,10 @@ export function BedSuggestionPanel({
                     <td>{admissionUrgencyLabels[workflow.data.patient.urgency]}</td>
                   </tr>
                 )}
+                <tr>
+                  <th scope="row">Needs isolation</th>
+                  <td>{workflow.data.patient.is_infectious ? 'Yes' : 'No'}</td>
+                </tr>
               </tbody>
             </table>
           )}

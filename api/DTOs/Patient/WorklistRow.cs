@@ -23,6 +23,8 @@ public class WorklistRow
 
     public AdmissionUrgency? Urgency { get; set; }
 
+    public bool IsInfectious { get; set; }
+
     public string? WardName { get; set; }
 
     public string? BedNumber { get; set; }

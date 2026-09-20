@@ -106,6 +106,27 @@ public sealed class BedSuggestionEndpointTests
     }
 
     [Fact]
+    public async Task A_maternity_bed_is_never_offered_to_a_patient_who_is_not_on_maternity()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var general = await NewWardAsync();
+        var generalBeds = await AddBedsAsync(general, 1, hasIsolation: true);
+        var maternity = await NewWardAsync(wardType: "maternity", genderPolicy: "female");
+        await AddBedsAsync(maternity, 5, hasIsolation: true);
+        await OnlyTheseWardsAsync(general.Id, maternity.Id);
+
+        var patient = await NewPatientAsync(nurse, gender: "female");
+        var admissionId = await NewAdmissionAsync(nurse, patient, isInfectious: true);
+
+        using var run = await SuggestAsync(nurse, new { admission_id = admissionId });
+
+        Assert.Equal("proposed", run.RootElement.GetProperty("outcome").GetString());
+        Assert.Equal(
+            generalBeds[0].ToString(),
+            run.RootElement.GetProperty("best").GetProperty("bed_id").GetString());
+    }
+
+    [Fact]
     public async Task A_patient_code_off_the_slip_finds_the_patient_and_their_open_visit()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);

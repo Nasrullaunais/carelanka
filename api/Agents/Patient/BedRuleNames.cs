@@ -29,6 +29,14 @@ public static class BedRuleNames
     public const string Continuity = "continuity";
     public const string Headroom = "headroom";
 
+    /// <summary>
+    /// Agent-only, not one of H0-H6: <see cref="Services.Patient.BedPlacementRules.EnsurePlaceable"/>
+    /// never throws this, because a nurse's manual pick is allowed to put a patient in a specialist
+    /// ward on purpose. The automatic suggestion is not that judgement call, so Maternity and
+    /// Mental Health beds are dropped before the shared rulebook ever sees them.
+    /// </summary>
+    public const string SpecialistWard = "specialist_ward";
+
     public static string ForRefusal(MessageCode code) => code switch
     {
         MessageCode.BedWardNotInService => WardActive,

@@ -11,6 +11,7 @@ using CareLanka.Api.Services.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using RouteLogView = CareLanka.Api.DTOs.Emergency.RouteLog;
 
 namespace CareLanka.Api.Services.Emergency;
 
@@ -21,10 +22,11 @@ public sealed class DispatchService : IDispatchService
     private readonly ICurrentUser _currentUser;
     private readonly TimeProvider _clock;
     private readonly EmergencyOptions _options;
+    private readonly ISceneLookupQueue _sceneLookups;
 
     public DispatchService(CareLankaDbContext db, IAmbulanceEligibilityService eligibility,
-        ICurrentUser currentUser, TimeProvider clock, IOptions<EmergencyOptions> options)
-        => (_db, _eligibility, _currentUser, _clock, _options) = (db, eligibility, currentUser, clock, options.Value);
+        ICurrentUser currentUser, TimeProvider clock, IOptions<EmergencyOptions> options, ISceneLookupQueue sceneLookups)
+        => (_db, _eligibility, _currentUser, _clock, _options, _sceneLookups) = (db, eligibility, currentUser, clock, options.Value, sceneLookups);
 
     private static readonly Dictionary<DispatchStatus, AmbulanceStatus> ProgressProjection = new()
     {
@@ -39,7 +41,39 @@ public sealed class DispatchService : IDispatchService
         var dispatch = await CreateCoreAsync(callId, request.AmbulanceId!.Value, ct);
         await SaveAsync(ct);
         await transaction.CommitAsync(ct);
+        QueueRoutePlan(dispatch);
         return ToDetail(dispatch);
+    }
+
+    public async Task<RouteLogView> GetRouteAsync(Guid id, CancellationToken ct = default)
+    {
+        var dispatch = await _db.Dispatches.AsNoTracking()
+            .Include(x => x.Crew)
+            .Include(x => x.RouteLog)
+            .SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw new NotFoundException("Dispatch", id);
+        if (_currentUser.Role == PrincipalRole.AmbulanceCrew && !dispatch.Crew.Any(x => x.StaffMemberId == _currentUser.Id))
+            throw new ForbiddenException();
+
+        var route = dispatch.RouteLog ?? throw new NotFoundException("Route", id);
+        return new RouteLogView
+        {
+            DispatchId = route.DispatchId,
+            OriginLatitude = route.OriginLatitude,
+            OriginLongitude = route.OriginLongitude,
+            DestinationLatitude = route.DestinationLatitude,
+            DestinationLongitude = route.DestinationLongitude,
+            PlannedDistanceKm = (double)route.PlannedDistanceKm,
+            PlannedDurationMinutes = route.PlannedDurationMinutes,
+            DepartedAt = route.DepartedAt,
+            ArrivedAt = route.ArrivedAt,
+            MapsApiReference = route.MapsApiReference
+        };
+    }
+
+    private void QueueRoutePlan(Dispatch dispatch)
+    {
+        if (dispatch.Ambulance.CurrentLatitude is { } latitude && dispatch.Ambulance.CurrentLongitude is { } longitude)
+            _sceneLookups.Enqueue(new RoutePlanJob(dispatch.Id, latitude, longitude));
     }
 
     public async Task<DispatchDetail> GetMyActiveAsync(CancellationToken ct = default)
@@ -110,7 +144,7 @@ public sealed class DispatchService : IDispatchService
             DestinationLongitude = longitude,
             DestinationLabel = label,
             GoogleMapsUrl = FormattableString.Invariant(
-                $"https://www.google.com/maps/dir/?api=1&destination={latitude},{longitude}&travelmode=driving")
+                $"https://www.google.com/maps/dir/?api=1&destination={latitude},{longitude}&travelmode=driving&dir_action=navigate")
         };
     }
 
@@ -203,6 +237,7 @@ public sealed class DispatchService : IDispatchService
         old.SupersededByDispatchId = replacement.Id;
         await SaveAsync(ct);
         await transaction.CommitAsync(ct);
+        QueueRoutePlan(replacement);
         return ToDetail(replacement);
     }
 

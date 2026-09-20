@@ -10,7 +10,7 @@ import {
   listEmergencyCallsOptions,
   updateEmergencyCallMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
-import type { AmbulanceEligibilityBlockReason, CallPriority, DispatchSummary } from '../services/api/generated';
+import type { AmbulanceEligibilityBlockReason, AmbulanceSummary, CallPriority, DispatchSummary } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
 import { canManageEmergency } from '../types/permissions';
 
@@ -52,8 +52,9 @@ export function EmergencyPage() {
     query: {
       page: 1,
       pageSize: PAGE_SIZE,
-      ...(selectedCall.data?.latitude !== undefined ? { nearToLatitude: selectedCall.data.latitude } : {}),
-      ...(selectedCall.data?.longitude !== undefined ? { nearToLongitude: selectedCall.data.longitude } : {}),
+      ...(selectedCall.data?.latitude != null && selectedCall.data?.longitude != null
+        ? { nearToLatitude: selectedCall.data.latitude, nearToLongitude: selectedCall.data.longitude, sortBy: 'distance' as const, sortDir: 'asc' as const }
+        : {}),
     },
   }));
   const currentCrew = useQuery({
@@ -220,8 +221,15 @@ function PriorityForm({ current, pending, onSave }: { current: CallPriority; pen
   </form>;
 }
 
+function travelLabel(ambulance: AmbulanceSummary) {
+  if (ambulance.distance_km === null || ambulance.distance_km === undefined) return '';
+  const distance = ambulance.distance_km.toFixed(1);
+  if (ambulance.drive_minutes) return ` · ${ambulance.drive_minutes} min drive · ${distance} km`;
+  return ` · ${distance} km in a straight line${ambulance.is_straight_line_distance ? ' (road times unavailable)' : ''}`;
+}
+
 function EligibleAmbulances({ ambulances, isLoading, isError, dispatching, onDispatch, onRetry }: {
-  ambulances: Array<{ id: string; registration_number: string; is_eligible?: boolean; eligibility_block_reasons?: AmbulanceEligibilityBlockReason[] | null; distance_km?: number | null; current_crew_count?: number; required_crew_count?: number }>;
+  ambulances: AmbulanceSummary[];
   isLoading: boolean; isError: boolean; dispatching: boolean; onDispatch: (id: string) => void; onRetry: () => void;
 }) {
   return <div className="emergency-section"><h3>Ambulance choices</h3>
@@ -229,7 +237,7 @@ function EligibleAmbulances({ ambulances, isLoading, isError, dispatching, onDis
     {isError && <Retry text="Could not check ambulance eligibility." onRetry={onRetry} />}
     {!isLoading && !isError && ambulances.length === 0 && <p className="empty">No ambulances are registered.</p>}
     {ambulances.map((ambulance) => <div className="emergency-ambulance" key={ambulance.id}>
-      <div><strong>{ambulance.registration_number}</strong><span className="muted"> · crew {ambulance.current_crew_count ?? 0}/{ambulance.required_crew_count ?? 2}{ambulance.distance_km !== null && ambulance.distance_km !== undefined ? ` · ${ambulance.distance_km.toFixed(1)} km` : ''}</span>
+      <div><strong>{ambulance.registration_number}</strong><span className="muted"> · crew {ambulance.current_crew_count ?? 0}/{ambulance.required_crew_count ?? 2}{travelLabel(ambulance)}</span>
         {!ambulance.is_eligible && <p className="emergency-block">{(ambulance.eligibility_block_reasons ?? []).map((reason) => blockReasonLabels[reason]).join(' · ') || 'Not eligible'}</p>}
       </div>
       <button type="button" disabled={!ambulance.is_eligible || dispatching} onClick={() => onDispatch(ambulance.id)}>{dispatching ? 'Dispatching…' : `Dispatch ${ambulance.registration_number}`}</button>

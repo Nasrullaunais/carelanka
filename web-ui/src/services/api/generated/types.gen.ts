@@ -199,6 +199,8 @@ export type AmbulanceSummary = {
     active_dispatch_id?: string | null;
     is_divertible: boolean;
     distance_km?: number | null;
+    drive_minutes?: number | null;
+    is_straight_line_distance?: boolean | null;
 };
 
 export type AmbulanceSummaryPagedResult = {
@@ -1281,6 +1283,19 @@ export type RetireAmbulanceRequest = {
 
 export type ReviewCancellationRequest = {
     notes?: string | null;
+};
+
+export type RouteLog = {
+    dispatch_id?: string;
+    origin_latitude?: number;
+    origin_longitude?: number;
+    destination_latitude?: number;
+    destination_longitude?: number;
+    planned_distance_km?: number;
+    planned_duration_minutes?: number;
+    departed_at?: string | null;
+    arrived_at?: string | null;
+    maps_api_reference?: string | null;
 };
 
 export type SettleBillRequest = {
@@ -3866,6 +3881,41 @@ export type ConfirmDischargeResponses = {
 };
 
 export type ConfirmDischargeResponse = ConfirmDischargeResponses[keyof ConfirmDischargeResponses];
+
+export type GetDispatchRouteData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/dispatches/{id}/route';
+};
+
+export type GetDispatchRouteErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetDispatchRouteError = GetDispatchRouteErrors[keyof GetDispatchRouteErrors];
+
+export type GetDispatchRouteResponses = {
+    /**
+     * OK
+     */
+    200: RouteLog;
+};
+
+export type GetDispatchRouteResponse = GetDispatchRouteResponses[keyof GetDispatchRouteResponses];
 
 export type CancelDispatchData = {
     body?: CancelDispatchRequest;

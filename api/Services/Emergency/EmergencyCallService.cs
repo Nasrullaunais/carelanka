@@ -20,19 +20,22 @@ public sealed class EmergencyCallService : IEmergencyCallService
     private readonly TimeProvider _timeProvider;
     private readonly EmergencyOptions _options;
     private readonly IDispatchService _dispatches;
+    private readonly ISceneLookupQueue _sceneLookups;
 
     public EmergencyCallService(
         CareLankaDbContext db,
         ICurrentUser currentUser,
         TimeProvider timeProvider,
         IOptions<EmergencyOptions> options,
-        IDispatchService dispatches)
+        IDispatchService dispatches,
+        ISceneLookupQueue sceneLookups)
     {
         _db = db;
         _currentUser = currentUser;
         _timeProvider = timeProvider;
         _options = options.Value;
         _dispatches = dispatches;
+        _sceneLookups = sceneLookups;
     }
 
     public async Task<EmergencyCallDetail> CreateAsync(
@@ -98,6 +101,7 @@ public sealed class EmergencyCallService : IEmergencyCallService
             return await DetailAsync(existing.Id, cancellationToken);
         }
 
+        _sceneLookups.Enqueue(new AddressLookupJob(call.Id));
         return await DetailAsync(call.Id, cancellationToken);
     }
 
@@ -245,9 +249,15 @@ public sealed class EmergencyCallService : IEmergencyCallService
         {
             call.Latitude = latitude;
             call.Longitude = longitude;
+            call.AddressLabel = null;
         }
 
         await _db.SaveChangesAsync(cancellationToken);
+        if (request.Latitude is not null && request.Longitude is not null)
+        {
+            _sceneLookups.Enqueue(new AddressLookupJob(call.Id));
+        }
+
         return await DetailAsync(id, cancellationToken);
     }
 

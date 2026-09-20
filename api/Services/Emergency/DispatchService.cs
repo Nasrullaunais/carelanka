@@ -110,7 +110,7 @@ public sealed class DispatchService : IDispatchService
             DestinationLongitude = longitude,
             DestinationLabel = label,
             GoogleMapsUrl = FormattableString.Invariant(
-                $"https://www.google.com/maps/dir/?api=1&destination={latitude},{longitude}&travelmode=driving")
+                $"https://www.google.com/maps/dir/?api=1&destination={latitude},{longitude}&travelmode=driving&dir_action=navigate")
         };
     }
 

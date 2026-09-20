@@ -61,7 +61,7 @@ public sealed class AmbulanceService : IAmbulanceService
         }
 
         var rows = await query.ToListAsync(cancellationToken);
-        var measuredDistances = request.NearToLatitude is not null && request.NearToLongitude is not null
+        var measurement = request.NearToLatitude is not null && request.NearToLongitude is not null
             ? await _distances.MeasureAsync(
                 rows.Select(ambulance => new AmbulanceLocation(
                     ambulance.Id,
@@ -70,7 +70,7 @@ public sealed class AmbulanceService : IAmbulanceService
                 request.NearToLatitude.Value,
                 request.NearToLongitude.Value,
                 cancellationToken)
-            : new Dictionary<Guid, double?>();
+            : null;
         var activeDispatches = await _db.Dispatches
             .AsNoTracking()
             .Where(dispatch => DispatchStatusExtensions.LiveStatuses.Contains(dispatch.Status))
@@ -89,6 +89,8 @@ public sealed class AmbulanceService : IAmbulanceService
                 ? dispatchId
                 : null;
             var crewCount = crewCounts.GetValueOrDefault(ambulance.Id);
+            AmbulanceTravel? travel = null;
+            measurement?.ByAmbulance.TryGetValue(ambulance.Id, out travel);
             var decision = _eligibility.Decide(new AmbulanceEligibilityFacts(
                 ambulance.IsActive,
                 ambulance.Status,
@@ -110,7 +112,9 @@ public sealed class AmbulanceService : IAmbulanceService
                 EligibilityBlockReasons = decision.BlockReasons,
                 ActiveDispatchId = activeDispatchId,
                 IsDivertible = activeDispatchId is null || IsDivertible(ambulance.Status),
-                DistanceKm = measuredDistances.GetValueOrDefault(ambulance.Id)
+                DistanceKm = travel?.DistanceKm,
+                DriveMinutes = travel?.DriveSeconds is { } seconds ? (int)Math.Ceiling(seconds / 60.0) : null,
+                IsStraightLineDistance = measurement?.IsStraightLine
             };
         });
 
@@ -125,8 +129,8 @@ public sealed class AmbulanceService : IAmbulanceService
         {
             (AmbulanceSortField.Status, true) => summaries.OrderBy(ambulance => ambulance.Status).ThenBy(ambulance => ambulance.Id),
             (AmbulanceSortField.Status, false) => summaries.OrderByDescending(ambulance => ambulance.Status).ThenBy(ambulance => ambulance.Id),
-            (AmbulanceSortField.Distance, true) => summaries.OrderBy(ambulance => ambulance.DistanceKm).ThenBy(ambulance => ambulance.Id),
-            (AmbulanceSortField.Distance, false) => summaries.OrderByDescending(ambulance => ambulance.DistanceKm).ThenBy(ambulance => ambulance.Id),
+            (AmbulanceSortField.Distance, true) => summaries.OrderBy(ambulance => ambulance.DistanceKm is null).ThenBy(ambulance => ambulance.DriveMinutes).ThenBy(ambulance => ambulance.DistanceKm).ThenBy(ambulance => ambulance.Id),
+            (AmbulanceSortField.Distance, false) => summaries.OrderBy(ambulance => ambulance.DistanceKm is null).ThenByDescending(ambulance => ambulance.DriveMinutes).ThenByDescending(ambulance => ambulance.DistanceKm).ThenBy(ambulance => ambulance.Id),
             (AmbulanceSortField.RegistrationNumber, true) => summaries.OrderBy(ambulance => ambulance.RegistrationNumber).ThenBy(ambulance => ambulance.Id),
             _ => summaries.OrderByDescending(ambulance => ambulance.RegistrationNumber).ThenBy(ambulance => ambulance.Id)
         };

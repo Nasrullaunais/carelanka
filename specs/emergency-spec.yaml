@@ -2106,7 +2106,15 @@ components:
         distance_km:
           type: number
           nullable: true
-          description: Only present when the query supplied `nearToLatitude`/`nearToLongitude`.
+          description: Only present when the query supplied `nearToLatitude`/`nearToLongitude`. Road distance, or straight-line when `is_straight_line_distance` is true.
+        drive_minutes:
+          type: integer
+          nullable: true
+          description: Estimated driving time. Absent when the routing service was unavailable and the ranking fell back to straight-line distance.
+        is_straight_line_distance:
+          type: boolean
+          nullable: true
+          description: True when the routing service failed and `distance_km` is a straight line, so the UI can say so. Absent when no position was supplied.
 
     AmbulanceDetail:
       allOf:

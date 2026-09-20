@@ -111,6 +111,10 @@ builder.Services
             && options.HospitalEntrance.Longitude is >= -180 and <= 180
             && (options.HospitalEntrance.Latitude != 0 || options.HospitalEntrance.Longitude != 0),
         "Emergency:HospitalEntrance must have a real latitude and longitude.")
+    .Validate(options => Uri.TryCreate(options.Routing.BaseUrl, UriKind.Absolute, out var routingUrl)
+            && routingUrl.Scheme is "http" or "https"
+            && options.Routing.TimeoutSeconds > 0,
+        "Emergency:Routing must have an http or https BaseUrl and a positive TimeoutSeconds.")
     .ValidateOnStart();
 
 builder.Services
@@ -364,7 +368,7 @@ builder.Services.AddScoped<IAmbulanceCrewService, AmbulanceCrewService>();
 builder.Services.AddScoped<IEmergencyCallService, EmergencyCallService>();
 builder.Services.AddScoped<IDispatchService, DispatchService>();
 builder.Services.AddScoped<IStaffLookupService, StubStaffLookupService>();
-builder.Services.AddSingleton<IAmbulanceDistanceService, StubAmbulanceDistanceService>();
+builder.Services.AddHttpClient<IAmbulanceDistanceService, OsrmAmbulanceDistanceService>();
 
 builder.Services.AddScoped<IBedService, BedService>();
 builder.Services.AddScoped<IEquipmentCategoryService, EquipmentCategoryService>();

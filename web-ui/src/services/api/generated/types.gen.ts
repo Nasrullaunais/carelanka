@@ -199,6 +199,8 @@ export type AmbulanceSummary = {
     active_dispatch_id?: string | null;
     is_divertible: boolean;
     distance_km?: number | null;
+    drive_minutes?: number | null;
+    is_straight_line_distance?: boolean | null;
 };
 
 export type AmbulanceSummaryPagedResult = {

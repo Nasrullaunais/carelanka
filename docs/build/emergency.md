@@ -394,14 +394,17 @@ Work:
 **Exit criteria:** the caller sees the correct ambulance and status, and tracking closes
 cleanly after handover.
 
-### Phase 7 — Real Maps integration and graceful fallback
+### Phase 7 — Real Maps integration and graceful fallback — **PARTLY DONE 2026-09-20**
 
 **Goal:** rank by road travel time without making dispatch depend on Google.
 
 Work:
 
 - Keep `IAmbulanceDistanceService` as the provider seam and replace the current
-  straight-line stub with the configured Google routing provider.
+  straight-line stub with a routing provider. **Built with OSRM** (free, no key, `Emergency:Routing`
+  in settings) instead of Google. The public OSRM server is for light use, so a hospital in
+  production would host its own. Ranking, the straight-line fallback and the label on the
+  dispatcher screen are done; the RouteLog row and reverse-geocoding below are not.
 - Reverse-geocode the scene for a readable address when possible.
 - Store planned distance, duration and provider reference in `RouteLog`.
 - Return a Google Maps launch URL or destination coordinates to Flutter; do not attempt

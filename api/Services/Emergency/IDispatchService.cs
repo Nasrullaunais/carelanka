@@ -1,3 +1,4 @@
+using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Emergency;
 
 namespace CareLanka.Api.Services.Emergency;
@@ -6,6 +7,7 @@ public interface IDispatchService
 {
     Task<DispatchDetail> GetMyActiveAsync(CancellationToken cancellationToken = default);
     Task<DispatchDetail> DispatchAsync(Guid callId, ManualDispatchRequest request, CancellationToken cancellationToken = default);
+    Task<PagedResult<DispatchSummary>> ListMyHistoryAsync(MyDispatchHistoryRequest request, CancellationToken cancellationToken = default);
     Task<NavigationTarget> GetMyNavigationTargetAsync(Guid dispatchId, CancellationToken cancellationToken = default);
     Task<DispatchDetail> AcknowledgeAsync(Guid dispatchId, CancellationToken cancellationToken = default);
     Task<DispatchDetail> DeclineAsync(Guid dispatchId, DeclineDispatchRequest request, CancellationToken cancellationToken = default);

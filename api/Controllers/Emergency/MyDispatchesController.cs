@@ -1,4 +1,5 @@
 using CareLanka.Api.Common.Auth;
+using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Emergency;
 using CareLanka.Api.Services.Emergency;
 using Microsoft.AspNetCore.Authorization;
@@ -17,6 +18,13 @@ public sealed class MyDispatchesController(IDispatchService dispatches) : Contro
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
     public async Task<ActionResult<DispatchDetail>> Active(CancellationToken ct) => Ok(await dispatches.GetMyActiveAsync(ct));
+
+    [HttpGet("history", Name = "getMyDispatchHistory")]
+    [ProducesResponseType(typeof(PagedResult<DispatchSummary>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    public async Task<ActionResult<PagedResult<DispatchSummary>>> History([FromQuery] MyDispatchHistoryRequest request, CancellationToken ct)
+        => Ok(await dispatches.ListMyHistoryAsync(request, ct));
 
     [HttpGet("{id:guid}/navigation", Name = "getMyDispatchNavigationTarget")]
     [ProducesResponseType(typeof(NavigationTarget), StatusCodes.Status200OK)]

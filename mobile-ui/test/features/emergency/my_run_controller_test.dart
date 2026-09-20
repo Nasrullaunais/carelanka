@@ -4,7 +4,10 @@ import 'package:carelanka_mobile/features/emergency/models/run_step.dart';
 import 'package:carelanka_mobile/features/emergency/services/crew_run_service.dart';
 import 'package:carelanka_mobile/features/emergency/state/my_run_controller.dart';
 import 'package:carelanka_mobile/services/api_client/models/dispatch_detail.dart';
+import 'package:carelanka_mobile/features/emergency/state/run_history_controller.dart';
 import 'package:carelanka_mobile/services/api_client/models/dispatch_status.dart';
+import 'package:carelanka_mobile/services/api_client/models/dispatch_summary.dart';
+import 'package:carelanka_mobile/services/api_client/models/dispatch_summary_paged_result.dart';
 import 'package:carelanka_mobile/services/api_client/models/navigation_target.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -40,6 +43,18 @@ final class FakeRunService implements CrewRunService {
   @override
   Future<DispatchDetail> handOver(String id, {String? notes, String? patientCondition}) =>
       _reply('handover:$notes|$patientCondition', DispatchStatus.handedOver);
+
+  @override
+  Future<DispatchSummaryPagedResult> history({required int page}) async {
+    calls.add('history:$page');
+    return DispatchSummaryPagedResult(
+      items: [DispatchSummary(id: 'past-$page', status: DispatchStatus.handedOver)],
+      page: page,
+      pageSize: 1,
+      totalItems: 2,
+      totalPages: 2,
+    );
+  }
 
   @override
   Future<NavigationTarget> navigationTarget(String id) async => const NavigationTarget(googleMapsUrl: 'https://maps');
@@ -127,5 +142,18 @@ void main() {
 
     expect(controller.actionError?.isNetworkFailure, isTrue);
     expect(controller.state.valueOrNull?.status, DispatchStatus.assigned);
+  });
+
+  test('history loads the first page, then older runs on request, then stops', () async {
+    final controller = RunHistoryController(FakeRunService());
+    await controller.load();
+
+    expect(controller.state.valueOrNull?.items.map((run) => run.id), ['past-1']);
+    expect(controller.state.valueOrNull?.hasMore, isTrue);
+
+    await controller.loadMore();
+
+    expect(controller.state.valueOrNull?.items.map((run) => run.id), ['past-1', 'past-2']);
+    expect(controller.state.valueOrNull?.hasMore, isFalse);
   });
 }

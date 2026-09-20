@@ -105,6 +105,7 @@ export 'models/discharge_candidate_paged_result.dart';
 export 'models/dispatch_detail.dart';
 export 'models/dispatch_status.dart';
 export 'models/dispatch_summary.dart';
+export 'models/dispatch_summary_paged_result.dart';
 export 'models/emergency_call_detail.dart';
 export 'models/emergency_call_sort_field.dart';
 export 'models/emergency_call_summary.dart';

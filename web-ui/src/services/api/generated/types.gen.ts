@@ -627,6 +627,14 @@ export type DispatchSummary = {
     completed_at?: string | null;
 };
 
+export type DispatchSummaryPagedResult = {
+    items: Array<DispatchSummary>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
 export type EmergencyCallDetail = {
     id?: string;
     patient_id?: string | null;
@@ -5306,6 +5314,40 @@ export type GetMyActiveDispatchResponses = {
 };
 
 export type GetMyActiveDispatchResponse = GetMyActiveDispatchResponses[keyof GetMyActiveDispatchResponses];
+
+export type GetMyDispatchHistoryData = {
+    body?: never;
+    path?: never;
+    query?: {
+        from?: string;
+        to?: string;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/me/dispatches/history';
+};
+
+export type GetMyDispatchHistoryErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+};
+
+export type GetMyDispatchHistoryError = GetMyDispatchHistoryErrors[keyof GetMyDispatchHistoryErrors];
+
+export type GetMyDispatchHistoryResponses = {
+    /**
+     * OK
+     */
+    200: DispatchSummaryPagedResult;
+};
+
+export type GetMyDispatchHistoryResponse = GetMyDispatchHistoryResponses[keyof GetMyDispatchHistoryResponses];
 
 export type GetMyDispatchNavigationTargetData = {
     body?: never;

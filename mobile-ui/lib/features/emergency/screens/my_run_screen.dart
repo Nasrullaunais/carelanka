@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/widgets/async_view.dart';
+import '../emergency_routes.dart';
 import '../models/run_step.dart';
 import '../services/crew_location_reporter.dart';
 import '../state/my_run_controller.dart';
@@ -34,7 +36,16 @@ class _MyRunScreenState extends State<MyRunScreen> {
     return CrewLocationLifecycle(
       reporter: reporter,
       child: Scaffold(
-        appBar: AppBar(title: const Text('My run')),
+        appBar: AppBar(
+          title: const Text('My run'),
+          actions: [
+            IconButton(
+              tooltip: 'Past runs',
+              icon: const Icon(Icons.history),
+              onPressed: () => context.push(EmergencyPaths.history),
+            ),
+          ],
+        ),
         body: Column(
           children: [
             if (locationNotice != null && controller.state.valueOrNull != null)

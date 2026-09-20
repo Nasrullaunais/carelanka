@@ -5,9 +5,12 @@ import '../../../services/api_client/clients/my_run_api.dart';
 import '../../../services/api_client/models/decline_dispatch_request.dart';
 import '../../../services/api_client/models/dispatch_detail.dart';
 import '../../../services/api_client/models/dispatch_status.dart';
+import '../../../services/api_client/models/dispatch_summary_paged_result.dart';
 import '../../../services/api_client/models/navigation_target.dart';
 import '../../../services/api_client/models/record_handover_request.dart';
 import '../../../services/api_client/models/update_my_dispatch_status_request.dart';
+
+const historyPageSize = 20;
 
 abstract interface class CrewRunService {
   Future<DispatchDetail?> activeRun();
@@ -16,6 +19,7 @@ abstract interface class CrewRunService {
   Future<DispatchDetail> advance(String id, DispatchStatus next);
   Future<DispatchDetail> handOver(String id, {String? notes, String? patientCondition});
   Future<NavigationTarget> navigationTarget(String id);
+  Future<DispatchSummaryPagedResult> history({required int page});
 }
 
 final class GeneratedCrewRunService implements CrewRunService {
@@ -48,6 +52,10 @@ final class GeneratedCrewRunService implements CrewRunService {
   Future<DispatchDetail> handOver(String id, {String? notes, String? patientCondition}) => callApi(
         () => _run.recordHandover(id: id, body: RecordHandoverRequest(notes: notes, patientCondition: patientCondition)),
       );
+
+  @override
+  Future<DispatchSummaryPagedResult> history({required int page}) =>
+      callApi(() => _run.getMyDispatchHistory(page: page, pageSize: historyPageSize));
 
   @override
   Future<NavigationTarget> navigationTarget(String id) => callApi(() => _run.getMyDispatchNavigationTarget(id: id));

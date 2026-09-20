@@ -395,6 +395,46 @@ public sealed class DispatchEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, (await stranger.GetAsync($"/api/dispatches/{dispatchId}/route")).StatusCode);
     }
 
+    [Fact]
+    public async Task Dispatching_saves_one_push_per_crew_member_with_no_incident_text()
+    {
+        var run = await SeedRunAsync();
+        var dispatchId = await DispatchAsync(run);
+
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        var pushes = await db.Notifications.Where(x => x.EntityId == dispatchId).ToListAsync();
+
+        Assert.Equal(2, pushes.Count);
+        Assert.All(pushes, push =>
+        {
+            Assert.Equal(NotificationStatus.Queued, push.Status);
+            Assert.Equal("dispatch", push.EntityType);
+            Assert.Equal("New ambulance assignment", push.Title);
+            Assert.Equal("Open CareLanka to see your run.", push.Body);
+        });
+        Assert.Equal(2, pushes.Select(x => x.RecipientStaffMemberId).Distinct().Count());
+    }
+
+    [Fact]
+    public async Task A_failed_dispatch_saves_no_push()
+    {
+        var run = await SeedRunAsync();
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+        var before = await CountPushesAsync();
+
+        var response = await manager.PostAsJsonAsync($"/api/emergency-calls/{Guid.NewGuid()}/dispatch", new { ambulance_id = run.AmbulanceId });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(before, await CountPushesAsync());
+    }
+
+    private async Task<int> CountPushesAsync()
+    {
+        using var scope = _application.Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<CareLankaDbContext>().Notifications.CountAsync();
+    }
+
     private List<T> QueuedJobs<T>() where T : SceneLookupJob
     {
         var reader = _application.Services.GetRequiredService<SceneLookupQueue>().Reader;

@@ -23,10 +23,12 @@ public sealed class DispatchService : IDispatchService
     private readonly TimeProvider _clock;
     private readonly EmergencyOptions _options;
     private readonly ISceneLookupQueue _sceneLookups;
+    private readonly IPushNotifications _push;
 
     public DispatchService(CareLankaDbContext db, IAmbulanceEligibilityService eligibility,
-        ICurrentUser currentUser, TimeProvider clock, IOptions<EmergencyOptions> options, ISceneLookupQueue sceneLookups)
-        => (_db, _eligibility, _currentUser, _clock, _options, _sceneLookups) = (db, eligibility, currentUser, clock, options.Value, sceneLookups);
+        ICurrentUser currentUser, TimeProvider clock, IOptions<EmergencyOptions> options, ISceneLookupQueue sceneLookups,
+        IPushNotifications push)
+        => (_db, _eligibility, _currentUser, _clock, _options, _sceneLookups, _push) = (db, eligibility, currentUser, clock, options.Value, sceneLookups, push);
 
     private static readonly Dictionary<DispatchStatus, AmbulanceStatus> ProgressProjection = new()
     {
@@ -269,6 +271,8 @@ public sealed class DispatchService : IDispatchService
         call.Status = CallStatus.Dispatched;
         ambulance.Status = AmbulanceStatus.Dispatched;
         _db.Dispatches.Add(dispatch);
+        _push.Stage(dispatch.Crew.Select(x => x.StaffMemberId), "New ambulance assignment",
+            "Open CareLanka to see your run.", "dispatch", dispatch.Id, "dispatch-assigned");
         return dispatch;
     }
 

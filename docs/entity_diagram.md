@@ -23,6 +23,10 @@ of that component was built and tested. Three schema-visible consequences, all m
 `AssignedBy.Agent` also changed meaning without changing shape — it now records that a human
 committed a bed the agent *suggested*, not that the agent wrote the row.
 
+**Revision 2.14** — `notifications` gains `DedupeKey`, `AttemptCount` and `NextAttemptAt` so it can
+double as the push retry queue, in the `Common_AddDeviceTokensAndNotifications` migration,
+which also creates `device_tokens` and `notifications`. Changes marked *(Rev 2.14)*.
+
 **Revision 2.13** — patients sign in with a username. `PatientAccount` loses two columns
 and gains one, in the `Common_PatientUsernameLogin` migration. Changes marked *(Rev 2.13)*.
 
@@ -1597,6 +1601,9 @@ invalid plan can be returned for revision instead of rejected wholesale.
 + SentAt: DateTimeOffset (nullable)
 + ReadAt: DateTimeOffset (nullable)
 + FailureReason: string (nullable)
++ DedupeKey: string (max 200, unique, non-null)   -- Rev 2.14: one push per reason, entity and person
++ AttemptCount: int (non-null, default 0)        -- Rev 2.14: delivery tries so far
++ NextAttemptAt: DateTimeOffset (non-null)        -- Rev 2.14: when a Queued push is next due
 ```
 **Table:** `notifications`
 **Note:** *(Rev 2)* No notification entity existed before, yet both flows depend on one:
@@ -1605,6 +1612,15 @@ reassigned nurse "an immediate push notification" (Flutter); the patient flow no
 bed assignment. `Channel` distinguishes in-app alerts from device push. Delivery uses
 `DeviceToken`. `(EntityType, EntityId)` lets the client deep-link to the workflow awaiting
 approval.
+
+*(Rev 2.14)* **`notifications` is also the retry queue.** A push is saved as `Queued` in the
+same transaction as the change that caused it, so it can never be lost or sent for a change
+that rolled back. A background worker sends what is due, marks it `Sent`, retries `Failed`
+sends with growing gaps, and gives up after five tries (`FailureReason = gave_up`).
+`no_device` means the person had no active `DeviceToken`. `DedupeKey`
+(`{reason}:{entity id}:{staff id}`) makes staging the same push twice impossible. A phone
+the push service rejects gets `DeviceToken.RevokedAt`. The push text is generic on purpose:
+no patient or incident detail reaches a lock screen.
 
 #### AuditLog extends Entity
 ```
@@ -2242,6 +2258,8 @@ CREATE UNIQUE INDEX ux_allocations_confirmed ON allocations (shift_id, staff_mem
 
 CREATE UNIQUE INDEX ux_refresh_tokens_hash ON refresh_tokens (token_hash);
 CREATE UNIQUE INDEX ux_device_tokens_token ON device_tokens (token);
+CREATE UNIQUE INDEX ux_notifications_dedupe_key ON notifications (dedupe_key);
+CREATE INDEX ix_notifications_due ON notifications (next_attempt_at) WHERE status = 'queued';
 ```
 
 ### CHECK constraints

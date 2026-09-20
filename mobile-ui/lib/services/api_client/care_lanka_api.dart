@@ -11,6 +11,7 @@ import 'clients/beds_api.dart';
 import 'clients/billing_api.dart';
 import 'clients/calls_api.dart';
 import 'clients/cancellation_review_api.dart';
+import 'clients/device_tokens_api.dart';
 import 'clients/discharge_api.dart';
 import 'clients/dispatches_api.dart';
 import 'clients/equipment_api.dart';
@@ -46,6 +47,7 @@ class CareLankaApi {
   BillingApi? _billing;
   CallsApi? _calls;
   CancellationReviewApi? _cancellationReview;
+  DeviceTokensApi? _deviceTokens;
   DischargeApi? _discharge;
   DispatchesApi? _dispatches;
   EquipmentApi? _equipment;
@@ -74,6 +76,8 @@ class CareLankaApi {
   CallsApi get calls => _calls ??= CallsApi(_dio, baseUrl: _baseUrl);
 
   CancellationReviewApi get cancellationReview => _cancellationReview ??= CancellationReviewApi(_dio, baseUrl: _baseUrl);
+
+  DeviceTokensApi get deviceTokens => _deviceTokens ??= DeviceTokensApi(_dio, baseUrl: _baseUrl);
 
   DischargeApi get discharge => _discharge ??= DischargeApi(_dio, baseUrl: _baseUrl);
 

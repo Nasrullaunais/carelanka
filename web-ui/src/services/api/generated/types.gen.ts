@@ -554,6 +554,14 @@ export type DeclineDispatchRequest = {
     reason?: string | null;
 };
 
+export type DevicePlatform = 'android' | 'ios' | 'web';
+
+export type DeviceRegistration = {
+    id?: string;
+    platform?: DevicePlatform;
+    last_seen_at?: string;
+};
+
 export type Discharge = {
     id: string;
     admission_id: string;
@@ -1254,6 +1262,11 @@ export type RecordHandoverRequest = {
 
 export type RefreshTokenRequest = {
     refresh_token: string;
+};
+
+export type RegisterDeviceRequest = {
+    token?: string | null;
+    platform?: DevicePlatform;
 };
 
 export type RejectPrescriptionRequest = {
@@ -3757,6 +3770,74 @@ export type RejectEmergencyCancellationRequestResponses = {
 };
 
 export type RejectEmergencyCancellationRequestResponse = RejectEmergencyCancellationRequestResponses[keyof RejectEmergencyCancellationRequestResponses];
+
+export type RegisterDeviceData = {
+    body?: RegisterDeviceRequest;
+    path?: never;
+    query?: never;
+    url: '/device-tokens';
+};
+
+export type RegisterDeviceErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type RegisterDeviceError = RegisterDeviceErrors[keyof RegisterDeviceErrors];
+
+export type RegisterDeviceResponses = {
+    /**
+     * OK
+     */
+    200: DeviceRegistration;
+};
+
+export type RegisterDeviceResponse = RegisterDeviceResponses[keyof RegisterDeviceResponses];
+
+export type UnregisterDeviceData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/device-tokens/{id}';
+};
+
+export type UnregisterDeviceErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type UnregisterDeviceError = UnregisterDeviceErrors[keyof UnregisterDeviceErrors];
+
+export type UnregisterDeviceResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type UnregisterDeviceResponse = UnregisterDeviceResponses[keyof UnregisterDeviceResponses];
 
 export type ListDischargeCandidatesData = {
     body?: never;

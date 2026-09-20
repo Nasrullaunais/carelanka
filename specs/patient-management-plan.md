@@ -989,8 +989,16 @@ Three things here are new as of 2026-09-16, and each came from asking what a nur
 | :--- | :--- | :--- |
 | `find_patient(identifier)` | read | NIC or patient code → the patient, their open admission if any. No match is an answer, not an error. |
 | `get_admission_requirements(admission_id)` | read | Category, gender, date of birth, infectious flag, urgency, expected arrival |
-| `list_available_beds(ward_type, gender, needs_isolation)` | read | Candidate beds: Equipment's register joined with our assignments, hold expiry applied. Only free, usable beds come back. |
+| `list_available_beds(ward_type)` | read | Candidate beds: Equipment's register joined with our assignments, hold expiry applied. Only free, usable beds come back. |
 | `get_ward_occupancy()` | read | Load per ward, for the balancing rule |
+
+**`list_available_beds` lost two of its arguments when it was built** *(2026-09-20)*. The design
+gave it `gender` and `needs_isolation` as well, and both had to go: a bed dropped inside SQL
+cannot be counted, and counting the drops is the only way §8.6 can say *which* wall the run hit
+instead of "none available". So the tool returns every free, usable bed and the hard rules are
+applied one step later, by the one rulebook every path already uses. `ward_type` stayed because
+narrowing to a ward type is what walking the downgrade ladder does, and it discards nothing the
+blocker needs.
 
 **Four tools. All four read. Not one of them writes anything.**
 
@@ -1072,6 +1080,13 @@ Every blocked outcome carries a `blocker` with a machine code and one plain sent
 | `visit_needs_no_bed` | `no_bed_required` | "This is an outpatient visit. They do not need a bed." |
 | `patient_not_found` | `no_such_patient` | "No patient matches that NIC or patient code." |
 | `failed` | `agent_failed` | "The suggestion could not be completed. Assign a bed by hand." |
+
+**`no_open_admission` has no outcome of its own, and rides on `patient_not_found`** *(built
+2026-09-20)*. The blocker table above never listed it, and the `outcome` enum has no value that
+fits: the patient was found, so "not found" is not strictly true, but there is nothing to suggest
+a bed for either. The precise answer lives in `blocker.code`, which is what the screen branches
+on, and the sentence names the fix - register the visit first. Adding a seventh outcome would be
+a five-spec change to say something the blocker already says.
 
 The sentence is **built in C# from the rule that actually blocked, not written by the model** — same instinct as the hard rules themselves. A model asked to explain why it failed will write something plausible; a counter is a filter result.
 
@@ -1347,13 +1362,15 @@ Steps 1, 3 and 6 are the safety net, and none of them involves the LLM — the s
 
 Same fields as §8.8: workflow id, objective, plan, completed steps, tool calls with inputs/outputs/timings, validation results, errors and retries, approval status, final outcome. Links to `CareRecommendation` the same way `AgentWorkflow` links to `BedAssignment` — via `(EntityType, EntityId)`, per `entity_diagram.md`'s `AgentWorkflow` note. No new shared table, no new column on `AgentWorkflow` or `AgentProposedChange`.
 
-### 8.20 What both agents still need, and nobody has built
+### 8.20 What both agents still need
 
-**`AgentWorkflow` and `AgentProposedChange` do not exist.** No entity, no configuration, no migration, no `/workflows` controller — checked against the tree on 2026-09-16, not remembered.
+**`AgentWorkflow` and `AgentProposedChange` exist** *(built by the group in PR #80, 2026-09-20 — tables `agent_workflows` and `agent_proposed_changes`, migration `Common_AddAgentWorkflows`)*. `BedAssignment.workflow_id` had been a column pointing at a missing table since step 2; it is now a real foreign key, added in `Patient_LinkBedAssignmentWorkflow`.
 
-They are **common, group-owned** (ADR 3, `specs/common-spec.yaml`), and all five agents need them. `BedAssignment.workflow_id` is already a column pointing at a table that is not there.
+**Only the tables landed.** The common `/api/workflows` endpoints in `common-spec.yaml` — list, read, approve, reject, request revision — are still unbuilt. The bed agent does not need them: `patient-spec.yaml` publishes its own `GET /bed-workflows/{workflowId}`, and §8.6b removed the approval endpoint entirely.
 
-This is the only thing standing between this component and both agents, and it is not one member's to decide. Until it is built, either agent can be developed against a stub recorded in `STUBS.md` — but the stub has to be written down, because a workflow record that is quietly discarded looks exactly like one that was persisted, and §9.1 scores persistence.
+**Nothing here is stubbed any more.** `ILanguageModel` and `GeminiLanguageModel` are built in `api/Agents/` exactly as ADR 2 describes, and `GeminiBedRationaleWriter` writes the one sentence shown under a suggested bed. With no key configured the API starts normally and `NoLanguageModel` is registered instead, so `DeterministicBedRationaleWriter` composes the sentence from the same facts the ranking used — which is also what happens when a key is dead, a quota is spent or the call times out. The model's polish is the only thing at risk; the suggestion is not.
+
+**The run is asynchronous, as the contract always said.** `POST /bed-suggestions` persists the plan, hands the workflow id to an in-process queue and answers 202 with `status: running`; `BedAgentWorker` runs it in its own scope and writes the result onto the row. One case does not queue: a lookup that matched no patient, or a patient with no open visit, is a single read and no model call, so it is settled before the 202 and comes back `completed`.
 
 ---
 

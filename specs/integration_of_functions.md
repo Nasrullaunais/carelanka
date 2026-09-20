@@ -993,6 +993,36 @@ the nurse on shift. `clinical_clearance` on the discharge checklist did **not** 
 Doctor-only. **M2, this is a note not a request** — `Doctor` and `WardNurse` are both already in
 `StaffRole` and M4 only reads the claim.
 
+**11.20 (ANNOUNCED by M4 on 2026-09-20) — the first agent is built, and it reserves four schema
+names nobody else may reuse.** The Bed and Patient Details Agent runs in `api/Agents/Patient/`
+behind `POST /api/bed-suggestions` and `GET /api/bed-workflows/{workflowId}`, both already in
+`patient-spec.yaml` and already in the uniqueness sweep.
+
+**M4 built two common things, and the group should take them over rather than write them again.**
+`api/Agents/ILanguageModel.cs`, `LanguageModelOptions.cs`, `GeminiLanguageModel.cs` and
+`NoLanguageModel.cs` are the provider seam ADR 2 specifies, and `api/Agents/AgentRunQueue.cs` is
+the 202-and-poll hand-off every agent needs. They are written to be provider- and
+component-agnostic: an agent hands over a fixed instruction and a JSON payload of facts, and gets
+JSON back. **Nothing in them is Patient Management's**, and nobody should add a second one - see
+"Common vs. yours" in `CLAUDE.md`. The key is configuration only (`LanguageModel:ApiKey`), absent
+from the repository, and with no key set the API starts normally and every agent still answers.
+
+Three more things the group needs to know:
+
+- **`bed_assignments.workflow_id` is now a real foreign key** to `agent_workflows.id`
+  (`Patient_LinkBedAssignmentWorkflow`, `ON DELETE RESTRICT`). It was a column pointing at a
+  missing table from step 2 until PR #80 landed the tables. Anybody deleting a workflow row now
+  has to consider the assignments that cite it, which is the point.
+- **Four schema names are taken** that are generated but not in any hand-written spec, because
+  the contract inlined them: `BedAgentStep`, `BedWorkflowValidation`, `BedWorkflowStatus` and
+  `BedApproverRole`. All four are deliberately prefixed, per the one-app rule — a staffing agent
+  wanting its own step shape needs its own name.
+- **The common `/api/workflows` endpoints are still unbuilt and the bed agent does not need
+  them.** `patient-spec.yaml` publishes its own poll route, and §8.6b of
+  `patient-management-plan.md` withdrew the approve/reject endpoints entirely: pressing "Use this
+  bed" on the existing `POST /admissions/{id}/assign-bed` *is* the approval. Whoever builds the
+  common surface should know one agent has already shipped without it.
+
 **11.18 (OPEN — announced by M3 on 2026-09-16) — a new equipment item waits for the hospital
 administrator to confirm it.**
 

@@ -13,6 +13,8 @@ using CareLanka.Api.Services.Equipment;
 using CareLanka.Api.Services.Equipment.Stubs;
 using CareLanka.Api.Services.Emergency;
 using CareLanka.Api.Services.Emergency.Stubs;
+using CareLanka.Api.Agents;
+using CareLanka.Api.Agents.Patient;
 using CareLanka.Api.Services.Patient;
 using FluentValidation;
 using FluentValidation.AspNetCore;
@@ -134,6 +136,17 @@ builder.Services
         "Push:PollSeconds, MaxAttempts, RetryBaseSeconds and BatchSize must be greater than zero.")
     .Validate(options => string.IsNullOrWhiteSpace(options.CredentialsPath) || File.Exists(options.CredentialsPath),
         "Push:CredentialsPath must point to an existing Firebase service-account file.")
+    .ValidateOnStart();
+
+builder.Services
+    .AddOptions<LanguageModelOptions>()
+    .Bind(builder.Configuration.GetSection(LanguageModelOptions.SectionName))
+    .Validate(options => options.TimeoutSeconds > 0 && options.MaxRetries >= 0,
+        "LanguageModel:TimeoutSeconds must be greater than zero and MaxRetries cannot be negative.")
+    .Validate(options => !string.IsNullOrWhiteSpace(options.Model)
+            && Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out var modelUrl)
+            && modelUrl.Scheme is "http" or "https",
+        "LanguageModel:Model must be set and BaseUrl must be an http or https address.")
     .ValidateOnStart();
 
 builder.Services
@@ -431,6 +444,28 @@ builder.Services.AddScoped<IBillingRateService, BillingRateService>();
 builder.Services.AddScoped<IMeService, MeService>();
 
 builder.Services.AddScoped<IBedRegistryService, BedRegistryService>();
+
+// The Bed and Patient Details Agent. The tools are the allow-list, so they are registered as one
+// interface and nothing else can widen them. The rationale writer is the only seam a language
+// model plugs into - see STUBS.md row M4b.
+builder.Services.AddScoped<IBedAgentTools, BedAgentTools>();
+builder.Services.AddScoped<DeterministicBedRationaleWriter>();
+builder.Services.AddScoped<IBedRationaleWriter, GeminiBedRationaleWriter>();
+builder.Services.AddScoped<IBedAgent, BedAgent>();
+builder.Services.AddScoped<IBedWorkflowRecorder, BedWorkflowRecorder>();
+builder.Services.AddScoped<IBedSuggestionService, BedSuggestionService>();
+builder.Services.AddScoped<BedAgentExecutor>();
+builder.Services.AddSingleton<IAgentRunQueue, AgentRunQueue>();
+builder.Services.AddHostedService<BedAgentWorker>();
+
+// ADR 2: the provider is one registration and nothing in an agent knows which model answered.
+// With no key the API still starts and every agent still answers - see NoLanguageModel.
+builder.Services.AddHttpClient(GeminiLanguageModel.HttpClientName);
+builder.Services.AddSingleton<ILanguageModel>(services =>
+    string.IsNullOrWhiteSpace(
+        services.GetRequiredService<IOptions<LanguageModelOptions>>().Value.ApiKey)
+        ? ActivatorUtilities.CreateInstance<NoLanguageModel>(services)
+        : ActivatorUtilities.CreateInstance<GeminiLanguageModel>(services));
 
 builder.Services.AddSingleton<IWardDirectory, StubWardDirectory>();
 

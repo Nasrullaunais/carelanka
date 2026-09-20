@@ -11,14 +11,14 @@ public static class BedPlacementRules
     public static bool RequiresBed(AdmissionCategory category)
         => category != AdmissionCategory.Outpatient;
 
-    private static int Rung(AdmissionCategory category) => category switch
+    public static int Rung(AdmissionCategory category) => category switch
     {
         AdmissionCategory.Icu => 0,
         AdmissionCategory.Hdu => 1,
         _ => 2
     };
 
-    private static int Rung(WardType wardType) => wardType switch
+    public static int Rung(WardType wardType) => wardType switch
     {
         WardType.Icu => 0,
         WardType.Hdu => 1,

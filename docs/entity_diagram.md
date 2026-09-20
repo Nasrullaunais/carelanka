@@ -23,6 +23,11 @@ of that component was built and tested. Three schema-visible consequences, all m
 `AssignedBy.Agent` also changed meaning without changing shape — it now records that a human
 committed a bed the agent *suggested*, not that the agent wrote the row.
 
+**Revision 2.17** — `bed_assignments.workflow_id` is a real foreign key to `agent_workflows.id`,
+added in the `Patient_LinkBedAssignmentWorkflow` migration with `ON DELETE RESTRICT` and an index.
+The column was written in step 2 and pointed at a table that did not exist until Revision 2.16.
+Still nullable, and null for every row a human picked by hand.
+
 **Revision 2.16** — `AgentWorkflow` and `AgentProposedChange` are built, in the
 `Common_AddAgentWorkflows` migration (tables `agent_workflows`, `agent_proposed_changes`).
 `AgentProposedChange.ProposedShiftId` is **not** built yet: `Shift` does not exist, so Staff

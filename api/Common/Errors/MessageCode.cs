@@ -166,5 +166,7 @@ public enum MessageCode
 
     NoBillRaised,
 
-    PatientCodeNotClaimable
+    PatientCodeNotClaimable,
+
+    BedSuggestionNotPossible
 }

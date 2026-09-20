@@ -2417,6 +2417,9 @@ namespace CareLanka.Api.Data.Migrations
                         .HasDatabaseName("ix_bed_assignments_reserved_until")
                         .HasFilter("status = 'reserved'");
 
+                    b.HasIndex("WorkflowId")
+                        .HasDatabaseName("ix_bed_assignments_workflow_id");
+
                     b.ToTable("bed_assignments", null, t =>
                         {
                             t.HasCheckConstraint("ck_bed_assignments_assigned_by", "assigned_by IN ('agent', 'user')");
@@ -3309,6 +3312,12 @@ namespace CareLanka.Api.Data.Migrations
                         .HasForeignKey("ApprovedByStaffMemberId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_bed_assignments_staff_members_approved_by_staff_member_id");
+
+                    b.HasOne("CareLanka.Api.Data.Entities.Common.AgentWorkflow", null)
+                        .WithMany()
+                        .HasForeignKey("WorkflowId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_bed_assignments_agent_workflows_workflow_id");
 
                     b.Navigation("Admission");
                 });

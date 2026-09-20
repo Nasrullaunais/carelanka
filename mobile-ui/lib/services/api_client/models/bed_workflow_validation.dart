@@ -1,0 +1,23 @@
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint, unused_import, invalid_annotation_target, unnecessary_import
+
+import 'package:json_annotation/json_annotation.dart';
+
+part 'bed_workflow_validation.g.dart';
+
+@JsonSerializable()
+class BedWorkflowValidation {
+  const BedWorkflowValidation({
+    this.passed,
+    this.failedRules,
+  });
+  
+  factory BedWorkflowValidation.fromJson(Map<String, Object?> json) => _$BedWorkflowValidationFromJson(json);
+  
+  final bool? passed;
+  @JsonKey(name: 'failed_rules')
+  final List<String>? failedRules;
+
+  Map<String, Object?> toJson() => _$BedWorkflowValidationToJson(this);
+}

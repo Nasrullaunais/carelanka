@@ -25,6 +25,8 @@ public sealed class PatientOpenApiContractTests
     [InlineData("ReleaseReason")]
     [InlineData("WorklistStatus")]
     [InlineData("BillLineSource")]
+    [InlineData("BedAgentOutcome")]
+    [InlineData("BedSuggestionBlockerCode")]
     public async Task Published_enum_values_match_the_contract_in_order(string enumName)
     {
         var generated = await GenerateAsync();
@@ -75,6 +77,9 @@ public sealed class PatientOpenApiContractTests
     [InlineData("MyBillLine")]
     [InlineData("PatientClaimPreview")]
     [InlineData("BookAppointmentRequest")]
+    [InlineData("BedSuggestionBlocker")]
+    [InlineData("SuggestedBed")]
+    [InlineData("BedSuggestionPatient")]
     public async Task Published_schema_required_members_match_the_contract(string schemaName)
     {
         var generated = await GenerateAsync();

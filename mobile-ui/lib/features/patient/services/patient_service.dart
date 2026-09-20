@@ -1,5 +1,10 @@
 import '../../../core/network/api.dart';
 import '../../../services/api_client/care_lanka_api.dart';
+import '../../../services/api_client/models/assign_bed_request.dart';
+import '../../../services/api_client/models/bed_assignment.dart';
+import '../../../services/api_client/models/bed_suggestion_request.dart';
+import '../../../services/api_client/models/bed_workflow_accepted.dart';
+import '../../../services/api_client/models/bed_workflow_summary.dart';
 import '../../../services/api_client/models/book_appointment_request.dart';
 import '../../../services/api_client/models/claim_by_patient_code_request.dart';
 import '../../../services/api_client/models/my_admission.dart';
@@ -139,6 +144,42 @@ class PatientService {
           includeFinished: includeFinished,
           page: page,
           pageSize: pageSize,
+        ));
+  }
+
+  /// Starts the bed agent. Either [admissionId] (already on the worklist) or
+  /// [patientIdentifier] (an NIC or patient code typed at the desk) — never both.
+  Future<BedWorkflowAccepted> requestBedSuggestion({
+    String? admissionId,
+    String? patientIdentifier,
+  }) {
+    return callApi(() => _api.bedAssignment.requestBedSuggestion(
+          body: BedSuggestionRequest(
+            admissionId: admissionId,
+            patientIdentifier: patientIdentifier,
+          ),
+        ));
+  }
+
+  Future<BedWorkflowSummary> getBedWorkflow(String workflowId) {
+    return callApi(() => _api.bedAssignment.getBedWorkflow(workflowId: workflowId));
+  }
+
+  /// The only way a bed is ever claimed — by hand or by confirming a suggestion. Passing
+  /// [workflowId] stamps the resulting assignment as the agent's, not a manual pick.
+  Future<BedAssignment> assignBed({
+    required String admissionId,
+    required String bedId,
+    String? workflowId,
+    String? overrideReason,
+  }) {
+    return callApi(() => _api.admissions.assignBedManually(
+          id: admissionId,
+          body: AssignBedRequest(
+            bedId: bedId,
+            workflowId: workflowId,
+            overrideReason: overrideReason,
+          ),
         ));
   }
 }

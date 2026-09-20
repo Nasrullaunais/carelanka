@@ -6,10 +6,13 @@ import '../../../core/widgets/async_view.dart';
 import '../../../core/widgets/phone_width.dart';
 import '../../../services/api_client/care_lanka_api.dart';
 import '../../../services/api_client/models/worklist_row.dart';
+import '../../../services/api_client/models/worklist_status.dart';
 import '../services/patient_service.dart';
+import '../state/bed_suggestion_controller.dart';
 import '../state/medical_profile_controller.dart';
 import '../state/worklist_controller.dart';
 import '../widgets/worklist_status_chip.dart';
+import 'bed_suggestion_screen.dart';
 import 'medical_profile_screen.dart';
 
 class NurseWorklistScreen extends StatefulWidget {
@@ -37,6 +40,11 @@ class _NurseWorklistScreenState extends State<NurseWorklistScreen> {
         appBar: AppBar(
           title: const Text('Ward worklist'),
           actions: [
+            IconButton(
+              icon: const Icon(Icons.bed_outlined),
+              tooltip: 'Suggest a bed',
+              onPressed: () => _openBedSuggestion(context),
+            ),
             IconButton(
               icon: const Icon(Icons.logout),
               tooltip: 'Sign out',
@@ -104,6 +112,7 @@ class _WorklistTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final place = [row.wardName, row.bedNumber].whereType<String>().join(' · ');
+    final needsBed = row.status == WorklistStatus.awaitingBed && row.requiresBed;
 
     return ListTile(
       leading: const Icon(Icons.local_hospital_outlined),
@@ -115,7 +124,22 @@ class _WorklistTile extends StatelessWidget {
           if (place.isNotEmpty) Text(place, style: theme.textTheme.bodySmall),
         ],
       ),
-      trailing: WorklistStatusChip(status: row.status),
+      trailing: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          WorklistStatusChip(status: row.status),
+          if (needsBed)
+            TextButton(
+              onPressed: () => _openBedSuggestion(
+                context,
+                admissionId: row.id,
+                patientName: row.patient.fullName,
+              ),
+              child: const Text('Suggest bed'),
+            ),
+        ],
+      ),
       isThreeLine: place.isNotEmpty,
       onTap: () => _openMedicalProfile(context),
     );
@@ -131,4 +155,22 @@ class _WorklistTile extends StatelessWidget {
       ),
     ));
   }
+}
+
+void _openBedSuggestion(
+  BuildContext context, {
+  String? admissionId,
+  String? patientName,
+}) {
+  final service = PatientService(context.read<CareLankaApi>());
+  final worklist = context.read<WorklistController>();
+
+  Navigator.of(context)
+      .push(MaterialPageRoute<void>(
+    builder: (_) => ChangeNotifierProvider(
+      create: (_) => BedSuggestionController(service),
+      child: BedSuggestionScreen(admissionId: admissionId, patientName: patientName),
+    ),
+  ))
+      .then((_) => worklist.load());
 }

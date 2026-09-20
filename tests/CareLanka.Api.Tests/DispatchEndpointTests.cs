@@ -7,6 +7,7 @@ using CareLanka.Api.Data.Entities.Common;
 using CareLanka.Api.Data.Entities.Emergency;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.Services.Common;
+using CareLanka.Api.Services.Emergency;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -355,6 +356,51 @@ public sealed class DispatchEndpointTests
         var response = await manager.PostAsJsonAsync($"/api/emergency-calls/{run.CallId}/dispatch", new { ambulance_id = run.AmbulanceId });
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         return (await ReadAsync(response)).GetProperty("id").GetGuid();
+    }
+
+    [Fact]
+    public async Task Dispatching_queues_a_route_plan_and_the_saved_route_is_readable_only_by_the_run()
+    {
+        var run = await SeedRunAsync();
+        var outsider = await SeedCrewAsync();
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+        var dispatchId = await DispatchAsync(run);
+
+        var job = QueuedJobs<RoutePlanJob>().Single(x => x.DispatchId == dispatchId);
+        Assert.Equal(6.927079m, job.OriginLatitude);
+        Assert.Equal(79.861244m, job.OriginLongitude);
+        Assert.Equal(HttpStatusCode.NotFound, (await manager.GetAsync($"/api/dispatches/{dispatchId}/route")).StatusCode);
+
+        using (var scope = _application.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+            db.RouteLogs.Add(new RouteLog
+            {
+                Id = Guid.NewGuid(), DispatchId = dispatchId, OriginLatitude = job.OriginLatitude, OriginLongitude = job.OriginLongitude,
+                DestinationLatitude = 6.9271m, DestinationLongitude = 79.8612m, PlannedDistanceKm = 4.24m, PlannedDurationMinutes = 11,
+                MapsApiReference = "osrm"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var managerView = await manager.GetAsync($"/api/dispatches/{dispatchId}/route");
+        Assert.Equal(HttpStatusCode.OK, managerView.StatusCode);
+        var body = await ReadAsync(managerView);
+        Assert.Equal(11, body.GetProperty("planned_duration_minutes").GetInt32());
+        Assert.Equal("osrm", body.GetProperty("maps_api_reference").GetString());
+
+        using var member = await ClientAsync(run.CrewEmails[0]);
+        Assert.Equal(HttpStatusCode.OK, (await member.GetAsync($"/api/dispatches/{dispatchId}/route")).StatusCode);
+        using var stranger = await ClientAsync(outsider.Email);
+        Assert.Equal(HttpStatusCode.Forbidden, (await stranger.GetAsync($"/api/dispatches/{dispatchId}/route")).StatusCode);
+    }
+
+    private List<T> QueuedJobs<T>() where T : SceneLookupJob
+    {
+        var reader = _application.Services.GetRequiredService<SceneLookupQueue>().Reader;
+        var jobs = new List<SceneLookupJob>();
+        while (reader.TryRead(out var job)) jobs.Add(job);
+        return jobs.OfType<T>().ToList();
     }
 
     private async Task<Run> SeedRunAsync(int crewCount = 2)

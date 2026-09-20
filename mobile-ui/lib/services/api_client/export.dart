@@ -185,6 +185,7 @@ export 'models/report_fault_request.dart';
 export 'models/request_cancellation_request.dart';
 export 'models/retire_ambulance_request.dart';
 export 'models/review_cancellation_request.dart';
+export 'models/route_log.dart';
 export 'models/settle_bill_request.dart';
 export 'models/sort_direction.dart';
 export 'models/staff_login_request.dart';

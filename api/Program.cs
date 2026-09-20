@@ -115,6 +115,11 @@ builder.Services
             && routingUrl.Scheme is "http" or "https"
             && options.Routing.TimeoutSeconds > 0,
         "Emergency:Routing must have an http or https BaseUrl and a positive TimeoutSeconds.")
+    .Validate(options => Uri.TryCreate(options.Geocoding.BaseUrl, UriKind.Absolute, out var geocodingUrl)
+            && geocodingUrl.Scheme is "http" or "https"
+            && options.Geocoding.TimeoutSeconds > 0
+            && !string.IsNullOrWhiteSpace(options.Geocoding.UserAgent),
+        "Emergency:Geocoding must have an http or https BaseUrl, a positive TimeoutSeconds and a UserAgent.")
     .ValidateOnStart();
 
 builder.Services
@@ -369,6 +374,11 @@ builder.Services.AddScoped<IEmergencyCallService, EmergencyCallService>();
 builder.Services.AddScoped<IDispatchService, DispatchService>();
 builder.Services.AddScoped<IStaffLookupService, StubStaffLookupService>();
 builder.Services.AddHttpClient<IAmbulanceDistanceService, OsrmAmbulanceDistanceService>();
+builder.Services.AddHttpClient<IReverseGeocoder, NominatimReverseGeocoder>();
+builder.Services.AddSingleton<SceneLookupQueue>();
+builder.Services.AddSingleton<ISceneLookupQueue>(services => services.GetRequiredService<SceneLookupQueue>());
+builder.Services.AddScoped<SceneLookupProcessor>();
+builder.Services.AddHostedService<SceneLookupWorker>();
 
 builder.Services.AddScoped<IBedService, BedService>();
 builder.Services.AddScoped<IEquipmentCategoryService, EquipmentCategoryService>();

@@ -13,6 +13,17 @@ public sealed class EmergencyOptions
     public HospitalEntranceOptions HospitalEntrance { get; set; } = new();
 
     public RoutingOptions Routing { get; set; } = new();
+
+    public GeocodingOptions Geocoding { get; set; } = new();
+}
+
+public sealed class GeocodingOptions
+{
+    public string BaseUrl { get; set; } = "https://nominatim.openstreetmap.org/";
+
+    public string UserAgent { get; set; } = "CareLanka-university-project";
+
+    public int TimeoutSeconds { get; set; } = 5;
 }
 
 public sealed class RoutingOptions

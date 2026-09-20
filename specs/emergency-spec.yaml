@@ -1206,6 +1206,9 @@ paths:
         line on the React map view reads from here, so the map shows the route that
         was actually planned rather than re-querying and getting a different answer
         later.
+
+        The route is saved a few seconds after dispatch, so this returns 404 until then and
+        when the routing service was unavailable. Crew can read only their own run.
       operationId: getDispatchRoute
       responses:
         '200':
@@ -1972,7 +1975,7 @@ components:
         address_label:
           type: string
           nullable: true
-          description: Human-readable address from the maps API's reverse geocode, for the crew.
+          description: Address looked up from the coordinates a few seconds after the call is logged, so it can be empty at first or when the lookup service is down.
         details: { type: string, nullable: true }
         priority: { $ref: '#/components/schemas/CallPriority' }
         status: { $ref: '#/components/schemas/CallStatus' }
@@ -2419,7 +2422,7 @@ components:
         maps_api_reference:
           type: string
           nullable: true
-          description: The maps provider's own request id, so a disputed ETA can be traced back.
+          description: Which routing provider produced the estimate (`osrm`), so a disputed ETA can be traced back. The provider gives no request ids.
 
     NavigationTarget:
       type: object

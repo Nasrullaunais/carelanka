@@ -9,6 +9,7 @@ public interface IDispatchService
     Task<DispatchDetail> DispatchAsync(Guid callId, ManualDispatchRequest request, CancellationToken cancellationToken = default);
     Task<PagedResult<DispatchSummary>> ListMyHistoryAsync(MyDispatchHistoryRequest request, CancellationToken cancellationToken = default);
     Task<NavigationTarget> GetMyNavigationTargetAsync(Guid dispatchId, CancellationToken cancellationToken = default);
+    Task<RouteLog> GetRouteAsync(Guid dispatchId, CancellationToken cancellationToken = default);
     Task<DispatchDetail> AcknowledgeAsync(Guid dispatchId, CancellationToken cancellationToken = default);
     Task<DispatchDetail> DeclineAsync(Guid dispatchId, DeclineDispatchRequest request, CancellationToken cancellationToken = default);
     Task<DispatchDetail> ProgressAsync(Guid dispatchId, UpdateMyDispatchStatusRequest request, CancellationToken cancellationToken = default);

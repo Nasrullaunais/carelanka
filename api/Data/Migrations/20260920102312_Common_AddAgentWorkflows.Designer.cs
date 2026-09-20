@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using CareLanka.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CareLanka.Api.Data.Migrations
 {
     [DbContext(typeof(CareLankaDbContext))]
-    partial class CareLankaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260920102312_Common_AddAgentWorkflows")]
+    partial class Common_AddAgentWorkflows
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1045,74 +1048,6 @@ namespace CareLanka.Api.Data.Migrations
                             t.HasCheckConstraint("ck_emergency_calls_priority", "priority IN ('critical', 'high', 'medium', 'low')");
 
                             t.HasCheckConstraint("ck_emergency_calls_status", "status IN ('received', 'dispatched', 'en_route', 'completed', 'cancelled')");
-                        });
-                });
-
-            modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.PreAdmissionNotice", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<int>("AttemptCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("attempt_count");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid>("DispatchId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("dispatch_id");
-
-                    b.Property<Guid>("EmergencyCallId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("emergency_call_id");
-
-                    b.Property<string>("FailureReason")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("failure_reason");
-
-                    b.Property<DateTimeOffset>("NextAttemptAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("next_attempt_at");
-
-                    b.Property<DateTimeOffset?>("SentAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("sent_at");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("status");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_pre_admission_notices");
-
-                    b.HasIndex("DispatchId")
-                        .HasDatabaseName("ix_pre_admission_notices_dispatch_id");
-
-                    b.HasIndex("EmergencyCallId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_pre_admission_notices_call");
-
-                    b.HasIndex("NextAttemptAt")
-                        .HasDatabaseName("ix_pre_admission_notices_due")
-                        .HasFilter("status = 'queued'");
-
-                    b.ToTable("pre_admission_notices", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_pre_admission_notices_attempts", "attempt_count >= 0");
-
-                            t.HasCheckConstraint("ck_pre_admission_notices_status", "status IN ('queued', 'sent', 'failed')");
                         });
                 });
 
@@ -3153,25 +3088,6 @@ namespace CareLanka.Api.Data.Migrations
                         .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_emergency_calls_patients_patient_id");
-                });
-
-            modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.PreAdmissionNotice", b =>
-                {
-                    b.HasOne("CareLanka.Api.Data.Entities.Emergency.Dispatch", null)
-                        .WithMany()
-                        .HasForeignKey("DispatchId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_pre_admission_notices_dispatches_dispatch_id");
-
-                    b.HasOne("CareLanka.Api.Data.Entities.Emergency.EmergencyCall", "EmergencyCall")
-                        .WithMany()
-                        .HasForeignKey("EmergencyCallId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_pre_admission_notices_emergency_calls_emergency_call_id");
-
-                    b.Navigation("EmergencyCall");
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.RouteLog", b =>

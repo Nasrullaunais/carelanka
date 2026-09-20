@@ -23,8 +23,10 @@ of that component was built and tested. Three schema-visible consequences, all m
 `AssignedBy.Agent` also changed meaning without changing shape — it now records that a human
 committed a bed the agent *suggested*, not that the agent wrote the row.
 
-**Revision 2.15** — Emergency gains `PreAdmissionNotice`, the retry record for the call to Patient
-Management's `POST /admissions/pre-admit`, in the `Emergency_AddPreAdmissionNotices` migration.
+**Revision 2.16** — `AgentWorkflow` and `AgentProposedChange` are built, in the
+`Common_AddAgentWorkflows` migration (tables `agent_workflows`, `agent_proposed_changes`).
+`AgentProposedChange.ProposedShiftId` is **not** built yet: `Shift` does not exist, so Staff
+adds that column and its foreign key with its own migration.
 
 **Revision 2.14** — `notifications` gains `DedupeKey`, `AttemptCount` and `NextAttemptAt` so it can
 double as the push retry queue, in the `Common_AddDeviceTokensAndNotifications` migration,

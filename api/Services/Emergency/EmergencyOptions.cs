@@ -11,6 +11,15 @@ public sealed class EmergencyOptions
     public int AcknowledgementTimeoutSeconds { get; set; } = 30;
 
     public HospitalEntranceOptions HospitalEntrance { get; set; } = new();
+
+    public RoutingOptions Routing { get; set; } = new();
+}
+
+public sealed class RoutingOptions
+{
+    public string BaseUrl { get; set; } = "https://router.project-osrm.org/";
+
+    public int TimeoutSeconds { get; set; } = 3;
 }
 
 public sealed class HospitalEntranceOptions

@@ -22,4 +22,6 @@ public sealed class AmbulanceSummary
     [Required]
     public bool IsDivertible { get; set; }
     public double? DistanceKm { get; set; }
+    public int? DriveMinutes { get; set; }
+    public bool? IsStraightLineDistance { get; set; }
 }

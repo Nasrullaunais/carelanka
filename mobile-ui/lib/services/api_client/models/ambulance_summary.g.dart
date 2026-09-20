@@ -26,6 +26,8 @@ AmbulanceSummary _$AmbulanceSummaryFromJson(
       .toList(),
   activeDispatchId: json['active_dispatch_id'] as String?,
   distanceKm: (json['distance_km'] as num?)?.toDouble(),
+  driveMinutes: (json['drive_minutes'] as num?)?.toInt(),
+  isStraightLineDistance: json['is_straight_line_distance'] as bool?,
 );
 
 Map<String, dynamic> _$AmbulanceSummaryToJson(AmbulanceSummary instance) =>
@@ -43,4 +45,6 @@ Map<String, dynamic> _$AmbulanceSummaryToJson(AmbulanceSummary instance) =>
       'active_dispatch_id': instance.activeDispatchId,
       'is_divertible': instance.isDivertible,
       'distance_km': instance.distanceKm,
+      'drive_minutes': instance.driveMinutes,
+      'is_straight_line_distance': instance.isStraightLineDistance,
     };

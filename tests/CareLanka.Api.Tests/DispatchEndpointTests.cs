@@ -417,6 +417,42 @@ public sealed class DispatchEndpointTests
     }
 
     [Fact]
+    public async Task Dispatching_queues_one_pre_admission_and_reassigning_does_not_add_another()
+    {
+        var run = await SeedRunAsync();
+        var replacement = await SeedRunAsync();
+        var dispatchId = await DispatchAsync(run);
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+
+        var reassign = await manager.PostAsJsonAsync($"/api/dispatches/{dispatchId}/reassign", new
+        {
+            replacement_ambulance_id = replacement.AmbulanceId,
+            reason = "Closer ambulance became free"
+        });
+
+        Assert.Equal(HttpStatusCode.OK, reassign.StatusCode);
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        var notice = await db.PreAdmissionNotices.SingleAsync(x => x.EmergencyCallId == run.CallId);
+        Assert.Equal(dispatchId, notice.DispatchId);
+        Assert.Equal(PreAdmissionStatus.Queued, notice.Status);
+    }
+
+    [Fact]
+    public async Task A_failed_dispatch_saves_no_pre_admission()
+    {
+        var run = await SeedRunAsync(crewCount: 1);
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+
+        var response = await manager.PostAsJsonAsync($"/api/emergency-calls/{run.CallId}/dispatch", new { ambulance_id = run.AmbulanceId });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        Assert.False(await db.PreAdmissionNotices.AnyAsync(x => x.EmergencyCallId == run.CallId));
+    }
+
+    [Fact]
     public async Task A_failed_dispatch_saves_no_push()
     {
         var run = await SeedRunAsync();

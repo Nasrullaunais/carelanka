@@ -120,6 +120,10 @@ builder.Services
             && options.Geocoding.TimeoutSeconds > 0
             && !string.IsNullOrWhiteSpace(options.Geocoding.UserAgent),
         "Emergency:Geocoding must have an http or https BaseUrl, a positive TimeoutSeconds and a UserAgent.")
+    .Validate(options => options.PreAdmission.ArrivalAllowanceMinutes > 0 && options.PreAdmission.PollSeconds > 0
+            && options.PreAdmission.MaxAttempts > 0 && options.PreAdmission.RetryBaseSeconds > 0
+            && options.PreAdmission.BatchSize > 0,
+        "Emergency:PreAdmission values must all be greater than zero.")
     .ValidateOnStart();
 
 builder.Services
@@ -397,6 +401,9 @@ builder.Services.AddSingleton<SceneLookupQueue>();
 builder.Services.AddSingleton<ISceneLookupQueue>(services => services.GetRequiredService<SceneLookupQueue>());
 builder.Services.AddScoped<SceneLookupProcessor>();
 builder.Services.AddHostedService<SceneLookupWorker>();
+builder.Services.AddScoped<IPreAdmissionGateway, StubPreAdmissionGateway>();
+builder.Services.AddScoped<PreAdmissionProcessor>();
+builder.Services.AddHostedService<PreAdmissionWorker>();
 
 builder.Services.AddScoped<IBedService, BedService>();
 builder.Services.AddScoped<IEquipmentCategoryService, EquipmentCategoryService>();

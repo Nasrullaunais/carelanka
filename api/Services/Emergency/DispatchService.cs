@@ -271,6 +271,15 @@ public sealed class DispatchService : IDispatchService
         call.Status = CallStatus.Dispatched;
         ambulance.Status = AmbulanceStatus.Dispatched;
         _db.Dispatches.Add(dispatch);
+        if (!await _db.PreAdmissionNotices.AnyAsync(x => x.EmergencyCallId == callId, ct))
+        {
+            _db.PreAdmissionNotices.Add(new PreAdmissionNotice
+            {
+                Id = Guid.NewGuid(), EmergencyCallId = callId, DispatchId = dispatch.Id,
+                Status = PreAdmissionStatus.Queued, NextAttemptAt = dispatch.DispatchedAt
+            });
+        }
+
         _push.Stage(dispatch.Crew.Select(x => x.StaffMemberId), "New ambulance assignment",
             "Open CareLanka to see your run.", "dispatch", dispatch.Id, "dispatch-assigned");
         return dispatch;

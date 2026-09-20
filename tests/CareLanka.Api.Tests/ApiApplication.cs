@@ -66,6 +66,10 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
             services.Remove(services.Single(service =>
                 service.ServiceType == typeof(IHostedService) && service.ImplementationType == typeof(SceneLookupWorker)));
             services.Replace(ServiceDescriptor.Singleton<IReverseGeocoder, NoAddressGeocoder>());
+            // Tests run the delivery pass themselves and never talk to Firebase.
+            services.Remove(services.Single(service =>
+                service.ServiceType == typeof(IHostedService) && service.ImplementationType == typeof(PushDeliveryWorker)));
+            services.Replace(ServiceDescriptor.Singleton<IPushSender, RecordingPushSender>());
         });
     }
 

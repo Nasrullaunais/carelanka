@@ -123,6 +123,16 @@ builder.Services
     .ValidateOnStart();
 
 builder.Services
+    .AddOptions<PushOptions>()
+    .Bind(builder.Configuration.GetSection(PushOptions.SectionName))
+    .Validate(options => options.PollSeconds > 0 && options.MaxAttempts > 0
+            && options.RetryBaseSeconds > 0 && options.BatchSize > 0,
+        "Push:PollSeconds, MaxAttempts, RetryBaseSeconds and BatchSize must be greater than zero.")
+    .Validate(options => string.IsNullOrWhiteSpace(options.CredentialsPath) || File.Exists(options.CredentialsPath),
+        "Push:CredentialsPath must point to an existing Firebase service-account file.")
+    .ValidateOnStart();
+
+builder.Services
     .AddOptions<EquipmentOptions>()
     .Bind(builder.Configuration.GetSection(EquipmentOptions.SectionName))
     .Validate(options => !string.IsNullOrWhiteSpace(options.ConfirmationCode),
@@ -372,6 +382,14 @@ builder.Services.AddScoped<IAmbulanceService, AmbulanceService>();
 builder.Services.AddScoped<IAmbulanceCrewService, AmbulanceCrewService>();
 builder.Services.AddScoped<IEmergencyCallService, EmergencyCallService>();
 builder.Services.AddScoped<IDispatchService, DispatchService>();
+builder.Services.AddScoped<IDeviceTokenService, DeviceTokenService>();
+builder.Services.AddScoped<IPushNotifications, PushNotifications>();
+builder.Services.AddScoped<PushDeliveryProcessor>();
+builder.Services.AddSingleton<IPushSender>(services =>
+    string.IsNullOrWhiteSpace(services.GetRequiredService<IOptions<PushOptions>>().Value.CredentialsPath)
+        ? ActivatorUtilities.CreateInstance<LoggingPushSender>(services)
+        : ActivatorUtilities.CreateInstance<FirebasePushSender>(services));
+builder.Services.AddHostedService<PushDeliveryWorker>();
 builder.Services.AddScoped<IStaffLookupService, StubStaffLookupService>();
 builder.Services.AddHttpClient<IAmbulanceDistanceService, OsrmAmbulanceDistanceService>();
 builder.Services.AddHttpClient<IReverseGeocoder, NominatimReverseGeocoder>();

@@ -16,6 +16,8 @@ public class CareLankaDbContext : DbContext
     public DbSet<StaffMember> StaffMembers => Set<StaffMember>();
     public DbSet<PatientAccount> PatientAccounts => Set<PatientAccount>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<DeviceToken> DeviceTokens => Set<DeviceToken>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     public DbSet<EmergencyCall> EmergencyCalls => Set<EmergencyCall>();
     public DbSet<Ambulance> Ambulances => Set<Ambulance>();

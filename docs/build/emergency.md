@@ -421,7 +421,7 @@ fallback ordering.
 
 **Exit criteria:** normal ranking uses driving ETA; provider failure remains dispatchable.
 
-### Phase 8 — Push notification reliability
+### Phase 8 — Push notification reliability — **BUILT 2026-09-20, not yet tried on a phone**
 
 **Goal:** deliver assignments while the crew app is backgrounded or closed.
 
@@ -437,6 +437,21 @@ Work:
 
 **Exit criteria:** a backgrounded assigned device receives the alert, and a missed push
 is recovered through polling.
+
+**What was built.** The Common tables (`device_tokens`, `notifications`, migration
+`Common_AddDeviceTokensAndNotifications`) plus `PUT /device-tokens` and
+`DELETE /device-tokens/{id}`. Dispatch and reassign save one `Queued` push per crew member
+inside the dispatch transaction, so a push never exists for a dispatch that rolled back.
+`PushDeliveryWorker` sends what is due through `IPushSender` (Firebase when
+`Push:CredentialsPath` is set, otherwise a log-only sender), retries with growing gaps, gives
+up after five tries, and revokes a token the provider rejects. The text is fixed
+("New ambulance assignment") and the data carries only the dispatch id. On the phone,
+`core/push` registers the token after a staff sign-in, unregisters on sign-out, and a tapped
+alert opens My run for the crew only. My run still polls every 10 seconds and refreshes when
+the app comes back to the front, which is the recovery for a missed push.
+
+**Not done.** A push is not withdrawn if the dispatch is cancelled before it is sent. The
+worker assumes one API instance. Android only; iPhone needs an Apple account.
 
 ### Phase 9 — Hospital preparation and handover integration
 

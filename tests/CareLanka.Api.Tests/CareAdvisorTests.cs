@@ -1,6 +1,7 @@
 using CareLanka.Api.Agents;
 using CareLanka.Api.Agents.Patient;
 using CareLanka.Api.Data.Enums;
+using CareLanka.Api.DTOs.Patient;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -37,9 +38,14 @@ public sealed class CareAdvisorTests
     [Fact]
     public async Task A_model_that_could_not_be_reached_falls_back_to_the_deterministic_draft()
     {
-        var candidate = await Advise(LanguageModelResult.Failure("the provider answered 503"));
+        var candidate = await Advise(LanguageModelResult.Failure(
+            "the provider answered 503", LanguageModelFailure.ProviderOverloaded));
 
         Assert.False(string.IsNullOrWhiteSpace(candidate.Message));
+
+        // The reviewer has to be able to tell this from a note written about their patient.
+        Assert.Equal(CareDraftSource.ModelUnavailable, candidate.Source);
+        Assert.Contains("too busy", candidate.SourceNote);
     }
 
     [Fact]

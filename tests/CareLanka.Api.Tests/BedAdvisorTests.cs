@@ -41,7 +41,8 @@ public sealed class BedAdvisorTests
     [Fact]
     public async Task A_model_that_could_not_be_reached_leaves_the_ranked_pick_standing()
     {
-        var advice = await Advise(LanguageModelResult.Failure("the provider answered 503"));
+        var advice = await Advise(LanguageModelResult.Failure(
+            "the provider answered 503", LanguageModelFailure.ProviderOverloaded));
 
         Assert.Equal(BedAdvice.None, advice);
     }

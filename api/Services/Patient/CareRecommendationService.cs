@@ -100,6 +100,52 @@ public sealed class CareRecommendationService : ICareRecommendationService
         };
     }
 
+    public async Task<CareWorkflowAccepted> RedraftAsync(Guid id, CancellationToken ct = default)
+    {
+        var recommendation = await _db.CareRecommendations
+            .FirstOrDefaultAsync(row => row.Id == id, ct)
+            ?? throw new NotFoundException("CareRecommendation", id);
+
+        if (recommendation.Status != CareRecommendationStatus.PendingReview)
+        {
+            throw new ConflictException(MessageCode.CareRecommendationNotPendingReview);
+        }
+
+        // A fresh workflow rather than a reset of the old one: the first run is a real thing that
+        // happened, and overwriting it would erase the record of why a redraft was needed.
+        var workflow = new AgentWorkflow
+        {
+            Id = Guid.NewGuid(),
+            AgentType = AgentType.PatientCareAdvisory,
+            EntityType = CareAgentExecutor.WorkflowEntityType,
+            EntityId = recommendation.Id,
+            CorrelationId = Guid.NewGuid(),
+            Objective = Objective,
+            Plan = BedWorkflowJson.Write(CareAgent.Plan),
+            Status = AgentWorkflowStatus.Pending,
+            StartedAt = DateTimeOffset.UtcNow,
+            AttemptCount = 0
+        };
+
+        _db.AgentWorkflows.Add(workflow);
+
+        // Cleared so the screen shows the run in progress rather than the draft being replaced.
+        recommendation.AgentMessage = null;
+        recommendation.UrgencyFlag = null;
+
+        await _db.SaveChangesAsync(ct);
+
+        _queue.Enqueue(workflow.Id);
+
+        return new CareWorkflowAccepted
+        {
+            WorkflowId = workflow.Id,
+            RecommendationId = recommendation.Id,
+            Status = "running",
+            PollUrl = $"/api/care-workflows/{workflow.Id}"
+        };
+    }
+
     public async Task<CareWorkflowSummary> GetWorkflowAsync(Guid workflowId, CancellationToken ct = default)
     {
         var workflow = await _db.AgentWorkflows
@@ -130,6 +176,10 @@ public sealed class CareRecommendationService : ICareRecommendationService
                 Passed = validation.Passed,
                 FailedRules = validation.FailedRules
             },
+            DraftSource = string.IsNullOrWhiteSpace(validation.DraftSource)
+                ? CareDraftSource.Model
+                : EnumWire.FromWire<CareDraftSource>(validation.DraftSource),
+            DraftNote = validation.DraftNote,
             Retries = Math.Max(0, workflow.AttemptCount - 1)
         };
     }
@@ -178,11 +228,14 @@ public sealed class CareRecommendationService : ICareRecommendationService
             .FirstOrDefaultAsync(row => row.Id == id, ct)
             ?? throw new NotFoundException("CareRecommendation", id);
 
+        // Newest first: a redraft adds a second workflow for the same report, and the screen has
+        // to follow the run happening now rather than the one that produced the draft being replaced.
         var workflowId = await _db.AgentWorkflows
             .AsNoTracking()
             .Where(row => row.AgentType == AgentType.PatientCareAdvisory
                 && row.EntityType == CareAgentExecutor.WorkflowEntityType
                 && row.EntityId == id)
+            .OrderByDescending(row => row.CreatedAt)
             .Select(row => (Guid?)row.Id)
             .FirstOrDefaultAsync(ct);
 

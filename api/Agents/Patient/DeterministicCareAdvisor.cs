@@ -1,4 +1,5 @@
 using CareLanka.Api.Data.Enums;
+using CareLanka.Api.DTOs.Patient;
 
 namespace CareLanka.Api.Agents.Patient;
 
@@ -31,6 +32,8 @@ public sealed class DeterministicCareAdvisor : ICareAdvisor
               "record for this patient, so this draft is based on their own words alone. " +
               "Suggest a bedside review this shift.";
 
-        return Task.FromResult(new CareDraftCandidate(urgency, message));
+        // Marked as the backup by default. Callers that know the specific cause replace the note.
+        return Task.FromResult(
+            new CareDraftCandidate(urgency, message, CareDraftSource.ModelUnavailable));
     }
 }

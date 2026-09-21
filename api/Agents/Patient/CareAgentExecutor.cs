@@ -88,7 +88,9 @@ public sealed class CareAgentExecutor
         workflow.ValidationResults = BedWorkflowJson.Write(new CareWorkflowValidationRecord
         {
             Passed = run.Validation.Passed,
-            FailedRules = run.Validation.FailedRules
+            FailedRules = run.Validation.FailedRules,
+            DraftSource = EnumWire.ToWire(run.Draft?.Source ?? DTOs.Patient.CareDraftSource.Model),
+            DraftNote = run.Draft?.SourceNote
         });
         workflow.Errors = run.Errors.Count == 0 ? null : BedWorkflowJson.Write(run.Errors);
         workflow.FinalOutcome = EnumWire.ToWire(run.Outcome);
@@ -143,9 +145,18 @@ public sealed class CareAgentExecutor
     }
 }
 
+/// <summary>
+/// Persisted as JSON in <c>agent_workflows.validation_results</c>. The two draft fields were added
+/// after the first rows were written, so a row without them reads back as a model draft with no
+/// note - which is what those rows were.
+/// </summary>
 public sealed class CareWorkflowValidationRecord
 {
     public bool Passed { get; set; } = true;
 
     public IReadOnlyList<string> FailedRules { get; set; } = Array.Empty<string>();
+
+    public string DraftSource { get; set; } = "model";
+
+    public string? DraftNote { get; set; }
 }

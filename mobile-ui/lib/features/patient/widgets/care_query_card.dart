@@ -91,8 +91,8 @@ class _CareQueryCardState extends State<CareQueryCard> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Tell us in your own words. A nurse or doctor will check it - this is not '
-            'answered automatically, and it is not for an emergency.',
+            'A nurse or doctor will check it - this is not answered automatically, and it is '
+            'not for an emergency.',
             style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 14),
@@ -100,14 +100,15 @@ class _CareQueryCardState extends State<CareQueryCard> {
             key: _formKey,
             child: TextFormField(
               controller: _text,
-              maxLines: 4,
+              minLines: 2,
+              maxLines: 3,
               maxLength: PatientFieldLimits.careReportMax,
               buildCounter: nearLimitCounter(),
               textCapitalization: TextCapitalization.sentences,
               validator: validateCareReport,
               enabled: !_submitting,
               decoration: const InputDecoration(
-                hintText: "e.g. My headache is worse today and it hurts more when I lie flat.",
+                hintText: 'e.g. My headache is worse today.',
                 alignLabelWithHint: true,
               ),
             ),
@@ -156,14 +157,19 @@ class _HistoryList extends StatelessWidget {
 
         final theme = Theme.of(context);
 
+        final shown = items.take(5).toList();
+
         return Padding(
-          padding: const EdgeInsets.only(top: 14),
+          padding: const EdgeInsets.only(top: 18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('What you have sent', style: theme.textTheme.titleSmall),
-              const SizedBox(height: 6),
-              for (final item in items.take(5)) _HistoryRow(item: item),
+              for (var i = 0; i < shown.length; i++) ...[
+                if (i > 0) const Divider(height: 28),
+                if (i == 0) const SizedBox(height: 10),
+                _HistoryRow(item: shown[i]),
+              ],
             ],
           ),
         );
@@ -183,78 +189,100 @@ class _HistoryRow extends StatelessWidget {
     final scheme = theme.colorScheme;
     final status = item.status;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(item.reportedText ?? '', style: theme.textTheme.bodyMedium),
-              ),
-              const SizedBox(width: 8),
-              _StatusChip(status: status),
-            ],
+    final answered =
+        status == CareRecommendationStatus.approved && item.doctorMessage != null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _Label(
+          text: item.reportedAt == null
+              ? 'You asked'
+              : 'You asked · ${FriendlyDate.relativeDayAndTime(item.reportedAt!)}',
+        ),
+        const SizedBox(height: 4),
+        Text(item.reportedText ?? '', style: theme.textTheme.bodyMedium),
+        const SizedBox(height: 10),
+        if (answered) ...[
+          _Label(text: 'Reply from the ward', color: scheme.primary),
+          const SizedBox(height: 4),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer,
+              borderRadius: BorderRadius.circular(AppTheme.radiusM),
+            ),
+            child: Text(
+              item.doctorMessage!,
+              style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onPrimaryContainer),
+            ),
           ),
-          if (item.reportedAt != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                FriendlyDate.relativeDayAndTime(item.reportedAt!),
-                style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-              ),
-            ),
-          if (status == CareRecommendationStatus.approved && item.doctorMessage != null) ...[
-            const SizedBox(height: 6),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: scheme.primaryContainer,
-                borderRadius: BorderRadius.circular(AppTheme.radiusM),
-              ),
-              child: Text(
-                item.doctorMessage!,
-                style: theme.textTheme.bodySmall?.copyWith(color: scheme.onPrimaryContainer),
-              ),
-            ),
-          ],
-        ],
+        ] else
+          _PendingNote(status: status),
+      ],
+    );
+  }
+}
+
+/// Small caps-style caption that separates the patient's own words from the ward's reply. The
+/// two used to run together with only a chip to tell them apart, which read as one block of text.
+class _Label extends StatelessWidget {
+  const _Label({required this.text, this.color});
+
+  final String text;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Text(
+      text.toUpperCase(),
+      style: theme.textTheme.labelSmall?.copyWith(
+        color: color ?? theme.colorScheme.onSurfaceVariant,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.6,
       ),
     );
   }
 }
 
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.status});
+/// What a patient sees before a reviewer has finished. A rejected report deliberately reads the
+/// same as one still waiting: the reason is staff-facing and never reaches the patient.
+class _PendingNote extends StatelessWidget {
+  const _PendingNote({required this.status});
 
   final CareRecommendationStatus? status;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
-    final (label, color) = switch (status) {
-      CareRecommendationStatus.approved => ('Reviewed', scheme.primary),
-      CareRecommendationStatus.rejected => ('Reviewed', scheme.onSurfaceVariant),
-      _ => ('Awaiting review', scheme.onSurfaceVariant),
-    };
+    final text = status == CareRecommendationStatus.rejected
+        ? 'Checked by a nurse or doctor. They will follow up with you in person.'
+        : 'Waiting for a nurse or doctor to check this.';
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context)
-            .textTheme
-            .labelSmall
-            ?.copyWith(color: color, fontWeight: FontWeight.w600),
-      ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          status == CareRecommendationStatus.rejected
+              ? Icons.check_circle_outline
+              : Icons.schedule,
+          size: 15,
+          color: scheme.onSurfaceVariant,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ),
+      ],
     );
   }
 }
+

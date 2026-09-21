@@ -462,6 +462,8 @@ export type CancellationRequestStatus = 'pending' | 'approved' | 'rejected';
 
 export type CareAgentOutcome = 'drafted' | 'escalated' | 'failed';
 
+export type CareDraftSource = 'model' | 'model_unavailable' | 'model_rejected';
+
 export type CareQueryRequest = {
     reported_text?: string | null;
 };
@@ -525,6 +527,8 @@ export type CareWorkflowSummary = {
     steps?: Array<BedAgentStep> | null;
     red_flag?: boolean;
     validation?: CareWorkflowValidation;
+    draft_source?: CareDraftSource;
+    draft_note?: string | null;
     retries?: number;
 };
 
@@ -4211,6 +4215,45 @@ export type RejectCareRecommendationResponses = {
 };
 
 export type RejectCareRecommendationResponse = RejectCareRecommendationResponses[keyof RejectCareRecommendationResponses];
+
+export type RedraftCareRecommendationData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/care-recommendations/{id}/redraft';
+};
+
+export type RedraftCareRecommendationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RedraftCareRecommendationError = RedraftCareRecommendationErrors[keyof RedraftCareRecommendationErrors];
+
+export type RedraftCareRecommendationResponses = {
+    /**
+     * Accepted
+     */
+    202: CareWorkflowAccepted;
+};
+
+export type RedraftCareRecommendationResponse = RedraftCareRecommendationResponses[keyof RedraftCareRecommendationResponses];
 
 export type RegisterDeviceData = {
     body?: RegisterDeviceRequest;

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using CareLanka.Api.Common.Persistence;
 using CareLanka.Api.Data.Enums;
+using CareLanka.Api.DTOs.Patient;
 
 namespace CareLanka.Api.Agents.Patient;
 
@@ -59,7 +60,7 @@ public sealed class GeminiCareAdvisor : ICareAdvisor
     {
         if (!_model.IsConfigured)
         {
-            return await Fallback(context, ct);
+            return await Fallback(context, LanguageModelFailure.NotConfigured, ct);
         }
 
         var result = await _model.CompleteJsonAsync(Instruction, Facts(context), ct);
@@ -69,16 +70,25 @@ public sealed class GeminiCareAdvisor : ICareAdvisor
             _log.LogWarning(
                 "The care advisor fell back to the deterministic draft: {Error}", result.Error);
 
-            return await Fallback(context, ct);
+            return await Fallback(context, result.Reason, ct);
         }
 
         var parsed = Parse(result.Json);
 
-        return parsed ?? await Fallback(context, ct);
+        return parsed ?? await Fallback(context, LanguageModelFailure.BadResponse, ct);
     }
 
-    private static Task<CareDraftCandidate> Fallback(CareAdviceContext context, CancellationToken ct)
-        => new DeterministicCareAdvisor().AdviseAsync(context, ct);
+    private static async Task<CareDraftCandidate> Fallback(
+        CareAdviceContext context, LanguageModelFailure failure, CancellationToken ct)
+    {
+        var candidate = await new DeterministicCareAdvisor().AdviseAsync(context, ct);
+
+        return candidate with
+        {
+            Source = CareDraftSource.ModelUnavailable,
+            SourceNote = failure.ToReviewerText()
+        };
+    }
 
     private static string Facts(CareAdviceContext context)
         => JsonSerializer.Serialize(new

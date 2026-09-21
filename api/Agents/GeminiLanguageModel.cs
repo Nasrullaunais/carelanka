@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -43,7 +44,8 @@ public sealed class GeminiLanguageModel : ILanguageModel
     {
         if (!IsConfigured)
         {
-            return LanguageModelResult.Failure(NoLanguageModel.Reason);
+            return LanguageModelResult.Failure(
+                NoLanguageModel.Reason, LanguageModelFailure.NotConfigured);
         }
 
         var body = JsonSerializer.Serialize(
@@ -60,6 +62,7 @@ public sealed class GeminiLanguageModel : ILanguageModel
 
         var attempts = Math.Max(0, _options.MaxRetries) + 1;
         string lastError = "The language model did not answer.";
+        var lastFailure = LanguageModelFailure.Unreachable;
 
         for (var attempt = 1; attempt <= attempts; attempt++)
         {
@@ -73,6 +76,7 @@ public sealed class GeminiLanguageModel : ILanguageModel
                 }
 
                 lastError = "The language model returned an empty response.";
+                lastFailure = LanguageModelFailure.BadResponse;
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -81,23 +85,52 @@ public sealed class GeminiLanguageModel : ILanguageModel
             catch (OperationCanceledException)
             {
                 lastError = $"The language model timed out after {_options.TimeoutSeconds}s.";
+                lastFailure = LanguageModelFailure.Timeout;
             }
             catch (HttpRequestException exception)
             {
                 lastError = $"The language model could not be reached: {exception.Message}";
+                lastFailure = Classify(exception.StatusCode);
             }
             catch (JsonException exception)
             {
                 lastError = $"The language model returned a malformed response: {exception.Message}";
+                lastFailure = LanguageModelFailure.BadResponse;
             }
 
             _log.LogWarning(
                 "Gemini attempt {Attempt} of {Attempts} failed: {Error}",
                 attempt, attempts, lastError);
+
+            if (!lastFailure.IsWorthRetrying())
+            {
+                _log.LogWarning(
+                    "Not retrying: {Reason} cannot succeed on a retry.", lastFailure);
+
+                break;
+            }
+
+            if (attempt < attempts)
+            {
+                // The provider being busy is the common case and it usually clears within a
+                // second or two, so back off rather than spending all three attempts at once.
+                await Task.Delay(TimeSpan.FromSeconds(attempt), ct);
+            }
         }
 
-        return LanguageModelResult.Failure(lastError);
+        return LanguageModelResult.Failure(lastError, lastFailure);
     }
+
+    private static LanguageModelFailure Classify(HttpStatusCode? status) => status switch
+    {
+        HttpStatusCode.TooManyRequests => LanguageModelFailure.QuotaExhausted,
+        HttpStatusCode.PaymentRequired => LanguageModelFailure.QuotaExhausted,
+        HttpStatusCode.ServiceUnavailable => LanguageModelFailure.ProviderOverloaded,
+        HttpStatusCode.InternalServerError => LanguageModelFailure.ProviderOverloaded,
+        HttpStatusCode.BadGateway => LanguageModelFailure.ProviderOverloaded,
+        HttpStatusCode.GatewayTimeout => LanguageModelFailure.Timeout,
+        _ => LanguageModelFailure.Unreachable
+    };
 
     private async Task<string?> CallAsync(string body, CancellationToken ct)
     {
@@ -121,7 +154,7 @@ public sealed class GeminiLanguageModel : ILanguageModel
         if (!response.IsSuccessStatusCode)
         {
             throw new HttpRequestException(
-                $"the provider answered {(int)response.StatusCode}");
+                $"the provider answered {(int)response.StatusCode}", null, response.StatusCode);
         }
 
         await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);

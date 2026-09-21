@@ -102,4 +102,24 @@ public class CareRecommendationsController : ControllerBase
     public async Task<ActionResult<CareRecommendationResponse>> RejectCareRecommendation(
         Guid id, [FromBody] RejectCareRecommendationRequest request, CancellationToken ct)
         => Ok(await _recommendations.RejectAsync(id, request, _currentUser.Id, ct));
+
+    /// <summary>
+    /// Run the agent again for a report still awaiting review. The usual reason a draft is the
+    /// fixed backup sentence is a model that was busy, which clears on its own - so the answer to
+    /// a useless draft is another run, not approving it anyway.
+    /// </summary>
+    [Authorize(Policy = Policies.CareRecommendationReviewer)]
+    [HttpPost("care-recommendations/{id:guid}/redraft", Name = "redraftCareRecommendation")]
+    [ProducesResponseType(typeof(CareWorkflowAccepted), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<CareWorkflowAccepted>> RedraftCareRecommendation(
+        Guid id, CancellationToken ct)
+    {
+        var accepted = await _recommendations.RedraftAsync(id, ct);
+
+        return Accepted(accepted.PollUrl, accepted);
+    }
 }

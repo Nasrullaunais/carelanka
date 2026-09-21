@@ -23,9 +23,11 @@ public interface ILanguageModel
         string instruction, string dataJson, CancellationToken cancellationToken = default);
 }
 
-public sealed record LanguageModelResult(bool Ok, string? Json, string? Error)
+public sealed record LanguageModelResult(
+    bool Ok, string? Json, string? Error, LanguageModelFailure Reason = LanguageModelFailure.None)
 {
     public static LanguageModelResult Success(string json) => new(true, json, null);
 
-    public static LanguageModelResult Failure(string error) => new(false, null, error);
+    public static LanguageModelResult Failure(string error, LanguageModelFailure reason)
+        => new(false, null, error, reason);
 }

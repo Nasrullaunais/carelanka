@@ -125,7 +125,15 @@ public sealed class CareAgent : ICareAgent
                 "The care advisor's draft failed {FailedRules}; falling back to the deterministic draft.",
                 string.Join(", ", validated.FailedRules));
 
-            final = await new DeterministicCareAdvisor().AdviseAsync(context, ct);
+            final = (await new DeterministicCareAdvisor().AdviseAsync(context, ct)) with
+            {
+                Source = CareDraftSource.ModelRejected,
+                SourceNote =
+                    "The AI model's draft broke a safety rule ("
+                    + string.Join(", ", validated.FailedRules)
+                    + ") and was thrown away, so the standard backup note was used instead."
+            };
+
             validated = CareRecommendationValidator.Validate(final, redFlag, profile?.Allergies);
         }
 

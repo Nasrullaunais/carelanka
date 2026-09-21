@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using CareLanka.Api.Data.Enums;
+using CareLanka.Api.DTOs.Patient;
 
 namespace CareLanka.Api.Agents.Patient;
 
@@ -77,7 +78,16 @@ public static partial class CareRecommendationValidator
     }
 }
 
-public sealed record CareDraftCandidate(CareUrgency UrgencyFlag, string Message);
+/// <summary>
+/// <paramref name="Source"/> is what tells a reviewer whether they are reading the model's own
+/// reasoning about this patient or the fixed backup sentence. The two are indistinguishable by
+/// eye, and approving the second one is a waste of the reviewer's time.
+/// </summary>
+public sealed record CareDraftCandidate(
+    CareUrgency UrgencyFlag,
+    string Message,
+    CareDraftSource Source = CareDraftSource.Model,
+    string? SourceNote = null);
 
 public sealed record CareValidationResult(
     bool Passed, IReadOnlyList<string> FailedRules, CareUrgency UrgencyFlag);

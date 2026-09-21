@@ -15,5 +15,6 @@ public sealed class NoLanguageModel : ILanguageModel
 
     public Task<LanguageModelResult> CompleteJsonAsync(
         string instruction, string dataJson, CancellationToken cancellationToken = default)
-        => Task.FromResult(LanguageModelResult.Failure(Reason));
+        => Task.FromResult(
+            LanguageModelResult.Failure(Reason, LanguageModelFailure.NotConfigured));
 }

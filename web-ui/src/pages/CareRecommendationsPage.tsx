@@ -4,12 +4,18 @@ import { toast } from 'sonner';
 import {
   approveCareRecommendationMutation,
   getCareRecommendationOptions,
+  getCareWorkflowOptions,
   getPatientMedicalProfileOptions,
   getPatientOptions,
   listCareRecommendationsOptions,
+  redraftCareRecommendationMutation,
   rejectCareRecommendationMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
-import type { CareRecommendationStatus, CareUrgency } from '../services/api/generated';
+import type {
+  BedAgentStep,
+  CareRecommendationStatus,
+  CareUrgency,
+} from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
 import { canReadCareQueue, canReviewCareRecommendation } from '../types/permissions';
 
@@ -23,6 +29,22 @@ const statusLabels: Record<CareRecommendationStatus, string> = {
   pending_review: 'Pending review',
   approved: 'Approved',
   rejected: 'Rejected',
+};
+
+const POLL_INTERVAL_MS = 800;
+
+/**
+ * Plain-language captions for the agent's own step names, so a nurse watching the run sees what
+ * is happening rather than the identifiers the workflow stores.
+ */
+const STEP_CAPTIONS: Record<string, string> = {
+  screen_red_flags: 'Checking the report for warning signs',
+  get_medical_profile: 'Reading the medical profile',
+  get_patient_history: 'Reading past visits and reports',
+  get_current_admission: 'Reading the current admission',
+  draft_recommendation: 'Writing a draft note',
+  validate_deterministically: 'Safety-checking the draft',
+  pause_for_approval: 'Waiting for a reviewer',
 };
 
 const statusFilters: Array<{ value: CareRecommendationStatus | 'all'; label: string }> = [
@@ -196,7 +218,15 @@ function RecommendationDetail({
   const [rejectionReason, setRejectionReason] = useState('');
   const [showReject, setShowReject] = useState(false);
 
-  const detail = useQuery(getCareRecommendationOptions({ path: { id: recommendationId } }));
+  const detail = useQuery({
+    ...getCareRecommendationOptions({ path: { id: recommendationId } }),
+    // Keep asking until the background run puts a draft on the row, so the note appears on its
+    // own rather than only when the reviewer thinks to reload.
+    refetchInterval: (query) =>
+      query.state.data?.workflow_id && !query.state.data?.agent_message
+        ? POLL_INTERVAL_MS
+        : false,
+  });
 
   const patientId = detail.data?.patient_id ?? '';
   const patient = useQuery({ ...getPatientOptions({ path: { id: patientId } }), enabled: !!patientId });
@@ -204,6 +234,18 @@ function RecommendationDetail({
     ...getPatientMedicalProfileOptions({ path: { id: patientId } }),
     enabled: !!patientId,
   });
+
+  // The draft is written by a background run, so an report opened straight away has no note yet.
+  // Polling the workflow is what tells the reviewer it is still coming rather than absent.
+  const workflowId = detail.data?.workflow_id ?? '';
+  const workflow = useQuery({
+    ...getCareWorkflowOptions({ path: { workflowId } }),
+    enabled: !!workflowId,
+    refetchInterval: (query) =>
+      query.state.data?.status === 'running' ? POLL_INTERVAL_MS : false,
+  });
+
+  const agentRunning = !!workflowId && (workflow.isLoading || workflow.data?.status === 'running');
 
   const refresh = () =>
     queryClient.invalidateQueries({
@@ -229,6 +271,16 @@ function RecommendationDetail({
       toast.success('Rejected.');
       void refresh();
       onDone();
+    },
+  });
+
+  const redraft = useMutation({
+    ...redraftCareRecommendationMutation(),
+    onSuccess: () => {
+      toast.success('Running the agent again…');
+      setDoctorMessage(null);
+      void detail.refetch();
+      void workflow.refetch();
     },
   });
 
@@ -315,7 +367,41 @@ function RecommendationDetail({
 
       <h4>The agent&apos;s draft</h4>
       <p className="hint">Staff-facing only. Never shown to the patient as written here.</p>
-      <p>{row.agent_message || <span className="muted">No draft — reviewer decides from the report alone.</span>}</p>
+
+      {agentRunning && !row.agent_message ? (
+        <>
+          <p className="muted">The agent is working on this now…</p>
+          <AgentProgress plan={workflow.data?.plan} steps={workflow.data?.steps} />
+        </>
+      ) : (
+        <>
+          {workflow.data && workflow.data.draft_source !== 'model' && (
+            <div className="hint" role="status" style={{ color: '#8a5300' }}>
+              <p style={{ margin: 0 }}>
+                <strong>Not a note about this patient.</strong>{' '}
+                {workflow.data.draft_note ??
+                  'The standard backup note was used instead of an AI draft.'}
+              </p>
+            </div>
+          )}
+          <p>
+            {row.agent_message || (
+              <span className="muted">No draft — reviewer decides from the report alone.</span>
+            )}
+          </p>
+
+          {mayReview && (
+            <button
+              type="button"
+              className="secondary small"
+              disabled={redraft.isPending}
+              onClick={() => redraft.mutate({ path: { id: recommendationId } })}
+            >
+              {redraft.isPending ? 'Starting…' : 'Try the agent again'}
+            </button>
+          )}
+        </>
+      )}
 
       {row.status !== 'pending_review' && (
         <>
@@ -409,5 +495,50 @@ function RecommendationDetail({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * What the agent has actually done so far. `plan` comes back the moment the run starts and
+ * `steps` fills in as each one completes, so this is the real state of the run rather than a
+ * spinner timed to feel about right.
+ */
+function AgentProgress({
+  plan,
+  steps,
+}: {
+  plan: string[] | null | undefined;
+  steps: BedAgentStep[] | null | undefined;
+}) {
+  const order = plan && plan.length > 0 ? plan : Object.keys(STEP_CAPTIONS);
+  const done = new Set((steps ?? []).filter((step) => step.ok !== false).map((step) => step.step));
+  const currentIndex = order.findIndex((step) => !done.has(step));
+
+  return (
+    <ul className="agent-progress" style={{ listStyle: 'none', margin: '0.5rem 0 0', padding: 0 }}>
+      {order.map((step, index) => {
+        const isDone = done.has(step);
+        const isCurrent = !isDone && index === currentIndex;
+
+        return (
+          <li
+            key={step}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.2rem 0',
+              opacity: isDone || isCurrent ? 1 : 0.45,
+            }}
+          >
+            <span aria-hidden="true">{isDone ? '✓' : isCurrent ? '…' : '·'}</span>
+            <span className={isCurrent ? '' : 'muted'}>
+              {STEP_CAPTIONS[step] ?? step}
+              {isCurrent ? '…' : ''}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

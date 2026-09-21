@@ -27,5 +27,15 @@ public sealed class CareWorkflowSummary
 
     public CareWorkflowValidation Validation { get; set; } = new();
 
+    /// <summary>
+    /// Whether the draft is the model's own note about this patient or the fixed backup sentence.
+    /// </summary>
+    public CareDraftSource DraftSource { get; set; }
+
+    /// <summary>
+    /// Plain-language reason the backup note was used, for the reviewer. Null on a model draft.
+    /// </summary>
+    public string? DraftNote { get; set; }
+
     public int Retries { get; set; }
 }

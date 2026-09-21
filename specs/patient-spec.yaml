@@ -2709,6 +2709,43 @@ paths:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /care-recommendations/{id}/redraft:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Care Recommendations]
+      summary: Run the agent again for a report still awaiting review
+      description: |
+        Roles: Doctor OR WardNurse. Same reviewers as approve and reject.
+
+        The usual reason a draft is the fixed backup sentence rather than a note about this
+        patient is a model that was busy, which clears on its own - so the reviewer's answer
+        to a useless draft is another run, not approving it anyway. Check draft_source on
+        CareWorkflowSummary to see which one you are reading.
+
+        Adds a second workflow rather than resetting the first: the original run happened and
+        overwriting it would erase the record of why a redraft was needed. The recommendation's
+        existing draft is cleared while the new run works.
+      operationId: redraftCareRecommendation
+      responses:
+        '202':
+          description: The run was queued. Poll the workflow for progress.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CareWorkflowAccepted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Only a Doctor or a WardNurse may redraft a care recommendation.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This recommendation is not pending review.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
   /me/care-recommendations:
     get:
       tags: [Patient Self-Service]
@@ -4666,7 +4703,22 @@ components:
             failed_rules:
               type: array
               items: { type: string }
+        draft_source: { $ref: '#/components/schemas/CareDraftSource' }
+        draft_note:
+          type: string
+          nullable: true
+          description: >-
+            Plain-language reason the fixed backup note was used instead of a model draft.
+            Null when draft_source is model.
         retries: { type: integer }
+
+    CareDraftSource:
+      type: string
+      description: >-
+        Where the draft on a care recommendation came from. Only model is a note written about
+        this patient; the other two are the same fixed backup sentence, and a reviewer has to be
+        told which one they are reading.
+      enum: [model, model_unavailable, model_rejected]
 
     CareRecommendationSummary:
       type: object

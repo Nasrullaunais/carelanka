@@ -12,6 +12,13 @@ public interface ICareRecommendationService
 
     Task<CareWorkflowSummary> GetWorkflowAsync(Guid workflowId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Run the agent again for a report that is still awaiting review. Exists because the usual
+    /// reason a draft is the fixed backup sentence is a busy model, which clears on its own - so
+    /// the reviewer's answer to a useless draft should be "try again", not "approve it anyway".
+    /// </summary>
+    Task<CareWorkflowAccepted> RedraftAsync(Guid id, CancellationToken ct = default);
+
     Task<PagedResult<CareRecommendationSummary>> ListAsync(
         CareRecommendationStatus? status,
         int page,

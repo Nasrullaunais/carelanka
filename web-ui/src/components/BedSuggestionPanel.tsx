@@ -5,11 +5,18 @@ import { toast } from 'sonner';
 import {
   assignBedManuallyMutation,
   getBedWorkflowOptions,
+  getPatientOptions,
+  listBedAvailabilityOptions,
+  listWardsOptions,
   requestBedSuggestionMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
 import type { BedAgentStep, PrincipalRole, SuggestedBed } from '../services/api/generated';
 import { canSetHighCareLevel } from '../types/permissions';
+import { placementFor } from '../types/beds';
+import type { Placement } from '../types/beds';
 import { admissionCategoryLabels, admissionUrgencyLabels, genderLabels } from '../types/patients';
+import { BedCandidateTable } from './BedCandidateTable';
+import type { BedCandidateBed } from './BedCandidateTable';
 
 const POLL_INTERVAL_MS = 800;
 
@@ -115,6 +122,55 @@ export function BedSuggestionPanel({
       },
     });
   }
+
+  function pickBed(bed: BedCandidateBed) {
+    const targetAdmissionId = admissionId ?? workflow.data?.patient?.admission_id;
+    if (!targetAdmissionId || !workflowId) return;
+
+    assign.mutate({
+      path: { id: targetAdmissionId },
+      body: {
+        bed_id: bed.id,
+        workflow_id: workflowId,
+        override_reason: reason.trim().length > 0 ? reason.trim() : undefined,
+      },
+    });
+  }
+
+  const patient = workflow.data?.patient;
+
+  const patientDetails = useQuery({
+    ...getPatientOptions({ path: { id: patient?.patient_id ?? '' } }),
+    enabled: showAlternatives && !!patient?.patient_id,
+  });
+
+  const wards = useQuery({ ...listWardsOptions({}), enabled: showAlternatives });
+
+  const allBeds = useQuery({
+    ...listBedAvailabilityOptions({ query: { availability: 'free', pageSize: 500 } }),
+    enabled: showAlternatives,
+  });
+
+  const wardsById = new Map((wards.data ?? []).map((ward) => [ward.id, ward]));
+
+  const bedCandidates = (allBeds.data?.items ?? []).map((bed) => ({
+    bed,
+    ward: wardsById.get(bed.ward_id),
+    placement:
+      patient?.admission_category !== undefined
+        ? placementFor(
+            bed,
+            wardsById.get(bed.ward_id),
+            { admission_category: patient.admission_category, is_infectious: patient.is_infectious ?? false },
+            { gender: patient.gender, date_of_birth: patientDetails.data?.date_of_birth },
+            role,
+          )
+        : ({ kind: 'refused', why: 'Loading…' } as Placement),
+  }));
+
+  const bedsMissing = (allBeds.data?.total_items ?? 0) - (allBeds.data?.items?.length ?? 0);
+  const bedTableLoading = wards.isLoading || allBeds.isLoading || patientDetails.isLoading;
+  const bedTableFailed = wards.isError || allBeds.isError || patientDetails.isError;
 
   // From a row on the board, the admission is already known, so the run starts as soon as the
   // panel opens rather than asking the nurse to type an identifier they already found once.
@@ -249,17 +305,38 @@ export function BedSuggestionPanel({
                 </button>
               )}
 
-              {showAlternatives &&
-                alternatives.map((bed) => (
-                  <BedCard
-                    key={bed.bed_id}
-                    bed={bed}
-                    headline="Also fits"
-                    role={role}
-                    assigning={assign.isPending}
-                    onUse={confirm}
-                  />
-                ))}
+              {showAlternatives && (
+                <div style={{ marginTop: '0.75rem' }}>
+                  {bedTableLoading ? (
+                    <p className="empty">Loading…</p>
+                  ) : bedTableFailed ? (
+                    <div className="empty">
+                      <p>Could not load the free beds.</p>
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => {
+                          void wards.refetch();
+                          void allBeds.refetch();
+                          void patientDetails.refetch();
+                        }}
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  ) : (
+                    <BedCandidateTable
+                      candidates={bedCandidates}
+                      writing={assign.isPending}
+                      missing={bedsMissing}
+                      actionLabel={(placement) =>
+                        placement.kind === 'override' ? 'Use anyway' : 'Use this bed'
+                      }
+                      onPick={(bed) => pickBed(bed)}
+                    />
+                  )}
+                </div>
+              )}
             </>
           )}
 

@@ -17,6 +17,7 @@ import type { PrincipalRole, WorklistRow } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
 import { MedicalProfilePanel } from '../components/MedicalProfilePanel';
 import { BedSuggestionPanel } from '../components/BedSuggestionPanel';
+import { BedCandidateTable } from '../components/BedCandidateTable';
 import {
   canAssignBed,
   canCompleteVisit,
@@ -27,7 +28,6 @@ import {
 import { localDateTime } from '../types/datetime';
 import { placementFor } from '../types/beds';
 import type { Placement } from '../types/beds';
-import { genderPolicyLabels, wardTypeLabels } from '../types/wards';
 import {
   arrivalRouteLabel,
   worklistStatusDetail,
@@ -562,9 +562,6 @@ function AssignBedPanel({
       : ({ kind: 'refused', why: 'Loading…' } as Placement),
   }));
 
-  const usable = candidates.filter((candidate) => candidate.placement.kind !== 'refused');
-  const overrides = candidates.filter((candidate) => candidate.placement.kind === 'override');
-
   const missing = (beds.data?.total_items ?? 0) - (beds.data?.items?.length ?? 0);
   const loading = visit.isLoading || wards.isLoading || beds.isLoading;
   const failed = visit.isError || wards.isError || beds.isError;
@@ -620,101 +617,39 @@ function AssignBedPanel({
         </p>
       ) : (
         <>
-          <table>
-            <thead>
-              <tr>
-                <th>Bed</th>
-                <th>Ward</th>
-                <th>Accepts</th>
-                <th>Isolation</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {candidates.map(({ bed, ward, placement }) => (
-                <tr key={bed.id}>
-                  <td>
-                    <strong>{bed.bed_number}</strong>
-                  </td>
-                  <td>
-                    {bed.ward_name}
-                    <br />
-                    <span className="muted">
-                      {ward ? wardTypeLabels[ward.ward_type] : 'Unknown ward'}
-                    </span>
-                  </td>
-                  <td>{ward ? genderPolicyLabels[ward.gender_policy] : '—'}</td>
-                  <td>{bed.has_isolation ? 'Yes' : 'No'}</td>
-                  <td>
-                    {placement.kind === 'refused' ? (
-                      <span className="muted">{placement.why}</span>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          className={placement.kind === 'override' ? 'warn' : undefined}
-                          disabled={writing}
-                          onClick={() =>
-                            correcting
-                              ? correct.mutate({
-                                  path: { id: row.id },
-                                  body: {
-                                    bed_id: bed.id,
-                                    reason: reason.trim().length > 0 ? reason.trim() : undefined,
-                                  },
-                                })
-                              : assign.mutate({
-                                  path: { id: row.id },
-                                  body: {
-                                    bed_id: bed.id,
-                                    override_reason:
-                                      reason.trim().length > 0 ? reason.trim() : undefined,
-                                  },
-                                })
-                          }
-                        >
-                          {placement.kind === 'override'
-                            ? correcting
-                              ? 'Move anyway'
-                              : 'Assign anyway'
-                            : correcting
-                              ? 'Move here'
-                              : alreadyHere
-                                ? 'Assign and admit'
-                                : 'Assign'}
-                        </button>
-                        {placement.kind === 'override' && (
-                          <p className="hint" style={{ marginTop: '0.25rem' }}>
-                            {placement.why}
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {usable.length === 0 && (
-            <p className="empty">
-              Beds are free, but none of them accepts this patient. The reason is on each row.
-            </p>
-          )}
-
-          {missing > 0 && (
-            <p className="field-error" style={{ marginTop: '0.6rem' }}>
-              {missing} more free {missing === 1 ? 'bed is' : 'beds are'} not shown. This list
-              is incomplete — report it before assigning a bed from it.
-            </p>
-          )}
-
-          {overrides.length > 0 && (
-            <p className="hint" style={{ marginTop: '0.6rem' }}>
-              Amber buttons are beds outside the patient&rsquo;s care level. You may use one as
-              duty manager; it is recorded as your decision, so give a reason in the note.
-            </p>
-          )}
+          <BedCandidateTable
+            candidates={candidates}
+            writing={writing}
+            missing={missing}
+            actionLabel={(placement) =>
+              placement.kind === 'override'
+                ? correcting
+                  ? 'Move anyway'
+                  : 'Assign anyway'
+                : correcting
+                  ? 'Move here'
+                  : alreadyHere
+                    ? 'Assign and admit'
+                    : 'Assign'
+            }
+            onPick={(bed) =>
+              correcting
+                ? correct.mutate({
+                    path: { id: row.id },
+                    body: {
+                      bed_id: bed.id,
+                      reason: reason.trim().length > 0 ? reason.trim() : undefined,
+                    },
+                  })
+                : assign.mutate({
+                    path: { id: row.id },
+                    body: {
+                      bed_id: bed.id,
+                      override_reason: reason.trim().length > 0 ? reason.trim() : undefined,
+                    },
+                  })
+            }
+          />
 
           <div className="field" style={{ marginTop: '0.9rem' }}>
             <label htmlFor="override-reason">

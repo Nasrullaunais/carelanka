@@ -74,44 +74,66 @@ public sealed class GeminiLanguageModelTests
     }
 
     /// <summary>
-    /// Gemini 3 reasons at "medium" unless told otherwise, which is what pushed a short reply past
-    /// the per-attempt timeout and left every run on its deterministic fallback.
+    /// The budget goes under <c>thinkingConfig</c>, not as a <c>thinkingLevel</c> beside
+    /// <c>temperature</c>: v1beta rejects the latter outright with a 400, which reads on the review
+    /// screen as "could not be reached" and costs a whole run. This is the shape the live API
+    /// accepted on 2026-09-21.
     /// </summary>
     [Fact]
-    public async Task The_configured_thinking_level_is_sent()
+    public async Task The_thinking_budget_is_sent_under_thinking_config()
     {
-        var (model, handler) = Build(HttpStatusCode.ServiceUnavailable);
+        var (model, handler) = Build(
+            HttpStatusCode.ServiceUnavailable,
+            configure: options => options.ThinkingBudget = 0);
 
         await model.CompleteJsonAsync("instruction", "{}");
 
         using var sent = JsonDocument.Parse(handler.LastBody!);
+        var config = sent.RootElement.GetProperty("generationConfig");
 
-        Assert.Equal(
-            "low",
-            sent.RootElement.GetProperty("generationConfig").GetProperty("thinkingLevel").GetString());
+        Assert.False(config.TryGetProperty("thinkingLevel", out _));
+        Assert.Equal(0, config.GetProperty("thinkingConfig").GetProperty("thinkingBudget").GetInt32());
     }
 
     [Fact]
-    public async Task An_empty_thinking_level_leaves_the_choice_to_the_provider()
+    public async Task No_thinking_budget_leaves_the_choice_to_the_provider()
     {
         var (model, handler) = Build(
             HttpStatusCode.ServiceUnavailable,
-            configure: options => options.ThinkingLevel = "");
+            configure: options => options.ThinkingBudget = null);
 
         await model.CompleteJsonAsync("instruction", "{}");
 
         using var sent = JsonDocument.Parse(handler.LastBody!);
 
         Assert.False(
-            sent.RootElement.GetProperty("generationConfig").TryGetProperty("thinkingLevel", out _));
+            sent.RootElement.GetProperty("generationConfig").TryGetProperty("thinkingConfig", out _));
+    }
+
+    /// <summary>
+    /// The provider says why in the body. Without it, a rejected field and an unreachable host are
+    /// the same log line, which is what made the 400 above take a round of guessing to find.
+    /// </summary>
+    [Fact]
+    public async Task The_providers_own_reason_reaches_the_error()
+    {
+        var (model, _) = Build(
+            HttpStatusCode.BadRequest,
+            body: """{"error":{"code":400,"message":"Unknown name \"thinkingLevel\""}}""");
+
+        var result = await model.CompleteJsonAsync("instruction", "{}");
+
+        Assert.False(result.Ok);
+        Assert.Contains("Unknown name", result.Error);
     }
 
     private static (GeminiLanguageModel Model, CountingHandler Handler) Build(
         HttpStatusCode status,
         string apiKey = "test-key",
-        Action<LanguageModelOptions>? configure = null)
+        Action<LanguageModelOptions>? configure = null,
+        string body = "{}")
     {
-        var handler = new CountingHandler(status);
+        var handler = new CountingHandler(status, body);
         var settings = new LanguageModelOptions
         {
             ApiKey = apiKey,
@@ -133,8 +155,13 @@ public sealed class GeminiLanguageModelTests
     private sealed class CountingHandler : HttpMessageHandler
     {
         private readonly HttpStatusCode _status;
+        private readonly string _body;
 
-        public CountingHandler(HttpStatusCode status) => _status = status;
+        public CountingHandler(HttpStatusCode status, string body)
+        {
+            _status = status;
+            _body = body;
+        }
 
         public int Calls { get; private set; }
 
@@ -150,7 +177,7 @@ public sealed class GeminiLanguageModelTests
 
             return new HttpResponseMessage(_status)
             {
-                Content = new StringContent("{}")
+                Content = new StringContent(_body)
             };
         }
     }

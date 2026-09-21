@@ -19,7 +19,15 @@ namespace CareLanka.Api.Agents.Patient;
 /// the one thing the agent could not say, and it answered a patient asking about their own
 /// allergen with "something you react badly to". The line is no longer *whether* a medicine is
 /// named, it is *how*: the agent may only ever name one the patient themselves raised or that is
-/// already on their record, and only to be negative about it.
+/// already on their record.
+/// </para>
+/// <para>
+/// CR5 was narrowed again later the same day. Requiring a negative word in every sentence that
+/// named a medicine threw away "Panadol is normally used for pain and fever." - a sentence the
+/// prompt asks for, and one that points the patient nowhere - so in practice any question about a
+/// medicine came back as the fallback note. CR5 now fails only a sentence that *directs* the
+/// patient at the substance. CR1 is untouched and carries the weight: no dosages, and no medicine
+/// the patient never raised.
 /// </para>
 /// </summary>
 public static partial class CareRecommendationValidator
@@ -36,16 +44,28 @@ public static partial class CareRecommendationValidator
     ];
 
     /// <summary>
-    /// What makes a sentence naming a medicine acceptable. Whole words, matched against the
-    /// normalised sentence, so "don't" and "shouldn't" arrive here as <c>dont</c> and
-    /// <c>shouldnt</c>. A sentence that names a medicine and carries none of these reads as
-    /// telling the patient to take it, which no draft is allowed to do.
+    /// What makes a sentence that tells the patient to take something acceptable after all -
+    /// because it is telling them <em>not</em> to.
     /// </summary>
-    private static readonly string[] NegativeMarkers =
-    [
+    /// <remarks>
+    /// Stored already normalised. <see cref="Normalise"/> collapses doubled letters, so a sentence
+    /// saying "allergy" arrives as <c>alergy</c>; a raw list here would never match those two and
+    /// the marker would be dead.
+    /// </remarks>
+    private static readonly HashSet<string> NegativeMarkers = new(new[]
+    {
         "not", "never", "avoid", "dont", "wont", "cant", "shouldnt", "mustnt", "unsafe", "stop",
         "allergic", "allergy", "reaction"
-    ];
+    }.Select(Normalise));
+
+    /// <summary>
+    /// Verbs that turn naming a medicine into directing the patient at it. Also normalised.
+    /// </summary>
+    private static readonly HashSet<string> DirectiveVerbs = new(new[]
+    {
+        "take", "taking", "use", "using", "try", "trying", "start", "swallow", "apply", "ask",
+        "asking", "request"
+    }.Select(Normalise));
 
     [GeneratedRegex(@"\b\d+(\.\d+)?\s?(mg|mcg|ml|g|iu|units?|tablets?|tabs?|capsules?|caps?)\b",
         RegexOptions.IgnoreCase)]
@@ -77,7 +97,7 @@ public static partial class CareRecommendationValidator
 
         var allergens = Substances(allergiesText);
 
-        if (!EveryMentionIsNegative(message, named.Concat(allergens)))
+        if (SomeSentenceDirectsThemToIt(message, named.Concat(allergens)))
         {
             failedRules.Add("CR5");
         }
@@ -90,11 +110,19 @@ public static partial class CareRecommendationValidator
     }
 
     /// <summary>
-    /// Every sentence that names one of <paramref name="substances"/> has to be negative about it.
+    /// Whether any sentence points the patient at one of <paramref name="substances"/> - tells them
+    /// to take it, use it, or ask someone for it - without saying not to in that same sentence.
     /// Sentence by sentence rather than whole-message, so one "do not take" cannot license a
     /// recommendation three sentences later.
     /// </summary>
-    private static bool EveryMentionIsNegative(string message, IEnumerable<string> substances)
+    /// <remarks>
+    /// Narrowed on 2026-09-21. It used to require every sentence naming a medicine to carry a
+    /// negative word, which failed "Panadol is normally used for pain and fever." - a sentence the
+    /// prompt explicitly asks for, and one that directs the patient nowhere. The rule now tracks
+    /// what it was always for: a draft must never tell a patient to take something. Describing a
+    /// medicine is not directing them at it, and a nurse or doctor still reads every word.
+    /// </remarks>
+    private static bool SomeSentenceDirectsThemToIt(string message, IEnumerable<string> substances)
     {
         var wanted = substances
             .Select(Normalise)
@@ -104,7 +132,7 @@ public static partial class CareRecommendationValidator
 
         if (wanted.Count == 0)
         {
-            return true;
+            return false;
         }
 
         var sentences = message.Split(
@@ -113,14 +141,59 @@ public static partial class CareRecommendationValidator
         return sentences
             .Select(Normalise)
             .Where(sentence => wanted.Any(sentence.Contains))
-            .All(IsNegative);
+            .Any(sentence => Directs(sentence) && !IsNegative(sentence));
+    }
+
+    /// <summary>
+    /// A directive is either an imperative - the sentence opens with the verb - or second person,
+    /// "you can take", "you should ask". A passive description like "is normally used for" is
+    /// neither, which is the whole point of reading it this way rather than hunting for the verb
+    /// anywhere in the sentence.
+    /// </summary>
+    private static bool Directs(string normalisedSentence)
+    {
+        var words = normalisedSentence.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        if (words.Length == 0)
+        {
+            return false;
+        }
+
+        var opening = words[0] == "please" && words.Length > 1 ? 1 : 0;
+
+        if (DirectiveVerbs.Contains(words[opening]))
+        {
+            return true;
+        }
+
+        for (var index = 0; index < words.Length; index++)
+        {
+            if (words[index] != "you")
+            {
+                continue;
+            }
+
+            // "you can take", "you should ask the nurse for" - far enough to clear a modal and an
+            // adverb, short enough that an unrelated verb later in the sentence is not caught.
+            var end = Math.Min(words.Length, index + 5);
+
+            for (var ahead = index + 1; ahead < end; ahead++)
+            {
+                if (DirectiveVerbs.Contains(words[ahead]))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private static bool IsNegative(string normalisedSentence)
     {
         var words = normalisedSentence.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
-        return words.Any(word => NegativeMarkers.Contains(word));
+        return words.Any(NegativeMarkers.Contains);
     }
 
     /// <summary>

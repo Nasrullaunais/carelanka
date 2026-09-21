@@ -12,13 +12,18 @@ public sealed class LanguageModelOptions
     public string ApiKey { get; set; } = string.Empty;
 
     /// <summary>
-    /// The free tier meters requests per day per model, so the model name is also the quota
-    /// bucket - <c>gemini-3.6-flash</c> allows 20 a day, which a few failed runs spend.
+    /// <c>gemini-3.5-flash</c> is the settled choice (2026-09-21), and the two reasons are both
+    /// measured rather than assumed.
     /// <para>
-    /// <c>gemini-3.5-flash</c> is the settled choice (2026-09-21). On the same one-line prompt and
-    /// the same key, 3.6 answered in 95s, 25s and 77s where 3.5 answered in 12s - free-tier queue
-    /// time, not reasoning, since both reported no thinking tokens. 3.6's published gains are token
-    /// economy and agentic tool loops, neither of which this one-call agent uses.
+    /// Speed: on one short prompt and one key, <c>gemini-3.6-flash</c> answered in 95s, 25s and 77s
+    /// where <c>gemini-3.5-flash</c> answered in 12s. Neither reported thinking tokens, so that is
+    /// free-tier queue time. 3.6's published gains are token economy and agentic tool loops,
+    /// neither of which a one-call agent paying nothing per token can use.
+    /// </para>
+    /// <para>
+    /// Quota: the free tier meters requests per day per model, so the model name is also the quota
+    /// bucket. The <c>gemini-3.6-flash</c> bucket turned out to be 20 a day, which a few failed
+    /// runs spend; changing model resets which bucket you are drawing from.
     /// </para>
     /// <para>
     /// Support for <see cref="ThinkingBudget"/> varies by model - <c>gemini-3.5-flash-lite</c>

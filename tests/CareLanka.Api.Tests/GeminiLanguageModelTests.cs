@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using CareLanka.Api.Agents;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -72,6 +73,39 @@ public sealed class GeminiLanguageModelTests
         Assert.InRange(handler.Calls, 2, 4);
     }
 
+    /// <summary>
+    /// Gemini 3 reasons at "medium" unless told otherwise, which is what pushed a short reply past
+    /// the per-attempt timeout and left every run on its deterministic fallback.
+    /// </summary>
+    [Fact]
+    public async Task The_configured_thinking_level_is_sent()
+    {
+        var (model, handler) = Build(HttpStatusCode.ServiceUnavailable);
+
+        await model.CompleteJsonAsync("instruction", "{}");
+
+        using var sent = JsonDocument.Parse(handler.LastBody!);
+
+        Assert.Equal(
+            "low",
+            sent.RootElement.GetProperty("generationConfig").GetProperty("thinkingLevel").GetString());
+    }
+
+    [Fact]
+    public async Task An_empty_thinking_level_leaves_the_choice_to_the_provider()
+    {
+        var (model, handler) = Build(
+            HttpStatusCode.ServiceUnavailable,
+            configure: options => options.ThinkingLevel = "");
+
+        await model.CompleteJsonAsync("instruction", "{}");
+
+        using var sent = JsonDocument.Parse(handler.LastBody!);
+
+        Assert.False(
+            sent.RootElement.GetProperty("generationConfig").TryGetProperty("thinkingLevel", out _));
+    }
+
     private static (GeminiLanguageModel Model, CountingHandler Handler) Build(
         HttpStatusCode status,
         string apiKey = "test-key",
@@ -104,15 +138,20 @@ public sealed class GeminiLanguageModelTests
 
         public int Calls { get; private set; }
 
-        protected override Task<HttpResponseMessage> SendAsync(
+        public string? LastBody { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Calls++;
+            LastBody = request.Content is null
+                ? null
+                : await request.Content.ReadAsStringAsync(cancellationToken);
 
-            return Task.FromResult(new HttpResponseMessage(_status)
+            return new HttpResponseMessage(_status)
             {
                 Content = new StringContent("{}")
-            });
+            };
         }
     }
 

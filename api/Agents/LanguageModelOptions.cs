@@ -16,11 +16,22 @@ public sealed class LanguageModelOptions
     public string BaseUrl { get; set; } = "https://generativelanguage.googleapis.com/v1beta";
 
     /// <summary>
+    /// How long the model may reason before it starts writing - "minimal", "low", "medium" or
+    /// "high". Gemini 3 defaults to "medium", which is what made a one-paragraph reply take 12-41
+    /// seconds and time out more often than not. Our prompts are short and heavily constrained, so
+    /// the reasoning was not buying an answer, only the wait. Set to empty to send nothing and let
+    /// the provider choose.
+    /// </summary>
+    public string ThinkingLevel { get; set; } = "low";
+
+    /// <summary>
     /// Hard timeout per attempt. §9.1 asks for one by name. Measured against the free tier on
     /// 2026-09-21, a call that succeeds takes 12-41 seconds, so the old 20 was hanging up on
-    /// answers that were on their way.
+    /// answers that were on their way. Raised to 70 on top of <see cref="ThinkingLevel"/>: three
+    /// attempts that each hang up a second before the answer arrives waste the whole run, and one
+    /// attempt that waits is cheaper than three that do not.
     /// </summary>
-    public int TimeoutSeconds { get; set; } = 45;
+    public int TimeoutSeconds { get; set; } = 70;
 
     /// <summary>
     /// Retries after the first attempt, so 2 means at most three calls. Three is the deliberate
@@ -42,7 +53,8 @@ public sealed class LanguageModelOptions
     /// of this - a draft goes into a queue a nurse reads when they have a moment - so it is worth
     /// waiting out a busy provider rather than falling back to the standard note in five seconds.
     /// Wide enough for three attempts at <see cref="TimeoutSeconds"/> plus the backoff between
-    /// them; lower it and the third attempt is the one that stops happening.
+    /// them; lower it and the third attempt is the one that stops happening. At 70s an attempt
+    /// that is 3 x 70 plus a 2s and a 4s backoff.
     /// </summary>
-    public int TotalBudgetSeconds { get; set; } = 150;
+    public int TotalBudgetSeconds { get; set; } = 220;
 }

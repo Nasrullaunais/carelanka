@@ -49,6 +49,17 @@ public sealed class GeminiLanguageModel : ILanguageModel
                 NoLanguageModel.Reason, LanguageModelFailure.NotConfigured);
         }
 
+        var generationConfig = new Dictionary<string, object>
+        {
+            ["responseMimeType"] = "application/json",
+            ["temperature"] = 0.2
+        };
+
+        if (!string.IsNullOrWhiteSpace(_options.ThinkingLevel))
+        {
+            generationConfig["thinkingLevel"] = _options.ThinkingLevel.Trim().ToLowerInvariant();
+        }
+
         var body = JsonSerializer.Serialize(
             new
             {
@@ -57,7 +68,7 @@ public sealed class GeminiLanguageModel : ILanguageModel
                 {
                     new { role = "user", parts = new[] { new { text = dataJson } } }
                 },
-                generationConfig = new { responseMimeType = "application/json", temperature = 0.2 }
+                generationConfig
             },
             Json);
 
@@ -76,6 +87,10 @@ public sealed class GeminiLanguageModel : ILanguageModel
 
                 if (!string.IsNullOrWhiteSpace(text))
                 {
+                    _log.LogInformation(
+                        "Gemini answered in {Seconds:n1}s on attempt {Attempt}.",
+                        elapsed.Elapsed.TotalSeconds, attempt);
+
                     return LanguageModelResult.Success(text);
                 }
 

@@ -5,6 +5,7 @@
 import 'package:json_annotation/json_annotation.dart';
 
 import 'care_recommendation_status.dart';
+import 'care_reviewer_role.dart';
 
 part 'my_care_recommendation.g.dart';
 
@@ -16,6 +17,9 @@ class MyCareRecommendation {
     this.reportedAt,
     this.status,
     this.doctorMessage,
+    this.reviewedByName,
+    this.reviewedByRole,
+    this.reviewedAt,
   });
   
   factory MyCareRecommendation.fromJson(Map<String, Object?> json) => _$MyCareRecommendationFromJson(json);
@@ -28,6 +32,12 @@ class MyCareRecommendation {
   final CareRecommendationStatus? status;
   @JsonKey(name: 'doctor_message')
   final String? doctorMessage;
+  @JsonKey(name: 'reviewed_by_name')
+  final String? reviewedByName;
+  @JsonKey(name: 'reviewed_by_role')
+  final CareReviewerRole? reviewedByRole;
+  @JsonKey(name: 'reviewed_at')
+  final DateTime? reviewedAt;
 
   Map<String, Object?> toJson() => _$MyCareRecommendationToJson(this);
 }

@@ -18,6 +18,13 @@ MyCareRecommendation _$MyCareRecommendationFromJson(
       ? null
       : CareRecommendationStatus.fromJson(json['status'] as String),
   doctorMessage: json['doctor_message'] as String?,
+  reviewedByName: json['reviewed_by_name'] as String?,
+  reviewedByRole: json['reviewed_by_role'] == null
+      ? null
+      : CareReviewerRole.fromJson(json['reviewed_by_role'] as String),
+  reviewedAt: json['reviewed_at'] == null
+      ? null
+      : DateTime.parse(json['reviewed_at'] as String),
 );
 
 Map<String, dynamic> _$MyCareRecommendationToJson(
@@ -28,4 +35,7 @@ Map<String, dynamic> _$MyCareRecommendationToJson(
   'reported_at': instance.reportedAt?.toIso8601String(),
   'status': instance.status,
   'doctor_message': instance.doctorMessage,
+  'reviewed_by_name': instance.reviewedByName,
+  'reviewed_by_role': instance.reviewedByRole,
+  'reviewed_at': instance.reviewedAt?.toIso8601String(),
 };

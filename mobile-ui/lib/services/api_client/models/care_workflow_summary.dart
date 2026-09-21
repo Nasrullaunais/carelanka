@@ -6,6 +6,7 @@ import 'package:json_annotation/json_annotation.dart';
 
 import 'bed_agent_step.dart';
 import 'care_agent_outcome.dart';
+import 'care_draft_source.dart';
 import 'care_workflow_status.dart';
 import 'care_workflow_validation.dart';
 
@@ -23,6 +24,8 @@ class CareWorkflowSummary {
     this.steps,
     this.redFlag,
     this.validation,
+    this.draftSource,
+    this.draftNote,
     this.retries,
   });
   
@@ -40,6 +43,10 @@ class CareWorkflowSummary {
   @JsonKey(name: 'red_flag')
   final bool? redFlag;
   final CareWorkflowValidation? validation;
+  @JsonKey(name: 'draft_source')
+  final CareDraftSource? draftSource;
+  @JsonKey(name: 'draft_note')
+  final String? draftNote;
   final int? retries;
 
   Map<String, Object?> toJson() => _$CareWorkflowSummaryToJson(this);

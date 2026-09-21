@@ -49,16 +49,46 @@ public sealed class GeminiLanguageModelTests
         Assert.Equal(0, handler.Calls);
     }
 
+    /// <summary>
+    /// A busy provider is worth waiting out, but the wait has a ceiling - otherwise a run could
+    /// sit on a thread indefinitely. The budget is what stops it.
+    /// </summary>
+    [Fact]
+    public async Task Retrying_stops_at_the_total_budget_even_with_attempts_left()
+    {
+        var (model, handler) = Build(
+            HttpStatusCode.ServiceUnavailable,
+            configure: options =>
+            {
+                options.MaxRetries = 20;
+                options.RetryBackoffSeconds = 1;
+                options.MaxBackoffSeconds = 1;
+                options.TotalBudgetSeconds = 3;
+            });
+
+        var result = await model.CompleteJsonAsync("instruction", "{}");
+
+        Assert.False(result.Ok);
+        Assert.InRange(handler.Calls, 2, 4);
+    }
+
     private static (GeminiLanguageModel Model, CountingHandler Handler) Build(
-        HttpStatusCode status, string apiKey = "test-key")
+        HttpStatusCode status,
+        string apiKey = "test-key",
+        Action<LanguageModelOptions>? configure = null)
     {
         var handler = new CountingHandler(status);
-        var options = Options.Create(new LanguageModelOptions
+        var settings = new LanguageModelOptions
         {
             ApiKey = apiKey,
             MaxRetries = 2,
-            TimeoutSeconds = 5
-        });
+            TimeoutSeconds = 5,
+            RetryBackoffSeconds = 0
+        };
+
+        configure?.Invoke(settings);
+
+        var options = Options.Create(settings);
 
         var model = new GeminiLanguageModel(
             new SingleClientFactory(handler), options, NullLogger<GeminiLanguageModel>.Instance);

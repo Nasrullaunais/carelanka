@@ -45,7 +45,7 @@ public sealed class CareAdvisorTests
 
         // The reviewer has to be able to tell this from a note written about their patient.
         Assert.Equal(CareDraftSource.ModelUnavailable, candidate.Source);
-        Assert.Contains("too busy", candidate.SourceNote);
+        Assert.Contains("busy", candidate.SourceNote);
     }
 
     [Fact]

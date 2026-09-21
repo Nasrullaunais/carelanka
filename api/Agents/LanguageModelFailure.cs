@@ -31,8 +31,8 @@ public static class LanguageModelFailureText
             "The AI model's free tier limit is used up, so the standard backup note was used "
             + "instead. A new API key is needed before the agent can write real drafts again.",
         LanguageModelFailure.ProviderOverloaded =>
-            "The AI model was too busy to answer, so the standard backup note was used instead. "
-            + "This usually clears on its own - try again.",
+            "The AI model stayed busy for as long as the agent kept trying, so the standard backup "
+            + "reply was used instead. This usually clears on its own - try again.",
         LanguageModelFailure.Timeout =>
             "The AI model took too long to answer, so the standard backup note was used instead. "
             + "Try again.",

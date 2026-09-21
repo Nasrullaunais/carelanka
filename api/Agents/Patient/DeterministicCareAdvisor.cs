@@ -8,6 +8,11 @@ namespace CareLanka.Api.Agents.Patient;
 /// timeout - and the one this validator always accepts. It never echoes the patient's own words
 /// or a recorded allergy back into the message, so it cannot fail CR1 or CR5 by construction:
 /// there is nothing free-text in it beyond the fixed sentences below.
+/// <para>
+/// Addressed to the patient, like the model's own draft. It cannot answer their question - it
+/// has not read it - so it says what is true whatever they asked: someone is coming, and
+/// medicines come from the nurse.
+/// </para>
 /// </summary>
 public sealed class DeterministicCareAdvisor : ICareAdvisor
 {
@@ -24,13 +29,18 @@ public sealed class DeterministicCareAdvisor : ICareAdvisor
             ? CareUrgency.High
             : hasHistory ? CareUrgency.Medium : CareUrgency.Low;
 
-        var message = hasHistory
-            ? "Patient has raised a new concern during their stay. A recorded medical profile " +
-              "exists for this patient - review it alongside the patient's own report below " +
-              "before deciding what to do. Suggest a bedside review this shift."
-            : "Patient has raised a new concern during their stay. No medical profile is on " +
-              "record for this patient, so this draft is based on their own words alone. " +
-              "Suggest a bedside review this shift.";
+        var message = context.RedFlagMatched
+            ? "Thank you for telling us. The ward staff have been told, and someone will come to " +
+              "you as soon as they can. Please stay where you are, and press the call bell now if " +
+              "you feel worse. Do not take anything that was not given to you here."
+            : hasHistory
+                ? "Thank you for telling us. A nurse or doctor will come and check on you this " +
+                  "shift, and they will look at your record before they do. Please do not take " +
+                  "anything that was not given to you here - ask your nurse first. Press the call " +
+                  "bell if you feel worse before they arrive."
+                : "Thank you for telling us. A nurse or doctor will come and check on you this " +
+                  "shift. Please do not take anything that was not given to you here - ask your " +
+                  "nurse first. Press the call bell if you feel worse before they arrive.";
 
         // Marked as the backup by default. Callers that know the specific cause replace the note.
         return Task.FromResult(

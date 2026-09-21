@@ -42,7 +42,7 @@ const STEP_CAPTIONS: Record<string, string> = {
   get_medical_profile: 'Reading the medical profile',
   get_patient_history: 'Reading past visits and reports',
   get_current_admission: 'Reading the current admission',
-  draft_recommendation: 'Writing a draft note',
+  draft_recommendation: 'Writing a draft reply',
   validate_deterministically: 'Safety-checking the draft',
   pause_for_approval: 'Waiting for a reviewer',
 };
@@ -87,8 +87,8 @@ export function CareRecommendationsPage() {
     <>
       <h1>Care recommendations</h1>
       <p className="muted">
-        What patients have reported about how they feel, and the agent&apos;s draft note for a
-        nurse or doctor to check before anything reaches the patient.
+        What patients have reported about how they feel, and the agent&apos;s draft reply for a
+        nurse or doctor to approve or correct before it reaches them.
       </p>
 
       <div className="card">
@@ -365,8 +365,10 @@ function RecommendationDetail({
         </dl>
       )}
 
-      <h4>The agent&apos;s draft</h4>
-      <p className="hint">Staff-facing only. Never shown to the patient as written here.</p>
+      <h4>The agent&apos;s draft reply</h4>
+      <p className="hint">
+        Written to the patient, in their words. Nothing reaches them until you approve it.
+      </p>
 
       {agentRunning && !row.agent_message ? (
         <>
@@ -378,17 +380,19 @@ function RecommendationDetail({
           {workflow.data && workflow.data.draft_source !== 'model' && (
             <div className="hint" role="status" style={{ color: '#8a5300' }}>
               <p style={{ margin: 0 }}>
-                <strong>Not a note about this patient.</strong>{' '}
+                <strong>Not an answer to what they asked.</strong>{' '}
                 {workflow.data.draft_note ??
-                  'The standard backup note was used instead of an AI draft.'}
+                  'The standard backup reply was used instead of an AI draft.'}
               </p>
             </div>
           )}
-          <p>
-            {row.agent_message || (
-              <span className="muted">No draft — reviewer decides from the report alone.</span>
-            )}
-          </p>
+          {!mayReview && (
+            <p>
+              {row.agent_message || (
+                <span className="muted">No draft — reviewer answers from the report alone.</span>
+              )}
+            </p>
+          )}
 
           {mayReview && (
             <button
@@ -429,14 +433,15 @@ function RecommendationDetail({
             <label htmlFor="doctor-message">Message the patient will see</label>
             <textarea
               id="doctor-message"
-              rows={3}
+              rows={5}
               maxLength={2000}
               value={draftedMessage}
+              placeholder="No draft — write the reply yourself."
               onChange={(event) => setDoctorMessage(event.target.value)}
             />
             <p className="hint">
-              Leave the agent&apos;s draft as-is, or edit it. Nothing reaches the patient until
-              you approve.
+              This is the agent&apos;s draft. Approve it as it stands, or correct it first — the
+              patient reads exactly what is in this box.
             </p>
           </div>
 

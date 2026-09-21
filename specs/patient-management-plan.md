@@ -256,7 +256,7 @@ care level, not by ward — an outpatient pays a fee and occupies no ward at all
 | `reported_at` | timestamptz | |
 | `red_flag` | boolean | Set by the deterministic keyword screen, before the model runs. See §8.13 |
 | `urgency_flag` | enum, nullable | `low` `medium` `high`. The agent's draft; `high` is forced, not suggested, when `red_flag = true` |
-| `agent_message` | text, nullable | The agent's draft. **Doctor-facing only. The patient never sees this field.** |
+| `agent_message` | text, nullable | The agent's draft of the reply, written to the patient (§8.12). **The patient never receives this field** — it is unapproved, and what they read is `doctor_message`. |
 | `status` | enum | `pending_review` `approved` `rejected` |
 | `reviewed_by_staff_id` | uuid, FK → Staff, nullable | **Doctor or Ward Nurse**, checked from the JWT. *(Rev 2026-09-16 — widened from Doctor-only; the reasoning and what it costs are in §8.16.)* |
 | `reviewed_at` | timestamptz, nullable | |
@@ -1230,7 +1230,7 @@ Per the assignment: workflow id, objective, plan, completed steps, tool calls wi
 
 ### 8.10 The second agent — Patient Care Advisory Agent
 
-> Given a patient who is **admitted right now**, their own description of how they feel, and the medical details the hospital holds on them, draft advice on what should be done — for a nurse or doctor to check and approve before the patient ever sees it.
+> Given a patient who is **admitted right now**, their own description of how they feel, and the medical details the hospital holds on them, draft the answer to them — what this means for them and what to do now — for a nurse or doctor to approve or correct before they ever see it.
 
 **One workflow. One job. A drafting assistant for clinical staff, never a substitute for one.**
 
@@ -1331,14 +1331,18 @@ An empty profile is an ordinary state, not an error — the agent proceeds on th
   "recommendation_id": "uuid",
   "red_flag": false,
   "urgency_flag": "medium",
-  "agent_message": "Reports a worsening headache since admission, worse lying flat. Known hypertension and type 2 diabetes on record; penicillin allergy noted. No prior episode of this pattern recorded. Suggest a bedside review this shift, and escalation if vision changes, neck stiffness or vomiting appear.",
+  "agent_message": "Thank you for telling us. A headache that is worse lying flat is worth a nurse looking at today, and your record has something on it they will want to check first. Please don't take anything that wasn't given to you here — ask your nurse. Press the call bell straight away if your vision changes, your neck goes stiff, or you are sick.",
   "requires_approval_by": "nurse_or_doctor"
 }
 ```
 
 `outcome` is one of `drafted`, `escalated` (red-flag path, §8.13), or `failed`.
 
-`agent_message` is written **for clinical staff**, not the patient — it is allowed to name a symptom pattern, refer to the profile and suggest what to watch for, because a nurse or doctor reads it critically before anything reaches the patient. `doctor_message`, the field the patient actually sees, is a separate write the reviewer makes at approval time (§7.7), and can be as short as "The nurse will come and check on you this afternoon." That gap between the two messages **is** the safety mechanism, not an inconsistency.
+`agent_message` is written **to the patient** *(changed 2026-09-21; it used to be a staff-facing note)*. It answers what they asked, in their words, using what the profile already records about them — without naming a substance, a dose or a diagnosis.
+
+The reason for the change: a nurse or doctor at the queue is not a copywriter. Asking the agent for a clinical note and the reviewer for the patient's reply meant the reviewer wrote every answer from scratch — and, in the built UI, the note was prefilled into the patient's box, so ward language went out to patients verbatim. The agent is now asked for the thing that is actually needed.
+
+**The safety mechanism is still two columns and a human, not two registers.** `doctor_message` is a separate write the reviewer makes at approval time (§7.7), so what the model drafted and what a human released both survive independently. What changed is only who the draft is addressed to. **What this costs, said plainly:** a reviewer who approves without reading now publishes model text verbatim, where before they had to type something. CR1 and CR5 (§8.15) are what stands in the way, and they are checked before the reviewer ever sees the draft.
 
 ### 8.13 The red-flag screen — deterministic, runs before the model
 
@@ -1367,13 +1371,13 @@ Four tools. Three read, one write, and the write can only ever create a draft aw
 
 | | Rule |
 | :--- | :--- |
-| CR1 | `agent_message` may not contain a drug name or a dosage pattern (fixed denylist + a simple dosage-unit regex — `mg`, `ml`, `tablets`, etc. adjacent to a number). This agent drafts notes, never prescriptions. |
+| CR1 | `agent_message` may not contain a drug name or a dosage pattern (fixed denylist + a simple dosage-unit regex — `mg`, `ml`, `tablets`, etc. adjacent to a number). This agent drafts replies, never prescriptions. |
 | CR2 | `urgency_flag` must be exactly one of `low` / `medium` / `high` — a closed enum, never free text |
 | CR3 | A `CareRecommendation` is invisible to the patient (`doctor_message IS NULL`) until `status = approved` |
 | CR4 | If the red-flag screen (§8.13) matched, `urgency_flag` must be `high`. The validator overwrites a lower value rather than trusting the model to have already applied it. |
 | CR5 | `agent_message` may not contradict the recorded `allergies` — a draft naming a substance the profile lists as an allergy is rejected outright. *(New 2026-09-16, and the reason the profile is worth having: a deterministic check is only possible because the allergy is a stored field rather than a sentence in a note.)* |
 
-**Soft guidance — the prompt asks for this, but nothing enforces it beyond CR1–CR5:** keep `agent_message` short, name the reported pattern, say which recorded condition made it relevant, suggest what staff should watch for.
+**Soft guidance — the prompt asks for this, but nothing enforces it beyond CR1–CR5:** keep `agent_message` short and in plain words, address the patient as "you", answer what they actually asked, say what they can do now and what would mean calling a nurse, and never tell them to start, stop or change any treatment.
 
 ### 8.16 Who approves — a nurse or a doctor
 
@@ -1387,7 +1391,7 @@ The reasoning: the patient is admitted and on a ward (§8.10b), and the person w
 
 - CR1 means the text can never contain a drug or a dose, whoever approves it.
 - CR5 means it can never contradict a recorded allergy.
-- `doctor_message` is written by the human at approval time. The safe approval is "A nurse will come and check on you" — and that is the one a nurse will reach for.
+- `doctor_message` is written by the human at approval time, and the reviewer can always cut the draft back to "A nurse will come and check on you." *(Weaker than it was before 2026-09-21: the draft now arrives already written to the patient, so doing nothing releases it. Reading it is the reviewer's actual job.)*
 
 **The discharge gate did not move.** `clinical_clearance` on the discharge checklist (§6.1) is still Doctor-only and always will be. That is a decision about whether somebody may leave the hospital; this is a note about whether somebody should be looked at sooner. Different weights, different gates.
 

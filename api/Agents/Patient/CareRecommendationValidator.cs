@@ -8,6 +8,10 @@ namespace CareLanka.Api.Agents.Patient;
 /// Rules CR1-CR5, enforced in C# after the model drafts and before any reviewer sees the result.
 /// A draft breaking CR1 or CR5 is rejected outright - the caller falls back to a safe deterministic
 /// message rather than showing the reviewer something unsafe.
+/// <para>
+/// These matter more now the draft is written to the patient rather than about them: a reviewer
+/// approving without reading publishes this text verbatim, so it has to be safe before they see it.
+/// </para>
 /// </summary>
 public static partial class CareRecommendationValidator
 {

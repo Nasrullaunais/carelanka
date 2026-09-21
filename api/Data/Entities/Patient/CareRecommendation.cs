@@ -4,7 +4,7 @@ namespace CareLanka.Api.Data.Entities.Patient;
 
 /// <summary>
 /// One row per symptom or concern a patient raises while admitted. The Patient Care Advisory
-/// Agent drafts <see cref="AgentMessage"/> for clinical staff; nothing here reaches the patient
+/// Agent drafts <see cref="AgentMessage"/> as the answer to them; nothing here reaches the patient
 /// until a Doctor or Ward Nurse approves it and writes <see cref="DoctorMessage"/>.
 /// </summary>
 public class CareRecommendation : AuditedEntity
@@ -26,7 +26,9 @@ public class CareRecommendation : AuditedEntity
     public CareUrgency? UrgencyFlag { get; set; }
 
     /// <summary>
-    /// The agent's draft. Staff-facing only - never returned on any patient-facing route.
+    /// The agent's draft of the reply, already written to the patient. Never returned on a
+    /// patient-facing route all the same: it is unapproved, and what the patient reads is
+    /// <see cref="DoctorMessage"/>, which a reviewer either copies from here or rewrites.
     /// </summary>
     public string? AgentMessage { get; set; }
 

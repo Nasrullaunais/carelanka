@@ -11,14 +11,22 @@ public static class EnumWire
         => ToSnakeCase(value.ToString());
 
     public static TEnum FromWire<TEnum>(string wire) where TEnum : struct, Enum
+        => (TEnum)FromWire(typeof(TEnum), wire);
+
+    public static object FromWire(Type enumType, string wire)
     {
-        var map = FromWireMaps.GetOrAdd(typeof(TEnum), static _ =>
-            Enum.GetValues<TEnum>().ToDictionary(v => ToSnakeCase(v.ToString()), v => (object)v));
+        if (!enumType.IsEnum)
+        {
+            throw new ArgumentException($"{enumType} is not an enum type.", nameof(enumType));
+        }
+
+        var map = FromWireMaps.GetOrAdd(enumType, static t =>
+            Enum.GetValues(t).Cast<object>().ToDictionary(v => ToSnakeCase(v.ToString()!), v => v));
 
         return map.TryGetValue(wire, out var value)
-            ? (TEnum)value
+            ? value
             : throw new ArgumentOutOfRangeException(
-                nameof(wire), wire, $"'{wire}' is not a {typeof(TEnum).Name} value.");
+                nameof(wire), wire, $"'{wire}' is not a {enumType.Name} value.");
     }
 
     public static IReadOnlyList<string> Values<TEnum>() where TEnum : struct, Enum

@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using CareLanka.Api.Common.Auth;
 using CareLanka.Api.Common.Errors;
+using CareLanka.Api.Common.ModelBinding;
 using CareLanka.Api.Common.OpenApi;
 using CareLanka.Api.Common.Persistence;
 using CareLanka.Api.Data;
@@ -44,6 +45,7 @@ builder.Services
     {
         options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
         options.ModelMetadataDetailsProviders.Add(new EmergencyQueryBindingMetadataProvider());
+        options.ModelBinderProviders.Insert(0, new SnakeCaseEnumModelBinderProvider());
     })
     .AddJsonOptions(options => ConfigureJson(options.JsonSerializerOptions));
 

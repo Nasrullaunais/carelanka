@@ -3,6 +3,7 @@ import { AppShell } from './components/AppShell';
 import { AppointmentsPage } from './pages/AppointmentsPage';
 import { BillingSettingsPage } from './pages/BillingSettingsPage';
 import { CapacityPage } from './pages/CapacityPage';
+import { CareRecommendationsPage } from './pages/CareRecommendationsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DischargePage } from './pages/DischargePage';
 import { EquipmentPage } from './pages/EquipmentPage';
@@ -55,6 +56,7 @@ export function App() {
         <Route path="/patients" element={<PatientsPage />} />
         <Route path="/appointments" element={<AppointmentsPage />} />
         <Route path="/discharge" element={<DischargePage />} />
+        <Route path="/care-recommendations" element={<CareRecommendationsPage />} />
 
         <Route path="/billing" element={<Navigate to="/discharge" replace />} />
         <Route path="/billing-settings" element={<BillingSettingsPage />} />

@@ -8,6 +8,8 @@ abstract final class PatientFieldLimits {
   static const address = 300;
   static const contactName = 200;
   static const visitReason = 300;
+  static const careReportMin = 5;
+  static const careReportMax = 2000;
 }
 
 const _nicPattern = r'^(\d{9}[VvXx]|\d{12}|(?=.*[A-Za-z])[A-Za-z0-9]{6,15})$';
@@ -38,6 +40,14 @@ String? validateContactName(String? value) =>
 
 String? validateVisitReason(String? value) =>
     _withinLimit(value, PatientFieldLimits.visitReason);
+
+String? validateCareReport(String? value) {
+  final text = value?.trim() ?? '';
+  if (text.length < PatientFieldLimits.careReportMin) {
+    return 'Say a bit more — at least ${PatientFieldLimits.careReportMin} characters.';
+  }
+  return _withinLimit(value, PatientFieldLimits.careReportMax);
+}
 
 String? _withinLimit(String? value, int limit) =>
     (value != null && value.length > limit) ? 'Use $limit characters or fewer' : null;

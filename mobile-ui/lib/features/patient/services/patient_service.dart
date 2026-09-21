@@ -1,12 +1,15 @@
 import '../../../core/network/api.dart';
 import '../../../services/api_client/care_lanka_api.dart';
 import '../../../services/api_client/models/book_appointment_request.dart';
+import '../../../services/api_client/models/care_query_request.dart';
+import '../../../services/api_client/models/care_workflow_accepted.dart';
 import '../../../services/api_client/models/claim_by_patient_code_request.dart';
 import '../../../services/api_client/models/my_admission.dart';
 import '../../../services/api_client/models/my_admission_paged_result.dart';
 import '../../../services/api_client/models/my_appointment.dart';
 import '../../../services/api_client/models/my_appointment_paged_result.dart';
 import '../../../services/api_client/models/my_bill.dart';
+import '../../../services/api_client/models/my_care_recommendation_paged_result.dart';
 import '../../../services/api_client/models/my_lab_report_paged_result.dart';
 import '../../../services/api_client/models/my_profile.dart';
 import '../../../services/api_client/models/patient_claim_preview.dart';
@@ -32,6 +35,10 @@ class PatientService {
 
   // This login already owns a record, so it cannot take a second one.
   static const alreadyLinkedCode = 'cl_pat_004';
+
+  // /me/care-queries refuses anybody without an open admission - the card that calls it only
+  // ever renders while admitted, so this is a backstop rather than something ordinary use hits.
+  static const notCurrentlyAdmittedForCareQueryCode = 'cl_pat_038';
 
   Future<MyProfile> loadMyProfile() {
     return callApi(_api.patientSelfService.getMyProfile);
@@ -104,6 +111,20 @@ class PatientService {
   Future<MyLabReportPagedResult> loadMyLabReports({int page = 1, int pageSize = 20}) {
     return callApi(
         () => _api.patientSelfService.getMyLabReports(page: page, pageSize: pageSize));
+  }
+
+  Future<CareWorkflowAccepted> submitCareQuery(String reportedText) {
+    return callApi(() => _api.patientSelfService.submitCareQuery(
+          body: CareQueryRequest(reportedText: reportedText.trim()),
+        ));
+  }
+
+  Future<MyCareRecommendationPagedResult> loadMyCareRecommendations({
+    int page = 1,
+    int pageSize = 20,
+  }) {
+    return callApi(() =>
+        _api.patientSelfService.getMyCareRecommendations(page: page, pageSize: pageSize));
   }
 
   /// The relative path for [downloadBytes] — the generated client's own

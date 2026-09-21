@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using CareLanka.Api.Common.Auth;
 using CareLanka.Api.Common.Errors;
+using CareLanka.Api.Common.ModelBinding;
 using CareLanka.Api.Common.OpenApi;
 using CareLanka.Api.Common.Persistence;
 using CareLanka.Api.Data;
@@ -44,6 +45,7 @@ builder.Services
     {
         options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
         options.ModelMetadataDetailsProviders.Add(new EmergencyQueryBindingMetadataProvider());
+        options.ModelBinderProviders.Insert(0, new SnakeCaseEnumModelBinderProvider());
     })
     .AddJsonOptions(options => ConfigureJson(options.JsonSerializerOptions));
 
@@ -351,6 +353,15 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.WarningDesk, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.EquipmentManager),
         EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
+    options.AddPolicy(Policies.CareQueueReader, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.Doctor),
+        EnumWire.ToWire(StaffRole.DutyManager)));
+
+    options.AddPolicy(Policies.CareRecommendationReviewer, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.Doctor)));
 });
 
 var authRequestsPerMinute = builder.Configuration.GetValue("RateLimits:AuthPerMinute", 20);
@@ -457,6 +468,19 @@ builder.Services.AddScoped<IBedSuggestionService, BedSuggestionService>();
 builder.Services.AddScoped<BedAgentExecutor>();
 builder.Services.AddSingleton<IAgentRunQueue, AgentRunQueue>();
 builder.Services.AddHostedService<BedAgentWorker>();
+
+// The Patient Care Advisory Agent. Three read tools, no write tool of its own - the draft it
+// produces is written by CareAgentExecutor once the model (or its deterministic fallback)
+// answers, never by the agent directly. Its own queue and worker, separate from the bed agent's:
+// two agents on one single-reader channel would mean whichever one reads first processes an id
+// it does not understand.
+builder.Services.AddScoped<ICareAgentTools, CareAgentTools>();
+builder.Services.AddScoped<ICareAdvisor, GeminiCareAdvisor>();
+builder.Services.AddScoped<ICareAgent, CareAgent>();
+builder.Services.AddScoped<ICareRecommendationService, CareRecommendationService>();
+builder.Services.AddScoped<CareAgentExecutor>();
+builder.Services.AddSingleton<ICareRunQueue, CareRunQueue>();
+builder.Services.AddHostedService<CareAgentWorker>();
 
 // ADR 2: the provider is one registration and nothing in an agent knows which model answered.
 // With no key the API still starts and every agent still answers - see NoLanguageModel.

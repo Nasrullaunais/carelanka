@@ -240,6 +240,10 @@ export type AppointmentPagedResult = {
 
 export type AppointmentStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
 
+export type ApproveCareRecommendationRequest = {
+    doctor_message?: string | null;
+};
+
 export type AssetType = 'equipment_item' | 'bed';
 
 export type AssignAmbulanceCrewRequest = {
@@ -455,6 +459,83 @@ export type CancelDispatchRequest = {
 export type CancelReason = 'diverted_to_other_hospital' | 'false_alarm' | 'died_en_route' | 'patient_refused' | 'no_show';
 
 export type CancellationRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export type CareAgentOutcome = 'drafted' | 'escalated' | 'failed';
+
+export type CareDraftSource = 'model' | 'model_unavailable' | 'model_rejected';
+
+export type CareQueryRequest = {
+    reported_text?: string | null;
+};
+
+export type CareRecommendation = {
+    id?: string;
+    patient_id?: string;
+    admission_id?: string | null;
+    reported_text?: string | null;
+    reported_at?: string;
+    red_flag?: boolean;
+    urgency_flag?: CareUrgency;
+    agent_message?: string | null;
+    status?: CareRecommendationStatus;
+    workflow_id?: string | null;
+    reviewed_by_staff_id?: string | null;
+    reviewed_at?: string | null;
+    doctor_message?: string | null;
+    rejection_reason?: string | null;
+    created_at?: string;
+    updated_at?: string;
+};
+
+export type CareRecommendationStatus = 'pending_review' | 'approved' | 'rejected';
+
+export type CareRecommendationSummary = {
+    id?: string;
+    patient_id?: string;
+    reported_at?: string;
+    red_flag?: boolean;
+    urgency_flag?: CareUrgency;
+    status?: CareRecommendationStatus;
+};
+
+export type CareRecommendationSummaryPagedResult = {
+    items: Array<CareRecommendationSummary>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
+export type CareUrgency = 'low' | 'medium' | 'high';
+
+export type CareWorkflowAccepted = {
+    workflow_id?: string;
+    recommendation_id?: string;
+    status?: string | null;
+    poll_url?: string | null;
+};
+
+export type CareWorkflowStatus = 'running' | 'pending_review' | 'completed' | 'failed';
+
+export type CareWorkflowSummary = {
+    workflow_id?: string;
+    recommendation_id?: string | null;
+    objective?: string | null;
+    status?: CareWorkflowStatus;
+    outcome?: CareAgentOutcome;
+    plan?: Array<string> | null;
+    steps?: Array<BedAgentStep> | null;
+    red_flag?: boolean;
+    validation?: CareWorkflowValidation;
+    draft_source?: CareDraftSource;
+    draft_note?: string | null;
+    retries?: number;
+};
+
+export type CareWorkflowValidation = {
+    passed?: boolean;
+    failed_rules?: Array<string> | null;
+};
 
 export type CheckInRequest = {
     admission_category: AdmissionCategory;
@@ -1011,6 +1092,22 @@ export type MyCallTracking = {
     updated_at?: string;
 };
 
+export type MyCareRecommendation = {
+    id?: string;
+    reported_text?: string | null;
+    reported_at?: string;
+    status?: CareRecommendationStatus;
+    doctor_message?: string | null;
+};
+
+export type MyCareRecommendationPagedResult = {
+    items: Array<MyCareRecommendation>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
 export type MyEmergencyCallSummary = {
     id?: string;
     patient_is_caller?: boolean;
@@ -1339,6 +1436,10 @@ export type RegisterDeviceRequest = {
     platform?: DevicePlatform;
 };
 
+export type RejectCareRecommendationRequest = {
+    reason?: string | null;
+};
+
 export type RejectPrescriptionRequest = {
     reason: string | null;
 };
@@ -1594,6 +1695,7 @@ export type WorklistRow = {
     source?: AdmissionSource;
     admission_category?: AdmissionCategory;
     urgency?: AdmissionUrgency;
+    is_infectious?: boolean;
     ward_name?: string | null;
     bed_number?: string | null;
     when: string;
@@ -3927,6 +4029,231 @@ export type RejectEmergencyCancellationRequestResponses = {
 };
 
 export type RejectEmergencyCancellationRequestResponse = RejectEmergencyCancellationRequestResponses[keyof RejectEmergencyCancellationRequestResponses];
+
+export type GetCareWorkflowData = {
+    body?: never;
+    path: {
+        workflowId: string;
+    };
+    query?: never;
+    url: '/care-workflows/{workflowId}';
+};
+
+export type GetCareWorkflowErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetCareWorkflowError = GetCareWorkflowErrors[keyof GetCareWorkflowErrors];
+
+export type GetCareWorkflowResponses = {
+    /**
+     * OK
+     */
+    200: CareWorkflowSummary;
+};
+
+export type GetCareWorkflowResponse = GetCareWorkflowResponses[keyof GetCareWorkflowResponses];
+
+export type ListCareRecommendationsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: CareRecommendationStatus;
+        page?: number;
+        pageSize?: number;
+        sortDir?: SortDirection;
+    };
+    url: '/care-recommendations';
+};
+
+export type ListCareRecommendationsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListCareRecommendationsError = ListCareRecommendationsErrors[keyof ListCareRecommendationsErrors];
+
+export type ListCareRecommendationsResponses = {
+    /**
+     * OK
+     */
+    200: CareRecommendationSummaryPagedResult;
+};
+
+export type ListCareRecommendationsResponse = ListCareRecommendationsResponses[keyof ListCareRecommendationsResponses];
+
+export type GetCareRecommendationData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/care-recommendations/{id}';
+};
+
+export type GetCareRecommendationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetCareRecommendationError = GetCareRecommendationErrors[keyof GetCareRecommendationErrors];
+
+export type GetCareRecommendationResponses = {
+    /**
+     * OK
+     */
+    200: CareRecommendation;
+};
+
+export type GetCareRecommendationResponse = GetCareRecommendationResponses[keyof GetCareRecommendationResponses];
+
+export type ApproveCareRecommendationData = {
+    body?: ApproveCareRecommendationRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/care-recommendations/{id}/approve';
+};
+
+export type ApproveCareRecommendationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ApproveCareRecommendationError = ApproveCareRecommendationErrors[keyof ApproveCareRecommendationErrors];
+
+export type ApproveCareRecommendationResponses = {
+    /**
+     * OK
+     */
+    200: CareRecommendation;
+};
+
+export type ApproveCareRecommendationResponse = ApproveCareRecommendationResponses[keyof ApproveCareRecommendationResponses];
+
+export type RejectCareRecommendationData = {
+    body?: RejectCareRecommendationRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/care-recommendations/{id}/reject';
+};
+
+export type RejectCareRecommendationErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type RejectCareRecommendationError = RejectCareRecommendationErrors[keyof RejectCareRecommendationErrors];
+
+export type RejectCareRecommendationResponses = {
+    /**
+     * OK
+     */
+    200: CareRecommendation;
+};
+
+export type RejectCareRecommendationResponse = RejectCareRecommendationResponses[keyof RejectCareRecommendationResponses];
+
+export type RedraftCareRecommendationData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/care-recommendations/{id}/redraft';
+};
+
+export type RedraftCareRecommendationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RedraftCareRecommendationError = RedraftCareRecommendationErrors[keyof RedraftCareRecommendationErrors];
+
+export type RedraftCareRecommendationResponses = {
+    /**
+     * Accepted
+     */
+    202: CareWorkflowAccepted;
+};
+
+export type RedraftCareRecommendationResponse = RedraftCareRecommendationResponses[keyof RedraftCareRecommendationResponses];
 
 export type RegisterDeviceData = {
     body?: RegisterDeviceRequest;
@@ -6317,6 +6644,75 @@ export type CancelMyAppointmentResponses = {
 };
 
 export type CancelMyAppointmentResponse = CancelMyAppointmentResponses[keyof CancelMyAppointmentResponses];
+
+export type SubmitCareQueryData = {
+    body?: CareQueryRequest;
+    path?: never;
+    query?: never;
+    url: '/me/care-queries';
+};
+
+export type SubmitCareQueryErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type SubmitCareQueryError = SubmitCareQueryErrors[keyof SubmitCareQueryErrors];
+
+export type SubmitCareQueryResponses = {
+    /**
+     * Accepted
+     */
+    202: CareWorkflowAccepted;
+};
+
+export type SubmitCareQueryResponse = SubmitCareQueryResponses[keyof SubmitCareQueryResponses];
+
+export type GetMyCareRecommendationsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/me/care-recommendations';
+};
+
+export type GetMyCareRecommendationsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type GetMyCareRecommendationsError = GetMyCareRecommendationsErrors[keyof GetMyCareRecommendationsErrors];
+
+export type GetMyCareRecommendationsResponses = {
+    /**
+     * OK
+     */
+    200: MyCareRecommendationPagedResult;
+};
+
+export type GetMyCareRecommendationsResponse = GetMyCareRecommendationsResponses[keyof GetMyCareRecommendationsResponses];
 
 export type ListPatientsData = {
     body?: never;

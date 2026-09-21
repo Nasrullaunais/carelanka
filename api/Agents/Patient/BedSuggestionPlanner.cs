@@ -22,6 +22,16 @@ public static class BedSuggestionPlanner
 
         foreach (var candidate in candidates)
         {
+            if (IsSpecialistWard(candidate.Ward.WardType))
+            {
+                // Maternity and Mental Health beds are never proposed automatically - there is no
+                // field anywhere recording that this admission is actually a maternity or mental
+                // health case, so an empty specialist ward would otherwise win on load alone. A
+                // nurse who knows the patient belongs there still places them by hand.
+                dropped.Add(new DroppedBed(candidate, BedRuleNames.SpecialistWard));
+                continue;
+            }
+
             try
             {
                 var isDowngrade = BedPlacementRules.EnsurePlaceable(
@@ -128,6 +138,9 @@ public static class BedSuggestionPlanner
             BedBlockers.NothingFree(requirements, filtered),
             RequiresApprovalBy: null);
     }
+
+    private static bool IsSpecialistWard(WardType wardType)
+        => wardType is WardType.Maternity or WardType.MentalHealth;
 
     public static int RungsBelow(AdmissionCategory category, WardType wardType)
         => BedPlacementRules.Rung(wardType) - BedPlacementRules.Rung(category);

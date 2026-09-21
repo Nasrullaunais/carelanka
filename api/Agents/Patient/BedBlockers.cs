@@ -63,6 +63,15 @@ public static class BedBlockers
                 + $"{Age(requirements.DateOfBirth)}.");
         }
 
+        if (filtered.RefusedBy(BedRuleNames.SpecialistWard) is { Count: > 0 })
+        {
+            return Blocker(
+                BedSuggestionBlockerCode.WardFull,
+                "The only free beds are on Maternity or Mental Health wards. The agent does not "
+                + "place patients there - assign one of those beds by hand if this patient "
+                + "belongs on that ward.");
+        }
+
         return Blocker(
             BedSuggestionBlockerCode.WardFull,
             $"No {BedRuleNames.Spoken(requirements.Category)} bed, and nothing one level down, is "

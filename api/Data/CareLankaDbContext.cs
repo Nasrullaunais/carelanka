@@ -55,6 +55,7 @@ public class CareLankaDbContext : DbContext
     public DbSet<BillingRate> BillingRates => Set<BillingRate>();
     public DbSet<AdmissionFeeRate> AdmissionFeeRates => Set<AdmissionFeeRate>();
     public DbSet<PatientMedicalProfile> PatientMedicalProfiles => Set<PatientMedicalProfile>();
+    public DbSet<CareRecommendation> CareRecommendations => Set<CareRecommendation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
         => modelBuilder.ApplyConfigurationsFromAssembly(typeof(CareLankaDbContext).Assembly);

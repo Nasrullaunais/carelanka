@@ -7,6 +7,7 @@ import 'package:carelanka_mobile/features/equipment/services/prescription_servic
 import 'package:carelanka_mobile/features/patient/screens/home_screen.dart';
 import 'package:carelanka_mobile/features/patient/screens/my_stay_screen.dart';
 import 'package:carelanka_mobile/features/patient/screens/profile_screen.dart';
+import 'package:carelanka_mobile/features/patient/services/patient_service.dart';
 import 'package:carelanka_mobile/features/patient/state/appointments_controller.dart';
 import 'package:carelanka_mobile/features/patient/state/my_stay_controller.dart';
 import 'package:carelanka_mobile/features/patient/state/profile_controller.dart';
@@ -121,6 +122,7 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
+          Provider<PatientService>.value(value: service),
           ChangeNotifierProvider.value(value: profileController),
           ChangeNotifierProvider.value(value: stayController),
           ChangeNotifierProvider.value(value: appointmentsController),

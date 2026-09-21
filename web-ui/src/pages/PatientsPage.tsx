@@ -263,6 +263,12 @@ export function PatientsPage() {
                           <span className="muted">
                             {row.urgency ? admissionUrgencyLabels[row.urgency] : ''}
                           </span>
+                          {row.is_infectious && (
+                            <>
+                              <br />
+                              <span className="badge severity-high">Needs isolation</span>
+                            </>
+                          )}
                         </>
                       ) : (
                         <span className="muted">Not recorded</span>

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -61,6 +62,9 @@ public sealed class GeminiLanguageModel : ILanguageModel
             Json);
 
         var attempts = Math.Max(0, _options.MaxRetries) + 1;
+        var budget = TimeSpan.FromSeconds(Math.Max(1, _options.TotalBudgetSeconds));
+        var elapsed = Stopwatch.StartNew();
+
         string lastError = "The language model did not answer.";
         var lastFailure = LanguageModelFailure.Unreachable;
 
@@ -110,15 +114,39 @@ public sealed class GeminiLanguageModel : ILanguageModel
                 break;
             }
 
-            if (attempt < attempts)
+            if (attempt >= attempts)
             {
-                // The provider being busy is the common case and it usually clears within a
-                // second or two, so back off rather than spending all three attempts at once.
-                await Task.Delay(TimeSpan.FromSeconds(attempt), ct);
+                break;
             }
+
+            // The provider being busy is the common case on the free tier. Back off and keep
+            // waiting: nobody is watching this run, so giving up in five seconds buys nothing.
+            var wait = Backoff(attempt);
+
+            if (elapsed.Elapsed + wait >= budget)
+            {
+                _log.LogWarning(
+                    "Giving up on Gemini after {Elapsed:n0}s of a {Budget:n0}s budget.",
+                    elapsed.Elapsed.TotalSeconds, budget.TotalSeconds);
+
+                break;
+            }
+
+            await Task.Delay(wait, ct);
         }
 
         return LanguageModelResult.Failure(lastError, lastFailure);
+    }
+
+    /// <summary>
+    /// Doubles each retry - 2s, 4s, 8s - capped, so six attempts spread over a minute or so rather
+    /// than hammering a provider that has just said it is busy.
+    /// </summary>
+    private TimeSpan Backoff(int attempt)
+    {
+        var seconds = Math.Max(0, _options.RetryBackoffSeconds) * Math.Pow(2, attempt - 1);
+
+        return TimeSpan.FromSeconds(Math.Min(seconds, Math.Max(0, _options.MaxBackoffSeconds)));
     }
 
     private static LanguageModelFailure Classify(HttpStatusCode? status) => status switch

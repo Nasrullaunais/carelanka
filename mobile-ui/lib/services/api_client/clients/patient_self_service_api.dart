@@ -8,12 +8,15 @@ import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
 import '../models/book_appointment_request.dart';
+import '../models/care_query_request.dart';
+import '../models/care_workflow_accepted.dart';
 import '../models/claim_by_patient_code_request.dart';
 import '../models/my_admission.dart';
 import '../models/my_admission_paged_result.dart';
 import '../models/my_appointment.dart';
 import '../models/my_appointment_paged_result.dart';
 import '../models/my_bill.dart';
+import '../models/my_care_recommendation_paged_result.dart';
 import '../models/my_lab_report_paged_result.dart';
 import '../models/my_profile.dart';
 import '../models/patient_claim_preview.dart';
@@ -88,5 +91,16 @@ abstract class PatientSelfServiceApi {
   @POST('/me/appointments/{id}/cancel')
   Future<MyAppointment> cancelMyAppointment({
     @Path('id') required String id,
+  });
+
+  @POST('/me/care-queries')
+  Future<CareWorkflowAccepted> submitCareQuery({
+    @Body() CareQueryRequest? body,
+  });
+
+  @GET('/me/care-recommendations')
+  Future<MyCareRecommendationPagedResult> getMyCareRecommendations({
+    @Query('page') int? page = 1,
+    @Query('pageSize') int? pageSize = 20,
   });
 }

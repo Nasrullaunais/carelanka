@@ -168,5 +168,9 @@ public enum MessageCode
 
     PatientCodeNotClaimable,
 
-    BedSuggestionNotPossible
+    BedSuggestionNotPossible,
+
+    NotCurrentlyAdmittedForCareQuery,
+
+    CareRecommendationNotPendingReview
 }

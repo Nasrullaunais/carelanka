@@ -372,4 +372,12 @@
     <value>{0} already has a bed or has left, so there is nothing to suggest.</value>
     <comment>The bed agent's entry point. Only a visit still waiting for a bed can receive a suggestion; one already reserved, admitted, discharged or cancelled is a 409 rather than a run that returns nothing. cl_pat_038 is deliberately skipped - it belongs to the care advisory agent.</comment>
   </data>
+  <data name="cl_pat_038" xml:space="preserve">
+    <value>You have no current stay, so there is nobody to route this to. If this is urgent, use the emergency call screen.</value>
+    <comment>The care advisory agent's entry point. POST /me/care-queries refuses anybody without an open admission - nothing runs, no workflow row is created, no model is called.</comment>
+  </data>
+  <data name="cl_pat_040" xml:space="preserve">
+    <value>This care recommendation has already been reviewed.</value>
+    <comment>Approve or reject on a recommendation that is not pending_review - either it was already actioned, or a second reviewer opened the same one a moment later.</comment>
+  </data>
 </root>

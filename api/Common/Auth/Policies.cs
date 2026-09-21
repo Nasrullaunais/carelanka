@@ -108,4 +108,18 @@ public static class Policies
     // The warnings list: low stock, expiring medicine and overdue maintenance. The equipment manager
     // runs the pharmacy and the register it is about; the administrator runs the maintenance unit.
     public const string WarningDesk = nameof(WarningDesk);
+
+    /// <summary>
+    /// Reading the care advisory agent's review queue - the patient's report, its draft, and the
+    /// run behind it. Wider than <see cref="CareRecommendationReviewer"/> by the duty manager, who
+    /// may see the queue exists without being able to act on it.
+    /// </summary>
+    public const string CareQueueReader = nameof(CareQueueReader);
+
+    /// <summary>
+    /// Approving, editing or rejecting a draft - a Doctor or the Ward Nurse on shift, the person
+    /// who will actually walk over and look at the patient. Deliberately narrower than
+    /// <see cref="CareQueueReader"/>; see patient-management-plan.md section 8.16.
+    /// </summary>
+    public const string CareRecommendationReviewer = nameof(CareRecommendationReviewer);
 }

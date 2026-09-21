@@ -11,6 +11,7 @@ import {
   canOpenAppointmentBoard,
   canOpenDischargeBoard,
   canSetBillingRates,
+  canReadCareQueue,
 } from './permissions';
 
 export type Destination = {
@@ -46,6 +47,13 @@ export const destinations: Destination[] = [
     description:
       'Who could go home: what they owe, what is still outstanding, and the sign-off that sends them.',
     canAccess: canOpenDischargeBoard,
+  },
+  {
+    to: '/care-recommendations',
+    label: 'Care recommendations',
+    description:
+      "What patients have reported about how they feel, and the agent's draft note for a nurse or doctor to check.",
+    canAccess: canReadCareQueue,
   },
   {
     to: '/billing-settings',

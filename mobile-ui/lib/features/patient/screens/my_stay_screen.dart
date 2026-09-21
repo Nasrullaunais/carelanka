@@ -9,6 +9,7 @@ import '../../../services/api_client/models/my_bill.dart';
 import '../state/my_stay_controller.dart';
 import '../state/profile_controller.dart';
 import '../widgets/bill_view.dart';
+import '../widgets/care_query_card.dart';
 import '../widgets/panels.dart';
 import 'claim_record_screen.dart';
 import '../widgets/stay_journey.dart';
@@ -117,6 +118,10 @@ class _Admission extends StatelessWidget {
               icon: Icons.route_outlined,
               child: StayJourneyTracker(journey: journey),
             ),
+          if (!journey.cancelled) ...[
+            const SizedBox(height: 16),
+            const CareQueryCard(),
+          ],
           if (hasPlaceOrTime) ...[
             const SizedBox(height: 16),
             SectionCard(

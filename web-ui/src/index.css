@@ -378,6 +378,13 @@ tr:last-child td {
   flex-wrap: wrap;
 }
 
+.filters {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+
 button.danger {
   border-color: var(--danger);
   color: var(--danger);

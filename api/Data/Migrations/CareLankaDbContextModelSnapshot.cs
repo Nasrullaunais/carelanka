@@ -2619,6 +2619,92 @@ namespace CareLanka.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.CareRecommendation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AdmissionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("admission_id");
+
+                    b.Property<string>("AgentMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("agent_message");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DoctorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("doctor_message");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<bool>("RedFlag")
+                        .HasColumnType("boolean")
+                        .HasColumnName("red_flag");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("rejection_reason");
+
+                    b.Property<DateTimeOffset>("ReportedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reported_at");
+
+                    b.Property<string>("ReportedText")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("reported_text");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reviewed_at");
+
+                    b.Property<Guid?>("ReviewedByStaffMemberId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reviewed_by_staff_member_id");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int?>("UrgencyFlag")
+                        .HasColumnType("integer")
+                        .HasColumnName("urgency_flag");
+
+                    b.HasKey("Id")
+                        .HasName("pk_care_recommendations");
+
+                    b.HasIndex("AdmissionId")
+                        .HasDatabaseName("ix_care_recommendations_admission_id");
+
+                    b.HasIndex("ReviewedByStaffMemberId")
+                        .HasDatabaseName("ix_care_recommendations_reviewed_by_staff_member_id");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_care_recommendations_status");
+
+                    b.HasIndex("PatientId", "ReportedAt")
+                        .HasDatabaseName("ix_care_recommendations_patient_id_reported_at");
+
+                    b.ToTable("care_recommendations", (string)null);
+                });
+
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.Discharge", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3357,6 +3443,32 @@ namespace CareLanka.Api.Data.Migrations
                         .HasConstraintName("fk_bill_line_items_bills_bill_id");
 
                     b.Navigation("Bill");
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.CareRecommendation", b =>
+                {
+                    b.HasOne("CareLanka.Api.Data.Entities.Patient.Admission", "Admission")
+                        .WithMany()
+                        .HasForeignKey("AdmissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_care_recommendations_admissions_admission_id");
+
+                    b.HasOne("CareLanka.Api.Data.Entities.Patient.Patient", "Patient")
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_care_recommendations_patients_patient_id");
+
+                    b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewedByStaffMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_care_recommendations_staff_members_reviewed_by_staff_member");
+
+                    b.Navigation("Admission");
+
+                    b.Navigation("Patient");
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Patient.Discharge", b =>

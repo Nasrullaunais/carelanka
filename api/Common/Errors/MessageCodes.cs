@@ -94,10 +94,9 @@ public static class MessageCodes
             [MessageCode.AppointmentBilledOnItsAdmission] = "cl_pat_035",
             [MessageCode.NoBillRaised] = "cl_pat_036",
             [MessageCode.PatientCodeNotClaimable] = "cl_pat_037",
-            // cl_pat_038 is reserved for the care advisory agent's entry point (build/patient.md
-            // step 15). Left free rather than reused, because a retired or reassigned code is
-            // how a client ends up branching on the wrong thing.
-            [MessageCode.BedSuggestionNotPossible] = "cl_pat_039"
+            [MessageCode.NotCurrentlyAdmittedForCareQuery] = "cl_pat_038",
+            [MessageCode.BedSuggestionNotPossible] = "cl_pat_039",
+            [MessageCode.CareRecommendationNotPendingReview] = "cl_pat_040"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

@@ -38,6 +38,7 @@ class _PatientArea extends StatelessWidget {
 
     return MultiProvider(
       providers: [
+        Provider<PatientService>.value(value: service),
         ChangeNotifierProvider(create: (_) => ProfileController(service)),
         ChangeNotifierProvider(create: (_) => MyStayController(service)),
         ChangeNotifierProvider(create: (_) => AppointmentsController(service)),

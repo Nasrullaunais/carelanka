@@ -157,4 +157,33 @@ public class MeController : ControllerBase
     public async Task<ActionResult<MyAppointment>> CancelMyAppointment(
         Guid id, CancellationToken ct)
         => Ok(await _me.CancelAppointmentAsync(id, ct));
+
+    /// <summary>
+    /// Describe how you feel, in your own words. Starts the Patient Care Advisory Agent and
+    /// returns immediately with a workflow id - the draft it writes is never shown here, only to
+    /// the Doctor or Ward Nurse who reviews it.
+    /// </summary>
+    [HttpPost("care-queries", Name = "submitCareQuery")]
+    [ProducesResponseType(typeof(CareWorkflowAccepted), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<CareWorkflowAccepted>> SubmitCareQuery(
+        [FromBody] CareQueryRequest request, CancellationToken ct)
+    {
+        var accepted = await _me.SubmitCareQueryAsync(request, ct);
+
+        return Accepted(accepted.PollUrl, accepted);
+    }
+
+    [HttpGet("care-recommendations", Name = "getMyCareRecommendations")]
+    [ProducesResponseType(typeof(PagedResult<MyCareRecommendation>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    public async Task<ActionResult<PagedResult<MyCareRecommendation>>> GetMyCareRecommendations(
+        [FromQuery][Range(1, int.MaxValue)] int page = 1,
+        [FromQuery][Range(1, 100)] int pageSize = 20,
+        CancellationToken ct = default)
+        => Ok(await _me.GetMyCareRecommendationsAsync(page, pageSize, ct));
 }

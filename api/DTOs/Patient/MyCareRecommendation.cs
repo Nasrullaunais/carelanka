@@ -20,4 +20,15 @@ public sealed class MyCareRecommendation
     /// Set only once <see cref="Status"/> is Approved.
     /// </summary>
     public string? DoctorMessage { get; set; }
+
+    /// <summary>
+    /// Who signed off the reply, and when. Set alongside <see cref="DoctorMessage"/>, so a
+    /// patient never learns that a report they cannot read was reviewed, or by whom. Null name
+    /// on an approved row means the reviewer's account has since been deactivated.
+    /// </summary>
+    public string? ReviewedByName { get; set; }
+
+    public CareReviewerRole? ReviewedByRole { get; set; }
+
+    public DateTimeOffset? ReviewedAt { get; set; }
 }

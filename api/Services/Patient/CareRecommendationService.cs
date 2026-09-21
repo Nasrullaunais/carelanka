@@ -300,7 +300,22 @@ public sealed class CareRecommendationService : ICareRecommendationService
                 ReportedText = row.ReportedText,
                 ReportedAt = row.ReportedAt,
                 Status = row.Status,
-                DoctorMessage = row.Status == CareRecommendationStatus.Approved ? row.DoctorMessage : null
+                DoctorMessage = row.Status == CareRecommendationStatus.Approved ? row.DoctorMessage : null,
+                ReviewedAt = row.Status == CareRecommendationStatus.Approved ? row.ReviewedAt : null,
+                ReviewedByName = row.Status == CareRecommendationStatus.Approved
+                    ? _db.StaffMembers
+                        .Where(staff => staff.Id == row.ReviewedByStaffMemberId)
+                        .Select(staff => staff.FirstName + " " + staff.LastName)
+                        .FirstOrDefault()
+                    : null,
+                ReviewedByRole = row.Status == CareRecommendationStatus.Approved
+                    ? _db.StaffMembers
+                        .Where(staff => staff.Id == row.ReviewedByStaffMemberId)
+                        .Select(staff => staff.Role == StaffRole.Doctor
+                            ? CareReviewerRole.Doctor
+                            : (CareReviewerRole?)CareReviewerRole.WardNurse)
+                        .FirstOrDefault()
+                    : null
             })
             .ToListAsync(ct);
 

@@ -4644,6 +4644,14 @@ components:
       type: string
       enum: [pending_review, approved, rejected]
 
+    CareReviewerRole:
+      type: string
+      description: |
+        Who signed off a care reply. Deliberately narrower than the group-owned `StaffRole`:
+        the CareRecommendationReviewer policy admits a Doctor or a Ward Nurse and nobody else,
+        so those are the only two a patient can ever be shown.
+      enum: [doctor, ward_nurse]
+
     CareQueryRequest:
       type: object
       required: [reported_text]
@@ -4795,5 +4803,22 @@ components:
         status: { $ref: '#/components/schemas/CareRecommendationStatus' }
         doctor_message:
           type: string
+          nullable: true
+          description: Set only once status is approved.
+        reviewed_by_name:
+          type: string
+          nullable: true
+          description: |
+            Who signed off the reply. Set alongside doctor_message, so a patient never learns
+            that a report they cannot read was reviewed, or by whom. Null on an approved row
+            means the reviewer's account has since been deactivated.
+        reviewed_by_role:
+          allOf:
+            - $ref: '#/components/schemas/CareReviewerRole'
+          nullable: true
+          description: The reviewer's role, so the reply can be attributed to a doctor or a nurse.
+        reviewed_at:
+          type: string
+          format: date-time
           nullable: true
           description: Set only once status is approved.

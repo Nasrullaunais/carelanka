@@ -114,7 +114,9 @@ public sealed class CareAgent : ICareAgent
         var candidate = await journal.StepAsync(Draft, () => _advisor.AdviseAsync(context, ct));
 
         var validated = journal.Step(
-            Validate, () => CareRecommendationValidator.Validate(candidate, redFlag, profile?.Allergies));
+            Validate,
+            () => CareRecommendationValidator.Validate(
+                candidate, redFlag, profile?.Allergies, request.ReportedText));
 
         var final = candidate;
 
@@ -135,7 +137,8 @@ public sealed class CareAgent : ICareAgent
                     + ") and was thrown away, so the standard backup note was used instead."
             };
 
-            validated = CareRecommendationValidator.Validate(final, redFlag, profile?.Allergies);
+            validated = CareRecommendationValidator.Validate(
+                final, redFlag, profile?.Allergies, request.ReportedText);
         }
 
         journal.Validation.Passed = validated.Passed;

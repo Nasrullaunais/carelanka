@@ -4761,9 +4761,11 @@ components:
           type: string
           nullable: true
           description: >-
-            The agent's draft. Staff-facing only - a patient never receives this field on any
-            route, which is enforced by MyCareRecommendation being a different shape rather
-            than by filtering this one.
+            The agent's draft of the reply, already addressed to the patient. Unapproved, so a
+            patient never receives this field on any route - what they read is doctor_message,
+            which the reviewer either approves from this draft or rewrites. The separation is
+            enforced by MyCareRecommendation being a different shape rather than by filtering
+            this one.
         status: { $ref: '#/components/schemas/CareRecommendationStatus' }
         workflow_id: { type: string, format: uuid, nullable: true }
         reviewed_by_staff_id: { type: string, format: uuid, nullable: true }

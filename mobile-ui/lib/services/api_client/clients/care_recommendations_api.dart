@@ -9,6 +9,7 @@ import '../models/approve_care_recommendation_request.dart';
 import '../models/care_recommendation.dart';
 import '../models/care_recommendation_status.dart';
 import '../models/care_recommendation_summary_paged_result.dart';
+import '../models/care_workflow_accepted.dart';
 import '../models/care_workflow_summary.dart';
 import '../models/reject_care_recommendation_request.dart';
 import '../models/sort_direction.dart';
@@ -47,5 +48,10 @@ abstract class CareRecommendationsApi {
   Future<CareRecommendation> rejectCareRecommendation({
     @Path('id') required String id,
     @Body() RejectCareRecommendationRequest? body,
+  });
+
+  @POST('/care-recommendations/{id}/redraft')
+  Future<CareWorkflowAccepted> redraftCareRecommendation({
+    @Path('id') required String id,
   });
 }

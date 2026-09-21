@@ -4,9 +4,10 @@ using CareLanka.Api.DTOs.Patient;
 namespace CareLanka.Api.Agents.Patient;
 
 /// <summary>
-/// The Patient Care Advisory Agent. One run drafts one note for a nurse or doctor to check: screen
-/// the patient's own words for a red flag, gather what the hospital already knows about them, ask
-/// the model to combine the two, and re-check the result deterministically before anyone sees it.
+/// The Patient Care Advisory Agent. One run drafts one reply to the patient for a nurse or doctor
+/// to check: screen the patient's own words for a red flag, gather what the hospital already knows
+/// about them, ask the model to answer them from the two together, and re-check the result
+/// deterministically before anyone sees it.
 /// <para>
 /// It writes nothing to the domain beyond the draft itself - the <c>CareRecommendation</c> row is
 /// created by the service before the agent ever runs, and this agent only ever fills in its draft

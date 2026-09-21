@@ -27,6 +27,10 @@ CareWorkflowSummary _$CareWorkflowSummaryFromJson(Map<String, dynamic> json) =>
           : CareWorkflowValidation.fromJson(
               json['validation'] as Map<String, dynamic>,
             ),
+      draftSource: json['draft_source'] == null
+          ? null
+          : CareDraftSource.fromJson(json['draft_source'] as String),
+      draftNote: json['draft_note'] as String?,
       retries: (json['retries'] as num?)?.toInt(),
     );
 
@@ -42,5 +46,7 @@ Map<String, dynamic> _$CareWorkflowSummaryToJson(
   'steps': instance.steps,
   'red_flag': instance.redFlag,
   'validation': instance.validation,
+  'draft_source': instance.draftSource,
+  'draft_note': instance.draftNote,
   'retries': instance.retries,
 };

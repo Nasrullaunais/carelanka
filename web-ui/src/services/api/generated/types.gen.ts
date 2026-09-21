@@ -506,6 +506,8 @@ export type CareRecommendationSummaryPagedResult = {
     total_pages: number;
 };
 
+export type CareReviewerRole = 'doctor' | 'ward_nurse';
+
 export type CareUrgency = 'low' | 'medium' | 'high';
 
 export type CareWorkflowAccepted = {
@@ -1098,6 +1100,9 @@ export type MyCareRecommendation = {
     reported_at?: string;
     status?: CareRecommendationStatus;
     doctor_message?: string | null;
+    reviewed_by_name?: string | null;
+    reviewed_by_role?: CareReviewerRole;
+    reviewed_at?: string | null;
 };
 
 export type MyCareRecommendationPagedResult = {

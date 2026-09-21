@@ -1371,11 +1371,23 @@ Four tools. Three read, one write, and the write can only ever create a draft aw
 
 | | Rule |
 | :--- | :--- |
-| CR1 | `agent_message` may not contain a drug name or a dosage pattern (fixed denylist + a simple dosage-unit regex — `mg`, `ml`, `tablets`, etc. adjacent to a number). This agent drafts replies, never prescriptions. |
+| CR1 | `agent_message` may never contain a dosage pattern (a simple dosage-unit regex — `mg`, `ml`, `tablets`, etc. adjacent to a number), and may name a medicine from the fixed denylist **only if the patient named it themselves or it is on their own allergy record**. The agent may discuss a medicine the patient raised; it may never introduce one. This agent drafts replies, never prescriptions. *(Widened 2026-09-21 — see below.)* |
 | CR2 | `urgency_flag` must be exactly one of `low` / `medium` / `high` — a closed enum, never free text |
 | CR3 | A `CareRecommendation` is invisible to the patient (`doctor_message IS NULL`) until `status = approved` |
 | CR4 | If the red-flag screen (§8.13) matched, `urgency_flag` must be `high`. The validator overwrites a lower value rather than trusting the model to have already applied it. |
-| CR5 | `agent_message` may not contradict the recorded `allergies` — a draft naming a substance the profile lists as an allergy is rejected outright. *(New 2026-09-16, and the reason the profile is worth having: a deterministic check is only possible because the allergy is a stored field rather than a sentence in a note.)* |
+| CR5 | `agent_message` may not contradict the recorded `allergies`. **Every sentence that names a medicine — one the patient raised, or one on their allergy record — must be negative about it** (a fixed marker list: `not`, `never`, `avoid`, `allergic`, `unsafe`, `stop`, …). Sentence by sentence, so one "do not take" cannot license a recommendation three sentences later. *(New 2026-09-16; rewritten 2026-09-21 from "may not name an allergen at all" — see below. The deterministic check is only possible because the allergy is a stored field rather than a sentence in a note.)* |
+
+**Why CR1 and CR5 were widened on 2026-09-21.** They used to ban naming any medicine at all, allergen included. Tested against a patient with `allergies: Penicillin` asking *"my headache is worse today. should i take some penicilin"*, the agent answered: *"Your record lists something you react badly to, so that medicine will not be given."* The rule written to keep the patient safe from their allergen had made the one genuinely useful sentence — *"do not take penicillin, your record lists it as an allergy"* — the only thing the agent could not say, and left the patient free to take it, since they were never told it was the thing.
+
+The line is no longer **whether** a medicine is named. It is **how**:
+
+- It must be one the patient raised themselves, or one already on their own record. The agent can never introduce a medicine — that is the dangerous direction, and CR1 still throws the draft away.
+- Every sentence naming it must be negative about it. The agent can tell a patient not to take something; it has no way to tell them to.
+- No dose, strength or tablet count, ever, for anything. Unchanged.
+
+**Spelling does not decide whether a safety rule fires.** The patient typed `penicilin`; the record says `Penicillin`. Matching is done on a normalised form — lower-cased, punctuation stripped, runs of one repeated letter collapsed — so both arrive as the same word. Without it, a typo silently disables the check.
+
+**What the model is still trusted for, and is not verified:** whether a medicine treats what the patient described, and what it is normally used for. That is general drug knowledge, it can be wrong, and only the reviewer stands behind it. The deterministic side guarantees the *shape* of the sentence, never the pharmacology.
 
 **Soft guidance — the prompt asks for this, but nothing enforces it beyond CR1–CR5:** keep `agent_message` short and in plain words, address the patient as "you", answer what they actually asked, say what they can do now and what would mean calling a nurse, and never tell them to start, stop or change any treatment.
 
@@ -1389,7 +1401,7 @@ The reasoning: the patient is admitted and on a ward (§8.10b), and the person w
 
 **What this costs, said plainly:** a nurse can now release clinically-flavoured text to a patient. Three things hold the line, and they are the reason this is defensible rather than sloppy:
 
-- CR1 means the text can never contain a drug or a dose, whoever approves it.
+- CR1 means the text can never contain a dose, and can never name a medicine the patient did not raise themselves, whoever approves it.
 - CR5 means it can never contradict a recorded allergy.
 - `doctor_message` is written by the human at approval time, and the reviewer can always cut the draft back to "A nurse will come and check on you." *(Weaker than it was before 2026-09-21: the draft now arrives already written to the patient, so doing nothing releases it. Reading it is the reviewer's actual job.)*
 
@@ -1571,7 +1583,7 @@ Every trigger already exists as a status change, so nothing new is needed on the
 | Merging duplicate patient records | Real hospitals do this; it's a whole workflow. Prevented up front by NIC lookup, and recorded here as a known limitation. |
 | Patient transfers between wards mid-stay | Nice to have. Only if time allows — the data model already supports it (a second `BedAssignment` with `release_reason = transferred`). |
 | ~~Billing beyond a checklist tick~~ | **No longer true — changed 2026-09-11.** Billing is Patient Management's; see §6.5 for what it is and §11.10 of `integration_of_functions.md` for the claim. What stays out is payment gateways, insurance claims, part payments, refunds, tax and discounts. |
-| Diagnosis, treatment, prescriptions, and anything else clinical | The line from §1. The care advisory agent (§8.10) drafts a note; it does not cross this line, because nothing it produces reaches a patient without a nurse's or doctor's approval standing in between, and CR1 means it can never name a drug or a dose whoever approves it. |
+| Diagnosis, treatment, prescriptions, and anything else clinical | The line from §1. The care advisory agent (§8.10) drafts a reply; it does not cross this line, because nothing it produces reaches a patient without a nurse's or doctor's approval standing in between, and CR1/CR5 mean it can never give a dose, never introduce a medicine, and never say anything but "do not take" about one, whoever approves it. |
 | A real electronic health record — vitals, lab results, structured clinical notes, coded diagnoses | Still out, and this is the row that moved most on 2026-09-16. `PatientMedicalProfile` (§8.10c) adds **four free-text fields a nurse types**: conditions, allergies, current symptoms, recent situation. That is what the care agent reads. It is not an EHR — no vitals, no lab results, no coded diagnosis, no clinical assessment, no history of changes beyond `updated_at` and who wrote it. Stating that plainly is the point; a demo that implies a real health record and cannot show one is worse than a small honest table. |
 | Per-visit medical history | `PatientMedicalProfile` is one row per patient, so `current_symptoms` describes whatever visit it was last written during. A patient discharged six months ago has a stale profile and nothing flags it. Accepted deliberately — §3.1 decision 1 — because a per-admission profile is one a nurse has to retype every visit, and the one that gets retyped is the one that stops being filled in. |
 | Patients reading their own medical profile | There is no `/api/me/medical-profile`. Showing somebody their own clinical record raises correction rights and wording questions that are a feature in their own right, not a free one. |
@@ -1642,7 +1654,9 @@ This matches the group plan, which already states that Emergency and Staff read 
 | :--- | :--- |
 | Patient is not admitted | **Nothing runs.** 409 `cl_pat_038` before the workflow is created — no row, no model call, no quota spent |
 | "I have a headache and it's worse lying down" | Drafted, `red_flag = false`, some `urgency_flag`, awaiting a Nurse or Doctor |
-| Profile records a penicillin allergy, model drafts text naming penicillin | CR5 rejects it — failure recorded, no draft published |
+| Profile records a penicillin allergy, patient asks about penicillin, model drafts "do not take penicillin — your record lists it as an allergy" | Passes. This is the answer the rules exist to make possible |
+| Same profile, model drafts "you could ask the nurse for penicillin" | CR5 rejects it — a sentence naming it that is not negative about it — failure recorded, no draft published |
+| Patient never mentioned ibuprofen, model drafts "ibuprofen is not right for this" | CR1 rejects it — the agent may not introduce a medicine, in any context |
 | Profile is completely empty | Drafts anyway, from the patient's words alone, and says it had no history to work from. Not an error |
 | "I have severe chest pain and can't breathe" | Keyword screen matches before the model runs. `red_flag = true`, `urgency_flag = high` forced, `outcome = escalated` |
 | Model drafts a message naming a dosage ("take 500mg paracetamol") | CR1 rejects it before a doctor sees it — failure recorded, no draft published |

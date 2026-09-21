@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Patient;
@@ -12,6 +13,14 @@ namespace CareLanka.Api.Agents.Patient;
 /// These matter more now the draft is written to the patient rather than about them: a reviewer
 /// approving without reading publishes this text verbatim, so it has to be safe before they see it.
 /// </para>
+/// <para>
+/// CR1 and CR5 were both widened on 2026-09-21. A blanket ban on naming any medicine meant the
+/// safest possible sentence - "do not take penicillin, your record lists it as an allergy" - was
+/// the one thing the agent could not say, and it answered a patient asking about their own
+/// allergen with "something you react badly to". The line is no longer *whether* a medicine is
+/// named, it is *how*: the agent may only ever name one the patient themselves raised or that is
+/// already on their record, and only to be negative about it.
+/// </para>
 /// </summary>
 public static partial class CareRecommendationValidator
 {
@@ -21,7 +30,21 @@ public static partial class CareRecommendationValidator
         "morphine", "pethidine", "tramadol", "codeine", "insulin", "metformin", "warfarin",
         "omeprazole", "diazepam", "amoxyclav", "augmentin", "ceftriaxone", "atropine",
         "adrenaline", "epinephrine", "salbutamol", "prednisolone", "furosemide", "heparin",
-        "paracetamol iv", "diclofenac", "metronidazole", "azithromycin", "ciprofloxacin"
+        "paracetamol iv", "diclofenac", "metronidazole", "azithromycin", "ciprofloxacin",
+        // Brand names a Sri Lankan patient is far more likely to type than the generic.
+        "panadol", "piriton", "disprin", "brufen", "amoxil", "zinnat", "voltaren"
+    ];
+
+    /// <summary>
+    /// What makes a sentence naming a medicine acceptable. Whole words, matched against the
+    /// normalised sentence, so "don't" and "shouldn't" arrive here as <c>dont</c> and
+    /// <c>shouldnt</c>. A sentence that names a medicine and carries none of these reads as
+    /// telling the patient to take it, which no draft is allowed to do.
+    /// </summary>
+    private static readonly string[] NegativeMarkers =
+    [
+        "not", "never", "avoid", "dont", "wont", "cant", "shouldnt", "mustnt", "unsafe", "stop",
+        "allergic", "allergy", "reaction"
     ];
 
     [GeneratedRegex(@"\b\d+(\.\d+)?\s?(mg|mcg|ml|g|iu|units?|tablets?|tabs?|capsules?|caps?)\b",
@@ -29,17 +52,32 @@ public static partial class CareRecommendationValidator
     private static partial Regex DosagePattern();
 
     public static CareValidationResult Validate(
-        CareDraftCandidate candidate, bool redFlagMatched, string? allergiesText)
+        CareDraftCandidate candidate,
+        bool redFlagMatched,
+        string? allergiesText,
+        string? reportedText = null)
     {
         var failedRules = new List<string>();
         var message = candidate.Message ?? string.Empty;
 
-        if (ContainsDrugOrDosage(message))
+        // Anything the patient raised themselves, plus anything already on their allergy record.
+        // The agent may discuss those; it may not introduce a medicine of its own.
+        var raised = Normalise(reportedText) + " " + Normalise(allergiesText);
+        var written = Normalise(message);
+
+        var named = DrugDenylist
+            .Where(drug => written.Contains(Normalise(drug)))
+            .ToList();
+
+        if (DosagePattern().IsMatch(message) ||
+            named.Any(drug => !raised.Contains(Normalise(drug))))
         {
             failedRules.Add("CR1");
         }
 
-        if (ContradictsAllergies(message, allergiesText))
+        var allergens = Substances(allergiesText);
+
+        if (!EveryMentionIsNegative(message, named.Concat(allergens)))
         {
             failedRules.Add("CR5");
         }
@@ -51,34 +89,107 @@ public static partial class CareRecommendationValidator
         return new CareValidationResult(failedRules.Count == 0, failedRules, urgency);
     }
 
-    private static bool ContainsDrugOrDosage(string message)
+    /// <summary>
+    /// Every sentence that names one of <paramref name="substances"/> has to be negative about it.
+    /// Sentence by sentence rather than whole-message, so one "do not take" cannot license a
+    /// recommendation three sentences later.
+    /// </summary>
+    private static bool EveryMentionIsNegative(string message, IEnumerable<string> substances)
     {
-        if (DosagePattern().IsMatch(message))
+        var wanted = substances
+            .Select(Normalise)
+            .Where(substance => substance.Length >= 3)
+            .Distinct()
+            .ToList();
+
+        if (wanted.Count == 0)
         {
             return true;
         }
 
-        return DrugDenylist.Any(drug =>
-            message.Contains(drug, StringComparison.OrdinalIgnoreCase));
+        var sentences = message.Split(
+            new[] { '.', '!', '?', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+        return sentences
+            .Select(Normalise)
+            .Where(sentence => wanted.Any(sentence.Contains))
+            .All(IsNegative);
+    }
+
+    private static bool IsNegative(string normalisedSentence)
+    {
+        var words = normalisedSentence.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        return words.Any(word => NegativeMarkers.Contains(word));
     }
 
     /// <summary>
-    /// Splits the recorded allergies into individual substances and checks the draft never names
-    /// one of them. Only possible because the allergy is a stored field, not a sentence in a note.
+    /// Splits the recorded allergies into individual substances. Only possible because the allergy
+    /// is a stored field rather than a sentence in a note.
     /// </summary>
-    private static bool ContradictsAllergies(string message, string? allergiesText)
+    public static IEnumerable<string> Substances(string? allergiesText)
+        => string.IsNullOrWhiteSpace(allergiesText)
+            ? []
+            : allergiesText.Split(
+                new[] { ',', ';', '/', '\n' },
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    /// <summary>
+    /// Whether <paramref name="text"/> names <paramref name="substance"/>, spelling allowed to be
+    /// approximate. Shared with the deterministic drafter so both sides of the run agree on what
+    /// counts as the patient having raised a substance.
+    /// </summary>
+    public static bool Names(string? text, string substance)
     {
-        if (string.IsNullOrWhiteSpace(allergiesText))
+        var wanted = Normalise(substance);
+
+        return wanted.Length >= 3 && Normalise(text).Contains(wanted);
+    }
+
+    /// <summary>
+    /// Lower-cased, apostrophes dropped, other punctuation turned into a space, and runs of one
+    /// repeated letter collapsed - so the patient who typed "penicilin" and the record that says
+    /// "Penicillin" both arrive here as the same word. Without that, the patient's own spelling
+    /// decides whether a safety rule fires.
+    /// </summary>
+    private static string Normalise(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
         {
-            return false;
+            return string.Empty;
         }
 
-        var substances = allergiesText
-            .Split(new[] { ',', ';', '/', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(token => token.Length >= 3);
+        var builder = new StringBuilder(value.Length);
+        var previous = '\0';
 
-        return substances.Any(substance =>
-            message.Contains(substance, StringComparison.OrdinalIgnoreCase));
+        foreach (var character in value.ToLowerInvariant())
+        {
+            if (character == '\'' || character == '’')
+            {
+                continue;
+            }
+
+            if (!char.IsLetterOrDigit(character))
+            {
+                if (previous != ' ')
+                {
+                    builder.Append(' ');
+                }
+
+                previous = ' ';
+                continue;
+            }
+
+            if (character == previous)
+            {
+                continue;
+            }
+
+            builder.Append(character);
+            previous = character;
+        }
+
+        return builder.ToString().Trim();
     }
 }
 

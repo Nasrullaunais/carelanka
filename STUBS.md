@@ -66,15 +66,14 @@ actually published.
 
 ## Open stubs
 
-**Three open.** Common auth was never stubbed: it was built and merged in PR #11. Row 2 is
-Equipment waiting on Patient Management, and rows 5 and 6 are Emergency dependencies.
-**Rows 1, 3, 4 and 7 are gone** — see Replaced below.
+**Two open.** Common auth was never stubbed: it was built and merged in PR #11. Row 2 is
+Equipment waiting on Patient Management, and row 5 is an Emergency dependency.
+**Rows 1, 3, 4, 6 and 7 are gone** — see Replaced below.
 
 | # | What is faked | Where it lives | Standing in for | Owner of the real thing | Added |
 | :-- | :--- | :--- | :--- | :--- | :--- |
 | 2 | Ward names on a bed — every ward is called `Stub ward <id fragment>` | `api/Services/Equipment/Stubs/StubWardDirectory.cs` | `GET /wards` — `patient-spec.yaml` | **M4 Lochana** | 2026-09-09 |
 | 5 | Staff name, active state and role lookup from the existing auth staff records | `api/Services/Emergency/Stubs/StubStaffLookupService.cs` | `POST /staff/lookup` — `staff-spec.yaml` | **M2 Kaveesha** | 2026-09-13 |
-| 6 | Pre-admission from a dispatch — logs a warning and reports success; no admission is created | `api/Services/Emergency/Stubs/StubPreAdmissionGateway.cs` | `POST /admissions/pre-admit` — `patient-spec.yaml` | **M4 Lochana** | 2026-09-20 |
 
 **Row 7 was opened and closed on the same day** — see Replaced below. `ILanguageModel` is built.
 
@@ -136,6 +135,7 @@ against" is answerable later.
 
 | # | What it was | Replaced by | Commit | Date |
 | :-- | :--- | :--- | :--- | :--- |
+| 6 | Pre-admission from a dispatch — logs a warning and reports success; no admission is created | `api/Services/Emergency/PreAdmissionGateway.cs`, an in-process call into Patient's `IAdmissionService.PreAdmitAsync`, plus the real `POST /admissions/pre-admit` and `POST /admissions/{id}/classify` on Patient's side | `feat/emergency-phase-3-dispatch` | 2026-09-22 |
 | 4 | Ambulance distance — straight-line distance instead of road distance | `api/Services/Emergency/OsrmAmbulanceDistanceService.cs` (road times from OSRM, no key needed; falls back to `StraightLineDistance`) | `feat/emergency-road-ranking` | 2026-09-20 |
 | 1 | Bed counts per ward — every ward reported exactly 6 beds | `api/Services/Patient/BedRegistryService.cs`, a delegating adapter over `IBedService.CountBedsByWardAsync` | `feat/patient-real-bed-counts` | 2026-09-10 |
 | 3 | Is this bed occupied — always answered **yes** | `api/Services/Equipment/BedOccupancyAdapter.cs`, over Patient Management's `IBedOccupancyService` | `feat/patient-manual-bed-assignment` | 2026-09-11 |

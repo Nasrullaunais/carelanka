@@ -28,6 +28,7 @@ public class CareLankaDbContext : DbContext
     public DbSet<DispatchCrew> DispatchCrew => Set<DispatchCrew>();
     public DbSet<RouteLog> RouteLogs => Set<RouteLog>();
     public DbSet<PreAdmissionNotice> PreAdmissionNotices => Set<PreAdmissionNotice>();
+    public DbSet<DispatchProposal> DispatchProposals => Set<DispatchProposal>();
 
     public DbSet<Bed> Beds => Set<Bed>();
     public DbSet<EquipmentCategory> EquipmentCategories => Set<EquipmentCategory>();

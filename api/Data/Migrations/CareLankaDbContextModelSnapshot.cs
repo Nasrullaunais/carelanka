@@ -793,6 +793,10 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("destination_ward_id");
 
+                    b.Property<Guid?>("DispatchProposalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dispatch_proposal_id");
+
                     b.Property<DateTimeOffset>("DispatchedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("dispatched_at");
@@ -847,6 +851,9 @@ namespace CareLanka.Api.Data.Migrations
                     b.HasIndex("DestinationWardId")
                         .HasDatabaseName("ix_dispatches_destination_ward_id");
 
+                    b.HasIndex("DispatchProposalId")
+                        .HasDatabaseName("ix_dispatches_dispatch_proposal_id");
+
                     b.HasIndex("EmergencyCallId")
                         .IsUnique()
                         .HasDatabaseName("ux_dispatches_active_emergency_call")
@@ -894,6 +901,159 @@ namespace CareLanka.Api.Data.Migrations
                         .HasDatabaseName("ix_dispatch_crew_dispatch_id_staff_member_id");
 
                     b.ToTable("dispatch_crew", (string)null);
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.DispatchProposal", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("AllowDiversion")
+                        .HasColumnType("boolean")
+                        .HasColumnName("allow_diversion");
+
+                    b.Property<string>("CallPriority")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("call_priority");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("EmergencyCallId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("emergency_call_id");
+
+                    b.Property<int?>("EstimatedMinutesToScene")
+                        .HasColumnType("integer")
+                        .HasColumnName("estimated_minutes_to_scene");
+
+                    b.Property<string>("ExcludeAmbulanceIdsJson")
+                        .HasColumnType("text")
+                        .HasColumnName("exclude_ambulance_ids_json");
+
+                    b.Property<bool>("IsDiversion")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_diversion");
+
+                    b.Property<int?>("MinutesSavedForThisCall")
+                        .HasColumnType("integer")
+                        .HasColumnName("minutes_saved_for_this_call");
+
+                    b.Property<string>("Outcome")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("outcome");
+
+                    b.Property<string>("PreAdmissionSentJson")
+                        .HasColumnType("text")
+                        .HasColumnName("pre_admission_sent_json");
+
+                    b.Property<Guid?>("ProposedAmbulanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("proposed_ambulance_id");
+
+                    b.Property<string>("Rationale")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("rationale");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("rejection_reason");
+
+                    b.Property<Guid?>("ReplacementAmbulanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("replacement_ambulance_id");
+
+                    b.Property<Guid?>("ResultingDispatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resulting_dispatch_id");
+
+                    b.Property<string>("ReviewNotes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("review_notes");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reviewed_at");
+
+                    b.Property<Guid?>("ReviewedByStaffMemberId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reviewed_by_staff_member_id");
+
+                    b.Property<int?>("SourceCallAdditionalWaitMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("source_call_additional_wait_minutes");
+
+                    b.Property<string>("SourceCallAddressLabel")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("source_call_address_label");
+
+                    b.Property<Guid?>("SourceCallId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_call_id");
+
+                    b.Property<string>("SourceCallPriority")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("source_call_priority");
+
+                    b.Property<int?>("SourceCallWaitingMinutesSoFar")
+                        .HasColumnType("integer")
+                        .HasColumnName("source_call_waiting_minutes_so_far");
+
+                    b.Property<Guid?>("SourceDispatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_dispatch_id");
+
+                    b.Property<string>("SourceDispatchStatus")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("source_dispatch_status");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("WorkflowId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workflow_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dispatch_proposals");
+
+                    b.HasIndex("EmergencyCallId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_dispatch_proposals_open_per_call")
+                        .HasFilter("status IN ('pending', 'pending_confirmation', 'pending_approval')");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_dispatch_proposals_status");
+
+                    b.HasIndex("WorkflowId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_dispatch_proposals_workflow_id");
+
+                    b.ToTable("dispatch_proposals", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_dispatch_proposals_priority", "call_priority IN ('critical', 'high', 'medium', 'low')");
+
+                            t.HasCheckConstraint("ck_dispatch_proposals_status", "status IN ('pending', 'pending_confirmation', 'pending_approval', 'approved', 'executed', 'rejected', 'failed')");
+                        });
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.EmergencyCall", b =>
@@ -2065,16 +2225,15 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnName("cancel_reason");
 
                     b.Property<string>("Category")
-                        .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("category");
 
-                    b.Property<DateTimeOffset>("CategorySetAt")
+                    b.Property<DateTimeOffset?>("CategorySetAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("category_set_at");
 
-                    b.Property<Guid>("CategorySetByStaffMemberId")
+                    b.Property<Guid?>("CategorySetByStaffMemberId")
                         .HasColumnType("uuid")
                         .HasColumnName("category_set_by_staff_member_id");
 
@@ -2176,7 +2335,7 @@ namespace CareLanka.Api.Data.Migrations
                         {
                             t.HasCheckConstraint("ck_admissions_cancel_reason", "cancel_reason IS NULL OR cancel_reason IN ('diverted_to_other_hospital', 'false_alarm', 'died_en_route', 'patient_refused', 'no_show')");
 
-                            t.HasCheckConstraint("ck_admissions_category", "category IN ('icu', 'hdu', 'inpatient', 'day_case', 'outpatient')");
+                            t.HasCheckConstraint("ck_admissions_category", "category IS NULL OR category IN ('icu', 'hdu', 'inpatient', 'day_case', 'outpatient')");
 
                             t.HasCheckConstraint("ck_admissions_source", "source IN ('emergency', 'walk_in', 'pre_registered')");
 
@@ -3169,6 +3328,12 @@ namespace CareLanka.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_dispatches_wards_destination_ward_id");
 
+                    b.HasOne("CareLanka.Api.Data.Entities.Emergency.DispatchProposal", null)
+                        .WithMany()
+                        .HasForeignKey("DispatchProposalId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_dispatches_dispatch_proposals_dispatch_proposal_id");
+
                     b.HasOne("CareLanka.Api.Data.Entities.Emergency.EmergencyCall", "EmergencyCall")
                         .WithMany("Dispatches")
                         .HasForeignKey("EmergencyCallId")
@@ -3206,6 +3371,18 @@ namespace CareLanka.Api.Data.Migrations
                         .HasConstraintName("fk_dispatch_crew_staff_members_staff_member_id");
 
                     b.Navigation("Dispatch");
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.DispatchProposal", b =>
+                {
+                    b.HasOne("CareLanka.Api.Data.Entities.Emergency.EmergencyCall", "EmergencyCall")
+                        .WithMany()
+                        .HasForeignKey("EmergencyCallId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_dispatch_proposals_emergency_calls_emergency_call_id");
+
+                    b.Navigation("EmergencyCall");
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.EmergencyCall", b =>
@@ -3312,7 +3489,6 @@ namespace CareLanka.Api.Data.Migrations
                         .WithMany()
                         .HasForeignKey("CategorySetByStaffMemberId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_admissions_staff_members_category_set_by_staff_member_id");
 
                     b.HasOne("CareLanka.Api.Data.Entities.Patient.Patient", "Patient")

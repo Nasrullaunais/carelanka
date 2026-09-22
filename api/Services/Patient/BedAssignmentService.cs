@@ -99,10 +99,13 @@ public sealed class BedAssignmentService : IBedAssignmentService
             .FirstOrDefaultAsync(candidate => candidate.Id == admissionId, ct)
             ?? throw new NotFoundException("Admission", admissionId);
 
-        EnsureMayApprove(admission.Category, ward);
+        var category = admission.Category
+            ?? throw new ConflictException(MessageCode.AdmissionNotYetClassified, admissionId);
+
+        EnsureMayApprove(category, ward);
 
         BedPlacementRules.EnsurePlaceable(
-            admission.Category,
+            category,
             admission.Patient.Gender,
             admission.Patient.DateOfBirth,
             admission.IsInfectious,
@@ -131,10 +134,13 @@ public sealed class BedAssignmentService : IBedAssignmentService
             .FirstOrDefaultAsync(candidate => candidate.Id == admissionId, ct)
             ?? throw new NotFoundException("Admission", admissionId);
 
-        EnsureMayApprove(admission.Category, ward);
+        var category = admission.Category
+            ?? throw new ConflictException(MessageCode.AdmissionNotYetClassified, admissionId);
+
+        EnsureMayApprove(category, ward);
 
         BedPlacementRules.EnsurePlaceable(
-            admission.Category,
+            category,
             admission.Patient.Gender,
             admission.Patient.DateOfBirth,
             admission.IsInfectious,
@@ -244,10 +250,13 @@ public sealed class BedAssignmentService : IBedAssignmentService
             .FirstOrDefaultAsync(candidate => candidate.Id == admissionId, ct)
             ?? throw new NotFoundException("Admission", admissionId);
 
-        if (!BedPlacementRules.RequiresBed(admission.Category))
+        var category = admission.Category
+            ?? throw new ConflictException(MessageCode.AdmissionNotYetClassified, admissionId);
+
+        if (!BedPlacementRules.RequiresBed(category))
         {
             throw new ConflictException(
-                MessageCode.VisitNeedsNoBed, EnumWire.ToWire(admission.Category));
+                MessageCode.VisitNeedsNoBed, EnumWire.ToWire(category));
         }
 
         AdmissionStatusMachine.EnsureMove(
@@ -259,10 +268,10 @@ public sealed class BedAssignmentService : IBedAssignmentService
 
         var ward = await FindWardAsync(bed.WardId, ct);
 
-        EnsureMayApprove(admission.Category, ward);
+        EnsureMayApprove(category, ward);
 
         var isDowngrade = BedPlacementRules.EnsurePlaceable(
-            admission.Category,
+            category,
             admission.Patient.Gender,
             admission.Patient.DateOfBirth,
             admission.IsInfectious,

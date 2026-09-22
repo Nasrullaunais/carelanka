@@ -7,13 +7,11 @@ public class Admission : AdmissionSummary
 {
     public string? DispatchId { get; set; }
 
-    [Required]
-    public Guid CategorySetByStaffId { get; set; }
+    public Guid? CategorySetByStaffId { get; set; }
 
     public string? CategorySetByStaffName { get; set; }
 
-    [Required]
-    public DateTimeOffset CategorySetAt { get; set; }
+    public DateTimeOffset? CategorySetAt { get; set; }
 
     [Required]
     public bool IsInfectious { get; set; }

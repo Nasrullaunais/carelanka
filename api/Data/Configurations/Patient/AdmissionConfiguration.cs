@@ -17,7 +17,8 @@ public class AdmissionConfiguration : IEntityTypeConfiguration<Admission>
             t.HasCheckConstraint(
                 "ck_admissions_source", EnumWire.CheckConstraint<AdmissionSource>("source"));
             t.HasCheckConstraint(
-                "ck_admissions_category", EnumWire.CheckConstraint<AdmissionCategory>("category"));
+                "ck_admissions_category",
+                $"category IS NULL OR {EnumWire.CheckConstraint<AdmissionCategory>("category")}");
             t.HasCheckConstraint(
                 "ck_admissions_urgency", EnumWire.CheckConstraint<AdmissionUrgency>("urgency"));
             t.HasCheckConstraint(
@@ -36,8 +37,7 @@ public class AdmissionConfiguration : IEntityTypeConfiguration<Admission>
 
         builder.Property(a => a.Category)
             .HasConversion(new SnakeCaseEnumConverter<AdmissionCategory>())
-            .HasMaxLength(20)
-            .IsRequired();
+            .HasMaxLength(20);
 
         builder.Property(a => a.Urgency)
             .HasConversion(new SnakeCaseEnumConverter<AdmissionUrgency>())

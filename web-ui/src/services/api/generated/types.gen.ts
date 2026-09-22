@@ -21,7 +21,7 @@ export type Admission = {
     id: string;
     patient?: PatientSummary;
     source: AdmissionSource;
-    admission_category: AdmissionCategory;
+    admission_category?: AdmissionCategory;
     urgency: AdmissionUrgency;
     status: AdmissionStatus;
     details_complete: boolean;
@@ -31,9 +31,9 @@ export type Admission = {
     expected_arrival?: string | null;
     admitted_at?: string | null;
     dispatch_id?: string | null;
-    category_set_by_staff_id: string;
+    category_set_by_staff_id?: string | null;
     category_set_by_staff_name?: string | null;
-    category_set_at: string;
+    category_set_at?: string | null;
     is_infectious: boolean;
     reported_by_user_id?: string | null;
     missing_fields: Array<string>;
@@ -71,7 +71,7 @@ export type AdmissionDetail = {
     id: string;
     patient?: PatientSummary;
     source: AdmissionSource;
-    admission_category: AdmissionCategory;
+    admission_category?: AdmissionCategory;
     urgency: AdmissionUrgency;
     status: AdmissionStatus;
     details_complete: boolean;
@@ -81,9 +81,9 @@ export type AdmissionDetail = {
     expected_arrival?: string | null;
     admitted_at?: string | null;
     dispatch_id?: string | null;
-    category_set_by_staff_id: string;
+    category_set_by_staff_id?: string | null;
     category_set_by_staff_name?: string | null;
-    category_set_at: string;
+    category_set_at?: string | null;
     is_infectious: boolean;
     reported_by_user_id?: string | null;
     missing_fields: Array<string>;
@@ -117,7 +117,7 @@ export type AdmissionSummary = {
     id: string;
     patient?: PatientSummary;
     source: AdmissionSource;
-    admission_category: AdmissionCategory;
+    admission_category?: AdmissionCategory;
     urgency: AdmissionUrgency;
     status: AdmissionStatus;
     details_complete: boolean;
@@ -242,6 +242,10 @@ export type AppointmentStatus = 'scheduled' | 'confirmed' | 'completed' | 'cance
 
 export type ApproveCareRecommendationRequest = {
     doctor_message?: string | null;
+};
+
+export type ApproveDispatchProposalRequest = {
+    notes?: string | null;
 };
 
 export type AssetType = 'equipment_item' | 'bed';
@@ -501,6 +505,10 @@ export type ClaimByPatientCodeRequest = {
     nic?: string | null;
 };
 
+export type ClassifyAdmissionRequest = {
+    admission_category?: AdmissionCategory;
+};
+
 export type CompleteDetailsRequest = {
     nic?: string | null;
     full_name?: string | null;
@@ -549,6 +557,12 @@ export type CreateBedRequest = {
     has_isolation?: boolean;
     nurse_station_distance?: number;
     asset_tag?: string | null;
+};
+
+export type CreateDispatchProposalRequest = {
+    emergency_call_id?: string;
+    allow_diversion?: boolean;
+    exclude_ambulance_ids?: Array<string> | null;
 };
 
 export type CreateEmergencyCallRequest = {
@@ -712,6 +726,76 @@ export type DispatchDetail = {
     crew_staff_ids?: Array<string> | null;
 };
 
+export type DispatchOutcome = 'free_ambulance_proposed' | 'diversion_proposed' | 'no_ambulance_available' | 'failed';
+
+export type DispatchPlanStep = {
+    sequence?: number;
+    description?: string | null;
+    status?: string | null;
+    started_at?: string | null;
+    completed_at?: string | null;
+};
+
+export type DispatchProposalDetail = {
+    id?: string;
+    workflow_id?: string;
+    emergency_call_id?: string;
+    call_priority?: CallPriority;
+    status?: DispatchProposalStatus;
+    outcome?: DispatchOutcome;
+    is_diversion?: boolean;
+    proposed_ambulance_registration?: string | null;
+    estimated_minutes_to_scene?: number | null;
+    created_at?: string;
+    objective?: string | null;
+    proposed_ambulance_id?: string | null;
+    rationale?: string | null;
+    diversion_impact?: DiversionImpact;
+    plan?: Array<DispatchPlanStep> | null;
+    validation?: Array<DispatchValidationResult> | null;
+    tool_calls?: Array<DispatchToolCall> | null;
+    errors?: Array<DispatchProposalError> | null;
+    attempt_count?: number;
+    started_at?: string | null;
+    completed_at?: string | null;
+    resulting_dispatch_id?: string | null;
+    reviewed_by_staff_member_id?: string | null;
+    reviewed_at?: string | null;
+    review_notes?: string | null;
+    rejection_reason?: DispatchRejectionReason;
+};
+
+export type DispatchProposalError = {
+    step?: string | null;
+    message?: string | null;
+    occurred_at?: string;
+};
+
+export type DispatchProposalStatus = 'pending' | 'pending_confirmation' | 'pending_approval' | 'approved' | 'executed' | 'rejected' | 'failed';
+
+export type DispatchProposalSummary = {
+    id?: string;
+    workflow_id?: string;
+    emergency_call_id?: string;
+    call_priority?: CallPriority;
+    status?: DispatchProposalStatus;
+    outcome?: DispatchOutcome;
+    is_diversion?: boolean;
+    proposed_ambulance_registration?: string | null;
+    estimated_minutes_to_scene?: number | null;
+    created_at?: string;
+};
+
+export type DispatchProposalSummaryPagedResult = {
+    items: Array<DispatchProposalSummary>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
+export type DispatchRejectionReason = 'unsafe_diversion' | 'source_call_too_urgent_to_divert' | 'ambulance_unsuitable' | 'handled_another_way' | 'no_longer_needed' | 'other';
+
 export type DispatchStatus = 'assigned' | 'acknowledged' | 'en_route_to_scene' | 'at_scene' | 'transporting_to_hospital' | 'handed_over' | 'declined' | 'cancelled' | 'reassigned';
 
 export type DispatchSummary = {
@@ -733,6 +817,37 @@ export type DispatchSummaryPagedResult = {
     page_size: number;
     total_items: number;
     total_pages: number;
+};
+
+export type DispatchToolCall = {
+    tool_name?: string | null;
+    arguments?: {
+        [key: string]: unknown;
+    } | null;
+    succeeded?: boolean;
+    duration_ms?: number;
+    error?: string | null;
+    called_at?: string;
+};
+
+export type DispatchValidationResult = {
+    check?: string | null;
+    passed?: boolean;
+    detail?: string | null;
+    checked_at?: string;
+};
+
+export type DiversionImpact = {
+    source_dispatch_id?: string;
+    source_call_id?: string;
+    source_call_priority?: CallPriority;
+    source_call_address_label?: string | null;
+    source_dispatch_status?: DispatchStatus;
+    source_call_waiting_minutes_so_far?: number;
+    source_call_additional_wait_minutes?: number;
+    replacement_ambulance_id?: string | null;
+    replacement_ambulance_registration?: string | null;
+    minutes_saved_for_this_call?: number;
 };
 
 export type EmergencyCallDetail = {
@@ -1312,6 +1427,18 @@ export type PharmacyTransactionPagedResult = {
 
 export type PharmacyTransactionType = 'received' | 'dispensed' | 'adjusted' | 'expired_removed';
 
+export type PreAdmitRequest = {
+    dispatch_id?: string | null;
+    patient_is_caller?: boolean;
+    caller_user_id?: string | null;
+    patient_id?: string | null;
+    expected_arrival?: string;
+    urgency?: AdmissionUrgency;
+    destination_ward_type_hint?: WardType;
+    provisional_name?: string | null;
+    provisional_gender?: Gender;
+};
+
 export type PreRegisterRequest = {
     nic: string;
     full_name: string;
@@ -1380,6 +1507,11 @@ export type RegisterDeviceRequest = {
 
 export type RejectCareRecommendationRequest = {
     reason?: string | null;
+};
+
+export type RejectDispatchProposalRequest = {
+    reason?: DispatchRejectionReason;
+    notes?: string | null;
 };
 
 export type RejectPrescriptionRequest = {
@@ -1760,6 +1892,90 @@ export type GetAdmissionResponses = {
 };
 
 export type GetAdmissionResponse = GetAdmissionResponses[keyof GetAdmissionResponses];
+
+export type PreAdmitFromDispatchData = {
+    body?: PreAdmitRequest;
+    path?: never;
+    query?: never;
+    url: '/admissions/pre-admit';
+};
+
+export type PreAdmitFromDispatchErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type PreAdmitFromDispatchError = PreAdmitFromDispatchErrors[keyof PreAdmitFromDispatchErrors];
+
+export type PreAdmitFromDispatchResponses = {
+    /**
+     * Created
+     */
+    201: Admission;
+};
+
+export type PreAdmitFromDispatchResponse = PreAdmitFromDispatchResponses[keyof PreAdmitFromDispatchResponses];
+
+export type ClassifyAdmissionData = {
+    body?: ClassifyAdmissionRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/admissions/{id}/classify';
+};
+
+export type ClassifyAdmissionErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ClassifyAdmissionError = ClassifyAdmissionErrors[keyof ClassifyAdmissionErrors];
+
+export type ClassifyAdmissionResponses = {
+    /**
+     * OK
+     */
+    200: Admission;
+};
+
+export type ClassifyAdmissionResponse = ClassifyAdmissionResponses[keyof ClassifyAdmissionResponses];
 
 export type CompleteAdmissionDetailsData = {
     body?: CompleteDetailsRequest;
@@ -4301,6 +4517,238 @@ export type ConfirmDischargeResponses = {
 };
 
 export type ConfirmDischargeResponse = ConfirmDischargeResponses[keyof ConfirmDischargeResponses];
+
+export type ListDispatchProposalsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        Status?: DispatchProposalStatus;
+        EmergencyCallId?: string;
+        IsDiversion?: boolean;
+        Page?: number;
+        PageSize?: number;
+    };
+    url: '/dispatch-proposals';
+};
+
+export type ListDispatchProposalsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListDispatchProposalsError = ListDispatchProposalsErrors[keyof ListDispatchProposalsErrors];
+
+export type ListDispatchProposalsResponses = {
+    /**
+     * OK
+     */
+    200: DispatchProposalSummaryPagedResult;
+};
+
+export type ListDispatchProposalsResponse = ListDispatchProposalsResponses[keyof ListDispatchProposalsResponses];
+
+export type CreateDispatchProposalData = {
+    body?: CreateDispatchProposalRequest;
+    path?: never;
+    query?: never;
+    url: '/dispatch-proposals';
+};
+
+export type CreateDispatchProposalErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CreateDispatchProposalError = CreateDispatchProposalErrors[keyof CreateDispatchProposalErrors];
+
+export type CreateDispatchProposalResponses = {
+    /**
+     * Accepted
+     */
+    202: DispatchProposalSummary;
+};
+
+export type CreateDispatchProposalResponse = CreateDispatchProposalResponses[keyof CreateDispatchProposalResponses];
+
+export type GetDispatchProposalData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/dispatch-proposals/{id}';
+};
+
+export type GetDispatchProposalErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetDispatchProposalError = GetDispatchProposalErrors[keyof GetDispatchProposalErrors];
+
+export type GetDispatchProposalResponses = {
+    /**
+     * OK
+     */
+    200: DispatchProposalDetail;
+};
+
+export type GetDispatchProposalResponse = GetDispatchProposalResponses[keyof GetDispatchProposalResponses];
+
+export type ConfirmDispatchProposalData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/dispatch-proposals/{id}/confirm';
+};
+
+export type ConfirmDispatchProposalErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ConfirmDispatchProposalError = ConfirmDispatchProposalErrors[keyof ConfirmDispatchProposalErrors];
+
+export type ConfirmDispatchProposalResponses = {
+    /**
+     * OK
+     */
+    200: DispatchProposalDetail;
+};
+
+export type ConfirmDispatchProposalResponse = ConfirmDispatchProposalResponses[keyof ConfirmDispatchProposalResponses];
+
+export type ApproveDispatchProposalData = {
+    body?: ApproveDispatchProposalRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/dispatch-proposals/{id}/approve';
+};
+
+export type ApproveDispatchProposalErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ApproveDispatchProposalError = ApproveDispatchProposalErrors[keyof ApproveDispatchProposalErrors];
+
+export type ApproveDispatchProposalResponses = {
+    /**
+     * OK
+     */
+    200: DispatchProposalDetail;
+};
+
+export type ApproveDispatchProposalResponse = ApproveDispatchProposalResponses[keyof ApproveDispatchProposalResponses];
+
+export type RejectDispatchProposalData = {
+    body?: RejectDispatchProposalRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/dispatch-proposals/{id}/reject';
+};
+
+export type RejectDispatchProposalErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RejectDispatchProposalError = RejectDispatchProposalErrors[keyof RejectDispatchProposalErrors];
+
+export type RejectDispatchProposalResponses = {
+    /**
+     * OK
+     */
+    200: DispatchProposalDetail;
+};
+
+export type RejectDispatchProposalResponse = RejectDispatchProposalResponses[keyof RejectDispatchProposalResponses];
 
 export type GetDispatchRouteData = {
     body?: never;

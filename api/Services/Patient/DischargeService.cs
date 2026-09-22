@@ -352,7 +352,7 @@ public sealed class DischargeService : IDischargeService
             Patient = ToPatientSummary(admission.Patient),
             WardName = label.WardName,
             BedNumber = label.BedNumber,
-            AdmissionCategory = admission.Category,
+            AdmissionCategory = admission.Category!.Value,
             AdmittedAt = admission.AdmittedAt,
             DaysInBed = admission.AdmittedAt is { } admitted
 

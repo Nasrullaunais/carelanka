@@ -38,4 +38,33 @@ public class EquipmentCategoriesController : ControllerBase
 
         return Created((string?)null, category);
     }
+
+    // Tidying the category list is the hospital administrator's, with the confirmation code,
+    // the same as confirming and retiring equipment.
+    [Authorize(Policy = Policies.EquipmentConfirmer)]
+    [HttpGet("for-removal", Name = "listEquipmentCategoriesForRemoval")]
+    [ProducesResponseType(typeof(List<EquipmentCategoryUsage>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    public async Task<ActionResult<IReadOnlyList<EquipmentCategoryUsage>>> ListEquipmentCategoriesForRemoval(
+        [FromHeader(Name = EquipmentOptions.ConfirmationCodeHeader)] string? confirmationCode,
+        CancellationToken ct)
+        => Ok(await _categories.ListForRemovalAsync(confirmationCode, ct));
+
+    [Authorize(Policy = Policies.EquipmentConfirmer)]
+    [HttpDelete("{id:guid}", Name = "removeEquipmentCategory")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<IActionResult> RemoveEquipmentCategory(
+        Guid id,
+        [FromHeader(Name = EquipmentOptions.ConfirmationCodeHeader)] string? confirmationCode,
+        CancellationToken ct)
+    {
+        await _categories.RemoveAsync(id, confirmationCode, ct);
+
+        return NoContent();
+    }
 }

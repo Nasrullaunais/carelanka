@@ -57,6 +57,11 @@ public class BedAssignmentConfiguration : IEntityTypeConfiguration<BedAssignment
             .HasForeignKey(b => b.ApprovedByStaffMemberId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne<Entities.Common.AgentWorkflow>()
+            .WithMany()
+            .HasForeignKey(b => b.WorkflowId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(b => b.BedId)
             .HasDatabaseName(LiveBedUniqueIndex)
             .IsUnique()

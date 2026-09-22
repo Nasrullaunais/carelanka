@@ -29,6 +29,7 @@ public sealed class MeService : IMeService
     private readonly IAppointmentService _appointments;
     private readonly IBedRegistryService _beds;
     private readonly ILabReportService _labReports;
+    private readonly ICareRecommendationService _careRecommendations;
 
     public MeService(
         CareLankaDbContext db,
@@ -36,7 +37,8 @@ public sealed class MeService : IMeService
         IPatientService patients,
         IAppointmentService appointments,
         IBedRegistryService beds,
-        ILabReportService labReports)
+        ILabReportService labReports,
+        ICareRecommendationService careRecommendations)
     {
         _db = db;
         _currentUser = currentUser;
@@ -44,6 +46,23 @@ public sealed class MeService : IMeService
         _appointments = appointments;
         _beds = beds;
         _labReports = labReports;
+        _careRecommendations = careRecommendations;
+    }
+
+    public async Task<CareWorkflowAccepted> SubmitCareQueryAsync(
+        CareQueryRequest request, CancellationToken ct = default)
+    {
+        var patient = await GetMyRecordAsync(ct);
+
+        return await _careRecommendations.SubmitAsync(patient.Id, request, ct);
+    }
+
+    public async Task<PagedResult<MyCareRecommendation>> GetMyCareRecommendationsAsync(
+        int page, int pageSize, CancellationToken ct = default)
+    {
+        var patient = await GetMyRecordAsync(ct);
+
+        return await _careRecommendations.GetMyRecommendationsAsync(patient.Id, page, pageSize, ct);
     }
 
     public async Task<MyProfile> PreRegisterAsync(

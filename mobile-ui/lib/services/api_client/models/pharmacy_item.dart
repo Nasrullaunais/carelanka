@@ -14,6 +14,7 @@ class PharmacyItem {
     required this.categoryId,
     required this.categoryName,
     required this.unit,
+    required this.batchCount,
     required this.quantityOnHand,
     required this.reorderThreshold,
     required this.isAvailable,
@@ -21,8 +22,7 @@ class PharmacyItem {
     required this.createdAt,
     required this.updatedAt,
     this.manufacturer,
-    this.batchNumber,
-    this.expiryDate,
+    this.earliestExpiry,
     this.unitPrice,
   });
   
@@ -35,11 +35,11 @@ class PharmacyItem {
   @JsonKey(name: 'category_name')
   final String categoryName;
   final String? manufacturer;
-  @JsonKey(name: 'batch_number')
-  final String? batchNumber;
-  @JsonKey(name: 'expiry_date')
-  final DateTime? expiryDate;
   final String unit;
+  @JsonKey(name: 'batch_count')
+  final int batchCount;
+  @JsonKey(name: 'earliest_expiry')
+  final DateTime? earliestExpiry;
   @JsonKey(name: 'quantity_on_hand')
   final int quantityOnHand;
   @JsonKey(name: 'reorder_threshold')

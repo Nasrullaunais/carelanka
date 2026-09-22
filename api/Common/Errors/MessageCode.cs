@@ -60,6 +60,20 @@ public enum MessageCode
 
     PrescriptionFileType,
 
+    EquipmentRetireNeedsCode,
+
+    EquipmentRemoveNeedsRetired,
+
+    PharmacyReceiveIsABatch,
+
+    PharmacyRemoveNeedsEmpty,
+
+    WarningClosed,
+
+    WarningNotResolved,
+
+    EquipmentCategoryInUse,
+
     PharmacyCategoryNameTaken,
 
     PharmacyItemNameTaken,
@@ -136,6 +150,10 @@ public enum MessageCode
 
     CrewMemberAlreadyAssigned,
 
+    AmbulanceNotEligible,
+
+    CallNotAwaitingDispatch,
+
     NicLinkedToAnotherAccount,
 
     NicDoesNotMatchYourRecord,
@@ -148,5 +166,11 @@ public enum MessageCode
 
     NoBillRaised,
 
-    PatientCodeNotClaimable
+    PatientCodeNotClaimable,
+
+    BedSuggestionNotPossible,
+
+    NotCurrentlyAdmittedForCareQuery,
+
+    CareRecommendationNotPendingReview
 }

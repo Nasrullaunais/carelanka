@@ -41,4 +41,10 @@ public interface IMeService
 
     Task<MyAppointment> CancelAppointmentAsync(
         Guid appointmentId, CancellationToken cancellationToken = default);
+
+    Task<CareWorkflowAccepted> SubmitCareQueryAsync(
+        CareQueryRequest request, CancellationToken cancellationToken = default);
+
+    Task<PagedResult<MyCareRecommendation>> GetMyCareRecommendationsAsync(
+        int page, int pageSize, CancellationToken cancellationToken = default);
 }

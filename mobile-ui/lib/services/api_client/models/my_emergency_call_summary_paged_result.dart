@@ -17,9 +17,9 @@ class MyEmergencyCallSummaryPagedResult {
     required this.totalItems,
     required this.totalPages,
   });
-
+  
   factory MyEmergencyCallSummaryPagedResult.fromJson(Map<String, Object?> json) => _$MyEmergencyCallSummaryPagedResultFromJson(json);
-
+  
   final List<MyEmergencyCallSummary> items;
   final int page;
   @JsonKey(name: 'page_size')

@@ -11,9 +11,9 @@ class AssignAmbulanceCrewRequest {
   const AssignAmbulanceCrewRequest({
     required this.staffMemberId,
   });
-
+  
   factory AssignAmbulanceCrewRequest.fromJson(Map<String, Object?> json) => _$AssignAmbulanceCrewRequestFromJson(json);
-
+  
   @JsonKey(name: 'staff_member_id')
   final String staffMemberId;
 

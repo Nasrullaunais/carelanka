@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using CareLanka.Api.Common.Auth;
 using CareLanka.Api.Common.Errors;
+using CareLanka.Api.Common.ModelBinding;
 using CareLanka.Api.Common.OpenApi;
 using CareLanka.Api.Common.Persistence;
 using CareLanka.Api.Data;
@@ -13,6 +14,8 @@ using CareLanka.Api.Services.Equipment;
 using CareLanka.Api.Services.Equipment.Stubs;
 using CareLanka.Api.Services.Emergency;
 using CareLanka.Api.Services.Emergency.Stubs;
+using CareLanka.Api.Agents;
+using CareLanka.Api.Agents.Patient;
 using CareLanka.Api.Services.Patient;
 using FluentValidation;
 using FluentValidation.AspNetCore;
@@ -42,6 +45,7 @@ builder.Services
     {
         options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
         options.ModelMetadataDetailsProviders.Add(new EmergencyQueryBindingMetadataProvider());
+        options.ModelBinderProviders.Insert(0, new SnakeCaseEnumModelBinderProvider());
     })
     .AddJsonOptions(options => ConfigureJson(options.JsonSerializerOptions));
 
@@ -107,6 +111,44 @@ builder.Services
         "Emergency:MinimumReadyCrew must be greater than zero.")
     .Validate(options => options.LocationMaxAgeMinutes > 0,
         "Emergency:LocationMaxAgeMinutes must be greater than zero.")
+    .Validate(options => options.HospitalEntrance.Latitude is >= -90 and <= 90
+            && options.HospitalEntrance.Longitude is >= -180 and <= 180
+            && (options.HospitalEntrance.Latitude != 0 || options.HospitalEntrance.Longitude != 0),
+        "Emergency:HospitalEntrance must have a real latitude and longitude.")
+    .Validate(options => Uri.TryCreate(options.Routing.BaseUrl, UriKind.Absolute, out var routingUrl)
+            && routingUrl.Scheme is "http" or "https"
+            && options.Routing.TimeoutSeconds > 0,
+        "Emergency:Routing must have an http or https BaseUrl and a positive TimeoutSeconds.")
+    .Validate(options => Uri.TryCreate(options.Geocoding.BaseUrl, UriKind.Absolute, out var geocodingUrl)
+            && geocodingUrl.Scheme is "http" or "https"
+            && options.Geocoding.TimeoutSeconds > 0
+            && !string.IsNullOrWhiteSpace(options.Geocoding.UserAgent),
+        "Emergency:Geocoding must have an http or https BaseUrl, a positive TimeoutSeconds and a UserAgent.")
+    .Validate(options => options.PreAdmission.ArrivalAllowanceMinutes > 0 && options.PreAdmission.PollSeconds > 0
+            && options.PreAdmission.MaxAttempts > 0 && options.PreAdmission.RetryBaseSeconds > 0
+            && options.PreAdmission.BatchSize > 0,
+        "Emergency:PreAdmission values must all be greater than zero.")
+    .ValidateOnStart();
+
+builder.Services
+    .AddOptions<PushOptions>()
+    .Bind(builder.Configuration.GetSection(PushOptions.SectionName))
+    .Validate(options => options.PollSeconds > 0 && options.MaxAttempts > 0
+            && options.RetryBaseSeconds > 0 && options.BatchSize > 0,
+        "Push:PollSeconds, MaxAttempts, RetryBaseSeconds and BatchSize must be greater than zero.")
+    .Validate(options => string.IsNullOrWhiteSpace(options.CredentialsPath) || File.Exists(options.CredentialsPath),
+        "Push:CredentialsPath must point to an existing Firebase service-account file.")
+    .ValidateOnStart();
+
+builder.Services
+    .AddOptions<LanguageModelOptions>()
+    .Bind(builder.Configuration.GetSection(LanguageModelOptions.SectionName))
+    .Validate(options => options.TimeoutSeconds > 0 && options.MaxRetries >= 0,
+        "LanguageModel:TimeoutSeconds must be greater than zero and MaxRetries cannot be negative.")
+    .Validate(options => !string.IsNullOrWhiteSpace(options.Model)
+            && Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out var modelUrl)
+            && modelUrl.Scheme is "http" or "https",
+        "LanguageModel:Model must be set and BaseUrl must be an http or https address.")
     .ValidateOnStart();
 
 builder.Services
@@ -114,6 +156,10 @@ builder.Services
     .Bind(builder.Configuration.GetSection(EquipmentOptions.SectionName))
     .Validate(options => !string.IsNullOrWhiteSpace(options.ConfirmationCode),
         "Equipment:ConfirmationCode must be set.")
+    .Validate(options => options.WarningSweepIntervalMinutes >= 0,
+        "Equipment:WarningSweepIntervalMinutes must be zero (off) or more.")
+    .Validate(options => options.ExpiryWarningDays > 0,
+        "Equipment:ExpiryWarningDays must be greater than zero.")
     .ValidateOnStart();
 
 var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
@@ -207,6 +253,15 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
 
+    options.AddPolicy(Policies.MedicalProfileReader, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.Doctor),
+        EnumWire.ToWire(StaffRole.DutyManager)));
+
+    options.AddPolicy(Policies.MedicalProfileAuthor, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.Doctor)));
+
     options.AddPolicy(Policies.AdmissionEditor, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.DutyManager)));
@@ -284,12 +339,29 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.EquipmentManager),
         EnumWire.ToWire(StaffRole.HospitalAdministrator)));
 
+    options.AddPolicy(Policies.PharmacyRemover, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.EquipmentManager),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
     options.AddPolicy(Policies.MaintenanceDesk, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.HospitalAdministrator)));
 
     options.AddPolicy(Policies.EquipmentItemEditor, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.EquipmentManager),
         EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
+    options.AddPolicy(Policies.WarningDesk, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.EquipmentManager),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
+    options.AddPolicy(Policies.CareQueueReader, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.Doctor),
+        EnumWire.ToWire(StaffRole.DutyManager)));
+
+    options.AddPolicy(Policies.CareRecommendationReviewer, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.Doctor)));
 });
 
 var authRequestsPerMinute = builder.Configuration.GetValue("RateLimits:AuthPerMinute", 20);
@@ -338,9 +410,24 @@ builder.Services.AddScoped<IAmbulanceService, AmbulanceService>();
 builder.Services.AddScoped<IAmbulanceCrewService, AmbulanceCrewService>();
 builder.Services.AddScoped<IEmergencyCallService, EmergencyCallService>();
 builder.Services.AddScoped<IDispatchService, DispatchService>();
-builder.Services.AddHostedService<UnacknowledgedDispatchAlertWorker>();
+builder.Services.AddScoped<IDeviceTokenService, DeviceTokenService>();
+builder.Services.AddScoped<IPushNotifications, PushNotifications>();
+builder.Services.AddScoped<PushDeliveryProcessor>();
+builder.Services.AddSingleton<IPushSender>(services =>
+    string.IsNullOrWhiteSpace(services.GetRequiredService<IOptions<PushOptions>>().Value.CredentialsPath)
+        ? ActivatorUtilities.CreateInstance<LoggingPushSender>(services)
+        : ActivatorUtilities.CreateInstance<FirebasePushSender>(services));
+builder.Services.AddHostedService<PushDeliveryWorker>();
 builder.Services.AddScoped<IStaffLookupService, StubStaffLookupService>();
-builder.Services.AddSingleton<IAmbulanceDistanceService, StubAmbulanceDistanceService>();
+builder.Services.AddHttpClient<IAmbulanceDistanceService, OsrmAmbulanceDistanceService>();
+builder.Services.AddHttpClient<IReverseGeocoder, NominatimReverseGeocoder>();
+builder.Services.AddSingleton<SceneLookupQueue>();
+builder.Services.AddSingleton<ISceneLookupQueue>(services => services.GetRequiredService<SceneLookupQueue>());
+builder.Services.AddScoped<SceneLookupProcessor>();
+builder.Services.AddHostedService<SceneLookupWorker>();
+builder.Services.AddScoped<IPreAdmissionGateway, StubPreAdmissionGateway>();
+builder.Services.AddScoped<PreAdmissionProcessor>();
+builder.Services.AddHostedService<PreAdmissionWorker>();
 
 builder.Services.AddScoped<IBedService, BedService>();
 builder.Services.AddScoped<IEquipmentCategoryService, EquipmentCategoryService>();
@@ -351,8 +438,11 @@ builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();
 builder.Services.AddSingleton<IEquipmentConfirmationCode, EquipmentConfirmationCode>();
 builder.Services.AddScoped<ILabReportService, LabReportService>();
 builder.Services.AddScoped<IPrescriptionService, PrescriptionService>();
+builder.Services.AddScoped<IWarningService, WarningService>();
+builder.Services.AddHostedService<WarningSweepWorker>();
 builder.Services.AddScoped<IWardService, WardService>();
 builder.Services.AddScoped<IPatientService, PatientService>();
+builder.Services.AddScoped<IMedicalProfileService, MedicalProfileService>();
 builder.Services.AddScoped<IAdmissionService, AdmissionService>();
 builder.Services.AddScoped<ICapacityService, CapacityService>();
 builder.Services.AddScoped<IAppointmentService, AppointmentService>();
@@ -365,6 +455,41 @@ builder.Services.AddScoped<IBillingRateService, BillingRateService>();
 builder.Services.AddScoped<IMeService, MeService>();
 
 builder.Services.AddScoped<IBedRegistryService, BedRegistryService>();
+
+// The Bed and Patient Details Agent. The tools are the allow-list, so they are registered as one
+// interface and nothing else can widen them. The advisor is the only seam a language model plugs
+// into, and it may only choose between beds the rules have already allowed.
+builder.Services.AddScoped<IBedAgentTools, BedAgentTools>();
+builder.Services.AddScoped<IBedRationaleWriter, DeterministicBedRationaleWriter>();
+builder.Services.AddScoped<IBedAdvisor, GeminiBedAdvisor>();
+builder.Services.AddScoped<IBedAgent, BedAgent>();
+builder.Services.AddScoped<IBedWorkflowRecorder, BedWorkflowRecorder>();
+builder.Services.AddScoped<IBedSuggestionService, BedSuggestionService>();
+builder.Services.AddScoped<BedAgentExecutor>();
+builder.Services.AddSingleton<IAgentRunQueue, AgentRunQueue>();
+builder.Services.AddHostedService<BedAgentWorker>();
+
+// The Patient Care Advisory Agent. Three read tools, no write tool of its own - the draft it
+// produces is written by CareAgentExecutor once the model (or its deterministic fallback)
+// answers, never by the agent directly. Its own queue and worker, separate from the bed agent's:
+// two agents on one single-reader channel would mean whichever one reads first processes an id
+// it does not understand.
+builder.Services.AddScoped<ICareAgentTools, CareAgentTools>();
+builder.Services.AddScoped<ICareAdvisor, GeminiCareAdvisor>();
+builder.Services.AddScoped<ICareAgent, CareAgent>();
+builder.Services.AddScoped<ICareRecommendationService, CareRecommendationService>();
+builder.Services.AddScoped<CareAgentExecutor>();
+builder.Services.AddSingleton<ICareRunQueue, CareRunQueue>();
+builder.Services.AddHostedService<CareAgentWorker>();
+
+// ADR 2: the provider is one registration and nothing in an agent knows which model answered.
+// With no key the API still starts and every agent still answers - see NoLanguageModel.
+builder.Services.AddHttpClient(GeminiLanguageModel.HttpClientName);
+builder.Services.AddSingleton<ILanguageModel>(services =>
+    string.IsNullOrWhiteSpace(
+        services.GetRequiredService<IOptions<LanguageModelOptions>>().Value.ApiKey)
+        ? ActivatorUtilities.CreateInstance<NoLanguageModel>(services)
+        : ActivatorUtilities.CreateInstance<GeminiLanguageModel>(services));
 
 builder.Services.AddSingleton<IWardDirectory, StubWardDirectory>();
 

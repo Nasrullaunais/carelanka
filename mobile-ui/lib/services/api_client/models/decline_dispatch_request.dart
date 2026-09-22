@@ -11,9 +11,9 @@ class DeclineDispatchRequest {
   const DeclineDispatchRequest({
     this.reason,
   });
-
+  
   factory DeclineDispatchRequest.fromJson(Map<String, Object?> json) => _$DeclineDispatchRequestFromJson(json);
-
+  
   final String? reason;
 
   Map<String, Object?> toJson() => _$DeclineDispatchRequestToJson(this);

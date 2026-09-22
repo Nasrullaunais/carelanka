@@ -24,6 +24,11 @@ public sealed class DispatchConfiguration : IEntityTypeConfiguration<Dispatch>
             .IsRequired();
         builder.Property(dispatch => dispatch.DispatchedAt).IsRequired();
         builder.Property(dispatch => dispatch.DeclinedReason).HasMaxLength(500);
+        builder.Property(dispatch => dispatch.CancellationReason).HasMaxLength(500);
+        builder.Property(dispatch => dispatch.ReassignmentReason).HasMaxLength(500);
+        builder.Property(dispatch => dispatch.HandoverNotes).HasMaxLength(1000);
+        builder.Property(dispatch => dispatch.PatientCondition).HasMaxLength(500);
+        builder.Property(dispatch => dispatch.Version).IsRowVersion();
 
         builder.HasOne(dispatch => dispatch.EmergencyCall)
             .WithMany(call => call.Dispatches)

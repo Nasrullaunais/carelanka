@@ -1206,6 +1206,9 @@ paths:
         line on the React map view reads from here, so the map shows the route that
         was actually planned rather than re-querying and getting a different answer
         later.
+
+        The route is saved a few seconds after dispatch, so this returns 404 until then and
+        when the routing service was unavailable. Crew can read only their own run.
       operationId: getDispatchRoute
       responses:
         '200':
@@ -1293,6 +1296,7 @@ paths:
                       items:
                         type: array
                         items: { $ref: '#/components/schemas/DispatchSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /me/dispatches/{id}/acknowledge:
@@ -1415,6 +1419,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
 
   /me/dispatches/{id}/handover:
     parameters:
@@ -1439,12 +1444,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [notes]
               properties:
-                notes: { type: string, maxLength: 1000 }
-                patient_condition: { type: string, maxLength: 500 }
-                identified_patient_name: { type: string, maxLength: 200, nullable: true }
-                identified_patient_phone: { type: string, maxLength: 20, nullable: true }
+                notes: { type: string, maxLength: 1000, nullable: true }
+                patient_condition: { type: string, maxLength: 500, nullable: true }
       responses:
         '200':
           description: Recorded
@@ -1973,7 +1975,7 @@ components:
         address_label:
           type: string
           nullable: true
-          description: Human-readable address from the maps API's reverse geocode, for the crew.
+          description: Address looked up from the coordinates a few seconds after the call is logged, so it can be empty at first or when the lookup service is down.
         details: { type: string, nullable: true }
         priority: { $ref: '#/components/schemas/CallPriority' }
         status: { $ref: '#/components/schemas/CallStatus' }
@@ -2107,7 +2109,15 @@ components:
         distance_km:
           type: number
           nullable: true
-          description: Only present when the query supplied `nearToLatitude`/`nearToLongitude`.
+          description: Only present when the query supplied `nearToLatitude`/`nearToLongitude`. Road distance, or straight-line when `is_straight_line_distance` is true.
+        drive_minutes:
+          type: integer
+          nullable: true
+          description: Estimated driving time. Absent when the routing service was unavailable and the ranking fell back to straight-line distance.
+        is_straight_line_distance:
+          type: boolean
+          nullable: true
+          description: True when the routing service failed and `distance_km` is a straight line, so the UI can say so. Absent when no position was supplied.
 
     AmbulanceDetail:
       allOf:
@@ -2339,6 +2349,14 @@ components:
         acknowledged_at: { type: string, format: date-time, nullable: true }
         acknowledged_by_staff_id: { type: string, format: uuid, nullable: true }
         declined_reason: { type: string, nullable: true }
+        cancellation_reason: { type: string, nullable: true }
+        reassignment_reason: { type: string, nullable: true }
+        acknowledgement_overdue:
+          type: boolean
+          description: |
+            Server-computed. True while the dispatch is still `assigned` and the configured
+            acknowledgement window (30 seconds by default) has passed. Nothing is stored;
+            the dispatcher board reads it and shows the warning.
         completed_at: { type: string, format: date-time, nullable: true }
         dispatch_proposal_id: { type: string, format: uuid, nullable: true }
         superseded_by_dispatch_id:
@@ -2356,6 +2374,7 @@ components:
         ambulance_registration: { type: string }
         call_priority: { $ref: '#/components/schemas/CallPriority' }
         status: { $ref: '#/components/schemas/DispatchStatus' }
+        acknowledgement_overdue: { type: boolean }
         crew_count: { type: integer }
         dispatched_at: { type: string, format: date-time }
         completed_at: { type: string, format: date-time, nullable: true }
@@ -2403,7 +2422,7 @@ components:
         maps_api_reference:
           type: string
           nullable: true
-          description: The maps provider's own request id, so a disputed ETA can be traced back.
+          description: Which routing provider produced the estimate (`osrm`), so a disputed ETA can be traced back. The provider gives no request ids.
 
     NavigationTarget:
       type: object

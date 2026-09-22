@@ -8,12 +8,18 @@ import 'package:retrofit/retrofit.dart';
 import '../models/cancel_dispatch_request.dart';
 import '../models/dispatch_detail.dart';
 import '../models/reassign_dispatch_request.dart';
+import '../models/route_log.dart';
 
 part 'dispatches_api.g.dart';
 
 @RestApi()
 abstract class DispatchesApi {
   factory DispatchesApi(Dio dio, {String? baseUrl}) = _DispatchesApi;
+
+  @GET('/dispatches/{id}/route')
+  Future<RouteLog> getDispatchRoute({
+    @Path('id') required String id,
+  });
 
   @POST('/dispatches/{id}/cancel')
   Future<DispatchDetail> cancelDispatch({

@@ -25,6 +25,8 @@ class AmbulanceSummary {
     this.eligibilityBlockReasons,
     this.activeDispatchId,
     this.distanceKm,
+    this.driveMinutes,
+    this.isStraightLineDistance,
   });
   
   factory AmbulanceSummary.fromJson(Map<String, Object?> json) => _$AmbulanceSummaryFromJson(json);
@@ -53,6 +55,10 @@ class AmbulanceSummary {
   final bool isDivertible;
   @JsonKey(name: 'distance_km')
   final double? distanceKm;
+  @JsonKey(name: 'drive_minutes')
+  final int? driveMinutes;
+  @JsonKey(name: 'is_straight_line_distance')
+  final bool? isStraightLineDistance;
 
   Map<String, Object?> toJson() => _$AmbulanceSummaryToJson(this);
 }

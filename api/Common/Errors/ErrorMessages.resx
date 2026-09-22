@@ -172,6 +172,34 @@
     <value>A prescription has to be a photo (JPEG or PNG) or a PDF. This one is {0}.</value>
     <comment>Names what is allowed and what arrived.</comment>
   </data>
+  <data name="cl_equ_024" xml:space="preserve">
+    <value>Retiring {0} is done from Retire, by the hospital administrator with the confirmation code.</value>
+    <comment>Taking a machine off the register for good is a second pair of eyes plus the code, so it cannot be an accidental edit.</comment>
+  </data>
+  <data name="cl_equ_025" xml:space="preserve">
+    <value>{0} has to be retired before it can be removed from the register.</value>
+    <comment>Two steps on purpose: retiring is the decision, removing only tidies the list afterwards.</comment>
+  </data>
+  <data name="cl_equ_026" xml:space="preserve">
+    <value>Stock arriving is a new batch of {0}, with its own expiry date. Use Add batch.</value>
+    <comment>Received stock has to say when it expires, which a plain quantity cannot.</comment>
+  </data>
+  <data name="cl_equ_027" xml:space="preserve">
+    <value>{0} still has {1} {2} on the shelf. Dispense or write off the rest before removing it.</value>
+    <comment>Removing hides the medicine from every list, so stock must not disappear with it.</comment>
+  </data>
+  <data name="cl_equ_028" xml:space="preserve">
+    <value>This warning is already closed ({0}), so there is nothing to acknowledge.</value>
+    <comment>Only an open warning can be acknowledged; a closed one stays as it was.</comment>
+  </data>
+  <data name="cl_equ_029" xml:space="preserve">
+    <value>This warning is {0}, not resolved. Only a resolved warning can be marked done.</value>
+    <comment>Done takes a fixed problem off the list; an open one must be fixed first.</comment>
+  </data>
+  <data name="cl_equ_030" xml:space="preserve">
+    <value>{0} still has {1} item(s) on the register. Remove those items first, then the category.</value>
+    <comment>Removing a category in use would leave machines with no category.</comment>
+  </data>
   <data name="cl_equ_013" xml:space="preserve">
     <value>{0} is with the maintenance unit. It comes back into service when they complete the repair, not by editing its status.</value>
     <comment>Says where the item is and who releases it, because the caller's next move is to go and look at the repair queue.</comment>
@@ -195,6 +223,12 @@
   </data>
   <data name="cl_emg_004" xml:space="preserve">
     <value>Crew member {0} already has a current ambulance assignment.</value>
+  </data>
+  <data name="cl_emg_005" xml:space="preserve">
+    <value>This ambulance cannot be dispatched: {0}.</value>
+  </data>
+  <data name="cl_emg_006" xml:space="preserve">
+    <value>This emergency call is not waiting for an ambulance.</value>
   </data>
   <data name="cl_pat_002" xml:space="preserve">
     <value>A patient with NIC {0} is already registered, as record {1}.</value>
@@ -333,5 +367,17 @@
   <data name="cl_pat_037" xml:space="preserve">
     <value>That patient code and NIC do not match. Check the slip the hospital gave you, or call the desk.</value>
     <comment>Patient self-service. Deliberately one message for every failure - no such code, wrong NIC, no NIC on file, already claimed. Saying which would confirm to a stranger holding a slip that the code is real, which is the thing the NIC is there to stop.</comment>
+  </data>
+  <data name="cl_pat_039" xml:space="preserve">
+    <value>{0} already has a bed or has left, so there is nothing to suggest.</value>
+    <comment>The bed agent's entry point. Only a visit still waiting for a bed can receive a suggestion; one already reserved, admitted, discharged or cancelled is a 409 rather than a run that returns nothing. cl_pat_038 is deliberately skipped - it belongs to the care advisory agent.</comment>
+  </data>
+  <data name="cl_pat_038" xml:space="preserve">
+    <value>You have no current stay, so there is nobody to route this to. If this is urgent, use the emergency call screen.</value>
+    <comment>The care advisory agent's entry point. POST /me/care-queries refuses anybody without an open admission - nothing runs, no workflow row is created, no model is called.</comment>
+  </data>
+  <data name="cl_pat_040" xml:space="preserve">
+    <value>This care recommendation has already been reviewed.</value>
+    <comment>Approve or reject on a recommendation that is not pending_review - either it was already actioned, or a second reviewer opened the same one a moment later.</comment>
   </data>
 </root>

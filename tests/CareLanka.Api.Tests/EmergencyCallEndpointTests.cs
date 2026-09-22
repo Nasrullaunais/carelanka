@@ -5,6 +5,7 @@ using System.Text.Json;
 using CareLanka.Api.Data;
 using CareLanka.Api.Data.Entities.Common;
 using CareLanka.Api.Data.Enums;
+using CareLanka.Api.Services.Emergency;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -54,6 +55,26 @@ public sealed class EmergencyCallEndpointTests
     }
 
     [Fact]
+    public async Task A_new_call_and_a_moved_call_both_queue_an_address_lookup()
+    {
+        using var patient = await PatientClientAsync();
+        using var manager = await StaffClientAsync(ApiApplication.ManagerEmail);
+        var queue = _application.Services.GetRequiredService<SceneLookupQueue>().Reader;
+        while (queue.TryRead(out _)) { }
+
+        using var created = await patient.PostAsJsonAsync("/api/emergency-calls", Request(Guid.NewGuid(), true));
+        using var body = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+        var callId = body.RootElement.GetProperty("id").GetGuid();
+        Assert.True(queue.TryRead(out var first));
+        Assert.Equal(new AddressLookupJob(callId), first);
+
+        using var moved = await manager.PatchAsJsonAsync($"/api/emergency-calls/{callId}", new { latitude = 6.93, longitude = 79.86 });
+        Assert.Equal(HttpStatusCode.OK, moved.StatusCode);
+        Assert.True(queue.TryRead(out var second));
+        Assert.Equal(new AddressLookupJob(callId), second);
+    }
+
+    [Fact]
     public async Task A_patient_call_can_be_manually_dispatched_and_handed_over_without_AI()
     {
         using var patient = await PatientClientAsync();
@@ -76,7 +97,7 @@ public sealed class EmergencyCallEndpointTests
         Assert.Equal(HttpStatusCode.OK, (await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status = "en_route_to_scene" })).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status = "at_scene" })).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status = "transporting_to_hospital" })).StatusCode);
-        using var handover = await crew.PostAsync($"/api/me/dispatches/{dispatchId}/handover", null);
+        using var handover = await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/handover", new { notes = "Handed to triage" });
         Assert.Equal(HttpStatusCode.OK, handover.StatusCode);
         using var handoverBody = JsonDocument.Parse(await handover.Content.ReadAsStringAsync());
         Assert.Equal("handed_over", handoverBody.RootElement.GetProperty("status").GetString());

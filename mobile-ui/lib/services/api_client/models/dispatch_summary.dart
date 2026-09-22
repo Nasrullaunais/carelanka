@@ -19,6 +19,7 @@ class DispatchSummary {
     this.status,
     this.destinationWardName,
     this.crewCount,
+    this.acknowledgementOverdue,
     this.dispatchedAt,
     this.completedAt,
   });
@@ -37,6 +38,8 @@ class DispatchSummary {
   final String? destinationWardName;
   @JsonKey(name: 'crew_count')
   final int? crewCount;
+  @JsonKey(name: 'acknowledgement_overdue')
+  final bool? acknowledgementOverdue;
   @JsonKey(name: 'dispatched_at')
   final DateTime? dispatchedAt;
   @JsonKey(name: 'completed_at')

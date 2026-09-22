@@ -17,12 +17,15 @@ public class PharmacyItem
 
     public string? Manufacturer { get; set; }
 
-    public string? BatchNumber { get; set; }
-
-    public DateOnly? ExpiryDate { get; set; }
-
     [Required]
     public string Unit { get; set; } = string.Empty;
+
+    /// <summary>How many deliveries of this medicine are on the shelf.</summary>
+    [Required]
+    public int BatchCount { get; set; }
+
+    /// <summary>The soonest expiry date among batches that still have stock.</summary>
+    public DateOnly? EarliestExpiry { get; set; }
 
     [Required]
     public int QuantityOnHand { get; set; }

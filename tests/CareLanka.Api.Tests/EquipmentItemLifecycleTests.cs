@@ -73,7 +73,7 @@ public sealed class EquipmentItemLifecycleTests
     {
         using var client = await EquipmentClientAsync();
         var id = await NewItemIdAsync(client);
-        await client.PutAsJsonAsync($"/api/equipment-items/{id}", new { status = "retired" });
+        await RetireAsync(id);
 
         var response = await ReportFaultAsync(client, id, "Found in the corridor.");
         using var body = await ReadJsonAsync(response);
@@ -149,8 +149,7 @@ public sealed class EquipmentItemLifecycleTests
 
         var back = await client.PutAsJsonAsync(
             $"/api/equipment-items/{repaired}", new { status = "available" });
-        var gone = await client.PutAsJsonAsync(
-            $"/api/equipment-items/{scrapped}", new { status = "retired" });
+        var gone = await RetireAsync(scrapped);
 
         Assert.Equal(HttpStatusCode.Conflict, back.StatusCode);
 
@@ -198,8 +197,7 @@ public sealed class EquipmentItemLifecycleTests
         var id = await NewItemIdAsync(client);
         await ReportFaultAsync(client, id, "Cracked housing, not worth repairing.");
 
-        var retired = await client.PutAsJsonAsync(
-            $"/api/equipment-items/{id}", new { status = "retired" });
+        var retired = await RetireAsync(id);
 
         Assert.Equal(HttpStatusCode.OK, retired.StatusCode);
 
@@ -285,16 +283,113 @@ public sealed class EquipmentItemLifecycleTests
         return id;
     }
 
+    // Retiring is the hospital administrator's, with the confirmation code.
+    private async Task<HttpResponseMessage> RetireAsync(Guid id)
+    {
+        using var administrator = await ConfirmingAdministratorAsync();
+
+        return await administrator.PostAsync($"/api/equipment-items/{id}/retire", null);
+    }
+
+    [Fact]
+    public async Task Retiring_is_the_administrators_with_the_code_and_not_an_edit()
+    {
+        using var equipment = await EquipmentClientAsync();
+        var id = await NewItemIdAsync(equipment);
+
+        var byEdit = await equipment.PutAsJsonAsync(
+            $"/api/equipment-items/{id}", new { status = "retired" });
+        using var editBody = await ReadJsonAsync(byEdit);
+
+        equipment.DefaultRequestHeaders.Add(
+            "X-Confirmation-Code", ApiApplication.EquipmentConfirmationCode);
+        var byManager = await equipment.PostAsync($"/api/equipment-items/{id}/retire", null);
+
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
+        administrator.DefaultRequestHeaders.Add("X-Confirmation-Code", "not-the-code");
+        var wrongCode = await administrator.PostAsync($"/api/equipment-items/{id}/retire", null);
+        using var codeBody = await ReadJsonAsync(wrongCode);
+
+        var retired = await RetireAsync(id);
+        using var body = await ReadJsonAsync(retired);
+
+        Assert.Equal(HttpStatusCode.Conflict, byEdit.StatusCode);
+        Assert.Equal("cl_equ_024", editBody.RootElement.GetProperty("code").GetString());
+        Assert.Equal(HttpStatusCode.Forbidden, byManager.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, wrongCode.StatusCode);
+        Assert.Equal("cl_equ_017", codeBody.RootElement.GetProperty("code").GetString());
+        Assert.Equal(HttpStatusCode.OK, retired.StatusCode);
+        Assert.Equal("retired", body.RootElement.GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task Removing_takes_a_retired_item_off_the_register_and_frees_its_tag()
+    {
+        using var equipment = await EquipmentClientAsync();
+        using var administrator = await ConfirmingAdministratorAsync();
+        var id = await NewItemIdAsync(equipment);
+
+        var tooEarly = await administrator.DeleteAsync($"/api/equipment-items/{id}");
+        using var tooEarlyBody = await ReadJsonAsync(tooEarly);
+
+        await RetireAsync(id);
+        var removed = await administrator.DeleteAsync($"/api/equipment-items/{id}");
+        var afterwards = await equipment.GetAsync($"/api/equipment-items/{id}");
+
+        Assert.Equal(HttpStatusCode.Conflict, tooEarly.StatusCode);
+        Assert.Equal("cl_equ_025", tooEarlyBody.RootElement.GetProperty("code").GetString());
+        Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, afterwards.StatusCode);
+    }
+
+    [Fact]
+    public async Task Removing_is_the_administrators_with_the_code()
+    {
+        using var equipment = await EquipmentClientAsync();
+        var id = await NewItemIdAsync(equipment);
+        await RetireAsync(id);
+
+        equipment.DefaultRequestHeaders.Add(
+            "X-Confirmation-Code", ApiApplication.EquipmentConfirmationCode);
+        var byManager = await equipment.DeleteAsync($"/api/equipment-items/{id}");
+
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
+        administrator.DefaultRequestHeaders.Add("X-Confirmation-Code", "not-the-code");
+        var wrongCode = await administrator.DeleteAsync($"/api/equipment-items/{id}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, byManager.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, wrongCode.StatusCode);
+    }
+
+    [Fact]
+    public async Task An_item_a_patient_is_using_cannot_be_retired()
+    {
+        using var client = await EquipmentClientAsync();
+        var id = await NewItemIdAsync(client);
+        await AssignAsync(client, id, Guid.NewGuid());
+
+        var response = await RetireAsync(id);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
     // A registered item cannot be assigned, faulted or serviced until the hospital administrator
     // confirms it, so every test that needs a working item confirms it first.
     private async Task ConfirmAsync(Guid id)
     {
-        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
-        administrator.DefaultRequestHeaders.Add(
-            "X-Confirmation-Code", ApiApplication.EquipmentConfirmationCode);
+        using var administrator = await ConfirmingAdministratorAsync();
 
         var response = await administrator.PostAsync($"/api/equipment-items/{id}/confirm", null);
         response.EnsureSuccessStatusCode();
+    }
+
+    private async Task<HttpClient> ConfirmingAdministratorAsync()
+    {
+        var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
+        administrator.DefaultRequestHeaders.Add(
+            "X-Confirmation-Code", ApiApplication.EquipmentConfirmationCode);
+
+        return administrator;
     }
 
     private Task<HttpClient> EquipmentClientAsync() => ClientAsync(ApiApplication.EquipmentEmail);

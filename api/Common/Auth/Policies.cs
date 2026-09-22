@@ -22,6 +22,20 @@ public static class Policies
 
     public const string PatientEditor = nameof(PatientEditor);
 
+    /// <summary>
+    /// Reading what the hospital knows about a patient's health. The duty manager is on it
+    /// because they work the patients board; reception and the billing desk are not, and that is
+    /// the whole point of it being a separate policy from <see cref="PatientDetails"/>.
+    /// </summary>
+    public const string MedicalProfileReader = nameof(MedicalProfileReader);
+
+    /// <summary>
+    /// Writing it - the nurse at the bed and the doctor, and nobody else. Narrower than
+    /// <see cref="MedicalProfileReader"/> by the duty manager, who reads a ward board rather
+    /// than taking a clinical history.
+    /// </summary>
+    public const string MedicalProfileAuthor = nameof(MedicalProfileAuthor);
+
     public const string AdmissionEditor = nameof(AdmissionEditor);
 
     public const string BedAssigner = nameof(BedAssigner);
@@ -79,6 +93,10 @@ public static class Policies
 
     public const string EquipmentConfirmationTracker = nameof(EquipmentConfirmationTracker);
 
+    // Removing a medicine from the register hides it from every list, so it takes the confirmation
+    // code on top of the role - the pharmacy's own staff, or the administrator.
+    public const string PharmacyRemover = nameof(PharmacyRemover);
+
     // The maintenance unit is run by the hospital administrator: booking work, reading the work
     // list, and confirming it done. The equipment manager reports faults and nothing more here.
     public const string MaintenanceDesk = nameof(MaintenanceDesk);
@@ -86,4 +104,22 @@ public static class Policies
     // Editing an item stays with the equipment manager; the administrator also needs it to retire a
     // machine the maintenance unit cannot fix.
     public const string EquipmentItemEditor = nameof(EquipmentItemEditor);
+
+    // The warnings list: low stock, expiring medicine and overdue maintenance. The equipment manager
+    // runs the pharmacy and the register it is about; the administrator runs the maintenance unit.
+    public const string WarningDesk = nameof(WarningDesk);
+
+    /// <summary>
+    /// Reading the care advisory agent's review queue - the patient's report, its draft, and the
+    /// run behind it. Wider than <see cref="CareRecommendationReviewer"/> by the duty manager, who
+    /// may see the queue exists without being able to act on it.
+    /// </summary>
+    public const string CareQueueReader = nameof(CareQueueReader);
+
+    /// <summary>
+    /// Approving, editing or rejecting a draft - a Doctor or the Ward Nurse on shift, the person
+    /// who will actually walk over and look at the patient. Deliberately narrower than
+    /// <see cref="CareQueueReader"/>; see patient-management-plan.md section 8.16.
+    /// </summary>
+    public const string CareRecommendationReviewer = nameof(CareRecommendationReviewer);
 }

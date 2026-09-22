@@ -11,6 +11,12 @@ export const transactionTypes = Object.keys(
   transactionTypeLabels,
 ) as PharmacyTransactionType[];
 
+// Stock arriving is a batch, with its own expiry date, so it is added through Add batch rather
+// than recorded as a plain movement. The API refuses `received` here too.
+export const movementTypes = transactionTypes.filter(
+  (type) => type !== 'received',
+) as PharmacyTransactionType[];
+
 export const takesStock: Record<PharmacyTransactionType, boolean> = {
   received: false,
   dispensed: true,

@@ -7,10 +7,13 @@ import 'package:dio/dio.dart';
 import 'clients/admissions_api.dart';
 import 'clients/ambulances_api.dart';
 import 'clients/auth_api.dart';
+import 'clients/bed_assignment_api.dart';
 import 'clients/beds_api.dart';
 import 'clients/billing_api.dart';
 import 'clients/calls_api.dart';
 import 'clients/cancellation_review_api.dart';
+import 'clients/care_recommendations_api.dart';
+import 'clients/device_tokens_api.dart';
 import 'clients/discharge_api.dart';
 import 'clients/dispatches_api.dart';
 import 'clients/equipment_api.dart';
@@ -18,6 +21,7 @@ import 'clients/health_api.dart';
 import 'clients/integration_api.dart';
 import 'clients/laboratory_api.dart';
 import 'clients/maintenance_api.dart';
+import 'clients/monitoring_api.dart';
 import 'clients/my_calls_api.dart';
 import 'clients/my_run_api.dart';
 import 'clients/patient_self_service_api.dart';
@@ -41,10 +45,13 @@ class CareLankaApi {
   AdmissionsApi? _admissions;
   AmbulancesApi? _ambulances;
   AuthApi? _auth;
+  BedAssignmentApi? _bedAssignment;
   BedsApi? _beds;
   BillingApi? _billing;
   CallsApi? _calls;
   CancellationReviewApi? _cancellationReview;
+  CareRecommendationsApi? _careRecommendations;
+  DeviceTokensApi? _deviceTokens;
   DischargeApi? _discharge;
   DispatchesApi? _dispatches;
   EquipmentApi? _equipment;
@@ -52,6 +59,7 @@ class CareLankaApi {
   IntegrationApi? _integration;
   LaboratoryApi? _laboratory;
   MaintenanceApi? _maintenance;
+  MonitoringApi? _monitoring;
   MyCallsApi? _myCalls;
   MyRunApi? _myRun;
   PatientSelfServiceApi? _patientSelfService;
@@ -65,6 +73,8 @@ class CareLankaApi {
 
   AuthApi get auth => _auth ??= AuthApi(_dio, baseUrl: _baseUrl);
 
+  BedAssignmentApi get bedAssignment => _bedAssignment ??= BedAssignmentApi(_dio, baseUrl: _baseUrl);
+
   BedsApi get beds => _beds ??= BedsApi(_dio, baseUrl: _baseUrl);
 
   BillingApi get billing => _billing ??= BillingApi(_dio, baseUrl: _baseUrl);
@@ -72,6 +82,10 @@ class CareLankaApi {
   CallsApi get calls => _calls ??= CallsApi(_dio, baseUrl: _baseUrl);
 
   CancellationReviewApi get cancellationReview => _cancellationReview ??= CancellationReviewApi(_dio, baseUrl: _baseUrl);
+
+  CareRecommendationsApi get careRecommendations => _careRecommendations ??= CareRecommendationsApi(_dio, baseUrl: _baseUrl);
+
+  DeviceTokensApi get deviceTokens => _deviceTokens ??= DeviceTokensApi(_dio, baseUrl: _baseUrl);
 
   DischargeApi get discharge => _discharge ??= DischargeApi(_dio, baseUrl: _baseUrl);
 
@@ -86,6 +100,8 @@ class CareLankaApi {
   LaboratoryApi get laboratory => _laboratory ??= LaboratoryApi(_dio, baseUrl: _baseUrl);
 
   MaintenanceApi get maintenance => _maintenance ??= MaintenanceApi(_dio, baseUrl: _baseUrl);
+
+  MonitoringApi get monitoring => _monitoring ??= MonitoringApi(_dio, baseUrl: _baseUrl);
 
   MyCallsApi get myCalls => _myCalls ??= MyCallsApi(_dio, baseUrl: _baseUrl);
 

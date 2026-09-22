@@ -46,19 +46,20 @@
 | 8 | Codegen gate | **Done.** `bun run check:codegen` in `web-ui/` regenerates and fails on any diff under `src/services/api/generated`. Reads the document off a **running** API on `:5231` |
 | 9 | React: admissions dashboard, bed board, occupancy report | **Done.** `DashboardPage`, `PatientsPage` (the board, with assign / correct bed on the row), `IntakePage`, `AppointmentsPage`, `CapacityPage`, `DischargePage`, `WardsPage`, `BillingSettingsPage` |
 | 9b | **The `/me/*` backend** | **Done 2026-09-12.** Seven routes: `pre-register`, `profile`, `admission`, `history`, book / list / cancel appointments. Not one takes a patient id - all scoped by the `sub` claim. `pre-register` creates no admission; see `patient-management-plan.md` §7.6 |
-| 10 | Flutter: nurse screens, then the patient's own-stay screens | **Done.** `mobile-ui/` is a real Flutter app with `android/` and `ios/`, the generated `api_client`, and the patient feature under `lib/features/patient/`. Local notifications on status change is the device feature |
-| 11 | **`PatientMedicalProfile` entity + configuration + migration + seed** | *(New 2026-09-16, and it moved to the front.)* One table, one row per patient, `UNIQUE(patient_id)`, plus `GET`/`PUT /patients/{id}/medical-profile` and the nurse screen. **Do this first of the six**: it is ordinary CRUD with no agent in it, it is what makes step 15 an agent rather than a rephraser, and the seed data has to exist before either agent can be demonstrated |
-| 12 | **The bed agent** | Hard rules H0–H6 are **already built** — `BedPlacementRules.cs`, step 6. The agent calls them, it does not get its own copy. Four **read-only** tools (§8.4), best + selectable alternatives, and a `blocker` sentence built in C# naming the rule that stopped it (§8.6). **It writes nothing** |
-| 13 | React + Flutter: the suggestion panel | Who the patient is, the suggested bed, every alternative with its own button. Confirming calls `POST /admissions/{id}/assign-bed` with the `workflow_id` — the endpoint from step 6, with one new optional field. **There is no approval screen and no approval endpoint** (§8.6b) |
-| 14 | `CareRecommendation` entity + configuration + migration | Independent of the bed workflow — no dependency on steps 1–13 beyond `Patient`, `Admission` and step 11 existing |
-| 15 | **The care advisory agent, last** | Deterministic red-flag keyword screen (§8.13) runs *before* the model, not after. Rules CR1–CR5 (§8.15) validated the same way H0–H6 are. CR5 is the new one and needs step 11. Entry point refuses anybody not admitted, `409 cl_pat_038` |
-| 16 | React + Flutter: the review queue, and the patient's side | Queue is **Doctor or Ward Nurse** (§8.16), and shows the profile the agent read. Patient side is a card inside My Stay, never a top-level screen; never renders `agent_message` or `rejection_reason` |
+| 10 | Flutter: nurse screens, then the patient's own-stay screens | **Done, then reversed 2026-09-21.** `mobile-ui/` is a real Flutter app with `android/` and `ios/`, the generated `api_client`, and the patient feature under `lib/features/patient/`. Local notifications on status change is the device feature. **The nurse screens named here were removed the same day** — see the row 12/13/16 notes below and `patient-management-plan.md` §10 |
+| 11 | **`PatientMedicalProfile` entity + configuration + migration + seed** | **Done 2026-09-18.** One table, one row per patient, `UNIQUE(patient_id)`, `GET`/`PUT /patients/{id}/medical-profile` behind `MedicalProfileReader` / `MedicalProfileAuthor`. **The editor is React-only** — the Flutter screen off the nurse worklist mentioned here was removed 2026-09-21; mobile has no staff screens. Seeded in `docs/seed/005_patient_medical_profiles.sql` — two patients are deliberately left without a profile so the agent's empty-profile path can be demonstrated |
+| 12 | **The bed agent** | **Done 2026-09-20, reworked 2026-09-21.** `api/Agents/Patient/` — four read-only tools, the plan/resolve/gather/filter/rank/decide/validate/pause loop with two retries and a safe failure, run on a background worker behind `POST /api/bed-suggestions` and `GET /api/bed-workflows/{workflowId}`. It calls the same `BedPlacementRules.EnsurePlaceable` a manual pick calls, three times over, and gets no rulebook of its own. **Gemini no longer just writes a sentence at the end** — `BedFitScoring` ranks candidates on seven weighted soft rules (S1–S7) first, then `GeminiBedAdvisor` picks one bed off a one-per-ward shortlist using the clinician's notes, the one input no weight can read. **It writes nothing but its own workflow row** — no hold, no bed out of circulation, the visit left at `awaiting_bed` |
+| 13 | React: the suggestion panel *(done, React-only)* | Who the patient is, one suggested bed with its reason and the sentences behind its score, "Choose another bed" revealing every alternative each with its own button, and a live progress checklist while the run is going. Confirming calls `POST /admissions/{id}/assign-bed` with the `workflow_id` — the endpoint from step 6, with one new optional field. **There is no approval screen and no approval endpoint** (§8.6b). **Not built in Flutter** — mobile has no staff screens (Reversed 2026-09-21) |
+| 14 | `CareRecommendation` entity + configuration + migration | **Done 2026-09-21.** `Patient_AddCareRecommendation`, applied locally. Independent of the bed workflow — no dependency on steps 1–13 beyond `Patient`, `Admission` and step 11 |
+| 15 | **The care advisory agent, last** | **Done 2026-09-21.** `api/Agents/Patient/CareAgent.cs` and friends — screen (§8.13, deterministic, before the model), gather (medical profile + history + current admission, three read-only tools), draft (`GeminiCareAdvisor`, falls back to `DeterministicCareAdvisor` with no key/dead quota/timeout — never a hard failure), validate (CR1–CR5, deterministic, `CareRecommendationValidator.cs`), pause. Own queue and worker (`CareRunQueue` / `CareAgentWorker`), separate from the bed agent's single-reader channel. Entry point (`POST /me/care-queries`) refuses anybody not admitted, `409 cl_pat_038`, before a workflow row or the model is ever touched |
+| 16 | React: the review queue, and the patient's side | **Done 2026-09-21.** Queue is **Doctor or Ward Nurse** to approve/reject (§8.16, `Policies.CareRecommendationReviewer`), **Doctor, Ward Nurse or Duty Manager** to read it (`Policies.CareQueueReader`), and shows the profile the agent read (fetched from the existing medical-profile endpoint, not a new field) — **in React for both roles**. Patient side is a card inside My Stay, only while admitted, never a top-level screen; never renders `agent_message` or `rejection_reason` — only `doctor_message` once approved, or a generic "reviewed" status otherwise |
 
-**Steps 11–16 all sit behind one thing that is not yours.** `AgentWorkflow` and
-`AgentProposedChange` are group-owned (ADR 3) and **do not exist anywhere in `api/`** — swept
-2026-09-16. `BedAssignment.WorkflowId` is already a column pointing at a missing table. Either
-build them as a group or stub them and write the stub into `STUBS.md`; a workflow record that
-is quietly dropped looks exactly like one that was persisted, and §9.1 scores persistence.
+**The thing steps 11–16 sat behind has landed.** `AgentWorkflow` and `AgentProposedChange` were
+built by the group in PR #80 on 2026-09-20, and `BedAssignment.WorkflowId` is now a real foreign
+key (`Patient_LinkBedAssignmentWorkflow`) rather than a column pointing at nothing. Only the
+tables landed — the common `/api/workflows` endpoints are still unbuilt, and neither agent here
+needs them. ADR 2's shared `ILanguageModel` is built too, in `api/Agents/`, with Gemini behind it
+and a deterministic writer underneath for a missing key or a dead quota.
 
 **Steps 1, 2 and 3 are done.** `Ward` landed in `Patient_AddWard` (PR #12). `Patient`,
 `Admission`, `Appointment`, `BedAssignment`, `Discharge` and `DischargeChecklistItem`
@@ -404,6 +405,16 @@ and a form — no agent, no LLM, no workflow tables, nothing blocked. It is also
 decides whether the care agent has anything to reason over, so doing it late is how step 15
 ends up being a model rephrasing a sentence.
 
+**Steps 14–16 landed 2026-09-21, on `feat/care-advisory-agent`, uncommitted.** Not yet clicked
+through in a browser — built and verified by 6 new integration tests through a real Postgres
+(guard rejection, draft-and-hold, red-flag escalation, ward-nurse approve, doctor reject, duty
+manager can read but not act), plus unit tests for the red-flag screen, CR1–CR5 and the model
+fallback. `dotnet test` **878/878**, `flutter test` **127/127**, `web-ui` typecheck and vitest
+clean, `web-ui` codegen drift gate re-run clean. See `RESUME.md` for what still needs a human
+looking at it before this is trustworthy — a red-team pass on the LLM prompt and a real Gemini
+key were not exercised, since `LanguageModel:ApiKey` in local user-secrets was never confirmed
+live against this new prompt.
+
 ---
 
 ## Things that will bite
@@ -448,7 +459,9 @@ becomes your `routine/urgent/emergency`. A mismatch is a 400 and it only shows u
 integration checkpoint 3.
 
 **Two human gates, and they are different people.** A ward nurse confirms a normal-ward bed
-in Flutter; the Duty Manager confirms ICU, high-dependency or **any downgrade** in React.
+in React; the Duty Manager confirms ICU, high-dependency or **any downgrade**, also in React
+*(Reversed 2026-09-21 — the ward nurse's gate used to be in Flutter; Patient Management has no
+staff screens on mobile, so both gates are the same app now)*.
 `AgentWorkflow.RequiredApproverRole` persists which one, so the authorization rule is
 visible in the audit trail instead of buried in C#.
 
@@ -459,7 +472,8 @@ Adding it means changing a committed enum, so it is not a diagram-only change. Y
 
 ## Auth
 
-Your roles: `ward_nurse` and `patient` (Flutter), `duty_manager` and `doctor` (React).
+Your roles: `patient` (Flutter); `ward_nurse`, `duty_manager` and `doctor` (React). *(Reversed
+2026-09-21 — `ward_nurse` used to also have Flutter screens. Mobile is the patient's app only.)*
 
 You have the largest `/me/*` surface in the project — `/me/admission`, `/me/history`,
 `/me/appointments`, `/me/pre-register`, `/me/care-recommendations`. **Every one is scoped

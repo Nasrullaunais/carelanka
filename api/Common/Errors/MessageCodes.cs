@@ -45,6 +45,13 @@ public static class MessageCodes
             [MessageCode.PrescriptionFileEmpty] = "cl_equ_021",
             [MessageCode.PrescriptionFileTooLarge] = "cl_equ_022",
             [MessageCode.PrescriptionFileType] = "cl_equ_023",
+            [MessageCode.EquipmentRetireNeedsCode] = "cl_equ_024",
+            [MessageCode.EquipmentRemoveNeedsRetired] = "cl_equ_025",
+            [MessageCode.PharmacyReceiveIsABatch] = "cl_equ_026",
+            [MessageCode.PharmacyRemoveNeedsEmpty] = "cl_equ_027",
+            [MessageCode.WarningClosed] = "cl_equ_028",
+            [MessageCode.WarningNotResolved] = "cl_equ_029",
+            [MessageCode.EquipmentCategoryInUse] = "cl_equ_030",
             [MessageCode.WardNameTaken] = "cl_pat_001",
             [MessageCode.PatientNicTaken] = "cl_pat_002",
             [MessageCode.PatientAlreadyHasAccount] = "cl_pat_003",
@@ -78,13 +85,18 @@ public static class MessageCodes
             [MessageCode.AmbulanceHasActiveDispatch] = "cl_emg_002",
             [MessageCode.StaffNotAmbulanceCrew] = "cl_emg_003",
             [MessageCode.CrewMemberAlreadyAssigned] = "cl_emg_004",
+            [MessageCode.AmbulanceNotEligible] = "cl_emg_005",
+            [MessageCode.CallNotAwaitingDispatch] = "cl_emg_006",
             [MessageCode.NicLinkedToAnotherAccount] = "cl_pat_031",
             [MessageCode.NicDoesNotMatchYourRecord] = "cl_pat_032",
             [MessageCode.AccountHasNoPatientRecord] = "cl_pat_033",
             [MessageCode.NoCurrentAdmission] = "cl_pat_034",
             [MessageCode.AppointmentBilledOnItsAdmission] = "cl_pat_035",
             [MessageCode.NoBillRaised] = "cl_pat_036",
-            [MessageCode.PatientCodeNotClaimable] = "cl_pat_037"
+            [MessageCode.PatientCodeNotClaimable] = "cl_pat_037",
+            [MessageCode.NotCurrentlyAdmittedForCareQuery] = "cl_pat_038",
+            [MessageCode.BedSuggestionNotPossible] = "cl_pat_039",
+            [MessageCode.CareRecommendationNotPendingReview] = "cl_pat_040"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

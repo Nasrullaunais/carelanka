@@ -12,9 +12,9 @@ class ReassignDispatchRequest {
     this.replacementAmbulanceId,
     this.reason,
   });
-
+  
   factory ReassignDispatchRequest.fromJson(Map<String, Object?> json) => _$ReassignDispatchRequestFromJson(json);
-
+  
   @JsonKey(name: 'replacement_ambulance_id')
   final String? replacementAmbulanceId;
   final String? reason;

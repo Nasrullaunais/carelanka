@@ -13,18 +13,21 @@ import {
   listWardsOptions,
   markArrivedMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
-import type { WorklistRow } from '../services/api/generated';
+import type { PrincipalRole, WorklistRow } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
+import { MedicalProfilePanel } from '../components/MedicalProfilePanel';
+import { BedSuggestionPanel } from '../components/BedSuggestionPanel';
+import { BedCandidateTable } from '../components/BedCandidateTable';
 import {
   canAssignBed,
   canCompleteVisit,
   canMarkArrived,
+  canReadMedicalProfile,
   canReadPatientDetails,
 } from '../types/permissions';
 import { localDateTime } from '../types/datetime';
 import { placementFor } from '../types/beds';
 import type { Placement } from '../types/beds';
-import { genderPolicyLabels, wardTypeLabels } from '../types/wards';
 import {
   arrivalRouteLabel,
   worklistStatusDetail,
@@ -52,6 +55,8 @@ export function PatientsPage() {
   const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState<string | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [suggestingId, setSuggestingId] = useState<string | null>(null);
+  const [deskSuggesting, setDeskSuggesting] = useState(false);
 
   const [bedMode, setBedMode] = useState<'assign' | 'correct'>('assign');
 
@@ -93,13 +98,22 @@ export function PatientsPage() {
 
   function openDetails(id: string) {
     setAssigningId(null);
+    setSuggestingId(null);
     setOpenId((current) => (current === id ? null : id));
   }
 
   function openAssign(id: string, mode: 'assign' | 'correct' = 'assign') {
     setOpenId(null);
+    setSuggestingId(null);
     setBedMode(mode);
     setAssigningId((current) => (current === id && bedMode === mode ? null : id));
+  }
+
+  function openSuggest(id: string) {
+    setOpenId(null);
+    setAssigningId(null);
+    setDeskSuggesting(false);
+    setSuggestingId((current) => (current === id ? null : id));
   }
 
   return (
@@ -137,6 +151,7 @@ export function PatientsPage() {
                   setPage(1);
                   setOpenId(null);
                   setAssigningId(null);
+                  setSuggestingId(null);
                 }}
               >
                 Clear
@@ -155,6 +170,7 @@ export function PatientsPage() {
                   setPage(1);
                   setOpenId(null);
                   setAssigningId(null);
+                  setSuggestingId(null);
                 }}
               />{' '}
               Include finished visits
@@ -165,6 +181,28 @@ export function PatientsPage() {
           </div>
         </form>
       </div>
+
+      {canAssignBed(role) && (
+        <div className="card">
+          <h2>Suggest a bed</h2>
+          <p className="muted">
+            Off a slip at the desk, before the patient has a row on this board — type their NIC
+            or patient code and the agent looks them up.
+          </p>
+
+          {deskSuggesting ? (
+            <BedSuggestionPanel
+              role={role}
+              onAssigned={() => setDeskSuggesting(false)}
+              onClose={() => setDeskSuggesting(false)}
+            />
+          ) : (
+            <button type="button" onClick={() => setDeskSuggesting(true)}>
+              Suggest a bed
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="card">
         <h2>
@@ -225,6 +263,12 @@ export function PatientsPage() {
                           <span className="muted">
                             {row.urgency ? admissionUrgencyLabels[row.urgency] : ''}
                           </span>
+                          {row.is_infectious && (
+                            <>
+                              <br />
+                              <span className="badge severity-high">Needs isolation</span>
+                            </>
+                          )}
                         </>
                       ) : (
                         <span className="muted">Not recorded</span>
@@ -246,8 +290,10 @@ export function PatientsPage() {
                         row={row}
                         role={role}
                         assigning={assigningId === row.id}
+                        suggesting={suggestingId === row.id}
                         open={openId === row.id}
                         onAssign={(mode) => openAssign(row.id, mode)}
+                        onSuggest={() => openSuggest(row.id)}
                         onDetails={() => openDetails(row.id)}
                       />
                     </td>
@@ -265,10 +311,23 @@ export function PatientsPage() {
                     </tr>
                   )}
 
+                  {suggestingId === row.id && (
+                    <tr className="drawer">
+                      <td colSpan={5}>
+                        <BedSuggestionPanel
+                          admissionId={row.id}
+                          role={role}
+                          onAssigned={() => setSuggestingId(null)}
+                          onClose={() => setSuggestingId(null)}
+                        />
+                      </td>
+                    </tr>
+                  )}
+
                   {openId === row.id && (
                     <tr className="drawer">
                       <td colSpan={5}>
-                        <DetailsPanel row={row} onClose={() => setOpenId(null)} />
+                        <DetailsPanel row={row} role={role} onClose={() => setOpenId(null)} />
                       </td>
                     </tr>
                   )}
@@ -334,15 +393,19 @@ function RowActions({
   row,
   role,
   assigning,
+  suggesting,
   open,
   onAssign,
+  onSuggest,
   onDetails,
 }: {
   row: WorklistRow;
   role: Parameters<typeof canAssignBed>[0];
   assigning: boolean;
+  suggesting: boolean;
   open: boolean;
   onAssign: (mode: 'assign' | 'correct') => void;
+  onSuggest: () => void;
   onDetails: () => void;
 }) {
   const invalidate = useBoardInvalidation();
@@ -369,9 +432,14 @@ function RowActions({
     <>
 
       {row.status === 'awaiting_bed' && row.requires_bed && canAssignBed(role) && (
-        <button type="button" onClick={() => onAssign('assign')}>
-          {assigning ? 'Cancel' : 'Assign bed'}
-        </button>
+        <>
+          <button type="button" onClick={() => onAssign('assign')}>
+            {assigning ? 'Cancel' : 'Assign bed'}
+          </button>{' '}
+          <button type="button" className="secondary" onClick={onSuggest}>
+            {suggesting ? 'Cancel' : 'Suggest bed'}
+          </button>
+        </>
       )}
 
       {(row.status === 'bed_ready' || row.status === 'admitted') &&
@@ -494,9 +562,6 @@ function AssignBedPanel({
       : ({ kind: 'refused', why: 'Loading…' } as Placement),
   }));
 
-  const usable = candidates.filter((candidate) => candidate.placement.kind !== 'refused');
-  const overrides = candidates.filter((candidate) => candidate.placement.kind === 'override');
-
   const missing = (beds.data?.total_items ?? 0) - (beds.data?.items?.length ?? 0);
   const loading = visit.isLoading || wards.isLoading || beds.isLoading;
   const failed = visit.isError || wards.isError || beds.isError;
@@ -552,101 +617,39 @@ function AssignBedPanel({
         </p>
       ) : (
         <>
-          <table>
-            <thead>
-              <tr>
-                <th>Bed</th>
-                <th>Ward</th>
-                <th>Accepts</th>
-                <th>Isolation</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {candidates.map(({ bed, ward, placement }) => (
-                <tr key={bed.id}>
-                  <td>
-                    <strong>{bed.bed_number}</strong>
-                  </td>
-                  <td>
-                    {bed.ward_name}
-                    <br />
-                    <span className="muted">
-                      {ward ? wardTypeLabels[ward.ward_type] : 'Unknown ward'}
-                    </span>
-                  </td>
-                  <td>{ward ? genderPolicyLabels[ward.gender_policy] : '—'}</td>
-                  <td>{bed.has_isolation ? 'Yes' : 'No'}</td>
-                  <td>
-                    {placement.kind === 'refused' ? (
-                      <span className="muted">{placement.why}</span>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          className={placement.kind === 'override' ? 'warn' : undefined}
-                          disabled={writing}
-                          onClick={() =>
-                            correcting
-                              ? correct.mutate({
-                                  path: { id: row.id },
-                                  body: {
-                                    bed_id: bed.id,
-                                    reason: reason.trim().length > 0 ? reason.trim() : undefined,
-                                  },
-                                })
-                              : assign.mutate({
-                                  path: { id: row.id },
-                                  body: {
-                                    bed_id: bed.id,
-                                    override_reason:
-                                      reason.trim().length > 0 ? reason.trim() : undefined,
-                                  },
-                                })
-                          }
-                        >
-                          {placement.kind === 'override'
-                            ? correcting
-                              ? 'Move anyway'
-                              : 'Assign anyway'
-                            : correcting
-                              ? 'Move here'
-                              : alreadyHere
-                                ? 'Assign and admit'
-                                : 'Assign'}
-                        </button>
-                        {placement.kind === 'override' && (
-                          <p className="hint" style={{ marginTop: '0.25rem' }}>
-                            {placement.why}
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {usable.length === 0 && (
-            <p className="empty">
-              Beds are free, but none of them accepts this patient. The reason is on each row.
-            </p>
-          )}
-
-          {missing > 0 && (
-            <p className="field-error" style={{ marginTop: '0.6rem' }}>
-              {missing} more free {missing === 1 ? 'bed is' : 'beds are'} not shown. This list
-              is incomplete — report it before assigning a bed from it.
-            </p>
-          )}
-
-          {overrides.length > 0 && (
-            <p className="hint" style={{ marginTop: '0.6rem' }}>
-              Amber buttons are beds outside the patient&rsquo;s care level. You may use one as
-              duty manager; it is recorded as your decision, so give a reason in the note.
-            </p>
-          )}
+          <BedCandidateTable
+            candidates={candidates}
+            writing={writing}
+            missing={missing}
+            actionLabel={(placement) =>
+              placement.kind === 'override'
+                ? correcting
+                  ? 'Move anyway'
+                  : 'Assign anyway'
+                : correcting
+                  ? 'Move here'
+                  : alreadyHere
+                    ? 'Assign and admit'
+                    : 'Assign'
+            }
+            onPick={(bed) =>
+              correcting
+                ? correct.mutate({
+                    path: { id: row.id },
+                    body: {
+                      bed_id: bed.id,
+                      reason: reason.trim().length > 0 ? reason.trim() : undefined,
+                    },
+                  })
+                : assign.mutate({
+                    path: { id: row.id },
+                    body: {
+                      bed_id: bed.id,
+                      override_reason: reason.trim().length > 0 ? reason.trim() : undefined,
+                    },
+                  })
+            }
+          />
 
           <div className="field" style={{ marginTop: '0.9rem' }}>
             <label htmlFor="override-reason">
@@ -677,7 +680,15 @@ function AssignBedPanel({
   );
 }
 
-function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void }) {
+function DetailsPanel({
+  row,
+  role,
+  onClose,
+}: {
+  row: WorklistRow;
+  role: PrincipalRole | undefined;
+  onClose: () => void;
+}) {
   const patient = useQuery(getPatientOptions({ path: { id: row.patient.id } }));
 
   const visit = useQuery(getAdmissionOptions({ path: { id: row.id } }));
@@ -782,6 +793,19 @@ function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void 
             </>
           )}
       </>
+
+      {canReadMedicalProfile(role) && (
+        <>
+          <h4 style={{ marginTop: '1.25rem', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+            Medical details
+          </h4>
+          <MedicalProfilePanel
+            patientId={row.patient.id}
+            patientName={row.patient.full_name}
+            role={role}
+          />
+        </>
+      )}
 
       <button
         type="button"

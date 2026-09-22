@@ -19,6 +19,7 @@ DispatchDetail _$DispatchDetailFromJson(Map<String, dynamic> json) =>
           : DispatchStatus.fromJson(json['status'] as String),
       destinationWardName: json['destination_ward_name'] as String?,
       crewCount: (json['crew_count'] as num?)?.toInt(),
+      acknowledgementOverdue: json['acknowledgement_overdue'] as bool?,
       dispatchedAt: json['dispatched_at'] == null
           ? null
           : DateTime.parse(json['dispatched_at'] as String),
@@ -31,6 +32,10 @@ DispatchDetail _$DispatchDetailFromJson(Map<String, dynamic> json) =>
           : DateTime.parse(json['acknowledged_at'] as String),
       acknowledgedByStaffId: json['acknowledged_by_staff_id'] as String?,
       declinedReason: json['declined_reason'] as String?,
+      cancellationReason: json['cancellation_reason'] as String?,
+      reassignmentReason: json['reassignment_reason'] as String?,
+      handoverNotes: json['handover_notes'] as String?,
+      patientCondition: json['patient_condition'] as String?,
       crewStaffIds: (json['crew_staff_ids'] as List<dynamic>?)
           ?.map((e) => e as String)
           .toList(),
@@ -45,11 +50,16 @@ Map<String, dynamic> _$DispatchDetailToJson(DispatchDetail instance) =>
       'status': instance.status,
       'destination_ward_name': instance.destinationWardName,
       'crew_count': instance.crewCount,
+      'acknowledgement_overdue': instance.acknowledgementOverdue,
       'dispatched_at': instance.dispatchedAt?.toIso8601String(),
       'completed_at': instance.completedAt?.toIso8601String(),
       'ambulance_id': instance.ambulanceId,
       'acknowledged_at': instance.acknowledgedAt?.toIso8601String(),
       'acknowledged_by_staff_id': instance.acknowledgedByStaffId,
       'declined_reason': instance.declinedReason,
+      'cancellation_reason': instance.cancellationReason,
+      'reassignment_reason': instance.reassignmentReason,
+      'handover_notes': instance.handoverNotes,
+      'patient_condition': instance.patientCondition,
       'crew_staff_ids': instance.crewStaffIds,
     };

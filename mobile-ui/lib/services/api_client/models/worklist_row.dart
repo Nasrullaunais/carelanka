@@ -23,6 +23,7 @@ class WorklistRow {
     this.source,
     this.admissionCategory,
     this.urgency,
+    this.isInfectious,
     this.wardName,
     this.bedNumber,
   });
@@ -38,6 +39,8 @@ class WorklistRow {
   @JsonKey(name: 'admission_category')
   final AdmissionCategory? admissionCategory;
   final AdmissionUrgency? urgency;
+  @JsonKey(name: 'is_infectious')
+  final bool? isInfectious;
   @JsonKey(name: 'ward_name')
   final String? wardName;
   @JsonKey(name: 'bed_number')

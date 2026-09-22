@@ -19,17 +19,22 @@ class DispatchDetail {
     this.status,
     this.destinationWardName,
     this.crewCount,
+    this.acknowledgementOverdue,
     this.dispatchedAt,
     this.completedAt,
     this.ambulanceId,
     this.acknowledgedAt,
     this.acknowledgedByStaffId,
     this.declinedReason,
+    this.cancellationReason,
+    this.reassignmentReason,
+    this.handoverNotes,
+    this.patientCondition,
     this.crewStaffIds,
   });
-
+  
   factory DispatchDetail.fromJson(Map<String, Object?> json) => _$DispatchDetailFromJson(json);
-
+  
   final String? id;
   @JsonKey(name: 'emergency_call_id')
   final String? emergencyCallId;
@@ -42,6 +47,8 @@ class DispatchDetail {
   final String? destinationWardName;
   @JsonKey(name: 'crew_count')
   final int? crewCount;
+  @JsonKey(name: 'acknowledgement_overdue')
+  final bool? acknowledgementOverdue;
   @JsonKey(name: 'dispatched_at')
   final DateTime? dispatchedAt;
   @JsonKey(name: 'completed_at')
@@ -54,6 +61,14 @@ class DispatchDetail {
   final String? acknowledgedByStaffId;
   @JsonKey(name: 'declined_reason')
   final String? declinedReason;
+  @JsonKey(name: 'cancellation_reason')
+  final String? cancellationReason;
+  @JsonKey(name: 'reassignment_reason')
+  final String? reassignmentReason;
+  @JsonKey(name: 'handover_notes')
+  final String? handoverNotes;
+  @JsonKey(name: 'patient_condition')
+  final String? patientCondition;
   @JsonKey(name: 'crew_staff_ids')
   final List<String>? crewStaffIds;
 

@@ -4,12 +4,14 @@ import {
   canReadCapacity,
   canReadEquipment,
   canRunMaintenance,
+  canReadWarnings,
   canReadLabReports,
   canReadWards,
   canRegisterPatient,
   canOpenAppointmentBoard,
   canOpenDischargeBoard,
   canSetBillingRates,
+  canReadCareQueue,
 } from './permissions';
 
 export type Destination = {
@@ -47,6 +49,13 @@ export const destinations: Destination[] = [
     canAccess: canOpenDischargeBoard,
   },
   {
+    to: '/care-recommendations',
+    label: 'Care recommendations',
+    description:
+      "What patients have reported about how they feel, and the agent's draft note for a nurse or doctor to check.",
+    canAccess: canReadCareQueue,
+  },
+  {
     to: '/billing-settings',
     label: 'Billing settings',
     description: 'What the hospital charges: every expense, in every kind of ward.',
@@ -75,6 +84,12 @@ export const destinations: Destination[] = [
     label: 'Maintenance unit',
     description: 'Book maintenance, confirm repairs done, and retire machines beyond repair.',
     canAccess: canRunMaintenance,
+  },
+  {
+    to: '/warnings',
+    label: 'Warnings',
+    description: 'Medicine running low or about to expire, and machines overdue for service.',
+    canAccess: canReadWarnings,
   },
   {
     to: '/laboratory',

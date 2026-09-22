@@ -23,6 +23,20 @@ of that component was built and tested. Three schema-visible consequences, all m
 `AssignedBy.Agent` also changed meaning without changing shape — it now records that a human
 committed a bed the agent *suggested*, not that the agent wrote the row.
 
+**Revision 2.17** — `bed_assignments.workflow_id` is a real foreign key to `agent_workflows.id`,
+added in the `Patient_LinkBedAssignmentWorkflow` migration with `ON DELETE RESTRICT` and an index.
+The column was written in step 2 and pointed at a table that did not exist until Revision 2.16.
+Still nullable, and null for every row a human picked by hand.
+
+**Revision 2.16** — `AgentWorkflow` and `AgentProposedChange` are built, in the
+`Common_AddAgentWorkflows` migration (tables `agent_workflows`, `agent_proposed_changes`).
+`AgentProposedChange.ProposedShiftId` is **not** built yet: `Shift` does not exist, so Staff
+adds that column and its foreign key with its own migration.
+
+**Revision 2.14** — `notifications` gains `DedupeKey`, `AttemptCount` and `NextAttemptAt` so it can
+double as the push retry queue, in the `Common_AddDeviceTokensAndNotifications` migration,
+which also creates `device_tokens` and `notifications`. Changes marked *(Rev 2.14)*.
+
 **Revision 2.13** — patients sign in with a username. `PatientAccount` loses two columns
 and gains one, in the `Common_PatientUsernameLogin` migration. Changes marked *(Rev 2.13)*.
 
@@ -577,6 +591,24 @@ crew changes do not alter the snapshot. *(Decision 30; Rev 3.1)*
 **Note:** Single summary row per `Dispatch` (1:1) — not a GPS waypoint trail.
 *(Decision 23)*
 
+#### PreAdmissionNotice extends AuditedEntity *(Rev 2.15 — new)*
+```
++ EmergencyCallId: Guid (unique, non-null) FK → EmergencyCall.Id
++ DispatchId: Guid (non-null) FK → Dispatch.Id
++ Status: PreAdmissionStatus (non-null)   // queued | sent | failed
++ AttemptCount: int (non-null)
++ NextAttemptAt: DateTimeOffset (non-null)
++ SentAt: DateTimeOffset (nullable)
++ FailureReason: string (nullable)        // gave_up | rejected | call_cancelled
+```
+**Table:** `pre_admission_notices`
+**Index:** partial `ix_pre_admission_notices_due` on `status = 'queued'`
+**Note:** One row per emergency call, not per dispatch. A reassign creates a new dispatch for
+the same patient, and a second row would open a second admission for them. `DispatchId` is
+the first dispatch, the id Patient Management is given. Written in the dispatch transaction
+and sent afterwards by `PreAdmissionWorker`, so a Patient Management outage never undoes a
+dispatch.
+
 ---
 
 ### Staff Management
@@ -782,6 +814,24 @@ so it cannot go negative and two people dispensing at once cannot both succeed p
 The check constraint is the last line of defence under that. The expiry index is filtered
 because the expiry sweep never asks about bandages.
 
+#### PharmacyBatch extends AuditedEntity *(Rev 4.2 — new, 2026-09-18)*
+```
++ PharmacyItemId: Guid (non-null) FK → PharmacyItem.Id, cascade
++ BatchNumber: int (non-null) -- 1 for the first delivery of that medicine, 2 for the next
++ Reference: string (nullable, max 50) -- the manufacturer's batch code on the box
++ ExpiryDate: DateOnly (nullable)
++ QuantityOnHand: int (non-null) -- >= 0
++ Note: string (nullable, max 300)
+```
+**Table:** `pharmacy_batches`
+**Constraints:** CHECK(quantity_on_hand >= 0) · UNIQUE(PharmacyItemId, BatchNumber)
+**Indexes:** `(PharmacyItemId, ExpiryDate) WHERE quantity_on_hand > 0`
+**Note:** One delivery of a medicine. Stock moved here from `PharmacyItem` because two deliveries
+of the same medicine expire on different days, and the one expiring first has to be dispensed
+first. `PharmacyItem.QuantityOnHand` is now the batches added up, kept in step in the same
+transaction. Migration `Equipment_AddPharmacyBatches` turned each item's existing quantity and
+expiry into its batch 1. See `equipment-management-plan.md` §5.1a.
+
 #### PharmacyTransaction extends Entity *(Rev 3 — new)*
 ```
 + PharmacyItemId: Guid (non-null) FK → PharmacyItem.Id
@@ -865,7 +915,7 @@ for why a laboratory result lives in this component and not in Patient Managemen
 + PerformedByStaffId: Guid (nullable)
 + CompletedAt: DateTimeOffset (nullable)
 + Notes: string (nullable)
-+ CreatedBy: RaisedBy (non-null) -- agent | user
++ CreatedBy: RaisedBy (non-null) -- agent | user | system
 ```
 **Table:** `maintenance_schedules`
 **Indexes:** `(AssetType, AssetId)` · `(ScheduledDate) WHERE status IN ('scheduled','overdue')`
@@ -886,11 +936,13 @@ revised)*
 + WardId: Guid (nullable)
 + RecommendedAction: string (non-null)
 + Status: WarningStatus (non-null)
-+ RaisedBy: RaisedBy (non-null) -- agent | user
++ RaisedBy: RaisedBy (non-null) -- agent | user | system
 + WorkflowId: Guid (nullable) FK → AgentWorkflow.Id
 + AcknowledgedByStaffId: Guid (nullable)
 + AcknowledgedAt: DateTimeOffset (nullable)
 + ResolvedAt: DateTimeOffset (nullable)
++ ClearedAt: DateTimeOffset (nullable) -- Done: off every list, kept as a record
++ ClearedByStaffId: Guid (nullable)
 ```
 **Table:** `warnings`
 **Index:** `(Status)` — every dashboard filters on open warnings
@@ -899,10 +951,12 @@ gained `pharmacy_item`. `RecommendedAction` is a short human sentence, never the
 reasoning. `RaisedBy` distinguishes the threshold sweep and a person reporting a fault from
 anything the agent infers; a reported fault starts at `high` severity because a person
 saying the machine is broken outranks what a sweep guesses.
-*(Rev 3)* The Rev 2 partial UNIQUE on `(EntityType, EntityId, Type) WHERE Status = 'Open'`
-is **not** in the shipped schema. It was written for a sweep that inserts on every tick, and
-that sweep does not exist yet. It has to come back with it, or the first run will duplicate
-every open warning. Tracked in `docs/build/equipment.md` step 7.
+*(Rev 3, 2026-09-19)* The sweep is built, and the partial UNIQUE came back with it:
+`ux_warnings_sweep_live` on `(Type, RelatedEntityType, RelatedEntityId) WHERE raised_by = 'system'
+AND status IN ('open','acknowledged')`. One live sweep warning per problem, however often it
+runs; reported faults are outside it, because two people can report the same machine. `RaisedBy`
+gained `system` for the sweep, so it is no longer confused with the agent
+(`Equipment_AddWarningSweep`).
 
 #### ActionRequest extends AuditedEntity *(Rev 3 — new; **not built yet**)*
 ```
@@ -1575,6 +1629,9 @@ invalid plan can be returned for revision instead of rejected wholesale.
 + SentAt: DateTimeOffset (nullable)
 + ReadAt: DateTimeOffset (nullable)
 + FailureReason: string (nullable)
++ DedupeKey: string (max 200, unique, non-null)   -- Rev 2.14: one push per reason, entity and person
++ AttemptCount: int (non-null, default 0)        -- Rev 2.14: delivery tries so far
++ NextAttemptAt: DateTimeOffset (non-null)        -- Rev 2.14: when a Queued push is next due
 ```
 **Table:** `notifications`
 **Note:** *(Rev 2)* No notification entity existed before, yet both flows depend on one:
@@ -1583,6 +1640,15 @@ reassigned nurse "an immediate push notification" (Flutter); the patient flow no
 bed assignment. `Channel` distinguishes in-app alerts from device push. Delivery uses
 `DeviceToken`. `(EntityType, EntityId)` lets the client deep-link to the workflow awaiting
 approval.
+
+*(Rev 2.14)* **`notifications` is also the retry queue.** A push is saved as `Queued` in the
+same transaction as the change that caused it, so it can never be lost or sent for a change
+that rolled back. A background worker sends what is due, marks it `Sent`, retries `Failed`
+sends with growing gaps, and gives up after five tries (`FailureReason = gave_up`).
+`no_device` means the person had no active `DeviceToken`. `DedupeKey`
+(`{reason}:{entity id}:{staff id}`) makes staging the same push twice impossible. A phone
+the push service rejects gets `DeviceToken.RevokedAt`. The push text is generic on purpose:
+no patient or incident detail reaches a lock screen.
 
 #### AuditLog extends Entity
 ```
@@ -2220,6 +2286,8 @@ CREATE UNIQUE INDEX ux_allocations_confirmed ON allocations (shift_id, staff_mem
 
 CREATE UNIQUE INDEX ux_refresh_tokens_hash ON refresh_tokens (token_hash);
 CREATE UNIQUE INDEX ux_device_tokens_token ON device_tokens (token);
+CREATE UNIQUE INDEX ux_notifications_dedupe_key ON notifications (dedupe_key);
+CREATE INDEX ix_notifications_due ON notifications (next_attempt_at) WHERE status = 'queued';
 ```
 
 ### CHECK constraints
@@ -2372,6 +2440,7 @@ CREATE INDEX ix_admissions_missing_fields ON admissions USING gin (missing_field
 | Ambulance | Dispatch | 1:N | Dispatch.AmbulanceId |
 | Ambulance | AmbulanceCrewAssignment | 1:N | AmbulanceCrewAssignment.AmbulanceId |
 | Dispatch | RouteLog | 1:1 | RouteLog.DispatchId |
+| EmergencyCall | PreAdmissionNotice | 1:1 | PreAdmissionNotice.EmergencyCallId |
 | Ward | Bed | 1:N | Bed.WardId |
 | Ward | Shift | 1:N | Shift.WardId |
 | Ward | WardStaffingRule | 1:N | WardStaffingRule.WardId |
@@ -2441,6 +2510,7 @@ rows are mutated after insert; pure join/append-only tables (`DispatchCrew`,
 | Dispatch | dispatches | | changed |
 | DispatchCrew | dispatch_crew | | |
 | RouteLog | route_logs | | |
+| PreAdmissionNotice | pre_admission_notices | | **new** |
 | WardStaffingRule | ward_staffing_rules | | **new** |
 | Shift | shifts | | changed |
 | Allocation | allocations | | changed |
@@ -2475,7 +2545,7 @@ rows are mutated after insert; pure join/append-only tables (`DispatchCrew`,
 
 | Component | Owner | Entities |
 |-----------|-------|----------|
-| Emergency / Ambulance | Member 1 | EmergencyCall, Ambulance, AmbulanceCrewAssignment, Dispatch, DispatchCrew, RouteLog |
+| Emergency / Ambulance | Member 1 | EmergencyCall, Ambulance, AmbulanceCrewAssignment, Dispatch, DispatchCrew, RouteLog, PreAdmissionNotice |
 | Staff Management | Member 2 | Shift, Allocation, LeaveRequest, Skill, StaffMemberSkill, WardStaffingRule |
 | Health Equipment | Member 3 | EquipmentCategory, EquipmentItem, **Bed**, PharmacyCategory, PharmacyItem, PharmacyTransaction, MaintenanceSchedule, Warning, ActionRequest |
 | Patient Management | Member 4 | Patient, **PatientAccount**, Admission, BedAssignment, Discharge, DischargeChecklistItem, Appointment, Ward |

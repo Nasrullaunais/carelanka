@@ -18,6 +18,7 @@ using CareLanka.Api.Agents;
 using CareLanka.Api.Agents.Emergency;
 using CareLanka.Api.Agents.Patient;
 using CareLanka.Api.Services.Patient;
+using CareLanka.Api.Services.Staff;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -419,7 +420,7 @@ builder.Services.AddSingleton<IPushSender>(services =>
         ? ActivatorUtilities.CreateInstance<LoggingPushSender>(services)
         : ActivatorUtilities.CreateInstance<FirebasePushSender>(services));
 builder.Services.AddHostedService<PushDeliveryWorker>();
-builder.Services.AddScoped<IStaffLookupService, StubStaffLookupService>();
+builder.Services.AddScoped<CareLanka.Api.Services.Emergency.IStaffLookupService, StubStaffLookupService>();
 builder.Services.AddHttpClient<IAmbulanceDistanceService, OsrmAmbulanceDistanceService>();
 builder.Services.AddHttpClient<IReverseGeocoder, NominatimReverseGeocoder>();
 builder.Services.AddSingleton<SceneLookupQueue>();
@@ -466,6 +467,8 @@ builder.Services.AddScoped<IBillingRateService, BillingRateService>();
 builder.Services.AddScoped<IMeService, MeService>();
 
 builder.Services.AddScoped<IBedRegistryService, BedRegistryService>();
+
+builder.Services.AddScoped<CareLanka.Api.Services.Staff.IStaffLookupService, StaffLookupService>();
 
 // The Patient Care Advisory Agent. Three read tools, no write tool of its own - the draft it
 // produces is written by CareAgentExecutor once the model (or its deterministic fallback)

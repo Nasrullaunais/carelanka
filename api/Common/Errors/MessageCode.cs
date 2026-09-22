@@ -154,6 +154,12 @@ public enum MessageCode
 
     CallNotAwaitingDispatch,
 
+    DispatchProposalConflict,
+
+    DispatchProposalNotConfirmable,
+
+    DispatchProposalNotApprovable,
+
     NicLinkedToAnotherAccount,
 
     NicDoesNotMatchYourRecord,

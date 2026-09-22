@@ -230,6 +230,15 @@
   <data name="cl_emg_006" xml:space="preserve">
     <value>This emergency call is not waiting for an ambulance.</value>
   </data>
+  <data name="cl_emg_007" xml:space="preserve">
+    <value>This call already has an open proposal or a live dispatch.</value>
+  </data>
+  <data name="cl_emg_008" xml:space="preserve">
+    <value>This proposal cannot be confirmed: {0}.</value>
+  </data>
+  <data name="cl_emg_009" xml:space="preserve">
+    <value>This diversion cannot be approved: {0}.</value>
+  </data>
   <data name="cl_pat_002" xml:space="preserve">
     <value>A patient with NIC {0} is already registered, as record {1}.</value>
     <comment>Look the existing patient up instead of creating a second record for the same person.</comment>

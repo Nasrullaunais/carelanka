@@ -15,6 +15,7 @@ using CareLanka.Api.Services.Equipment.Stubs;
 using CareLanka.Api.Services.Emergency;
 using CareLanka.Api.Services.Emergency.Stubs;
 using CareLanka.Api.Agents;
+using CareLanka.Api.Agents.Emergency;
 using CareLanka.Api.Agents.Patient;
 using CareLanka.Api.Services.Patient;
 using FluentValidation;
@@ -428,6 +429,16 @@ builder.Services.AddHostedService<SceneLookupWorker>();
 builder.Services.AddScoped<IPreAdmissionGateway, StubPreAdmissionGateway>();
 builder.Services.AddScoped<PreAdmissionProcessor>();
 builder.Services.AddHostedService<PreAdmissionWorker>();
+
+// The Dispatch & Routing Agent. Three read-only tools, no write tool at all - a dispatch only
+// exists once a Duty Manager confirms or approves through the proposal API. Its own queue and
+// worker, separate from the bed and care agents' for the same single-reader-channel reason.
+builder.Services.AddScoped<IDispatchAgentTools, DispatchAgentTools>();
+builder.Services.AddScoped<IDispatchAgent, DispatchAgent>();
+builder.Services.AddScoped<IDispatchProposalService, DispatchProposalService>();
+builder.Services.AddScoped<DispatchProposalExecutor>();
+builder.Services.AddSingleton<IDispatchRunQueue, DispatchRunQueue>();
+builder.Services.AddHostedService<DispatchProposalWorker>();
 
 builder.Services.AddScoped<IBedService, BedService>();
 builder.Services.AddScoped<IEquipmentCategoryService, EquipmentCategoryService>();

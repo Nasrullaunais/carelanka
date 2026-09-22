@@ -4,7 +4,6 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
-import 'assigned_by.dart';
 import 'assignment_status.dart';
 import 'release_reason.dart';
 
@@ -19,10 +18,8 @@ class BedAssignment {
     required this.wardName,
     required this.bedNumber,
     required this.status,
-    required this.assignedBy,
     required this.isDowngrade,
     this.reservedUntil,
-    this.workflowId,
     this.approvedByStaffId,
     this.approvedByStaffName,
     this.approvedAt,
@@ -47,10 +44,6 @@ class BedAssignment {
   final AssignmentStatus status;
   @JsonKey(name: 'reserved_until')
   final DateTime? reservedUntil;
-  @JsonKey(name: 'assigned_by')
-  final AssignedBy assignedBy;
-  @JsonKey(name: 'workflow_id')
-  final String? workflowId;
   @JsonKey(name: 'is_downgrade')
   final bool isDowngrade;
   @JsonKey(name: 'approved_by_staff_id')

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   assignEquipmentItemMutation,
+  countEquipmentItemsAwaitingConfirmationOptions,
   createEquipmentCategoryMutation,
   createEquipmentItemMutation,
   listEquipmentCategoriesOptions,
@@ -20,9 +21,17 @@ import type {
 } from '../services/api/generated';
 import { WardPatientPicker } from '../components/WardPatientPicker';
 import { useSession } from '../services/auth/useSession';
-import { canManageEquipment, canReportFault } from '../types/permissions';
+import {
+  canConfirmEquipment,
+  canManageEquipment,
+  canReportFault,
+  canTrackEquipmentConfirmations,
+} from '../types/permissions';
 import { equipmentStatusLabels, equipmentStatuses } from '../types/equipment';
 import { ItemDetailCard } from './equipment/ItemDetailCard';
+import { ConfirmNewEquipmentCard } from './equipment/ConfirmNewEquipmentCard';
+import { RemoveCategoriesCard } from './equipment/RemoveCategoriesCard';
+import { RemoveItemDialog, RetireItemDialog } from './equipment/RetireItemDialog';
 
 const PAGE_SIZE = 10;
 
@@ -39,6 +48,10 @@ export function EquipmentPage() {
   const [selected, setSelected] = useState<string | null>(null);
 
   const categories = useQuery(listEquipmentCategoriesOptions());
+  const awaitingConfirmation = useQuery({
+    ...countEquipmentItemsAwaitingConfirmationOptions(),
+    enabled: canTrackEquipmentConfirmations(role),
+  });
   const wards = useQuery(listWardsOptions({ query: { isActive: true } }));
 
   const items = useQuery(
@@ -58,7 +71,11 @@ export function EquipmentPage() {
     queryClient.invalidateQueries({
       predicate: (query) => {
         const id = (query.queryKey[0] as { _id?: string } | undefined)?._id;
-        return id === 'listEquipmentItems' || id === 'getEquipmentItem';
+        return (
+          id === 'listEquipmentItems' ||
+          id === 'getEquipmentItem' ||
+          id === 'countEquipmentItemsAwaitingConfirmation'
+        );
       },
     });
   }
@@ -152,6 +169,10 @@ export function EquipmentPage() {
         </div>
       </div>
 
+      {canConfirmEquipment(role) && <ConfirmNewEquipmentCard />}
+
+      {canConfirmEquipment(role) && <RemoveCategoriesCard />}
+
       {canManageEquipment(role) && (
         <RegisterItemCard
           categories={(categories.data ?? []).map((c) => ({ id: c.id, name: c.name }))}
@@ -172,6 +193,18 @@ export function EquipmentPage() {
 
       <div className="card">
         <h2>Item register</h2>
+        {awaitingConfirmation.data && awaitingConfirmation.data.count > 0 && (
+          <p className="info-note">
+            <strong>
+              {awaitingConfirmation.data.count === 1
+                ? '1 item is'
+                : `${awaitingConfirmation.data.count} items are`}{' '}
+              awaiting confirmation.
+            </strong>{' '}
+            The hospital administrator confirms new items, on this page or in the mobile app.
+            Each one appears here once it is confirmed.
+          </p>
+        )}
         <ItemTable
           isLoading={items.isLoading}
           isError={items.isError}
@@ -309,9 +342,12 @@ function LifecycleActions({
 }) {
   const [assigning, setAssigning] = useState(false);
   const [reporting, setReporting] = useState(false);
+  const [retiring, setRetiring] = useState(false);
+  const [removing, setRemoving] = useState(false);
 
   const manage = canManageEquipment(role);
   const report = canReportFault(role);
+  const retire = canConfirmEquipment(role);
 
   const release = useMutation({
     ...releaseEquipmentItemMutation(),
@@ -346,6 +382,18 @@ function LifecycleActions({
             Report fault
           </button>
         )}
+
+        {retire && item.status !== 'retired' && (
+          <button type="button" className="secondary danger" onClick={() => setRetiring(true)}>
+            Retire
+          </button>
+        )}
+
+        {retire && item.status === 'retired' && (
+          <button type="button" className="secondary danger" onClick={() => setRemoving(true)}>
+            Remove
+          </button>
+        )}
       </div>
 
       {assigning && (
@@ -353,6 +401,30 @@ function LifecycleActions({
       )}
       {reporting && (
         <FaultDialog item={item} onClose={() => setReporting(false)} onChanged={onChanged} />
+      )}
+      {removing && (
+        <RemoveItemDialog
+          itemId={item.id}
+          itemName={item.name}
+          assetTag={item.asset_tag}
+          onClose={() => setRemoving(false)}
+          onDone={() => {
+            setRemoving(false);
+            onChanged();
+          }}
+        />
+      )}
+      {retiring && (
+        <RetireItemDialog
+          itemId={item.id}
+          itemName={item.name}
+          assetTag={item.asset_tag}
+          onClose={() => setRetiring(false)}
+          onDone={() => {
+            setRetiring(false);
+            onChanged();
+          }}
+        />
       )}
     </>
   );
@@ -548,7 +620,9 @@ function RegisterItemCard({
   const create = useMutation({
     ...createEquipmentItemMutation(),
     onSuccess: (item) => {
-      toast.success(`${item.name} registered as ${item.asset_tag}.`);
+      toast.success(
+        `${item.name} (${item.asset_tag}) sent to the hospital administrator for confirmation.`,
+      );
       setName('');
       setAssetTag('');
       setSerialNumber('');
@@ -586,9 +660,11 @@ function RegisterItemCard({
     <div className="card">
       <h2>Register an item</h2>
       <p className="muted" style={{ marginBottom: '0.9rem' }}>
-        A new item is always available. There is no way to register one already assigned or
-        retired, because neither has a story behind it. Asset tags are unique across beds and
-        equipment together, since a tag scan has to resolve to one thing.
+        A new item waits for the hospital administrator to confirm it, on the web or in the
+        mobile app, and only then joins the register below. Once confirmed it is available. There is no way to
+        register one already assigned or retired, because neither has a story behind it. Asset
+        tags are unique across beds and equipment together, since a tag scan has to resolve to
+        one thing.
       </p>
 
       {categories.length === 0 ? (

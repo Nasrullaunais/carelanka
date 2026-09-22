@@ -27,4 +27,10 @@ public class Warning : AuditedEntity
     public DateTimeOffset? AcknowledgedAt { get; set; }
 
     public DateTimeOffset? ResolvedAt { get; set; }
+
+    /// <summary>When the administrator marked a resolved warning done, taking it off the list.
+    /// The row stays in the database for the record.</summary>
+    public DateTimeOffset? ClearedAt { get; set; }
+
+    public Guid? ClearedByStaffId { get; set; }
 }

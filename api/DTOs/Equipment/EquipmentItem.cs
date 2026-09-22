@@ -12,6 +12,13 @@ public class EquipmentItem : EquipmentItemSummary
     public Guid? AssignedToAdmissionId { get; set; }
 
     [Required]
+    public bool AwaitingConfirmation { get; set; }
+
+    public Guid? ConfirmedByStaffId { get; set; }
+
+    public DateTimeOffset? ConfirmedAt { get; set; }
+
+    [Required]
     public DateTimeOffset CreatedAt { get; set; }
 
     [Required]

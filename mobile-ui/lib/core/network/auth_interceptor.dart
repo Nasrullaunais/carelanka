@@ -3,8 +3,6 @@ import 'package:dio/dio.dart';
 import '../auth/session_expiry.dart';
 import '../auth/token_store.dart';
 
-/// Attaches the bearer token, and on a 401 tries the refresh token once before
-/// giving up on the session.
 class AuthInterceptor extends QueuedInterceptor {
   AuthInterceptor({
     required TokenStore tokens,
@@ -17,8 +15,7 @@ class AuthInterceptor extends QueuedInterceptor {
   final TokenStore _tokens;
   final SessionExpiry _sessionExpiry;
 
-  /// Deliberately has no interceptors: refreshing through the main client would
-  /// recurse the moment the refresh call itself answered 401.
+  // No interceptors: refreshing through the main client would recurse the moment the refresh call itself got a 401.
   final Dio _refreshDio;
 
   static const _retriedKey = 'carelanka.retried_after_refresh';

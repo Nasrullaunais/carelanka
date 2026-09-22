@@ -113,6 +113,66 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
+  /equipment-categories/for-removal:
+    get:
+      tags: [Equipment]
+      summary: Categories with how many items use each, for removing unwanted ones
+      description: |
+        Roles: HospitalAdministrator, with the confirmation code (`X-Confirmation-Code`, the same
+        code as equipment confirmation). A missing or wrong code answers 403 `cl_equ_017`.
+        *(Rev 3, 2026-09-19.)*
+
+        `item_count` counts items on the register - retired ones and ones awaiting confirmation
+        included, removed ones not. Only a category at 0 can be removed.
+      operationId: listEquipmentCategoriesForRemoval
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
+      responses:
+        '200':
+          description: Every category, by name
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/EquipmentCategoryUsage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Not the hospital administrator, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /equipment-categories/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    delete:
+      tags: [Equipment]
+      summary: Remove an unwanted equipment category
+      description: |
+        Roles: HospitalAdministrator, with the confirmation code. *(Rev 3, 2026-09-19.)*
+
+        Refused with 409 `cl_equ_030` while any item on the register uses it: remove those items
+        first. A soft delete - the category leaves every list and picker, and its name is free
+        to be used again.
+      operationId: removeEquipmentCategory
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
+      responses:
+        '204':
+          description: Removed
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Not the hospital administrator, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Items still use this category.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
   /equipment-items:
     post:
       tags: [Equipment]
@@ -124,6 +184,11 @@ paths:
         `name`, `category_id`, `model`, `manufacturer` and `purchase_date` are the fields named
         in the component plan; `asset_tag`, `ward_id` and `serial_number` are additions the plan
         depends on for the QR-scan device feature and ward-location tracking.
+
+        The new item has `awaiting_confirmation = true`. It is left out of
+        `GET /equipment-items` and cannot be edited, assigned, faulted or serviced until a
+        hospital administrator confirms it through `POST /equipment-items/{id}/confirm`. A
+        mistake is fixed by the administrator rejecting it and the item being registered again.
       operationId: createEquipmentItem
       requestBody:
         required: true
@@ -132,7 +197,7 @@ paths:
             schema: { $ref: '#/components/schemas/CreateEquipmentItemRequest' }
       responses:
         '201':
-          description: Created, status `available`
+          description: Created, status `available` and awaiting confirmation
           content:
             application/json:
               schema: { $ref: '#/components/schemas/EquipmentItem' }
@@ -153,7 +218,11 @@ paths:
     get:
       tags: [Equipment]
       summary: Search equipment items
-      description: 'Roles: any authenticated staff.'
+      description: |
+        Roles: any authenticated staff.
+
+        Confirmed items only. An item still awaiting confirmation is not part of the register
+        yet - see `GET /equipment-items/pending-confirmation`.
       operationId: listEquipmentItems
       parameters:
         - name: search
@@ -194,6 +263,121 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /equipment-items/pending-confirmation:
+    get:
+      tags: [Equipment]
+      summary: List newly registered items awaiting confirmation
+      description: |
+        Roles: HospitalAdministrator, with the confirmation code.
+
+        The hospital administrator's queue - in the mobile app and on the web Equipment page -
+        oldest first. The equipment
+        manager who registers an item cannot confirm it, so nobody approves their own entry.
+        A missing or wrong `X-Confirmation-Code` answers 403 `cl_equ_017`, the same as a role
+        that may not confirm at all. The code lives in the API's configuration
+        (`Equipment:ConfirmationCode`), never in a client.
+      operationId: listEquipmentItemsAwaitingConfirmation
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
+      responses:
+        '200':
+          description: Every item awaiting confirmation
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/EquipmentItem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: This role may not confirm equipment, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /equipment-items/pending-confirmation/count:
+    get:
+      tags: [Equipment]
+      summary: Count the items awaiting confirmation
+      description: |
+        Roles: EquipmentManager, HospitalAdministrator.
+
+        Lets the web dashboard say how many registered items have not reached the register yet.
+        A number only, so it needs no confirmation code.
+      operationId: countEquipmentItemsAwaitingConfirmation
+      responses:
+        '200':
+          description: How many items are awaiting confirmation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PendingEquipmentCount' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /equipment-items/{id}/confirm:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Equipment]
+      summary: Confirm a newly registered item onto the register
+      description: |
+        Roles: HospitalAdministrator, with the confirmation code.
+
+        Business operation beyond CRUD. Clears `awaiting_confirmation` and stamps
+        `confirmed_by_staff_id` and `confirmed_at`. From then on the item is listed and can be
+        used like any other.
+      operationId: confirmEquipmentItem
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
+      responses:
+        '200':
+          description: Confirmed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EquipmentItem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: This role may not confirm equipment, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This item is not awaiting confirmation - it was already confirmed.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /equipment-items/{id}/reject:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Equipment]
+      summary: Reject a newly registered item
+      description: |
+        Roles: HospitalAdministrator, with the confirmation code.
+
+        Business operation beyond CRUD. Soft-deletes an item that is still awaiting
+        confirmation, so it never reaches the register and its asset tag and serial number can
+        be registered again with the right details.
+      operationId: rejectEquipmentItem
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
+      responses:
+        '204':
+          description: Rejected and removed
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: This role may not confirm equipment, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This item is not awaiting confirmation - it was already confirmed.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
   /equipment-items/{id}:
     parameters:
       - $ref: '#/components/parameters/PathId'
@@ -214,13 +398,14 @@ paths:
       tags: [Equipment]
       summary: Update an equipment item
       description: |
-        Roles: InventoryAdministrator.
+        Roles: EquipmentManager, HospitalAdministrator. The administrator uses it to retire a machine
+        the maintenance unit cannot repair.
 
         A `status` of `maintenance` cannot be edited back to `available` here. The item is with
         the maintenance unit and returns to service only when they complete the repair, so this
-        answers 409. `retired` is still reachable from `maintenance`: scrapping a machine nobody
-        can fix is the other real outcome of a fault, and it closes that item's open work order
-        and fault warning with it.
+        answers 409. `retired` cannot be set here either *(Rev 3, 2026-09-18)*: retiring is
+        irreversible, so it has its own endpoint that asks for the confirmation code
+        (`POST /equipment-items/{id}/retire`, `cl_equ_024`).
       operationId: updateEquipmentItem
       requestBody:
         required: true
@@ -239,10 +424,43 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
           description: >-
-            That status change is not a legal move in the equipment lifecycle, or the item is
-            with the maintenance unit and only they can return it to service.
+            That status change is not a legal move in the equipment lifecycle, the item is
+            with the maintenance unit and only they can return it to service, or it is still
+            awaiting confirmation.
           content:
             application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+    delete:
+      tags: [Equipment]
+      summary: Remove a retired item from the register
+      description: |
+        Roles: HospitalAdministrator, with the confirmation code.
+
+        Only after `POST /equipment-items/{id}/retire`: an item still in use answers 409
+        `cl_equ_025`. Two steps on purpose - retiring is the decision, removing only tidies the
+        list afterwards.
+
+        A soft delete. The row and its history stay in the database; it leaves every list, and its
+        asset tag and serial number are free for a new item, because both unique indexes are
+        scoped to live rows.
+      operationId: removeEquipmentItem
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
+      responses:
+        '204':
+          description: Removed from the register
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: This role may not remove equipment, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This item is not retired yet.
+          content:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /equipment-items/by-tag/{assetTag}:
@@ -340,6 +558,43 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
+  /equipment-items/{id}/retire:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Equipment]
+      summary: Retire an equipment item for good
+      description: |
+        Roles: HospitalAdministrator, with the confirmation code.
+
+        Business operation beyond CRUD, and the only way an item reaches `retired`. Use it when a
+        machine is beyond repair or is no longer used in the hospital. `retired` is terminal: the
+        item can never be assigned again and a replacement is registered as a new item. Any open
+        repair job is cancelled and any open fault warning closed with it.
+
+        An item a patient is currently using cannot be retired - release it first.
+      operationId: retireEquipmentItem
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
+      responses:
+        '200':
+          description: Retired
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EquipmentItem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: This role may not retire equipment, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This item is assigned to a patient, or is already retired.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
   /equipment-items/{id}/report-fault:
     parameters:
       - $ref: '#/components/parameters/PathId'
@@ -355,7 +610,8 @@ paths:
 
         It also opens a `MaintenanceSchedule` of type `repair`, dated today, carrying the
         description as its notes. That row is the maintenance unit's work order: the item comes
-        back into service through `POST /maintenance-schedules/{id}/complete` and no other way.
+        back into service when the hospital administrator confirms it done
+        (`POST /maintenance-schedules/{id}/confirm`), and no other way.
         An item already waiting on an open job does not get a second one - a further fault on
         the same machine is more detail on the same repair.
       operationId: reportEquipmentFault
@@ -652,6 +908,138 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+    delete:
+      tags: [Pharmacy]
+      summary: Remove a medicine the hospital no longer stocks
+      description: |
+        Roles: InventoryAdministrator or HospitalAdministrator, with the confirmation code
+        (`X-Confirmation-Code`, checked against `Equipment:ConfirmationCode` - the same code as
+        equipment confirmation). A missing or wrong code answers 403 `cl_equ_017`.
+
+        Refused with 409 `cl_equ_027` while any stock is left, so boxes cannot disappear from the
+        register with the medicine: dispense or write off the rest first.
+
+        A soft delete. Batches and movement history stay in the database; the medicine leaves every
+        list and search, and its name is free to be registered again, because the unique index on
+        the name is scoped to live rows.
+      operationId: removePharmacyItem
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
+      responses:
+        '204':
+          description: Removed from the register
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: This role may not remove medicines, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: There is still stock on the shelf.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /pharmacy-items/{id}/batches:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Pharmacy]
+      summary: The deliveries of one medicine
+      description: |
+        Roles: any authenticated staff.
+
+        Every batch of this medicine, oldest first. A batch with `quantity_on_hand = 0` is used up
+        and kept for the record.
+      operationId: listPharmacyBatches
+      responses:
+        '200':
+          description: Every batch, batch 1 first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PharmacyBatch' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Pharmacy]
+      summary: Record a delivery as the next batch
+      description: |
+        Roles: InventoryAdministrator.
+
+        Business operation beyond CRUD, and the only way stock comes in. The batch takes the next
+        number for this medicine - 2 after the first delivery, and so on - and carries its own
+        expiry date, so two deliveries never share one. Adds to the item's total and writes a
+        `received` movement against the batch.
+
+        `POST /pharmacy-items/{id}/transactions` with `type = received` answers 400 `cl_equ_026`:
+        stock arriving has an expiry date, which that shape cannot carry.
+      operationId: addPharmacyBatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddPharmacyBatchRequest' }
+      responses:
+        '201':
+          description: The new batch
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PharmacyBatch' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /pharmacy-items/{id}/batches/{batchId}/transactions:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+      - name: batchId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Pharmacy]
+      summary: Record a movement against one named batch
+      description: |
+        Roles: InventoryAdministrator.
+
+        Business operation beyond CRUD. The same movements as
+        `POST /pharmacy-items/{id}/transactions`, but out of the batch named in the path rather
+        than whichever expires first - for stock expiring in one delivery, or a stocktake
+        correction on the box in front of you. `received` answers 400 `cl_equ_026` here too: a
+        delivery is a new batch.
+
+        Refused with 409 when that batch does not hold enough, even if the shelf does in total.
+        The message names the batch.
+      operationId: recordPharmacyBatchTransaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePharmacyTransactionRequest' }
+      responses:
+        '201':
+          description: Recorded; the item with its new total
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PharmacyItem' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: No such pharmacy item, or no such batch of it.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '409':
+          description: This batch does not hold that much.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
   /pharmacy-items/{id}/transactions:
     parameters:
       - $ref: '#/components/parameters/PathId'
@@ -886,6 +1274,205 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
 
   # ------------------------------------------------------------------
+  # Pharmacy - prescriptions sent from the patient app
+  # ------------------------------------------------------------------
+
+  /me/prescriptions:
+    get:
+      tags: [Pharmacy]
+      summary: List my prescriptions
+      description: |
+        Roles: Patient (own only).
+
+        Newest first. Owned by Equipment Management even though it sits under `/me`: the
+        pharmacy is this component's. A login not yet linked to a hospital record answers 404
+        `cl_pat_033`, the same as every other `/me` read.
+      operationId: listMyPrescriptions
+      responses:
+        '200':
+          description: Every prescription this patient has sent
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MyPrescription' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: This login is not linked to a hospital record yet.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+    post:
+      tags: [Pharmacy]
+      summary: Send a prescription to the pharmacy
+      description: |
+        Roles: Patient.
+
+        A photo (JPEG or PNG) or PDF of a doctor's prescription, up to 10 MB, with an optional
+        note. The patient comes from the token, never the form. It arrives as `submitted`, and
+        the pharmacy gets the medicine ready and issues a collection token.
+      operationId: uploadMyPrescription
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [File]
+              properties:
+                File: { type: string, format: binary }
+                Note: { type: string, maxLength: 500 }
+      responses:
+        '201':
+          description: Sent, status `submitted`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyPrescription' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: This login is not linked to a hospital record yet.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /prescriptions:
+    get:
+      tags: [Pharmacy]
+      summary: The pharmacy's prescription list
+      description: |
+        Roles: EquipmentManager (the pharmacy - StaffRole has no pharmacist value).
+
+        One status at a time. `submitted` and `ready` are the work still to do, oldest first and
+        never cut short. `delivered` and `rejected` are history, newest first, the most recent 100.
+      operationId: listPrescriptions
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/PrescriptionStatus' }
+          description: Defaults to `submitted`.
+      responses:
+        '200':
+          description: Prescriptions in that status, with the patient's code and name
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Prescription' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /prescriptions/{id}/file:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [Pharmacy]
+      summary: Open the uploaded prescription
+      description: 'Roles: EquipmentManager. Served inline with the stored content type.'
+      operationId: downloadPrescription
+      responses:
+        '200':
+          description: The photo or PDF
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /prescriptions/{id}/ready:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Pharmacy]
+      summary: Mark the medicine ready and issue a collection token
+      description: |
+        Roles: EquipmentManager.
+
+        Business operation beyond CRUD. `submitted -> ready`. Issues the next token number for
+        today, counted in Sri Lanka time (Asia/Colombo) and restarting at 1 each day. The pair
+        `token_date` + `token_number` is unique; two pharmacists pressing Ready together each get
+        their own number. The patient sees the token in the app.
+      operationId: markPrescriptionReady
+      responses:
+        '200':
+          description: Ready, token issued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Prescription' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This prescription is not waiting (`cl_equ_020`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /prescriptions/{id}/deliver:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Pharmacy]
+      summary: Mark the medicine collected
+      description: |
+        Roles: EquipmentManager.
+
+        Business operation beyond CRUD. `ready -> delivered`, when the patient shows their token
+        at the counter. The patient sees it as delivered.
+      operationId: markPrescriptionDelivered
+      responses:
+        '200':
+          description: Delivered
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Prescription' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This prescription is not ready (`cl_equ_020`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /prescriptions/{id}/reject:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Pharmacy]
+      summary: Say a prescription cannot be filled
+      description: |
+        Roles: EquipmentManager.
+
+        Business operation beyond CRUD. `submitted` or `ready` -> `rejected`, with a reason the
+        patient reads in the app - an unreadable photo, a medicine the pharmacy does not stock.
+      operationId: rejectPrescription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RejectPrescriptionRequest' }
+      responses:
+        '200':
+          description: Rejected
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Prescription' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This prescription is already delivered or rejected (`cl_equ_020`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  # ------------------------------------------------------------------
   # Maintenance
   # ------------------------------------------------------------------
 
@@ -894,7 +1481,8 @@ paths:
       tags: [Maintenance]
       summary: List maintenance schedules
       description: |
-        Roles: InventoryAdministrator, EquipmentTechnician.
+        Roles: HospitalAdministrator. The maintenance unit is theirs; the equipment manager only
+        reports faults.
 
         `overdue=true` returns `status = scheduled AND scheduled_date < today`, computed at read
         time - nothing cached, nothing to drift.
@@ -931,7 +1519,7 @@ paths:
       tags: [Maintenance]
       summary: Schedule maintenance manually, without the agent
       description: |
-        Roles: InventoryAdministrator.
+        Roles: HospitalAdministrator.
 
         The manual path must always work: if the only way to schedule service were through the
         agent, the hospital stops the moment the agent stops. When `asset_type = bed`, this still
@@ -957,40 +1545,88 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
-  /maintenance-schedules/{id}/complete:
+  /maintenance-schedules/pending-confirmation:
+    get:
+      tags: [Maintenance]
+      summary: List open maintenance for the hospital administrator to confirm done
+      description: |
+        Roles: HospitalAdministrator, with the confirmation code.
+
+        Every open job - a reported fault's repair as soon as it is reported, and anything
+        scheduled - earliest due first. The hospital administrator's queue, in the mobile app and
+        on the web Maintenance unit page. A
+        missing or wrong `X-Confirmation-Code` answers 403 `cl_equ_017`, the same code and rule
+        as confirming a newly registered equipment item.
+      operationId: listMaintenanceSchedulesAwaitingConfirmation
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
+      responses:
+        '200':
+          description: Every open maintenance task
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MaintenanceSchedule' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: This role may not confirm maintenance, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /maintenance-schedules/pending-confirmation/count:
+    get:
+      tags: [Maintenance]
+      summary: Count open maintenance
+      description: |
+        Roles: EquipmentManager, HospitalAdministrator.
+
+        A number only, so it needs no confirmation code.
+      operationId: countMaintenanceSchedulesAwaitingConfirmation
+      responses:
+        '200':
+          description: How many maintenance tasks are open
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PendingEquipmentCount' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /maintenance-schedules/{id}/confirm:
     parameters:
       - $ref: '#/components/parameters/PathId'
     post:
       tags: [Maintenance]
-      summary: Mark a maintenance task complete
+      summary: Confirm a maintenance task done
       description: |
-        Roles: EquipmentTechnician.
+        Roles: HospitalAdministrator, with the confirmation code.
 
-        Business operation beyond CRUD. Sets `status = completed`, `completed_at`,
-        `performed_by_staff_id` from the caller's JWT, and recomputes `next_maintenance_due`.
-        For `asset_type = equipment_item`, sets `EquipmentItem.status` back to `available`. The
+        Business operation beyond CRUD, and the only way a task is completed. Sets
+        `status = completed`, `completed_at`, `performed_by_staff_id` from the caller's JWT, and
+        recomputes `next_maintenance_due`. For `asset_type = equipment_item`, sets
+        `EquipmentItem.status` back to `available`; for a bed, `condition` back to `usable`. The
         related `Warning`, if any, moves to `action_taken`.
-      operationId: completeMaintenanceSchedule
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                notes: { type: string, maxLength: 1000 }
+      operationId: confirmMaintenanceSchedule
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
       responses:
         '200':
-          description: Completed
+          description: Confirmed done
           content:
             application/json:
               schema: { $ref: '#/components/schemas/MaintenanceSchedule' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+        '403':
+          description: This role may not confirm maintenance, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: This schedule is not in a status that can be completed.
+          description: This task is not open - it is already completed or was cancelled.
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   # ------------------------------------------------------------------
@@ -1072,7 +1708,11 @@ paths:
     get:
       tags: [Monitoring]
       summary: List warnings
-      description: 'Roles: InventoryAdministrator.'
+      description: |
+        Roles: EquipmentManager or HospitalAdministrator. *(Rev 3, 2026-09-19.)*
+
+        Worst first (critical, high, medium, low), then newest. Holds the sweep's warnings
+        (`raised_by = system`), reported faults (`user`) and, later, the agent's (`agent`).
       operationId: listWarnings
       parameters:
         - name: status
@@ -1099,6 +1739,7 @@ paths:
                       items:
                         type: array
                         items: { $ref: '#/components/schemas/Warning' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
@@ -1108,7 +1749,10 @@ paths:
     post:
       tags: [Monitoring]
       summary: Acknowledge a warning
-      description: 'Roles: InventoryAdministrator. Records who has seen it, without closing it.'
+      description: |
+        Roles: EquipmentManager or HospitalAdministrator. Records who has seen it, without
+        closing it. Acknowledging again changes nothing; a closed warning (`action_taken` or
+        `dismissed`) answers 409 `cl_equ_028`.
       operationId: acknowledgeWarning
       responses:
         '200':
@@ -1119,6 +1763,80 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The warning is already closed.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /warnings/{id}/clear:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Monitoring]
+      summary: Mark a resolved warning done
+      description: |
+        Roles: HospitalAdministrator, with the confirmation code (`X-Confirmation-Code`, the
+        same code as equipment confirmation). A missing or wrong code answers 403 `cl_equ_017`.
+        *(Rev 3, 2026-09-19.)*
+
+        Only an `action_taken` (resolved) warning; anything else answers 409 `cl_equ_029`. It
+        leaves every warnings list for good, and the row stays in the database with
+        `cleared_at` and who cleared it.
+      operationId: clearWarning
+      parameters:
+        - $ref: '#/components/parameters/ConfirmationCode'
+      responses:
+        '204':
+          description: Marked done and taken off the list
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Not the hospital administrator, or the confirmation code is missing or wrong.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The warning is not resolved.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /warnings/sweep:
+    post:
+      tags: [Monitoring]
+      summary: Run the deterministic warning sweep now
+      description: |
+        Roles: EquipmentManager or HospitalAdministrator. *(Rev 3, 2026-09-19.)*
+
+        Build step 7. Fixed rules in code, no model: the agent reads these warnings, it never
+        decides whether one exists. The same sweep also runs on a timer every
+        `Equipment:WarningSweepIntervalMinutes` (default 60; 0 turns the timer off).
+
+        - `low_stock` - `quantity_on_hand <= reorder_threshold`, or under 3 days of supply at
+          the last 14 days' dispensing rate. Critical when out, high at half the threshold or
+          less, otherwise medium.
+        - `medicine_expiring` - a batch with stock expiring within `Equipment:ExpiryWarningDays`
+          (default 30), or already expired. One warning per medicine naming each batch;
+          critical once expired, high within 7 days, medium within 14, otherwise low.
+        - `maintenance_overdue` - a machine past `next_maintenance_due` with nothing booked, or
+          a routine service or calibration booked for a day gone by (equipment or bed). Repairs
+          are left out: an open repair already has its `equipment_faulty` warning. High after
+          30 days late, otherwise medium.
+
+        One live warning per problem: running it again updates the wording and severity of the
+        open one rather than adding another, and a warning whose problem is gone moves to
+        `action_taken`. A severity that rises re-opens an acknowledged warning. Only the sweep's
+        own warnings (`raised_by = system`) are touched.
+      operationId: runWarningSweep
+      responses:
+        '200':
+          description: What this run changed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarningSweepResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /action-requests:
     get:
@@ -1388,6 +2106,12 @@ components:
       name: sortDir
       in: query
       schema: { type: string, enum: [asc, desc], default: desc }
+    ConfirmationCode:
+      name: X-Confirmation-Code
+      in: header
+      required: true
+      description: The equipment confirmation code, checked by the API against `Equipment:ConfirmationCode`.
+      schema: { type: string }
 
   responses:
     BadRequest:
@@ -1454,7 +2178,8 @@ components:
 
     RaisedBy:
       type: string
-      enum: [agent, user]
+      description: '`system` is the deterministic warning sweep *(Rev 3, 2026-09-19)*.'
+      enum: [agent, user, system]
 
     ActionType:
       type: string
@@ -1472,6 +2197,11 @@ components:
     PharmacyTransactionType:
       type: string
       enum: [received, dispensed, adjusted, expired_removed]
+
+    PrescriptionStatus:
+      type: string
+      description: '`submitted` waiting for the pharmacy, `ready` with a token, `delivered` collected, `rejected` cannot be filled.'
+      enum: [submitted, ready, delivered, rejected]
 
     # ---------- common ----------
 
@@ -1583,6 +2313,42 @@ components:
               format: uuid
               nullable: true
               description: Set when status = assigned. References Patient Management's Admission table.
+            awaiting_confirmation:
+              type: boolean
+              description: True from registration until a hospital administrator confirms the item.
+            confirmed_by_staff_id:
+              type: string
+              format: uuid
+              nullable: true
+              description: The hospital administrator who confirmed it. Null for items registered before confirmation existed.
+            confirmed_at: { type: string, format: date-time, nullable: true }
+
+    EquipmentCategoryUsage:
+      type: object
+      required: [id, name, item_count]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        item_count:
+          type: integer
+          minimum: 0
+          description: Items on the register in this category. Removable only at 0.
+
+    PendingEquipmentCount:
+      type: object
+      required: [count]
+      properties:
+        count: { type: integer, minimum: 0 }
+
+    WarningSweepResult:
+      type: object
+      required: [raised, updated, resolved, still_open, ran_at]
+      properties:
+        raised: { type: integer, minimum: 0, description: New warnings raised }
+        updated: { type: integer, minimum: 0, description: Open warnings whose wording or severity moved on }
+        resolved: { type: integer, minimum: 0, description: Warnings closed because the problem is gone }
+        still_open: { type: integer, minimum: 0, description: Sweep warnings open or acknowledged after this run }
+        ran_at: { type: string, format: date-time }
 
     EquipmentItemDetail:
       allOf:
@@ -1665,6 +2431,33 @@ components:
         reorder_threshold: { type: integer, minimum: 0, default: 10 }
         unit_price: { type: number, format: float, nullable: true }
 
+    PharmacyBatch:
+      type: object
+      description: |
+        One delivery of a medicine: the boxes that arrived together and the expiry date on them.
+        Stock lives here rather than on the item, because two deliveries expire on different days
+        and the one expiring first has to leave the shelf first.
+      required: [id, pharmacy_item_id, batch_number, quantity_on_hand, received_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        pharmacy_item_id: { type: string, format: uuid }
+        batch_number: { type: integer, description: '1 for the first delivery of this medicine, 2 for the next.' }
+        reference: { type: string, nullable: true, description: "The manufacturer's batch code from the box." }
+        expiry_date: { type: string, format: date, nullable: true }
+        quantity_on_hand: { type: integer, minimum: 0 }
+        note: { type: string, nullable: true }
+        received_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    AddPharmacyBatchRequest:
+      type: object
+      required: [quantity]
+      properties:
+        quantity: { type: integer, minimum: 1, description: 'How many units arrived.' }
+        expiry_date: { type: string, format: date, nullable: true }
+        reference: { type: string, maxLength: 50, nullable: true }
+        note: { type: string, maxLength: 300, nullable: true }
+
     PharmacyItem:
       allOf:
         - $ref: '#/components/schemas/AuditFields'
@@ -1675,9 +2468,13 @@ components:
             category_id: { type: string, format: uuid }
             category_name: { type: string }
             manufacturer: { type: string, nullable: true }
-            batch_number: { type: string, nullable: true }
-            expiry_date: { type: string, format: date, nullable: true }
             unit: { type: string }
+            batch_count: { type: integer, description: 'How many deliveries of this medicine are on the shelf.' }
+            earliest_expiry:
+              type: string
+              format: date
+              nullable: true
+              description: The soonest expiry date among batches that still have stock - what is dispensed next.
             quantity_on_hand: { type: integer }
             reorder_threshold: { type: integer }
             unit_price: { type: number, format: float, nullable: true }
@@ -1731,10 +2528,62 @@ components:
             schedule_type: { $ref: '#/components/schemas/MaintenanceType' }
             scheduled_date: { type: string, format: date }
             status: { $ref: '#/components/schemas/MaintenanceStatus' }
-            performed_by_staff_id: { type: string, format: uuid, nullable: true }
+            performed_by_staff_id:
+              type: string
+              format: uuid
+              nullable: true
+              description: The hospital administrator who confirmed the task done.
             completed_at: { type: string, format: date-time, nullable: true }
             notes: { type: string, nullable: true }
             created_by: { $ref: '#/components/schemas/RaisedBy' }
+
+    # ---------- prescriptions ----------
+
+    MyPrescription:
+      type: object
+      description: What a patient sees of their own prescription. No staff ids.
+      required: [id, file_name, content_type, byte_size, status, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        note: { type: string, nullable: true }
+        file_name: { type: string }
+        content_type: { type: string }
+        byte_size: { type: integer }
+        status: { $ref: '#/components/schemas/PrescriptionStatus' }
+        token_date: { type: string, format: date, nullable: true, description: 'The day the token belongs to, in Sri Lanka time.' }
+        token_number: { type: integer, nullable: true, description: 'Set when the pharmacy marks it ready. Restarts at 1 each day.' }
+        ready_at: { type: string, format: date-time, nullable: true }
+        delivered_at: { type: string, format: date-time, nullable: true }
+        rejection_reason: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    Prescription:
+      type: object
+      description: The pharmacy's view - who sent it, so the medicine goes to the right person.
+      required: [id, patient_id, patient_code, patient_name, file_name, content_type, byte_size, status, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        patient_id: { type: string, format: uuid, description: "Patient Management's patient, id only." }
+        patient_code: { type: string }
+        patient_name: { type: string }
+        note: { type: string, nullable: true }
+        file_name: { type: string }
+        content_type: { type: string }
+        byte_size: { type: integer }
+        status: { $ref: '#/components/schemas/PrescriptionStatus' }
+        token_date: { type: string, format: date, nullable: true }
+        token_number: { type: integer, nullable: true }
+        ready_at: { type: string, format: date-time, nullable: true }
+        delivered_at: { type: string, format: date-time, nullable: true }
+        rejection_reason: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    RejectPrescriptionRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
 
     # ---------- laboratory ----------
 
@@ -1834,7 +2683,10 @@ components:
               type: string
               enum: [pharmacy_item, equipment_item, bed]
             related_entity_id: { type: string, format: uuid }
-            related_entity_label: { type: string }
+            related_entity_label:
+              type: string
+              nullable: true
+              description: The medicine, machine or bed by name. Filled on the warnings list.
             ward_id: { type: string, format: uuid, nullable: true }
             recommended_action:
               type: string

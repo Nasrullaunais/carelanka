@@ -2,11 +2,14 @@ using CareLanka.Api.Data;
 using CareLanka.Api.Data.Entities.Common;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.Services.Common;
+using CareLanka.Api.Services.Emergency;
 using System.Collections.Concurrent;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Testcontainers.PostgreSql;
 using Xunit;
@@ -27,6 +30,8 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
 
     public const string AmbulanceEmail = "ambulance.tests@carelanka.invalid";
     public const string SigningKey = "test-signing-key-that-is-at-least-32-characters";
+
+    public const string EquipmentConfirmationCode = "test-confirmation-code";
 
     private readonly string _databasePassword = Guid.NewGuid().ToString("N");
     private readonly PostgreSqlContainer _database;
@@ -49,10 +54,26 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
         builder.UseEnvironment("Testing");
 
         builder.UseSetting("RateLimits:AuthPerMinute", "1000");
+        builder.UseSetting("Equipment:ConfirmationCode", EquipmentConfirmationCode);
+        // Tests run the sweep themselves; a timer sweeping mid-test would only add noise.
+        builder.UseSetting("Equipment:WarningSweepIntervalMinutes", "0");
 
         builder.ConfigureLogging(logging => logging.AddProvider(new CapturingLoggerProvider(Logs)));
         builder.ConfigureServices(services =>
-            services.AddControllers().AddApplicationPart(typeof(TestPolicyController).Assembly));
+        {
+            services.AddControllers().AddApplicationPart(typeof(TestPolicyController).Assembly);
+            // Tests drain SceneLookupQueue and run the processor themselves; the real worker would call the internet.
+            services.Remove(services.Single(service =>
+                service.ServiceType == typeof(IHostedService) && service.ImplementationType == typeof(SceneLookupWorker)));
+            services.Replace(ServiceDescriptor.Singleton<IReverseGeocoder, NoAddressGeocoder>());
+            // Tests run the delivery pass themselves and never talk to Firebase.
+            services.Remove(services.Single(service =>
+                service.ServiceType == typeof(IHostedService) && service.ImplementationType == typeof(PushDeliveryWorker)));
+            services.Replace(ServiceDescriptor.Singleton<IPushSender, RecordingPushSender>());
+            // Tests run the pre-admission pass themselves and never call Patient Management.
+            services.Remove(services.Single(service =>
+                service.ServiceType == typeof(IHostedService) && service.ImplementationType == typeof(PreAdmissionWorker)));
+        });
     }
 
     public async Task InitializeAsync()

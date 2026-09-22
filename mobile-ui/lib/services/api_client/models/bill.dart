@@ -13,7 +13,6 @@ part 'bill.g.dart';
 class Bill {
   const Bill({
     required this.id,
-    required this.admissionId,
     required this.billNumber,
     required this.currency,
     required this.lines,
@@ -22,6 +21,8 @@ class Bill {
     required this.patient,
     required this.createdAt,
     required this.updatedAt,
+    this.admissionId,
+    this.appointmentId,
     this.raisedByStaffId,
     this.raisedByStaffName,
     this.settledAt,
@@ -34,7 +35,9 @@ class Bill {
   
   final String id;
   @JsonKey(name: 'admission_id')
-  final String admissionId;
+  final String? admissionId;
+  @JsonKey(name: 'appointment_id')
+  final String? appointmentId;
   @JsonKey(name: 'bill_number')
   final String billNumber;
   final String currency;

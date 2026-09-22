@@ -62,14 +62,33 @@ Every feature folder has the same five sub-folders:
 | :--- | :--- |
 | `screens/` | Full pages — one per route |
 | `widgets/` | Smaller pieces used by those screens |
-| `models/` | Dart classes matching the API's JSON |
-| `services/` | All HTTP calls for this feature |
+| `models/` | **UI-only shapes, and usually empty.** See the note below |
+| `services/` | This feature's wrapper over the generated API client |
 | `state/` | State management (providers / controllers) |
 
 **The layering rule:** screens never call `http` directly. A screen asks its
 `state/`, which asks its `services/`, which uses `core/network/`. This is the
 same separation the React lecture describes (UI → hooks → services → server),
 and it is what makes the code testable.
+
+> **`models/` and `services/` no longer mean what this table originally said**, and the
+> patient feature is the worked example of the correction.
+>
+> This table used to read *"`models/`: Dart classes matching the API's JSON"* and
+> *"`services/`: all HTTP calls for this feature"* — which is hand-writing a client, the one
+> thing `CLAUDE.md` forbids outright. **Domain shapes come from the generated
+> `lib/services/api_client/`**, which is committed (323 files on `main`), and a feature's
+> `services/` wraps that client instead of calling `http` or `dio`. `core/network/` owns the
+> JWT header and error handling once, for everyone.
+>
+> `lib/features/patient/` is built this way today: `models/` is empty, and
+> `services/patient_service.dart` imports `care_lanka_api.dart` and the generated model
+> classes and calls them. A `models/` folder only earns a file when the UI needs a shape the
+> API does not have — a tab enum, a form's draft state — never a copy of a response.
+>
+> `CLAUDE.md` records this as the group's working resolution. One question is still genuinely
+> open and is **not** answered by the patient feature: whether `lib/services/api_client/`
+> stays committed or is regenerated in CI.
 
 ---
 
@@ -118,44 +137,18 @@ member's own job inside their feature folder.
 
 ## 5. Getting started
 
-> **⚠️ One-time setup — this must be done once, by one person, before anyone
-> can run the app.**
->
-> The Flutter SDK was not installed on the machine where this skeleton was
-> created, so the platform folders (`android/` and `ios/`) **do not exist yet**.
-> Until someone generates them, `flutter run` will not work for anybody.
-
-**Whoever sets up first (only one person needs to do this):**
+> **The one-time setup is done.** `android/` and `ios/` are committed. This section used to
+> say they did not exist and that one person had to run `flutter create .` first — that
+> happened, and the folders are on `main`. **Do not run `flutter create .` again.**
 
 ```bash
-cd mobile-ui
-flutter create .          # adds android/ and ios/ — does NOT touch lib/
-flutter pub get
-flutter run               # check it launches
-```
-
-Then commit the generated folders so nobody else has to repeat it:
-
-```bash
-git add android ios
-git commit -m "Add Flutter platform folders (android/ios)"
-```
-
-`flutter create .` is safe to run here. Because `pubspec.yaml` already exists,
-Flutter fills in only what is missing — it leaves `lib/`, `pubspec.yaml`, this
-README and everyone's feature folders exactly as they are.
-
-**Everyone else, after that person has pushed:**
-
-```bash
-git pull
 cd mobile-ui
 flutter pub get
 flutter run
 ```
 
-If you pull and `android/` still isn't there, ask in the group chat who is doing
-the setup — don't run `flutter create .` a second time in parallel.
+If `flutter run` cannot find a device, `flutter devices` lists what it can see; Chrome counts
+as one, and the patient screens are built and tested against it.
 
 ---
 

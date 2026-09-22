@@ -105,17 +105,18 @@ public sealed class AuthFlowTests
     public async Task Patient_can_register_log_in_and_read_an_unlinked_principal()
     {
         using var client = _application.CreateClient();
-        var phone = NewPhoneNumber("77");
+        var username = NewUsername();
 
         var registration = await client.PostAsJsonAsync("/api/auth/patient/register", new
         {
-            phone_number = phone,
-            password = ApiApplication.Password,
-            full_name = "Integration Patient"
+            username,
+            password = ApiApplication.Password
         });
+        // Typed back in capitals, to prove the username is matched case-insensitively
+        // rather than one person ending up with two accounts.
         var login = await client.PostAsJsonAsync("/api/auth/patient/login", new
         {
-            phone_number = phone,
+            username = username.ToUpperInvariant(),
             password = ApiApplication.Password
         });
         using var loginBody = await ReadJsonAsync(login);
@@ -133,16 +134,14 @@ public sealed class AuthFlowTests
     }
 
     [Fact]
-    public async Task Concurrent_registration_of_one_phone_returns_one_201_and_one_409()
+    public async Task Concurrent_registration_of_one_username_returns_one_201_and_one_409()
     {
         using var firstClient = _application.CreateClient();
         using var secondClient = _application.CreateClient();
-        var phone = NewPhoneNumber("71");
         var body = new
         {
-            phone_number = phone,
-            password = ApiApplication.Password,
-            full_name = "Concurrent Patient"
+            username = NewUsername(),
+            password = ApiApplication.Password
         };
 
         var responses = await Task.WhenAll(
@@ -189,6 +188,6 @@ public sealed class AuthFlowTests
     private static async Task<JsonDocument> ReadJsonAsync(HttpResponseMessage response)
         => JsonDocument.Parse(await response.Content.ReadAsStringAsync());
 
-    private static string NewPhoneNumber(string prefix)
-        => $"+94{prefix}{Random.Shared.Next(10_000_000, 99_999_999)}";
+    private static string NewUsername()
+        => $"patient.{Random.Shared.Next(10_000_000, 99_999_999)}";
 }

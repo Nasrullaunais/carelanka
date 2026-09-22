@@ -507,13 +507,13 @@ function ChecklistRow({
   const mandatory = item?.mandatory ?? mandatoryChecklistItems.has(itemKey);
 
   return (
-    <div className="row" style={{ alignItems: 'flex-start' }}>
-      <div className="field">
-        <strong>{checklistLabel(itemKey)}</strong>
+    <div className="checklist-row">
+      <div>
+        <strong>{checklistLabel(itemKey)}</strong>{' '}
         {mandatory && <span className="badge">Required</span>}
         <div className="small muted">{checklistHints[itemKey]}</div>
       </div>
-      <div className="field">
+      <div>
         {ticked ? (
           <>
             <span className="badge status-available">Done</span>
@@ -526,7 +526,7 @@ function ChecklistRow({
           <span className="muted">Not done</span>
         )}
       </div>
-      <div style={{ alignSelf: 'center' }}>
+      <div>
         {mayTick && onToggle && (
           <button
             type="button"

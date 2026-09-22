@@ -8,10 +8,18 @@ import 'package:json_annotation/json_annotation.dart';
 enum DispatchStatus {
   @JsonValue('assigned')
   assigned('assigned'),
-  @JsonValue('en_route')
-  enRoute('en_route'),
-  @JsonValue('completed')
-  completed('completed'),
+  @JsonValue('acknowledged')
+  acknowledged('acknowledged'),
+  @JsonValue('en_route_to_scene')
+  enRouteToScene('en_route_to_scene'),
+  @JsonValue('at_scene')
+  atScene('at_scene'),
+  @JsonValue('transporting_to_hospital')
+  transportingToHospital('transporting_to_hospital'),
+  @JsonValue('handed_over')
+  handedOver('handed_over'),
+  @JsonValue('declined')
+  declined('declined'),
   @JsonValue('cancelled')
   cancelled('cancelled'),
   @JsonValue('reassigned')

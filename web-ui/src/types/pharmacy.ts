@@ -1,4 +1,4 @@
-import type { PharmacyTransactionType } from '../services/api/generated';
+import type { PharmacyTransactionType, PrescriptionStatus } from '../services/api/generated';
 
 export const transactionTypeLabels: Record<PharmacyTransactionType, string> = {
   received: 'Received',
@@ -9,6 +9,12 @@ export const transactionTypeLabels: Record<PharmacyTransactionType, string> = {
 
 export const transactionTypes = Object.keys(
   transactionTypeLabels,
+) as PharmacyTransactionType[];
+
+// Stock arriving is a batch, with its own expiry date, so it is added through Add batch rather
+// than recorded as a plain movement. The API refuses `received` here too.
+export const movementTypes = transactionTypes.filter(
+  (type) => type !== 'received',
 ) as PharmacyTransactionType[];
 
 export const takesStock: Record<PharmacyTransactionType, boolean> = {
@@ -24,3 +30,12 @@ export const needsNote: Record<PharmacyTransactionType, boolean> = {
   adjusted: true,
   expired_removed: false,
 };
+
+export const prescriptionStatusLabels: Record<PrescriptionStatus, string> = {
+  submitted: 'Waiting',
+  ready: 'Ready for collection',
+  delivered: 'Delivered',
+  rejected: "Can't fill",
+};
+
+export const prescriptionStatuses = Object.keys(prescriptionStatusLabels) as PrescriptionStatus[];

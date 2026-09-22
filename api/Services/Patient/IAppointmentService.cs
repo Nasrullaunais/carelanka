@@ -28,6 +28,15 @@ public interface IAppointmentService
     Task<AppointmentEntity> CancelForPatientAsync(
         Guid appointmentId, Guid patientId, CancellationToken cancellationToken = default);
 
+    Task<AppointmentResponse> CancelAtTheDeskAsync(
+        Guid id, CancelAppointmentRequest request, CancellationToken cancellationToken = default);
+
+    Task<AppointmentResponse> ConfirmAsync(Guid id, CancellationToken cancellationToken = default);
+
+    Task<AppointmentResponse> CompleteAsync(Guid id, CancellationToken cancellationToken = default);
+
+    Task<AppointmentResponse> MarkNoShowAsync(Guid id, CancellationToken cancellationToken = default);
+
     Task<AppointmentEntity?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<AppointmentEntity> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);

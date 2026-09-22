@@ -13,8 +13,15 @@ public sealed class AmbulanceSummary
     public AmbulanceStatus Status { get; set; }
     public decimal? CurrentLatitude { get; set; }
     public decimal? CurrentLongitude { get; set; }
+    public DateTimeOffset? LocationUpdatedAt { get; set; }
+    public int CurrentCrewCount { get; set; }
+    public int RequiredCrewCount { get; set; }
+    public bool IsEligible { get; set; }
+    public IReadOnlyList<AmbulanceEligibilityBlockReason> EligibilityBlockReasons { get; set; } = [];
     public Guid? ActiveDispatchId { get; set; }
     [Required]
     public bool IsDivertible { get; set; }
     public double? DistanceKm { get; set; }
+    public int? DriveMinutes { get; set; }
+    public bool? IsStraightLineDistance { get; set; }
 }

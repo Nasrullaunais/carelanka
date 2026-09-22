@@ -49,6 +49,20 @@ hand to a deterministic validator, pause for approval — is exactly right.
 `patient-management-plan.md` §8.7 is the worked example; the other three can
 follow that pattern inside their own component and get on with it.
 
+**Revised 2026-09-16 — one change worth copying.** M4 rewrote both Patient Management agents
+after building the rest of that component, and the change the other three may want is this:
+**the bed agent now holds no write tool at all.** It used to place a 30-minute hold on its
+chosen bed before a human saw anything, on the reasoning that a hold is not an admission so it
+is low-impact. That was wrong in a way that only shows at scale — a hold takes a real bed out
+of circulation, so a run nobody acts on quietly makes a ward look full to everybody else,
+including this coordinator. Committing is now a human pressing a button on the ordinary manual
+endpoint, with its row lock and its hard rules.
+
+If your agent's "proposal" reserves, locks or allocates something real, the same question
+applies: what does a run nobody approves cost the rest of the hospital? For the coordinator
+specifically it means **a plan that stalls at approval leaves nothing half-allocated on M4's
+side** — the admission is exactly where it started.
+
 Three things are left for later, once the four agents exist:
 
 | To do | Related |
@@ -75,7 +89,7 @@ distinct agents" — so five is allowed and everyone keeps their own domain agen
 | :--- | :--- | :--- |
 | **Coordinator** | Group | Receives the objective, produces a structured plan, delegates each step to a domain agent, collects results, assembles one approval package |
 | Dispatch & Routing | M1 | Which ambulance, which route, which destination ward |
-| Patient Admission & Bed | M4 | Which ward and bed, or a flagged downgrade |
+| Bed & Patient Details | M4 | Who the patient is, and which ward and bed — or a named blocker saying which rule stopped it |
 | Staff Allocation | M2 | Whether the destination ward is staffed, and what to reallocate |
 | Equipment Monitoring | M3 | Whether the destination ward has the equipment it needs |
 
@@ -102,11 +116,13 @@ COORDINATOR — plan
         │
         ▼
   step 1 → Dispatch & Routing Agent      [M1] → proposes ambulance + route + ward
-  step 2 → Patient Admission & Bed Agent [M4] → proposes bed, 30-min hold, may flag downgrade
+  step 2 → Bed & Patient Details Agent [M4] → suggests bed + alternatives; writes nothing
   step 3 → Staff Allocation Agent        [M2] → flags short-staffing, proposes reallocation
   step 4 → Equipment Monitoring Agent    [M3] → ready / not_ready for that ward
         │
         │  each step writes its own AgentProposedChange rows, linked by correlation_id
+        │  (M4's bed agent proposes only — since 2026-09-16 it holds no write tool
+        │   and places no hold, so nothing is reserved while the plan waits)
         ▼
 DETERMINISTIC VALIDATION — plain C#, no model involved
   each component re-checks its own hard rules; the coordinator checks the plan is

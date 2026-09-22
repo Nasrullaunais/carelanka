@@ -3,12 +3,15 @@ import {
   canReadPatientDetails,
   canReadCapacity,
   canReadEquipment,
+  canRunMaintenance,
+  canReadWarnings,
   canReadLabReports,
   canReadWards,
   canRegisterPatient,
-  canWorkAppointmentDesk,
+  canOpenAppointmentBoard,
   canOpenDischargeBoard,
   canSetBillingRates,
+  canReadCareQueue,
 } from './permissions';
 
 export type Destination = {
@@ -35,8 +38,8 @@ export const destinations: Destination[] = [
   {
     to: '/appointments',
     label: 'Expected visits',
-    description: 'Who has booked to come in. Take a booking, or check someone in.',
-    canAccess: canWorkAppointmentDesk,
+    description: 'Who has booked to come in, and when they are expected.',
+    canAccess: canOpenAppointmentBoard,
   },
   {
     to: '/discharge',
@@ -44,6 +47,13 @@ export const destinations: Destination[] = [
     description:
       'Who could go home: what they owe, what is still outstanding, and the sign-off that sends them.',
     canAccess: canOpenDischargeBoard,
+  },
+  {
+    to: '/care-recommendations',
+    label: 'Care recommendations',
+    description:
+      "What patients have reported about how they feel, and the agent's draft note for a nurse or doctor to check.",
+    canAccess: canReadCareQueue,
   },
   {
     to: '/billing-settings',
@@ -72,8 +82,14 @@ export const destinations: Destination[] = [
   {
     to: '/maintenance-unit',
     label: 'Maintenance unit',
-    description: 'Machines waiting to be fixed. Confirm a repair and the item goes back into service.',
-    canAccess: canReadEquipment,
+    description: 'Book maintenance, confirm repairs done, and retire machines beyond repair.',
+    canAccess: canRunMaintenance,
+  },
+  {
+    to: '/warnings',
+    label: 'Warnings',
+    description: 'Medicine running low or about to expire, and machines overdue for service.',
+    canAccess: canReadWarnings,
   },
   {
     to: '/laboratory',

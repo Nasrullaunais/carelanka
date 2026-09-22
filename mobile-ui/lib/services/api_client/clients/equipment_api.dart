@@ -9,10 +9,12 @@ import '../models/assign_equipment_item_request.dart';
 import '../models/create_equipment_category_request.dart';
 import '../models/create_equipment_item_request.dart';
 import '../models/equipment_category.dart';
+import '../models/equipment_category_usage.dart';
 import '../models/equipment_item.dart';
 import '../models/equipment_item_detail.dart';
 import '../models/equipment_item_summary_paged_result.dart';
 import '../models/equipment_status.dart';
+import '../models/pending_equipment_count.dart';
 import '../models/report_fault_request.dart';
 import '../models/update_equipment_item_request.dart';
 
@@ -28,6 +30,17 @@ abstract class EquipmentApi {
   @POST('/equipment-categories')
   Future<EquipmentCategory> createEquipmentCategory({
     @Body() CreateEquipmentCategoryRequest? body,
+  });
+
+  @GET('/equipment-categories/for-removal')
+  Future<List<EquipmentCategoryUsage>> listEquipmentCategoriesForRemoval({
+    @Header('X-Confirmation-Code') required String xConfirmationCode,
+  });
+
+  @DELETE('/equipment-categories/{id}')
+  Future<void> removeEquipmentCategory({
+    @Path('id') required String id,
+    @Header('X-Confirmation-Code') required String xConfirmationCode,
   });
 
   @GET('/equipment-items')
@@ -47,6 +60,26 @@ abstract class EquipmentApi {
     @Body() CreateEquipmentItemRequest? body,
   });
 
+  @GET('/equipment-items/pending-confirmation')
+  Future<List<EquipmentItem>> listEquipmentItemsAwaitingConfirmation({
+    @Header('X-Confirmation-Code') required String xConfirmationCode,
+  });
+
+  @GET('/equipment-items/pending-confirmation/count')
+  Future<PendingEquipmentCount> countEquipmentItemsAwaitingConfirmation();
+
+  @POST('/equipment-items/{id}/confirm')
+  Future<EquipmentItem> confirmEquipmentItem({
+    @Path('id') required String id,
+    @Header('X-Confirmation-Code') required String xConfirmationCode,
+  });
+
+  @POST('/equipment-items/{id}/reject')
+  Future<void> rejectEquipmentItem({
+    @Path('id') required String id,
+    @Header('X-Confirmation-Code') required String xConfirmationCode,
+  });
+
   @GET('/equipment-items/{id}')
   Future<EquipmentItemDetail> getEquipmentItem({
     @Path('id') required String id,
@@ -56,6 +89,12 @@ abstract class EquipmentApi {
   Future<EquipmentItem> updateEquipmentItem({
     @Path('id') required String id,
     @Body() UpdateEquipmentItemRequest? body,
+  });
+
+  @DELETE('/equipment-items/{id}')
+  Future<void> removeEquipmentItem({
+    @Path('id') required String id,
+    @Header('X-Confirmation-Code') required String xConfirmationCode,
   });
 
   @GET('/equipment-items/by-tag/{assetTag}')
@@ -72,6 +111,12 @@ abstract class EquipmentApi {
   @POST('/equipment-items/{id}/release')
   Future<EquipmentItem> releaseEquipmentItem({
     @Path('id') required String id,
+  });
+
+  @POST('/equipment-items/{id}/retire')
+  Future<EquipmentItem> retireEquipmentItem({
+    @Path('id') required String id,
+    @Header('X-Confirmation-Code') required String xConfirmationCode,
   });
 
   @POST('/equipment-items/{id}/report-fault')

@@ -17,12 +17,18 @@ public class CareLankaDbContext : DbContext
     public DbSet<StaffMember> StaffMembers => Set<StaffMember>();
     public DbSet<PatientAccount> PatientAccounts => Set<PatientAccount>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<DeviceToken> DeviceTokens => Set<DeviceToken>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<AgentWorkflow> AgentWorkflows => Set<AgentWorkflow>();
+    public DbSet<AgentProposedChange> AgentProposedChanges => Set<AgentProposedChange>();
 
     public DbSet<EmergencyCall> EmergencyCalls => Set<EmergencyCall>();
     public DbSet<Ambulance> Ambulances => Set<Ambulance>();
+    public DbSet<AmbulanceCrewAssignment> AmbulanceCrewAssignments => Set<AmbulanceCrewAssignment>();
     public DbSet<Dispatch> Dispatches => Set<Dispatch>();
     public DbSet<DispatchCrew> DispatchCrew => Set<DispatchCrew>();
     public DbSet<RouteLog> RouteLogs => Set<RouteLog>();
+    public DbSet<PreAdmissionNotice> PreAdmissionNotices => Set<PreAdmissionNotice>();
 
     public DbSet<Skill> Skills => Set<Skill>();
     public DbSet<StaffMemberSkill> StaffMemberSkills => Set<StaffMemberSkill>();
@@ -38,8 +44,12 @@ public class CareLankaDbContext : DbContext
     public DbSet<Warning> Warnings => Set<Warning>();
     public DbSet<PharmacyCategory> PharmacyCategories => Set<PharmacyCategory>();
     public DbSet<PharmacyItem> PharmacyItems => Set<PharmacyItem>();
+
+    public DbSet<PharmacyBatch> PharmacyBatches => Set<PharmacyBatch>();
     public DbSet<PharmacyTransaction> PharmacyTransactions => Set<PharmacyTransaction>();
     public DbSet<LabReport> LabReports => Set<LabReport>();
+
+    public DbSet<Prescription> Prescriptions => Set<Prescription>();
 
     public DbSet<Ward> Wards => Set<Ward>();
     public DbSet<PatientEntity> Patients => Set<PatientEntity>();
@@ -52,6 +62,8 @@ public class CareLankaDbContext : DbContext
     public DbSet<BillLineItem> BillLineItems => Set<BillLineItem>();
     public DbSet<BillingRate> BillingRates => Set<BillingRate>();
     public DbSet<AdmissionFeeRate> AdmissionFeeRates => Set<AdmissionFeeRate>();
+    public DbSet<PatientMedicalProfile> PatientMedicalProfiles => Set<PatientMedicalProfile>();
+    public DbSet<CareRecommendation> CareRecommendations => Set<CareRecommendation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
         => modelBuilder.ApplyConfigurationsFromAssembly(typeof(CareLankaDbContext).Assembly);

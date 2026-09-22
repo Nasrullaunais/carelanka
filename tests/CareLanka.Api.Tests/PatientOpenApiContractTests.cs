@@ -23,9 +23,10 @@ public sealed class PatientOpenApiContractTests
     [InlineData("AssignmentStatus")]
     [InlineData("AssignedBy")]
     [InlineData("ReleaseReason")]
-    [InlineData("WorklistKind")]
     [InlineData("WorklistStatus")]
     [InlineData("BillLineSource")]
+    [InlineData("BedAgentOutcome")]
+    [InlineData("BedSuggestionBlockerCode")]
     public async Task Published_enum_values_match_the_contract_in_order(string enumName)
     {
         var generated = await GenerateAsync();
@@ -46,6 +47,7 @@ public sealed class PatientOpenApiContractTests
     [InlineData("PatientSummary")]
     [InlineData("Patient")]
     [InlineData("PatientDetail")]
+    [InlineData("PatientMedicalProfile")]
     [InlineData("CreateAdmissionRequest")]
     [InlineData("Admission")]
     [InlineData("AdmissionDetail")]
@@ -71,7 +73,13 @@ public sealed class PatientOpenApiContractTests
     [InlineData("MyProfile")]
     [InlineData("MyAdmission")]
     [InlineData("MyAppointment")]
+    [InlineData("MyBill")]
+    [InlineData("MyBillLine")]
+    [InlineData("PatientClaimPreview")]
     [InlineData("BookAppointmentRequest")]
+    [InlineData("BedSuggestionBlocker")]
+    [InlineData("SuggestedBed")]
+    [InlineData("BedSuggestionPatient")]
     public async Task Published_schema_required_members_match_the_contract(string schemaName)
     {
         var generated = await GenerateAsync();
@@ -120,6 +128,61 @@ public sealed class PatientOpenApiContractTests
             "cancelMyAppointment",
             paths.GetProperty("/me/appointments/{id}/cancel").GetProperty("post")
                 .GetProperty("operationId").GetString());
+        Assert.Equal(
+            "previewMyClaim",
+            paths.GetProperty("/me/claim/preview").GetProperty("post")
+                .GetProperty("operationId").GetString());
+        Assert.Equal(
+            "claimMyRecord",
+            paths.GetProperty("/me/claim").GetProperty("post")
+                .GetProperty("operationId").GetString());
+        Assert.Equal(
+            "getMyBill",
+            paths.GetProperty("/me/admissions/{admissionId}/bill").GetProperty("get")
+                .GetProperty("operationId").GetString());
+    }
+
+    [Fact]
+    public async Task The_patient_bill_publishes_none_of_the_staff_bill_fields()
+    {
+        var generated = await GenerateAsync();
+
+        var properties = generated.RootElement
+            .GetProperty("components").GetProperty("schemas")
+            .GetProperty("MyBill").GetProperty("properties");
+
+        foreach (var staffOnly in new[]
+                 {
+                     "raised_by_staff_id", "raised_by_staff_name", "settled_by_staff_id",
+                     "settled_by_staff_name", "settlement_note", "patient"
+                 })
+        {
+            Assert.False(properties.TryGetProperty(staffOnly, out _),
+                $"MyBill must not publish {staffOnly} - it is a staff-only field.");
+        }
+
+        Assert.True(properties.TryGetProperty("is_final", out _));
+    }
+
+    [Fact]
+    public async Task The_claim_preview_publishes_only_masked_fields()
+    {
+        var generated = await GenerateAsync();
+
+        var properties = generated.RootElement
+            .GetProperty("components").GetProperty("schemas")
+            .GetProperty("PatientClaimPreview").GetProperty("properties");
+
+        // An unmasked name, NIC or address here would hand a stranger holding the slip
+        // exactly what the masking exists to withhold.
+        foreach (var name in new[] { "full_name", "nic", "address", "date_of_birth", "phone" })
+        {
+            Assert.False(properties.TryGetProperty(name, out _),
+                $"PatientClaimPreview must not publish {name} unmasked.");
+        }
+
+        Assert.True(properties.TryGetProperty("masked_full_name", out _));
+        Assert.True(properties.TryGetProperty("masked_phone", out _));
     }
 
     [Fact]
@@ -174,6 +237,15 @@ public sealed class PatientOpenApiContractTests
         Assert.Equal(
             new[] { "200", "401", "403", "404", "409" },
             Responses(paths.GetProperty("/me/appointments/{id}/cancel").GetProperty("post")));
+        Assert.Equal(
+            new[] { "200", "400", "401", "403", "404", "409" },
+            Responses(paths.GetProperty("/me/claim/preview").GetProperty("post")));
+        Assert.Equal(
+            new[] { "200", "400", "401", "403", "404", "409" },
+            Responses(paths.GetProperty("/me/claim").GetProperty("post")));
+        Assert.Equal(
+            new[] { "200", "401", "403", "404" },
+            Responses(paths.GetProperty("/me/admissions/{admissionId}/bill").GetProperty("get")));
     }
 
     [Fact]

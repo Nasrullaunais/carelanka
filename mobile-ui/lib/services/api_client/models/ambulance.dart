@@ -19,6 +19,7 @@ class Ambulance {
     required this.updatedAt,
     this.currentLatitude,
     this.currentLongitude,
+    this.locationUpdatedAt,
     this.outOfServiceReason,
   });
   
@@ -31,6 +32,8 @@ class Ambulance {
   final double? currentLatitude;
   @JsonKey(name: 'current_longitude')
   final double? currentLongitude;
+  @JsonKey(name: 'location_updated_at')
+  final DateTime? locationUpdatedAt;
   final AmbulanceStatus status;
   @JsonKey(name: 'out_of_service_reason')
   final String? outOfServiceReason;

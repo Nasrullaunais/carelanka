@@ -1,6 +1,5 @@
 import { Fragment, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -14,12 +13,15 @@ import {
   listWardsOptions,
   markArrivedMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
-import type { WorklistRow } from '../services/api/generated';
+import type { PrincipalRole, WorklistRow } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
+import { MedicalProfilePanel } from '../components/MedicalProfilePanel';
+import { BedSuggestionPanel } from '../components/BedSuggestionPanel';
 import {
   canAssignBed,
   canCompleteVisit,
   canMarkArrived,
+  canReadMedicalProfile,
   canReadPatientDetails,
 } from '../types/permissions';
 import { localDateTime } from '../types/datetime';
@@ -53,6 +55,8 @@ export function PatientsPage() {
   const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState<string | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [suggestingId, setSuggestingId] = useState<string | null>(null);
+  const [deskSuggesting, setDeskSuggesting] = useState(false);
 
   const [bedMode, setBedMode] = useState<'assign' | 'correct'>('assign');
 
@@ -94,13 +98,22 @@ export function PatientsPage() {
 
   function openDetails(id: string) {
     setAssigningId(null);
+    setSuggestingId(null);
     setOpenId((current) => (current === id ? null : id));
   }
 
   function openAssign(id: string, mode: 'assign' | 'correct' = 'assign') {
     setOpenId(null);
+    setSuggestingId(null);
     setBedMode(mode);
     setAssigningId((current) => (current === id && bedMode === mode ? null : id));
+  }
+
+  function openSuggest(id: string) {
+    setOpenId(null);
+    setAssigningId(null);
+    setDeskSuggesting(false);
+    setSuggestingId((current) => (current === id ? null : id));
   }
 
   return (
@@ -138,6 +151,7 @@ export function PatientsPage() {
                   setPage(1);
                   setOpenId(null);
                   setAssigningId(null);
+                  setSuggestingId(null);
                 }}
               >
                 Clear
@@ -156,6 +170,7 @@ export function PatientsPage() {
                   setPage(1);
                   setOpenId(null);
                   setAssigningId(null);
+                  setSuggestingId(null);
                 }}
               />{' '}
               Include finished visits
@@ -166,6 +181,28 @@ export function PatientsPage() {
           </div>
         </form>
       </div>
+
+      {canAssignBed(role) && (
+        <div className="card">
+          <h2>Suggest a bed</h2>
+          <p className="muted">
+            Off a slip at the desk, before the patient has a row on this board — type their NIC
+            or patient code and the agent looks them up.
+          </p>
+
+          {deskSuggesting ? (
+            <BedSuggestionPanel
+              role={role}
+              onAssigned={() => setDeskSuggesting(false)}
+              onClose={() => setDeskSuggesting(false)}
+            />
+          ) : (
+            <button type="button" onClick={() => setDeskSuggesting(true)}>
+              Suggest a bed
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="card">
         <h2>
@@ -226,17 +263,15 @@ export function PatientsPage() {
                           <span className="muted">
                             {row.urgency ? admissionUrgencyLabels[row.urgency] : ''}
                           </span>
-                        </>
-                      ) : (
-                        <span className="muted">
-                          Set at check-in
-                          {row.reason ? (
+                          {row.is_infectious && (
                             <>
                               <br />
-                              For: {row.reason}
+                              <span className="badge severity-high">Needs isolation</span>
                             </>
-                          ) : null}
-                        </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="muted">Not recorded</span>
                       )}
                     </td>
                     <td>
@@ -255,8 +290,10 @@ export function PatientsPage() {
                         row={row}
                         role={role}
                         assigning={assigningId === row.id}
+                        suggesting={suggestingId === row.id}
                         open={openId === row.id}
                         onAssign={(mode) => openAssign(row.id, mode)}
+                        onSuggest={() => openSuggest(row.id)}
                         onDetails={() => openDetails(row.id)}
                       />
                     </td>
@@ -274,10 +311,23 @@ export function PatientsPage() {
                     </tr>
                   )}
 
+                  {suggestingId === row.id && (
+                    <tr className="drawer">
+                      <td colSpan={5}>
+                        <BedSuggestionPanel
+                          admissionId={row.id}
+                          role={role}
+                          onAssigned={() => setSuggestingId(null)}
+                          onClose={() => setSuggestingId(null)}
+                        />
+                      </td>
+                    </tr>
+                  )}
+
                   {openId === row.id && (
                     <tr className="drawer">
                       <td colSpan={5}>
-                        <DetailsPanel row={row} onClose={() => setOpenId(null)} />
+                        <DetailsPanel row={row} role={role} onClose={() => setOpenId(null)} />
                       </td>
                     </tr>
                   )}
@@ -343,15 +393,19 @@ function RowActions({
   row,
   role,
   assigning,
+  suggesting,
   open,
   onAssign,
+  onSuggest,
   onDetails,
 }: {
   row: WorklistRow;
   role: Parameters<typeof canAssignBed>[0];
   assigning: boolean;
+  suggesting: boolean;
   open: boolean;
   onAssign: (mode: 'assign' | 'correct') => void;
+  onSuggest: () => void;
   onDetails: () => void;
 }) {
   const invalidate = useBoardInvalidation();
@@ -377,16 +431,15 @@ function RowActions({
   return (
     <>
 
-      {row.status === 'not_arrived' && (
-        <Link to="/appointments" className="muted" style={{ fontSize: '0.82rem' }}>
-          Check in at the desk
-        </Link>
-      )}
-
       {row.status === 'awaiting_bed' && row.requires_bed && canAssignBed(role) && (
-        <button type="button" onClick={() => onAssign('assign')}>
-          {assigning ? 'Cancel' : 'Assign bed'}
-        </button>
+        <>
+          <button type="button" onClick={() => onAssign('assign')}>
+            {assigning ? 'Cancel' : 'Assign bed'}
+          </button>{' '}
+          <button type="button" className="secondary" onClick={onSuggest}>
+            {suggesting ? 'Cancel' : 'Suggest bed'}
+          </button>
+        </>
       )}
 
       {(row.status === 'bed_ready' || row.status === 'admitted') &&
@@ -692,13 +745,18 @@ function AssignBedPanel({
   );
 }
 
-function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void }) {
+function DetailsPanel({
+  row,
+  role,
+  onClose,
+}: {
+  row: WorklistRow;
+  role: PrincipalRole | undefined;
+  onClose: () => void;
+}) {
   const patient = useQuery(getPatientOptions({ path: { id: row.patient.id } }));
 
-  const visit = useQuery({
-    ...getAdmissionOptions({ path: { id: row.id } }),
-    enabled: row.kind === 'visit',
-  });
+  const visit = useQuery(getAdmissionOptions({ path: { id: row.id } }));
 
   const liveBed = visit.data?.bed_assignments?.find(
     (assignment) => assignment.status !== 'released',
@@ -735,29 +793,10 @@ function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void 
         </table>
       )}
 
-      {row.kind === 'booking' ? (
-        <>
-          <h4 style={{ marginTop: '1.25rem', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
-            This appointment
-          </h4>
-          <table>
-            <tbody>
-              <Field label="Scheduled for">{localDateTime(row.when)}</Field>
-              <Field label="Reason" empty="Not given">
-                {row.reason}
-              </Field>
-            </tbody>
-          </table>
-          <p className="hint">
-            There is no visit record yet. Checking the patient in at the bookings desk creates
-            one, and the care level is recorded there by the member of staff at the desk.
-          </p>
-        </>
-      ) : (
-        <>
-          <h4 style={{ marginTop: '1.25rem', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
-            This visit
-          </h4>
+      <>
+        <h4 style={{ marginTop: '1.25rem', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+          This visit
+        </h4>
           {visit.isLoading && <p className="empty">Loading…</p>}
           {visit.data && (
             <table>
@@ -818,6 +857,18 @@ function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void 
               </ul>
             </>
           )}
+      </>
+
+      {canReadMedicalProfile(role) && (
+        <>
+          <h4 style={{ marginTop: '1.25rem', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+            Medical details
+          </h4>
+          <MedicalProfilePanel
+            patientId={row.patient.id}
+            patientName={row.patient.full_name}
+            role={role}
+          />
         </>
       )}
 

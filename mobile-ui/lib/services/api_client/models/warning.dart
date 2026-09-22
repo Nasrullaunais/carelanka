@@ -25,6 +25,7 @@ class Warning {
     required this.raisedBy,
     required this.createdAt,
     required this.updatedAt,
+    this.relatedEntityLabel,
     this.wardId,
     this.workflowId,
     this.acknowledgedByStaffId,
@@ -41,6 +42,8 @@ class Warning {
   final RelatedEntityType relatedEntityType;
   @JsonKey(name: 'related_entity_id')
   final String relatedEntityId;
+  @JsonKey(name: 'related_entity_label')
+  final String? relatedEntityLabel;
   @JsonKey(name: 'ward_id')
   final String? wardId;
   @JsonKey(name: 'recommended_action')

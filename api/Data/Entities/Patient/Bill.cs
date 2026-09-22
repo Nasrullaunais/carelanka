@@ -4,9 +4,18 @@ namespace CareLanka.Api.Data.Entities.Patient;
 
 public class Bill : AuditedEntity
 {
-    public Guid AdmissionId { get; set; }
+    /// <summary>
+    /// Exactly one of <see cref="AdmissionId"/> and <see cref="AppointmentId"/>
+    /// is set, enforced by a check constraint. A patient seen at a booked
+    /// appointment and sent home is billed without ever being admitted.
+    /// </summary>
+    public Guid? AdmissionId { get; set; }
 
-    public Admission Admission { get; set; } = null!;
+    public Admission? Admission { get; set; }
+
+    public Guid? AppointmentId { get; set; }
+
+    public Appointment? Appointment { get; set; }
 
     public string BillNumber { get; set; } = null!;
 

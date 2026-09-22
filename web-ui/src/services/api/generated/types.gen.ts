@@ -10,6 +10,13 @@ export type AddBillChargeRequest = {
     unit_price: number;
 };
 
+export type AddPharmacyBatchRequest = {
+    quantity: number;
+    expiry_date?: string | null;
+    reference?: string | null;
+    note?: string | null;
+};
+
 export type Admission = {
     id: string;
     patient?: PatientSummary;
@@ -136,6 +143,7 @@ export type Ambulance = {
     registration_number: string;
     current_latitude?: number | null;
     current_longitude?: number | null;
+    location_updated_at?: string | null;
     status: AmbulanceStatus;
     out_of_service_reason?: string | null;
     is_active: boolean;
@@ -143,11 +151,23 @@ export type Ambulance = {
     updated_at: string;
 };
 
+export type AmbulanceCrewAssignment = {
+    id?: string;
+    ambulance_id?: string;
+    staff_member_id?: string;
+    full_name?: string | null;
+    assigned_at?: string;
+    assigned_by_staff_id?: string;
+    unassigned_at?: string | null;
+    unassigned_by_staff_id?: string | null;
+};
+
 export type AmbulanceDetail = {
     id: string;
     registration_number: string;
     current_latitude?: number | null;
     current_longitude?: number | null;
+    location_updated_at?: string | null;
     status: AmbulanceStatus;
     out_of_service_reason?: string | null;
     is_active: boolean;
@@ -156,7 +176,10 @@ export type AmbulanceDetail = {
     active_dispatch?: DispatchSummary;
     is_divertible?: boolean;
     runs_today?: number;
+    current_crew?: Array<AmbulanceCrewAssignment> | null;
 };
+
+export type AmbulanceEligibilityBlockReason = 'inactive' | 'out_of_service' | 'insufficient_crew' | 'active_dispatch' | 'missing_location' | 'stale_location';
 
 export type AmbulanceSortField = 'registration_number' | 'status' | 'distance';
 
@@ -168,9 +191,16 @@ export type AmbulanceSummary = {
     status: AmbulanceStatus;
     current_latitude?: number | null;
     current_longitude?: number | null;
+    location_updated_at?: string | null;
+    current_crew_count?: number;
+    required_crew_count?: number;
+    is_eligible?: boolean;
+    eligibility_block_reasons?: Array<AmbulanceEligibilityBlockReason> | null;
     active_dispatch_id?: string | null;
     is_divertible: boolean;
     distance_km?: number | null;
+    drive_minutes?: number | null;
+    is_straight_line_distance?: boolean | null;
 };
 
 export type AmbulanceSummaryPagedResult = {
@@ -188,7 +218,14 @@ export type Appointment = {
     status: AppointmentStatus;
     reason?: string | null;
     booked_by_staff_id?: string | null;
+    confirmed_at?: string | null;
+    confirmed_by_staff_id?: string | null;
     admission_id?: string | null;
+    cancellation_reason?: string | null;
+    cancelled_by_staff_id?: string | null;
+    can_confirm: boolean;
+    can_cancel: boolean;
+    can_complete: boolean;
     created_at?: string;
     updated_at?: string;
 };
@@ -201,12 +238,21 @@ export type AppointmentPagedResult = {
     total_pages: number;
 };
 
-export type AppointmentStatus = 'scheduled' | 'checked_in' | 'completed' | 'cancelled' | 'no_show';
+export type AppointmentStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
+
+export type ApproveCareRecommendationRequest = {
+    doctor_message?: string | null;
+};
 
 export type AssetType = 'equipment_item' | 'bed';
 
+export type AssignAmbulanceCrewRequest = {
+    staff_member_id: string;
+};
+
 export type AssignBedRequest = {
     bed_id: string;
+    workflow_id?: string | null;
     override_reason?: string | null;
 };
 
@@ -238,6 +284,19 @@ export type Bed = {
     created_at: string;
     updated_at: string;
 };
+
+export type BedAgentOutcome = 'proposed' | 'proposed_with_downgrade' | 'needs_duty_manager' | 'no_bed_available' | 'visit_needs_no_bed' | 'patient_not_found' | 'failed';
+
+export type BedAgentStep = {
+    step?: string | null;
+    tool?: string | null;
+    started_at?: string;
+    duration_ms?: number;
+    ok?: boolean;
+    error?: string | null;
+};
+
+export type BedApproverRole = 'ward_nurse' | 'duty_manager';
 
 export type BedAssignment = {
     id: string;
@@ -282,9 +341,66 @@ export type BedPagedResult = {
     total_pages: number;
 };
 
+export type BedSuggestionBlocker = {
+    code: BedSuggestionBlockerCode;
+    message: string | null;
+};
+
+export type BedSuggestionBlockerCode = 'downgrade_needed' | 'upgrade_only' | 'ward_full' | 'gender_policy' | 'needs_isolation' | 'pediatric_only' | 'no_bed_required' | 'no_such_patient' | 'no_open_admission' | 'agent_failed';
+
+export type BedSuggestionPatient = {
+    patient_id: string;
+    patient_code: string | null;
+    full_name: string | null;
+    age?: number | null;
+    gender?: Gender;
+    admission_id?: string | null;
+    admission_category?: AdmissionCategory;
+    urgency?: AdmissionUrgency;
+    is_infectious?: boolean;
+    status?: AdmissionStatus;
+};
+
+export type BedSuggestionRequest = {
+    admission_id?: string | null;
+    patient_identifier?: string | null;
+};
+
+export type BedWorkflowAccepted = {
+    workflow_id?: string;
+    admission_id?: string | null;
+    status?: BedWorkflowStatus;
+    poll_url?: string | null;
+};
+
+export type BedWorkflowStatus = 'running' | 'awaiting_approval' | 'completed' | 'failed';
+
+export type BedWorkflowSummary = {
+    workflow_id?: string;
+    admission_id?: string | null;
+    objective?: string | null;
+    status?: BedWorkflowStatus;
+    outcome?: BedAgentOutcome;
+    plan?: Array<string> | null;
+    steps?: Array<BedAgentStep> | null;
+    patient?: BedSuggestionPatient;
+    best?: SuggestedBed;
+    alternatives?: Array<SuggestedBed> | null;
+    blocker?: BedSuggestionBlocker;
+    validation?: BedWorkflowValidation;
+    requires_approval_by?: BedApproverRole;
+    retries?: number;
+};
+
+export type BedWorkflowValidation = {
+    passed?: boolean;
+    failed_rules?: Array<string> | null;
+};
+
 export type Bill = {
     id: string;
-    admission_id: string;
+    admission_id?: string | null;
+    appointment_id?: string | null;
     bill_number: string;
     currency: string;
     lines: Array<BillLine>;
@@ -310,7 +426,7 @@ export type BillLine = {
     line_total: number;
 };
 
-export type BillLineSource = 'admission_fee' | 'bed_stay' | 'manual';
+export type BillLineSource = 'admission_fee' | 'bed_stay' | 'consultation_fee' | 'manual';
 
 export type BillingRateBook = {
     wards: Array<WardRates>;
@@ -325,12 +441,103 @@ export type BookAppointmentRequest = {
 
 export type CallPriority = 'critical' | 'high' | 'medium' | 'low';
 
+export type CallStatus = 'received' | 'dispatched' | 'en_route' | 'completed' | 'cancelled';
+
 export type CancelAdmissionRequest = {
     reason: CancelReason;
     note?: string | null;
 };
 
+export type CancelAppointmentRequest = {
+    reason: string;
+};
+
+export type CancelDispatchRequest = {
+    reason?: string | null;
+};
+
 export type CancelReason = 'diverted_to_other_hospital' | 'false_alarm' | 'died_en_route' | 'patient_refused' | 'no_show';
+
+export type CancellationRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export type CareAgentOutcome = 'drafted' | 'escalated' | 'failed';
+
+export type CareDraftSource = 'model' | 'model_unavailable' | 'model_rejected';
+
+export type CareQueryRequest = {
+    reported_text?: string | null;
+};
+
+export type CareRecommendation = {
+    id?: string;
+    patient_id?: string;
+    admission_id?: string | null;
+    reported_text?: string | null;
+    reported_at?: string;
+    red_flag?: boolean;
+    urgency_flag?: CareUrgency;
+    agent_message?: string | null;
+    status?: CareRecommendationStatus;
+    workflow_id?: string | null;
+    reviewed_by_staff_id?: string | null;
+    reviewed_at?: string | null;
+    doctor_message?: string | null;
+    rejection_reason?: string | null;
+    created_at?: string;
+    updated_at?: string;
+};
+
+export type CareRecommendationStatus = 'pending_review' | 'approved' | 'rejected';
+
+export type CareRecommendationSummary = {
+    id?: string;
+    patient_id?: string;
+    reported_at?: string;
+    red_flag?: boolean;
+    urgency_flag?: CareUrgency;
+    status?: CareRecommendationStatus;
+};
+
+export type CareRecommendationSummaryPagedResult = {
+    items: Array<CareRecommendationSummary>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
+export type CareReviewerRole = 'doctor' | 'ward_nurse';
+
+export type CareUrgency = 'low' | 'medium' | 'high';
+
+export type CareWorkflowAccepted = {
+    workflow_id?: string;
+    recommendation_id?: string;
+    status?: string | null;
+    poll_url?: string | null;
+};
+
+export type CareWorkflowStatus = 'running' | 'pending_review' | 'completed' | 'failed';
+
+export type CareWorkflowSummary = {
+    workflow_id?: string;
+    recommendation_id?: string | null;
+    objective?: string | null;
+    status?: CareWorkflowStatus;
+    outcome?: CareAgentOutcome;
+    plan?: Array<string> | null;
+    steps?: Array<BedAgentStep> | null;
+    red_flag?: boolean;
+    validation?: CareWorkflowValidation;
+    draft_source?: CareDraftSource;
+    draft_note?: string | null;
+    retries?: number;
+};
+
+export type CareWorkflowValidation = {
+    passed?: boolean;
+    failed_rules?: Array<string> | null;
+};
 
 export type CheckInRequest = {
     admission_category: AdmissionCategory;
@@ -352,6 +559,11 @@ export type ChecklistUpdateRequest = {
     billing_settled?: boolean | null;
 };
 
+export type ClaimByPatientCodeRequest = {
+    patient_code?: string | null;
+    nic?: string | null;
+};
+
 export type CompleteDetailsRequest = {
     nic?: string | null;
     full_name?: string | null;
@@ -360,10 +572,6 @@ export type CompleteDetailsRequest = {
     address?: string | null;
     emergency_contact_name?: string | null;
     emergency_contact_phone?: string | null;
-};
-
-export type CompleteMaintenanceScheduleRequest = {
-    notes?: string | null;
 };
 
 export type ConfirmDischargeRequest = {
@@ -387,7 +595,7 @@ export type CreateAdmissionRequest = {
 };
 
 export type CreateAmbulanceRequest = {
-    registration_number: string;
+    registration_number: string | null;
     current_latitude?: number | null;
     current_longitude?: number | null;
 };
@@ -404,6 +612,20 @@ export type CreateBedRequest = {
     has_isolation?: boolean;
     nurse_station_distance?: number;
     asset_tag?: string | null;
+};
+
+export type CreateEmergencyCallRequest = {
+    patient_is_caller: boolean;
+    patient_id?: string | null;
+    caller_name?: string | null;
+    caller_phone?: string | null;
+    latitude: number;
+    longitude: number;
+    location_accuracy_metres: number;
+    location_captured_at: string;
+    idempotency_key: string;
+    details?: string | null;
+    priority?: CallPriority;
 };
 
 export type CreateEquipmentCategoryRequest = {
@@ -481,6 +703,18 @@ export type CurrentPrincipal = {
     patient_id?: string | null;
 };
 
+export type DeclineDispatchRequest = {
+    reason?: string | null;
+};
+
+export type DevicePlatform = 'android' | 'ios' | 'web';
+
+export type DeviceRegistration = {
+    id?: string;
+    platform?: DevicePlatform;
+    last_seen_at?: string;
+};
+
 export type Discharge = {
     id: string;
     admission_id: string;
@@ -519,7 +753,29 @@ export type DischargeCandidatePagedResult = {
     total_pages: number;
 };
 
-export type DispatchStatus = 'assigned' | 'en_route' | 'completed' | 'cancelled' | 'reassigned';
+export type DispatchDetail = {
+    id?: string;
+    emergency_call_id?: string;
+    ambulance_registration?: string | null;
+    call_priority?: CallPriority;
+    status?: DispatchStatus;
+    destination_ward_name?: string | null;
+    crew_count?: number;
+    acknowledgement_overdue?: boolean;
+    dispatched_at?: string;
+    completed_at?: string | null;
+    ambulance_id?: string;
+    acknowledged_at?: string | null;
+    acknowledged_by_staff_id?: string | null;
+    declined_reason?: string | null;
+    cancellation_reason?: string | null;
+    reassignment_reason?: string | null;
+    handover_notes?: string | null;
+    patient_condition?: string | null;
+    crew_staff_ids?: Array<string> | null;
+};
+
+export type DispatchStatus = 'assigned' | 'acknowledged' | 'en_route_to_scene' | 'at_scene' | 'transporting_to_hospital' | 'handed_over' | 'declined' | 'cancelled' | 'reassigned';
 
 export type DispatchSummary = {
     id?: string;
@@ -529,8 +785,84 @@ export type DispatchSummary = {
     status?: DispatchStatus;
     destination_ward_name?: string | null;
     crew_count?: number;
+    acknowledgement_overdue?: boolean;
     dispatched_at?: string;
     completed_at?: string | null;
+};
+
+export type DispatchSummaryPagedResult = {
+    items: Array<DispatchSummary>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
+export type EmergencyCallDetail = {
+    id?: string;
+    patient_id?: string | null;
+    caller_user_id?: string | null;
+    patient_is_caller?: boolean;
+    caller_name?: string | null;
+    caller_phone?: string | null;
+    latitude?: number;
+    longitude?: number;
+    location_accuracy_metres?: number;
+    location_captured_at?: string;
+    idempotency_key?: string;
+    address_label?: string | null;
+    details?: string | null;
+    priority?: CallPriority;
+    status?: CallStatus;
+    outcome?: string | null;
+    transported?: boolean | null;
+    cancellation_request_status?: CancellationRequestStatus;
+    created_at?: string;
+    updated_at?: string;
+    dispatches?: Array<DispatchSummary>;
+    open_proposal_id?: string | null;
+};
+
+export type EmergencyCallSortField = 'priority' | 'created_at' | 'status';
+
+export type EmergencyCallSummary = {
+    id?: string;
+    priority?: CallPriority;
+    status?: CallStatus;
+    caller_name?: string | null;
+    address_label?: string | null;
+    latitude?: number;
+    longitude?: number;
+    active_dispatch_id?: string | null;
+    open_proposal_id?: string | null;
+    waiting_minutes?: number;
+    created_at?: string;
+};
+
+export type EmergencyCallSummaryPagedResult = {
+    items: Array<EmergencyCallSummary>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
+export type EmergencyCancellationRequest = {
+    emergency_call_id?: string;
+    status?: CancellationRequestStatus;
+    reason?: string | null;
+    requested_at?: string;
+    reviewed_at?: string | null;
+    reviewed_by_staff_id?: string | null;
+    review_notes?: string | null;
+};
+
+export type EmergencyCancellationRequestPagedResult = {
+    items: Array<EmergencyCancellationRequest>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
 };
 
 export type EquipmentCategory = {
@@ -538,6 +870,12 @@ export type EquipmentCategory = {
     name: string;
     created_at: string;
     updated_at: string;
+};
+
+export type EquipmentCategoryUsage = {
+    id: string;
+    name: string;
+    item_count: number;
 };
 
 export type EquipmentItem = {
@@ -555,6 +893,9 @@ export type EquipmentItem = {
     purchase_date: string;
     serial_number?: string | null;
     assigned_to_admission_id?: string | null;
+    awaiting_confirmation: boolean;
+    confirmed_by_staff_id?: string | null;
+    confirmed_at?: string | null;
     created_at: string;
     updated_at: string;
 };
@@ -574,6 +915,9 @@ export type EquipmentItemDetail = {
     purchase_date: string;
     serial_number?: string | null;
     assigned_to_admission_id?: string | null;
+    awaiting_confirmation: boolean;
+    confirmed_by_staff_id?: string | null;
+    confirmed_at?: string | null;
     created_at: string;
     updated_at: string;
     maintenance_history: Array<MaintenanceSchedule>;
@@ -672,6 +1016,10 @@ export type MaintenanceStatus = 'scheduled' | 'in_progress' | 'completed' | 'ove
 
 export type MaintenanceType = 'routine_service' | 'calibration' | 'repair';
 
+export type ManualDispatchRequest = {
+    ambulance_id?: string | null;
+};
+
 export type MyAdmission = {
     admission_id: string;
     status: AdmissionStatus;
@@ -701,6 +1049,8 @@ export type MyAppointment = {
     status_text: string;
     reason?: string | null;
     can_cancel: boolean;
+    cancellation_reason?: string | null;
+    cancelled_by_hospital: boolean;
 };
 
 export type MyAppointmentPagedResult = {
@@ -709,6 +1059,108 @@ export type MyAppointmentPagedResult = {
     page_size: number;
     total_items: number;
     total_pages: number;
+};
+
+export type MyBill = {
+    admission_id?: string | null;
+    appointment_id?: string | null;
+    bill_number: string;
+    currency: string;
+    lines: Array<MyBillLine>;
+    total: number;
+    is_final: boolean;
+    settled: boolean;
+    settled_at?: string | null;
+    updated_at: string;
+};
+
+export type MyBillLine = {
+    source: BillLineSource;
+    description: string;
+    quantity: number;
+    unit_price: number;
+    line_total: number;
+};
+
+export type MyCallTracking = {
+    emergency_call_id?: string;
+    call_status?: CallStatus;
+    ambulance_is_on_the_way?: boolean;
+    ambulance_latitude?: number | null;
+    ambulance_longitude?: number | null;
+    ambulance_location_is_stale?: boolean;
+    estimated_minutes_to_arrival?: number | null;
+    cancellation_request_status?: CancellationRequestStatus;
+    updated_at?: string;
+};
+
+export type MyCareRecommendation = {
+    id?: string;
+    reported_text?: string | null;
+    reported_at?: string;
+    status?: CareRecommendationStatus;
+    doctor_message?: string | null;
+    reviewed_by_name?: string | null;
+    reviewed_by_role?: CareReviewerRole;
+    reviewed_at?: string | null;
+};
+
+export type MyCareRecommendationPagedResult = {
+    items: Array<MyCareRecommendation>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
+export type MyEmergencyCallSummary = {
+    id?: string;
+    patient_is_caller?: boolean;
+    priority?: CallPriority;
+    status?: CallStatus;
+    cancellation_request_status?: CancellationRequestStatus;
+    created_at?: string;
+};
+
+export type MyEmergencyCallSummaryPagedResult = {
+    items: Array<MyEmergencyCallSummary>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
+export type MyLabReport = {
+    id: string;
+    test_name: string;
+    summary?: string | null;
+    file_name: string;
+    content_type: string;
+    byte_size: number;
+    created_at: string;
+};
+
+export type MyLabReportPagedResult = {
+    items: Array<MyLabReport>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
+export type MyPrescription = {
+    id: string;
+    note?: string | null;
+    file_name: string;
+    content_type: string;
+    byte_size: number;
+    status: PrescriptionStatus;
+    token_date?: string | null;
+    token_number?: number | null;
+    ready_at?: string | null;
+    delivered_at?: string | null;
+    rejection_reason?: string | null;
+    created_at: string;
 };
 
 export type MyProfile = {
@@ -724,6 +1176,17 @@ export type MyProfile = {
     details_complete: boolean;
     missing_fields: Array<string>;
 };
+
+export type NavigationTarget = {
+    dispatch_id?: string;
+    waypoint_type?: NavigationWaypoint;
+    destination_latitude?: number;
+    destination_longitude?: number;
+    destination_label?: string | null;
+    google_maps_url?: string | null;
+};
+
+export type NavigationWaypoint = 'scene' | 'hospital_emergency_entrance';
 
 export type OutstandingBill = {
     admission_id: string;
@@ -765,6 +1228,12 @@ export type Patient = {
     updated_at?: string;
 };
 
+export type PatientClaimPreview = {
+    patient_code: string;
+    masked_full_name: string;
+    masked_phone?: string | null;
+};
+
 export type PatientDetail = {
     id: string;
     patient_code: string;
@@ -784,7 +1253,7 @@ export type PatientDetail = {
 };
 
 export type PatientLoginRequest = {
-    phone_number: string;
+    username: string;
     password: string;
 };
 
@@ -798,10 +1267,20 @@ export type PatientLookupResult = {
     has_open_admission: boolean;
 };
 
+export type PatientMedicalProfile = {
+    patient_id: string;
+    known_conditions?: string | null;
+    allergies?: string | null;
+    current_symptoms?: string | null;
+    recent_situation?: string | null;
+    updated_by_staff_id?: string | null;
+    updated_by_staff_name?: string | null;
+    updated_at?: string | null;
+};
+
 export type PatientRegisterRequest = {
-    phone_number: string;
+    username: string;
     password: string;
-    full_name: string;
 };
 
 export type PatientSortField = 'full_name' | 'created_at';
@@ -824,6 +1303,22 @@ export type PatientSummaryPagedResult = {
     total_pages: number;
 };
 
+export type PendingEquipmentCount = {
+    count: number;
+};
+
+export type PharmacyBatch = {
+    id: string;
+    pharmacy_item_id: string;
+    batch_number: number;
+    reference?: string | null;
+    expiry_date?: string | null;
+    quantity_on_hand: number;
+    note?: string | null;
+    received_at: string;
+    updated_at: string;
+};
+
 export type PharmacyCategory = {
     id: string;
     name: string;
@@ -838,9 +1333,9 @@ export type PharmacyItem = {
     category_id: string;
     category_name: string;
     manufacturer?: string | null;
-    batch_number?: string | null;
-    expiry_date?: string | null;
     unit: string;
+    batch_count: number;
+    earliest_expiry?: string | null;
     quantity_on_hand: number;
     reorder_threshold: number;
     unit_price?: number | null;
@@ -861,6 +1356,8 @@ export type PharmacyItemPagedResult = {
 export type PharmacyTransaction = {
     id: string;
     pharmacy_item_id: string;
+    pharmacy_batch_id?: string | null;
+    batch_number?: number | null;
     type: PharmacyTransactionType;
     quantity: number;
     performed_by_staff_id: string;
@@ -889,6 +1386,27 @@ export type PreRegisterRequest = {
     emergency_contact_phone?: string | null;
 };
 
+export type Prescription = {
+    id: string;
+    patient_id: string;
+    patient_code: string;
+    patient_name: string;
+    note?: string | null;
+    file_name: string;
+    content_type: string;
+    byte_size: number;
+    status: PrescriptionStatus;
+    token_date?: string | null;
+    token_number?: number | null;
+    ready_at?: string | null;
+    delivered_at?: string | null;
+    rejection_reason?: string | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type PrescriptionStatus = 'submitted' | 'ready' | 'delivered' | 'rejected';
+
 export type PrincipalRole = 'ward_nurse' | 'doctor' | 'ambulance_crew' | 'general_staff' | 'duty_manager' | 'hospital_administrator' | 'equipment_manager' | 'patient';
 
 export type PrincipalType = 'staff' | 'patient';
@@ -902,22 +1420,71 @@ export type ProblemDetails = {
     [key: string]: unknown;
 };
 
-export type RaisedBy = 'agent' | 'user';
+export type RaisedBy = 'agent' | 'user' | 'system';
+
+export type ReassignDispatchRequest = {
+    replacement_ambulance_id?: string | null;
+    reason?: string | null;
+};
+
+export type RecordHandoverRequest = {
+    notes?: string | null;
+    patient_condition?: string | null;
+};
 
 export type RefreshTokenRequest = {
     refresh_token: string;
+};
+
+export type RegisterDeviceRequest = {
+    token?: string | null;
+    platform?: DevicePlatform;
+};
+
+export type RejectCareRecommendationRequest = {
+    reason?: string | null;
+};
+
+export type RejectPrescriptionRequest = {
+    reason: string | null;
 };
 
 export type RelatedEntityType = 'pharmacy_item' | 'equipment_item' | 'bed';
 
 export type ReleaseReason = 'discharged' | 'hold_expired' | 'cancelled' | 'transferred' | 'rejected' | 'corrected';
 
+export type ReportAmbulanceLocationRequest = {
+    latitude?: number | null;
+    longitude?: number | null;
+};
+
 export type ReportFaultRequest = {
     description: string;
 };
 
+export type RequestCancellationRequest = {
+    reason?: string | null;
+};
+
 export type RetireAmbulanceRequest = {
-    reason: string;
+    reason: string | null;
+};
+
+export type ReviewCancellationRequest = {
+    notes?: string | null;
+};
+
+export type RouteLog = {
+    dispatch_id?: string;
+    origin_latitude?: number;
+    origin_longitude?: number;
+    destination_latitude?: number;
+    destination_longitude?: number;
+    planned_distance_km?: number;
+    planned_duration_minutes?: number;
+    departed_at?: string | null;
+    arrived_at?: string | null;
+    maps_api_reference?: string | null;
 };
 
 export type SettleBillRequest = {
@@ -929,6 +1496,17 @@ export type SortDirection = 'asc' | 'desc';
 export type StaffLoginRequest = {
     email: string;
     password: string;
+};
+
+export type SuggestedBed = {
+    bed_id: string;
+    ward_name: string | null;
+    bed_number: string | null;
+    is_downgrade: boolean;
+    requires_duty_manager: boolean;
+    rules_satisfied?: Array<string> | null;
+    fit_factors?: Array<string> | null;
+    rationale?: string | null;
 };
 
 export type UpdateAmbulanceRequest = {
@@ -949,6 +1527,15 @@ export type UpdateBillingRatesRequest = {
     admission_fees?: Array<AdmissionFeeUpdate> | null;
 };
 
+export type UpdateEmergencyCallRequest = {
+    priority?: CallPriority;
+    details?: string;
+    caller_name?: string;
+    caller_phone?: string;
+    latitude?: number;
+    longitude?: number;
+};
+
 export type UpdateEquipmentItemRequest = {
     name?: string | null;
     model?: string | null;
@@ -956,6 +1543,19 @@ export type UpdateEquipmentItemRequest = {
     status?: EquipmentStatus;
     ward_id?: string | null;
     next_maintenance_due?: string | null;
+};
+
+export type UpdateMedicalProfileRequest = {
+    known_conditions?: string | null;
+    allergies?: string | null;
+    current_symptoms?: string | null;
+    recent_situation?: string | null;
+};
+
+export type UpdateMyDispatchStatusRequest = {
+    status?: DispatchStatus;
+    latitude?: number | null;
+    longitude?: number | null;
 };
 
 export type UpdatePatientRequest = {
@@ -1057,6 +1657,7 @@ export type Warning = {
     severity: WarningSeverity;
     related_entity_type: RelatedEntityType;
     related_entity_id: string;
+    related_entity_label?: string | null;
     ward_id?: string | null;
     recommended_action: string;
     status: WarningStatus;
@@ -1069,27 +1670,40 @@ export type Warning = {
     updated_at: string;
 };
 
+export type WarningPagedResult = {
+    items: Array<Warning>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
 export type WarningSeverity = 'low' | 'medium' | 'high' | 'critical';
 
 export type WarningStatus = 'open' | 'acknowledged' | 'action_taken' | 'dismissed';
 
-export type WarningType = 'low_stock' | 'medicine_expiring' | 'maintenance_overdue' | 'equipment_faulty';
+export type WarningSweepResult = {
+    raised: number;
+    updated: number;
+    resolved: number;
+    still_open: number;
+    ran_at: string;
+};
 
-export type WorklistKind = 'booking' | 'visit';
+export type WarningType = 'low_stock' | 'medicine_expiring' | 'maintenance_overdue' | 'equipment_faulty';
 
 export type WorklistRow = {
     id: string;
-    kind: WorklistKind;
     patient: PatientSummary;
     status: WorklistStatus;
     requires_bed: boolean;
     source?: AdmissionSource;
     admission_category?: AdmissionCategory;
     urgency?: AdmissionUrgency;
+    is_infectious?: boolean;
     ward_name?: string | null;
     bed_number?: string | null;
     when: string;
-    reason?: string | null;
 };
 
 export type WorklistRowPagedResult = {
@@ -1100,7 +1714,7 @@ export type WorklistRowPagedResult = {
     total_pages: number;
 };
 
-export type WorklistStatus = 'not_arrived' | 'awaiting_bed' | 'bed_ready' | 'admitted' | 'completed' | 'cancelled';
+export type WorklistStatus = 'awaiting_bed' | 'bed_ready' | 'admitted' | 'completed' | 'cancelled';
 
 export type ListAdmissionsData = {
     body?: never;
@@ -1550,6 +2164,84 @@ export type CreateAppointmentResponses = {
 
 export type CreateAppointmentResponse = CreateAppointmentResponses[keyof CreateAppointmentResponses];
 
+export type ConfirmAppointmentData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/appointments/{id}/confirm';
+};
+
+export type ConfirmAppointmentErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ConfirmAppointmentError = ConfirmAppointmentErrors[keyof ConfirmAppointmentErrors];
+
+export type ConfirmAppointmentResponses = {
+    /**
+     * OK
+     */
+    200: Appointment;
+};
+
+export type ConfirmAppointmentResponse = ConfirmAppointmentResponses[keyof ConfirmAppointmentResponses];
+
+export type MarkAppointmentNoShowData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/appointments/{id}/no-show';
+};
+
+export type MarkAppointmentNoShowErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type MarkAppointmentNoShowError = MarkAppointmentNoShowErrors[keyof MarkAppointmentNoShowErrors];
+
+export type MarkAppointmentNoShowResponses = {
+    /**
+     * OK
+     */
+    200: Appointment;
+};
+
+export type MarkAppointmentNoShowResponse = MarkAppointmentNoShowResponses[keyof MarkAppointmentNoShowResponses];
+
 export type CheckInAppointmentData = {
     body?: CheckInRequest;
     path: {
@@ -1593,6 +2285,88 @@ export type CheckInAppointmentResponses = {
 
 export type CheckInAppointmentResponse = CheckInAppointmentResponses[keyof CheckInAppointmentResponses];
 
+export type CancelAppointmentAtTheDeskData = {
+    body?: CancelAppointmentRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/appointments/{id}/cancel';
+};
+
+export type CancelAppointmentAtTheDeskErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CancelAppointmentAtTheDeskError = CancelAppointmentAtTheDeskErrors[keyof CancelAppointmentAtTheDeskErrors];
+
+export type CancelAppointmentAtTheDeskResponses = {
+    /**
+     * OK
+     */
+    200: Appointment;
+};
+
+export type CancelAppointmentAtTheDeskResponse = CancelAppointmentAtTheDeskResponses[keyof CancelAppointmentAtTheDeskResponses];
+
+export type CompleteAppointmentData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/appointments/{id}/complete';
+};
+
+export type CompleteAppointmentErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CompleteAppointmentError = CompleteAppointmentErrors[keyof CompleteAppointmentErrors];
+
+export type CompleteAppointmentResponses = {
+    /**
+     * OK
+     */
+    200: Appointment;
+};
+
+export type CompleteAppointmentResponse = CompleteAppointmentResponses[keyof CompleteAppointmentResponses];
+
 export type ListPatientWorklistData = {
     body?: never;
     path?: never;
@@ -1631,6 +2405,124 @@ export type ListPatientWorklistResponses = {
 
 export type ListPatientWorklistResponse = ListPatientWorklistResponses[keyof ListPatientWorklistResponses];
 
+export type GetCurrentAmbulanceCrewData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/ambulances/{id}/crew';
+};
+
+export type GetCurrentAmbulanceCrewErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetCurrentAmbulanceCrewError = GetCurrentAmbulanceCrewErrors[keyof GetCurrentAmbulanceCrewErrors];
+
+export type GetCurrentAmbulanceCrewResponses = {
+    /**
+     * OK
+     */
+    200: Array<AmbulanceCrewAssignment>;
+};
+
+export type GetCurrentAmbulanceCrewResponse = GetCurrentAmbulanceCrewResponses[keyof GetCurrentAmbulanceCrewResponses];
+
+export type AssignCurrentAmbulanceCrewData = {
+    body: AssignAmbulanceCrewRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/ambulances/{id}/crew';
+};
+
+export type AssignCurrentAmbulanceCrewErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type AssignCurrentAmbulanceCrewError = AssignCurrentAmbulanceCrewErrors[keyof AssignCurrentAmbulanceCrewErrors];
+
+export type AssignCurrentAmbulanceCrewResponses = {
+    /**
+     * Created
+     */
+    201: AmbulanceCrewAssignment;
+};
+
+export type AssignCurrentAmbulanceCrewResponse = AssignCurrentAmbulanceCrewResponses[keyof AssignCurrentAmbulanceCrewResponses];
+
+export type UnassignCurrentAmbulanceCrewData = {
+    body?: never;
+    path: {
+        ambulanceId: string;
+        staffMemberId: string;
+    };
+    query?: never;
+    url: '/ambulances/{ambulanceId}/crew/{staffMemberId}';
+};
+
+export type UnassignCurrentAmbulanceCrewErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type UnassignCurrentAmbulanceCrewError = UnassignCurrentAmbulanceCrewErrors[keyof UnassignCurrentAmbulanceCrewErrors];
+
+export type UnassignCurrentAmbulanceCrewResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type UnassignCurrentAmbulanceCrewResponse = UnassignCurrentAmbulanceCrewResponses[keyof UnassignCurrentAmbulanceCrewResponses];
+
 export type ListAmbulancesData = {
     body?: never;
     path?: never;
@@ -1640,6 +2532,7 @@ export type ListAmbulancesData = {
         nearToLatitude?: number;
         nearToLongitude?: number;
         includeRetired?: boolean;
+        eligibleOnly?: boolean;
         page?: number;
         pageSize?: number;
         sortBy?: AmbulanceSortField;
@@ -1871,6 +2764,45 @@ export type ReinstateAmbulanceResponses = {
 
 export type ReinstateAmbulanceResponse = ReinstateAmbulanceResponses[keyof ReinstateAmbulanceResponses];
 
+export type ReportAmbulanceLocationData = {
+    body?: ReportAmbulanceLocationRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/ambulances/{id}/location';
+};
+
+export type ReportAmbulanceLocationErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type ReportAmbulanceLocationError = ReportAmbulanceLocationErrors[keyof ReportAmbulanceLocationErrors];
+
+export type ReportAmbulanceLocationResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type ReportAmbulanceLocationResponse = ReportAmbulanceLocationResponses[keyof ReportAmbulanceLocationResponses];
+
 export type LoginData = {
     body?: StaffLoginRequest;
     path?: never;
@@ -2056,6 +2988,82 @@ export type GetCurrentUserResponses = {
 };
 
 export type GetCurrentUserResponse = GetCurrentUserResponses[keyof GetCurrentUserResponses];
+
+export type RequestBedSuggestionData = {
+    body?: BedSuggestionRequest;
+    path?: never;
+    query?: never;
+    url: '/bed-suggestions';
+};
+
+export type RequestBedSuggestionErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RequestBedSuggestionError = RequestBedSuggestionErrors[keyof RequestBedSuggestionErrors];
+
+export type RequestBedSuggestionResponses = {
+    /**
+     * Accepted
+     */
+    202: BedWorkflowAccepted;
+};
+
+export type RequestBedSuggestionResponse = RequestBedSuggestionResponses[keyof RequestBedSuggestionResponses];
+
+export type GetBedWorkflowData = {
+    body?: never;
+    path: {
+        workflowId: string;
+    };
+    query?: never;
+    url: '/bed-workflows/{workflowId}';
+};
+
+export type GetBedWorkflowErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetBedWorkflowError = GetBedWorkflowErrors[keyof GetBedWorkflowErrors];
+
+export type GetBedWorkflowResponses = {
+    /**
+     * OK
+     */
+    200: BedWorkflowSummary;
+};
+
+export type GetBedWorkflowResponse = GetBedWorkflowResponses[keyof GetBedWorkflowResponses];
 
 export type ListBedsData = {
     body?: never;
@@ -2448,6 +3456,206 @@ export type ListOutstandingBillsResponses = {
 
 export type ListOutstandingBillsResponse = ListOutstandingBillsResponses[keyof ListOutstandingBillsResponses];
 
+export type GetAppointmentBillData = {
+    body?: never;
+    path: {
+        appointmentId: string;
+    };
+    query?: never;
+    url: '/appointments/{appointmentId}/bill';
+};
+
+export type GetAppointmentBillErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetAppointmentBillError = GetAppointmentBillErrors[keyof GetAppointmentBillErrors];
+
+export type GetAppointmentBillResponses = {
+    /**
+     * OK
+     */
+    200: Bill;
+};
+
+export type GetAppointmentBillResponse = GetAppointmentBillResponses[keyof GetAppointmentBillResponses];
+
+export type PrepareAppointmentBillData = {
+    body?: never;
+    path: {
+        appointmentId: string;
+    };
+    query?: never;
+    url: '/appointments/{appointmentId}/bill';
+};
+
+export type PrepareAppointmentBillErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type PrepareAppointmentBillError = PrepareAppointmentBillErrors[keyof PrepareAppointmentBillErrors];
+
+export type PrepareAppointmentBillResponses = {
+    /**
+     * OK
+     */
+    200: Bill;
+};
+
+export type PrepareAppointmentBillResponse = PrepareAppointmentBillResponses[keyof PrepareAppointmentBillResponses];
+
+export type AddAppointmentBillChargeData = {
+    body?: AddBillChargeRequest;
+    path: {
+        appointmentId: string;
+    };
+    query?: never;
+    url: '/appointments/{appointmentId}/bill/charges';
+};
+
+export type AddAppointmentBillChargeErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type AddAppointmentBillChargeError = AddAppointmentBillChargeErrors[keyof AddAppointmentBillChargeErrors];
+
+export type AddAppointmentBillChargeResponses = {
+    /**
+     * OK
+     */
+    200: Bill;
+};
+
+export type AddAppointmentBillChargeResponse = AddAppointmentBillChargeResponses[keyof AddAppointmentBillChargeResponses];
+
+export type RemoveAppointmentBillChargeData = {
+    body?: never;
+    path: {
+        appointmentId: string;
+        lineId: string;
+    };
+    query?: never;
+    url: '/appointments/{appointmentId}/bill/charges/{lineId}';
+};
+
+export type RemoveAppointmentBillChargeErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RemoveAppointmentBillChargeError = RemoveAppointmentBillChargeErrors[keyof RemoveAppointmentBillChargeErrors];
+
+export type RemoveAppointmentBillChargeResponses = {
+    /**
+     * OK
+     */
+    200: Bill;
+};
+
+export type RemoveAppointmentBillChargeResponse = RemoveAppointmentBillChargeResponses[keyof RemoveAppointmentBillChargeResponses];
+
+export type SettleAppointmentBillData = {
+    body?: SettleBillRequest;
+    path: {
+        appointmentId: string;
+    };
+    query?: never;
+    url: '/appointments/{appointmentId}/bill/settle';
+};
+
+export type SettleAppointmentBillErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type SettleAppointmentBillError = SettleAppointmentBillErrors[keyof SettleAppointmentBillErrors];
+
+export type SettleAppointmentBillResponses = {
+    /**
+     * OK
+     */
+    200: Bill;
+};
+
+export type SettleAppointmentBillResponse = SettleAppointmentBillResponses[keyof SettleAppointmentBillResponses];
+
 export type GetBillingRatesData = {
     body?: never;
     path?: never;
@@ -2509,6 +3717,616 @@ export type UpdateBillingRatesResponses = {
 };
 
 export type UpdateBillingRatesResponse = UpdateBillingRatesResponses[keyof UpdateBillingRatesResponses];
+
+export type ListEmergencyCallsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: CallStatus;
+        priority?: CallPriority;
+        search?: string;
+        from?: string;
+        to?: string;
+        unassignedOnly?: boolean;
+        page?: number;
+        pageSize?: number;
+        sortBy?: EmergencyCallSortField;
+        sortDir?: 'asc' | 'desc';
+    };
+    url: '/emergency-calls';
+};
+
+export type ListEmergencyCallsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListEmergencyCallsError = ListEmergencyCallsErrors[keyof ListEmergencyCallsErrors];
+
+export type ListEmergencyCallsResponses = {
+    /**
+     * OK
+     */
+    200: EmergencyCallSummaryPagedResult;
+};
+
+export type ListEmergencyCallsResponse = ListEmergencyCallsResponses[keyof ListEmergencyCallsResponses];
+
+export type CreateEmergencyCallData = {
+    body: CreateEmergencyCallRequest;
+    path?: never;
+    query?: never;
+    url: '/emergency-calls';
+};
+
+export type CreateEmergencyCallErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+};
+
+export type CreateEmergencyCallError = CreateEmergencyCallErrors[keyof CreateEmergencyCallErrors];
+
+export type CreateEmergencyCallResponses = {
+    /**
+     * Created
+     */
+    201: EmergencyCallDetail;
+};
+
+export type CreateEmergencyCallResponse = CreateEmergencyCallResponses[keyof CreateEmergencyCallResponses];
+
+export type GetEmergencyCallData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/emergency-calls/{id}';
+};
+
+export type GetEmergencyCallErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetEmergencyCallError = GetEmergencyCallErrors[keyof GetEmergencyCallErrors];
+
+export type GetEmergencyCallResponses = {
+    /**
+     * OK
+     */
+    200: EmergencyCallDetail;
+};
+
+export type GetEmergencyCallResponse = GetEmergencyCallResponses[keyof GetEmergencyCallResponses];
+
+export type UpdateEmergencyCallData = {
+    body: UpdateEmergencyCallRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/emergency-calls/{id}';
+};
+
+export type UpdateEmergencyCallErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type UpdateEmergencyCallError = UpdateEmergencyCallErrors[keyof UpdateEmergencyCallErrors];
+
+export type UpdateEmergencyCallResponses = {
+    /**
+     * OK
+     */
+    200: EmergencyCallDetail;
+};
+
+export type UpdateEmergencyCallResponse = UpdateEmergencyCallResponses[keyof UpdateEmergencyCallResponses];
+
+export type DispatchEmergencyCallData = {
+    body?: ManualDispatchRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/emergency-calls/{id}/dispatch';
+};
+
+export type DispatchEmergencyCallErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type DispatchEmergencyCallError = DispatchEmergencyCallErrors[keyof DispatchEmergencyCallErrors];
+
+export type DispatchEmergencyCallResponses = {
+    /**
+     * Created
+     */
+    201: DispatchDetail;
+};
+
+export type DispatchEmergencyCallResponse = DispatchEmergencyCallResponses[keyof DispatchEmergencyCallResponses];
+
+export type ListEmergencyCancellationRequestsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        Status?: CancellationRequestStatus;
+        Page?: number;
+        PageSize?: number;
+    };
+    url: '/emergency-cancellation-requests';
+};
+
+export type ListEmergencyCancellationRequestsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListEmergencyCancellationRequestsError = ListEmergencyCancellationRequestsErrors[keyof ListEmergencyCancellationRequestsErrors];
+
+export type ListEmergencyCancellationRequestsResponses = {
+    /**
+     * OK
+     */
+    200: EmergencyCancellationRequestPagedResult;
+};
+
+export type ListEmergencyCancellationRequestsResponse = ListEmergencyCancellationRequestsResponses[keyof ListEmergencyCancellationRequestsResponses];
+
+export type ApproveEmergencyCancellationRequestData = {
+    body?: ReviewCancellationRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/emergency-calls/{id}/cancellation-request/approve';
+};
+
+export type ApproveEmergencyCancellationRequestErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ApproveEmergencyCancellationRequestError = ApproveEmergencyCancellationRequestErrors[keyof ApproveEmergencyCancellationRequestErrors];
+
+export type ApproveEmergencyCancellationRequestResponses = {
+    /**
+     * OK
+     */
+    200: EmergencyCancellationRequest;
+};
+
+export type ApproveEmergencyCancellationRequestResponse = ApproveEmergencyCancellationRequestResponses[keyof ApproveEmergencyCancellationRequestResponses];
+
+export type RejectEmergencyCancellationRequestData = {
+    body?: ReviewCancellationRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/emergency-calls/{id}/cancellation-request/reject';
+};
+
+export type RejectEmergencyCancellationRequestErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RejectEmergencyCancellationRequestError = RejectEmergencyCancellationRequestErrors[keyof RejectEmergencyCancellationRequestErrors];
+
+export type RejectEmergencyCancellationRequestResponses = {
+    /**
+     * OK
+     */
+    200: EmergencyCancellationRequest;
+};
+
+export type RejectEmergencyCancellationRequestResponse = RejectEmergencyCancellationRequestResponses[keyof RejectEmergencyCancellationRequestResponses];
+
+export type GetCareWorkflowData = {
+    body?: never;
+    path: {
+        workflowId: string;
+    };
+    query?: never;
+    url: '/care-workflows/{workflowId}';
+};
+
+export type GetCareWorkflowErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetCareWorkflowError = GetCareWorkflowErrors[keyof GetCareWorkflowErrors];
+
+export type GetCareWorkflowResponses = {
+    /**
+     * OK
+     */
+    200: CareWorkflowSummary;
+};
+
+export type GetCareWorkflowResponse = GetCareWorkflowResponses[keyof GetCareWorkflowResponses];
+
+export type ListCareRecommendationsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: CareRecommendationStatus;
+        page?: number;
+        pageSize?: number;
+        sortDir?: SortDirection;
+    };
+    url: '/care-recommendations';
+};
+
+export type ListCareRecommendationsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListCareRecommendationsError = ListCareRecommendationsErrors[keyof ListCareRecommendationsErrors];
+
+export type ListCareRecommendationsResponses = {
+    /**
+     * OK
+     */
+    200: CareRecommendationSummaryPagedResult;
+};
+
+export type ListCareRecommendationsResponse = ListCareRecommendationsResponses[keyof ListCareRecommendationsResponses];
+
+export type GetCareRecommendationData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/care-recommendations/{id}';
+};
+
+export type GetCareRecommendationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetCareRecommendationError = GetCareRecommendationErrors[keyof GetCareRecommendationErrors];
+
+export type GetCareRecommendationResponses = {
+    /**
+     * OK
+     */
+    200: CareRecommendation;
+};
+
+export type GetCareRecommendationResponse = GetCareRecommendationResponses[keyof GetCareRecommendationResponses];
+
+export type ApproveCareRecommendationData = {
+    body?: ApproveCareRecommendationRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/care-recommendations/{id}/approve';
+};
+
+export type ApproveCareRecommendationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ApproveCareRecommendationError = ApproveCareRecommendationErrors[keyof ApproveCareRecommendationErrors];
+
+export type ApproveCareRecommendationResponses = {
+    /**
+     * OK
+     */
+    200: CareRecommendation;
+};
+
+export type ApproveCareRecommendationResponse = ApproveCareRecommendationResponses[keyof ApproveCareRecommendationResponses];
+
+export type RejectCareRecommendationData = {
+    body?: RejectCareRecommendationRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/care-recommendations/{id}/reject';
+};
+
+export type RejectCareRecommendationErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type RejectCareRecommendationError = RejectCareRecommendationErrors[keyof RejectCareRecommendationErrors];
+
+export type RejectCareRecommendationResponses = {
+    /**
+     * OK
+     */
+    200: CareRecommendation;
+};
+
+export type RejectCareRecommendationResponse = RejectCareRecommendationResponses[keyof RejectCareRecommendationResponses];
+
+export type RedraftCareRecommendationData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/care-recommendations/{id}/redraft';
+};
+
+export type RedraftCareRecommendationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RedraftCareRecommendationError = RedraftCareRecommendationErrors[keyof RedraftCareRecommendationErrors];
+
+export type RedraftCareRecommendationResponses = {
+    /**
+     * Accepted
+     */
+    202: CareWorkflowAccepted;
+};
+
+export type RedraftCareRecommendationResponse = RedraftCareRecommendationResponses[keyof RedraftCareRecommendationResponses];
+
+export type RegisterDeviceData = {
+    body?: RegisterDeviceRequest;
+    path?: never;
+    query?: never;
+    url: '/device-tokens';
+};
+
+export type RegisterDeviceErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type RegisterDeviceError = RegisterDeviceErrors[keyof RegisterDeviceErrors];
+
+export type RegisterDeviceResponses = {
+    /**
+     * OK
+     */
+    200: DeviceRegistration;
+};
+
+export type RegisterDeviceResponse = RegisterDeviceResponses[keyof RegisterDeviceResponses];
+
+export type UnregisterDeviceData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/device-tokens/{id}';
+};
+
+export type UnregisterDeviceErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type UnregisterDeviceError = UnregisterDeviceErrors[keyof UnregisterDeviceErrors];
+
+export type UnregisterDeviceResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type UnregisterDeviceResponse = UnregisterDeviceResponses[keyof UnregisterDeviceResponses];
 
 export type ListDischargeCandidatesData = {
     body?: never;
@@ -2634,6 +4452,127 @@ export type ConfirmDischargeResponses = {
 
 export type ConfirmDischargeResponse = ConfirmDischargeResponses[keyof ConfirmDischargeResponses];
 
+export type GetDispatchRouteData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/dispatches/{id}/route';
+};
+
+export type GetDispatchRouteErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetDispatchRouteError = GetDispatchRouteErrors[keyof GetDispatchRouteErrors];
+
+export type GetDispatchRouteResponses = {
+    /**
+     * OK
+     */
+    200: RouteLog;
+};
+
+export type GetDispatchRouteResponse = GetDispatchRouteResponses[keyof GetDispatchRouteResponses];
+
+export type CancelDispatchData = {
+    body?: CancelDispatchRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/dispatches/{id}/cancel';
+};
+
+export type CancelDispatchErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CancelDispatchError = CancelDispatchErrors[keyof CancelDispatchErrors];
+
+export type CancelDispatchResponses = {
+    /**
+     * OK
+     */
+    200: DispatchDetail;
+};
+
+export type CancelDispatchResponse = CancelDispatchResponses[keyof CancelDispatchResponses];
+
+export type ReassignDispatchData = {
+    body?: ReassignDispatchRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/dispatches/{id}/reassign';
+};
+
+export type ReassignDispatchErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ReassignDispatchError = ReassignDispatchErrors[keyof ReassignDispatchErrors];
+
+export type ReassignDispatchResponses = {
+    /**
+     * OK
+     */
+    200: DispatchDetail;
+};
+
+export type ReassignDispatchResponse = ReassignDispatchResponses[keyof ReassignDispatchResponses];
+
 export type ListEquipmentCategoriesData = {
     body?: never;
     path?: never;
@@ -2695,6 +4634,80 @@ export type CreateEquipmentCategoryResponses = {
 };
 
 export type CreateEquipmentCategoryResponse = CreateEquipmentCategoryResponses[keyof CreateEquipmentCategoryResponses];
+
+export type ListEquipmentCategoriesForRemovalData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/equipment-categories/for-removal';
+};
+
+export type ListEquipmentCategoriesForRemovalErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListEquipmentCategoriesForRemovalError = ListEquipmentCategoriesForRemovalErrors[keyof ListEquipmentCategoriesForRemovalErrors];
+
+export type ListEquipmentCategoriesForRemovalResponses = {
+    /**
+     * OK
+     */
+    200: Array<EquipmentCategoryUsage>;
+};
+
+export type ListEquipmentCategoriesForRemovalResponse = ListEquipmentCategoriesForRemovalResponses[keyof ListEquipmentCategoriesForRemovalResponses];
+
+export type RemoveEquipmentCategoryData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/equipment-categories/{id}';
+};
+
+export type RemoveEquipmentCategoryErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RemoveEquipmentCategoryError = RemoveEquipmentCategoryErrors[keyof RemoveEquipmentCategoryErrors];
+
+export type RemoveEquipmentCategoryResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type RemoveEquipmentCategoryResponse = RemoveEquipmentCategoryResponses[keyof RemoveEquipmentCategoryResponses];
 
 export type ListEquipmentItemsData = {
     body?: never;
@@ -2774,6 +4787,193 @@ export type CreateEquipmentItemResponses = {
 };
 
 export type CreateEquipmentItemResponse = CreateEquipmentItemResponses[keyof CreateEquipmentItemResponses];
+
+export type ListEquipmentItemsAwaitingConfirmationData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/equipment-items/pending-confirmation';
+};
+
+export type ListEquipmentItemsAwaitingConfirmationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListEquipmentItemsAwaitingConfirmationError = ListEquipmentItemsAwaitingConfirmationErrors[keyof ListEquipmentItemsAwaitingConfirmationErrors];
+
+export type ListEquipmentItemsAwaitingConfirmationResponses = {
+    /**
+     * OK
+     */
+    200: Array<EquipmentItem>;
+};
+
+export type ListEquipmentItemsAwaitingConfirmationResponse = ListEquipmentItemsAwaitingConfirmationResponses[keyof ListEquipmentItemsAwaitingConfirmationResponses];
+
+export type CountEquipmentItemsAwaitingConfirmationData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/equipment-items/pending-confirmation/count';
+};
+
+export type CountEquipmentItemsAwaitingConfirmationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type CountEquipmentItemsAwaitingConfirmationError = CountEquipmentItemsAwaitingConfirmationErrors[keyof CountEquipmentItemsAwaitingConfirmationErrors];
+
+export type CountEquipmentItemsAwaitingConfirmationResponses = {
+    /**
+     * OK
+     */
+    200: PendingEquipmentCount;
+};
+
+export type CountEquipmentItemsAwaitingConfirmationResponse = CountEquipmentItemsAwaitingConfirmationResponses[keyof CountEquipmentItemsAwaitingConfirmationResponses];
+
+export type ConfirmEquipmentItemData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/equipment-items/{id}/confirm';
+};
+
+export type ConfirmEquipmentItemErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ConfirmEquipmentItemError = ConfirmEquipmentItemErrors[keyof ConfirmEquipmentItemErrors];
+
+export type ConfirmEquipmentItemResponses = {
+    /**
+     * OK
+     */
+    200: EquipmentItem;
+};
+
+export type ConfirmEquipmentItemResponse = ConfirmEquipmentItemResponses[keyof ConfirmEquipmentItemResponses];
+
+export type RejectEquipmentItemData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/equipment-items/{id}/reject';
+};
+
+export type RejectEquipmentItemErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RejectEquipmentItemError = RejectEquipmentItemErrors[keyof RejectEquipmentItemErrors];
+
+export type RejectEquipmentItemResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type RejectEquipmentItemResponse = RejectEquipmentItemResponses[keyof RejectEquipmentItemResponses];
+
+export type RemoveEquipmentItemData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/equipment-items/{id}';
+};
+
+export type RemoveEquipmentItemErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RemoveEquipmentItemError = RemoveEquipmentItemErrors[keyof RemoveEquipmentItemErrors];
+
+export type RemoveEquipmentItemResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type RemoveEquipmentItemResponse = RemoveEquipmentItemResponses[keyof RemoveEquipmentItemResponses];
 
 export type GetEquipmentItemData = {
     body?: never;
@@ -2961,6 +5161,48 @@ export type ReleaseEquipmentItemResponses = {
 };
 
 export type ReleaseEquipmentItemResponse = ReleaseEquipmentItemResponses[keyof ReleaseEquipmentItemResponses];
+
+export type RetireEquipmentItemData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/equipment-items/{id}/retire';
+};
+
+export type RetireEquipmentItemErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RetireEquipmentItemError = RetireEquipmentItemErrors[keyof RetireEquipmentItemErrors];
+
+export type RetireEquipmentItemResponses = {
+    /**
+     * OK
+     */
+    200: EquipmentItem;
+};
+
+export type RetireEquipmentItemResponse = RetireEquipmentItemResponses[keyof RetireEquipmentItemResponses];
 
 export type ReportEquipmentFaultData = {
     body?: ReportFaultRequest;
@@ -3282,16 +5524,539 @@ export type CreateMaintenanceScheduleResponses = {
 
 export type CreateMaintenanceScheduleResponse = CreateMaintenanceScheduleResponses[keyof CreateMaintenanceScheduleResponses];
 
-export type CompleteMaintenanceScheduleData = {
-    body?: CompleteMaintenanceScheduleRequest;
+export type ListMaintenanceSchedulesAwaitingConfirmationData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/maintenance-schedules/pending-confirmation';
+};
+
+export type ListMaintenanceSchedulesAwaitingConfirmationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListMaintenanceSchedulesAwaitingConfirmationError = ListMaintenanceSchedulesAwaitingConfirmationErrors[keyof ListMaintenanceSchedulesAwaitingConfirmationErrors];
+
+export type ListMaintenanceSchedulesAwaitingConfirmationResponses = {
+    /**
+     * OK
+     */
+    200: Array<MaintenanceSchedule>;
+};
+
+export type ListMaintenanceSchedulesAwaitingConfirmationResponse = ListMaintenanceSchedulesAwaitingConfirmationResponses[keyof ListMaintenanceSchedulesAwaitingConfirmationResponses];
+
+export type CountMaintenanceSchedulesAwaitingConfirmationData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/maintenance-schedules/pending-confirmation/count';
+};
+
+export type CountMaintenanceSchedulesAwaitingConfirmationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type CountMaintenanceSchedulesAwaitingConfirmationError = CountMaintenanceSchedulesAwaitingConfirmationErrors[keyof CountMaintenanceSchedulesAwaitingConfirmationErrors];
+
+export type CountMaintenanceSchedulesAwaitingConfirmationResponses = {
+    /**
+     * OK
+     */
+    200: PendingEquipmentCount;
+};
+
+export type CountMaintenanceSchedulesAwaitingConfirmationResponse = CountMaintenanceSchedulesAwaitingConfirmationResponses[keyof CountMaintenanceSchedulesAwaitingConfirmationResponses];
+
+export type ConfirmMaintenanceScheduleData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
     path: {
         id: string;
     };
     query?: never;
-    url: '/maintenance-schedules/{id}/complete';
+    url: '/maintenance-schedules/{id}/confirm';
 };
 
-export type CompleteMaintenanceScheduleErrors = {
+export type ConfirmMaintenanceScheduleErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ConfirmMaintenanceScheduleError = ConfirmMaintenanceScheduleErrors[keyof ConfirmMaintenanceScheduleErrors];
+
+export type ConfirmMaintenanceScheduleResponses = {
+    /**
+     * OK
+     */
+    200: MaintenanceSchedule;
+};
+
+export type ConfirmMaintenanceScheduleResponse = ConfirmMaintenanceScheduleResponses[keyof ConfirmMaintenanceScheduleResponses];
+
+export type ListWarningsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: WarningStatus;
+        severity?: WarningSeverity;
+        type?: WarningType;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/warnings';
+};
+
+export type ListWarningsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListWarningsError = ListWarningsErrors[keyof ListWarningsErrors];
+
+export type ListWarningsResponses = {
+    /**
+     * OK
+     */
+    200: WarningPagedResult;
+};
+
+export type ListWarningsResponse = ListWarningsResponses[keyof ListWarningsResponses];
+
+export type RunWarningSweepData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/warnings/sweep';
+};
+
+export type RunWarningSweepErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type RunWarningSweepError = RunWarningSweepErrors[keyof RunWarningSweepErrors];
+
+export type RunWarningSweepResponses = {
+    /**
+     * OK
+     */
+    200: WarningSweepResult;
+};
+
+export type RunWarningSweepResponse = RunWarningSweepResponses[keyof RunWarningSweepResponses];
+
+export type AcknowledgeWarningData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/warnings/{id}/acknowledge';
+};
+
+export type AcknowledgeWarningErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type AcknowledgeWarningError = AcknowledgeWarningErrors[keyof AcknowledgeWarningErrors];
+
+export type AcknowledgeWarningResponses = {
+    /**
+     * OK
+     */
+    200: Warning;
+};
+
+export type AcknowledgeWarningResponse = AcknowledgeWarningResponses[keyof AcknowledgeWarningResponses];
+
+export type ClearWarningData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/warnings/{id}/clear';
+};
+
+export type ClearWarningErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ClearWarningError = ClearWarningErrors[keyof ClearWarningErrors];
+
+export type ClearWarningResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type ClearWarningResponse = ClearWarningResponses[keyof ClearWarningResponses];
+
+export type GetMyEmergencyCallsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: CallStatus;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/me/emergency-calls';
+};
+
+export type GetMyEmergencyCallsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+};
+
+export type GetMyEmergencyCallsError = GetMyEmergencyCallsErrors[keyof GetMyEmergencyCallsErrors];
+
+export type GetMyEmergencyCallsResponses = {
+    /**
+     * OK
+     */
+    200: MyEmergencyCallSummaryPagedResult;
+};
+
+export type GetMyEmergencyCallsResponse = GetMyEmergencyCallsResponses[keyof GetMyEmergencyCallsResponses];
+
+export type TrackMyEmergencyCallData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/emergency-calls/{id}/tracking';
+};
+
+export type TrackMyEmergencyCallErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type TrackMyEmergencyCallError = TrackMyEmergencyCallErrors[keyof TrackMyEmergencyCallErrors];
+
+export type TrackMyEmergencyCallResponses = {
+    /**
+     * OK
+     */
+    200: MyCallTracking;
+};
+
+export type TrackMyEmergencyCallResponse = TrackMyEmergencyCallResponses[keyof TrackMyEmergencyCallResponses];
+
+export type CancelMyEmergencyCallData = {
+    body?: RequestCancellationRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/emergency-calls/{id}/cancel';
+};
+
+export type CancelMyEmergencyCallErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CancelMyEmergencyCallError = CancelMyEmergencyCallErrors[keyof CancelMyEmergencyCallErrors];
+
+export type CancelMyEmergencyCallResponses = {
+    /**
+     * OK
+     */
+    200: MyEmergencyCallSummary;
+};
+
+export type CancelMyEmergencyCallResponse = CancelMyEmergencyCallResponses[keyof CancelMyEmergencyCallResponses];
+
+export type RequestMyEmergencyCallCancellationData = {
+    body?: RequestCancellationRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/emergency-calls/{id}/cancellation-request';
+};
+
+export type RequestMyEmergencyCallCancellationErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RequestMyEmergencyCallCancellationError = RequestMyEmergencyCallCancellationErrors[keyof RequestMyEmergencyCallCancellationErrors];
+
+export type RequestMyEmergencyCallCancellationResponses = {
+    /**
+     * Created
+     */
+    201: EmergencyCancellationRequest;
+};
+
+export type RequestMyEmergencyCallCancellationResponse = RequestMyEmergencyCallCancellationResponses[keyof RequestMyEmergencyCallCancellationResponses];
+
+export type GetMyActiveDispatchData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/me/dispatches/active';
+};
+
+export type GetMyActiveDispatchErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetMyActiveDispatchError = GetMyActiveDispatchErrors[keyof GetMyActiveDispatchErrors];
+
+export type GetMyActiveDispatchResponses = {
+    /**
+     * OK
+     */
+    200: DispatchDetail;
+};
+
+export type GetMyActiveDispatchResponse = GetMyActiveDispatchResponses[keyof GetMyActiveDispatchResponses];
+
+export type GetMyDispatchHistoryData = {
+    body?: never;
+    path?: never;
+    query?: {
+        from?: string;
+        to?: string;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/me/dispatches/history';
+};
+
+export type GetMyDispatchHistoryErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+};
+
+export type GetMyDispatchHistoryError = GetMyDispatchHistoryErrors[keyof GetMyDispatchHistoryErrors];
+
+export type GetMyDispatchHistoryResponses = {
+    /**
+     * OK
+     */
+    200: DispatchSummaryPagedResult;
+};
+
+export type GetMyDispatchHistoryResponse = GetMyDispatchHistoryResponses[keyof GetMyDispatchHistoryResponses];
+
+export type GetMyDispatchNavigationTargetData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/dispatches/{id}/navigation';
+};
+
+export type GetMyDispatchNavigationTargetErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type GetMyDispatchNavigationTargetError = GetMyDispatchNavigationTargetErrors[keyof GetMyDispatchNavigationTargetErrors];
+
+export type GetMyDispatchNavigationTargetResponses = {
+    /**
+     * OK
+     */
+    200: NavigationTarget;
+};
+
+export type GetMyDispatchNavigationTargetResponse = GetMyDispatchNavigationTargetResponses[keyof GetMyDispatchNavigationTargetResponses];
+
+export type AcknowledgeMyDispatchData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/dispatches/{id}/acknowledge';
+};
+
+export type AcknowledgeMyDispatchErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type AcknowledgeMyDispatchError = AcknowledgeMyDispatchErrors[keyof AcknowledgeMyDispatchErrors];
+
+export type AcknowledgeMyDispatchResponses = {
+    /**
+     * OK
+     */
+    200: DispatchDetail;
+};
+
+export type AcknowledgeMyDispatchResponse = AcknowledgeMyDispatchResponses[keyof AcknowledgeMyDispatchResponses];
+
+export type DeclineMyDispatchData = {
+    body?: DeclineDispatchRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/dispatches/{id}/decline';
+};
+
+export type DeclineMyDispatchErrors = {
     /**
      * Bad Request
      */
@@ -3314,16 +6079,102 @@ export type CompleteMaintenanceScheduleErrors = {
     409: ProblemDetails;
 };
 
-export type CompleteMaintenanceScheduleError = CompleteMaintenanceScheduleErrors[keyof CompleteMaintenanceScheduleErrors];
+export type DeclineMyDispatchError = DeclineMyDispatchErrors[keyof DeclineMyDispatchErrors];
 
-export type CompleteMaintenanceScheduleResponses = {
+export type DeclineMyDispatchResponses = {
     /**
      * OK
      */
-    200: MaintenanceSchedule;
+    200: DispatchDetail;
 };
 
-export type CompleteMaintenanceScheduleResponse = CompleteMaintenanceScheduleResponses[keyof CompleteMaintenanceScheduleResponses];
+export type DeclineMyDispatchResponse = DeclineMyDispatchResponses[keyof DeclineMyDispatchResponses];
+
+export type UpdateMyDispatchStatusData = {
+    body?: UpdateMyDispatchStatusRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/dispatches/{id}/status';
+};
+
+export type UpdateMyDispatchStatusErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type UpdateMyDispatchStatusError = UpdateMyDispatchStatusErrors[keyof UpdateMyDispatchStatusErrors];
+
+export type UpdateMyDispatchStatusResponses = {
+    /**
+     * OK
+     */
+    200: DispatchDetail;
+};
+
+export type UpdateMyDispatchStatusResponse = UpdateMyDispatchStatusResponses[keyof UpdateMyDispatchStatusResponses];
+
+export type RecordHandoverData = {
+    body?: RecordHandoverRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/dispatches/{id}/handover';
+};
+
+export type RecordHandoverErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RecordHandoverError = RecordHandoverErrors[keyof RecordHandoverErrors];
+
+export type RecordHandoverResponses = {
+    /**
+     * OK
+     */
+    200: DispatchDetail;
+};
+
+export type RecordHandoverResponse = RecordHandoverResponses[keyof RecordHandoverResponses];
 
 export type PreRegisterSelfData = {
     body?: PreRegisterRequest;
@@ -3361,6 +6212,88 @@ export type PreRegisterSelfResponses = {
 };
 
 export type PreRegisterSelfResponse = PreRegisterSelfResponses[keyof PreRegisterSelfResponses];
+
+export type PreviewMyClaimData = {
+    body?: ClaimByPatientCodeRequest;
+    path?: never;
+    query?: never;
+    url: '/me/claim/preview';
+};
+
+export type PreviewMyClaimErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type PreviewMyClaimError = PreviewMyClaimErrors[keyof PreviewMyClaimErrors];
+
+export type PreviewMyClaimResponses = {
+    /**
+     * OK
+     */
+    200: PatientClaimPreview;
+};
+
+export type PreviewMyClaimResponse = PreviewMyClaimResponses[keyof PreviewMyClaimResponses];
+
+export type ClaimMyRecordData = {
+    body?: ClaimByPatientCodeRequest;
+    path?: never;
+    query?: never;
+    url: '/me/claim';
+};
+
+export type ClaimMyRecordErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ClaimMyRecordError = ClaimMyRecordErrors[keyof ClaimMyRecordErrors];
+
+export type ClaimMyRecordResponses = {
+    /**
+     * OK
+     */
+    200: MyProfile;
+};
+
+export type ClaimMyRecordResponse = ClaimMyRecordResponses[keyof ClaimMyRecordResponses];
 
 export type GetMyProfileData = {
     body?: never;
@@ -3463,6 +6396,147 @@ export type GetMyHistoryResponses = {
 };
 
 export type GetMyHistoryResponse = GetMyHistoryResponses[keyof GetMyHistoryResponses];
+
+export type GetMyBillData = {
+    body?: never;
+    path: {
+        admissionId: string;
+    };
+    query?: never;
+    url: '/me/admissions/{admissionId}/bill';
+};
+
+export type GetMyBillErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetMyBillError = GetMyBillErrors[keyof GetMyBillErrors];
+
+export type GetMyBillResponses = {
+    /**
+     * OK
+     */
+    200: MyBill;
+};
+
+export type GetMyBillResponse = GetMyBillResponses[keyof GetMyBillResponses];
+
+export type GetMyAppointmentBillData = {
+    body?: never;
+    path: {
+        appointmentId: string;
+    };
+    query?: never;
+    url: '/me/appointments/{appointmentId}/bill';
+};
+
+export type GetMyAppointmentBillErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetMyAppointmentBillError = GetMyAppointmentBillErrors[keyof GetMyAppointmentBillErrors];
+
+export type GetMyAppointmentBillResponses = {
+    /**
+     * OK
+     */
+    200: MyBill;
+};
+
+export type GetMyAppointmentBillResponse = GetMyAppointmentBillResponses[keyof GetMyAppointmentBillResponses];
+
+export type GetMyLabReportsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/me/lab-reports';
+};
+
+export type GetMyLabReportsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type GetMyLabReportsError = GetMyLabReportsErrors[keyof GetMyLabReportsErrors];
+
+export type GetMyLabReportsResponses = {
+    /**
+     * OK
+     */
+    200: MyLabReportPagedResult;
+};
+
+export type GetMyLabReportsResponse = GetMyLabReportsResponses[keyof GetMyLabReportsResponses];
+
+export type DownloadMyLabReportData = {
+    body?: never;
+    path: {
+        reportId: string;
+    };
+    query?: never;
+    url: '/me/lab-reports/{reportId}/file';
+};
+
+export type DownloadMyLabReportErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type DownloadMyLabReportError = DownloadMyLabReportErrors[keyof DownloadMyLabReportErrors];
+
+export type DownloadMyLabReportResponses = {
+    /**
+     * OK
+     */
+    200: Blob | File;
+};
+
+export type DownloadMyLabReportResponse = DownloadMyLabReportResponses[keyof DownloadMyLabReportResponses];
 
 export type ListMyAppointmentsData = {
     body?: never;
@@ -3575,6 +6649,75 @@ export type CancelMyAppointmentResponses = {
 };
 
 export type CancelMyAppointmentResponse = CancelMyAppointmentResponses[keyof CancelMyAppointmentResponses];
+
+export type SubmitCareQueryData = {
+    body?: CareQueryRequest;
+    path?: never;
+    query?: never;
+    url: '/me/care-queries';
+};
+
+export type SubmitCareQueryErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type SubmitCareQueryError = SubmitCareQueryErrors[keyof SubmitCareQueryErrors];
+
+export type SubmitCareQueryResponses = {
+    /**
+     * Accepted
+     */
+    202: CareWorkflowAccepted;
+};
+
+export type SubmitCareQueryResponse = SubmitCareQueryResponses[keyof SubmitCareQueryResponses];
+
+export type GetMyCareRecommendationsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/me/care-recommendations';
+};
+
+export type GetMyCareRecommendationsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type GetMyCareRecommendationsError = GetMyCareRecommendationsErrors[keyof GetMyCareRecommendationsErrors];
+
+export type GetMyCareRecommendationsResponses = {
+    /**
+     * OK
+     */
+    200: MyCareRecommendationPagedResult;
+};
+
+export type GetMyCareRecommendationsResponse = GetMyCareRecommendationsResponses[keyof GetMyCareRecommendationsResponses];
 
 export type ListPatientsData = {
     body?: never;
@@ -3763,6 +6906,80 @@ export type LookupPatientResponses = {
 
 export type LookupPatientResponse = LookupPatientResponses[keyof LookupPatientResponses];
 
+export type GetPatientMedicalProfileData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/patients/{id}/medical-profile';
+};
+
+export type GetPatientMedicalProfileErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetPatientMedicalProfileError = GetPatientMedicalProfileErrors[keyof GetPatientMedicalProfileErrors];
+
+export type GetPatientMedicalProfileResponses = {
+    /**
+     * OK
+     */
+    200: PatientMedicalProfile;
+};
+
+export type GetPatientMedicalProfileResponse = GetPatientMedicalProfileResponses[keyof GetPatientMedicalProfileResponses];
+
+export type ReplacePatientMedicalProfileData = {
+    body?: UpdateMedicalProfileRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/patients/{id}/medical-profile';
+};
+
+export type ReplacePatientMedicalProfileErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type ReplacePatientMedicalProfileError = ReplacePatientMedicalProfileErrors[keyof ReplacePatientMedicalProfileErrors];
+
+export type ReplacePatientMedicalProfileResponses = {
+    /**
+     * OK
+     */
+    200: PatientMedicalProfile;
+};
+
+export type ReplacePatientMedicalProfileResponse = ReplacePatientMedicalProfileResponses[keyof ReplacePatientMedicalProfileResponses];
+
 export type LinkPatientAccountData = {
     body?: LinkPatientAccountRequest;
     path: {
@@ -3805,6 +7022,79 @@ export type LinkPatientAccountResponses = {
 };
 
 export type LinkPatientAccountResponse = LinkPatientAccountResponses[keyof LinkPatientAccountResponses];
+
+export type ListMyPrescriptionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/me/prescriptions';
+};
+
+export type ListMyPrescriptionsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type ListMyPrescriptionsError = ListMyPrescriptionsErrors[keyof ListMyPrescriptionsErrors];
+
+export type ListMyPrescriptionsResponses = {
+    /**
+     * OK
+     */
+    200: Array<MyPrescription>;
+};
+
+export type ListMyPrescriptionsResponse = ListMyPrescriptionsResponses[keyof ListMyPrescriptionsResponses];
+
+export type UploadMyPrescriptionData = {
+    body?: {
+        File?: Blob | File;
+        Note?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/me/prescriptions';
+};
+
+export type UploadMyPrescriptionErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type UploadMyPrescriptionError = UploadMyPrescriptionErrors[keyof UploadMyPrescriptionErrors];
+
+export type UploadMyPrescriptionResponses = {
+    /**
+     * Created
+     */
+    201: MyPrescription;
+};
+
+export type UploadMyPrescriptionResponse = UploadMyPrescriptionResponses[keyof UploadMyPrescriptionResponses];
 
 export type ListPharmacyCategoriesData = {
     body?: never;
@@ -3946,6 +7236,48 @@ export type CreatePharmacyItemResponses = {
 
 export type CreatePharmacyItemResponse = CreatePharmacyItemResponses[keyof CreatePharmacyItemResponses];
 
+export type RemovePharmacyItemData = {
+    body?: never;
+    headers: {
+        'X-Confirmation-Code': string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/pharmacy-items/{id}';
+};
+
+export type RemovePharmacyItemErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RemovePharmacyItemError = RemovePharmacyItemErrors[keyof RemovePharmacyItemErrors];
+
+export type RemovePharmacyItemResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type RemovePharmacyItemResponse = RemovePharmacyItemResponses[keyof RemovePharmacyItemResponses];
+
 export type GetPharmacyItemData = {
     body?: never;
     path: {
@@ -3976,6 +7308,76 @@ export type GetPharmacyItemResponses = {
 };
 
 export type GetPharmacyItemResponse = GetPharmacyItemResponses[keyof GetPharmacyItemResponses];
+
+export type ListPharmacyBatchesData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/pharmacy-items/{id}/batches';
+};
+
+export type ListPharmacyBatchesErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type ListPharmacyBatchesError = ListPharmacyBatchesErrors[keyof ListPharmacyBatchesErrors];
+
+export type ListPharmacyBatchesResponses = {
+    /**
+     * OK
+     */
+    200: Array<PharmacyBatch>;
+};
+
+export type ListPharmacyBatchesResponse = ListPharmacyBatchesResponses[keyof ListPharmacyBatchesResponses];
+
+export type AddPharmacyBatchData = {
+    body?: AddPharmacyBatchRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/pharmacy-items/{id}/batches';
+};
+
+export type AddPharmacyBatchErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type AddPharmacyBatchError = AddPharmacyBatchErrors[keyof AddPharmacyBatchErrors];
+
+export type AddPharmacyBatchResponses = {
+    /**
+     * Created
+     */
+    201: PharmacyBatch;
+};
+
+export type AddPharmacyBatchResponse = AddPharmacyBatchResponses[keyof AddPharmacyBatchResponses];
 
 export type ListPharmacyTransactionsData = {
     body?: never;
@@ -4061,6 +7463,241 @@ export type RecordPharmacyTransactionResponses = {
 };
 
 export type RecordPharmacyTransactionResponse = RecordPharmacyTransactionResponses[keyof RecordPharmacyTransactionResponses];
+
+export type RecordPharmacyBatchTransactionData = {
+    body?: CreatePharmacyTransactionRequest;
+    path: {
+        id: string;
+        batchId: string;
+    };
+    query?: never;
+    url: '/pharmacy-items/{id}/batches/{batchId}/transactions';
+};
+
+export type RecordPharmacyBatchTransactionErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RecordPharmacyBatchTransactionError = RecordPharmacyBatchTransactionErrors[keyof RecordPharmacyBatchTransactionErrors];
+
+export type RecordPharmacyBatchTransactionResponses = {
+    /**
+     * Created
+     */
+    201: PharmacyItem;
+};
+
+export type RecordPharmacyBatchTransactionResponse = RecordPharmacyBatchTransactionResponses[keyof RecordPharmacyBatchTransactionResponses];
+
+export type ListPrescriptionsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: PrescriptionStatus;
+    };
+    url: '/prescriptions';
+};
+
+export type ListPrescriptionsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListPrescriptionsError = ListPrescriptionsErrors[keyof ListPrescriptionsErrors];
+
+export type ListPrescriptionsResponses = {
+    /**
+     * OK
+     */
+    200: Array<Prescription>;
+};
+
+export type ListPrescriptionsResponse = ListPrescriptionsResponses[keyof ListPrescriptionsResponses];
+
+export type DownloadPrescriptionData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/prescriptions/{id}/file';
+};
+
+export type DownloadPrescriptionErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type DownloadPrescriptionError = DownloadPrescriptionErrors[keyof DownloadPrescriptionErrors];
+
+export type DownloadPrescriptionResponses = {
+    /**
+     * OK
+     */
+    200: Blob | File;
+};
+
+export type DownloadPrescriptionResponse = DownloadPrescriptionResponses[keyof DownloadPrescriptionResponses];
+
+export type MarkPrescriptionReadyData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/prescriptions/{id}/ready';
+};
+
+export type MarkPrescriptionReadyErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type MarkPrescriptionReadyError = MarkPrescriptionReadyErrors[keyof MarkPrescriptionReadyErrors];
+
+export type MarkPrescriptionReadyResponses = {
+    /**
+     * OK
+     */
+    200: Prescription;
+};
+
+export type MarkPrescriptionReadyResponse = MarkPrescriptionReadyResponses[keyof MarkPrescriptionReadyResponses];
+
+export type MarkPrescriptionDeliveredData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/prescriptions/{id}/deliver';
+};
+
+export type MarkPrescriptionDeliveredErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type MarkPrescriptionDeliveredError = MarkPrescriptionDeliveredErrors[keyof MarkPrescriptionDeliveredErrors];
+
+export type MarkPrescriptionDeliveredResponses = {
+    /**
+     * OK
+     */
+    200: Prescription;
+};
+
+export type MarkPrescriptionDeliveredResponse = MarkPrescriptionDeliveredResponses[keyof MarkPrescriptionDeliveredResponses];
+
+export type RejectPrescriptionData = {
+    body?: RejectPrescriptionRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/prescriptions/{id}/reject';
+};
+
+export type RejectPrescriptionErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RejectPrescriptionError = RejectPrescriptionErrors[keyof RejectPrescriptionErrors];
+
+export type RejectPrescriptionResponses = {
+    /**
+     * OK
+     */
+    200: Prescription;
+};
+
+export type RejectPrescriptionResponse = RejectPrescriptionResponses[keyof RejectPrescriptionResponses];
 
 export type ListBedAvailabilityData = {
     body?: never;

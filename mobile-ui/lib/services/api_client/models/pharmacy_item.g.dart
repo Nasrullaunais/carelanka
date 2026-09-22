@@ -12,6 +12,7 @@ PharmacyItem _$PharmacyItemFromJson(Map<String, dynamic> json) => PharmacyItem(
   categoryId: json['category_id'] as String,
   categoryName: json['category_name'] as String,
   unit: json['unit'] as String,
+  batchCount: (json['batch_count'] as num).toInt(),
   quantityOnHand: (json['quantity_on_hand'] as num).toInt(),
   reorderThreshold: (json['reorder_threshold'] as num).toInt(),
   isAvailable: json['is_available'] as bool,
@@ -19,10 +20,9 @@ PharmacyItem _$PharmacyItemFromJson(Map<String, dynamic> json) => PharmacyItem(
   createdAt: DateTime.parse(json['created_at'] as String),
   updatedAt: DateTime.parse(json['updated_at'] as String),
   manufacturer: json['manufacturer'] as String?,
-  batchNumber: json['batch_number'] as String?,
-  expiryDate: json['expiry_date'] == null
+  earliestExpiry: json['earliest_expiry'] == null
       ? null
-      : DateTime.parse(json['expiry_date'] as String),
+      : DateTime.parse(json['earliest_expiry'] as String),
   unitPrice: (json['unit_price'] as num?)?.toDouble(),
 );
 
@@ -33,9 +33,9 @@ Map<String, dynamic> _$PharmacyItemToJson(PharmacyItem instance) =>
       'category_id': instance.categoryId,
       'category_name': instance.categoryName,
       'manufacturer': instance.manufacturer,
-      'batch_number': instance.batchNumber,
-      'expiry_date': instance.expiryDate?.toIso8601String(),
       'unit': instance.unit,
+      'batch_count': instance.batchCount,
+      'earliest_expiry': instance.earliestExpiry?.toIso8601String(),
       'quantity_on_hand': instance.quantityOnHand,
       'reorder_threshold': instance.reorderThreshold,
       'unit_price': instance.unitPrice,

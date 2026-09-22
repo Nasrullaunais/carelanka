@@ -4,13 +4,13 @@ using CareLanka.Api.DTOs.Patient;
 namespace CareLanka.Api.Agents.Patient;
 
 /// <summary>
-/// What the run did, as it does it - same shape and purpose as <see cref="BedAgentJournal"/>.
-/// Every step with its timing, every tool call by name, every error, and the verdict of the
-/// deterministic validator, built as the run goes rather than reconstructed afterwards.
+/// What the run did, as it does it. Every step with its timing, every tool call by name, every
+/// error, and the verdict of the deterministic validator, built as the run goes rather than
+/// reconstructed afterwards.
 /// </summary>
 public sealed class CareAgentJournal
 {
-    private readonly List<BedAgentStep> _steps = [];
+    private readonly List<CareAgentStep> _steps = [];
     private readonly List<string> _errors = [];
 
     public CareWorkflowValidation Validation { get; } = new() { Passed = true };
@@ -91,7 +91,7 @@ public sealed class CareAgentJournal
     {
         clock.Stop();
 
-        _steps.Add(new BedAgentStep
+        _steps.Add(new CareAgentStep
         {
             Step = step,
             Tool = tool,
@@ -105,7 +105,7 @@ public sealed class CareAgentJournal
 
 public sealed record CareAgentRun(
     IReadOnlyList<string> Plan,
-    IReadOnlyList<BedAgentStep> Steps,
+    IReadOnlyList<CareAgentStep> Steps,
     CareAgentOutcome Outcome,
     CareDraftCandidate? Draft,
     bool RedFlag,

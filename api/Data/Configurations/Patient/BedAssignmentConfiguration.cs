@@ -20,9 +20,6 @@ public class BedAssignmentConfiguration : IEntityTypeConfiguration<BedAssignment
             t.HasCheckConstraint(
                 "ck_bed_assignments_status", EnumWire.CheckConstraint<AssignmentStatus>("status"));
             t.HasCheckConstraint(
-                "ck_bed_assignments_assigned_by",
-                EnumWire.CheckConstraint<AssignedBy>("assigned_by"));
-            t.HasCheckConstraint(
                 "ck_bed_assignments_release_reason",
                 $"release_reason IS NULL OR {EnumWire.CheckConstraint<ReleaseReason>("release_reason")}");
         });
@@ -32,11 +29,6 @@ public class BedAssignmentConfiguration : IEntityTypeConfiguration<BedAssignment
         builder.Property(b => b.Status)
             .HasConversion(new SnakeCaseEnumConverter<AssignmentStatus>())
             .HasMaxLength(20)
-            .IsRequired();
-
-        builder.Property(b => b.AssignedBy)
-            .HasConversion(new SnakeCaseEnumConverter<AssignedBy>())
-            .HasMaxLength(10)
             .IsRequired();
 
         builder.Property(b => b.ReleaseReason)
@@ -55,11 +47,6 @@ public class BedAssignmentConfiguration : IEntityTypeConfiguration<BedAssignment
         builder.HasOne<Entities.Common.StaffMember>()
             .WithMany()
             .HasForeignKey(b => b.ApprovedByStaffMemberId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne<Entities.Common.AgentWorkflow>()
-            .WithMany()
-            .HasForeignKey(b => b.WorkflowId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(b => b.BedId)

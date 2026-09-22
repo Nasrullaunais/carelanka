@@ -827,7 +827,6 @@ components:
       enum:
         - coordinator
         - dispatch_routing
-        - patient_admission_bed
         - staff_allocation
         - equipment_monitoring
 
@@ -972,7 +971,6 @@ components:
     ProposedChangeType:
       type: string
       enum:
-        - reserve_bed
         - end_allocation
         - create_allocation
         - assign_ambulance

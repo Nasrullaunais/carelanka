@@ -78,29 +78,26 @@ screens in both apps.**
 | | **Member 1** Emergency | **Member 2** Staff | **Member 3** Equipment | **Member 4** Patient |
 | :--- | :--- | :--- | :--- | :--- |
 | **Owns (data)** | EmergencyCall, Ambulance, AmbulanceCrewAssignment, Dispatch, DispatchCrew, RouteLog | Shift, Allocation, LeaveRequest, Skill, StaffMemberSkill, WardStaffingRule | EquipmentCategory, EquipmentItem, **Bed**, PharmacyCategory, PharmacyItem, PharmacyTransaction, MaintenanceSchedule, Warning, ActionRequest | Patient, PatientAccount, PatientMedicalProfile, Admission, Ward, BedAssignment, Discharge, DischargeChecklistItem, Appointment, Bill, BillLineItem, BillingRate, AdmissionFeeRate, CareRecommendation |
-| **React screens** | Live call board, manual/agent dispatch confirmation, fleet/current-crew board, cancellation review, route/map view, reports | Staff records CRUD, roster approval, ward coverage dashboard, leave approval | Stock dashboard, warning queue, procurement/maintenance approval | Admissions dashboard, patients board, bed suggestion panel, intake, capacity, discharge confirmation, billing, medical profile editor, care draft review queue, occupancy report |
+| **React screens** | Live call board, manual/agent dispatch confirmation, fleet/current-crew board, cancellation review, route/map view, reports | Staff records CRUD, roster approval, ward coverage dashboard, leave approval | Stock dashboard, warning queue, procurement/maintenance approval | Admissions dashboard, patients board, intake, capacity, discharge confirmation, billing, medical profile editor, care draft review queue, occupancy report |
 | **Flutter screens** | Crew: acknowledge/decline dispatch, launch Google Maps, update status, handover | Staff: my shifts, clock in/out, request leave, request swap | Ward staff: report faulty equipment, view ward stock, take a bed out of service | Nurse: place a patient in a normal-ward bed, update status, complete details, maintain the medical profile, review care drafts, request discharge. Patient: emergency report/tracking/cancellation, my stay, my bill, book a visit, discharge instructions, **and while admitted, tell us how you are feeling and read the approved reply** |
-| **AI agent** | Dispatch & Routing | Staff Allocation | Equipment Monitoring | Bed & Patient Details, **+ Patient Care Advisory** |
+| **AI agent** | Dispatch & Routing | Staff Allocation | Equipment Monitoring | Patient Care Advisory |
 | **Device feature** | GPS + Google Maps launch | Date/time picker for leave dates | Camera for fault photos | Local notifications on status change, date/time picker for booking |
 | **Third-party API** | Google route/ETA on the backend | — | — | — |
 
 > Only one third-party integration is required for the whole system (§4.1), and
 > Member 1's maps API covers it. Others are optional.
 
-> **Member 4 runs two agents, not one.** Added on the lecturer's direction at topic
-> finalization: a component this patient-facing needed an agent the patient actually
-> talks to, not only one that moves beds behind the scenes. **Patient Care Advisory**
-> reads an admitted patient's own description of how they feel, plus the medical profile
-> staff have recorded for them, and drafts a decision-support note — never a diagnosis —
-> which a **Doctor or Ward Nurse** must approve before the patient ever sees it. Same
-> human-approval pattern as every other agent in this table, one workflow later. Full
-> design in `patient-management-plan.md` §8.10.
+> **Member 4's agent is Patient Care Advisory.** Added on the lecturer's direction at
+> topic finalization: a component this patient-facing needed an agent the patient
+> actually talks to. It reads an admitted patient's own description of how they feel,
+> plus the medical profile staff have recorded for them, and drafts a decision-support
+> note — never a diagnosis — which a **Doctor or Ward Nurse** must approve before the
+> patient ever sees it. Same human-approval pattern as every other agent in this table.
+> Full design in `patient-management-plan.md` §8.10.
 >
-> **Both were redesigned on 2026-09-16**, after the rest of that component was built and
-> tested. The bed agent gained patient lookup by NIC or patient code — hence the name —
-> and **lost its write tool entirely**: it suggests a best bed plus selectable
-> alternatives, and a human pressing a button is what commits one, through the ordinary
-> manual endpoint. Nothing is held or reserved while a suggestion waits.
+> **A bed-suggestion agent existed alongside it from 2026-09-16 and was removed on
+> 2026-09-22** — bed placement is the manual `POST /admissions/{id}/assign-bed` path
+> only now, same as it always was for the human half of that workflow.
 
 ---
 

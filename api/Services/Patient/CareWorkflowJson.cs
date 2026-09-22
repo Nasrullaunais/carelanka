@@ -8,7 +8,7 @@ namespace CareLanka.Api.Services.Patient;
 /// exactly. A workflow row read straight out of PostgreSQL then says the same thing, in the same
 /// words, as the response a reviewer sees on screen - which is the point of persisting it.
 /// </summary>
-public static class BedWorkflowJson
+public static class CareWorkflowJson
 {
     public static readonly JsonSerializerOptions Options = Build();
 

@@ -1,5 +1,17 @@
 namespace CareLanka.Api.Agents;
 
+/// <summary>
+/// Common, group-owned (ADR 2, <c>integration_of_functions.md</c> §11.20) - every agent in the
+/// app shares one of these. Nothing here is Patient Management's to decide alone.
+/// </summary>
+/// <remarks>
+/// <b>Do not change a default below without re-measuring it.</b> Every value here was wrong at
+/// least once - a documented field the real API rejects, a timeout too tight to survive one busy
+/// retry, a model that turned out three times slower on the same key - and each mistake cost a
+/// full session to trace back to "the agent is stuck" before the actual cause was found. The
+/// reasoning is written on each property below; read it before touching the number, or the next
+/// person spends that same session again.
+/// </remarks>
 public sealed class LanguageModelOptions
 {
     public const string SectionName = "LanguageModel";

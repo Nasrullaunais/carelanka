@@ -29,6 +29,13 @@ namespace CareLanka.Api.Agents.Patient;
 /// patient at the substance. CR1 is untouched and carries the weight: no dosages, and no medicine
 /// the patient never raised.
 /// </para>
+/// <para>
+/// <b>Both rules were wrong before they were right, and each wrong version passed its own tests
+/// - it looked correct until a real model draft hit it.</b> If CR1 or CR5 needs to change again,
+/// re-run the full <c>CareRecommendationValidatorTests</c> suite including the sentences each
+/// narrowing exists to still catch ("You could ask the nurse for penicillin." must still fail),
+/// not just the new case being added.
+/// </para>
 /// </summary>
 public static partial class CareRecommendationValidator
 {

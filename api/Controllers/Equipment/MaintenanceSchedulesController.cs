@@ -19,7 +19,7 @@ public class MaintenanceSchedulesController : ControllerBase
     public MaintenanceSchedulesController(IMaintenanceService maintenance)
         => _maintenance = maintenance;
 
-    [Authorize(Policy = Policies.EquipmentManager)]
+    [Authorize(Policy = Policies.MaintenanceDesk)]
     [HttpGet(Name = "listMaintenanceSchedules")]
     [ProducesResponseType(typeof(PagedResult<MaintenanceSchedule>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
@@ -35,7 +35,7 @@ public class MaintenanceSchedulesController : ControllerBase
         => Ok(await _maintenance.ListAsync(
             new MaintenanceQuery(status, assetType, overdue, page, pageSize), ct));
 
-    [Authorize(Policy = Policies.EquipmentManager)]
+    [Authorize(Policy = Policies.MaintenanceDesk)]
     [HttpPost(Name = "createMaintenanceSchedule")]
     [ProducesResponseType(typeof(MaintenanceSchedule), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
@@ -51,15 +51,35 @@ public class MaintenanceSchedulesController : ControllerBase
         return Created((string?)null, schedule);
     }
 
-    [Authorize(Policy = Policies.EquipmentManager)]
-    [HttpPost("{id:guid}/complete", Name = "completeMaintenanceSchedule")]
+    [Authorize(Policy = Policies.EquipmentConfirmer)]
+    [HttpGet("pending-confirmation", Name = "listMaintenanceSchedulesAwaitingConfirmation")]
+    [ProducesResponseType(typeof(List<MaintenanceSchedule>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    public async Task<ActionResult<IReadOnlyList<MaintenanceSchedule>>> ListMaintenanceSchedulesAwaitingConfirmation(
+        [FromHeader(Name = EquipmentOptions.ConfirmationCodeHeader)] string? confirmationCode,
+        CancellationToken ct)
+        => Ok(await _maintenance.ListOpenAsync(confirmationCode, ct));
+
+    [Authorize(Policy = Policies.EquipmentConfirmationTracker)]
+    [HttpGet("pending-confirmation/count", Name = "countMaintenanceSchedulesAwaitingConfirmation")]
+    [ProducesResponseType(typeof(PendingEquipmentCount), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    public async Task<ActionResult<PendingEquipmentCount>> CountMaintenanceSchedulesAwaitingConfirmation(
+        CancellationToken ct)
+        => Ok(await _maintenance.CountOpenAsync(ct));
+
+    [Authorize(Policy = Policies.EquipmentConfirmer)]
+    [HttpPost("{id:guid}/confirm", Name = "confirmMaintenanceSchedule")]
     [ProducesResponseType(typeof(MaintenanceSchedule), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
-    public async Task<ActionResult<MaintenanceSchedule>> CompleteMaintenanceSchedule(
-        Guid id, [FromBody] CompleteMaintenanceScheduleRequest? request, CancellationToken ct)
-        => Ok(await _maintenance.CompleteAsync(id, request?.Notes, ct));
+    public async Task<ActionResult<MaintenanceSchedule>> ConfirmMaintenanceSchedule(
+        Guid id,
+        [FromHeader(Name = EquipmentOptions.ConfirmationCodeHeader)] string? confirmationCode,
+        CancellationToken ct)
+        => Ok(await _maintenance.ConfirmDoneAsync(id, confirmationCode, ct));
 }

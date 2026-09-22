@@ -40,6 +40,11 @@ public class BillLineItemConfiguration : IEntityTypeConfiguration<BillLineItem>
 
         builder.HasIndex(i => i.BillId).HasDatabaseName("ix_bill_line_items_bill_id");
 
-        builder.HasQueryFilter(i => i.Bill.Admission.Patient.IsActive);
+        // Follows whichever leg the bill hangs off. Reaching only through the
+        // admission made every appointment line invisible, which read as the
+        // lines having been deleted and silently regenerated the bill.
+        builder.HasQueryFilter(i =>
+            (i.Bill.Admission != null && i.Bill.Admission.Patient.IsActive)
+            || (i.Bill.Appointment != null && i.Bill.Appointment.Patient.IsActive));
     }
 }

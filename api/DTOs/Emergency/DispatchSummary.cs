@@ -2,7 +2,7 @@ using CareLanka.Api.Data.Enums;
 
 namespace CareLanka.Api.DTOs.Emergency;
 
-public sealed class DispatchSummary
+public class DispatchSummary
 {
     public Guid Id { get; set; }
     public Guid EmergencyCallId { get; set; }
@@ -11,6 +11,7 @@ public sealed class DispatchSummary
     public DispatchStatus Status { get; set; }
     public string? DestinationWardName { get; set; }
     public int CrewCount { get; set; }
+    public bool AcknowledgementOverdue { get; set; }
     public DateTimeOffset DispatchedAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }
 }

@@ -13,7 +13,9 @@ MyAppointment _$MyAppointmentFromJson(Map<String, dynamic> json) =>
       status: AppointmentStatus.fromJson(json['status'] as String),
       statusText: json['status_text'] as String,
       canCancel: json['can_cancel'] as bool,
+      cancelledByHospital: json['cancelled_by_hospital'] as bool,
       reason: json['reason'] as String?,
+      cancellationReason: json['cancellation_reason'] as String?,
     );
 
 Map<String, dynamic> _$MyAppointmentToJson(MyAppointment instance) =>
@@ -24,4 +26,6 @@ Map<String, dynamic> _$MyAppointmentToJson(MyAppointment instance) =>
       'status_text': instance.statusText,
       'reason': instance.reason,
       'can_cancel': instance.canCancel,
+      'cancellation_reason': instance.cancellationReason,
+      'cancelled_by_hospital': instance.cancelledByHospital,
     };

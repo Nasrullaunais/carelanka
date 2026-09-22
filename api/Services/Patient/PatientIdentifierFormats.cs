@@ -15,6 +15,13 @@ public static class PatientIdentifierFormats
     public const string PhoneMessage =
         "A phone number is ten digits starting with 0, like 0771234567.";
 
+    // Mirrors PatientCodes.Next: a P and seven characters, with I, L, O, 0 and 1 left out.
+    public const string PatientCode = "^P[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{7}$";
+
+    public const string PatientCodeMessage =
+        "A patient code is a P followed by seven characters, like PK4M9XB2. "
+        + "It is on the slip the hospital gave you.";
+
     public const int MaxAgeYears = 120;
 }
 

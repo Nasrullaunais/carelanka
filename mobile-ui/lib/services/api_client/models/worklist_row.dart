@@ -8,7 +8,6 @@ import 'admission_category.dart';
 import 'admission_source.dart';
 import 'admission_urgency.dart';
 import 'patient_summary.dart';
-import 'worklist_kind.dart';
 import 'worklist_status.dart';
 
 part 'worklist_row.g.dart';
@@ -17,7 +16,6 @@ part 'worklist_row.g.dart';
 class WorklistRow {
   const WorklistRow({
     required this.id,
-    required this.kind,
     required this.patient,
     required this.status,
     required this.requiresBed,
@@ -25,15 +23,14 @@ class WorklistRow {
     this.source,
     this.admissionCategory,
     this.urgency,
+    this.isInfectious,
     this.wardName,
     this.bedNumber,
-    this.reason,
   });
   
   factory WorklistRow.fromJson(Map<String, Object?> json) => _$WorklistRowFromJson(json);
   
   final String id;
-  final WorklistKind kind;
   final PatientSummary patient;
   final WorklistStatus status;
   @JsonKey(name: 'requires_bed')
@@ -42,6 +39,8 @@ class WorklistRow {
   @JsonKey(name: 'admission_category')
   final AdmissionCategory? admissionCategory;
   final AdmissionUrgency? urgency;
+  @JsonKey(name: 'is_infectious')
+  final bool? isInfectious;
   @JsonKey(name: 'ward_name')
   final String? wardName;
   @JsonKey(name: 'bed_number')
@@ -50,7 +49,6 @@ class WorklistRow {
   /// The name has been replaced because it contains a keyword. Original name: `when`.
   @JsonKey(name: 'when')
   final DateTime whenValue;
-  final String? reason;
 
   Map<String, Object?> toJson() => _$WorklistRowToJson(this);
 }

@@ -10,8 +10,13 @@ namespace CareLanka.Api.Services.Equipment;
 public sealed class EquipmentCategoryService : IEquipmentCategoryService
 {
     private readonly CareLankaDbContext _db;
+    private readonly IEquipmentConfirmationCode _confirmationCode;
 
-    public EquipmentCategoryService(CareLankaDbContext db) => _db = db;
+    public EquipmentCategoryService(CareLankaDbContext db, IEquipmentConfirmationCode confirmationCode)
+    {
+        _db = db;
+        _confirmationCode = confirmationCode;
+    }
 
     public async Task<IReadOnlyList<EquipmentCategory>> ListAsync(
         CancellationToken cancellationToken = default)
@@ -57,6 +62,49 @@ public sealed class EquipmentCategoryService : IEquipmentCategoryService
             CreatedAt = category.CreatedAt,
             UpdatedAt = category.UpdatedAt
         };
+    }
+
+    public async Task<IReadOnlyList<EquipmentCategoryUsage>> ListForRemovalAsync(
+        string? confirmationCode, CancellationToken cancellationToken = default)
+    {
+        _confirmationCode.Ensure(confirmationCode);
+
+        // Items read through the category apply their own soft-delete filter, so a removed item
+        // no longer holds its category in place.
+        return await _db.EquipmentCategories
+            .AsNoTracking()
+            .OrderBy(c => c.Name)
+            .Select(c => new EquipmentCategoryUsage
+            {
+                Id = c.Id,
+                Name = c.Name,
+                ItemCount = c.Items.Count()
+            })
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task RemoveAsync(
+        Guid id, string? confirmationCode, CancellationToken cancellationToken = default)
+    {
+        _confirmationCode.Ensure(confirmationCode);
+
+        var category = await GetByIdAsync(id, cancellationToken);
+
+        // Every item keeps a category, so one still in use cannot go. Retired items and items
+        // awaiting confirmation count too: they are still on the register.
+        var inUse = await _db.EquipmentItems.CountAsync(i => i.CategoryId == id, cancellationToken);
+
+        if (inUse > 0)
+        {
+            throw new ConflictException(MessageCode.EquipmentCategoryInUse, category.Name, inUse);
+        }
+
+        // A soft delete: the name is free to be used again, because the unique index on it is
+        // scoped to live rows, and items removed earlier still point at a row that exists.
+        category.IsActive = false;
+        category.DeletedAt = DateTimeOffset.UtcNow;
+
+        await _db.SaveChangesAsync(cancellationToken);
     }
 
     public Task<CategoryEntity?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default)

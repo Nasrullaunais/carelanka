@@ -4,6 +4,7 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
+import 'ambulance_eligibility_block_reason.dart';
 import 'ambulance_status.dart';
 
 part 'ambulance_summary.g.dart';
@@ -17,8 +18,15 @@ class AmbulanceSummary {
     required this.isDivertible,
     this.currentLatitude,
     this.currentLongitude,
+    this.locationUpdatedAt,
+    this.currentCrewCount,
+    this.requiredCrewCount,
+    this.isEligible,
+    this.eligibilityBlockReasons,
     this.activeDispatchId,
     this.distanceKm,
+    this.driveMinutes,
+    this.isStraightLineDistance,
   });
   
   factory AmbulanceSummary.fromJson(Map<String, Object?> json) => _$AmbulanceSummaryFromJson(json);
@@ -31,12 +39,26 @@ class AmbulanceSummary {
   final double? currentLatitude;
   @JsonKey(name: 'current_longitude')
   final double? currentLongitude;
+  @JsonKey(name: 'location_updated_at')
+  final DateTime? locationUpdatedAt;
+  @JsonKey(name: 'current_crew_count')
+  final int? currentCrewCount;
+  @JsonKey(name: 'required_crew_count')
+  final int? requiredCrewCount;
+  @JsonKey(name: 'is_eligible')
+  final bool? isEligible;
+  @JsonKey(name: 'eligibility_block_reasons')
+  final List<AmbulanceEligibilityBlockReason>? eligibilityBlockReasons;
   @JsonKey(name: 'active_dispatch_id')
   final String? activeDispatchId;
   @JsonKey(name: 'is_divertible')
   final bool isDivertible;
   @JsonKey(name: 'distance_km')
   final double? distanceKm;
+  @JsonKey(name: 'drive_minutes')
+  final int? driveMinutes;
+  @JsonKey(name: 'is_straight_line_distance')
+  final bool? isStraightLineDistance;
 
   Map<String, Object?> toJson() => _$AmbulanceSummaryToJson(this);
 }

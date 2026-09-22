@@ -86,10 +86,9 @@ public sealed class BedAssignmentService : IBedAssignmentService
     public async Task<BedAssignmentResponse> AssignManuallyAsync(
         Guid admissionId, AssignBedRequest request, CancellationToken ct = default)
     {
-        var bedId = request.BedId!.Value;
+        var bedId = request.BedId;
 
         var bed = await _beds.FindBedAsync(bedId, ct)
-
             ?? throw new NotFoundException("Bed", bedId);
 
         var ward = await FindWardAsync(bed.WardId, ct);
@@ -100,10 +99,13 @@ public sealed class BedAssignmentService : IBedAssignmentService
             .FirstOrDefaultAsync(candidate => candidate.Id == admissionId, ct)
             ?? throw new NotFoundException("Admission", admissionId);
 
-        EnsureMayApprove(admission.Category, ward);
+        var category = admission.Category
+            ?? throw new ConflictException(MessageCode.AdmissionNotYetClassified, admissionId);
+
+        EnsureMayApprove(category, ward);
 
         BedPlacementRules.EnsurePlaceable(
-            admission.Category,
+            category,
             admission.Patient.Gender,
             admission.Patient.DateOfBirth,
             admission.IsInfectious,
@@ -132,10 +134,13 @@ public sealed class BedAssignmentService : IBedAssignmentService
             .FirstOrDefaultAsync(candidate => candidate.Id == admissionId, ct)
             ?? throw new NotFoundException("Admission", admissionId);
 
-        EnsureMayApprove(admission.Category, ward);
+        var category = admission.Category
+            ?? throw new ConflictException(MessageCode.AdmissionNotYetClassified, admissionId);
+
+        EnsureMayApprove(category, ward);
 
         BedPlacementRules.EnsurePlaceable(
-            admission.Category,
+            category,
             admission.Patient.Gender,
             admission.Patient.DateOfBirth,
             admission.IsInfectious,
@@ -198,9 +203,6 @@ public sealed class BedAssignmentService : IBedAssignmentService
             ReservedUntil = wasOccupied ? null : reservedUntil,
             OccupiedAt = occupiedAt,
 
-            AssignedBy = AssignedBy.User,
-            WorkflowId = null,
-
             IsDowngrade = live.IsDowngrade,
 
             ApprovedByStaffMemberId = _currentUser.Id,
@@ -248,10 +250,13 @@ public sealed class BedAssignmentService : IBedAssignmentService
             .FirstOrDefaultAsync(candidate => candidate.Id == admissionId, ct)
             ?? throw new NotFoundException("Admission", admissionId);
 
-        if (!BedPlacementRules.RequiresBed(admission.Category))
+        var category = admission.Category
+            ?? throw new ConflictException(MessageCode.AdmissionNotYetClassified, admissionId);
+
+        if (!BedPlacementRules.RequiresBed(category))
         {
             throw new ConflictException(
-                MessageCode.VisitNeedsNoBed, EnumWire.ToWire(admission.Category));
+                MessageCode.VisitNeedsNoBed, EnumWire.ToWire(category));
         }
 
         AdmissionStatusMachine.EnsureMove(
@@ -263,10 +268,10 @@ public sealed class BedAssignmentService : IBedAssignmentService
 
         var ward = await FindWardAsync(bed.WardId, ct);
 
-        EnsureMayApprove(admission.Category, ward);
+        EnsureMayApprove(category, ward);
 
         var isDowngrade = BedPlacementRules.EnsurePlaceable(
-            admission.Category,
+            category,
             admission.Patient.Gender,
             admission.Patient.DateOfBirth,
             admission.IsInfectious,
@@ -285,10 +290,6 @@ public sealed class BedAssignmentService : IBedAssignmentService
             BedId = bed.Id,
             Status = AssignmentStatus.Reserved,
             ReservedUntil = BedHold.ExpiresAt(admission.ExpectedArrivalAt, now),
-
-            AssignedBy = AssignedBy.User,
-
-            WorkflowId = null,
 
             IsDowngrade = isDowngrade,
 
@@ -451,8 +452,6 @@ public sealed class BedAssignmentService : IBedAssignmentService
             BedNumber = bedNumber,
             Status = assignment.Status,
             ReservedUntil = assignment.ReservedUntil,
-            AssignedBy = assignment.AssignedBy,
-            WorkflowId = assignment.WorkflowId,
             IsDowngrade = assignment.IsDowngrade,
             ApprovedByStaffId = assignment.ApprovedByStaffMemberId,
             ApprovedByStaffName = StaffNames.Lookup(names, assignment.ApprovedByStaffMemberId),

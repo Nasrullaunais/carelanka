@@ -132,7 +132,7 @@ public sealed class AppointmentEndpointTests
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         var patientId = await NewPatientAsync(nurse, "Books Again After Discharge");
 
-        var appointmentId = await BookIdAsync(nurse, patientId, SoonUtc());
+        var appointmentId = await ConfirmedIdAsync(nurse, patientId, SoonUtc());
         await CheckInAsync(nurse, appointmentId);
         await DischargeAsync(patientId);
 
@@ -187,7 +187,7 @@ public sealed class AppointmentEndpointTests
 
         var stillBooked = await BookIdAsync(
             nurse, await NewPatientAsync(nurse, "Still Expected"), At(day, 9));
-        var arrived = await BookIdAsync(
+        var arrived = await ConfirmedIdAsync(
             nurse, await NewPatientAsync(nurse, "Already Arrived"), At(day, 10));
         await CheckInAsync(nurse, arrived);
 
@@ -209,7 +209,7 @@ public sealed class AppointmentEndpointTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal(
             HttpStatusCode.OK,
-            (await nurse.GetAsync("/api/appointments?status=checked_in")).StatusCode);
+            (await nurse.GetAsync("/api/appointments?status=confirmed")).StatusCode);
     }
 
     [Fact]
@@ -236,7 +236,7 @@ public sealed class AppointmentEndpointTests
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         var patientId = await NewPatientAsync(nurse, "Checks In As Pre Registered");
-        var appointmentId = await BookIdAsync(nurse, patientId, SoonUtc());
+        var appointmentId = await ConfirmedIdAsync(nurse, patientId, SoonUtc());
 
         var response = await CheckInAsync(nurse, appointmentId);
         using var admission = await ReadJsonAsync(response);
@@ -261,18 +261,21 @@ public sealed class AppointmentEndpointTests
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         var patientId = await NewPatientAsync(nurse, "Booking Links To Admission");
-        var appointmentId = await BookIdAsync(nurse, patientId, SoonUtc());
+        var appointmentId = await ConfirmedIdAsync(nurse, patientId, SoonUtc());
 
         using var admission = await ReadJsonAsync(await CheckInAsync(nurse, appointmentId));
         var admissionId = admission.RootElement.GetProperty("id").GetString();
 
         using var listed = await ReadJsonAsync(
-            await nurse.GetAsync("/api/appointments?status=checked_in&pageSize=100"));
+            await nurse.GetAsync("/api/appointments?status=completed&pageSize=100"));
         var booking = listed.RootElement.GetProperty("items").EnumerateArray()
             .Single(item => item.GetProperty("id").GetString() == appointmentId);
 
-        Assert.Equal("checked_in", booking.GetProperty("status").GetString());
+        // Both endings read as completed, so admission_id is the only thing that says the
+        // patient stayed in rather than went home.
+        Assert.Equal("completed", booking.GetProperty("status").GetString());
         Assert.Equal(admissionId, booking.GetProperty("admission_id").GetString());
+        Assert.False(booking.GetProperty("can_complete").GetBoolean());
     }
 
     [Fact]
@@ -280,7 +283,7 @@ public sealed class AppointmentEndpointTests
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         var patientId = await NewPatientAsync(nurse, "Checked In Twice");
-        var appointmentId = await BookIdAsync(nurse, patientId, SoonUtc());
+        var appointmentId = await ConfirmedIdAsync(nurse, patientId, SoonUtc());
 
         await CheckInAsync(nurse, appointmentId);
         var again = await CheckInAsync(nurse, appointmentId);
@@ -296,9 +299,9 @@ public sealed class AppointmentEndpointTests
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         using var manager = await ClientAsync(ApiApplication.ManagerEmail);
 
-        var refusedFor = await BookIdAsync(
+        var refusedFor = await ConfirmedIdAsync(
             nurse, await NewPatientAsync(nurse, "Nurse Tries ICU"), SoonUtc());
-        var allowedFor = await BookIdAsync(
+        var allowedFor = await ConfirmedIdAsync(
             nurse, await NewPatientAsync(nurse, "Manager Does ICU"), SoonUtc());
 
         var refused = await CheckInAsync(nurse, refusedFor, category: "icu");
@@ -317,7 +320,7 @@ public sealed class AppointmentEndpointTests
 
         foreach (var category in new[] { "outpatient", "day_case", "inpatient" })
         {
-            var appointmentId = await BookIdAsync(
+            var appointmentId = await ConfirmedIdAsync(
                 nurse, await NewPatientAsync(nurse, $"Nurse Checks In {category}"), SoonUtc());
 
             var response = await CheckInAsync(nurse, appointmentId, category: category);
@@ -330,7 +333,7 @@ public sealed class AppointmentEndpointTests
     public async Task A_check_in_with_no_care_level_is_refused_rather_than_filed_as_intensive_care()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
-        var appointmentId = await BookIdAsync(
+        var appointmentId = await ConfirmedIdAsync(
             nurse, await NewPatientAsync(nurse, "Check In With No Category"), SoonUtc());
 
         var response = await nurse.PostAsJsonAsync(
@@ -345,7 +348,7 @@ public sealed class AppointmentEndpointTests
     public async Task A_check_in_naming_a_clinician_who_does_not_exist_is_refused()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
-        var appointmentId = await BookIdAsync(
+        var appointmentId = await ConfirmedIdAsync(
             nurse, await NewPatientAsync(nurse, "Check In With Unknown Staff"), SoonUtc());
 
         var response = await CheckInAsync(nurse, appointmentId, staffId: Guid.NewGuid().ToString());
@@ -370,7 +373,7 @@ public sealed class AppointmentEndpointTests
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         var patientId = await NewPatientAsync(nurse, "Failed Check In Rolls Back");
-        var appointmentId = await BookIdAsync(nurse, patientId, SoonUtc());
+        var appointmentId = await ConfirmedIdAsync(nurse, patientId, SoonUtc());
 
         await NewAdmissionAsync(nurse, patientId);
 
@@ -381,25 +384,212 @@ public sealed class AppointmentEndpointTests
         Assert.Equal("cl_pat_006", body.RootElement.GetProperty("code").GetString());
 
         using var listed = await ReadJsonAsync(
-            await nurse.GetAsync("/api/appointments?status=scheduled&pageSize=100"));
+            await nurse.GetAsync("/api/appointments?status=confirmed&pageSize=100"));
 
         Assert.Contains(appointmentId, Ids(listed));
     }
 
     [Fact]
-    public async Task The_desk_is_the_ward_nurse_and_the_duty_manager_and_nobody_else()
+    public async Task The_desk_is_reception_the_ward_nurse_and_the_duty_manager_and_nobody_else()
     {
         using var doctor = await ClientAsync(ApiApplication.DoctorEmail);
         using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
+        using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
         using var manager = await ClientAsync(ApiApplication.ManagerEmail);
 
+        // Reading the list is wider than acting on it: the administrator reaches a booking to
+        // bill it, and cannot check anyone in.
         Assert.Equal(
             HttpStatusCode.Forbidden,
             (await doctor.GetAsync("/api/appointments")).StatusCode);
         Assert.Equal(
-            HttpStatusCode.Forbidden,
+            HttpStatusCode.OK,
             (await administrator.GetAsync("/api/appointments")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await reception.GetAsync("/api/appointments")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await manager.GetAsync("/api/appointments")).StatusCode);
+
+        var id = Guid.NewGuid().ToString();
+
+        foreach (var refused in new[] { doctor, administrator })
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, (await CheckInAsync(refused, id)).StatusCode);
+        }
+
+        // Past the policy, so a missing booking is a 404 rather than a 403.
+        foreach (var allowed in new[] { reception, manager })
+        {
+            Assert.Equal(HttpStatusCode.NotFound, (await CheckInAsync(allowed, id)).StatusCode);
+        }
+    }
+
+    [Fact]
+    public async Task Reception_books_checks_in_completes_and_calls_off_a_booking()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
+
+        var booked = await ConfirmedIdAsync(
+            reception, await NewPatientAsync(nurse, "Reception Books"), SoonUtc());
+
+        var checkedIn = await CheckInAsync(
+            reception,
+            await ConfirmedIdAsync(reception, await NewPatientAsync(nurse, "Reception Admits"), SoonUtc()));
+
+        var completed = await reception.PostAsync(
+            $"/api/appointments/{booked}/complete", content: null);
+
+        var calledOff = await reception.PostAsJsonAsync(
+            $"/api/appointments/{await BookIdAsync(reception, await NewPatientAsync(nurse, "Reception Calls Off"), SoonUtc())}/cancel",
+            new { reason = "Clinic full at 09:00. Please rebook after 14:00." });
+
+        Assert.Equal(HttpStatusCode.Created, checkedIn.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, calledOff.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_nurse_who_records_a_visit_as_seen_can_also_raise_and_settle_its_bill()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+
+        var appointmentId = await ConfirmedIdAsync(
+            nurse, await NewPatientAsync(nurse, "Nurse Bills The Visit"), SoonUtc());
+
+        var completed = await nurse.PostAsync(
+            $"/api/appointments/{appointmentId}/complete", content: null);
+
+        var raised = await nurse.PostAsync(
+            $"/api/appointments/{appointmentId}/bill", content: null);
+
+        var charged = await nurse.PostAsJsonAsync(
+            $"/api/appointments/{appointmentId}/bill/charges",
+            new { description = "Chest X-ray", quantity = 1, unit_price = 3500 });
+
+        var settled = await nurse.PostAsJsonAsync(
+            $"/api/appointments/{appointmentId}/bill/settle",
+            new { settlement_note = "Cash" });
+
+        Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, raised.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, charged.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, settled.StatusCode);
+    }
+
+    /// An admission bill is settled at discharge and that tick is reception's alone, so
+    /// widening the outpatient bill must not have widened this one with it.
+    [Fact]
+    public async Task A_nurse_still_may_not_touch_an_admission_bill()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var admissionId = Guid.NewGuid().ToString();
+
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (await nurse.PostAsync($"/api/admissions/{admissionId}/bill", content: null))
+                .StatusCode);
+
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (await nurse.PostAsJsonAsync(
+                $"/api/admissions/{admissionId}/bill/settle", new { settlement_note = "Cash" }))
+                .StatusCode);
+    }
+
+    /// The whole point of the confirm step: a booking three weeks out must not be one click
+    /// away from creating an admission and starting a bed search for an empty chair.
+    [Fact]
+    public async Task Nothing_on_the_day_is_reachable_until_the_desk_confirms_the_booking()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var patientId = await NewPatientAsync(nurse, "Not Confirmed Yet");
+        var appointmentId = await BookIdAsync(nurse, patientId, SoonUtc());
+
+        var admit = await CheckInAsync(nurse, appointmentId);
+        var seen = await nurse.PostAsync($"/api/appointments/{appointmentId}/complete", null);
+        var absent = await nurse.PostAsync($"/api/appointments/{appointmentId}/no-show", null);
+
+        foreach (var refused in new[] { admit, seen, absent })
+        {
+            Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+        }
+
+        using var body = await ReadJsonAsync(admit);
+        Assert.Equal("cl_err_409_transition", body.RootElement.GetProperty("code").GetString());
+
+        Assert.Equal(HttpStatusCode.OK, (await ConfirmAsync(nurse, appointmentId)).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await CheckInAsync(nurse, appointmentId)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Confirming_stamps_who_did_it_and_opens_the_day_of_actions()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var appointmentId = await BookIdAsync(
+            nurse, await NewPatientAsync(nurse, "Gets Confirmed"), SoonUtc());
+
+        using var booked = await ReadJsonAsync(
+            await nurse.GetAsync($"/api/appointments?status=scheduled&pageSize=100"));
+        Assert.Contains(appointmentId, Ids(booked));
+
+        using var body = await ReadJsonAsync(await ConfirmAsync(nurse, appointmentId));
+
+        Assert.Equal("confirmed", body.RootElement.GetProperty("status").GetString());
+        Assert.False(body.RootElement.GetProperty("can_confirm").GetBoolean());
+        Assert.True(body.RootElement.GetProperty("can_complete").GetBoolean());
+        Assert.True(body.RootElement.GetProperty("can_cancel").GetBoolean());
+        Assert.Equal(
+            await NurseIdAsync(),
+            body.RootElement.GetProperty("confirmed_by_staff_id").GetString());
+        Assert.NotEqual(
+            JsonValueKind.Null, body.RootElement.GetProperty("confirmed_at").ValueKind);
+    }
+
+    [Fact]
+    public async Task Confirming_the_same_booking_twice_is_refused()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var appointmentId = await ConfirmedIdAsync(
+            nurse, await NewPatientAsync(nurse, "Confirmed Twice"), SoonUtc());
+
+        Assert.Equal(
+            HttpStatusCode.Conflict, (await ConfirmAsync(nurse, appointmentId)).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_patient_who_never_came_is_recorded_as_such_and_can_book_again()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var patientId = await NewPatientAsync(nurse, "Never Turned Up");
+        var appointmentId = await ConfirmedIdAsync(nurse, patientId, SoonUtc());
+
+        using var body = await ReadJsonAsync(
+            await nurse.PostAsync($"/api/appointments/{appointmentId}/no-show", null));
+
+        Assert.Equal("no_show", body.RootElement.GetProperty("status").GetString());
+        Assert.False(body.RootElement.GetProperty("can_cancel").GetBoolean());
+
+        // The booking is closed, so it no longer blocks the next one.
+        Assert.Equal(
+            HttpStatusCode.Created,
+            (await BookAsync(nurse, patientId, SoonUtc())).StatusCode);
+    }
+
+    /// An admitted patient is billed on their admission at discharge. Both endings read as
+    /// completed, so without this guard the same visit could be charged twice.
+    [Fact]
+    public async Task An_admitted_booking_cannot_also_be_billed_as_an_outpatient_visit()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var appointmentId = await ConfirmedIdAsync(
+            nurse, await NewPatientAsync(nurse, "Admitted Not Billed Here"), SoonUtc());
+
+        Assert.Equal(HttpStatusCode.Created, (await CheckInAsync(nurse, appointmentId)).StatusCode);
+
+        var raised = await nurse.PostAsync($"/api/appointments/{appointmentId}/bill", null);
+        using var body = await ReadJsonAsync(raised);
+
+        Assert.Equal(HttpStatusCode.Conflict, raised.StatusCode);
+        Assert.Equal("cl_pat_035", body.RootElement.GetProperty("code").GetString());
     }
 
     [Fact]
@@ -442,6 +632,21 @@ public sealed class AppointmentEndpointTests
 
         using var body = await ReadJsonAsync(created);
         return body.RootElement.GetProperty("id").GetString()!;
+    }
+
+    private static Task<HttpResponseMessage> ConfirmAsync(HttpClient client, string id)
+        => client.PostAsync($"/api/appointments/{id}/confirm", content: null);
+
+    /// What most tests want: a booking the desk has read and accepted, which is the only
+    /// state the day-of actions are reachable from.
+    private static async Task<string> ConfirmedIdAsync(
+        HttpClient client, string patientId, DateTimeOffset scheduledAt)
+    {
+        var id = await BookIdAsync(client, patientId, scheduledAt);
+
+        Assert.Equal(HttpStatusCode.OK, (await ConfirmAsync(client, id)).StatusCode);
+
+        return id;
     }
 
     private async Task<HttpResponseMessage> CheckInAsync(

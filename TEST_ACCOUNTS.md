@@ -1,230 +1,151 @@
-# Test accounts and how to sign in
+# Test accounts
 
-Every account that exists in a freshly seeded CareLanka database, what it is for,
-and how to actually use one.
-
-**Assignment §15 requires test accounts in the submission.** This is that list.
-
-These are demo accounts on a demo database. **Change every password before this
-is pointed at anything real**, and never reuse them anywhere else.
+Every account in a freshly seeded CareLanka database. **Required by assignment §15.**
 
 They come from `docs/seed/001_identity.sql`. Nothing here is hard-coded in the
-application — if you have not run that script, none of these exist yet. See
-`api/README.md`.
+application — if you have not run that script, none of these exist. See `api/README.md`.
+
+Demo passwords on a demo database. **Change every one before this points at anything real.**
 
 ---
 
-## Staff — sign in with an email
+## Staff
 
-`POST /api/auth/login`
+Sign in with an email: `POST /api/auth/login`
 
-**Password for all seven: `CareLanka#2026`**
-
-| Email | Role | Name it shows as |
+| Role | Email | Password |
 | :--- | :--- | :--- |
-| `nurse.perera@carelanka.lk` | `ward_nurse` | Amara Perera |
-| `dr.silva@carelanka.lk` | `doctor` | Nimal Silva |
-| `crew.fernando@carelanka.lk` | `ambulance_crew` | Kasun Fernando |
-| `staff.jayasuriya@carelanka.lk` | `general_staff` | Ishara Jayasuriya |
-| `duty.rajapaksa@carelanka.lk` | `duty_manager` | Sanduni Rajapaksa |
-| `admin.wickrama@carelanka.lk` | `hospital_administrator` | Tharindu Wickramasinghe |
-| `equip.bandara@carelanka.lk` | `equipment_manager` | Ruwan Bandara |
+| Reception (general staff) | `staff.jayasuriya@carelanka.lk` | `CareLanka#2026` |
+| Ward nurse | `nurse.perera@carelanka.lk` | `CareLanka#2026` |
+| Doctor | `dr.silva@carelanka.lk` | `CareLanka#2026` |
+| Duty manager | `duty.rajapaksa@carelanka.lk` | `CareLanka#2026` |
+| Hospital administrator | `admin.wickrama@carelanka.lk` | `CareLanka#2026` |
+| Equipment manager | `equip.bandara@carelanka.lk` | `CareLanka#2026` |
+| Ambulance crew | `crew.fernando@carelanka.lk` | `CareLanka#2026` |
+| **Deactivated** | `former.gunasekara@carelanka.lk` | `CareLanka#2026` |
 
-**Who to sign in as for the patient journey**, because it takes four different
-people on purpose and one account will not walk the whole thing:
+The last one exists to fail. The password is right and login still returns 401, the same
+answer as a wrong password and an unknown email — so nobody can learn which addresses are
+real by trying a list.
 
-| Step | Account | Why not somebody else |
-| :--- | :--- | :--- |
-| Register and admit | `staff.jayasuriya` (reception) | The front desk does the paperwork. `crew.fernando` is refused — changed 2026-09-11 |
-| Assign the bed | `staff.jayasuriya` or `nurse.perera` | Reception can bed a walk-in standing at the desk — changed 2026-09-12. Any bed **matching** the care level, an ICU bed for an ICU patient included |
-| Mark them arrived | `nurse.perera` | **The nurse and nobody else**, not even the duty manager: she is the one who can see the patient is in the bed. So a bed reception assigns stays *held* until she confirms it |
-| Tick `clinical_clearance` | `dr.silva` | **A doctor and nobody else.** This is the wall |
-| Tick medication, follow-up, transport | `nurse.perera` | |
-| Prepare and settle the bill | `staff.jayasuriya` | Reception takes money. This is also the only way `billing_settled` is ever ticked |
-| Confirm the discharge | `staff.jayasuriya` or `nurse.perera` | Any care level, ICU included — changed 2026-09-12. The gate is the checklist, and `dr.silva` has to have ticked clinical clearance before this works at all |
+## Patients
 
-`duty.rajapaksa` is needed for any bed that **does not match** the care level — a
-downgrade, or a ward more acute than assessed. Those show as **amber** buttons in
-the bed picker rather than the ordinary green. A matching bed is anybody's, so an
-ICU patient no longer waits for a duty manager to be found.
+Sign in with a username: `POST /api/auth/patient/login`
 
-**Discharge no longer depends on the care level at all.** Reception or a ward
-nurse confirms any patient, ICU included. What still stops one is the checklist:
-`dr.silva` must tick clinical clearance and the bill must be settled, or confirming
-is a 409. So the doctor is the real gate, and always was.
+| Username | Password |
+| :--- | :--- |
+| `chathura.w` | `Patient#2026` |
 
-**A children's ward only takes patients under 18**, and a patient with no recorded
-date of birth counts as an adult. So give a test patient a real date of birth if you
-want to see the pediatric ward offered.
+This account has no `patients` row behind it, which is the ordinary state for a fresh
+sign-up. `GET /api/auth/me` returns `patient_id: null` and every `/api/me/*` route except
+`pre-register` answers 404 with `cl_pat_033` until the patient fills in their details.
 
-```json
-POST /api/auth/login
-{
-  "email": "duty.rajapaksa@carelanka.lk",
-  "password": "CareLanka#2026"
-}
-```
-
-One per role, because the demo has to switch between four different roles inside
-ten minutes and creating accounts on stage is how demos die.
+Registration is open — `POST /api/auth/patient/register` with a username and a password
+makes a new one and signs you straight in.
 
 ---
 
-## Patient — sign in with a phone number
+## What each role can do
 
-`POST /api/auth/patient/login`
+### Reception (general staff)
+Registers walk-in patients and edits their details · assigns a bed · marks a patient
+arrived · raises, itemises and settles a bill · confirms a discharge · reads the bookings
+list, wards and bed capacity.
+**Cannot:** check a booking in, tick clinical clearance, or set prices.
 
-| Phone number | Password | Name |
-| :--- | :--- | :--- |
-| `+94771234567` | `Patient#2026` | Chathura Wijesinghe |
+### Ward nurse
+Everything reception does, plus: admits a patient and moves the admission through its
+states · checks a booked patient in · cancels a booking · completes missing patient
+details · ticks the non-clinical discharge items · reads lab reports.
+**Cannot:** tick clinical clearance, or set prices.
 
-```json
-POST /api/auth/patient/login
-{
-  "phone_number": "+94771234567",
-  "password": "Patient#2026"
-}
-```
+### Doctor
+Ticks **clinical clearance** — the one item nobody else can tick, and no discharge happens
+without it · reads patient details and lab reports · reads the discharge board.
+**Cannot:** register, admit, bed, bill, or confirm a discharge.
 
-**A patient signs in with a phone number, not an email.** That is not a
-different spelling of the same thing — staff and patients are two separate
-tables, with two separate login endpoints, on purpose.
+### Duty manager
+Everything reception and the ward nurse can do, plus the two things that need authority:
+**assigning a bed that does not match the assessed care level** (either direction), and
+**checking a patient in at ICU or HDU level**. Also handles emergency calls and ambulances,
+and can start an agent workflow.
 
----
+### Hospital administrator
+**Sets prices** — the admission fee per care level and every ward's rates. Nobody else can.
+**Creates and retires wards.** Reads patient details, the bookings list and the discharge
+board. **Removes unwanted equipment categories** on the web Equipment page (the Remove categories
+card, same code; only categories no item uses). **Confirms new equipment** in the mobile app or on the web Equipment page — an item the
+equipment manager registers only reaches the web register once the administrator confirms it.
+Both ask for the confirmation code first: `equipment2026`. **Confirms maintenance done** the same way, in the
+mobile app or on the web Maintenance unit page — every reported fault and scheduled job is listed
+there, and confirming it puts the item back into service. **Runs the maintenance unit** on the web:
+books maintenance and sees the open jobs. **Retires equipment** — the Retire button on any item, and
+Beyond repair in the maintenance unit, both ask for the same code. Retiring is permanent. A retired
+item then has **Remove**, which asks for the code again and takes it off the register for good.
+Sees the **Warnings** page too (below), and is the one who presses **Done** on a resolved warning
+to take it off the list - that asks for the same code, `equipment2026`.
+**Cannot:** register, admit, bed, or discharge anyone.
 
-## The account that exists to fail
+### Equipment manager
+Beds, equipment items, pharmacy and maintenance. **Files lab reports** — the only role that
+can. Reads patient details and lab reports.
+**Runs the pharmacy's prescription queue** on the web Pharmacy page: marks one ready (which issues
+the patient's token), delivered, or can't fill. **Adds a batch** when a delivery arrives, and
+**removes** a medicine the hospital no longer stocks - that one asks for the same confirmation code,
+`equipment2026`, and only once the shelf is empty.
+**Warnings page** (web): medicine at or below its reorder level, batches expiring within 30 days,
+and machines overdue for service. An automatic check raises them every hour; **Run check** does it
+now. **Acknowledge** records that you have seen one; it closes by itself once the problem is fixed.
+**Cannot:** confirm an item they registered, or run the maintenance unit (booking, confirming or
+retiring) — the hospital administrator does those. Reports a fault from the Equipment page.
 
-| Email | Password | State |
-| :--- | :--- | :--- |
-| `former.gunasekara@carelanka.lk` | `CareLanka#2026` | **Deactivated** |
+### Ambulance crew
+Emergency calls and ambulances.
+**Cannot:** register or admit a patient — that is reception's job, not the crew's.
 
-The password is correct and **login still returns 401**. That is the intended
-behaviour, not a bug.
-
-Sign in with a wrong password, an email that was never registered, and this
-account, and you get three responses that are exactly the same, character for
-character:
-
-```json
-{
-  "title": "Unauthorized",
-  "status": 401,
-  "detail": "Those sign-in details are not correct.",
-  "code": "cl_err_401"
-}
-```
-
-If the three answers differed at all, anyone could feed the endpoint a list of
-addresses and learn which ones belong to real hospital staff — without ever
-guessing a password. Same answer to all three, and there is nothing to learn.
-
----
-
-## Making a new patient account
-
-Registration is open — no token needed.
-
-```json
-POST /api/auth/patient/register
-{
-  "phone_number": "+94770001234",
-  "password": "Something#2026",
-  "full_name": "Your Name"
-}
-```
-
-You are signed in immediately: the response is a full token pair, not just
-"created".
-
-Try the same phone number twice and the second one is a `409` — one active
-account per number.
+### Patient (mobile app only)
+Their own record and nothing else: saves their details, books and cancels one visit at a
+time, follows their current stay, and reads their discharge instructions afterwards. **Sends a
+prescription** to the pharmacy from the Prescriptions tab and sees its collection token once it is
+ready.
+No `/api/me/*` route takes a patient id — every one resolves the record from the token, so
+being handed somebody else's is impossible rather than merely checked.
 
 ---
 
-## What comes back when you sign in
+## Walking the patient journey
 
-Every one of the four sign-in endpoints returns the same shape:
+It takes four people on purpose. One account will not do the whole thing.
 
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIs...",
-  "token_type": "Bearer",
-  "expires_in": 900,
-  "refresh_token": "tF6OUlraLuOHF+OicwCTra62BUdMG51Vm59E/VLgTZ4=",
-  "principal": {
-    "id": "50d77772-fba4-4a7a-b64c-3a04f3aaead7",
-    "principal_type": "staff",
-    "role": "duty_manager",
-    "display_name": "Sanduni Rajapaksa",
-    "email": "duty.rajapaksa@carelanka.lk",
-    "phone_number": null,
-    "patient_id": null
-  }
-}
-```
+| Step | Sign in as |
+| :--- | :--- |
+| Register and admit | Reception |
+| Assign the bed | Reception, nurse or duty manager. Duty manager only if the ward does not match the care level |
+| Mark them arrived | Reception, nurse or duty manager |
+| Check in a booked visit | Nurse or duty manager. Duty manager for ICU or HDU |
+| Tick clinical clearance | **Doctor** |
+| Raise and settle the bill | Reception |
+| Confirm the discharge | Reception, nurse or duty manager |
 
-**Two tokens, two different jobs.**
-
-- `access_token` goes on every request. It lasts **15 minutes** and then stops
-  working.
-- `refresh_token` gets you a new pair when the first one dies. Guard it the way
-  you would a password — it is the thing that keeps someone signed in.
-
-**`patient_id` is `null`, and that is normal.** It is null for every staff
-member, and null for a patient who has an account but has never been treated
-here — which is every patient until Patient Management ships the screen where
-staff link a login to a medical record. A Flutter screen that assumes it is
-filled in will crash on the very first real user.
+A children's ward only takes patients under 18, and a patient with no recorded date of
+birth counts as an adult.
 
 ---
 
-## Using a token in Swagger
+## Using a token
 
-1. Run `POST /api/auth/login` and copy `access_token` out of the response.
-2. Click **Authorize**, top right of the Swagger page.
-3. Paste the token. **Do not type `Bearer ` in front of it** — Swagger adds that
-   itself, and pasting it twice is the usual reason a token "does not work".
-4. Every locked endpoint now works from the page.
+Sign in, copy `access_token`, send it as `Authorization: Bearer <token>`. In Swagger, click
+**Authorize** and paste the token **without** typing `Bearer` in front — Swagger adds that
+itself, and pasting it twice is the usual reason a token "does not work".
 
-When it stops working after 15 minutes, `POST /api/auth/refresh` with your
-`refresh_token` gives you a fresh pair. Paste the new access token in again.
-
----
-
-## Using a token from the command line
-
-```bash
-# sign in and keep the token
-TOKEN=$(curl -s -X POST http://localhost:5231/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"duty.rajapaksa@carelanka.lk","password":"CareLanka#2026"}' \
-  | jq -r .access_token)
-
-# use it
-curl http://localhost:5231/api/auth/me -H "Authorization: Bearer $TOKEN"
-```
-
-PowerShell:
-
-```powershell
-$r = Invoke-RestMethod -Uri http://localhost:5231/api/auth/login -Method Post `
-  -ContentType application/json `
-  -Body '{"email":"duty.rajapaksa@carelanka.lk","password":"CareLanka#2026"}'
-
-Invoke-RestMethod -Uri http://localhost:5231/api/auth/me `
-  -Headers @{ Authorization = "Bearer $($r.access_token)" }
-```
-
----
-
-## When sign-in is not working
+An access token lasts **15 minutes**. `POST /api/auth/refresh` with your `refresh_token`
+gives you a fresh pair. Each refresh token works **once**; reusing an old one deliberately
+ends every session that account has.
 
 | What you see | What it usually is |
 | :--- | :--- |
-| `401` on a password you are sure about | The seed script has not been run. Nothing exists yet |
-| `401` on **everything**, suddenly | The access token is over 15 minutes old. Refresh it |
-| `401` right after a refresh worked | Each refresh token works **once**. You reused an old one — and doing that deliberately ends every session that account has |
-| `403`, not `401` | You are signed in fine. That role just is not allowed to do that |
+| `401` on a password you are sure about | The seed script has not been run |
+| `401` on everything, suddenly | The access token is over 15 minutes old. Refresh it |
+| `403`, not `401` | You are signed in fine. That role is not allowed to do that |
 | `429` | Too many attempts. Wait a minute |
-| `500` on any endpoint that reads data | PostgreSQL is not reachable. Open `/api/health` — it says `database: down` outright |
-| App will not start at all | `Jwt:SigningKey` is not set. `api/README.md`, step 2 |
+| `500` on anything that reads data | PostgreSQL is not reachable. `/api/health` says so outright |

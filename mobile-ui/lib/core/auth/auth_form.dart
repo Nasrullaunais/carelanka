@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// The shared frame for the welcome, sign-in and sign-up screens, so all three
-/// line up on a phone and on a wide browser window alike.
 class AuthScaffold extends StatelessWidget {
   const AuthScaffold({
     super.key,
@@ -126,7 +124,18 @@ class AuthSubmitButton extends StatelessWidget {
   }
 }
 
-/// Sri Lankan mobile numbers, in the shape the API's seeded accounts use.
+// Deliberately not shown on the sign-in screen — it would tell a stranger what a valid username looks like.
+String? validateUsername(String? value) {
+  final text = value?.trim() ?? '';
+  if (text.isEmpty) return 'Choose a username';
+  if (text.length < 3) return 'Use at least 3 characters';
+  if (text.length > 50) return 'Use 50 characters or fewer';
+  if (!RegExp(r'^[a-zA-Z0-9._-]+$').hasMatch(text)) {
+    return 'Letters, numbers, dots, underscores and hyphens only';
+  }
+  return null;
+}
+
 String? validatePhoneNumber(String? value) {
   final text = value?.trim() ?? '';
   if (text.isEmpty) return 'Enter your phone number';

@@ -8,7 +8,7 @@ part of 'retire_ambulance_request.dart';
 
 RetireAmbulanceRequest _$RetireAmbulanceRequestFromJson(
   Map<String, dynamic> json,
-) => RetireAmbulanceRequest(reason: json['reason'] as String);
+) => RetireAmbulanceRequest(reason: json['reason'] as String?);
 
 Map<String, dynamic> _$RetireAmbulanceRequestToJson(
   RetireAmbulanceRequest instance,

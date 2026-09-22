@@ -20,6 +20,9 @@ public class Warning
     [Required]
     public Guid RelatedEntityId { get; set; }
 
+    /// <summary>The medicine, machine or bed by name, so a list does not have to look each one up.</summary>
+    public string? RelatedEntityLabel { get; set; }
+
     public Guid? WardId { get; set; }
 
     [Required]

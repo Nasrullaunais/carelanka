@@ -8,7 +8,6 @@ part of 'worklist_row.dart';
 
 WorklistRow _$WorklistRowFromJson(Map<String, dynamic> json) => WorklistRow(
   id: json['id'] as String,
-  kind: WorklistKind.fromJson(json['kind'] as String),
   patient: PatientSummary.fromJson(json['patient'] as Map<String, dynamic>),
   status: WorklistStatus.fromJson(json['status'] as String),
   requiresBed: json['requires_bed'] as bool,
@@ -22,23 +21,22 @@ WorklistRow _$WorklistRowFromJson(Map<String, dynamic> json) => WorklistRow(
   urgency: json['urgency'] == null
       ? null
       : AdmissionUrgency.fromJson(json['urgency'] as String),
+  isInfectious: json['is_infectious'] as bool?,
   wardName: json['ward_name'] as String?,
   bedNumber: json['bed_number'] as String?,
-  reason: json['reason'] as String?,
 );
 
 Map<String, dynamic> _$WorklistRowToJson(WorklistRow instance) =>
     <String, dynamic>{
       'id': instance.id,
-      'kind': instance.kind,
       'patient': instance.patient,
       'status': instance.status,
       'requires_bed': instance.requiresBed,
       'source': instance.source,
       'admission_category': instance.admissionCategory,
       'urgency': instance.urgency,
+      'is_infectious': instance.isInfectious,
       'ward_name': instance.wardName,
       'bed_number': instance.bedNumber,
       'when': instance.whenValue.toIso8601String(),
-      'reason': instance.reason,
     };

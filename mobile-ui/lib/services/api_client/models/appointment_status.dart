@@ -8,8 +8,8 @@ import 'package:json_annotation/json_annotation.dart';
 enum AppointmentStatus {
   @JsonValue('scheduled')
   scheduled('scheduled'),
-  @JsonValue('checked_in')
-  checkedIn('checked_in'),
+  @JsonValue('confirmed')
+  confirmed('confirmed'),
   @JsonValue('completed')
   completed('completed'),
   @JsonValue('cancelled')

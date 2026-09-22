@@ -11,11 +11,20 @@ public class EmergencyCall : AuditedEntity
     public string? CallerPhone { get; set; }
     public decimal Latitude { get; set; }
     public decimal Longitude { get; set; }
+    public decimal LocationAccuracyMetres { get; set; }
+    public DateTimeOffset LocationCapturedAt { get; set; } = DateTimeOffset.UtcNow;
+    public Guid IdempotencyKey { get; set; } = Guid.NewGuid();
     public string? AddressLabel { get; set; }
     public string? Details { get; set; }
     public CallPriority Priority { get; set; }
     public CallStatus Status { get; set; }
     public string? Outcome { get; set; }
     public bool? Transported { get; set; }
+    public CancellationRequestStatus? CancellationRequestStatus { get; set; }
+    public string? CancellationRequestReason { get; set; }
+    public DateTimeOffset? CancellationRequestedAt { get; set; }
+    public DateTimeOffset? CancellationReviewedAt { get; set; }
+    public Guid? CancellationReviewedByStaffId { get; set; }
+    public string? CancellationReviewNotes { get; set; }
     public ICollection<Dispatch> Dispatches { get; set; } = new List<Dispatch>();
 }

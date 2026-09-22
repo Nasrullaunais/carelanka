@@ -329,7 +329,11 @@ function DischargeDetail({
       <div className="dialog-head no-print">
         <h3>
           {visit.patient?.full_name ?? 'Admission'}{' '}
-          <span className="badge">{admissionCategoryLabels[visit.admission_category]}</span>
+          <span className="badge">
+            {visit.admission_category
+              ? admissionCategoryLabels[visit.admission_category]
+              : 'Not yet classified'}
+          </span>
         </h3>
         <div className="actions">
           <button type="button" className="secondary small" onClick={() => window.print()}>
@@ -372,7 +376,11 @@ function DischargeDetail({
         </div>
         <div>
           <dt>Care level</dt>
-          <dd>{admissionCategoryLabels[visit.admission_category]}</dd>
+          <dd>
+            {visit.admission_category
+              ? admissionCategoryLabels[visit.admission_category]
+              : 'Not yet classified'}
+          </dd>
         </div>
         <div>
           <dt>Admitted</dt>
@@ -507,13 +515,13 @@ function ChecklistRow({
   const mandatory = item?.mandatory ?? mandatoryChecklistItems.has(itemKey);
 
   return (
-    <div className="row" style={{ alignItems: 'flex-start' }}>
-      <div className="field">
-        <strong>{checklistLabel(itemKey)}</strong>
+    <div className="checklist-row">
+      <div>
+        <strong>{checklistLabel(itemKey)}</strong>{' '}
         {mandatory && <span className="badge">Required</span>}
         <div className="small muted">{checklistHints[itemKey]}</div>
       </div>
-      <div className="field">
+      <div>
         {ticked ? (
           <>
             <span className="badge status-available">Done</span>
@@ -526,7 +534,7 @@ function ChecklistRow({
           <span className="muted">Not done</span>
         )}
       </div>
-      <div style={{ alignSelf: 'center' }}>
+      <div>
         {mayTick && onToggle && (
           <button
             type="button"

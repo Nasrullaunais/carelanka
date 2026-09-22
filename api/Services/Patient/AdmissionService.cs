@@ -24,6 +24,8 @@ public sealed class AdmissionService : IAdmissionService
         AdmissionStatus.Cancelled
     ];
 
+    private const int PatientSaveAttempts = 5;
+
     private readonly CareLankaDbContext _db;
     private readonly IBedRegistryService _beds;
     private readonly IDischargeService _discharges;
@@ -195,6 +197,168 @@ public sealed class AdmissionService : IAdmissionService
         return await FillAsync(new AdmissionResponse(), admission, BedLabel.None, ct);
     }
 
+    public async Task<AdmissionResponse> PreAdmitAsync(
+        PreAdmitRequest request, CancellationToken ct = default)
+    {
+        var duplicate = await _db.Admissions
+            .AnyAsync(a => a.DispatchId == request.DispatchId, ct);
+
+        if (duplicate)
+        {
+            throw new ConflictException(MessageCode.PreAdmissionAlreadyExists, request.DispatchId);
+        }
+
+        var patient = request.PatientIsCaller
+            ? await _db.Patients.FirstOrDefaultAsync(p => p.Id == request.PatientId!.Value, ct)
+                ?? throw new NotFoundException("Patient", request.PatientId!.Value)
+            : await NewProvisionalPatientAsync(request, ct);
+
+        var alreadyAdmitted = await _db.Admissions
+            .AnyAsync(a => a.PatientId == patient.Id && !ClosedStatuses.Contains(a.Status), ct);
+
+        if (alreadyAdmitted)
+        {
+            throw new ConflictException(MessageCode.PatientHasOpenAdmission, patient.FullName);
+        }
+
+        // destination_ward_type_hint is a routing hint only - it has nowhere to be stored and
+        // never becomes admission_category on its own. A human sets that via /classify.
+        var admission = new AdmissionEntity
+        {
+            Id = Guid.NewGuid(),
+            PatientId = patient.Id,
+            Source = AdmissionSource.Emergency,
+            Category = null,
+            Urgency = request.Urgency,
+
+            Status = AdmissionStatus.AwaitingBed,
+
+            IsInfectious = false,
+            CategorySetByStaffMemberId = null,
+            CategorySetAt = null,
+            DispatchId = request.DispatchId.Trim(),
+            ExpectedArrivalAt = request.ExpectedArrival,
+            ReportedByUserId = request.PatientIsCaller ? null : request.CallerUserId,
+            MissingFields = PatientDetailChecklist.MissingFor(patient)
+        };
+
+        _db.Admissions.Add(admission);
+
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException exception)
+            when (IsUniqueViolation(exception, AdmissionConfiguration.OpenAdmissionUniqueIndex))
+        {
+            throw new ConflictException(MessageCode.PatientHasOpenAdmission, patient.FullName);
+        }
+
+        admission.Patient = patient;
+
+        return await FillAsync(new AdmissionResponse(), admission, BedLabel.None, ct);
+    }
+
+    public async Task<AdmissionResponse> ClassifyAsync(
+        Guid id, ClassifyAdmissionRequest request, Guid staffId, CancellationToken ct = default)
+    {
+        var admission = await _db.Admissions
+            .Include(a => a.Patient)
+            .Include(a => a.BedAssignments)
+            .FirstOrDefaultAsync(a => a.Id == id, ct)
+            ?? throw new NotFoundException("Admission", id);
+
+        if (admission.Category is not null)
+        {
+            throw new ConflictException(MessageCode.AdmissionAlreadyClassified, id);
+        }
+
+        admission.Category = request.AdmissionCategory;
+        admission.CategorySetByStaffMemberId = staffId;
+        admission.CategorySetAt = DateTimeOffset.UtcNow;
+
+        if (!BedPlacementRules.RequiresBed(request.AdmissionCategory)
+            && admission.Status == AdmissionStatus.AwaitingBed)
+        {
+            AdmissionStatusMachine.EnsureMove(
+                admission.Status, AdmissionStatus.Admitted, AdmissionStatus.AwaitingBed);
+
+            admission.Status = AdmissionStatus.Admitted;
+            admission.AdmittedAt = DateTimeOffset.UtcNow;
+        }
+
+        await _db.SaveChangesAsync(ct);
+
+        return await FillAsync(
+            new AdmissionResponse(), admission, await LabelBedsAsync(new[] { admission }, ct), ct);
+    }
+
+    private async Task<PatientEntity> NewProvisionalPatientAsync(
+        PreAdmitRequest request, CancellationToken ct)
+    {
+        PatientEntity? contact = request.CallerUserId is { } callerUserId
+            ? await _db.Patients.FirstOrDefaultAsync(p => p.UserAccountId == callerUserId, ct)
+            : null;
+
+        var patient = new PatientEntity
+        {
+            Id = Guid.NewGuid(),
+            PatientCode = PatientCodes.Next(),
+            FullName = Clean(request.ProvisionalName) ?? "Unknown patient",
+            Gender = request.ProvisionalGender ?? Gender.Unknown,
+            EmergencyContactName = contact?.FullName,
+            EmergencyContactPhone = contact?.Phone
+        };
+
+        _db.Patients.Add(patient);
+
+        for (var attempt = 1; ; attempt++)
+        {
+            patient.TempReference = await NextTempReferenceAsync(ct);
+
+            try
+            {
+                await _db.SaveChangesAsync(ct);
+                return patient;
+            }
+            catch (DbUpdateException exception)
+                when (attempt < PatientSaveAttempts
+                      && IsUniqueViolation(exception, PatientConfiguration.TempReferenceUniqueIndex))
+            {
+            }
+            catch (DbUpdateException exception)
+                when (attempt < PatientSaveAttempts
+                      && IsUniqueViolation(exception, PatientConfiguration.PatientCodeUniqueIndex))
+            {
+                patient.PatientCode = PatientCodes.Next();
+            }
+        }
+    }
+
+    private async Task<string> NextTempReferenceAsync(CancellationToken ct)
+    {
+        var year = DateTimeOffset.UtcNow.Year;
+        var prefix = $"UNKNOWN-{year}-";
+
+        var used = await _db.Patients
+            .IgnoreQueryFilters()
+            .Where(p => p.TempReference != null && p.TempReference.StartsWith(prefix))
+            .Select(p => p.TempReference!)
+            .ToListAsync(ct);
+
+        var highest = used
+            .Select(reference => int.TryParse(reference[prefix.Length..], out var n) ? n : 0)
+            .DefaultIfEmpty(0)
+            .Max();
+
+        if (highest >= 9999)
+        {
+            throw new ConflictException(MessageCode.TempReferenceExhausted);
+        }
+
+        return $"{prefix}{highest + 1:D4}";
+    }
+
     public async Task<AdmissionResponse> CompleteDetailsAsync(
         Guid id, CompleteDetailsRequest request, CancellationToken ct = default)
     {
@@ -264,7 +428,7 @@ public sealed class AdmissionService : IAdmissionService
             {
                 throw new ConflictException(
                     MessageCode.VisitNeedsDischargeNotComplete,
-                    EnumWire.ToWire(admission.Category));
+                    EnumWire.ToWire(admission.Category!.Value));
             }
 
             AdmissionStatusMachine.EnsureMove(
@@ -442,8 +606,6 @@ public sealed class AdmissionService : IAdmissionService
 
             Status = assignment.Status,
             ReservedUntil = assignment.ReservedUntil,
-            AssignedBy = assignment.AssignedBy,
-            WorkflowId = assignment.WorkflowId,
             IsDowngrade = assignment.IsDowngrade,
             ApprovedByStaffId = assignment.ApprovedByStaffMemberId,
             ApprovedByStaffName = StaffNames.Lookup(names, assignment.ApprovedByStaffMemberId),

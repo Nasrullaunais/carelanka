@@ -14,6 +14,9 @@ import { canManageEquipment } from '../types/permissions';
 import { Dialog } from './EquipmentPage';
 import { StockDialog } from './pharmacy/StockDialog';
 import { ItemHistoryCard } from './pharmacy/ItemHistoryCard';
+import { AddBatchDialog, BatchList } from './pharmacy/BatchList';
+import { RemoveMedicineDialog } from './pharmacy/RemoveMedicineDialog';
+import { PrescriptionsCard } from './pharmacy/PrescriptionsCard';
 
 const PAGE_SIZE = 10;
 
@@ -71,6 +74,8 @@ export function PharmacyPage() {
         per medicine for the whole hospital. Whether wards need their own stock is open
         question 1 in the component plan.
       </p>
+
+      {canManageEquipment(role) && <PrescriptionsCard />}
 
       <div className="card">
         <h2>Search</h2>
@@ -230,7 +235,7 @@ function ItemTable({
         <tr>
           <th>Item</th>
           <th>Category</th>
-          <th>Expires</th>
+          <th>Expires first</th>
           <th>On hand</th>
           <th>Stock</th>
           {canManageEquipment(role) && <th>Movement</th>}
@@ -238,36 +243,82 @@ function ItemTable({
       </thead>
       <tbody>
         {items.map((item) => (
-          <tr key={item.id} className={selectedId === item.id ? 'selected' : undefined}>
-            <td>
-              <button type="button" className="linklike" onClick={() => onSelect(item.id)}>
-                <strong>{item.name}</strong>
-              </button>
-              <div className="muted small">
-                {item.manufacturer ?? 'No manufacturer recorded'}
-                {item.batch_number ? ` · batch ${item.batch_number}` : ''}
-              </div>
-            </td>
-            <td>{item.category_name}</td>
-            <td>
-              <Expiry date={item.expiry_date} />
-            </td>
-            <td>
-              <strong>{item.quantity_on_hand}</strong>{' '}
-              <span className="muted small">{item.unit}</span>
-            </td>
-            <td>
-              <StockBadge item={item} />
-            </td>
-            {canManageEquipment(role) && (
-              <td>
-                <MoveStockButton item={item} onChanged={onChanged} />
-              </td>
-            )}
-          </tr>
+          <ItemRows
+            key={item.id}
+            item={item}
+            selectedId={selectedId}
+            onSelect={onSelect}
+            role={role}
+            onChanged={onChanged}
+          />
         ))}
       </tbody>
     </table>
+  );
+}
+
+// One medicine: its own row, and under it every batch once the arrow is opened.
+function ItemRows({
+  item,
+  selectedId,
+  onSelect,
+  role,
+  onChanged,
+}: {
+  item: PharmacyItem;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  role: PrincipalRole | undefined;
+  onChanged: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const manage = canManageEquipment(role);
+
+  return (
+    <>
+      <tr className={selectedId === item.id ? 'selected' : undefined}>
+        <td>
+          <button type="button" className="linklike" onClick={() => onSelect(item.id)}>
+            <strong>{item.name}</strong>
+          </button>
+          <div className="muted small">{item.manufacturer ?? 'No manufacturer recorded'}</div>
+          {item.batch_count > 0 && (
+            <button
+              type="button"
+              className="linklike small"
+              aria-expanded={open}
+              onClick={() => setOpen((current) => !current)}
+            >
+              {open ? '▾' : '▸'} {item.batch_count} {item.batch_count === 1 ? 'batch' : 'batches'}
+            </button>
+          )}
+        </td>
+        <td>{item.category_name}</td>
+        <td>
+          <Expiry date={item.earliest_expiry} />
+        </td>
+        <td>
+          <strong>{item.quantity_on_hand}</strong>{' '}
+          <span className="muted small">{item.unit}</span>
+        </td>
+        <td>
+          <StockBadge item={item} />
+        </td>
+        {manage && (
+          <td>
+            <MoveStockButton item={item} onChanged={onChanged} />
+          </td>
+        )}
+      </tr>
+
+      {open && (
+        <tr>
+          <td colSpan={manage ? 6 : 5}>
+            <BatchList item={item} manage={manage} onChanged={onChanged} />
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
@@ -304,14 +355,45 @@ function Expiry({ date }: { date: string | null | undefined }) {
 
 function MoveStockButton({ item, onChanged }: { item: PharmacyItem; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [removing, setRemoving] = useState(false);
 
   return (
     <>
+      <button type="button" className="secondary" onClick={() => setAdding(true)}>
+        Add batch
+      </button>{' '}
       <button type="button" className="secondary" onClick={() => setOpen(true)}>
         Record movement
+      </button>{' '}
+      <button
+        type="button"
+        className="secondary danger"
+        title={
+          item.quantity_on_hand > 0
+            ? 'Dispense or write off the rest of the stock first'
+            : undefined
+        }
+        disabled={item.quantity_on_hand > 0}
+        onClick={() => setRemoving(true)}
+      >
+        Remove
       </button>
       {open && (
         <StockDialog item={item} onClose={() => setOpen(false)} onChanged={onChanged} />
+      )}
+      {adding && (
+        <AddBatchDialog item={item} onClose={() => setAdding(false)} onChanged={onChanged} />
+      )}
+      {removing && (
+        <RemoveMedicineDialog
+          item={item}
+          onClose={() => setRemoving(false)}
+          onDone={() => {
+            setRemoving(false);
+            onChanged();
+          }}
+        />
       )}
     </>
   );

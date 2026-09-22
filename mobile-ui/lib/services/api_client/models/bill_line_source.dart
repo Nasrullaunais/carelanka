@@ -10,6 +10,8 @@ enum BillLineSource {
   admissionFee('admission_fee'),
   @JsonValue('bed_stay')
   bedStay('bed_stay'),
+  @JsonValue('consultation_fee')
+  consultationFee('consultation_fee'),
   @JsonValue('manual')
   manual('manual'),
   /// Default value for all unparsed values, allows backward compatibility when adding new values on the backend.

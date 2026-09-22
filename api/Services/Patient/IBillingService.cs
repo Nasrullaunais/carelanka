@@ -22,6 +22,25 @@ public interface IBillingService
     Task<BillResponse> SettleAsync(
         Guid admissionId, SettleBillRequest request, CancellationToken cancellationToken = default);
 
+    Task<BillResponse> GetForAppointmentAsync(
+        Guid appointmentId, CancellationToken cancellationToken = default);
+
+    Task<BillResponse> PrepareForAppointmentAsync(
+        Guid appointmentId, CancellationToken cancellationToken = default);
+
+    Task<BillResponse> AddAppointmentChargeAsync(
+        Guid appointmentId,
+        AddBillChargeRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<BillResponse> RemoveAppointmentChargeAsync(
+        Guid appointmentId, Guid lineId, CancellationToken cancellationToken = default);
+
+    Task<BillResponse> SettleAppointmentAsync(
+        Guid appointmentId,
+        SettleBillRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<PagedResult<OutstandingBill>> ListOutstandingAsync(
         string? search,
         bool includeSettled,

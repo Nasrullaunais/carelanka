@@ -15,22 +15,23 @@ import 'token_store.dart';
 
 enum AuthStatus { restoring, signedOut, signedIn }
 
-/// Who is logged in, for the whole app. Features read [principal]; they never
-/// hold a token themselves.
 class AuthController extends ChangeNotifier {
   AuthController({
     required CareLankaApi api,
     required TokenStore tokens,
     required SessionExpiry sessionExpiry,
+    Future<void> Function()? beforeSignOut,
   })  : _api = api,
         _tokens = tokens,
-        _sessionExpiry = sessionExpiry {
+        _sessionExpiry = sessionExpiry,
+        _beforeSignOut = beforeSignOut {
     _sessionExpiry.addListener(_onSessionExpired);
   }
 
   final CareLankaApi _api;
   final TokenStore _tokens;
   final SessionExpiry _sessionExpiry;
+  final Future<void> Function()? _beforeSignOut;
 
   AuthStatus _status = AuthStatus.restoring;
   CurrentPrincipal? _principal;
@@ -43,8 +44,7 @@ class AuthController extends ChangeNotifier {
   bool get isPatient => _principal?.principalType == PrincipalType.patient;
   bool get isStaff => _principal?.principalType == PrincipalType.staff;
 
-  /// Called once at startup. A stored token that the API rejects is treated as
-  /// no session at all rather than an error the user has to dismiss.
+  // A stored token the API rejects is treated as no session, not an error.
   Future<void> restore() async {
     final token = await _tokens.readAccessToken();
     if (token == null) {
@@ -66,29 +66,23 @@ class AuthController extends ChangeNotifier {
         ));
   }
 
-  Future<bool> signInAsPatient({required String phoneNumber, required String password}) {
+  Future<bool> signInAsPatient({required String username, required String password}) {
     return _signIn(() => _api.auth.loginPatient(
-          body: PatientLoginRequest(phoneNumber: phoneNumber, password: password),
+          body: PatientLoginRequest(username: username, password: password),
         ));
   }
 
-  /// Creates the login itself. The account has no medical record behind it
-  /// until the patient fills in their details, which is a separate step.
   Future<bool> registerAsPatient({
-    required String fullName,
-    required String phoneNumber,
+    required String username,
     required String password,
   }) {
     return _signIn(() => _api.auth.registerPatientAccount(
-          body: PatientRegisterRequest(
-            fullName: fullName,
-            phoneNumber: phoneNumber,
-            password: password,
-          ),
+          body: PatientRegisterRequest(username: username, password: password),
         ));
   }
 
   Future<void> signOut() async {
+    await _beforeSignOut?.call();
     final refreshToken = await _tokens.readRefreshToken();
     if (refreshToken != null) {
       try {
@@ -96,8 +90,7 @@ class AuthController extends ChangeNotifier {
               body: RefreshTokenRequest(refreshToken: refreshToken),
             ));
       } on ApiException {
-        // The local session is being dropped either way; a failed server-side
-        // revoke must not strand the user in a signed-in state.
+        // Local session drops either way; a failed server revoke can't strand the user signed in.
       }
     }
     await _tokens.clear();

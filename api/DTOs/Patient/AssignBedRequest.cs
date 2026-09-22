@@ -1,12 +1,11 @@
-using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace CareLanka.Api.DTOs.Patient;
 
 public class AssignBedRequest
 {
-    [Required]
-    public Guid? BedId { get; set; }
+    [JsonRequired]
+    public Guid BedId { get; set; }
 
-    [MaxLength(500)]
     public string? OverrideReason { get; set; }
 }

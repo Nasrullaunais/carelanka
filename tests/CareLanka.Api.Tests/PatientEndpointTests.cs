@@ -725,9 +725,8 @@ public sealed class PatientEndpointTests
         using var client = _application.CreateClient();
         var response = await client.PostAsJsonAsync("/api/auth/patient/register", new
         {
-            phone_number = NewPhone(),
-            password = "PatientApp#2026",
-            full_name = "App User"
+            username = $"app.user.{Random.Shared.Next(10_000_000, 99_999_999)}",
+            password = "PatientApp#2026"
         });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);

@@ -19,6 +19,7 @@ DispatchSummary _$DispatchSummaryFromJson(Map<String, dynamic> json) =>
           : DispatchStatus.fromJson(json['status'] as String),
       destinationWardName: json['destination_ward_name'] as String?,
       crewCount: (json['crew_count'] as num?)?.toInt(),
+      acknowledgementOverdue: json['acknowledgement_overdue'] as bool?,
       dispatchedAt: json['dispatched_at'] == null
           ? null
           : DateTime.parse(json['dispatched_at'] as String),
@@ -36,6 +37,7 @@ Map<String, dynamic> _$DispatchSummaryToJson(DispatchSummary instance) =>
       'status': instance.status,
       'destination_ward_name': instance.destinationWardName,
       'crew_count': instance.crewCount,
+      'acknowledgement_overdue': instance.acknowledgementOverdue,
       'dispatched_at': instance.dispatchedAt?.toIso8601String(),
       'completed_at': instance.completedAt?.toIso8601String(),
     };

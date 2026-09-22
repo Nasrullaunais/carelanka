@@ -17,16 +17,9 @@ class AppRoutes {
   static const patientLogin = '/sign-in';
   static const staffLogin = '/staff/sign-in';
 
-  /// Reachable without a session. Anything else bounces to [welcome].
   static const signedOut = {welcome, register, patientLogin, staffLogin};
 }
 
-/// The app's one router.
-///
-/// [routes] is where each member plugs their feature's routes in, and
-/// [homePathFor] decides where a principal lands after signing in — both are
-/// passed from `app.dart` so this file never needs to know which features
-/// exist.
 GoRouter createAppRouter({
   required AuthController auth,
   required List<RouteBase> routes,
@@ -51,8 +44,6 @@ GoRouter createAppRouter({
           return location == AppRoutes.splash ? null : AppRoutes.splash;
 
         case AuthStatus.signedOut:
-          // Signing up and signing in are separate screens, so this cannot pin
-          // the user to one path the way a single login screen could.
           return AppRoutes.signedOut.contains(location) ? null : AppRoutes.welcome;
 
         case AuthStatus.signedIn:

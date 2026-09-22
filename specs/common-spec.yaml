@@ -61,6 +61,11 @@ tags:
     description: |
       Token issuing for both identities. Everything here is unauthenticated except
       `/auth/logout` and `/auth/me`.
+  - name: Device tokens
+    description: |
+      The phone addresses the push service needs to reach a signed-in staff member.
+      A push is only ever a nudge to open the app - the app still reads the real data
+      from the API, so a missed push loses nothing.
   - name: Workflows
     description: |
       The group-owned agent workflow record. Read the trace, approve or reject the one
@@ -134,13 +139,15 @@ paths:
       summary: Patient self-registration
       description: |
         Unauthenticated. Creates a `PatientAccount` - a **login**, not a medical record.
-        No `Patient` row is created and none is linked. Staff link the two later through
-        `POST /patients/{id}/link-account` after checking identity.
+        A username and a password are all it takes; the patient's name, NIC, gender, date
+        of birth and contact number are collected afterwards by `POST /me/pre-register`.
+        No `Patient` row is created here and none is linked. Staff link the two later
+        through `POST /patients/{id}/link-account` after checking identity.
 
         Assignment §8 requires registration, login and logout in the Flutter app; this is
         the registration half.
 
-        409 when the phone number already has an active account.
+        409 when the username already has an active account.
       operationId: registerPatientAccount
       security: []
       requestBody:
@@ -156,7 +163,7 @@ paths:
               schema: { $ref: '#/components/schemas/AuthTokens' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '409':
-          description: That phone number already has an active account
+          description: That username already has an active account
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -167,8 +174,9 @@ paths:
       tags: [Auth]
       summary: Patient login
       description: |
-        Unauthenticated. Phone number and password for a `PatientAccount`. Same
-        indistinguishable 401 as staff login, for the same reason.
+        Unauthenticated. Username and password for a `PatientAccount`. The username is
+        matched case-insensitively. Same indistinguishable 401 as staff login, for the
+        same reason.
 
         Updates `PatientAccount.LastLoginAt` on success.
       operationId: loginPatient
@@ -265,6 +273,57 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/CurrentPrincipal' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ============================================================
+  # Device tokens - push delivery
+  # ============================================================
+
+  /device-tokens:
+    put:
+      tags: [Device tokens]
+      summary: Register this phone for push
+      description: |
+        Roles: any staff.
+
+        Idempotent by token: registering a token that already exists moves it to the
+        caller and switches it back on, so a phone handed to a colleague follows the
+        person currently signed in. Call it after every sign-in and whenever the push
+        service issues a new token.
+      operationId: registerDevice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterDeviceRequest' }
+      responses:
+        '200':
+          description: The registration
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceRegistration' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /device-tokens/{id}:
+    delete:
+      tags: [Device tokens]
+      summary: Stop pushes to this phone
+      description: |
+        Roles: any staff, for their own registrations only. Call it on sign-out, before
+        the session is dropped. Idempotent - a second call is still 204. Someone
+        else's registration is a 404, so ids cannot be probed.
+      operationId: unregisterDevice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Pushes stopped }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   # ============================================================
   # Workflows - the group-owned agent surface
@@ -660,22 +719,45 @@ components:
 
     PatientLoginRequest:
       type: object
-      required: [phone_number, password]
+      required: [username, password]
       properties:
-        phone_number:
+        username:
           type: string
-          maxLength: 20
-          example: '+94771234567'
-          description: The login identifier for a patient account. Unique among active accounts.
+          maxLength: 50
+          example: chathura.w
+          description: The login identifier for a patient account. Unique among active accounts and matched case-insensitively.
         password: { type: string, format: password, minLength: 8, maxLength: 128 }
 
     PatientRegisterRequest:
       type: object
-      required: [phone_number, password, full_name]
+      required: [username, password]
       properties:
-        phone_number: { type: string, maxLength: 20, example: '+94771234567' }
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+          pattern: '^[a-zA-Z0-9._-]+$'
+          example: chathura.w
+          description: Letters, digits, dots, underscores and hyphens. Stored lower-cased.
         password: { type: string, format: password, minLength: 8, maxLength: 128 }
-        full_name: { type: string, minLength: 1, maxLength: 200 }
+
+    RegisterDeviceRequest:
+      type: object
+      required: [token, platform]
+      properties:
+        token:
+          type: string
+          maxLength: 512
+          description: The registration token the push service issued to this phone.
+        platform: { type: string, enum: [android, ios, web] }
+
+    DeviceRegistration:
+      type: object
+      required: [id, platform, last_seen_at]
+      properties:
+        id: { type: string, format: uuid }
+        platform: { type: string, enum: [android, ios, web] }
+        last_seen_at: { type: string, format: date-time }
 
     RefreshTokenRequest:
       type: object
@@ -710,7 +792,10 @@ components:
           description: StaffMember.Id or PatientAccount.Id, depending on principal_type.
         principal_type: { type: string, enum: [staff, patient] }
         role: { $ref: '#/components/schemas/PrincipalRole' }
-        display_name: { type: string, example: Dr. Perera }
+        display_name:
+          type: string
+          example: Dr. Perera
+          description: A staff member's full name, or a patient account's username.
         email:
           type: string
           format: email
@@ -719,7 +804,9 @@ components:
         phone_number:
           type: string
           nullable: true
-          description: Patient accounts only. Null for staff.
+          description: |
+            Always null today. A patient's contact number lives on their `Patient` record,
+            not on the login, and staff accounts have never carried one.
         patient_id:
           type: string
           format: uuid
@@ -740,7 +827,6 @@ components:
       enum:
         - coordinator
         - dispatch_routing
-        - patient_admission_bed
         - staff_allocation
         - equipment_monitoring
 
@@ -885,7 +971,6 @@ components:
     ProposedChangeType:
       type: string
       enum:
-        - reserve_bed
         - end_allocation
         - create_allocation
         - assign_ambulance

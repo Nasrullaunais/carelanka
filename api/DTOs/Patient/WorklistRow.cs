@@ -9,9 +9,6 @@ public class WorklistRow
     public Guid Id { get; set; }
 
     [Required]
-    public WorklistKind Kind { get; set; }
-
-    [Required]
     public PatientSummary Patient { get; set; } = null!;
 
     [Required]
@@ -26,6 +23,8 @@ public class WorklistRow
 
     public AdmissionUrgency? Urgency { get; set; }
 
+    public bool IsInfectious { get; set; }
+
     public string? WardName { get; set; }
 
     public string? BedNumber { get; set; }
@@ -33,5 +32,4 @@ public class WorklistRow
     [Required]
     public DateTimeOffset When { get; set; }
 
-    public string? Reason { get; set; }
 }

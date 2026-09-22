@@ -29,6 +29,8 @@ public interface IPatientService
     Task LinkAccountAsync(
         Guid id, Guid userAccountId, CancellationToken cancellationToken = default);
 
+    Task<PatientEntity?> FindByUserAccountIdAsync(Guid accountId, CancellationToken cancellationToken = default);
+
     Task<PatientEntity?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<PatientEntity> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);

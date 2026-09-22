@@ -35,8 +35,8 @@ Say the same thing again with simpler words and fewer of them.
 
 ## Current state
 
-**All four components have started.** *(Re-swept 2026-09-13 against the tree, not from
-memory — 509 tests pass, 5/5 specs valid, 0 collisions.)*
+**All four components have started.** *(Re-swept 2026-09-14 against the tree, not from
+memory — 570 tests pass, 5/5 specs valid, 0 collisions.)*
 
 **Common auth is built** (PR #11): `CareLankaDbContext`, the three base entity classes,
 `StaffMember` / `PatientAccount` / `RefreshToken`, the six `/api/auth` endpoints,
@@ -46,9 +46,9 @@ logins are in `TEST_ACCOUNTS.md`.
 
 | Component | Where it is |
 | :--- | :--- |
-| **Patient** (Lochana) | 12 controllers, 43 routes. Wards, patients, admissions and the 7-state machine, capacity, bed assignment, the worklist, discharge, billing, and the seven `/api/me/*` patient routes. React screens for all of it. Left: the two AI agents (steps 11–16), the reports, and `POST /admissions/pre-admit` |
+| **Patient** (Lochana) | 13 controllers, 53+15 routes. Wards, patients, admissions and the 7-state machine, capacity, bed assignment, the worklist, discharge, billing, and the `/api/me/*` patient routes. React screens for staff, a real Flutter app for the patient only — mobile has no nurse/reception/duty-manager/admin screens, reversed 2026-09-21. `PatientMedicalProfile` landed 2026-09-18 (React editor only, since the reversal). The bed suggestion agent (steps 12–13) was removed on 2026-09-22 — bed placement is manual assignment only now (`BedAssignmentService`, `/admissions/{id}/assign-bed`), merged to `main` in PR #89. **The care advisory agent (steps 14–16) landed 2026-09-21 and is merged into `main`** (PR #87, tuned further in PR #88) — `CareRecommendation` table + migration, the agent (red-flag screen, gather, Gemini draft with a deterministic fallback, CR1–CR5 validator, pause for review), `/me/care-queries` + `/me/care-recommendations`, the staff `/care-recommendations` queue + approve/reject, React review queue page, and a "How are you feeling?" card in Flutter's My Stay (admitted patients only). See `RESUME.md` for the untested/unverified parts. Left: the reports, and `POST /admissions/pre-admit` |
 | **Equipment** (Sethmin) | 8 controllers. Beds, equipment items and categories, pharmacy, maintenance, and the laboratory (`/lab-reports`, `/ward-patients`) |
-| **Emergency** (Nasrulla Unais) | `EmergencyCall`, `Ambulance`, `Dispatch`, `DispatchCrew`, `RouteLog` and their migration; `AmbulancesController` is the first endpoint |
+| **Emergency** (Nasrulla Unais) | Phases 0–2: aligned contract, ambulance/current-crew readiness, and patient/staff emergency-call intake with caller-scoped APIs |
 | **Staff** (Kaveesha) | Not started — no entities, no controllers, and no `staff-management-plan.md` |
 
 **Emergency and Staff swapped owners on 2026-09-12** (commit `4f60832`). Nasrulla Unais has
@@ -57,12 +57,17 @@ Emergency, Kaveesha has Staff. `BUILD_PLAN.md` is the authority if this line goe
 `web-ui/` is a full Vite app — login, app shell, and screens for Patient, Equipment and the
 laboratory, with the generated client under `src/services/api/generated/`.
 
-**`mobile-ui/` is still a skeleton.** Every folder under `lib/` is a `.gitkeep`, `app.dart`
-renders one line of text, and there is no `android/` or `ios/` — nobody has run
-`flutter create .` yet.
+**`mobile-ui/` is a real Flutter app** *(as of 2026-09-16 — this line used to say "still a
+skeleton")*. `android/` and `ios/` exist, the generated `api_client` is wired up, and
+`lib/features/patient/` is a built and tested feature. The other three feature folders are
+still empty.
 
 Still not built anywhere: the audit interceptor, `AgentWorkflow` / `AgentProposedChange`, any
 AI agent, and CI (there is no `.github/`).
+
+**`AgentWorkflow` is now the thing in front of the most work.** It is common, group-owned and
+settled by ADR 3, and every agent in the project needs it — Patient Management's two are
+designed and ready to build behind it (`docs/build/patient.md` steps 11–16).
 
 **Where a committed contract in `specs/` already answers a question, that contract wins over
 anything written here.** This section goes stale fastest of anything in this file — check the
@@ -81,6 +86,7 @@ here is the order of authority.
 | `docs/CareLanka_Component_Plan.md` | The four components, who owns which, the seven roles, why React and Flutter differ. Read first. | Group |
 | `docs/BUILD_PLAN.md` | **The build index.** Build order, the five tracks, who is waiting on whom, integration checkpoints. Read before writing code. | Group |
 | `docs/build/{common,emergency,staff,equipment,patient}.md` | **What your member builds, step by step.** Read your own in full; read `build/common.md` §7 whoever you are — four things about auth that change how you build. | That track's owner |
+| `docs/build/emergency-agent-prompts.md` | **Copyable prompts for handing one Emergency phase to a fresh agent.** Use only when starting or handing off an Emergency implementation phase. | Emergency owner |
 | `TEST_ACCOUNTS.md` | **Who to log in as.** The seeded accounts, their roles and passwords, and how to use a token in Swagger or curl. Required by assignment §15. | Common (group-owned) |
 | `STUBS.md` | **Every fake standing in for someone else's unbuilt work.** Read the rows where `Owner` is your member — somebody is already depending on those. | Everyone, constantly |
 | `docs/entity_diagram.md` | Every table, field and enum, with the reasoning. | Group; each member edits only their own entities |
@@ -340,6 +346,82 @@ get it wrong and "not found" means two different things at two layers again.
   decide → propose → deterministic validation → pause for approval.
   `patient-management-plan.md` §8.7 is the template. Chaining the four together
   is `ai-orchestration-workflow.md`, and comes after.
+
+## API validation and controller standards
+
+Apply these rules to every new API request surface and every request surface deliberately
+refactored as part of the current task. Existing DataAnnotations elsewhere are migration
+work, not permission to copy the old pattern and not an invitation to widen an unrelated
+change across the repository.
+
+### Automated controller validation
+
+- `[ApiController]` and the ASP.NET validation pipeline reject invalid input before the
+  action runs. Controller actions bind, delegate and return.
+- Treat an action's request object as already validated. Do not add request null checks,
+  `ModelState.IsValid` branches, or property-by-property validation to controllers.
+- Keep business invariants in services. Missing related records, illegal state changes,
+  concurrency conflicts and authorization based on persisted state use the existing typed
+  exception flow; they are not request-shape validation.
+
+### FluentValidation is the request-validation mechanism
+
+- Use FluentValidation exclusively for API request validation. Request DTOs and
+  action-bound query models carry no `System.ComponentModel.DataAnnotations` attributes.
+- Give every request DTO its own `AbstractValidator<T>` class. Co-locate its complete
+  request-shape rules there, including cross-property rules such as paired coordinates.
+- Bind a query with validation rules into a query request model and validate it through
+  the same pipeline. Do not put `[Range]`, `[RegularExpression]` or similar attributes on
+  controller parameters.
+- Register FluentValidation automatic MVC validation and validator discovery once in the
+  API composition root. Configure MVC to suppress its implicit non-nullable-reference
+  `Required` rule so FluentValidation remains the single source of request rules.
+- Preserve the existing invalid-model response factory: validation failures return the
+  published `application/problem+json` `ValidationProblemDetails` shape and stable
+  `MessageCode.ValidationFailed` extension.
+- Integration-test that invalid bodies and query models return 400 without entering the
+  action or service.
+
+### Nullable request contracts
+
+- Nullable reference types stay enabled.
+- A required request property uses a non-nullable type; an optional request property uses
+  a nullable type.
+- Express required content explicitly in its validator, for example `.NotEmpty()` for a
+  required string. Apply optional rules with `When`, `Unless`, or a nullable-aware rule so
+  omission remains valid.
+- Keep DTOs as serialization shapes only. They contain properties and, only when the wire
+  format cannot express itself otherwise, serialization attributes; they contain no
+  validation or business logic.
+
+Expected shape:
+
+```csharp
+public sealed class CreateThingRequest
+{
+    public string Name { get; set; } = string.Empty;
+    public string? Notes { get; set; }
+}
+
+public sealed class CreateThingRequestValidator : AbstractValidator<CreateThingRequest>
+{
+    public CreateThingRequestValidator()
+    {
+        RuleFor(request => request.Name).NotEmpty().MaximumLength(200);
+        RuleFor(request => request.Notes).MaximumLength(500);
+    }
+}
+
+[ApiController]
+public sealed class ThingsController : ControllerBase
+{
+    [HttpPost]
+    public async Task<ActionResult<Thing>> Create(
+        [FromBody] CreateThingRequest request,
+        CancellationToken cancellationToken)
+        => Created((string?)null, await _things.CreateAsync(request, cancellationToken));
+}
+```
 
 ## Data conventions
 

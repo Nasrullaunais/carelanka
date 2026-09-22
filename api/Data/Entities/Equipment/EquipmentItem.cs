@@ -27,4 +27,10 @@ public class EquipmentItem : SoftDeletableEntity
     public string? SerialNumber { get; set; }
 
     public DateOnly? NextMaintenanceDue { get; set; }
+
+    public bool AwaitingConfirmation { get; set; }
+
+    public Guid? ConfirmedByStaffId { get; set; }
+
+    public DateTimeOffset? ConfirmedAt { get; set; }
 }

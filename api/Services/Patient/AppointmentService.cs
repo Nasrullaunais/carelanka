@@ -16,7 +16,11 @@ namespace CareLanka.Api.Services.Patient;
 
 public sealed class AppointmentService : IAppointmentService
 {
-    private static readonly AppointmentStatus[] OpenStatuses = [AppointmentStatus.Scheduled];
+    private static readonly AppointmentStatus[] OpenStatuses =
+    [
+        AppointmentStatus.Scheduled,
+        AppointmentStatus.Confirmed
+    ];
 
     private static readonly AdmissionStatus[] ClosedAdmissionStatuses =
     [
@@ -105,7 +109,7 @@ public sealed class AppointmentService : IAppointmentService
             .FirstOrDefaultAsync(a => a.Id == appointmentId && a.PatientId == patientId, ct)
             ?? throw new NotFoundException("Appointment", appointmentId);
 
-        if (appointment.Status != AppointmentStatus.Scheduled)
+        if (!OpenStatuses.Contains(appointment.Status))
         {
             throw new IllegalTransitionException(
                 "Appointment",
@@ -118,6 +122,110 @@ public sealed class AppointmentService : IAppointmentService
         await _db.SaveChangesAsync(ct);
 
         return appointment;
+    }
+
+    /// <summary>
+    /// The desk reads the booking and accepts it. Nothing physical has happened - the patient
+    /// may not be due for weeks - which is exactly why this is not the same click as admitting
+    /// them. Everything the desk does on the day needs a confirmed booking first.
+    /// </summary>
+    public async Task<AppointmentResponse> ConfirmAsync(Guid id, CancellationToken ct = default)
+    {
+        var appointment = await OpenAsync(id, ct);
+
+        if (appointment.Status != AppointmentStatus.Scheduled)
+        {
+            throw new IllegalTransitionException(
+                "Appointment",
+                EnumWire.ToWire(appointment.Status),
+                EnumWire.ToWire(AppointmentStatus.Confirmed));
+        }
+
+        appointment.Status = AppointmentStatus.Confirmed;
+        appointment.ConfirmedAt = DateTimeOffset.UtcNow;
+        appointment.ConfirmedByStaffMemberId = _currentUser.Id;
+
+        await _db.SaveChangesAsync(ct);
+
+        return ToResponse(appointment);
+    }
+
+    /// <summary>
+    /// They were expected, the time has passed and they never came. A separate ending from a
+    /// cancellation, which somebody chose.
+    /// </summary>
+    public async Task<AppointmentResponse> MarkNoShowAsync(
+        Guid id, CancellationToken ct = default)
+    {
+        var appointment = await OpenAsync(id, ct);
+
+        EnsureConfirmed(appointment, AppointmentStatus.NoShow);
+
+        appointment.Status = AppointmentStatus.NoShow;
+
+        await _db.SaveChangesAsync(ct);
+
+        return ToResponse(appointment);
+    }
+
+    public async Task<AppointmentResponse> CancelAtTheDeskAsync(
+        Guid id, CancelAppointmentRequest request, CancellationToken ct = default)
+    {
+        var appointment = await OpenAsync(id, ct);
+
+        if (!OpenStatuses.Contains(appointment.Status))
+        {
+            throw new IllegalTransitionException(
+                "Appointment",
+                EnumWire.ToWire(appointment.Status),
+                EnumWire.ToWire(AppointmentStatus.Cancelled));
+        }
+
+        appointment.Status = AppointmentStatus.Cancelled;
+        appointment.CancellationReason = request.Reason.Trim();
+        appointment.CancelledByStaffMemberId = _currentUser.Id;
+
+        await _db.SaveChangesAsync(ct);
+
+        return ToResponse(appointment);
+    }
+
+    /// <summary>
+    /// The patient came in, was seen, and went home. No admission and no bed, so the only thing
+    /// left is the bill, and it is raised against this appointment.
+    /// </summary>
+    public async Task<AppointmentResponse> CompleteAsync(Guid id, CancellationToken ct = default)
+    {
+        var appointment = await OpenAsync(id, ct);
+
+        EnsureConfirmed(appointment, AppointmentStatus.Completed);
+
+        appointment.Status = AppointmentStatus.Completed;
+
+        await _db.SaveChangesAsync(ct);
+
+        return ToResponse(appointment);
+    }
+
+    private async Task<AppointmentEntity> OpenAsync(Guid id, CancellationToken ct)
+        => await _db.Appointments
+            .Include(a => a.Patient)
+            .FirstOrDefaultAsync(a => a.Id == id, ct)
+            ?? throw new NotFoundException("Appointment", id);
+
+    /// <summary>
+    /// The three day-of endings - admitted, seen, never came - all need the desk to have read
+    /// the booking first. Confirming is the one step that is never skipped.
+    /// </summary>
+    private static void EnsureConfirmed(AppointmentEntity appointment, AppointmentStatus wanted)
+    {
+        if (appointment.Status != AppointmentStatus.Confirmed)
+        {
+            throw new IllegalTransitionException(
+                "Appointment",
+                EnumWire.ToWire(appointment.Status),
+                EnumWire.ToWire(wanted));
+        }
     }
 
     private async Task<AppointmentEntity> BookAsync(
@@ -175,13 +283,7 @@ public sealed class AppointmentService : IAppointmentService
             .FirstOrDefaultAsync(a => a.Id == id, ct)
             ?? throw new NotFoundException("Appointment", id);
 
-        if (appointment.Status != AppointmentStatus.Scheduled)
-        {
-            throw new IllegalTransitionException(
-                "Appointment",
-                EnumWire.ToWire(appointment.Status),
-                EnumWire.ToWire(AppointmentStatus.CheckedIn));
-        }
+        EnsureConfirmed(appointment, AppointmentStatus.Completed);
 
         var admission = await _admissions.CreateAsync(new CreateAdmissionRequest
         {
@@ -197,7 +299,9 @@ public sealed class AppointmentService : IAppointmentService
             ExpectedArrival = null
         }, ct);
 
-        appointment.Status = AppointmentStatus.CheckedIn;
+        // Over as a booking either way. AdmissionId is what says they stayed in rather than
+        // went home, and it is what stops a second bill being raised here.
+        appointment.Status = AppointmentStatus.Completed;
         appointment.AdmissionId = admission.Id;
 
         await _db.SaveChangesAsync(ct);
@@ -251,6 +355,13 @@ public sealed class AppointmentService : IAppointmentService
             Reason = appointment.Reason,
             BookedByStaffId = appointment.BookedByStaffMemberId,
             AdmissionId = appointment.AdmissionId,
+            CancellationReason = appointment.CancellationReason,
+            CancelledByStaffId = appointment.CancelledByStaffMemberId,
+            ConfirmedAt = appointment.ConfirmedAt,
+            ConfirmedByStaffId = appointment.ConfirmedByStaffMemberId,
+            CanConfirm = appointment.Status == AppointmentStatus.Scheduled,
+            CanCancel = OpenStatuses.Contains(appointment.Status),
+            CanComplete = appointment.Status == AppointmentStatus.Confirmed,
             CreatedAt = appointment.CreatedAt,
             UpdatedAt = appointment.UpdatedAt
         };

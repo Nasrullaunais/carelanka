@@ -15,7 +15,7 @@ class PatientLoginScreen extends StatefulWidget {
 
 class _PatientLoginScreenState extends State<PatientLoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _phone = TextEditingController();
+  final _username = TextEditingController();
   final _password = TextEditingController();
 
   bool _busy = false;
@@ -23,7 +23,7 @@ class _PatientLoginScreenState extends State<PatientLoginScreen> {
 
   @override
   void dispose() {
-    _phone.dispose();
+    _username.dispose();
     _password.dispose();
     super.dispose();
   }
@@ -34,7 +34,7 @@ class _PatientLoginScreenState extends State<PatientLoginScreen> {
     setState(() => _busy = true);
     final auth = context.read<AuthController>();
     final signedIn = await auth.signInAsPatient(
-      phoneNumber: _phone.text.trim(),
+      username: _username.text.trim(),
       password: _password.text,
     );
 
@@ -51,7 +51,7 @@ class _PatientLoginScreenState extends State<PatientLoginScreen> {
   Widget build(BuildContext context) {
     return AuthScaffold(
       title: 'Sign in',
-      subtitle: 'Use the phone number you registered with.',
+      subtitle: 'Use the username you registered with.',
       children: [
         Form(
           key: _formKey,
@@ -59,11 +59,14 @@ class _PatientLoginScreenState extends State<PatientLoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               AuthTextField(
-                controller: _phone,
-                label: 'Phone number',
+                controller: _username,
+                label: 'Username',
                 enabled: !_busy,
-                keyboardType: TextInputType.phone,
-                validator: validatePhoneNumber,
+                keyboardType: TextInputType.text,
+                // Only checked for emptiness — anything more tells a stranger what a valid username looks like.
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? 'Enter your username'
+                    : null,
               ),
               AuthTextField(
                 controller: _password,

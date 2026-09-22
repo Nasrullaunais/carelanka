@@ -29,7 +29,7 @@
 | 4 | Pharmacy items + the atomic stock decrement | `UPDATE ... WHERE quantity_on_hand >= :qty` — **one conditional update, never read-then-write** |
 | 5 | Maintenance schedules | Polymorphic over `equipment_item` and `bed` |
 | 6 | **The bed-occupancy check before touching a bed** | Call M4's `GET /beds/{id}/occupancy` inside the same request, before committing. Occupied or held → 409, nothing written |
-| 7 | Deterministic warnings | Threshold sweep: low stock, expiring medicine, overdue maintenance. **Not agent-generated** — the agent *reviews* these |
+| 7 | Deterministic warnings | Threshold sweep: low stock, expiring medicine, overdue maintenance. **Not agent-generated** — the agent *reviews* these. **Built** *(2026-09-19)*: hourly timer + Run check, web Warnings page — plan §5.3 |
 | 8 | Codegen gate | |
 | 9 | React: stock dashboard, warning queue, approval queue | |
 | 10 | Flutter: report a fault, ward stock, take a bed out of service | Camera for fault photos is your device feature |

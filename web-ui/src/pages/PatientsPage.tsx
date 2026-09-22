@@ -1,6 +1,5 @@
 import { Fragment, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -14,18 +13,20 @@ import {
   listWardsOptions,
   markArrivedMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
-import type { WorklistRow } from '../services/api/generated';
+import type { PrincipalRole, WorklistRow } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
+import { MedicalProfilePanel } from '../components/MedicalProfilePanel';
+import { BedCandidateTable } from '../components/BedCandidateTable';
 import {
   canAssignBed,
   canCompleteVisit,
   canMarkArrived,
+  canReadMedicalProfile,
   canReadPatientDetails,
 } from '../types/permissions';
 import { localDateTime } from '../types/datetime';
 import { placementFor } from '../types/beds';
 import type { Placement } from '../types/beds';
-import { genderPolicyLabels, wardTypeLabels } from '../types/wards';
 import {
   arrivalRouteLabel,
   worklistStatusDetail,
@@ -226,17 +227,15 @@ export function PatientsPage() {
                           <span className="muted">
                             {row.urgency ? admissionUrgencyLabels[row.urgency] : ''}
                           </span>
-                        </>
-                      ) : (
-                        <span className="muted">
-                          Set at check-in
-                          {row.reason ? (
+                          {row.is_infectious && (
                             <>
                               <br />
-                              For: {row.reason}
+                              <span className="badge severity-high">Needs isolation</span>
                             </>
-                          ) : null}
-                        </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="muted">Not recorded</span>
                       )}
                     </td>
                     <td>
@@ -277,7 +276,7 @@ export function PatientsPage() {
                   {openId === row.id && (
                     <tr className="drawer">
                       <td colSpan={5}>
-                        <DetailsPanel row={row} onClose={() => setOpenId(null)} />
+                        <DetailsPanel row={row} role={role} onClose={() => setOpenId(null)} />
                       </td>
                     </tr>
                   )}
@@ -376,12 +375,6 @@ function RowActions({
 
   return (
     <>
-
-      {row.status === 'not_arrived' && (
-        <Link to="/appointments" className="muted" style={{ fontSize: '0.82rem' }}>
-          Check in at the desk
-        </Link>
-      )}
 
       {row.status === 'awaiting_bed' && row.requires_bed && canAssignBed(role) && (
         <button type="button" onClick={() => onAssign('assign')}>
@@ -509,9 +502,6 @@ function AssignBedPanel({
       : ({ kind: 'refused', why: 'Loading…' } as Placement),
   }));
 
-  const usable = candidates.filter((candidate) => candidate.placement.kind !== 'refused');
-  const overrides = candidates.filter((candidate) => candidate.placement.kind === 'override');
-
   const missing = (beds.data?.total_items ?? 0) - (beds.data?.items?.length ?? 0);
   const loading = visit.isLoading || wards.isLoading || beds.isLoading;
   const failed = visit.isError || wards.isError || beds.isError;
@@ -567,101 +557,39 @@ function AssignBedPanel({
         </p>
       ) : (
         <>
-          <table>
-            <thead>
-              <tr>
-                <th>Bed</th>
-                <th>Ward</th>
-                <th>Accepts</th>
-                <th>Isolation</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {candidates.map(({ bed, ward, placement }) => (
-                <tr key={bed.id}>
-                  <td>
-                    <strong>{bed.bed_number}</strong>
-                  </td>
-                  <td>
-                    {bed.ward_name}
-                    <br />
-                    <span className="muted">
-                      {ward ? wardTypeLabels[ward.ward_type] : 'Unknown ward'}
-                    </span>
-                  </td>
-                  <td>{ward ? genderPolicyLabels[ward.gender_policy] : '—'}</td>
-                  <td>{bed.has_isolation ? 'Yes' : 'No'}</td>
-                  <td>
-                    {placement.kind === 'refused' ? (
-                      <span className="muted">{placement.why}</span>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          className={placement.kind === 'override' ? 'warn' : undefined}
-                          disabled={writing}
-                          onClick={() =>
-                            correcting
-                              ? correct.mutate({
-                                  path: { id: row.id },
-                                  body: {
-                                    bed_id: bed.id,
-                                    reason: reason.trim().length > 0 ? reason.trim() : undefined,
-                                  },
-                                })
-                              : assign.mutate({
-                                  path: { id: row.id },
-                                  body: {
-                                    bed_id: bed.id,
-                                    override_reason:
-                                      reason.trim().length > 0 ? reason.trim() : undefined,
-                                  },
-                                })
-                          }
-                        >
-                          {placement.kind === 'override'
-                            ? correcting
-                              ? 'Move anyway'
-                              : 'Assign anyway'
-                            : correcting
-                              ? 'Move here'
-                              : alreadyHere
-                                ? 'Assign and admit'
-                                : 'Assign'}
-                        </button>
-                        {placement.kind === 'override' && (
-                          <p className="hint" style={{ marginTop: '0.25rem' }}>
-                            {placement.why}
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {usable.length === 0 && (
-            <p className="empty">
-              Beds are free, but none of them accepts this patient. The reason is on each row.
-            </p>
-          )}
-
-          {missing > 0 && (
-            <p className="field-error" style={{ marginTop: '0.6rem' }}>
-              {missing} more free {missing === 1 ? 'bed is' : 'beds are'} not shown. This list
-              is incomplete — report it before assigning a bed from it.
-            </p>
-          )}
-
-          {overrides.length > 0 && (
-            <p className="hint" style={{ marginTop: '0.6rem' }}>
-              Amber buttons are beds outside the patient&rsquo;s care level. You may use one as
-              duty manager; it is recorded as your decision, so give a reason in the note.
-            </p>
-          )}
+          <BedCandidateTable
+            candidates={candidates}
+            writing={writing}
+            missing={missing}
+            actionLabel={(placement) =>
+              placement.kind === 'override'
+                ? correcting
+                  ? 'Move anyway'
+                  : 'Assign anyway'
+                : correcting
+                  ? 'Move here'
+                  : alreadyHere
+                    ? 'Assign and admit'
+                    : 'Assign'
+            }
+            onPick={(bed) =>
+              correcting
+                ? correct.mutate({
+                    path: { id: row.id },
+                    body: {
+                      bed_id: bed.id,
+                      reason: reason.trim().length > 0 ? reason.trim() : undefined,
+                    },
+                  })
+                : assign.mutate({
+                    path: { id: row.id },
+                    body: {
+                      bed_id: bed.id,
+                      override_reason: reason.trim().length > 0 ? reason.trim() : undefined,
+                    },
+                  })
+            }
+          />
 
           <div className="field" style={{ marginTop: '0.9rem' }}>
             <label htmlFor="override-reason">
@@ -692,13 +620,18 @@ function AssignBedPanel({
   );
 }
 
-function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void }) {
+function DetailsPanel({
+  row,
+  role,
+  onClose,
+}: {
+  row: WorklistRow;
+  role: PrincipalRole | undefined;
+  onClose: () => void;
+}) {
   const patient = useQuery(getPatientOptions({ path: { id: row.patient.id } }));
 
-  const visit = useQuery({
-    ...getAdmissionOptions({ path: { id: row.id } }),
-    enabled: row.kind === 'visit',
-  });
+  const visit = useQuery(getAdmissionOptions({ path: { id: row.id } }));
 
   const liveBed = visit.data?.bed_assignments?.find(
     (assignment) => assignment.status !== 'released',
@@ -735,36 +668,19 @@ function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void 
         </table>
       )}
 
-      {row.kind === 'booking' ? (
-        <>
-          <h4 style={{ marginTop: '1.25rem', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
-            This appointment
-          </h4>
-          <table>
-            <tbody>
-              <Field label="Scheduled for">{localDateTime(row.when)}</Field>
-              <Field label="Reason" empty="Not given">
-                {row.reason}
-              </Field>
-            </tbody>
-          </table>
-          <p className="hint">
-            There is no visit record yet. Checking the patient in at the bookings desk creates
-            one, and the care level is recorded there by the member of staff at the desk.
-          </p>
-        </>
-      ) : (
-        <>
-          <h4 style={{ marginTop: '1.25rem', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
-            This visit
-          </h4>
+      <>
+        <h4 style={{ marginTop: '1.25rem', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+          This visit
+        </h4>
           {visit.isLoading && <p className="empty">Loading…</p>}
           {visit.data && (
             <table>
               <tbody>
                 <Field label="Arrived by">{admissionSourceLabels[visit.data.source]}</Field>
-                <Field label="Care level">
-                  {admissionCategoryLabels[visit.data.admission_category]}
+                <Field label="Care level" empty="Not yet classified">
+                  {visit.data.admission_category
+                    ? admissionCategoryLabels[visit.data.admission_category]
+                    : null}
                 </Field>
                 <Field label="Urgency">{admissionUrgencyLabels[visit.data.urgency]}</Field>
                 <Field label="Needs a bed">
@@ -785,8 +701,10 @@ function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void 
                 <Field label="Admitted by" empty="Not recorded">
                   {visit.data.category_set_by_staff_name}
                 </Field>
-                <Field label="Care level chosen">
-                  {localDateTime(visit.data.category_set_at)}
+                <Field label="Care level chosen" empty="Not yet classified">
+                  {visit.data.category_set_at
+                    ? localDateTime(visit.data.category_set_at)
+                    : null}
                 </Field>
                 <Field label="Bed assigned by" empty="No bed assigned">
                   {liveBed?.approved_by_staff_name ?? (liveBed ? 'Not recorded' : null)}
@@ -818,6 +736,18 @@ function DetailsPanel({ row, onClose }: { row: WorklistRow; onClose: () => void 
               </ul>
             </>
           )}
+      </>
+
+      {canReadMedicalProfile(role) && (
+        <>
+          <h4 style={{ marginTop: '1.25rem', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+            Medical details
+          </h4>
+          <MedicalProfilePanel
+            patientId={row.patient.id}
+            patientName={row.patient.full_name}
+            role={role}
+          />
         </>
       )}
 

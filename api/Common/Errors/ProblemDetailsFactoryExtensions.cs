@@ -33,6 +33,16 @@ public static class ProblemDetailsFactoryExtensions
             Detail = exception.Message
         };
 
+        if (exception is DispatchProposalRejectedException dispatchRejected)
+        {
+            if (dispatchRejected.BlockReason is { } blockReason)
+            {
+                problem.Extensions["block_reason"] = CareLanka.Api.Common.Persistence.EnumWire.ToWire(blockReason);
+            }
+
+            problem.Extensions["failed_checks"] = dispatchRejected.FailedChecks;
+        }
+
         return problem.WithCareLankaExtensions(context, exception.Code);
     }
 

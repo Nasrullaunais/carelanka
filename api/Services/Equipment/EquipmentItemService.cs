@@ -5,6 +5,7 @@ using CareLanka.Api.Data;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Equipment;
+using CareLanka.Api.Services.Common;
 using Microsoft.EntityFrameworkCore;
 using ItemEntity = CareLanka.Api.Data.Entities.Equipment.EquipmentItem;
 using ScheduleEntity = CareLanka.Api.Data.Entities.Equipment.MaintenanceSchedule;
@@ -16,17 +17,27 @@ public sealed class EquipmentItemService : IEquipmentItemService
 {
     private readonly CareLankaDbContext _db;
     private readonly IWardDirectory _wards;
+    private readonly ICurrentUser _currentUser;
+    private readonly IEquipmentConfirmationCode _confirmationCode;
 
-    public EquipmentItemService(CareLankaDbContext db, IWardDirectory wards)
+    public EquipmentItemService(
+        CareLankaDbContext db,
+        IWardDirectory wards,
+        ICurrentUser currentUser,
+        IEquipmentConfirmationCode confirmationCode)
     {
         _db = db;
         _wards = wards;
+        _currentUser = currentUser;
+        _confirmationCode = confirmationCode;
     }
 
     public async Task<PagedResult<EquipmentItemSummary>> ListAsync(
         EquipmentItemQuery query, CancellationToken cancellationToken = default)
     {
-        var items = _db.EquipmentItems.AsNoTracking().Include(i => i.Category).AsQueryable();
+        var items = _db.EquipmentItems.AsNoTracking()
+            .Include(i => i.Category)
+            .Where(i => !i.AwaitingConfirmation);
 
         if (query.CategoryId is { } category)
         {
@@ -97,6 +108,7 @@ public sealed class EquipmentItemService : IEquipmentItemService
             Manufacturer = request.Manufacturer.Trim(),
             PurchaseDate = request.PurchaseDate,
             Status = EquipmentStatus.Available,
+            AwaitingConfirmation = true,
             WardId = request.WardId,
             AssetTag = assetTag,
             SerialNumber = serialNumber,
@@ -129,13 +141,20 @@ public sealed class EquipmentItemService : IEquipmentItemService
     public async Task<EquipmentItem> UpdateAsync(
         Guid id, UpdateEquipmentItemRequest request, CancellationToken cancellationToken = default)
     {
-        var item = await GetByIdAsync(id, cancellationToken);
+        var item = await GetConfirmedAsync(id, cancellationToken);
 
         if (request.Status is { } status && status != item.Status)
         {
             if (status == EquipmentStatus.Assigned)
             {
                 throw new BadRequestException(MessageCode.ValidationFailed);
+            }
+
+            // Retiring is its own endpoint, because it is irreversible and needs the confirmation
+            // code. Allowing it here would be a way round that.
+            if (status == EquipmentStatus.Retired)
+            {
+                throw new ConflictException(MessageCode.EquipmentRetireNeedsCode, item.Name);
             }
 
             EnsureTransitionAllowed(item, status, TransitionReason.Update);
@@ -146,11 +165,6 @@ public sealed class EquipmentItemService : IEquipmentItemService
             }
 
             item.Status = status;
-
-            if (status == EquipmentStatus.Retired)
-            {
-                await CloseOpenRepairWorkAsync(item.Id, cancellationToken);
-            }
         }
 
         if (request.Name is { } name)
@@ -186,7 +200,7 @@ public sealed class EquipmentItemService : IEquipmentItemService
     public async Task<EquipmentItem> AssignAsync(
         Guid id, Guid admissionId, CancellationToken cancellationToken = default)
     {
-        var item = await GetByIdAsync(id, cancellationToken);
+        var item = await GetConfirmedAsync(id, cancellationToken);
 
         EnsureTransitionAllowed(item, EquipmentStatus.Assigned, TransitionReason.Assign);
 
@@ -200,7 +214,7 @@ public sealed class EquipmentItemService : IEquipmentItemService
 
     public async Task<EquipmentItem> ReleaseAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var item = await GetByIdAsync(id, cancellationToken);
+        var item = await GetConfirmedAsync(id, cancellationToken);
 
         EnsureTransitionAllowed(item, EquipmentStatus.Available, TransitionReason.Release);
 
@@ -213,10 +227,51 @@ public sealed class EquipmentItemService : IEquipmentItemService
         return await ToItemAsync(item, cancellationToken);
     }
 
+    public async Task<EquipmentItem> RetireAsync(
+        Guid id, string? confirmationCode, CancellationToken cancellationToken = default)
+    {
+        _confirmationCode.Ensure(confirmationCode);
+
+        var item = await GetConfirmedAsync(id, cancellationToken);
+
+        EnsureTransitionAllowed(item, EquipmentStatus.Retired, TransitionReason.Update);
+
+        item.Status = EquipmentStatus.Retired;
+        item.AssignedToAdmissionId = null;
+
+        // A retired machine leaves the maintenance unit's queue with it: nobody should be holding
+        // a work order for something that no longer exists.
+        await CloseOpenRepairWorkAsync(item.Id, cancellationToken);
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return await ToItemAsync(item, cancellationToken);
+    }
+
+    public async Task RemoveAsync(
+        Guid id, string? confirmationCode, CancellationToken cancellationToken = default)
+    {
+        _confirmationCode.Ensure(confirmationCode);
+
+        var item = await GetByIdAsync(id, cancellationToken);
+
+        // Retiring is the decision and is recorded; removing only takes the row off the register
+        // afterwards. Doing it in one step would let a live machine vanish in a single click.
+        if (item.Status != EquipmentStatus.Retired)
+        {
+            throw new ConflictException(MessageCode.EquipmentRemoveNeedsRetired, item.Name);
+        }
+
+        item.IsActive = false;
+        item.DeletedAt = DateTimeOffset.UtcNow;
+
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<EquipmentItem> ReportFaultAsync(
         Guid id, string description, CancellationToken cancellationToken = default)
     {
-        var item = await GetByIdAsync(id, cancellationToken);
+        var item = await GetConfirmedAsync(id, cancellationToken);
 
         EnsureTransitionAllowed(item, EquipmentStatus.Maintenance, TransitionReason.Fault);
 
@@ -242,6 +297,88 @@ public sealed class EquipmentItemService : IEquipmentItemService
         await _db.SaveChangesAsync(cancellationToken);
 
         return await ToItemAsync(item, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<EquipmentItem>> ListAwaitingConfirmationAsync(
+        string? confirmationCode, CancellationToken cancellationToken = default)
+    {
+        _confirmationCode.Ensure(confirmationCode);
+
+        var rows = await _db.EquipmentItems.AsNoTracking()
+            .Include(i => i.Category)
+            .Where(i => i.AwaitingConfirmation)
+            .OrderBy(i => i.CreatedAt)
+            .ThenBy(i => i.Id)
+            .ToListAsync(cancellationToken);
+
+        var names = await WardNamesAsync(rows.Select(i => i.WardId), cancellationToken);
+
+        return rows.Select(row =>
+        {
+            var item = new EquipmentItem();
+            Fill(item, row, names);
+            return item;
+        }).ToList();
+    }
+
+    public async Task<PendingEquipmentCount> CountAwaitingConfirmationAsync(
+        CancellationToken cancellationToken = default)
+        => new()
+        {
+            Count = await _db.EquipmentItems.CountAsync(i => i.AwaitingConfirmation, cancellationToken)
+        };
+
+    public async Task<EquipmentItem> ConfirmAsync(
+        Guid id, string? confirmationCode, CancellationToken cancellationToken = default)
+    {
+        _confirmationCode.Ensure(confirmationCode);
+
+        var item = await GetAwaitingConfirmationAsync(id, cancellationToken);
+
+        item.AwaitingConfirmation = false;
+        item.ConfirmedByStaffId = _currentUser.Id;
+        item.ConfirmedAt = DateTimeOffset.UtcNow;
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return await ToItemAsync(item, cancellationToken);
+    }
+
+    public async Task RejectAsync(
+        Guid id, string? confirmationCode, CancellationToken cancellationToken = default)
+    {
+        _confirmationCode.Ensure(confirmationCode);
+
+        var item = await GetAwaitingConfirmationAsync(id, cancellationToken);
+
+        item.IsActive = false;
+        item.DeletedAt = DateTimeOffset.UtcNow;
+
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<ItemEntity> GetAwaitingConfirmationAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var item = await GetByIdAsync(id, cancellationToken);
+
+        if (!item.AwaitingConfirmation)
+        {
+            throw new ConflictException(MessageCode.EquipmentNotAwaitingConfirmation, item.Name);
+        }
+
+        return item;
+    }
+
+    private async Task<ItemEntity> GetConfirmedAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var item = await GetByIdAsync(id, cancellationToken);
+
+        if (item.AwaitingConfirmation)
+        {
+            throw new ConflictException(MessageCode.EquipmentAwaitingConfirmation, item.Name);
+        }
+
+        return item;
     }
 
     private async Task CloseOpenRepairWorkAsync(Guid itemId, CancellationToken cancellationToken)
@@ -485,6 +622,9 @@ public sealed class EquipmentItemService : IEquipmentItemService
             full.PurchaseDate = item.PurchaseDate;
             full.SerialNumber = item.SerialNumber;
             full.AssignedToAdmissionId = item.AssignedToAdmissionId;
+            full.AwaitingConfirmation = item.AwaitingConfirmation;
+            full.ConfirmedByStaffId = item.ConfirmedByStaffId;
+            full.ConfirmedAt = item.ConfirmedAt;
             full.CreatedAt = item.CreatedAt;
             full.UpdatedAt = item.UpdatedAt;
         }

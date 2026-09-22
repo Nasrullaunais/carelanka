@@ -9,15 +9,13 @@ part of 'patient_register_request.dart';
 PatientRegisterRequest _$PatientRegisterRequestFromJson(
   Map<String, dynamic> json,
 ) => PatientRegisterRequest(
-  phoneNumber: json['phone_number'] as String,
+  username: json['username'] as String,
   password: json['password'] as String,
-  fullName: json['full_name'] as String,
 );
 
 Map<String, dynamic> _$PatientRegisterRequestToJson(
   PatientRegisterRequest instance,
 ) => <String, dynamic>{
-  'phone_number': instance.phoneNumber,
+  'username': instance.username,
   'password': instance.password,
-  'full_name': instance.fullName,
 };

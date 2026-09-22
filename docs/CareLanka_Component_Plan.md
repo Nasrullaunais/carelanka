@@ -38,8 +38,8 @@ responsibilities and permissions (§4.1). We have seven. Role names match the
 | **Hospital Administrator** | React | Member 2 | Manage staff records, approve rosters and reallocations, approve leave |
 | **General Staff** | Flutter | Member 2 | View own shifts, clock in/out, request leave or a shift swap |
 | **Equipment & Inventory Manager** | React | Member 3 | Monitor stock and maintenance, approve procurement and servicing |
-| **Ward Nurse** | Flutter | Member 4 | Admit patients, approve normal-ward beds, update patient status, complete missing details, request discharge |
-| **Patient** | Flutter | Member 4 | Book a visit, view own admission status, ward/bed and discharge details. Read-only, own record only |
+| **Ward Nurse** | React | Member 4 | Admit patients, approve normal-ward beds, update patient status, complete missing details, maintain the medical profile, request discharge, review/approve/reject a care advisory draft. *(Reversed from Flutter to React 2026-09-21 — Patient Management has no staff-facing screen on mobile at all.)* |
+| **Patient** | Flutter | Member 4 | Report an emergency for self or another person, track the narrow response view, request cancellation, book a visit, view own stay and bill, claim an unclaimed record by patient code, and — while admitted — describe how they feel and read the approved reply |
 
 **Two things worth being clear about:**
 
@@ -77,23 +77,27 @@ screens in both apps.**
 
 | | **Member 1** Emergency | **Member 2** Staff | **Member 3** Equipment | **Member 4** Patient |
 | :--- | :--- | :--- | :--- | :--- |
-| **Owns (data)** | EmergencyCall, Ambulance, Dispatch, DispatchCrew, RouteLog | Shift, Allocation, LeaveRequest, Skill, StaffMemberSkill, WardStaffingRule | EquipmentCategory, EquipmentItem, **Bed**, PharmacyCategory, PharmacyItem, PharmacyTransaction, MaintenanceSchedule, Warning, ActionRequest | Patient, PatientAccount, Admission, Ward, BedAssignment, Discharge, DischargeChecklistItem, Appointment |
-| **React screens** | Live call board, dispatch approvals, route/map view, call outcome report | Staff records CRUD, roster approval, ward coverage dashboard, leave approval | Stock dashboard, warning queue, procurement/maintenance approval | Admissions dashboard, bed board, ICU/downgrade bed approval, discharge confirmation, occupancy report |
-| **Flutter screens** | Crew: receive dispatch, navigate, update status, handover. Patient: make emergency call | Staff: my shifts, clock in/out, request leave, request swap | Ward staff: report faulty equipment, view ward stock, take a bed out of service | Nurse: approve normal-ward bed, update status, complete details, request discharge. Patient: my stay, book a visit, discharge instructions, **ask about a symptom, see my doctor-approved recommendations** |
-| **AI agent** | Dispatch & Routing | Staff Allocation | Equipment Monitoring | Patient Admission & Bed, **+ Patient Care Advisory** |
-| **Device feature** | GPS + maps | Date/time picker for leave dates | Camera for fault photos | Local notifications on status change, date/time picker for booking |
-| **Third-party API** | Maps / navigation | — | — | — |
+| **Owns (data)** | EmergencyCall, Ambulance, AmbulanceCrewAssignment, Dispatch, DispatchCrew, RouteLog | Shift, Allocation, LeaveRequest, Skill, StaffMemberSkill, WardStaffingRule | EquipmentCategory, EquipmentItem, **Bed**, PharmacyCategory, PharmacyItem, PharmacyTransaction, MaintenanceSchedule, Warning, ActionRequest | Patient, PatientAccount, PatientMedicalProfile, Admission, Ward, BedAssignment, Discharge, DischargeChecklistItem, Appointment, Bill, BillLineItem, BillingRate, AdmissionFeeRate, CareRecommendation |
+| **React screens** | Live call board, manual/agent dispatch confirmation, fleet/current-crew board, cancellation review, route/map view, reports | Staff records CRUD, roster approval, ward coverage dashboard, leave approval | Stock dashboard, warning queue, procurement/maintenance approval | Admissions dashboard, patients board, intake, capacity, discharge confirmation, billing, medical profile editor, care draft review queue, occupancy report |
+| **Flutter screens** | Crew: acknowledge/decline dispatch, launch Google Maps, update status, handover | Staff: my shifts, clock in/out, request leave, request swap | Ward staff: report faulty equipment, view ward stock, take a bed out of service | Patient only — reversed 2026-09-21, so there is no ward-nurse/reception/duty-manager/admin screen here at all: home, my stay (status, bill summary, discharge instructions), past visits, book/view appointments, my details, profile, lab reports, claim an unclaimed record by patient code, emergency report/tracking/cancellation, **and while admitted, tell us how you are feeling and read the approved reply** |
+| **AI agent** | Dispatch & Routing | Staff Allocation | Equipment Monitoring | Patient Care Advisory |
+| **Device feature** | GPS + Google Maps launch | Date/time picker for leave dates | Camera for fault photos | Local notifications on status change, date/time picker for booking |
+| **Third-party API** | Google route/ETA on the backend | — | — | — |
 
 > Only one third-party integration is required for the whole system (§4.1), and
 > Member 1's maps API covers it. Others are optional.
 
-> **Member 4 runs two agents, not one.** Added on the lecturer's direction at topic
-> finalization: a component this patient-facing needed an agent the patient actually
-> talks to, not only one that moves beds behind the scenes. **Patient Care Advisory**
-> reads a patient's own description of a symptom plus their stored history and drafts
-> a decision-support note — never a diagnosis — which a **Doctor** must approve before
-> the patient ever sees it. Same human-approval pattern as every other agent in this
-> table, one workflow later. Full design in `patient-management-plan.md` §8.10.
+> **Member 4's agent is Patient Care Advisory.** Added on the lecturer's direction at
+> topic finalization: a component this patient-facing needed an agent the patient
+> actually talks to. It reads an admitted patient's own description of how they feel,
+> plus the medical profile staff have recorded for them, and drafts a decision-support
+> note — never a diagnosis — which a **Doctor or Ward Nurse** must approve before the
+> patient ever sees it. Same human-approval pattern as every other agent in this table.
+> Full design in `patient-management-plan.md` §8.10.
+>
+> **A bed-suggestion agent existed alongside it from 2026-09-16 and was removed on
+> 2026-09-22** — bed placement is the manual `POST /admissions/{id}/assign-bed` path
+> only now, same as it always was for the human half of that workflow.
 
 ---
 
@@ -101,26 +105,25 @@ screens in both apps.**
 
 ### 4.1 Emergency / Ambulance — Member 1
 
-Handles an emergency call end to end: taking the call, finding and dispatching
-the nearest ambulance, routing it, and deciding which ward the patient goes to.
+Handles an emergency call end to end: taking the call, finding and dispatching an
+eligible ambulance with its current crew, calculating route/ETA, and completing the
+response at handover to CareLanka Hospital's emergency entrance.
 
-- **Main functions:** log an incoming call with location; track ambulance
-  availability; dispatch the nearest ambulance; route it via a maps API; record
-  the call outcome
-- **Agent:** given a call, proposes which ambulance, which route, which ward
+- **Main functions:** log a call for the caller or another person; manage current
+  ambulance crew; compute eligibility; manually dispatch; capture crew
+  acknowledgement/decline and progress; calculate route/ETA; record handover;
+  expose narrow caller tracking and cancellation review
+- **Agent:** recommends an eligible ambulance and explains the route/ETA ranking;
+  deterministic code validates and the Duty Manager confirms
 - **Approval — two gates, sized to the decision.** A routine send is **one tap**:
-  the agent ranks the free ambulances by real driving ETA and the dispatcher
-  confirms. A **diversion** — turning around an ambulance already driving to
+  the agent ranks eligible ambulances by real driving ETA and the Duty Manager
+  confirms. A **diversion** — turning around an ambulance still driving to
   another call — goes to the Duty Manager with the full cost to that other
   patient shown before they decide. An ambulance that has already reached its
   patient is never diverted by anyone. See `specs/emergency-management-plan.md` §5
 
-> **Changed from v2, needs group confirmation.** This previously read *"sending
-> the nearest ambulance happens immediately"* with no human at all. Emergency's
-> own design doc argues the one-tap gate costs seconds and is far easier to
-> defend than an AI moving emergency vehicles unsupervised — so no agent output
-> anywhere in CareLanka is now applied without a person. Raised in
-> `emergency-management-plan.md` §14.
+> **Settled for this release.** No ambulance moves without Duty Manager confirmation.
+> Maps, AI, push, and Patient Management failure leave manual dispatch available.
 
 ### 4.2 Staff Management — Member 2
 
@@ -191,9 +194,9 @@ its state, and the audit trail stops being trustworthy. It also means a bug in
 your component can only ever corrupt your own tables.
 
 **`Ward` is the exception to watch.** It belongs to Patient Management but is
-referenced by Staff (`Shift.WardId`), Equipment (`EquipmentItem.WardId`,
-`EquipmentItem.WardId`) and Emergency (`Dispatch.DestinationWardId`). Treat its
-schema as frozen once agreed — changing it breaks three other people.
+referenced by Staff (`Shift.WardId`) and Equipment (`EquipmentItem.WardId`). Emergency
+does not store a ward: this release navigates to one configured hospital emergency
+entrance and Patient Management prepares the ward/bed.
 
 Detailed boundaries, and what each member needs from the others, are in
 [`specs/integration_of_functions.md`](specs/integration_of_functions.md).
@@ -202,23 +205,28 @@ Detailed boundaries, and what each member needs from the others, are in
 
 ## 6. The end-to-end workflow
 
-One emergency call triggers all four agents, then one human approves the plan.
-This is the cross-platform workflow the assignment requires in §4.1, and the one
-assessed Agentic AI workflow §9.1 requires.
+One emergency call can start the cross-component agent chain, but each high-impact
+change keeps its owning human gate. Emergency's first gate is the Duty Manager's routine
+dispatch confirmation; manual dispatch remains available if any dependency fails.
 
 How the four agents get chained together is designed in
 `specs/ai-orchestration-workflow.md`, once the agents themselves exist.
 
 ```text
-Emergency call comes in                              [Flutter — M1]
+Patient reports for self or another person           [Flutter screen — M4; API — M1]
         |
         v
 Dispatch & Routing Agent                             [M1]
-  -> proposes ambulance + route + destination ward
+  -> recommends eligible ambulance + route/ETA
+  -> deterministic validation; Duty Manager confirms
         |
         v
-Patient Admission & Bed Agent                        [M4]
-  -> checks bed availability, proposes admission + bed
+Bed placement                                        [M4]
+  -> Emergency notification cannot block dispatch
+  -> a nurse, manager or reception checks bed availability and assigns one by hand
+  -> *(Was a Bed & Patient Details Agent step through 2026-09-21 — same "suggest, human
+      commits" shape, no write tool of its own. Removed 2026-09-22: a human does this step
+      directly now, same endpoint the agent used to feed. See `patient-management-plan.md` §8.)*
         |
         v
 Staff Allocation Agent                               [M2]
@@ -236,7 +244,7 @@ Duty Manager reviews the whole plan                  [React — M1/M4]
 APPROVE   REJECT / REVISE
    |
    v
-Crew and ward nurse get their tasks                  [Flutter — M1/M4]
+Crew gets their task on Flutter, ward nurse on React  [M1/M4]
         |
         v
 Patient arrives, is admitted, and can see

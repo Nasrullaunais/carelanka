@@ -3,6 +3,7 @@ using CareLanka.Api.Common.Auth;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Patient;
+using CareLanka.Api.Services.Common;
 using CareLanka.Api.Services.Patient;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -17,11 +18,14 @@ public class AdmissionsController : ControllerBase
 {
     private readonly IAdmissionService _admissions;
     private readonly IBedAssignmentService _beds;
+    private readonly ICurrentUser _currentUser;
 
-    public AdmissionsController(IAdmissionService admissions, IBedAssignmentService beds)
+    public AdmissionsController(
+        IAdmissionService admissions, IBedAssignmentService beds, ICurrentUser currentUser)
     {
         _admissions = admissions;
         _beds = beds;
+        _currentUser = currentUser;
     }
 
     [Authorize(Policy = Policies.PatientDetails)]
@@ -69,6 +73,34 @@ public class AdmissionsController : ControllerBase
         return CreatedAtRoute("getAdmission", new { id = admission.Id }, admission);
     }
 
+    [Authorize(Policy = Policies.PatientRegistrar)]
+    [HttpPost("pre-admit", Name = "preAdmitFromDispatch")]
+    [ProducesResponseType(typeof(AdmissionResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<AdmissionResponse>> PreAdmit(
+        [FromBody] PreAdmitRequest request, CancellationToken ct)
+    {
+        var admission = await _admissions.PreAdmitAsync(request, ct);
+
+        return CreatedAtRoute("getAdmission", new { id = admission.Id }, admission);
+    }
+
+    [Authorize(Policy = Policies.AdmissionEditor)]
+    [HttpPost("{id:guid}/classify", Name = "classifyAdmission")]
+    [ProducesResponseType(typeof(AdmissionResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<AdmissionResponse>> ClassifyAdmission(
+        Guid id, [FromBody] ClassifyAdmissionRequest request, CancellationToken ct)
+        => Ok(await _admissions.ClassifyAsync(id, request, _currentUser.Id, ct));
+
     [Authorize(Policy = Policies.AdmissionEditor)]
     [HttpPatch("{id:guid}/details", Name = "completeAdmissionDetails")]
     [ProducesResponseType(typeof(AdmissionResponse), StatusCodes.Status200OK)]
@@ -81,7 +113,7 @@ public class AdmissionsController : ControllerBase
         Guid id, [FromBody] CompleteDetailsRequest request, CancellationToken ct)
         => Ok(await _admissions.CompleteDetailsAsync(id, request, ct));
 
-    [Authorize(Policy = Policies.WardNurse)]
+    [Authorize(Policy = Policies.ArrivalConfirmer)]
     [HttpPost("{id:guid}/arrive", Name = "markArrived")]
     [ProducesResponseType(typeof(AdmissionResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]

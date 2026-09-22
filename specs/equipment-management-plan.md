@@ -62,6 +62,8 @@ When the hospital buys a new item, the Administrator adds it under the matching 
 | Role | App | What they can do here |
 | :--- | :--- | :--- |
 | **Inventory Administrator** | React | Add/manage equipment and pharmacy categories, add equipment items and pharmacy items, update equipment status, bed register admin, the warnings/recommendations queue (approve / reject), reports |
+| **Patient** *(Rev 3, 2026-09-17)* | Flutter | Send a photo of a prescription to the pharmacy, then follow it: waiting, ready with a collection token, delivered, or can't be filled — see §5.4 |
+| **Hospital Administrator** *(Rev 3, 2026-09-16)* | Flutter | Confirm or reject a newly registered equipment item before it joins the register — see §4.3. Confirm maintenance done — see §6.1. *(Rev 3, 2026-09-17.)* Runs the maintenance unit on the web: books maintenance, reads the open-jobs list, and retires a machine beyond repair. The equipment manager only reports faults |
 | **Equipment Technician** | Flutter | Scan an asset tag to pull up its record, update an equipment item's status in the field, mark a maintenance task complete, report a fault |
 | **Any authenticated staff role** *(shared JWT, no Equipment-specific grant needed)* | Flutter / React | Search equipment and pharmacy items and check availability — a read-only capability, not gated to a role we define, because any nurse, doctor or crew member across the hospital may need to know "do we have X in stock" |
 
@@ -201,7 +203,7 @@ Constraint: `UNIQUE(ward_id, bed_number)`.
 | `ward_id` | uuid, nullable | |
 | `recommended_action` | text | Short human-readable summary, not the model's raw reasoning |
 | `status` | enum | `open` `acknowledged` `action_taken` `dismissed` |
-| `raised_by` | enum | `agent` `user` |
+| `raised_by` | enum | `agent` `user` `system` — `system` is the deterministic sweep *(Rev 3, 2026-09-19)* |
 | `workflow_id` | uuid, nullable | |
 | `acknowledged_by_staff_id` | uuid, FK, nullable | |
 | `acknowledged_at` | timestamptz, nullable | |
@@ -304,17 +306,38 @@ available ──> retired                     (planned decommission, rare)
 
 `retired` is terminal. A replacement is a new `EquipmentItem` row, never a reactivated one.
 
+**Removing a retired item.** *(Rev 3, 2026-09-18.)* `DELETE /equipment-items/{id}` — the administrator, with the same code — takes a retired item off the register altogether: a soft delete, so the row and its history stay in the database while every list stops showing it and its asset tag is free again. An item that is not retired answers 409 `cl_equ_025`, so the decision and the tidying stay two separate steps.
+
+**Retiring is the hospital administrator's, with the confirmation code.** *(Rev 3, 2026-09-18.)* `POST /equipment-items/{id}/retire` is the only way in: `PUT /equipment-items/{id}` refuses `status = retired` with 409 `cl_equ_024`, so taking a machine off the register for good cannot be an accidental edit by whoever happens to be editing items. It is the same code and the same person as §4.3 and §6.1. An item a patient is using has to be released first; any open repair job and fault warning are closed with the item.
+
 **Assigning an item** (`available -> assigned`) requires `assigned_to_admission_id`. **Releasing it** (`assigned -> available`) clears that field. Unlike Patient Management's `BedAssignment`, this component does not keep a full assignment history table — only the current assignment is stored, which is a deliberate simplification flagged in §15.
 
 **Marking maintenance** (`available -> maintenance`) can happen two ways: the Administrator does it manually, or a Technician's fault report (§7.1) does it automatically — a broken defibrillator changes status the moment it's reported, not on the next scheduled sweep.
 
-**Coming back out of maintenance is the maintenance unit's move, not the Administrator's.** *(Rev 2, 2026-09-13.)* A fault report opens a `MaintenanceSchedule` of type `repair` alongside the warning, and that work order is the only route back to `available` — `POST /maintenance-schedules/{id}/complete` returns the item to service, records who did the work, and closes the fault in one transaction. Editing `status` back to `available` through `PUT /equipment-items/{id}` answers 409 instead.
+**Coming back out of maintenance is the maintenance unit's move, not the Administrator's.** *(Rev 2, 2026-09-13.)* A fault report opens a `MaintenanceSchedule` of type `repair` alongside the warning, and that work order is the only route back to `available` — the hospital administrator confirming it done (`POST /maintenance-schedules/{id}/confirm`, §6.1) returns the item to service, records who confirmed it, and closes the fault in one transaction. Editing `status` back to `available` through `PUT /equipment-items/{id}` answers 409 instead.
 
 The reason is the same one behind the bed-occupancy check: a rule that only holds when everybody remembers it is not a rule. Without this, a reported fault is a status a busy Administrator can undo from a dropdown without anybody looking at the machine, and the fault warning stays open behind it. `retired` remains reachable from `maintenance`, because *beyond repair* is the other honest ending — and retiring cancels the open work order and closes the warning, so the unit's queue never lists a machine that no longer exists.
 
 ### 4.2 Bed condition
 
 Two states only, matching Patient Management's `Bed` schema exactly: `usable` / `out_of_service`. Retiring a bed is a separate, explicit, irreversible endpoint (§7.2), not a status value, so its one-way nature is visible in the API rather than hidden inside a generic update.
+
+### 4.3 Confirmation before the register *(Rev 3, 2026-09-16)*
+
+A newly registered `EquipmentItem` does not go straight onto the register. It is saved with `awaiting_confirmation = true` and waits for the hospital administrator to confirm it — in the mobile app, or on the web Equipment page *(Rev 3, 2026-09-17)*. Both call the same endpoints with the same code.
+
+```
+registered ──> awaiting confirmation ──> confirmed   (joins the register, status available)
+                                     └─> rejected    (soft-deleted, never listed)
+```
+
+While it waits, the item is left out of `GET /equipment-items`, and editing it, assigning it, reporting a fault against it or scheduling its maintenance all answer 409 `cl_equ_018`. The administrator confirms exactly what was registered; a mistake is fixed by rejecting it and registering it again. Confirming stamps `confirmed_by_staff_id` and `confirmed_at`. Rejecting soft-deletes the row, so its asset tag and serial number are free to be registered again with the right details. Items that existed before this rule are treated as confirmed.
+
+**Who confirms.** Only the hospital administrator — a different person from the equipment manager who registered the item, so nobody approves their own entry. The role is enforced by the `EquipmentConfirmer` policy.
+
+**The confirmation code.** On top of the role, listing, confirming and rejecting all send an `X-Confirmation-Code` header. The API compares it against `Equipment:ConfirmationCode` in its own configuration and answers 403 `cl_equ_017` when it is missing or wrong. It is never stored in a client: a code checked only in the app can be read out of the web build, and the endpoint would still be callable without it.
+
+**Why not a new `EquipmentStatus` value.** Waiting for confirmation is not a lifecycle state of a machine in use — it is whether the register has accepted the row at all. A separate flag keeps the transition matrix in §4.1 unchanged, and the web status filter never offers a state nobody on the dashboard can see.
 
 ---
 
@@ -331,6 +354,30 @@ Quantities are never edited directly. Every change is a `PharmacyTransaction`, a
 | `adjusted` | Inventory Administrator, with a mandatory note | `±quantity` — stocktake corrections |
 | `expired_removed` | Inventory Administrator, usually following a `dispose_expired_stock` action | `-quantity` |
 
+### 5.1a Batches — one medicine, many deliveries *(Rev 3, 2026-09-18)*
+
+A medicine is registered once, with its name, category and unit. Every delivery of it after that is a **batch**, numbered 1, 2, 3 for that medicine, with its own expiry date and its own count of boxes.
+
+```
+Amoxicillin 250mg          on hand 58, expires first 2026-10-01
+  1st batch   18 boxes     expires 2026-10-01
+  2nd batch   40 boxes     expires 2027-03-31
+```
+
+- **Stock lives on the batch.** `PharmacyItem.QuantityOnHand` is every batch added up, kept in step inside the same transaction, so the register and the batch list can never disagree.
+- **Arriving stock is `POST /pharmacy-items/{id}/batches`**, never a `received` movement — a delivery has an expiry date and a plain quantity cannot carry one. That movement type answers 400 `cl_equ_026`.
+- **Dispensing empties the batch that expires first**, spilling into the next when one is not enough, and writes one movement per batch it touches. That is what stops stock going out of date on the shelf while newer boxes are handed out.
+- **A movement can name its batch.** `POST /pharmacy-items/{id}/batches/{batchId}/transactions` does the same movements out of one named delivery — stock expiring in that box, or a stocktake correction on it. It is refused if that batch alone does not hold enough, even when the shelf does.
+- **An adjustment with no batch named lands on the newest batch** — the one somebody has just been counting.
+- **A used-up batch is kept**, at zero, because it is part of the history of what was dispensed.
+- **Registering a medicine can include the first delivery** (`quantity_on_hand` + `expiry_date`), which becomes batch 1, or leave it out for a medicine stocked but not held.
+
+### 5.1b Removing a medicine *(Rev 3, 2026-09-18)*
+
+`DELETE /pharmacy-items/{id}` takes a medicine the hospital no longer stocks off the register: a soft delete, so its batches and movement history stay in the database while it leaves every list and search, and its name is free again.
+
+It asks for the confirmation code — the same one as equipment confirmation, checked by the API — on top of the role, and it is **refused while any stock is left** (409 `cl_equ_027`). Boxes on the shelf must be dispensed or written off first, otherwise stock would disappear from the register with nothing in the history to say where it went.
+
 ### 5.2 Search and availability — the literal requirement
 
 `GET /api/pharmacy-items?search=&availableOnly=` is open to **any authenticated staff role**, per §2. It matches name or category, and `availableOnly=true` filters to `quantity_on_hand > 0` — exactly "search for pharmacy items and check whether they are currently available."
@@ -344,7 +391,37 @@ Two independent triggers, both checked by the same sweep:
 | `quantity_on_hand` below `reorder_threshold`, or projected days-of-supply under 3 at the current dispensing rate | `low_stock` |
 | `expiry_date` within 30 days, and `quantity_on_hand > 0` | `medicine_expiring` |
 
+**Built — the deterministic sweep** *(Rev 3, 2026-09-19, build step 7)*. `WarningService.SweepAsync`, fixed rules in C#, no model. It runs every `Equipment:WarningSweepIntervalMinutes` (60; 0 turns the timer off) and on demand from **Run check** (`POST /warnings/sweep`). Warnings carry `raised_by = system`.
+
+| Rule | Type | Severity |
+| :--- | :--- | :--- |
+| On hand `<=` reorder level (the same test the pharmacy page highlights), or under 3 days left at the last 14 days' dispensing | `low_stock` | critical when out, high at half the level or less (or under 3 days), otherwise medium |
+| A batch with stock expiring within `Equipment:ExpiryWarningDays` (30), or already expired. One warning per medicine naming every such batch | `medicine_expiring` | critical once expired, high within 7 days, medium within 14, otherwise low |
+| A machine past `next_maintenance_due` with nothing booked, or a routine service or calibration booked for a day gone by (equipment or bed) | `maintenance_overdue` | high after 30 days late, otherwise medium |
+
+Repairs are left out of the overdue rule on purpose: an open repair already has its `equipment_faulty` warning, and one problem should be one warning. "Today" is the hospital's day in Sri Lanka, not UTC's.
+
+Each run reconciles against the sweep's live warnings: a problem still there updates the open warning's wording and severity rather than adding another (a partial unique index backs this up); a problem that is gone closes its warning as `action_taken`; a severity that rises re-opens a warning somebody had acknowledged. Reported faults (`raised_by = user`) are never touched — they close when the administrator confirms the repair. The agent (step 11) reads these warnings; it never decides whether one exists.
+
+**Done** *(Rev 3, 2026-09-19)*. A resolved warning stays on the Resolved tab until the hospital administrator presses **Done** and enters the confirmation code (`POST /warnings/{id}/clear`). That takes it off every list; the row stays in the database with `cleared_at` and who cleared it. Only a resolved warning can be marked done (409 `cl_equ_029` otherwise).
+
 ---
+
+### 5.4 Prescriptions from the patient app *(Rev 3, 2026-09-17)*
+
+A patient photographs their prescription in the mobile app and sends it to the pharmacy, so the medicine is ready before they arrive and they collect it by token instead of queueing.
+
+```
+patient sends photo ──> submitted ──(pharmacy: ready)──> ready, token N ──(pharmacy: delivered)──> delivered
+                            └──────────────(pharmacy: can't fill, with a reason)──────────────> rejected
+```
+
+- **Sending.** `POST /api/me/prescriptions`: a JPEG, PNG or PDF up to 10 MB, and an optional note. The patient comes from the token. A login not yet linked to a hospital record is told to add its details first (`cl_pat_033`).
+- **The pharmacy.** The Pharmacy page lists prescriptions by status, opens the photo, and moves each one on. The pharmacy stands on `equipment_manager`, because `StaffRole` has no pharmacist.
+- **The token.** Marking ready issues the next number for the day, counted in Sri Lanka time and restarting at 1 each morning. `(token_date, token_number)` is unique, so two pharmacists pressing Ready together get two numbers rather than one each.
+- **The patient's view.** The Prescriptions tab shows each one's state; a ready one shows the token large enough to hold up at the counter, a delivered one shows when it was collected, a rejected one shows the pharmacy's reason.
+
+No stock moves here. Dispensing from stock is still a `PharmacyTransaction` (§5.1), recorded separately; linking a prescription to the items dispensed is not built.
 
 ## 6. The maintenance workflow
 
@@ -356,11 +433,21 @@ Two independent triggers, both checked by the same sweep:
 5. THRESHOLD    deterministic rule decides requires_approval (§8.6)
 6. APPROVE      Administrator approves in React (or it auto-clears)
 7. SCHEDULE     MaintenanceSchedule row created, status = scheduled; EquipmentItem.status -> maintenance
-8. COMPLETE     Technician scans the asset tag, marks it done in Flutter
+8. CONFIRM      hospital administrator confirms it done in Flutter, with the confirmation code
 9. RECOMPUTE    next_maintenance_due advances; EquipmentItem.status -> available; Warning -> action_taken
 ```
 
-A Technician or any staff member can also report a fault directly (`POST /api/equipment-items/{id}/report-fault`) without waiting for the sweep, exactly as §4.1 describes.
+A Technician or any staff member can also report a fault directly (`POST /api/equipment-items/{id}/report-fault`) without waiting for the sweep, exactly as §4.1 describes. The equipment manager can also book a service, calibration or repair by hand from the Maintenance unit screen.
+
+### 6.1 The hospital administrator confirms maintenance done *(Rev 3, 2026-09-16)*
+
+Every open job — a reported fault's repair the moment it is reported, and anything scheduled — appears for the hospital administrator — in the mobile app, and on the web Maintenance unit page *(Rev 3, 2026-09-17)*. Confirming one done (`POST /maintenance-schedules/{id}/confirm`) completes it, records the administrator in `performed_by_staff_id`, returns the item to service, advances `next_maintenance_due` and closes the warning.
+
+```
+fault reported / job scheduled ──> open (web list + mobile list) ──(confirm done, mobile)──> completed
+```
+
+That is the only way a job is completed. The equipment manager's old `POST /maintenance-schedules/{id}/complete` was removed, so the person booking the work cannot sign it off. The rule and the code are the same as §4.3: only the hospital administrator, and every list and confirm call sends `X-Confirmation-Code`, checked by the API.
 
 ---
 
@@ -374,14 +461,22 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/equipment-categories` | Any staff | |
 | `POST` | `/api/equipment-categories` | Inventory Administrator | |
-| `POST` | `/api/equipment-items` | Inventory Administrator | Register a new item under a category |
+| `GET` | `/api/equipment-categories/for-removal` | Hospital Administrator + code *(Rev 3, 2026-09-19)* | Every category with `item_count` |
+| `DELETE` | `/api/equipment-categories/{id}` | Hospital Administrator + code *(Rev 3, 2026-09-19)* | Soft-deletes an unused category; in use → 409 `cl_equ_030` |
+| `POST` | `/api/equipment-items` | Inventory Administrator | Register a new item under a category. It awaits confirmation — §4.3 |
 | `GET` | `/api/equipment-items` | Any staff | `?search=`, `?categoryId=`, `?wardId=`, `?status=`. Paginated, sortable. |
 | `GET` | `/api/equipment-items/{id}` | Any staff | Includes maintenance history |
 | `GET` | `/api/equipment-items/by-tag/{assetTag}` | Equipment Technician | **Business op.** What the QR scan resolves to. |
-| `PUT` | `/api/equipment-items/{id}` | Inventory Administrator | |
+| `PUT` | `/api/equipment-items/{id}` | Inventory Administrator; Hospital Administrator | Edits only — `status = retired` answers 409 *(Rev 3, 2026-09-18)* |
 | `POST` | `/api/equipment-items/{id}/assign` | Inventory Administrator, Equipment Technician | **Business op.** Requires `admission_id`. `available -> assigned`. |
 | `POST` | `/api/equipment-items/{id}/release` | Inventory Administrator, Equipment Technician | **Business op.** `assigned -> available`, clears the admission link. |
 | `POST` | `/api/equipment-items/{id}/report-fault` | Equipment Technician, any staff | **Business op.** §6, last paragraph. |
+| `POST` | `/api/equipment-items/{id}/retire` | Hospital Administrator + code *(Rev 3, 2026-09-18)* | **Business op.** The only route to `retired`. §4.1 |
+| `DELETE` | `/api/equipment-items/{id}` | Hospital Administrator + code *(Rev 3, 2026-09-18)* | Soft-deletes a retired item off the register. §4.1 |
+| `GET` | `/api/equipment-items/pending-confirmation` | Hospital Administrator + code | *(Rev 3)* Items awaiting confirmation, oldest first. §4.3 |
+| `GET` | `/api/equipment-items/pending-confirmation/count` | Equipment Manager, Hospital Administrator | *(Rev 3)* How many are waiting — no code, a number only |
+| `POST` | `/api/equipment-items/{id}/confirm` | Hospital Administrator + code | *(Rev 3)* **Business op.** Joins the register |
+| `POST` | `/api/equipment-items/{id}/reject` | Hospital Administrator + code | *(Rev 3)* **Business op.** Soft-deletes it; the tag is free again |
 
 ### 7.2 Beds
 
@@ -401,16 +496,29 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 | `POST` | `/api/pharmacy-items` | Inventory Administrator | |
 | `GET` | `/api/pharmacy-items` | **Any authenticated staff** | `?search=`, `?categoryId=`, `?availableOnly=`. The literal requirement from §5.2. |
 | `GET` | `/api/pharmacy-items/{id}` | Any staff | |
-| `POST` | `/api/pharmacy-items/{id}/transactions` | Role depends on `type` — see §5.1 | **Business op.** The atomic conditional update from §3.3. |
+| `DELETE` | `/api/pharmacy-items/{id}` | Inventory Administrator, Hospital Administrator + code *(Rev 3, 2026-09-18)* | Soft-deletes a medicine with an empty shelf. §5.1b |
+| `GET` | `/api/pharmacy-items/{id}/batches` | Any staff | *(Rev 3, 2026-09-18)* Every delivery of this medicine. §5.1a |
+| `POST` | `/api/pharmacy-items/{id}/batches` | Inventory Administrator | *(Rev 3, 2026-09-18)* **Business op.** A delivery: the next batch, with its expiry date |
+| `POST` | `/api/pharmacy-items/{id}/batches/{batchId}/transactions` | Inventory Administrator | *(Rev 3, 2026-09-18)* **Business op.** A movement out of one named batch. §5.1a |
+| `POST` | `/api/pharmacy-items/{id}/transactions` | Role depends on `type` — see §5.1 | **Business op.** The atomic conditional update from §3.3. `received` answers 400 — it is a batch |
 | `GET` | `/api/pharmacy-items/{id}/transactions` | Inventory Administrator | History, paginated |
+| `GET` | `/api/me/prescriptions` | Patient | *(Rev 3)* Own prescriptions, newest first. §5.4 |
+| `POST` | `/api/me/prescriptions` | Patient | *(Rev 3)* Send a photo or PDF, multipart |
+| `GET` | `/api/prescriptions` | Equipment Manager | *(Rev 3)* `?status=`; open work oldest first, history the latest 100 |
+| `GET` | `/api/prescriptions/{id}/file` | Equipment Manager | *(Rev 3)* The photo, inline |
+| `POST` | `/api/prescriptions/{id}/ready` | Equipment Manager | *(Rev 3)* **Business op.** Issues today's next token |
+| `POST` | `/api/prescriptions/{id}/deliver` | Equipment Manager | *(Rev 3)* **Business op.** `ready -> delivered` |
+| `POST` | `/api/prescriptions/{id}/reject` | Equipment Manager | *(Rev 3)* **Business op.** With a reason the patient sees |
 
 ### 7.4 Maintenance
 
 | Method | Route | Role | Notes |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/api/maintenance-schedules` | Inventory Administrator, Equipment Technician | `?status=`, `?assetType=`, `?overdue=true` |
-| `POST` | `/api/maintenance-schedules` | Inventory Administrator | Manual scheduling, no agent involved |
-| `POST` | `/api/maintenance-schedules/{id}/complete` | Equipment Technician | **Business op.** §6 steps 8–9. |
+| `GET` | `/api/maintenance-schedules` | Hospital Administrator *(Rev 3, 2026-09-17)* | `?status=`, `?assetType=`, `?overdue=true` |
+| `POST` | `/api/maintenance-schedules` | Hospital Administrator *(Rev 3, 2026-09-17)* | Manual scheduling, no agent involved |
+| `GET` | `/api/maintenance-schedules/pending-confirmation` | Hospital Administrator + code | *(Rev 3)* Every open job, earliest due first. §6.1 |
+| `GET` | `/api/maintenance-schedules/pending-confirmation/count` | Equipment Manager, Hospital Administrator | *(Rev 3)* How many are open — no code |
+| `POST` | `/api/maintenance-schedules/{id}/confirm` | Hospital Administrator + code | *(Rev 3)* **Business op.** §6 steps 8–9. Replaces `/complete`, which was removed |
 
 ### 7.5 Laboratory *(Rev 2, 2026-09-13)*
 
@@ -429,8 +537,10 @@ Two policies, not one: a nurse reads a result and acts on it, while issuing one 
 | :--- | :--- | :--- | :--- |
 | `POST` | `/api/equipment/monitor` | Inventory Administrator, or the group orchestrator | **Agent entry point.** Runs a sweep, returns `workflow_id`. |
 | `GET` | `/api/workflows/{workflowId}` | Inventory Administrator | Plan, steps, tool calls, validation, outcome |
-| `GET` | `/api/warnings` | Inventory Administrator | `?status=`, `?severity=`, `?type=` |
-| `POST` | `/api/warnings/{id}/acknowledge` | Inventory Administrator | |
+| `GET` | `/api/warnings` | Equipment Manager, Hospital Administrator *(Rev 3, 2026-09-19)* | `?status=`, `?severity=`, `?type=`. Worst first, then newest |
+| `POST` | `/api/warnings/sweep` | Equipment Manager, Hospital Administrator *(Rev 3, 2026-09-19)* | **Run check** — the deterministic sweep, §5.3. Returns raised / updated / resolved / still open |
+| `POST` | `/api/warnings/{id}/acknowledge` | Equipment Manager, Hospital Administrator *(Rev 3, 2026-09-19)* | Records who saw it. A closed warning answers 409 `cl_equ_028` |
+| `POST` | `/api/warnings/{id}/clear` | Hospital Administrator + code *(Rev 3, 2026-09-19)* | **Done** — takes a resolved warning off the list. Not resolved: 409 `cl_equ_029` |
 | `GET` | `/api/action-requests` | Inventory Administrator | The approvals queue — **this is the demo screen** |
 | `POST` | `/api/action-requests/{id}/approve` | Inventory Administrator | **High-impact gate.** Executes the action per §3.3. |
 | `POST` | `/api/action-requests/{id}/reject` | Inventory Administrator | Requires a reason |
@@ -563,11 +673,11 @@ Per the assignment: workflow id, objective, plan, completed steps, tool calls wi
 
 | Screen | Contents |
 | :--- | :--- |
-| **Equipment inventory** | Search, filter by category/ward/status, sort, paginate |
+| **Equipment inventory** | Search, filter by category/ward/status, sort, paginate. *(Rev 3, 2026-09-16.)* Lists confirmed items only, and tells the equipment manager and administrator how many registered items are still awaiting confirmation. *(Rev 3, 2026-09-17.)* The hospital administrator also gets a **Confirm new equipment** card: enter the confirmation code, then Confirm or Reject each waiting item — the same queue as the mobile app, §4.3. *(Rev 3, 2026-09-18.)* Every item carries a **Retire** button for the administrator, which asks for the confirmation code; a retired one carries **Remove**, which takes it off the register after the same code — §4.1. *(Rev 3, 2026-09-19.)* Below it, a **Remove categories** card for the administrator: the code unlocks every category with how many items use it, and **Remove** takes an unused one off the list |
 | **Equipment detail** | Item info, maintenance history, current warnings, assign/release. *(Rev 2, 2026-09-13.)* Assigning picks the patient by ward rather than taking a pasted admission id |
-| **Pharmacy inventory** | Search, filter by category, below-threshold and expiring-soon highlighted |
+| **Pharmacy inventory** | Search, filter by category, below-threshold and expiring-soon highlighted. *(Rev 3, 2026-09-18.)* An arrow under each medicine opens its batches — number, expiry, boxes left, batch code — with **Record movement** on each one, and **Add batch** records a delivery. §5.1a. **Remove** takes a medicine off the register once its shelf is empty, after the confirmation code — §5.1b. *(Rev 3, 2026-09-17.)* A **Prescriptions from the app** card: waiting, ready, delivered and can't-fill tabs, view the photo, Ready (issues a token), Mark delivered, Can't fill with a reason — §5.4 |
 | **Maintenance calendar** | Scheduled and overdue, by asset type |
-| **Maintenance unit** | *(Rev 2, 2026-09-13.)* The repair queue: every machine out of service and what was reported against it. Confirm the repair and the item returns to service; mark it beyond repair and it is retired. The only screen that can bring an item back from `maintenance` — see §4.1 |
+| **Maintenance unit** | *(Rev 3, 2026-09-17 — the hospital administrator's page only.)* Book a service, calibration or repair; the open-jobs list with Beyond repair (retires the item, asking for the confirmation code — §4.1); and Confirm maintenance done, after the confirmation code — §6.1. The equipment manager does not see it: they report faults from the Equipment page |
 | **Laboratory** | *(Rev 2, 2026-09-13.)* Pick a ward, read down who is in it, and file a result against whoever the specimen came from. Search by code, name or NIC is the second way in, for an outpatient in no ward. Clinical staff see the same screen without the upload form — see §7.5 |
 | **Bed register admin** | Create beds, mark out of service, retire — occupancy block surfaced as a clear error |
 | **Warnings & recommendations queue** | Everything open, recommended action, urgency, cost. Approve / Reject / auto-approved badge. **This is the demo screen.** |
@@ -586,6 +696,19 @@ Protected routes by role, loading / empty / success / error states throughout.
 | Complete service | Confirm work done, add notes |
 | Report a fault | Free-text report against a scanned item |
 | Assign / release equipment | Link or clear `assigned_to_admission_id` |
+
+**Hospital Administrator** *(Rev 3, 2026-09-16)*:
+
+| Screen | Contents |
+| :--- | :--- |
+| Equipment confirmation | How many items are waiting. Opening it asks for the confirmation code; the API checks it. Then each waiting item with Confirm and Reject — §4.3 |
+| Maintenance confirmation | How many jobs are open. Same code step. Then each job — item, type, due date, what was reported — with Confirm done — §6.1 |
+
+**Patient** *(Rev 3, 2026-09-17)* — a tab in the patient app, built here and placed there by `PatientShell`:
+
+| Screen | Contents |
+| :--- | :--- |
+| Prescriptions | Every prescription sent and its state; the token shown large once ready. Upload prescription: photograph it or attach a PDF, optional note — §5.4 |
 
 **Any staff (shared role, §2):**
 
@@ -706,6 +829,9 @@ Rule-based assertions, not an LLM judge.
 | One central pharmacy quantity, not per-ward | Matches your plan's description; per-ward stock is the more complex model used for equipment consumables in an earlier draft, dropped here to match what you actually described | Add `ward_id` to `PharmacyItem` (or split into a `PharmacyStockLevel` table) if per-ward tracking turns out to matter |
 | No equipment-assignment history table | Your plan describes a status field, not an audit trail; keeping only the current assignment is the literal reading | Add an `EquipmentAssignment` table (mirroring Patient's `BedAssignment`) if the group wants "who had this before" queries |
 | One `ActionRequest`/`Warning` pair covers both pharmacy and equipment problems | One contract, one approvals queue, one report, instead of two nearly-identical proposal systems | Split by domain if pharmacy and equipment approvals end up needing very different fields |
+| A newly registered item waits for the hospital administrator to confirm it *(Rev 3, 2026-09-16)* | Stops a mistyped or duplicate item reaching the register and being handed to a patient. The administrator is a different person from the registering equipment manager, and a confirmation code checked by the API sits on top of the role | Drop the code and rely on the role alone, or let items register straight onto the list again |
+| Maintenance is confirmed done by the hospital administrator *(Rev 3, 2026-09-16)* | A machine is only handed back to the wards when someone other than the person who booked the work says it is done, with the same code as item registration | Give the equipment manager a way to complete a job again |
+| Patients send prescriptions from the app and collect by token *(Rev 3, 2026-09-17)* | No queue at the pharmacy window: the medicine is ready before the patient arrives, and a daily token number is short enough to call out | Keep dispensing walk-in only |
 | Threshold-based auto-approval | Confirmed in our conversation — keeps the agent doing useful daily work while still gating anything costly, urgent or irreversible | "Always require approval" is the safer, simpler fallback |
 
 ---

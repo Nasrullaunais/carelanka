@@ -16,8 +16,6 @@ class AppointmentsController extends ChangeNotifier {
 
   AsyncData<List<MyAppointment>> get appointments => _appointments;
 
-  /// True while a booking or cancellation is in flight, so the screen can stop
-  /// a second tap turning into a second appointment.
   bool get busy => _busy;
 
   List<MyAppointment> get upcoming =>
@@ -28,13 +26,17 @@ class AppointmentsController extends ChangeNotifier {
       (_appointments.valueOrNull ?? const []).where((a) => !_isOpen(a)).toList()
         ..sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));
 
+  // Completed is deliberately not open, whichever way it ended. Either the patient went home
+  // or they are in a bed, and the stay -- not the booking -- is what they are waiting on.
   static bool _isOpen(MyAppointment appointment) =>
       appointment.status == AppointmentStatus.scheduled ||
-      appointment.status == AppointmentStatus.checkedIn;
+      appointment.status == AppointmentStatus.confirmed;
 
-  Future<void> load() async {
-    _appointments = const AsyncData.loading();
-    notifyListeners();
+  Future<void> load({bool showLoading = true}) async {
+    if (showLoading) {
+      _appointments = const AsyncData.loading();
+      notifyListeners();
+    }
 
     try {
       final page = await _service.loadMyAppointments();
@@ -45,8 +47,6 @@ class AppointmentsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Returns the error rather than swallowing it: booking fails for reasons the
-  /// patient can act on — one open booking at a time, and none while admitted.
   Future<ApiException?> book({required DateTime scheduledAt, String? reason}) async {
     return _write(() => _service.bookAppointment(scheduledAt: scheduledAt, reason: reason));
   }

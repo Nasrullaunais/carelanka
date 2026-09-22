@@ -22,7 +22,7 @@ public enum MessageCode
 
     RefreshTokenInvalid,
 
-    PhoneNumberAlreadyRegistered,
+    UsernameAlreadyTaken,
 
     BedNumberTaken,
 
@@ -45,6 +45,34 @@ public enum MessageCode
     LabReportFileTooLarge,
 
     LabReportFileType,
+
+    ConfirmationCodeIncorrect,
+
+    EquipmentAwaitingConfirmation,
+
+    EquipmentNotAwaitingConfirmation,
+
+    PrescriptionWrongStatus,
+
+    PrescriptionFileEmpty,
+
+    PrescriptionFileTooLarge,
+
+    PrescriptionFileType,
+
+    EquipmentRetireNeedsCode,
+
+    EquipmentRemoveNeedsRetired,
+
+    PharmacyReceiveIsABatch,
+
+    PharmacyRemoveNeedsEmpty,
+
+    WarningClosed,
+
+    WarningNotResolved,
+
+    EquipmentCategoryInUse,
 
     PharmacyCategoryNameTaken,
 
@@ -118,11 +146,41 @@ public enum MessageCode
 
     AmbulanceHasActiveDispatch,
 
+    StaffNotAmbulanceCrew,
+
+    CrewMemberAlreadyAssigned,
+
+    AmbulanceNotEligible,
+
+    CallNotAwaitingDispatch,
+
+    DispatchProposalConflict,
+
+    DispatchProposalNotConfirmable,
+
+    DispatchProposalNotApprovable,
+
     NicLinkedToAnotherAccount,
 
     NicDoesNotMatchYourRecord,
 
     AccountHasNoPatientRecord,
 
-    NoCurrentAdmission
+    NoCurrentAdmission,
+
+    AppointmentBilledOnItsAdmission,
+
+    NoBillRaised,
+
+    PatientCodeNotClaimable,
+
+    NotCurrentlyAdmittedForCareQuery,
+
+    CareRecommendationNotPendingReview,
+
+    PreAdmissionAlreadyExists,
+
+    AdmissionAlreadyClassified,
+
+    AdmissionNotYetClassified
 }

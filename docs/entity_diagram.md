@@ -5,6 +5,66 @@ single hospital / multiple wards, unified staff identity, generic agent-workflow
 audit-log schemas). PKs are `Guid` (PostgreSQL `uuid`, `default: gen_random_uuid()`)
 throughout.
 
+**Revision 3.2** *(2026-09-16)* — both Patient Management agents were redesigned after the rest
+of that component was built and tested. Three schema-visible consequences, all marked *(Rev 3.2)*:
+
+- **`PatientMedicalProfile` (new)** — one row per patient, `UNIQUE(patient_id)`, four free-text
+  fields a clinician types. It exists because the Patient Care Advisory Agent had nothing to
+  reason over. Owned by Patient Management. See
+  [`PatientMedicalProfile`](#patientmedicalprofile-extends-auditedentity-rev-32--new).
+- **`AdmissionStatus.AwaitingApproval` is no longer reached.** First because the bed agent held
+  no write tool, then because it was removed outright (2026-09-22) — bed placement is manual
+  only. The value stays in the enum — Equipment's ward-patient list reads it, and removing a
+  value from a shared enum is a cross-component change for no gain.
+- **`CareRecommendation`'s review gate widened to `Doctor` OR `WardNurse`**, with a new
+  deterministic rule (CR5) against `PatientMedicalProfile.Allergies` holding the line instead
+  of the role alone.
+
+`AssignedBy.Agent` also changed meaning without changing shape — it now records that a human
+committed a bed the agent *suggested*, not that the agent wrote the row.
+
+**Revision 2.17** — `bed_assignments.workflow_id` is a real foreign key to `agent_workflows.id`,
+added in the `Patient_LinkBedAssignmentWorkflow` migration with `ON DELETE RESTRICT` and an index.
+The column was written in step 2 and pointed at a table that did not exist until Revision 2.16.
+Still nullable, and null for every row a human picked by hand.
+
+**Revision 2.16** — `AgentWorkflow` and `AgentProposedChange` are built, in the
+`Common_AddAgentWorkflows` migration (tables `agent_workflows`, `agent_proposed_changes`).
+`AgentProposedChange.ProposedShiftId` is **not** built yet: `Shift` does not exist, so Staff
+adds that column and its foreign key with its own migration.
+
+**Revision 2.14** — `notifications` gains `DedupeKey`, `AttemptCount` and `NextAttemptAt` so it can
+double as the push retry queue, in the `Common_AddDeviceTokensAndNotifications` migration,
+which also creates `device_tokens` and `notifications`. Changes marked *(Rev 2.14)*.
+
+**Revision 2.13** — patients sign in with a username. `PatientAccount` loses two columns
+and gains one, in the `Common_PatientUsernameLogin` migration. Changes marked *(Rev 2.13)*.
+
+- **`PatientAccount.Username`** replaces `PhoneNumber` as the login identifier. Registration
+  now asks for a username and a password and nothing else; the name, NIC, gender, date of
+  birth and contact number arrive afterwards through `POST /me/pre-register`, which is where
+  they belong — on the medical record, not on the login.
+- **`PatientAccount.FullName` and `PhoneNumber` are gone.** Both duplicated columns on
+  `patients`, and neither had anything to fill it once registration stopped asking. A column
+  that is always empty is worse than no column: the next person to read the schema believes it.
+- **Existing rows kept their login.** The migration backfills `username` from the digits of
+  the old `phone_number` before dropping it, so the same person still reaches the same row.
+
+**Revision 3.1** — Emergency's response unit and dispatch contract were aligned before
+the next migration:
+
+- **`AmbulanceCrewAssignment` (new)** records current and historical ambulance duty.
+  One crew member has at most one row with `UnassignedAt = null`.
+- **`DispatchCrew` is an immutable snapshot**, copied from current ambulance crew when
+  the Duty Manager creates a dispatch.
+- **`DispatchStatus` is the authoritative journey state**, including acknowledgement,
+  scene arrival, transport and handover. `CallStatus` and `AmbulanceStatus` are projections.
+- **`Dispatch.DestinationWardId` is removed.** This release routes every transport to
+  CareLanka Hospital's configured emergency entrance; Patient Management owns ward and bed
+  preparation.
+- **Post-assignment cancellation review lives on `EmergencyCall`** as one current request;
+  the audit log retains its change history.
+
 **Revision 2.12** — the billing tables are written down at last. Four tables that landed on
 2026-09-11 with step 7 and were never added here: `bills`, `bill_line_items`, `billing_rates`
 and `admission_fee_rates`, in the `Patient_AddBilling`, `Patient_AddBillingRates` and
@@ -85,7 +145,7 @@ this document.
 configuration, the `Patient_AddWard` migration and `GET`/`POST /wards`), and building it
 settled two names this document and `patient-spec.yaml` disagreed on. Changes marked
 *(Rev 2.8)*. **`Ward`'s schema is now frozen** — `Shift.WardId`, `EquipmentItem.WardId` and
-`Dispatch.DestinationWardId` all point at it.
+Emergency no longer stores a ward reference on Dispatch as of Rev 3.1.
 
 - **`WardGenderPolicy` is named `GenderPolicy`.** The committed spec publishes it as
   `GenderPolicy`, and on an entity Member 4 owns the spec wins. Same values, same wire
@@ -124,9 +184,12 @@ already used everywhere else in this document.
 - **`CareRecommendation` (new)** — see
   [`CareRecommendation`](#carerecommendation-extends-auditedentity-rev-26--new). Owned by
   Patient Management, alongside the existing entities.
-- **`AgentType.PatientCareAdvisory` (new)** — the fifth agent value. The existing
-  `PatientAdmissionBed` is untouched; this project now has two agents in one component
-  rather than a replacement.
+- **`AgentType.PatientCareAdvisory` (new)** — the fifth agent value, at the time this was
+  written. The existing `PatientAdmissionBed` was untouched then; this project ran two
+  agents in one component rather than a replacement. *(No longer true — `PatientAdmissionBed`
+  was removed from the enum on 2026-09-22 along with the bed agent itself. `PatientCareAdvisory`
+  is Patient Management's only `AgentType` value today. See the `AssignedBy` entry above and
+  `patient-management-plan.md` §8 for the removal.)*
 - **`ProposedChangeType.CreateCareRecommendation` (new)** — the write this agent's
   workflow proposes, following the same `AgentProposedChange` shape every other agent
   already uses. No new column was needed on that shared table — see the entity note for
@@ -356,15 +419,25 @@ One staff member may have several devices. Scoped to `StaffMember` only; see
 
 #### PatientAccount extends SoftDeletableEntity *(Rev 2.5 — new)*
 ```
-+ PhoneNumber: string (unique, non-null)               -- the login identifier
++ Username: string (max 50, unique, non-null)          -- the login identifier (Rev 2.13)
 + PasswordHash: string (non-null)
-+ FullName: string (non-null)
 + LastLoginAt: DateTimeOffset (nullable)
 ```
 **Table:** `patient_accounts`
 **Owner:** Patient Management (Member 4).
 **Constraints:**
-- `UNIQUE (phone_number) WHERE is_active`
+- `UNIQUE (username) WHERE is_active`
+
+*(Rev 2.13)* **A login, and nothing more.** `Username` is letters, digits, dots, underscores
+and hyphens, 3 to 50 characters, stored lower-cased so one person cannot hold two accounts
+that differ only in capitals. `UsernameRules` holds the shape, because the register DTO, the
+login DTO and `common-spec.yaml` all have to agree with it.
+
+`CurrentPrincipal.DisplayName` is the username for a patient — the account is created before
+any medical record exists, so there is no person's name to show yet.
+
+`PhoneNumber` and `FullName` were dropped in the same migration. A patient's name and contact
+number live on `patients`, which is the only place staff can trust them.
 
 *(Rev 2.5)* **This table was missing, and three committed specs were already pointing at
 it.** Rev 2.3 resolved Open Decision 1 in favour of patients keeping an app login, but no
@@ -407,12 +480,21 @@ more often than a hospital would like.
 + CallerPhone: string (nullable)
 + Latitude: decimal(9,6) (non-null)
 + Longitude: decimal(9,6) (non-null)
++ LocationAccuracyMetres: decimal(8,2) (non-null)            -- (Rev 3.1 — new)
++ LocationCapturedAt: DateTimeOffset (non-null)              -- (Rev 3.1 — new)
++ IdempotencyKey: Guid (non-null)                             -- (Rev 3.1 — new)
 + AddressLabel: string (nullable)                           -- (Rev 2.4 — new)
 + Details: string (nullable)
 + Priority: CallPriority (non-null)
 + Status: CallStatus (non-null)
 + Outcome: string (nullable)
 + Transported: bool (nullable)                              -- (Rev 2.4 — new)
++ CancellationRequestStatus: CancellationRequestStatus (nullable) -- (Rev 3.1 — new)
++ CancellationRequestReason: string (nullable)              -- (Rev 3.1 — new)
++ CancellationRequestedAt: DateTimeOffset (nullable)        -- (Rev 3.1 — new)
++ CancellationReviewedAt: DateTimeOffset (nullable)         -- (Rev 3.1 — new)
++ CancellationReviewedByStaffId: Guid (nullable) FK → StaffMember.Id
++ CancellationReviewNotes: string (nullable)                -- (Rev 3.1 — new)
 ```
 **Table:** `emergency_calls`
 **Note:** `PatientId` nullable — identity is often unknown at the scene, settable
@@ -442,6 +524,7 @@ publishes. Both fields are carried unchanged onto the dispatch notification
 + RegistrationNumber: string (unique, non-null)
 + CurrentLatitude: decimal(9,6) (nullable)
 + CurrentLongitude: decimal(9,6) (nullable)
++ LocationUpdatedAt: DateTimeOffset (nullable)               -- (Rev 3.1 — new)
 + Status: AmbulanceStatus (non-null)
 + OutOfServiceReason: string (nullable)                     -- (Rev 2.4 — new)
 ```
@@ -450,24 +533,38 @@ publishes. Both fields are carried unchanged onto the dispatch notification
 Onboard equipment is explicitly not tracked (equipment stays ward-scoped only).
 *(Decisions 9, 14)*
 
+#### AmbulanceCrewAssignment extends AuditedEntity *(Rev 3.1 — new)*
+```
++ AmbulanceId: Guid (non-null) FK → Ambulance.Id
++ StaffMemberId: Guid (non-null) FK → StaffMember.Id
++ AssignedAt: DateTimeOffset (non-null)
++ UnassignedAt: DateTimeOffset (nullable)
++ AssignedByStaffId: Guid (non-null) FK → StaffMember.Id
++ UnassignedByStaffId: Guid (nullable) FK → StaffMember.Id
+```
+**Table:** `ambulance_crew_assignments`
+**Constraints:** `UNIQUE(StaffMemberId) WHERE UnassignedAt IS NULL` and
+`UNIQUE(AmbulanceId, StaffMemberId) WHERE UnassignedAt IS NULL`.
+**Note:** Current ambulance responsibility, separate from ward `Shift`/`Allocation`.
+Only staff with the `ambulance_crew` role may be assigned. The ready-crew minimum starts
+at two and is configuration, not a database constant. Historical rows are ended, not
+deleted.
+
 #### Dispatch extends AuditedEntity
 ```
 + EmergencyCallId: Guid (non-null) FK → EmergencyCall.Id
 + AmbulanceId: Guid (non-null) FK → Ambulance.Id
-+ DestinationWardId: Guid (nullable) FK → Ward.Id       -- (Rev 2: was non-null)
 + Status: DispatchStatus (non-null)
 + SupersededByDispatchId: Guid (nullable) FK → Dispatch.Id  -- (Rev 2.4 — new)
 + DispatchedAt: DateTimeOffset (non-null)
 + CompletedAt: DateTimeOffset (nullable)
 ```
 **Table:** `dispatches`
-**Note:** Row is created either instantly (nearest-ambulance fast path) or after
-Duty Manager approval (reassignment case) — both paths are recorded uniformly via
-`AgentWorkflow` beforehand. *(Decisions 18, 20)*
-*(Rev 2)* `DestinationWardId` is now nullable: the fast path creates the `Dispatch`
-immediately, but the destination ward is only settled once the Patient Admission & Bed
-Agent runs, which is a later step in the orchestration sequence. Non-null would have
-forced a decision that has not been made yet.
+**Note:** A row is created only after a Duty Manager manually dispatches or confirms an
+agent recommendation. The same command and deterministic validation serve both paths.
+`Status` is authoritative; call and ambulance statuses are projections updated in the
+same transaction. Ward/bed selection is not stored here because it belongs to Patient
+Management.
 
 #### DispatchCrew extends Entity
 ```
@@ -476,8 +573,9 @@ forced a decision that has not been made yet.
 ```
 **Table:** `dispatch_crew`
 **Constraint:** UNIQUE(DispatchId, StaffMemberId)
-**Note:** Crew assigned directly on `Dispatch`, not through `Allocation` — ambulance
-duty is real-time, not part of the ward-based shift roster. *(Decision 30)*
+**Note:** Immutable responding-crew history. Every row is copied from the selected
+ambulance's current `AmbulanceCrewAssignment` rows in the dispatch transaction. Later
+crew changes do not alter the snapshot. *(Decision 30; Rev 3.1)*
 
 #### RouteLog extends AuditedEntity
 ```
@@ -495,6 +593,24 @@ duty is real-time, not part of the ward-based shift roster. *(Decision 30)*
 **Table:** `route_logs`
 **Note:** Single summary row per `Dispatch` (1:1) — not a GPS waypoint trail.
 *(Decision 23)*
+
+#### PreAdmissionNotice extends AuditedEntity *(Rev 2.15 — new)*
+```
++ EmergencyCallId: Guid (unique, non-null) FK → EmergencyCall.Id
++ DispatchId: Guid (non-null) FK → Dispatch.Id
++ Status: PreAdmissionStatus (non-null)   // queued | sent | failed
++ AttemptCount: int (non-null)
++ NextAttemptAt: DateTimeOffset (non-null)
++ SentAt: DateTimeOffset (nullable)
++ FailureReason: string (nullable)        // gave_up | rejected | call_cancelled
+```
+**Table:** `pre_admission_notices`
+**Index:** partial `ix_pre_admission_notices_due` on `status = 'queued'`
+**Note:** One row per emergency call, not per dispatch. A reassign creates a new dispatch for
+the same patient, and a second row would open a second admission for them. `DispatchId` is
+the first dispatch, the id Patient Management is given. Written in the dispatch transaction
+and sent afterwards by `PreAdmissionWorker`, so a Patient Management outage never undoes a
+dispatch.
 
 ---
 
@@ -642,17 +758,24 @@ the service-layer duplicate check. *(Decision 33, revised)*
 + AssetTag: string (non-null, max 50)
 + SerialNumber: string (nullable, max 100)
 + NextMaintenanceDue: DateOnly (nullable)
++ AwaitingConfirmation: bool (non-null, default false) -- true from registration until confirmed
++ ConfirmedByStaffId: Guid (nullable) -- the hospital administrator who confirmed it
++ ConfirmedAt: DateTimeOffset (nullable)
 ```
 **Table:** `equipment_items`
 **Constraints:** UNIQUE(AssetTag) **WHERE is_active** · UNIQUE(SerialNumber) **WHERE
 is_active AND serial_number IS NOT NULL** · CHECK(status IN the enum)
 **Indexes:** `(CategoryId)` · `(WardId)` · `(Status)` · `(NextMaintenanceDue) WHERE status
-<> 'retired'`
+<> 'retired'` · `(AwaitingConfirmation) WHERE awaiting_confirmation`
 **Note:** Durable, individually tracked assets. `WardId` and `AssignedToAdmissionId` are
 bare references into Patient Management's tables — no foreign key, because we never write
 them. Asset tags are meant to be unique across beds and equipment together; Postgres cannot
 index across two tables, so that half is enforced in application code and is a **known gap**
 tracked as issue #17. *(Decision 8)*
+*(Rev 3.1, 2026-09-16)* A new item waits with `AwaitingConfirmation = true` until the hospital
+administrator confirms it; a rejected one is soft-deleted. Rows that existed before the column
+default to `false`, i.e. already confirmed. `ConfirmedByStaffId` is a bare staff id, the same as
+`PerformedByStaffId`. See `equipment-management-plan.md` §4.3.
 
 #### Bed extends SoftDeletableEntity — **owned here, defined under Patient Management**
 See the `Bed` entry in the Patient Management section. Listed here so this section is a
@@ -694,6 +817,24 @@ so it cannot go negative and two people dispensing at once cannot both succeed p
 The check constraint is the last line of defence under that. The expiry index is filtered
 because the expiry sweep never asks about bandages.
 
+#### PharmacyBatch extends AuditedEntity *(Rev 4.2 — new, 2026-09-18)*
+```
++ PharmacyItemId: Guid (non-null) FK → PharmacyItem.Id, cascade
++ BatchNumber: int (non-null) -- 1 for the first delivery of that medicine, 2 for the next
++ Reference: string (nullable, max 50) -- the manufacturer's batch code on the box
++ ExpiryDate: DateOnly (nullable)
++ QuantityOnHand: int (non-null) -- >= 0
++ Note: string (nullable, max 300)
+```
+**Table:** `pharmacy_batches`
+**Constraints:** CHECK(quantity_on_hand >= 0) · UNIQUE(PharmacyItemId, BatchNumber)
+**Indexes:** `(PharmacyItemId, ExpiryDate) WHERE quantity_on_hand > 0`
+**Note:** One delivery of a medicine. Stock moved here from `PharmacyItem` because two deliveries
+of the same medicine expire on different days, and the one expiring first has to be dispensed
+first. `PharmacyItem.QuantityOnHand` is now the batches added up, kept in step in the same
+transaction. Migration `Equipment_AddPharmacyBatches` turned each item's existing quantity and
+expiry into its batch 1. See `equipment-management-plan.md` §5.1a.
+
 #### PharmacyTransaction extends Entity *(Rev 3 — new)*
 ```
 + PharmacyItemId: Guid (non-null) FK → PharmacyItem.Id
@@ -713,6 +854,30 @@ withdrawn. It also carries **no navigation back to `PharmacyItem`** in the EF mo
 makes an `Include` silently drop history rows once an item is retired — the trail has to
 outlive the thing it describes. An `adjusted` row requires a `Note`; a stocktake correction
 nobody explained cannot be audited later.
+
+#### Prescription extends AuditedEntity *(Rev 4.1 — new, 2026-09-17)*
+```
++ PatientId: Guid (non-null) -- Patient Management's patient, id only
++ Note: string (nullable, max 500) -- from the patient
++ FileName: string (non-null, max 255)
++ ContentType: string (non-null, max 100) -- image/jpeg | image/png | application/pdf
++ Content: byte[] (non-null)
++ ByteSize: int (non-null) -- > 0, at most 10 MB
++ Status: PrescriptionStatus (non-null)
++ TokenDate: DateOnly (nullable) -- Sri Lanka date the token belongs to
++ TokenNumber: int (nullable) -- set on ready, restarts at 1 each day
++ ReadyAt / ReadyByStaffId (nullable)
++ DeliveredAt / DeliveredByStaffId (nullable)
++ RejectionReason: string (nullable, max 500) / RejectedAt / RejectedByStaffId (nullable)
+```
+**Table:** `prescriptions`
+**Constraints:** CHECK(byte_size > 0) · CHECK(status IN the enum) · UNIQUE(TokenDate, TokenNumber)
+**WHERE token_number IS NOT NULL**
+**Indexes:** `(PatientId, CreatedAt DESC)` · `(Status, CreatedAt)`
+**Note:** A photo of a prescription a patient sends from the app, so the pharmacy can have the
+medicine ready and the patient collects by token. No foreign key on `PatientId`, for the reason
+`LabReport` gives. Staff ids are bare references, like `PerformedByStaffId`. See
+`equipment-management-plan.md` §5.4.
 
 #### LabReport extends Entity *(Rev 4 — new, 2026-09-13)*
 ```
@@ -753,7 +918,7 @@ for why a laboratory result lives in this component and not in Patient Managemen
 + PerformedByStaffId: Guid (nullable)
 + CompletedAt: DateTimeOffset (nullable)
 + Notes: string (nullable)
-+ CreatedBy: RaisedBy (non-null) -- agent | user
++ CreatedBy: RaisedBy (non-null) -- agent | user | system
 ```
 **Table:** `maintenance_schedules`
 **Indexes:** `(AssetType, AssetId)` · `(ScheduledDate) WHERE status IN ('scheduled','overdue')`
@@ -774,11 +939,13 @@ revised)*
 + WardId: Guid (nullable)
 + RecommendedAction: string (non-null)
 + Status: WarningStatus (non-null)
-+ RaisedBy: RaisedBy (non-null) -- agent | user
++ RaisedBy: RaisedBy (non-null) -- agent | user | system
 + WorkflowId: Guid (nullable) FK → AgentWorkflow.Id
 + AcknowledgedByStaffId: Guid (nullable)
 + AcknowledgedAt: DateTimeOffset (nullable)
 + ResolvedAt: DateTimeOffset (nullable)
++ ClearedAt: DateTimeOffset (nullable) -- Done: off every list, kept as a record
++ ClearedByStaffId: Guid (nullable)
 ```
 **Table:** `warnings`
 **Index:** `(Status)` — every dashboard filters on open warnings
@@ -787,10 +954,12 @@ gained `pharmacy_item`. `RecommendedAction` is a short human sentence, never the
 reasoning. `RaisedBy` distinguishes the threshold sweep and a person reporting a fault from
 anything the agent infers; a reported fault starts at `high` severity because a person
 saying the machine is broken outranks what a sweep guesses.
-*(Rev 3)* The Rev 2 partial UNIQUE on `(EntityType, EntityId, Type) WHERE Status = 'Open'`
-is **not** in the shipped schema. It was written for a sweep that inserts on every tick, and
-that sweep does not exist yet. It has to come back with it, or the first run will duplicate
-every open warning. Tracked in `docs/build/equipment.md` step 7.
+*(Rev 3, 2026-09-19)* The sweep is built, and the partial UNIQUE came back with it:
+`ux_warnings_sweep_live` on `(Type, RelatedEntityType, RelatedEntityId) WHERE raised_by = 'system'
+AND status IN ('open','acknowledged')`. One live sweep warning per problem, however often it
+runs; reported faults are outside it, because two people can report the same machine. `RaisedBy`
+gained `system` for the sweep, so it is no longer confused with the agent
+(`Equipment_AddWarningSweep`).
 
 #### ActionRequest extends AuditedEntity *(Rev 3 — new; **not built yet**)*
 ```
@@ -833,7 +1002,7 @@ patient.
 + GenderPolicy: GenderPolicy (non-null)                 -- (Rev 2; Rev 2.8: enum was WardGenderPolicy)
 ```
 **Table:** `wards` — **built.** `Patient_AddWard`, `api/Data/Entities/Patient/Ward.cs`.
-**Note:** `Type` lets the Patient Admission & Bed Agent filter candidate beds by matching
+**Note:** `Type` lets the Bed & Patient Details Agent filter candidate beds by matching
 ward type to the patient's category. *(Decision 31)*
 
 *(Rev 2.2)* **`Type` is its own enum, not `AdmissionCategory`.** Reusing `AdmissionCategory`
@@ -980,7 +1149,7 @@ to refuse it outright rather than relying on the generator to remember.
 chosen by a clinician at the desk on check-in — `CheckInRequest` carries
 `admission_category` and `category_set_by_staff_id` — so storing a guess at booking time
 gave the same fact two homes and no rule about which one wins. `Reason` is free text shown
-to staff and never read by the bed agent: free text stays data, never instructions.
+to staff only.
 **Note:** *(Rev 2)* Covers the patient flow's third arrival path — "they booked a visit
 beforehand". Previously an `Admission` could only be emergency-linked or unexplained.
 On check-in this becomes an `Admission` with `Source = Booked`.
@@ -1027,9 +1196,8 @@ with two places to disagree. `DischargedAt` is returned by the spec and had no c
 **BEFORE** they arrive, so a bed is ready when they get here". That state was
 unrepresentable: `AdmittedAt` was non-null and `AdmissionStatus` was only
 `{Active, Discharged}`.
-`Urgency` and `IsInfectious` are the patient-side inputs to the bed agent's filter and
-ranking rules; both are set by clinical staff, never by the agent — the same wall that
-keeps `Category` a human decision.
+`Urgency` and `IsInfectious` are the patient-side inputs to bed placement's hard rules; both
+are set by clinical staff — the same wall that keeps `Category` a human decision.
 
 *(Rev 2.2)* **Renamed to the names `patient-spec.yaml` already publishes.** Rev 2 invented
 `AcuityLevel` and `RequiresIsolation` for fields the committed spec already had as
@@ -1095,14 +1263,12 @@ Deliberately **separate from `Status`**: how far through their stay a patient is
 complete their paperwork is are independent facts. A fully-admitted ICU patient can still be
 missing a NIC, and collapsing the two would make one unrepresentable.
 
-#### BedAssignment extends AuditedEntity *(Rev 2.9 — changed)*
+#### BedAssignment extends AuditedEntity *(Rev 2.9 — changed; AssignedBy/WorkflowId dropped 2026-09-22)*
 ```
 + AdmissionId: Guid (non-null) FK → Admission.Id
 + BedId: Guid (non-null)                                -- no FK: beds is Equipment's table
 + Status: AssignmentStatus (non-null)                   -- (Rev 2.9 — new)
 + ReservedUntil: DateTimeOffset (nullable)              -- (Rev 2.9 — the 30-minute hold)
-+ AssignedBy: AssignedBy (non-null)                     -- (Rev 2.9: agent or human)
-+ WorkflowId: Guid (nullable) → AgentWorkflow.Id        -- (Rev 2: no FK until that table exists)
 + IsDowngrade: bool = false (non-null)                  -- (Rev 2)
 + ApprovedByStaffMemberId: Guid (nullable) FK → StaffMember.Id  -- (Rev 2)
 + ApprovedAt: DateTimeOffset (nullable)                 -- (Rev 2.9 — new)
@@ -1130,17 +1296,20 @@ auditable.
 separate table until the spec was implemented; it publishes one bed row whose `status` walks
 `reserved → occupied → released`, and no reservation schema at all. One row per claim means
 "this bed is taken" has exactly one home, which is the same argument this document makes for
-keeping occupancy off `Bed`. A background sweep moves `reserved` rows past `ReservedUntil` to
-`released` with `ReleaseReason = HoldExpired`.
+keeping occupancy off `Bed`. **There is no background sweep** — a lapsed `reserved` row is
+read as free everywhere, and the next `INSERT` that would claim its bed closes it first, as
+`ReleaseReason = HoldExpired`, at write time. See `patient-management-plan.md` §5.3.
 
-**`BedId` is a plain column, not a foreign key.** `beds` belongs to Health Equipment
-(Member 3) and does not exist yet. The constraint goes in when their table lands; until then
-`STUBS.md` row 109 stands.
+**`BedId` is a plain column, not a foreign key — permanently, by design, not because
+Equipment's table is missing.** `beds` belongs to Health Equipment (Member 3) and has existed
+since `Equipment_AddBed`; the column stays FK-less because a cross-component foreign key would
+put Patient's schema in the way of Equipment being the sole writer of its own table (`CLAUDE.md`,
+"one writer per table"). `BedAssignmentConfiguration` indexes `BedId` but never constrains it.
 
 #### Discharge extends AuditedEntity *(Rev 2.9 — changed)*
 ```
 + AdmissionId: Guid (unique, non-null) FK → Admission.Id
-+ FlaggedBy: AssignedBy (non-null)                      -- (Rev 2.9: agent or human)
++ FlaggedBy: AssignedBy (non-null)                      -- (Rev 2.9: agent or human; `DischargeService` only ever writes `User` today — no agent flags a discharge)
 + FlaggedAt: DateTimeOffset (non-null)                  -- (Rev 2.9 — new)
 + ConfirmedByStaffMemberId: Guid (nullable) FK → StaffMember.Id  -- (Rev 2.9: was DischargedByStaffMemberId)
 + ConfirmedAt: DateTimeOffset (nullable)                -- (Rev 2.9: was DischargedAt)
@@ -1149,8 +1318,7 @@ keeping occupancy off `Bed`. A background sweep moves `reserved` rows past `Rese
 **Table:** `discharges` — **built.** `Patient_AddAdmission`.
 **Note:** 1:1 companion row created **at admission time**, with its checklist rows unticked,
 not only once discharge actually happens — this gives clinical staff somewhere to
-update readiness during the stay, and gives the Patient Admission & Bed Agent a
-persistent target to monitor. `DischargedAt`/`DischargeSummary` stay null until
+update readiness during the stay. `DischargedAt`/`DischargeSummary` stay null until
 confirmed. *(Decisions 10, 32)*
 *(Rev 2.9)* **`ReadinessStatus` is gone entirely.** Rev 2 already made it derived — `Ready`
 once every checklist item was complete — and a derived value still stored is a value that can
@@ -1280,6 +1448,52 @@ are invented — no real price list was given to us — and `BillingRates.cs` st
 the fallback `PriceList.Defaults` reads when a row is missing. So a fresh database prices a
 bill correctly before anybody has opened the settings screen.
 
+#### PatientMedicalProfile extends AuditedEntity *(Rev 3.2 — new)*
+```
++ PatientId: Guid (non-null) FK → Patient.Id           -- UNIQUE, one profile per patient
++ KnownConditions: string (nullable)                   -- diabetes, asthma, hypertension
++ Allergies: string (nullable)                         -- read deterministically by CR5
++ CurrentSymptoms: string (nullable)                   -- what they are in with this time
++ RecentSituation: string (nullable)                   -- a fall last week, a finished course
++ UpdatedByStaffMemberId: Guid (non-null) FK → StaffMember.Id
+```
+**Table:** `patient_medical_profiles`
+**Index:** `UNIQUE(patient_id)` — a plain unique, **not** scoped `WHERE is_active`, because
+this is `AuditedEntity` and not soft-deletable. There is no such thing as retiring a
+patient's medical history; the `Patient` row is the soft-deletable thing and the profile
+goes with it.
+
+**Note:** *(Rev 3.2)* **The problem in one sentence: this schema had never stored a single
+clinical fact, so the "care advisory" agent had nothing to advise on.** It read demographics
+and the administrative shape of past visits, which made it a model rephrasing a sentence
+rather than an agent. This table is what it reads instead.
+
+Four things it deliberately is not:
+
+- **Not a diagnosis.** Every character is what a clinician typed. No field records anything
+  this system worked out. Recording that a patient is asthmatic is not diagnosing asthma, so
+  `patient-management-plan.md` §1's clinical scope line does not move.
+- **Not an EHR.** No vitals, no lab results, no coded conditions, no clinical assessment, no
+  change history beyond `UpdatedAt` and who wrote it. `patient-management-plan.md` §11 says so
+  plainly rather than implying otherwise.
+- **Not per-visit.** One row per patient, so `CurrentSymptoms` describes whichever visit it
+  was last written during. Accepted deliberately: a per-admission profile is one a nurse
+  retypes every visit, and the one that gets retyped is the one that stops being filled in.
+- **Not patient-readable.** There is no `/me/` route. Showing somebody their own clinical
+  record raises correction rights and wording questions that are a feature in their own right.
+
+**An empty profile is the ordinary state, not an error.** Every field is nullable and the row
+is created lazily on first write. The agent handles an empty one by drafting from the
+patient's own words and saying it had no history to work from.
+
+**`Allergies` is the field that earns the table.** CR5 rejects any agent draft naming a
+substance recorded there, deterministically, before a reviewer sees it — and that check is
+only possible because the allergy is a stored field rather than a sentence buried in a note.
+That is the same instinct as bed placement's hard rules: the thing that must never fail is
+plain C# reading a column, not the model being asked nicely.
+
+---
+
 #### CareRecommendation extends AuditedEntity *(Rev 2.6 — new)*
 ```
 + PatientId: Guid (non-null) FK → Patient.Id
@@ -1290,7 +1504,7 @@ bill correctly before anybody has opened the settings screen.
 + UrgencyFlag: CareUrgency (nullable)                   -- the agent's draft triage flag
 + AgentMessage: string (nullable)                       -- the agent's draft, doctor-facing only
 + Status: CareRecommendationStatus (non-null)
-+ ReviewedByStaffMemberId: Guid (nullable) FK → StaffMember.Id  -- Doctor role, enforced in code
++ ReviewedByStaffMemberId: Guid (nullable) FK → StaffMember.Id  -- Doctor OR WardNurse, enforced in code (Rev 3.2)
 + ReviewedAt: DateTimeOffset (nullable)
 + DoctorMessage: string (nullable)                     -- what the patient actually sees
 + RejectionReason: string (nullable)                   -- staff-facing only, never sent to the patient
@@ -1301,9 +1515,19 @@ lecturer's direction — see the Rev 2.6 note above. `AgentMessage` and `DoctorM
 deliberately two columns, not one edited in place: the model's draft must survive
 independently of what a doctor approved, for the same audit reason `AgentWorkflow`
 already keeps a `FinalOutcome` separate from its `Plan`. **The patient never reads
-`AgentMessage`** — only `DoctorMessage`, and only once `Status = Approved`. A `Doctor`
-role check gates every write to the review fields; `ReviewedByStaffMemberId` is how a
-`clinical_clearance`-style approval trail exists for this agent too.
+`AgentMessage`** — only `DoctorMessage`, and only once `Status = Approved`.
+`ReviewedByStaffMemberId` is how a `clinical_clearance`-style approval trail exists for this
+agent too.
+
+*(Rev 3.2)* **The review gate is now `Doctor` OR `WardNurse`, not `Doctor` alone.** The agent
+only runs for admitted patients, and the person who will walk over and look at one is the
+nurse on shift — Doctor-only meant a draft about a headache waited for a ward round. What
+holds the line instead is deterministic rather than role-based: CR1 forbids a drug name or a
+dosage in `AgentMessage` whoever approves it, and CR5 (new) rejects any draft contradicting
+the recorded `PatientMedicalProfile.Allergies`. `DoctorMessage` keeps its name although a
+nurse may now write it; renaming a published field to gain nothing is churn.
+`clinical_clearance` on the discharge checklist did **not** move and is still Doctor-only.
+Full reasoning and what it costs: `patient-management-plan.md` §8.16.
 **Why no new column on `AgentProposedChange`.** That table's typed FKs
 (`ProposedStaffMemberId`, `ProposedShiftId`, `ProposedBedId`, `ProposedWardId`) exist
 because those four values need referential integrity and query-by-content. This agent's
@@ -1407,6 +1631,9 @@ invalid plan can be returned for revision instead of rejected wholesale.
 + SentAt: DateTimeOffset (nullable)
 + ReadAt: DateTimeOffset (nullable)
 + FailureReason: string (nullable)
++ DedupeKey: string (max 200, unique, non-null)   -- Rev 2.14: one push per reason, entity and person
++ AttemptCount: int (non-null, default 0)        -- Rev 2.14: delivery tries so far
++ NextAttemptAt: DateTimeOffset (non-null)        -- Rev 2.14: when a Queued push is next due
 ```
 **Table:** `notifications`
 **Note:** *(Rev 2)* No notification entity existed before, yet both flows depend on one:
@@ -1415,6 +1642,15 @@ reassigned nurse "an immediate push notification" (Flutter); the patient flow no
 bed assignment. `Channel` distinguishes in-app alerts from device push. Delivery uses
 `DeviceToken`. `(EntityType, EntityId)` lets the client deep-link to the workflow awaiting
 approval.
+
+*(Rev 2.14)* **`notifications` is also the retry queue.** A push is saved as `Queued` in the
+same transaction as the change that caused it, so it can never be lost or sent for a change
+that rolled back. A background worker sends what is due, marks it `Sent`, retries `Failed`
+sends with growing gaps, and gives up after five tries (`FailureReason = gave_up`).
+`no_device` means the person had no active `DeviceToken`. `DedupeKey`
+(`{reason}:{entity id}:{staff id}`) makes staging the same push twice impossible. A phone
+the push service rejects gets `DeviceToken.RevokedAt`. The push text is generic on purpose:
+no patient or incident detail reaches a lock screen.
 
 #### AuditLog extends Entity
 ```
@@ -1509,8 +1745,21 @@ Available, Dispatched, EnRoute, AtScene, Transporting, OutOfService
 
 ### DispatchStatus
 ```
-Assigned, EnRoute, Completed, Cancelled, Reassigned
+Assigned, Acknowledged, EnRouteToScene, AtScene, TransportingToHospital,
+HandedOver, Declined, Cancelled, Reassigned
 ```
+Serialized as `assigned`, `acknowledged`, `en_route_to_scene`, `at_scene`,
+`transporting_to_hospital`, `handed_over`, `declined`, `cancelled`, `reassigned`.
+The normal path follows the first six in order. `Declined` is terminal from `Assigned`;
+`Cancelled` and `Reassigned` are terminal pre-arrival alternatives. No diversion or
+reassignment is legal from `AtScene` onward.
+
+### CancellationRequestStatus *(Rev 3.1 — new)*
+```
+Pending, Approved, Rejected
+```
+Serialized as `pending`, `approved`, `rejected`. Null on `EmergencyCall` means no
+post-assignment request exists.
 
 ### AllocationStatus *(Rev 2 — new)*
 ```
@@ -1572,6 +1821,13 @@ AND status = 'scheduled'`, so nothing has to be swept nightly and nothing can dr
 EquipmentItem, Bed
 ```
 Serialized as `equipment_item`, `bed`. What a `MaintenanceSchedule` row points at.
+
+### PrescriptionStatus *(Rev 4.1 — new, 2026-09-17)*
+```
+Submitted, Ready, Delivered, Rejected
+```
+Serialized as `submitted`, `ready`, `delivered`, `rejected`. `Ready` is when a token is issued;
+`Rejected` carries a reason the patient reads.
 
 ### PharmacyTransactionType *(Rev 3 — new)*
 ```
@@ -1668,7 +1924,7 @@ ladder is documented as `icu -> hdu -> inpatient`. Rev 2.1 said enum literals we
 `high_dependency` and silently broke the match. The C# member keeps the readable name and
 `HasConversion<string>()` maps it to `hdu`.
 
-Ordered most to least acute so the bed agent's downgrade logic ("offers the next best
+Ordered most to least acute so bed placement's downgrade logic ("offers the next best
 thing") is a simple ordinal step.
 
 ### WardType *(Rev 2.2 — new; three members added 2026-09-11)*
@@ -1686,8 +1942,8 @@ surgical bed and an ordinary bed identically, with no way to tell them apart on 
 three sit on the same rung as `general` in `BedPlacementRules.Rung`, so no placement rule
 changed — what they buy is a price and a name, not a new level of care.
 
-`emergency-spec.yaml` publishes a separate `WardTypeHint` that still lists six. That is
-Nasrulla Unais's file and an open item, not an edit — see `integration_of_functions.md` §11.11.
+Emergency no longer mirrors this enum. It routes to the configured hospital emergency
+entrance; Patient Management uses `WardType` when it prepares a ward/bed.
 
 ### AdmissionUrgency *(Rev 2.2 — replaces AcuityLevel)*
 ```
@@ -1740,10 +1996,18 @@ which was a real gap worth keeping.
 `patient-spec.yaml` has no value for. Adding it means adding it to the published enum too,
 so it is carried to Open Decisions as item 10 rather than decided here by one member.
 
-### AppointmentStatus *(Rev 2 — new)*
+### AppointmentStatus *(Rev 2.3 — `CheckedIn` replaced by `Confirmed`)*
 ```
-Scheduled, CheckedIn, Completed, Cancelled, NoShow
+Scheduled, Confirmed, Completed, Cancelled, NoShow
 ```
+Shown to staff as: Needs confirming, Expected, Finished, Cancelled, Did not come.
+
+`Confirmed` is the desk saying it has read the booking, and is the gate on every day-of
+action — without it, "admit" sat one click away on a booking three weeks out.
+
+`Completed` covers both endings. `AdmissionId` null means the patient was seen and went home
+and the bill is on the appointment; set means they were admitted, and the bill is the
+admission's. `CheckedIn` said nothing `AdmissionId` did not already say.
 
 ### BedCondition *(Rev 2.2 — replaces BedStatus)*
 ```
@@ -1774,13 +2038,14 @@ Rev 2's `BedReservationStatus {Held, Confirmed, Expired, Released}` belonged to 
 a hold ended is a different fact from the state it ended in, and keeping them apart means
 "why is this bed free again?" has one answer instead of two half-answers.
 
-### AssignedBy *(Rev 2.9 — new)*
+### AssignedBy *(Rev 2.9 — new; dropped from `BedAssignment` 2026-09-22)*
 ```
 Agent, User
 ```
-Serialized as `agent`, `user`. Whether the bed agent proposed this or a human picked it.
-Used on `BedAssignment.AssignedBy` and `Discharge.FlaggedBy`, and it is what the approval
-gate and the agent-performance report both read.
+Serialized as `agent`, `user`. Used on `Discharge.FlaggedBy` only now — `Patient_RemoveBedAgentWorkflowLink`
+dropped the column off `BedAssignment`. It recorded whether a bed-suggestion-agent run had
+proposed the bed a human then committed; with that agent removed, every bed assignment is a
+human one and the column had nothing left to say.
 
 ### ReleaseReason *(Rev 2.9 — new)*
 ```
@@ -1804,7 +2069,7 @@ middle states of the flow. `Expected` is now `AwaitingBed`; `Active` is now `Adm
 | Status | Meaning | `AdmittedAt` |
 | :-- | :-- | :--: |
 | `AwaitingBed` | Record exists, no bed found yet. The emergency pre-arrival state. | null |
-| `AwaitingApproval` | The bed agent proposed a bed; a human has not approved it. | null |
+| `AwaitingApproval` | **Reserved, and no longer reached.** *(Rev 3.2)* It meant "the bed agent proposed a bed and a human has not approved it", first while the agent held no write tool, then unreachable outright once the agent was removed (2026-09-22) — the admission now stays at `AwaitingBed` until somebody commits a bed manually. Kept in the enum because Equipment's ward-patient list already reads it and removing a value from a shared enum is a cross-component change for no gain. Nothing sets it; nothing should. See `patient-management-plan.md` §8.6b | null |
 | `BedReserved` | Approved and held (`BedAssignment.Status = Reserved`); patient not yet in it. | null |
 | `Admitted` | In the bed. Live `BedAssignment` with `EndAt IS NULL`. | set |
 | `ReadyForDischarge` | Every `DischargeChecklistItem` complete; awaiting confirmation. | set |
@@ -1848,8 +2113,8 @@ model judgement alone.
 PendingReview, Approved, Rejected
 ```
 A `CareRecommendation` is invisible to the patient until `Approved`. `Rejected` still
-records the doctor's reason, but the patient only ever sees a generic note that their
-doctor reviewed it — never `RejectionReason` itself.
+records the reviewer's reason, but the patient only ever sees a generic note that it was
+reviewed — never `RejectionReason` itself.
 
 ### PatientDetailField *(Rev 2.1 — new; Rev 2.9 — aligned to the spec)*
 ```
@@ -1964,7 +2229,7 @@ never create another `ICU-1`. Worse under EF Core, where a global query filter o
 
 ```sql
 CREATE UNIQUE INDEX ux_staff_members_email     ON staff_members (email)              WHERE is_active;
-CREATE UNIQUE INDEX ux_patient_accounts_phone ON patient_accounts (phone_number)     WHERE is_active;   -- (Rev 2.7)
+CREATE UNIQUE INDEX ux_patient_accounts_username ON patient_accounts (username)       WHERE is_active;   -- (Rev 2.13)
 CREATE UNIQUE INDEX ux_ambulances_reg          ON ambulances (registration_number)   WHERE is_active;
 CREATE UNIQUE INDEX ux_wards_name              ON wards (name)                       WHERE is_active;
 CREATE UNIQUE INDEX ux_beds_ward_number        ON beds (ward_id, bed_number)         WHERE is_active;
@@ -1999,7 +2264,15 @@ CREATE UNIQUE INDEX ux_admissions_open ON admissions (patient_id)
 
 -- an ambulance cannot be on two runs
 CREATE UNIQUE INDEX ux_dispatch_ambulance ON dispatches (ambulance_id)
-    WHERE status IN ('assigned', 'en_route');
+    WHERE status IN ('assigned', 'acknowledged', 'en_route_to_scene', 'at_scene',
+                     'transporting_to_hospital');
+
+-- one crew member can have only one current ambulance, with no duplicate current row
+CREATE UNIQUE INDEX ux_ambulance_crew_current_staff
+    ON ambulance_crew_assignments (staff_member_id) WHERE unassigned_at IS NULL;
+CREATE UNIQUE INDEX ux_ambulance_crew_current_pair
+    ON ambulance_crew_assignments (ambulance_id, staff_member_id) WHERE unassigned_at IS NULL;
+CREATE UNIQUE INDEX ux_emergency_calls_idempotency_key ON emergency_calls (idempotency_key);
 
 -- no duplicate open warning per target  (otherwise every threshold tick inserts one)
 CREATE UNIQUE INDEX ux_warnings_open ON warnings (entity_type, entity_id, type)
@@ -2011,6 +2284,8 @@ CREATE UNIQUE INDEX ux_allocations_confirmed ON allocations (shift_id, staff_mem
 
 CREATE UNIQUE INDEX ux_refresh_tokens_hash ON refresh_tokens (token_hash);
 CREATE UNIQUE INDEX ux_device_tokens_token ON device_tokens (token);
+CREATE UNIQUE INDEX ux_notifications_dedupe_key ON notifications (dedupe_key);
+CREATE INDEX ix_notifications_due ON notifications (next_attempt_at) WHERE status = 'queued';
 ```
 
 ### CHECK constraints
@@ -2149,6 +2424,7 @@ CREATE INDEX ix_admissions_missing_fields ON admissions USING gin (missing_field
 | StaffMember | Skill | N:M | StaffMemberSkill |
 | StaffMember | Shift | N:M | Allocation |
 | StaffMember | Dispatch | N:M | DispatchCrew |
+| StaffMember | Ambulance | N:M over time | AmbulanceCrewAssignment |
 | StaffMember | RefreshToken | 1:N | RefreshToken.StaffMemberId |
 | StaffMember | DeviceToken | 1:N | DeviceToken.StaffMemberId |
 | StaffMember | Notification | 1:N | Notification.RecipientStaffMemberId |
@@ -2160,12 +2436,13 @@ CREATE INDEX ix_admissions_missing_fields ON admissions USING gin (missing_field
 | EmergencyCall | Dispatch | 1:N | Dispatch.EmergencyCallId |
 | Appointment | Admission | 1:N (nullable) | Admission.AppointmentId |
 | Ambulance | Dispatch | 1:N | Dispatch.AmbulanceId |
+| Ambulance | AmbulanceCrewAssignment | 1:N | AmbulanceCrewAssignment.AmbulanceId |
 | Dispatch | RouteLog | 1:1 | RouteLog.DispatchId |
+| EmergencyCall | PreAdmissionNotice | 1:1 | PreAdmissionNotice.EmergencyCallId |
 | Ward | Bed | 1:N | Bed.WardId |
 | Ward | Shift | 1:N | Shift.WardId |
 | Ward | WardStaffingRule | 1:N | WardStaffingRule.WardId |
 | Ward | EquipmentItem | 1:N | EquipmentItem.WardId |
-| Ward | Dispatch | 1:N (nullable) | Dispatch.DestinationWardId |
 | Skill | Shift | 1:N (nullable) | Shift.RequiredSkillId |
 | EquipmentCategory | EquipmentItem | 1:N | EquipmentItem.CategoryId *(Rev 3)* |
 | PharmacyCategory | PharmacyItem | 1:N | PharmacyItem.CategoryId *(Rev 3)* |
@@ -2227,9 +2504,11 @@ rows are mutated after insert; pure join/append-only tables (`DispatchCrew`,
 | DeviceToken | device_tokens | | **new** |
 | EmergencyCall | emergency_calls | | |
 | Ambulance | ambulances | ✓ | |
+| AmbulanceCrewAssignment | ambulance_crew_assignments | | **new (3.1)** |
 | Dispatch | dispatches | | changed |
 | DispatchCrew | dispatch_crew | | |
 | RouteLog | route_logs | | |
+| PreAdmissionNotice | pre_admission_notices | | **new** |
 | WardStaffingRule | ward_staffing_rules | | **new** |
 | Shift | shifts | | changed |
 | Allocation | allocations | | changed |
@@ -2256,7 +2535,7 @@ rows are mutated after insert; pure join/append-only tables (`DispatchCrew`,
 | Notification | notifications | | **new** |
 | AuditLog | audit_logs | | changed |
 
-**34 tables** (was 25). *(Rev 2.5 added `PatientAccount`. Rev 2.6 added `CareRecommendation`.)*
+**35 tables** (was 25). *(Rev 3.1 added `AmbulanceCrewAssignment`.)*
 
 ---
 
@@ -2264,7 +2543,7 @@ rows are mutated after insert; pure join/append-only tables (`DispatchCrew`,
 
 | Component | Owner | Entities |
 |-----------|-------|----------|
-| Emergency / Ambulance | Member 1 | EmergencyCall, Ambulance, Dispatch, DispatchCrew, RouteLog |
+| Emergency / Ambulance | Member 1 | EmergencyCall, Ambulance, AmbulanceCrewAssignment, Dispatch, DispatchCrew, RouteLog, PreAdmissionNotice |
 | Staff Management | Member 2 | Shift, Allocation, LeaveRequest, Skill, StaffMemberSkill, WardStaffingRule |
 | Health Equipment | Member 3 | EquipmentCategory, EquipmentItem, **Bed**, PharmacyCategory, PharmacyItem, PharmacyTransaction, MaintenanceSchedule, Warning, ActionRequest |
 | Patient Management | Member 4 | Patient, **PatientAccount**, Admission, BedAssignment, Discharge, DischargeChecklistItem, Appointment, Ward |
@@ -2275,8 +2554,9 @@ specific member's is common: auth and the JWT, the `DbContext` and base classes,
 exception handler, the audit interceptor, the agent workflow tables and the Coordinator
 Agent. Contract: `specs/common-spec.yaml`. Reasoning: `docs/ADR.md` ADR 3.
 
-**Note:** `Ward` sits under Patient Management but is referenced by all four components
-(`Shift.WardId`, `EquipmentItem.WardId`, `Dispatch.DestinationWardId`). *(Rev 3)* Pharmacy
+**Note:** `Ward` sits under Patient Management and is referenced by Staff and Equipment
+(`Shift.WardId`, `EquipmentItem.WardId`). Emergency routes to the configured hospital
+emergency entrance and carries no ward FK as of Rev 3.1. *(Rev 3)* Pharmacy
 stock is central, so `PharmacyItem` has no `WardId`.
 Treat its schema as frozen once agreed — changes to it break three other members.
 
@@ -2346,19 +2626,17 @@ the first half of that contrast disappears.
 - `patient-spec.yaml` now publishes the booking endpoints: `POST /me/appointments`,
   `GET /me/appointments`, `POST /me/appointments/{id}/cancel`, and the staff side
   `GET /appointments`, `POST /appointments`, `POST /appointments/{id}/check-in`.
-  Check-in creates an ordinary `Admission` with `source = pre_registered`, so the bed agent
-  path is unchanged. Doctor calendars, time slots and availability search remain out of
-  scope. *Done: Member 4.*
+  Check-in creates an ordinary `Admission` with `source = pre_registered`, so the manual
+  bed-assignment path is unchanged. Doctor calendars, time slots and availability search
+  remain out of scope. *Done: Member 4.*
 
 Note for Member 4's own design: patient notifications are local (the app checks its own
 status), not push, so `DeviceToken` is not on the Patient Management critical path either
 way.
 
-**2. Single hospital vs. the "non-nearest hospital" approval trigger.** This document
-settles on one hospital with multiple wards, but the Component Plan says the Duty Manager
-approves when the plan "sends the patient to a hospital other than the nearest one" — an
-unreachable branch. The reassignment trigger still works, so the approval demo survives.
-Fix the Component Plan wording, or introduce a `Hospital` entity.
+**2. Single hospital vs. the "non-nearest hospital" approval trigger — RESOLVED (Rev
+3.1).** This release serves one CareLanka Hospital emergency entrance. The Duty Manager's
+heavy gate is pre-arrival ambulance diversion; there is no hospital-selection branch.
 
 **3. Enum storage strategy — RESOLVED (2026-09-07): `HasConversion<string>()` plus a
 CHECK constraint,** stored `snake_case` to match the wire values the specs publish. Full
@@ -2382,9 +2660,10 @@ needs. Either FK it to `Ward` or drop it.
 shift has `EndTime < StartTime`. Rev 2 documents the roll-over rule on the entity, but
 overlap detection stays fiddly. Consider `StartAt`/`EndAt` as `timestamptz` instead.
 
-**7. Triple status bookkeeping.** `CallStatus`, `DispatchStatus` and `AmbulanceStatus` all
-carry `EnRoute` — three rows to keep in sync on every transition. Pick one as
-authoritative and derive the rest, or write down the sync rule.
+**7. Triple status bookkeeping — RESOLVED (Rev 3.1).** `DispatchStatus` is authoritative.
+One transition service updates `CallStatus` and `AmbulanceStatus` projections in the same
+transaction. Eligibility recomputes its invariant inputs and never trusts the ambulance
+projection alone.
 
 **8. Decision log.** This document cites 37 numbered decisions but no log exists in the
 repo, and decisions 1, 3, 5, 28 and 37 are never cited. For a submission graded on

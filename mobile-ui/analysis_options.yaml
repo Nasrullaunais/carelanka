@@ -18,6 +18,8 @@ analyzer:
     # the ASP.NET code that publishes the OpenAPI document.
     - lib/services/api_client/**
     - '**/*.g.dart'
+    - android/**
+    - ios/**
 
 linter:
   # The lint rules applied to this project can be customized in the

@@ -8,6 +8,7 @@ using CareLanka.Api.DTOs.Patient;
 using CareLanka.Api.Services.Common;
 using Microsoft.EntityFrameworkCore;
 using AdmissionEntity = CareLanka.Api.Data.Entities.Patient.Admission;
+using AppointmentEntity = CareLanka.Api.Data.Entities.Patient.Appointment;
 using BedAssignmentEntity = CareLanka.Api.Data.Entities.Patient.BedAssignment;
 using BillEntity = CareLanka.Api.Data.Entities.Patient.Bill;
 using BillLineEntity = CareLanka.Api.Data.Entities.Patient.BillLineItem;
@@ -53,11 +54,11 @@ public sealed class BillingService : IBillingService
         var bill = await _db.Bills
             .AsNoTracking()
             .Include(row => row.LineItems)
-            .Include(row => row.Admission)
+            .Include(row => row.Admission!)
                 .ThenInclude(admission => admission.Patient)
             .FirstOrDefaultAsync(row => row.AdmissionId == admissionId, ct);
 
-        return bill is null ? null : await ToResponseAsync(bill, bill.Admission.Patient, ct);
+        return bill is null ? null : await ToResponseAsync(bill, bill.Admission!.Patient, ct);
     }
 
     public Task<BillResponse> PrepareAsync(Guid admissionId, CancellationToken ct = default)
@@ -121,6 +122,169 @@ public sealed class BillingService : IBillingService
             await _discharges.MarkBillingSettledAsync(admissionId, true, ct);
         }, ct);
 
+    public async Task<BillResponse> GetForAppointmentAsync(
+        Guid appointmentId, CancellationToken ct = default)
+    {
+        var bill = await _db.Bills
+            .AsNoTracking()
+            .Include(row => row.LineItems)
+            .Include(row => row.Appointment!)
+                .ThenInclude(appointment => appointment.Patient)
+            .FirstOrDefaultAsync(row => row.AppointmentId == appointmentId, ct)
+            ?? throw new NotFoundException("Bill", appointmentId);
+
+        return await ToResponseAsync(bill, bill.Appointment!.Patient, ct);
+    }
+
+    public Task<BillResponse> PrepareForAppointmentAsync(
+        Guid appointmentId, CancellationToken ct = default)
+        => InAppointmentTransactionAsync(
+            appointmentId, (_, bill) => RegenerateForAppointmentAsync(bill, ct), ct);
+
+    public Task<BillResponse> AddAppointmentChargeAsync(
+        Guid appointmentId, AddBillChargeRequest request, CancellationToken ct = default)
+        => InAppointmentTransactionAsync(appointmentId, async (_, bill) =>
+        {
+            if (bill.LineItems.Count == 0)
+            {
+                await RegenerateForAppointmentAsync(bill, ct);
+            }
+
+            Add(bill, new BillLineEntity
+            {
+                Id = Guid.NewGuid(),
+                BillId = bill.Id,
+                Source = BillLineSource.Manual,
+                Description = request.Description.Trim(),
+
+                Quantity = request.Quantity!.Value,
+                UnitPrice = request.UnitPrice!.Value
+            });
+        }, ct);
+
+    public Task<BillResponse> RemoveAppointmentChargeAsync(
+        Guid appointmentId, Guid lineId, CancellationToken ct = default)
+        => InAppointmentTransactionAsync(appointmentId, (_, bill) =>
+        {
+            var line = bill.LineItems.FirstOrDefault(item => item.Id == lineId)
+                ?? throw new NotFoundException("BillLine", lineId);
+
+            if (line.Source != BillLineSource.Manual)
+            {
+                throw new ConflictException(MessageCode.BillLineNotRemovable);
+            }
+
+            bill.LineItems.Remove(line);
+            _db.BillLineItems.Remove(line);
+
+            return Task.CompletedTask;
+        }, ct);
+
+    public Task<BillResponse> SettleAppointmentAsync(
+        Guid appointmentId, SettleBillRequest request, CancellationToken ct = default)
+        => InAppointmentTransactionAsync(appointmentId, async (_, bill) =>
+        {
+            if (bill.LineItems.Count == 0)
+            {
+                await RegenerateForAppointmentAsync(bill, ct);
+            }
+
+            bill.SettledAt = DateTimeOffset.UtcNow;
+            bill.SettledByStaffMemberId = _currentUser.Id;
+            bill.SettlementNote = Clean(request.SettlementNote);
+
+            // Nothing to tick on a discharge checklist: nobody was admitted, so
+            // there is no admission for the discharge service to flag.
+        }, ct);
+
+    private async Task<BillResponse> InAppointmentTransactionAsync(
+        Guid appointmentId,
+        Func<AppointmentEntity, BillEntity, Task> work,
+        CancellationToken ct)
+    {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+
+        await _db.Database.ExecuteSqlAsync(
+            $"SELECT id FROM appointments WHERE id = {appointmentId} FOR UPDATE", ct);
+
+        var appointment = await _db.Appointments
+            .Include(row => row.Patient)
+            .FirstOrDefaultAsync(row => row.Id == appointmentId, ct)
+            ?? throw new NotFoundException("Appointment", appointmentId);
+
+        if (appointment.AdmissionId is not null)
+        {
+            throw new ConflictException(MessageCode.AppointmentBilledOnItsAdmission);
+        }
+
+        var bill = await FindOrOpenForAppointmentAsync(appointment, ct);
+
+        if (bill.IsSettled)
+        {
+            throw new ConflictException(MessageCode.BillAlreadySettled, bill.BillNumber);
+        }
+
+        await work(appointment, bill);
+
+        await _db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+
+        return await ToResponseAsync(bill, appointment.Patient, ct);
+    }
+
+    private async Task<BillEntity> FindOrOpenForAppointmentAsync(
+        AppointmentEntity appointment, CancellationToken ct)
+    {
+        var existing = await _db.Bills
+            .Include(bill => bill.LineItems)
+            .FirstOrDefaultAsync(bill => bill.AppointmentId == appointment.Id, ct);
+
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        var bill = new BillEntity
+        {
+            Id = Guid.NewGuid(),
+            AppointmentId = appointment.Id,
+            BillNumber = await NextBillNumberAsync(ct),
+
+            RaisedByStaffMemberId = _currentUser.Id
+        };
+
+        _db.Bills.Add(bill);
+
+        return bill;
+    }
+
+    /// <summary>
+    /// An appointment bill carries one generated line, the consultation itself.
+    /// No admission fee and no bed nights, because nobody was admitted.
+    /// </summary>
+    private async Task RegenerateForAppointmentAsync(BillEntity bill, CancellationToken ct)
+    {
+        var stale = bill.LineItems.Where(line => line.Source != BillLineSource.Manual).ToList();
+
+        foreach (var line in stale)
+        {
+            bill.LineItems.Remove(line);
+            _db.BillLineItems.Remove(line);
+        }
+
+        var prices = await _rates.GetPriceListAsync(ct);
+
+        Add(bill, new BillLineEntity
+        {
+            Id = Guid.NewGuid(),
+            BillId = bill.Id,
+            Source = BillLineSource.ConsultationFee,
+            Description = "Consultation fee",
+            Quantity = 1m,
+            UnitPrice = prices.AdmissionFee(AdmissionCategory.Outpatient)
+        });
+    }
+
     public async Task<PagedResult<OutstandingBill>> ListOutstandingAsync(
         string? search, bool includeSettled, int page, int pageSize, CancellationToken ct = default)
     {
@@ -170,8 +334,9 @@ public sealed class BillingService : IBillingService
         var bills = await _db.Bills
             .AsNoTracking()
             .Include(bill => bill.LineItems)
-            .Where(bill => admissionIds.Contains(bill.AdmissionId))
-            .ToDictionaryAsync(bill => bill.AdmissionId, ct);
+            .Where(bill => bill.AdmissionId != null
+                && admissionIds.Contains(bill.AdmissionId.Value))
+            .ToDictionaryAsync(bill => bill.AdmissionId!.Value, ct);
 
         var labels = await BedLabels.LiveByAdmissionAsync(_db, _beds, admissionIds, now, ct);
         var wardTypes = await WardTypesByBedAsync(admissions, ct);
@@ -194,7 +359,7 @@ public sealed class BillingService : IBillingService
                 AdmissionId = admission.Id,
                 Patient = ToPatientSummary(admission.Patient),
                 Status = admission.Status,
-                AdmissionCategory = admission.Category,
+                AdmissionCategory = admission.Category!.Value,
                 WardName = label.WardName,
                 BedNumber = label.BedNumber,
                 AdmittedAt = admission.AdmittedAt,
@@ -313,9 +478,9 @@ public sealed class BillingService : IBillingService
                 Id = Guid.NewGuid(),
                 BillId = billId,
                 Source = BillLineSource.AdmissionFee,
-                Description = $"Admission fee ({EnumWire.ToWire(admission.Category)})",
+                Description = $"Admission fee ({EnumWire.ToWire(admission.Category!.Value)})",
                 Quantity = 1m,
-                UnitPrice = prices.AdmissionFee(admission.Category)
+                UnitPrice = prices.AdmissionFee(admission.Category!.Value)
             }
         };
 
@@ -464,6 +629,7 @@ public sealed class BillingService : IBillingService
         {
             Id = bill.Id,
             AdmissionId = bill.AdmissionId,
+            AppointmentId = bill.AppointmentId,
             BillNumber = bill.BillNumber,
             Currency = BillingRates.Currency,
             Lines = lines,

@@ -25,6 +25,12 @@ public interface IAdmissionService
     Task<AdmissionResponse> CreateAsync(
         CreateAdmissionRequest request, CancellationToken cancellationToken = default);
 
+    Task<AdmissionResponse> PreAdmitAsync(
+        PreAdmitRequest request, CancellationToken cancellationToken = default);
+
+    Task<AdmissionResponse> ClassifyAsync(
+        Guid id, ClassifyAdmissionRequest request, Guid staffId, CancellationToken cancellationToken = default);
+
     Task<AdmissionResponse> CompleteDetailsAsync(
         Guid id, CompleteDetailsRequest request, CancellationToken cancellationToken = default);
 

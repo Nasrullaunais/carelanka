@@ -7,7 +7,6 @@ import 'package:dio/dio.dart';
 import 'clients/admissions_api.dart';
 import 'clients/ambulances_api.dart';
 import 'clients/auth_api.dart';
-import 'clients/bed_assignment_api.dart';
 import 'clients/beds_api.dart';
 import 'clients/billing_api.dart';
 import 'clients/calls_api.dart';
@@ -45,7 +44,6 @@ class CareLankaApi {
   AdmissionsApi? _admissions;
   AmbulancesApi? _ambulances;
   AuthApi? _auth;
-  BedAssignmentApi? _bedAssignment;
   BedsApi? _beds;
   BillingApi? _billing;
   CallsApi? _calls;
@@ -72,8 +70,6 @@ class CareLankaApi {
   AmbulancesApi get ambulances => _ambulances ??= AmbulancesApi(_dio, baseUrl: _baseUrl);
 
   AuthApi get auth => _auth ??= AuthApi(_dio, baseUrl: _baseUrl);
-
-  BedAssignmentApi get bedAssignment => _bedAssignment ??= BedAssignmentApi(_dio, baseUrl: _baseUrl);
 
   BedsApi get beds => _beds ??= BedsApi(_dio, baseUrl: _baseUrl);
 

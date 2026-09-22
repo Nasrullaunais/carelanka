@@ -124,9 +124,13 @@ public sealed class CareAgent : ICareAgent
         {
             // A draft breaking CR1 or CR5 never reaches a reviewer. The deterministic fallback is
             // built from fixed sentences and structured facts only, so it always passes.
+            // The rejected text is the only evidence of whether a rule caught something real or
+            // misfired, and nothing else keeps it - the row that gets saved holds the fallback.
             _logger.LogWarning(
-                "The care advisor's draft failed {FailedRules}; falling back to the deterministic draft.",
-                string.Join(", ", validated.FailedRules));
+                "The care advisor's draft failed {FailedRules}; falling back to the deterministic "
+                + "draft. The rejected draft was: {RejectedDraft}",
+                string.Join(", ", validated.FailedRules),
+                candidate.Message);
 
             final = (await new DeterministicCareAdvisor().AdviseAsync(context, ct)) with
             {

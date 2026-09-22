@@ -130,6 +130,50 @@ public sealed class CareRecommendationValidatorTests
         Assert.True(result.Passed);
     }
 
+    /// <summary>
+    /// The reason CR5 was narrowed. Saying what a medicine is for sends the patient nowhere, and
+    /// failing it meant every question about a medicine came back as the fallback note - the model's
+    /// real answer never reached the reviewer at all.
+    /// </summary>
+    [Theory]
+    [InlineData("Please do not take penicillin on your own. Penicillin is normally used for infections.")]
+    [InlineData("Penicillin is normally used for infections. Your nurse will check your record first.")]
+    public void Describing_what_a_medicine_is_for_passes_CR5(string message)
+    {
+        var result = Validate(message, reportedText: "can I take penicillin");
+
+        Assert.True(result.Passed, string.Join(", ", result.FailedRules));
+    }
+
+    /// <summary>
+    /// The other half of the same change: narrowing CR5 must not let a draft point the patient at
+    /// a medicine. These are the sentences the rule exists for.
+    /// </summary>
+    [Theory]
+    [InlineData("You can take penicillin if the pain gets worse.")]
+    [InlineData("Try penicillin and see if it settles.")]
+    [InlineData("You should ask the nurse for penicillin.")]
+    public void Sending_the_patient_towards_a_medicine_still_fails_CR5(string message)
+    {
+        var result = Validate(message, reportedText: "can I take penicillin");
+
+        Assert.Contains("CR5", result.FailedRules);
+    }
+
+    /// <summary>
+    /// Normalise collapses doubled letters, so a draft saying "allergy" arrives as "alergy". The
+    /// marker list has to be normalised too or the word never matches its own entry.
+    /// </summary>
+    [Fact]
+    public void An_allergy_word_counts_as_saying_not_to()
+    {
+        var result = Validate(
+            "You are allergic to penicillin, so ask your nurse before anything is given to you.",
+            reportedText: "can I take penicillin");
+
+        Assert.True(result.Passed, string.Join(", ", result.FailedRules));
+    }
+
     private static CareValidationResult Validate(
         string message, string? reportedText = null)
         => CareRecommendationValidator.Validate(

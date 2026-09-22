@@ -271,8 +271,7 @@ public sealed class MaintenanceEndpointTests
             Id = Guid.NewGuid(),
             AdmissionId = admission.Id,
             BedId = bedId,
-            Status = AssignmentStatus.Occupied,
-            AssignedBy = AssignedBy.User
+            Status = AssignmentStatus.Occupied
         });
 
         await db.SaveChangesAsync();

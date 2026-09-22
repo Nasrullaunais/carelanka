@@ -1,5 +1,17 @@
 namespace CareLanka.Api.Agents;
 
+/// <summary>
+/// Common, group-owned (ADR 2, <c>integration_of_functions.md</c> §11.20) - every agent in the
+/// app shares one of these. Nothing here is Patient Management's to decide alone.
+/// </summary>
+/// <remarks>
+/// <b>Do not change a default below without re-measuring it.</b> Every value here was wrong at
+/// least once - a documented field the real API rejects, a timeout too tight to survive one busy
+/// retry, a model that turned out three times slower on the same key - and each mistake cost a
+/// full session to trace back to "the agent is stuck" before the actual cause was found. The
+/// reasoning is written on each property below; read it before touching the number, or the next
+/// person spends that same session again.
+/// </remarks>
 public sealed class LanguageModelOptions
 {
     public const string SectionName = "LanguageModel";
@@ -11,16 +23,52 @@ public sealed class LanguageModelOptions
     /// </summary>
     public string ApiKey { get; set; } = string.Empty;
 
-    public string Model { get; set; } = "gemini-3.6-flash";
+    /// <summary>
+    /// <c>gemini-3.5-flash</c> is the settled choice (2026-09-21), and the two reasons are both
+    /// measured rather than assumed.
+    /// <para>
+    /// Speed: on one short prompt and one key, <c>gemini-3.6-flash</c> answered in 95s, 25s and 77s
+    /// where <c>gemini-3.5-flash</c> answered in 12s. Neither reported thinking tokens, so that is
+    /// free-tier queue time. 3.6's published gains are token economy and agentic tool loops,
+    /// neither of which a one-call agent paying nothing per token can use.
+    /// </para>
+    /// <para>
+    /// Quota: the free tier meters requests per day per model, so the model name is also the quota
+    /// bucket. The <c>gemini-3.6-flash</c> bucket turned out to be 20 a day, which a few failed
+    /// runs spend; changing model resets which bucket you are drawing from.
+    /// </para>
+    /// <para>
+    /// Support for <see cref="ThinkingBudget"/> varies by model - <c>gemini-3.5-flash-lite</c>
+    /// rejects it outright with a 400 - so re-check both together when changing this.
+    /// </para>
+    /// </summary>
+    public string Model { get; set; } = "gemini-3.5-flash";
 
     public string BaseUrl { get; set; } = "https://generativelanguage.googleapis.com/v1beta";
 
     /// <summary>
+    /// Tokens the model may spend reasoning before it starts writing, sent as
+    /// <c>generationConfig.thinkingConfig.thinkingBudget</c>. Gemini 3 reasons by default, which is
+    /// what made a one-paragraph reply take 12-41 seconds and time out more often than not; our
+    /// prompts are short and heavily constrained, so that was buying the wait and not the answer.
+    /// Null sends nothing and lets the provider choose.
+    /// </summary>
+    /// <remarks>
+    /// The documented <c>generationConfig.thinkingLevel</c> is not a field this API version has -
+    /// v1beta rejects it outright with "Unknown name thinkingLevel at generation_config: Cannot
+    /// find field". <c>thinkingConfig</c> is the shape it accepts. Verified against the live API on
+    /// 2026-09-21; do not "correct" it back to the one the docs show without re-checking.
+    /// </remarks>
+    public int? ThinkingBudget { get; set; }
+
+    /// <summary>
     /// Hard timeout per attempt. §9.1 asks for one by name. Measured against the free tier on
     /// 2026-09-21, a call that succeeds takes 12-41 seconds, so the old 20 was hanging up on
-    /// answers that were on their way.
+    /// answers that were on their way. Raised to 60 on top of <see cref="ThinkingBudget"/>: three
+    /// attempts that each hang up a second before the answer arrives waste the whole run, and one
+    /// attempt that waits is cheaper than three that do not.
     /// </summary>
-    public int TimeoutSeconds { get; set; } = 45;
+    public int TimeoutSeconds { get; set; } = 60;
 
     /// <summary>
     /// Retries after the first attempt, so 2 means at most three calls. Three is the deliberate
@@ -42,7 +90,8 @@ public sealed class LanguageModelOptions
     /// of this - a draft goes into a queue a nurse reads when they have a moment - so it is worth
     /// waiting out a busy provider rather than falling back to the standard note in five seconds.
     /// Wide enough for three attempts at <see cref="TimeoutSeconds"/> plus the backoff between
-    /// them; lower it and the third attempt is the one that stops happening.
+    /// them; lower it and the third attempt is the one that stops happening. At 60s an attempt
+    /// that is 3 x 60 plus a 2s and a 4s backoff.
     /// </summary>
-    public int TotalBudgetSeconds { get; set; } = 150;
+    public int TotalBudgetSeconds { get; set; } = 190;
 }

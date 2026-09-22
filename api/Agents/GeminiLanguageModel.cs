@@ -49,6 +49,20 @@ public sealed class GeminiLanguageModel : ILanguageModel
                 NoLanguageModel.Reason, LanguageModelFailure.NotConfigured);
         }
 
+        var generationConfig = new Dictionary<string, object>
+        {
+            ["responseMimeType"] = "application/json",
+            ["temperature"] = 0.2
+        };
+
+        if (_options.ThinkingBudget is { } thinkingBudget)
+        {
+            generationConfig["thinkingConfig"] = new Dictionary<string, object>
+            {
+                ["thinkingBudget"] = thinkingBudget
+            };
+        }
+
         var body = JsonSerializer.Serialize(
             new
             {
@@ -57,7 +71,7 @@ public sealed class GeminiLanguageModel : ILanguageModel
                 {
                     new { role = "user", parts = new[] { new { text = dataJson } } }
                 },
-                generationConfig = new { responseMimeType = "application/json", temperature = 0.2 }
+                generationConfig
             },
             Json);
 
@@ -76,6 +90,10 @@ public sealed class GeminiLanguageModel : ILanguageModel
 
                 if (!string.IsNullOrWhiteSpace(text))
                 {
+                    _log.LogInformation(
+                        "Gemini answered in {Seconds:n1}s on attempt {Attempt}.",
+                        elapsed.Elapsed.TotalSeconds, attempt);
+
                     return LanguageModelResult.Success(text);
                 }
 
@@ -181,8 +199,12 @@ public sealed class GeminiLanguageModel : ILanguageModel
 
         if (!response.IsSuccessStatusCode)
         {
+            // The provider says why in the body - a rejected field, a spent quota, a blocked key.
+            // Without it every failure reads as the same opaque status code.
+            var detail = await ReasonAsync(response, timeout.Token);
+
             throw new HttpRequestException(
-                $"the provider answered {(int)response.StatusCode}", null, response.StatusCode);
+                $"the provider answered {(int)response.StatusCode}{detail}", null, response.StatusCode);
         }
 
         await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
@@ -190,6 +212,38 @@ public sealed class GeminiLanguageModel : ILanguageModel
         using var document = await JsonDocument.ParseAsync(stream, cancellationToken: timeout.Token);
 
         return ExtractText(document.RootElement);
+    }
+
+    /// <summary>
+    /// Read for a log line, so it must never throw: a failure reading why a call failed would
+    /// replace the reason with a second, less useful one.
+    /// </summary>
+    private static async Task<string> ReasonAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        try
+        {
+            var body = await response.Content.ReadAsStringAsync(ct);
+
+            if (string.IsNullOrWhiteSpace(body))
+            {
+                return string.Empty;
+            }
+
+            using var document = JsonDocument.Parse(body);
+
+            var message = document.RootElement.TryGetProperty("error", out var error)
+                && error.TryGetProperty("message", out var text)
+                    ? text.GetString()
+                    : null;
+
+            var reason = (message ?? body).ReplaceLineEndings(" ");
+
+            return $" - {(reason.Length <= 400 ? reason : reason[..400])}";
+        }
+        catch (Exception)
+        {
+            return string.Empty;
+        }
     }
 
     /// <summary>

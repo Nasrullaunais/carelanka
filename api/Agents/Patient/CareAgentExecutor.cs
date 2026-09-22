@@ -10,9 +10,8 @@ namespace CareLanka.Api.Agents.Patient;
 
 /// <summary>
 /// Runs one queued care-agent workflow to completion and writes the result onto its workflow row
-/// and its <see cref="CareRecommendationEntity"/> row. Same shape as
-/// <c>BedAgentExecutor</c>: a run that throws still ends as a row marked failed, never left
-/// pending forever.
+/// and its <see cref="CareRecommendationEntity"/> row. A run that throws still ends as a row
+/// marked failed, never left pending forever.
 /// </summary>
 public sealed class CareAgentExecutor
 {
@@ -84,15 +83,15 @@ public sealed class CareAgentExecutor
 
     private void Record(AgentWorkflow workflow, CareRecommendationEntity recommendation, CareAgentRun run)
     {
-        workflow.CompletedSteps = BedWorkflowJson.Write(run.Steps);
-        workflow.ValidationResults = BedWorkflowJson.Write(new CareWorkflowValidationRecord
+        workflow.CompletedSteps = CareWorkflowJson.Write(run.Steps);
+        workflow.ValidationResults = CareWorkflowJson.Write(new CareWorkflowValidationRecord
         {
             Passed = run.Validation.Passed,
             FailedRules = run.Validation.FailedRules,
             DraftSource = EnumWire.ToWire(run.Draft?.Source ?? DTOs.Patient.CareDraftSource.Model),
             DraftNote = run.Draft?.SourceNote
         });
-        workflow.Errors = run.Errors.Count == 0 ? null : BedWorkflowJson.Write(run.Errors);
+        workflow.Errors = run.Errors.Count == 0 ? null : CareWorkflowJson.Write(run.Errors);
         workflow.FinalOutcome = EnumWire.ToWire(run.Outcome);
         workflow.AttemptCount = run.Attempts;
         workflow.CompletedAt = DateTimeOffset.UtcNow;
@@ -114,7 +113,7 @@ public sealed class CareAgentExecutor
                 ChangeType = ProposedChangeType.CreateCareRecommendation,
                 TargetEntityType = WorkflowEntityType,
                 TargetEntityId = recommendation.Id,
-                Payload = BedWorkflowJson.Write(new
+                Payload = CareWorkflowJson.Write(new
                 {
                     patient_id = recommendation.PatientId,
                     admission_id = recommendation.AdmissionId,
@@ -136,9 +135,9 @@ public sealed class CareAgentExecutor
 
     private static void RecordFailure(AgentWorkflow workflow)
     {
-        workflow.ValidationResults = BedWorkflowJson.Write(
+        workflow.ValidationResults = CareWorkflowJson.Write(
             new CareWorkflowValidationRecord { Passed = false, FailedRules = Array.Empty<string>() });
-        workflow.Errors = BedWorkflowJson.Write(new[] { "The care agent could not complete this run." });
+        workflow.Errors = CareWorkflowJson.Write(new[] { "The care agent could not complete this run." });
         workflow.FinalOutcome = EnumWire.ToWire(DTOs.Patient.CareAgentOutcome.Failed);
         workflow.Status = AgentWorkflowStatus.Failed;
         workflow.CompletedAt = DateTimeOffset.UtcNow;

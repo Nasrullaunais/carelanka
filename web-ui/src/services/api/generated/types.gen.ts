@@ -252,7 +252,6 @@ export type AssignAmbulanceCrewRequest = {
 
 export type AssignBedRequest = {
     bed_id: string;
-    workflow_id?: string | null;
     override_reason?: string | null;
 };
 
@@ -285,19 +284,6 @@ export type Bed = {
     updated_at: string;
 };
 
-export type BedAgentOutcome = 'proposed' | 'proposed_with_downgrade' | 'needs_duty_manager' | 'no_bed_available' | 'visit_needs_no_bed' | 'patient_not_found' | 'failed';
-
-export type BedAgentStep = {
-    step?: string | null;
-    tool?: string | null;
-    started_at?: string;
-    duration_ms?: number;
-    ok?: boolean;
-    error?: string | null;
-};
-
-export type BedApproverRole = 'ward_nurse' | 'duty_manager';
-
 export type BedAssignment = {
     id: string;
     admission_id: string;
@@ -306,8 +292,6 @@ export type BedAssignment = {
     bed_number: string;
     status: AssignmentStatus;
     reserved_until?: string | null;
-    assigned_by: AssignedBy;
-    workflow_id?: string | null;
     is_downgrade: boolean;
     approved_by_staff_id?: string | null;
     approved_by_staff_name?: string | null;
@@ -339,62 +323,6 @@ export type BedPagedResult = {
     page_size: number;
     total_items: number;
     total_pages: number;
-};
-
-export type BedSuggestionBlocker = {
-    code: BedSuggestionBlockerCode;
-    message: string | null;
-};
-
-export type BedSuggestionBlockerCode = 'downgrade_needed' | 'upgrade_only' | 'ward_full' | 'gender_policy' | 'needs_isolation' | 'pediatric_only' | 'no_bed_required' | 'no_such_patient' | 'no_open_admission' | 'agent_failed';
-
-export type BedSuggestionPatient = {
-    patient_id: string;
-    patient_code: string | null;
-    full_name: string | null;
-    age?: number | null;
-    gender?: Gender;
-    admission_id?: string | null;
-    admission_category?: AdmissionCategory;
-    urgency?: AdmissionUrgency;
-    is_infectious?: boolean;
-    status?: AdmissionStatus;
-};
-
-export type BedSuggestionRequest = {
-    admission_id?: string | null;
-    patient_identifier?: string | null;
-};
-
-export type BedWorkflowAccepted = {
-    workflow_id?: string;
-    admission_id?: string | null;
-    status?: BedWorkflowStatus;
-    poll_url?: string | null;
-};
-
-export type BedWorkflowStatus = 'running' | 'awaiting_approval' | 'completed' | 'failed';
-
-export type BedWorkflowSummary = {
-    workflow_id?: string;
-    admission_id?: string | null;
-    objective?: string | null;
-    status?: BedWorkflowStatus;
-    outcome?: BedAgentOutcome;
-    plan?: Array<string> | null;
-    steps?: Array<BedAgentStep> | null;
-    patient?: BedSuggestionPatient;
-    best?: SuggestedBed;
-    alternatives?: Array<SuggestedBed> | null;
-    blocker?: BedSuggestionBlocker;
-    validation?: BedWorkflowValidation;
-    requires_approval_by?: BedApproverRole;
-    retries?: number;
-};
-
-export type BedWorkflowValidation = {
-    passed?: boolean;
-    failed_rules?: Array<string> | null;
 };
 
 export type Bill = {
@@ -462,6 +390,15 @@ export type CancellationRequestStatus = 'pending' | 'approved' | 'rejected';
 
 export type CareAgentOutcome = 'drafted' | 'escalated' | 'failed';
 
+export type CareAgentStep = {
+    step?: string | null;
+    tool?: string | null;
+    started_at?: string;
+    duration_ms?: number;
+    ok?: boolean;
+    error?: string | null;
+};
+
 export type CareDraftSource = 'model' | 'model_unavailable' | 'model_rejected';
 
 export type CareQueryRequest = {
@@ -526,7 +463,7 @@ export type CareWorkflowSummary = {
     status?: CareWorkflowStatus;
     outcome?: CareAgentOutcome;
     plan?: Array<string> | null;
-    steps?: Array<BedAgentStep> | null;
+    steps?: Array<CareAgentStep> | null;
     red_flag?: boolean;
     validation?: CareWorkflowValidation;
     draft_source?: CareDraftSource;
@@ -1496,17 +1433,6 @@ export type SortDirection = 'asc' | 'desc';
 export type StaffLoginRequest = {
     email: string;
     password: string;
-};
-
-export type SuggestedBed = {
-    bed_id: string;
-    ward_name: string | null;
-    bed_number: string | null;
-    is_downgrade: boolean;
-    requires_duty_manager: boolean;
-    rules_satisfied?: Array<string> | null;
-    fit_factors?: Array<string> | null;
-    rationale?: string | null;
 };
 
 export type UpdateAmbulanceRequest = {
@@ -2988,82 +2914,6 @@ export type GetCurrentUserResponses = {
 };
 
 export type GetCurrentUserResponse = GetCurrentUserResponses[keyof GetCurrentUserResponses];
-
-export type RequestBedSuggestionData = {
-    body?: BedSuggestionRequest;
-    path?: never;
-    query?: never;
-    url: '/bed-suggestions';
-};
-
-export type RequestBedSuggestionErrors = {
-    /**
-     * Bad Request
-     */
-    400: ValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: ProblemDetails;
-    /**
-     * Forbidden
-     */
-    403: ProblemDetails;
-    /**
-     * Not Found
-     */
-    404: ProblemDetails;
-    /**
-     * Conflict
-     */
-    409: ProblemDetails;
-};
-
-export type RequestBedSuggestionError = RequestBedSuggestionErrors[keyof RequestBedSuggestionErrors];
-
-export type RequestBedSuggestionResponses = {
-    /**
-     * Accepted
-     */
-    202: BedWorkflowAccepted;
-};
-
-export type RequestBedSuggestionResponse = RequestBedSuggestionResponses[keyof RequestBedSuggestionResponses];
-
-export type GetBedWorkflowData = {
-    body?: never;
-    path: {
-        workflowId: string;
-    };
-    query?: never;
-    url: '/bed-workflows/{workflowId}';
-};
-
-export type GetBedWorkflowErrors = {
-    /**
-     * Unauthorized
-     */
-    401: ProblemDetails;
-    /**
-     * Forbidden
-     */
-    403: ProblemDetails;
-    /**
-     * Not Found
-     */
-    404: ProblemDetails;
-};
-
-export type GetBedWorkflowError = GetBedWorkflowErrors[keyof GetBedWorkflowErrors];
-
-export type GetBedWorkflowResponses = {
-    /**
-     * OK
-     */
-    200: BedWorkflowSummary;
-};
-
-export type GetBedWorkflowResponse = GetBedWorkflowResponses[keyof GetBedWorkflowResponses];
 
 export type ListBedsData = {
     body?: never;

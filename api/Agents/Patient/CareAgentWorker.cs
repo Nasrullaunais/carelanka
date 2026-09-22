@@ -1,8 +1,7 @@
 namespace CareLanka.Api.Agents.Patient;
 
 /// <summary>
-/// Runs queued care-agent workflows one at a time, each in its own DI scope. Same shape as
-/// <c>BedAgentWorker</c>.
+/// Runs queued care-agent workflows one at a time, each in its own DI scope.
 /// </summary>
 public sealed class CareAgentWorker : BackgroundService
 {

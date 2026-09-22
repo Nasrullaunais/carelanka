@@ -12,7 +12,7 @@ import {
   rejectCareRecommendationMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
 import type {
-  BedAgentStep,
+  CareAgentStep,
   CareRecommendationStatus,
   CareUrgency,
 } from '../services/api/generated';
@@ -513,7 +513,7 @@ function AgentProgress({
   steps,
 }: {
   plan: string[] | null | undefined;
-  steps: BedAgentStep[] | null | undefined;
+  steps: CareAgentStep[] | null | undefined;
 }) {
   const order = plan && plan.length > 0 ? plan : Object.keys(STEP_CAPTIONS);
   const done = new Set((steps ?? []).filter((step) => step.ok !== false).map((step) => step.step));

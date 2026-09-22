@@ -9,7 +9,6 @@ using CareLanka.Api.DTOs.Patient;
 using CareLanka.Api.Services.Common;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
-using AgentWorkflow = CareLanka.Api.Data.Entities.Common.AgentWorkflow;
 using BedAssignmentEntity = CareLanka.Api.Data.Entities.Patient.BedAssignment;
 using BedAssignmentResponse = CareLanka.Api.DTOs.Patient.BedAssignment;
 using WardEntity = CareLanka.Api.Data.Entities.Patient.Ward;
@@ -114,8 +113,7 @@ public sealed class BedAssignmentService : IBedAssignmentService
             bed,
             IsDutyManager);
 
-        var assignment = await WriteAsync(
-            admissionId, bed, request.OverrideReason, request.WorkflowId, ct);
+        var assignment = await WriteAsync(admissionId, bed, request.OverrideReason, ct);
 
         return await ToResponseAsync(assignment, ward!.Name, bed.BedNumber, ct);
     }
@@ -205,9 +203,6 @@ public sealed class BedAssignmentService : IBedAssignmentService
             ReservedUntil = wasOccupied ? null : reservedUntil,
             OccupiedAt = occupiedAt,
 
-            AssignedBy = AssignedBy.User,
-            WorkflowId = null,
-
             IsDowngrade = live.IsDowngrade,
 
             ApprovedByStaffMemberId = _currentUser.Id,
@@ -243,7 +238,6 @@ public sealed class BedAssignmentService : IBedAssignmentService
         Guid admissionId,
         RegisteredBed bed,
         string? overrideReason,
-        Guid? workflowId,
         CancellationToken ct)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
@@ -289,8 +283,6 @@ public sealed class BedAssignmentService : IBedAssignmentService
 
         await ReleaseLapsedHoldsAsync(bed.Id, now, ct);
 
-        var workflow = await TrustedWorkflowAsync(workflowId, admissionId, bed.Id, ct);
-
         var assignment = new BedAssignmentEntity
         {
             Id = Guid.NewGuid(),
@@ -298,10 +290,6 @@ public sealed class BedAssignmentService : IBedAssignmentService
             BedId = bed.Id,
             Status = AssignmentStatus.Reserved,
             ReservedUntil = BedHold.ExpiresAt(admission.ExpectedArrivalAt, now),
-
-            AssignedBy = workflow is null ? AssignedBy.User : AssignedBy.Agent,
-
-            WorkflowId = workflow?.Id,
 
             IsDowngrade = isDowngrade,
 
@@ -312,8 +300,6 @@ public sealed class BedAssignmentService : IBedAssignmentService
 
         admission.Status = AdmissionStatus.BedReserved;
         _db.BedAssignments.Add(assignment);
-
-        MarkSuggestionTaken(workflow, bed.Id, assignment.Id, now);
 
         try
         {
@@ -333,54 +319,6 @@ public sealed class BedAssignmentService : IBedAssignmentService
         await transaction.CommitAsync(ct);
 
         return assignment;
-    }
-
-    /// <summary>
-    /// A workflow id on the body means the nurse pressed "Use this bed" on an agent suggestion. It
-    /// is trusted only when this run really did suggest this bed for this visit; anything else -
-    /// an id that does not exist, one belonging to another patient, one naming a different bed -
-    /// is recorded as a manual assignment rather than believed, because the alternative is a
-    /// hand-typed id deciding what the audit trail says an agent did.
-    /// </summary>
-    private async Task<AgentWorkflow?> TrustedWorkflowAsync(
-        Guid? workflowId, Guid admissionId, Guid bedId, CancellationToken ct)
-    {
-        if (workflowId is not { } id)
-        {
-            return null;
-        }
-
-        var workflow = await _db.AgentWorkflows
-            .Include(row => row.ProposedChanges)
-            .FirstOrDefaultAsync(
-                row => row.Id == id && row.AgentType == AgentType.PatientAdmissionBed, ct);
-
-        if (workflow is null || workflow.EntityId != admissionId)
-        {
-            return null;
-        }
-
-        return workflow.ProposedChanges.Any(change => change.ProposedBedId == bedId)
-            ? workflow
-            : null;
-    }
-
-    private void MarkSuggestionTaken(
-        AgentWorkflow? workflow, Guid bedId, Guid assignmentId, DateTimeOffset now)
-    {
-        if (workflow is null)
-        {
-            return;
-        }
-
-        var taken = workflow.ProposedChanges.First(change => change.ProposedBedId == bedId);
-
-        taken.AppliedAt = now;
-        taken.AppliedEntityId = assignmentId;
-
-        workflow.Status = AgentWorkflowStatus.Executed;
-        workflow.ReviewedByStaffMemberId = _currentUser.Id;
-        workflow.ReviewedAt = now;
     }
 
     private async Task ReleaseLapsedHoldsAsync(Guid bedId, DateTimeOffset now, CancellationToken ct)
@@ -514,8 +452,6 @@ public sealed class BedAssignmentService : IBedAssignmentService
             BedNumber = bedNumber,
             Status = assignment.Status,
             ReservedUntil = assignment.ReservedUntil,
-            AssignedBy = assignment.AssignedBy,
-            WorkflowId = assignment.WorkflowId,
             IsDowngrade = assignment.IsDowngrade,
             ApprovedByStaffId = assignment.ApprovedByStaffMemberId,
             ApprovedByStaffName = StaffNames.Lookup(names, assignment.ApprovedByStaffMemberId),

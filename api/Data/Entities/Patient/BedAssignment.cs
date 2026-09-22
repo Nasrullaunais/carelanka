@@ -16,10 +16,6 @@ public class BedAssignment : AuditedEntity
 
     public DateTimeOffset? OccupiedAt { get; set; }
 
-    public AssignedBy AssignedBy { get; set; }
-
-    public Guid? WorkflowId { get; set; }
-
     public bool IsDowngrade { get; set; }
 
     public Guid? ApprovedByStaffMemberId { get; set; }

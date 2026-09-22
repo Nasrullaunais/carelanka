@@ -442,8 +442,7 @@ public sealed class CapacityEndpointTests
             AdmissionId = admissionId,
             BedId = bedId,
             Status = status,
-            ReservedUntil = reservedUntil,
-            AssignedBy = AssignedBy.User
+            ReservedUntil = reservedUntil
         });
 
         await db.SaveChangesAsync();

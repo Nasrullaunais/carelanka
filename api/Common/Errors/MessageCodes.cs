@@ -98,7 +98,6 @@ public static class MessageCodes
             [MessageCode.NoBillRaised] = "cl_pat_036",
             [MessageCode.PatientCodeNotClaimable] = "cl_pat_037",
             [MessageCode.NotCurrentlyAdmittedForCareQuery] = "cl_pat_038",
-            [MessageCode.BedSuggestionNotPossible] = "cl_pat_039",
             [MessageCode.CareRecommendationNotPendingReview] = "cl_pat_040",
             [MessageCode.PreAdmissionAlreadyExists] = "cl_pat_041",
             [MessageCode.AdmissionAlreadyClassified] = "cl_pat_042",

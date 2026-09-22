@@ -16,7 +16,6 @@ import {
 import type { PrincipalRole, WorklistRow } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
 import { MedicalProfilePanel } from '../components/MedicalProfilePanel';
-import { BedSuggestionPanel } from '../components/BedSuggestionPanel';
 import { BedCandidateTable } from '../components/BedCandidateTable';
 import {
   canAssignBed,
@@ -55,8 +54,6 @@ export function PatientsPage() {
   const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState<string | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
-  const [suggestingId, setSuggestingId] = useState<string | null>(null);
-  const [deskSuggesting, setDeskSuggesting] = useState(false);
 
   const [bedMode, setBedMode] = useState<'assign' | 'correct'>('assign');
 
@@ -98,22 +95,13 @@ export function PatientsPage() {
 
   function openDetails(id: string) {
     setAssigningId(null);
-    setSuggestingId(null);
     setOpenId((current) => (current === id ? null : id));
   }
 
   function openAssign(id: string, mode: 'assign' | 'correct' = 'assign') {
     setOpenId(null);
-    setSuggestingId(null);
     setBedMode(mode);
     setAssigningId((current) => (current === id && bedMode === mode ? null : id));
-  }
-
-  function openSuggest(id: string) {
-    setOpenId(null);
-    setAssigningId(null);
-    setDeskSuggesting(false);
-    setSuggestingId((current) => (current === id ? null : id));
   }
 
   return (
@@ -151,7 +139,6 @@ export function PatientsPage() {
                   setPage(1);
                   setOpenId(null);
                   setAssigningId(null);
-                  setSuggestingId(null);
                 }}
               >
                 Clear
@@ -170,7 +157,6 @@ export function PatientsPage() {
                   setPage(1);
                   setOpenId(null);
                   setAssigningId(null);
-                  setSuggestingId(null);
                 }}
               />{' '}
               Include finished visits
@@ -181,28 +167,6 @@ export function PatientsPage() {
           </div>
         </form>
       </div>
-
-      {canAssignBed(role) && (
-        <div className="card">
-          <h2>Suggest a bed</h2>
-          <p className="muted">
-            Off a slip at the desk, before the patient has a row on this board — type their NIC
-            or patient code and the agent looks them up.
-          </p>
-
-          {deskSuggesting ? (
-            <BedSuggestionPanel
-              role={role}
-              onAssigned={() => setDeskSuggesting(false)}
-              onClose={() => setDeskSuggesting(false)}
-            />
-          ) : (
-            <button type="button" onClick={() => setDeskSuggesting(true)}>
-              Suggest a bed
-            </button>
-          )}
-        </div>
-      )}
 
       <div className="card">
         <h2>
@@ -290,10 +254,8 @@ export function PatientsPage() {
                         row={row}
                         role={role}
                         assigning={assigningId === row.id}
-                        suggesting={suggestingId === row.id}
                         open={openId === row.id}
                         onAssign={(mode) => openAssign(row.id, mode)}
-                        onSuggest={() => openSuggest(row.id)}
                         onDetails={() => openDetails(row.id)}
                       />
                     </td>
@@ -306,19 +268,6 @@ export function PatientsPage() {
                           row={row}
                           mode={bedMode}
                           onDone={() => setAssigningId(null)}
-                        />
-                      </td>
-                    </tr>
-                  )}
-
-                  {suggestingId === row.id && (
-                    <tr className="drawer">
-                      <td colSpan={5}>
-                        <BedSuggestionPanel
-                          admissionId={row.id}
-                          role={role}
-                          onAssigned={() => setSuggestingId(null)}
-                          onClose={() => setSuggestingId(null)}
                         />
                       </td>
                     </tr>
@@ -393,19 +342,15 @@ function RowActions({
   row,
   role,
   assigning,
-  suggesting,
   open,
   onAssign,
-  onSuggest,
   onDetails,
 }: {
   row: WorklistRow;
   role: Parameters<typeof canAssignBed>[0];
   assigning: boolean;
-  suggesting: boolean;
   open: boolean;
   onAssign: (mode: 'assign' | 'correct') => void;
-  onSuggest: () => void;
   onDetails: () => void;
 }) {
   const invalidate = useBoardInvalidation();
@@ -432,14 +377,9 @@ function RowActions({
     <>
 
       {row.status === 'awaiting_bed' && row.requires_bed && canAssignBed(role) && (
-        <>
-          <button type="button" onClick={() => onAssign('assign')}>
-            {assigning ? 'Cancel' : 'Assign bed'}
-          </button>{' '}
-          <button type="button" className="secondary" onClick={onSuggest}>
-            {suggesting ? 'Cancel' : 'Suggest bed'}
-          </button>
-        </>
+        <button type="button" onClick={() => onAssign('assign')}>
+          {assigning ? 'Cancel' : 'Assign bed'}
+        </button>
       )}
 
       {(row.status === 'bed_ready' || row.status === 'admitted') &&
@@ -737,8 +677,10 @@ function DetailsPanel({
             <table>
               <tbody>
                 <Field label="Arrived by">{admissionSourceLabels[visit.data.source]}</Field>
-                <Field label="Care level">
-                  {admissionCategoryLabels[visit.data.admission_category]}
+                <Field label="Care level" empty="Not yet classified">
+                  {visit.data.admission_category
+                    ? admissionCategoryLabels[visit.data.admission_category]
+                    : null}
                 </Field>
                 <Field label="Urgency">{admissionUrgencyLabels[visit.data.urgency]}</Field>
                 <Field label="Needs a bed">
@@ -759,8 +701,10 @@ function DetailsPanel({
                 <Field label="Admitted by" empty="Not recorded">
                   {visit.data.category_set_by_staff_name}
                 </Field>
-                <Field label="Care level chosen">
-                  {localDateTime(visit.data.category_set_at)}
+                <Field label="Care level chosen" empty="Not yet classified">
+                  {visit.data.category_set_at
+                    ? localDateTime(visit.data.category_set_at)
+                    : null}
                 </Field>
                 <Field label="Bed assigned by" empty="No bed assigned">
                   {liveBed?.approved_by_staff_name ?? (liveBed ? 'Not recorded' : null)}

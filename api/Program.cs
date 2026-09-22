@@ -467,24 +467,9 @@ builder.Services.AddScoped<IMeService, MeService>();
 
 builder.Services.AddScoped<IBedRegistryService, BedRegistryService>();
 
-// The Bed and Patient Details Agent. The tools are the allow-list, so they are registered as one
-// interface and nothing else can widen them. The advisor is the only seam a language model plugs
-// into, and it may only choose between beds the rules have already allowed.
-builder.Services.AddScoped<IBedAgentTools, BedAgentTools>();
-builder.Services.AddScoped<IBedRationaleWriter, DeterministicBedRationaleWriter>();
-builder.Services.AddScoped<IBedAdvisor, GeminiBedAdvisor>();
-builder.Services.AddScoped<IBedAgent, BedAgent>();
-builder.Services.AddScoped<IBedWorkflowRecorder, BedWorkflowRecorder>();
-builder.Services.AddScoped<IBedSuggestionService, BedSuggestionService>();
-builder.Services.AddScoped<BedAgentExecutor>();
-builder.Services.AddSingleton<IAgentRunQueue, AgentRunQueue>();
-builder.Services.AddHostedService<BedAgentWorker>();
-
 // The Patient Care Advisory Agent. Three read tools, no write tool of its own - the draft it
 // produces is written by CareAgentExecutor once the model (or its deterministic fallback)
-// answers, never by the agent directly. Its own queue and worker, separate from the bed agent's:
-// two agents on one single-reader channel would mean whichever one reads first processes an id
-// it does not understand.
+// answers, never by the agent directly.
 builder.Services.AddScoped<ICareAgentTools, CareAgentTools>();
 builder.Services.AddScoped<ICareAdvisor, GeminiCareAdvisor>();
 builder.Services.AddScoped<ICareAgent, CareAgent>();

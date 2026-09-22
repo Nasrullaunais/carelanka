@@ -26,11 +26,6 @@ public class BedAssignment
     public DateTimeOffset? ReservedUntil { get; set; }
 
     [Required]
-    public AssignedBy AssignedBy { get; set; }
-
-    public Guid? WorkflowId { get; set; }
-
-    [Required]
     public bool IsDowngrade { get; set; }
 
     public Guid? ApprovedByStaffId { get; set; }

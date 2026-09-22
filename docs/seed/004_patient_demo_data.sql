@@ -238,11 +238,11 @@ BEGIN
          now() - interval '2 days', v_admitted_4);
 
     INSERT INTO bed_assignments
-        (id, admission_id, bed_id, status, assigned_by, occupied_at, is_downgrade,
+        (id, admission_id, bed_id, status, occupied_at, is_downgrade,
          created_at, updated_at)
     VALUES
-        (v_ba3, v_ad3, v_bed_s2_1, 'occupied', 'user', v_admitted_3, false, v_admitted_3, v_admitted_3),
-        (v_ba4, v_ad4, v_bed_s2_2, 'occupied', 'user', v_admitted_4, false, v_admitted_4, v_admitted_4);
+        (v_ba3, v_ad3, v_bed_s2_1, 'occupied', v_admitted_3, false, v_admitted_3, v_admitted_3),
+        (v_ba4, v_ad4, v_bed_s2_2, 'occupied', v_admitted_4, false, v_admitted_4, v_admitted_4);
 
     -- Ishara's bill is raised but NOT settled, on an admission that is still open. This is the
     -- only record here that makes `MyBill.is_final = false`, which is what the Flutter screen
@@ -353,12 +353,12 @@ BEGIN
          v_admitted_10 - interval '1 day', v_discharged_10);
 
     INSERT INTO bed_assignments
-        (id, admission_id, bed_id, status, assigned_by, occupied_at, released_at,
+        (id, admission_id, bed_id, status, occupied_at, released_at,
          release_reason, is_downgrade, created_at, updated_at)
     VALUES
-        (v_ba9, v_ad9, v_bed_s5_1, 'released', 'user', v_admitted_9, v_discharged_9,
+        (v_ba9, v_ad9, v_bed_s5_1, 'released', v_admitted_9, v_discharged_9,
          'discharged', false, v_admitted_9, v_discharged_9),
-        (v_ba10, v_ad10, v_bed_s5_2, 'released', 'user', v_admitted_10, v_discharged_10,
+        (v_ba10, v_ad10, v_bed_s5_2, 'released', v_admitted_10, v_discharged_10,
          'discharged', false, v_admitted_10, v_discharged_10);
 
     INSERT INTO discharges

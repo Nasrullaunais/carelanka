@@ -17,8 +17,7 @@ export interface BedCandidate {
 }
 
 /**
- * The full free-bed table, shared by the manual "Assign a bed" drawer and the bed agent's
- * "Choose another bed" view — the same table either way, not a cut-down floating list.
+ * The full free-bed table used by the "Assign a bed" and "Change bed" drawers.
  */
 export function BedCandidateTable({
   candidates,

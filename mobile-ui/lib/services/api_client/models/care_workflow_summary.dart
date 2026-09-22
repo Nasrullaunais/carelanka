@@ -4,8 +4,8 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
-import 'bed_agent_step.dart';
 import 'care_agent_outcome.dart';
+import 'care_agent_step.dart';
 import 'care_draft_source.dart';
 import 'care_workflow_status.dart';
 import 'care_workflow_validation.dart';
@@ -39,7 +39,7 @@ class CareWorkflowSummary {
   final CareWorkflowStatus? status;
   final CareAgentOutcome? outcome;
   final List<String>? plan;
-  final List<BedAgentStep>? steps;
+  final List<CareAgentStep>? steps;
   @JsonKey(name: 'red_flag')
   final bool? redFlag;
   final CareWorkflowValidation? validation;

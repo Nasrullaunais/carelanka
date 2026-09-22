@@ -442,8 +442,6 @@ public sealed class AdmissionService : IAdmissionService
 
             Status = assignment.Status,
             ReservedUntil = assignment.ReservedUntil,
-            AssignedBy = assignment.AssignedBy,
-            WorkflowId = assignment.WorkflowId,
             IsDowngrade = assignment.IsDowngrade,
             ApprovedByStaffId = assignment.ApprovedByStaffMemberId,
             ApprovedByStaffName = StaffNames.Lookup(names, assignment.ApprovedByStaffMemberId),

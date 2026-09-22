@@ -881,7 +881,18 @@ That last one is the agent's own observability, which the assignment explicitly 
 
 ## 8. The AI agents
 
-This component runs **two** agents, not one. §8.1–§8.9 is the first — the **Bed & Patient Details Agent**. §8.10 onward is the second — **Patient Care Advisory**, added on the lecturer's direction during topic finalization: a component called Patient Management whose only AI behaviour is picking a bed does not read as patient-facing. Both agents hold the same line — neither ever makes a clinical call alone — they just stand on either side of a human doing it.
+> **Removed from the running system 2026-09-22.** §8.1–§8.9 below describes the **Bed & Patient
+> Details Agent** as it was built and later redesigned — none of it is live code any more. Bed
+> placement is `POST /admissions/{id}/assign-bed`, manual only, same endpoint it always was.
+> **Left in place rather than deleted or rewritten**, because §8.4–§8.9 is cited by name as the
+> worked "gather → filter → rank → propose → validate → human gate → execute" template from
+> `emergency-management-plan.md`, `equipment-management-plan.md`, `ai-orchestration-workflow.md`,
+> `docs/ADR.md` and `CLAUDE.md` — removing it here would break a reference the rest of the group's
+> agent designs still point to. Read it as design history and as that template, not as a
+> description of what `api/` currently does. §8.10 onward — **Patient Care Advisory** — is current
+> and live.
+
+This component ran **two** agents, not one. §8.1–§8.9 was the first — the **Bed & Patient Details Agent**. §8.10 onward is the second — **Patient Care Advisory**, added on the lecturer's direction during topic finalization: a component called Patient Management whose only AI behaviour is picking a bed does not read as patient-facing. Both agents held the same line — neither ever makes a clinical call alone — they just stand on either side of a human doing it.
 
 **Both agents were redesigned on 2026-09-16, after the rest of the component was built and tested.** What changed, and why, is recorded per section below. The short version: the bed agent no longer writes anything at all, and the care agent now reads a real medical profile instead of pretending demographics were enough.
 

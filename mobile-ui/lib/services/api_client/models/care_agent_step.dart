@@ -4,11 +4,11 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
-part 'bed_agent_step.g.dart';
+part 'care_agent_step.g.dart';
 
 @JsonSerializable()
-class BedAgentStep {
-  const BedAgentStep({
+class CareAgentStep {
+  const CareAgentStep({
     this.step,
     this.tool,
     this.startedAt,
@@ -17,7 +17,7 @@ class BedAgentStep {
     this.error,
   });
   
-  factory BedAgentStep.fromJson(Map<String, Object?> json) => _$BedAgentStepFromJson(json);
+  factory CareAgentStep.fromJson(Map<String, Object?> json) => _$CareAgentStepFromJson(json);
   
   final String? step;
   final String? tool;
@@ -28,5 +28,5 @@ class BedAgentStep {
   final bool? ok;
   final String? error;
 
-  Map<String, Object?> toJson() => _$BedAgentStepToJson(this);
+  Map<String, Object?> toJson() => _$CareAgentStepToJson(this);
 }

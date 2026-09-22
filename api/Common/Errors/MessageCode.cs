@@ -168,8 +168,6 @@ public enum MessageCode
 
     PatientCodeNotClaimable,
 
-    BedSuggestionNotPossible,
-
     NotCurrentlyAdmittedForCareQuery,
 
     CareRecommendationNotPendingReview

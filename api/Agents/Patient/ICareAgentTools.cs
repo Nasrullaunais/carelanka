@@ -3,10 +3,9 @@ using CareLanka.Api.Data.Enums;
 namespace CareLanka.Api.Agents.Patient;
 
 /// <summary>
-/// The allow-list as a type, same shape as <see cref="IBedAgentTools"/>. Three read tools and
-/// nothing else - the write tool (<c>draft_recommendation</c>) is not here because it is not a
-/// lookup: it is what the agent's own service does with the model's answer, in
-/// <c>ICareRecommendationService</c>.
+/// The allow-list as a type. Three read tools and nothing else - the write tool
+/// (<c>draft_recommendation</c>) is not here because it is not a lookup: it is what the agent's
+/// own service does with the model's answer, in <c>ICareRecommendationService</c>.
 /// </summary>
 public interface ICareAgentTools
 {

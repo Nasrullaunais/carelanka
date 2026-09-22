@@ -27,10 +27,9 @@ RUN.md
 IMPORTANT.md
 PR_DRAFT.md
 OVERALL_EXPLANATION.md
+Assignment.md
 
 # Firebase phone-app config, kept out of git
 mobile-ui/android/app/google-services.json
 
-Lecture 05.pdf
-Lecture 06.pdf
-Lecture 07.pdf
+

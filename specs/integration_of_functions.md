@@ -124,7 +124,7 @@ The second version keeps working when hold expiry, out-of-service beds or a new 
 | **`BillingRate`, `AdmissionFeeRate`** — what the hospital charges | **Patient (M4)** — *added 2026-09-11, see §11.13* | Nobody yet | Read: any staff. Write: administrator only |
 | **`BedAssignment`** — who is in a bed, holds, approvals | **Patient (M4)** | Equipment (before servicing a bed) | Patient only |
 | `Ward` — name, type, gender policy | **Patient (M4)** — *see §11.1* | All | Patient only |
-| `AgentWorkflow`, `AgentProposedChange` | **Common (group-owned)** — *DECIDED §11.2, **and still not built anywhere** as of 2026-09-16* | All five agents | All five agents, by `workflow_id` |
+| `AgentWorkflow`, `AgentProposedChange` | **Common (group-owned)** — *DECIDED §11.2, **built 2026-09-20** by the group in PR #80 (`Common_AddAgentWorkflows`)* | The four agents currently running | All four, by `workflow_id` — down from five agents / all five when this row was first written; the bed agent that used a fifth was removed 2026-09-22, see §11.17 |
 | `StaffMember`, `PatientAccount`, `RefreshToken`, login, JWT issuing | **Common (group-owned)** — `specs/common-spec.yaml` | All | Common only |
 | `AuditLog`, `Notification`, `DeviceToken` | **Common (group-owned)** | All | Written by the audit interceptor, never by hand |
 
@@ -337,7 +337,7 @@ occupied              free
 
 **The hard rule: maintenance never evicts a patient.** If the bed is occupied or under a live hold, Equipment waits. M4 exposes the check; M3 respects the answer.
 
-One equipment warning ends with a human approving a different bed for a patient. **Two components, two agents, one visible consequence** — a far better demo than either agent running alone, and exactly what the rubric means by orchestration.
+One equipment warning ends with a human approving a different bed for a patient. **Two components, one agent and one manual decision, one visible consequence** — a far better demo than the agent running alone, and exactly what the rubric means by orchestration. *(Was "two agents" while the bed agent existed; bed placement is the Duty Manager's own call now, per the diagram above.)*
 
 **Reverse direction:** when servicing finishes, M3 returns the bed to `usable` and it re-enters M4's candidate pool automatically. No call needed — M4 reads the current condition every time.
 
@@ -399,14 +399,16 @@ Pre-admission created, status = awaiting_bed                    [M4]
   clinical staff set admission_category                       (human)
         │
         ▼
-Bed & Patient Details Agent                                   [M4]
+Bed placement — manual, since the agent's removal 2026-09-22             [M4]
   reads Equipment's bed register  ────────read──────────────►   [M3]
-  filters on hard rules H0-H6, ranks on soft rules
-  suggests a best bed plus every other bed that passed
-  deterministic validator re-checks every hard rule
-  WRITES NOTHING and holds no bed — changed 2026-09-16.
-  The 30-minute hold is written when a human commits, by
-  POST /admissions/{id}/assign-bed, under a row lock.
+  a nurse, manager or reception filters on hard rules H0-H6 by eye,
+  and picks a bed from the candidate list
+  server re-checks every hard rule regardless of who picked
+  The 30-minute hold is written when the human commits, by
+  POST /admissions/{id}/assign-bed, under a row lock — same endpoint,
+  same lock, as when a Bed & Patient Details Agent step fed it here
+  through 2026-09-22 (deterministic H0-H6 filter, soft-rule ranking,
+  best bed plus every other bed that passed, no write tool of its own).
         │
         ▼
 Staff Allocation Agent                                          [M2]
@@ -426,7 +428,8 @@ APPROVE   REJECT / REVISE
    │           └──► back to the relevant agent; admission stays awaiting_bed
    ▼
 Bed approval re-checked under a row lock, then committed        [M4]
-Ambulance crew + ward nurse get their tasks in Flutter        [M1/M4]
+Ambulance crew gets its task in Flutter; ward nurse gets hers
+in React — reversed from Flutter 2026-09-21                  [M1/M4]
    │
    ▼
 Patient arrives, marked admitted, assignment becomes occupied   [M4]

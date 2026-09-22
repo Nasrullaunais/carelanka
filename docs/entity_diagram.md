@@ -184,9 +184,12 @@ already used everywhere else in this document.
 - **`CareRecommendation` (new)** — see
   [`CareRecommendation`](#carerecommendation-extends-auditedentity-rev-26--new). Owned by
   Patient Management, alongside the existing entities.
-- **`AgentType.PatientCareAdvisory` (new)** — the fifth agent value. The existing
-  `PatientAdmissionBed` is untouched; this project now has two agents in one component
-  rather than a replacement.
+- **`AgentType.PatientCareAdvisory` (new)** — the fifth agent value, at the time this was
+  written. The existing `PatientAdmissionBed` was untouched then; this project ran two
+  agents in one component rather than a replacement. *(No longer true — `PatientAdmissionBed`
+  was removed from the enum on 2026-09-22 along with the bed agent itself. `PatientCareAdvisory`
+  is Patient Management's only `AgentType` value today. See the `AssignedBy` entry above and
+  `patient-management-plan.md` §8 for the removal.)*
 - **`ProposedChangeType.CreateCareRecommendation` (new)** — the write this agent's
   workflow proposes, following the same `AgentProposedChange` shape every other agent
   already uses. No new column was needed on that shared table — see the entity note for
@@ -1293,17 +1296,20 @@ auditable.
 separate table until the spec was implemented; it publishes one bed row whose `status` walks
 `reserved → occupied → released`, and no reservation schema at all. One row per claim means
 "this bed is taken" has exactly one home, which is the same argument this document makes for
-keeping occupancy off `Bed`. A background sweep moves `reserved` rows past `ReservedUntil` to
-`released` with `ReleaseReason = HoldExpired`.
+keeping occupancy off `Bed`. **There is no background sweep** — a lapsed `reserved` row is
+read as free everywhere, and the next `INSERT` that would claim its bed closes it first, as
+`ReleaseReason = HoldExpired`, at write time. See `patient-management-plan.md` §5.3.
 
-**`BedId` is a plain column, not a foreign key.** `beds` belongs to Health Equipment
-(Member 3) and does not exist yet. The constraint goes in when their table lands; until then
-`STUBS.md` row 109 stands.
+**`BedId` is a plain column, not a foreign key — permanently, by design, not because
+Equipment's table is missing.** `beds` belongs to Health Equipment (Member 3) and has existed
+since `Equipment_AddBed`; the column stays FK-less because a cross-component foreign key would
+put Patient's schema in the way of Equipment being the sole writer of its own table (`CLAUDE.md`,
+"one writer per table"). `BedAssignmentConfiguration` indexes `BedId` but never constrains it.
 
 #### Discharge extends AuditedEntity *(Rev 2.9 — changed)*
 ```
 + AdmissionId: Guid (unique, non-null) FK → Admission.Id
-+ FlaggedBy: AssignedBy (non-null)                      -- (Rev 2.9: agent or human)
++ FlaggedBy: AssignedBy (non-null)                      -- (Rev 2.9: agent or human; `DischargeService` only ever writes `User` today — no agent flags a discharge)
 + FlaggedAt: DateTimeOffset (non-null)                  -- (Rev 2.9 — new)
 + ConfirmedByStaffMemberId: Guid (nullable) FK → StaffMember.Id  -- (Rev 2.9: was DischargedByStaffMemberId)
 + ConfirmedAt: DateTimeOffset (nullable)                -- (Rev 2.9: was DischargedAt)

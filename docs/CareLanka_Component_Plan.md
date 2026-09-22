@@ -38,8 +38,8 @@ responsibilities and permissions (§4.1). We have seven. Role names match the
 | **Hospital Administrator** | React | Member 2 | Manage staff records, approve rosters and reallocations, approve leave |
 | **General Staff** | Flutter | Member 2 | View own shifts, clock in/out, request leave or a shift swap |
 | **Equipment & Inventory Manager** | React | Member 3 | Monitor stock and maintenance, approve procurement and servicing |
-| **Ward Nurse** | Flutter | Member 4 | Admit patients, approve normal-ward beds, update patient status, complete missing details, request discharge |
-| **Patient** | Flutter | Member 4 | Report an emergency for self or another person, track the narrow response view, request cancellation, book a visit, and view own stay |
+| **Ward Nurse** | React | Member 4 | Admit patients, approve normal-ward beds, update patient status, complete missing details, maintain the medical profile, request discharge, review/approve/reject a care advisory draft. *(Reversed from Flutter to React 2026-09-21 — Patient Management has no staff-facing screen on mobile at all.)* |
+| **Patient** | Flutter | Member 4 | Report an emergency for self or another person, track the narrow response view, request cancellation, book a visit, view own stay and bill, claim an unclaimed record by patient code, and — while admitted — describe how they feel and read the approved reply |
 
 **Two things worth being clear about:**
 
@@ -79,7 +79,7 @@ screens in both apps.**
 | :--- | :--- | :--- | :--- | :--- |
 | **Owns (data)** | EmergencyCall, Ambulance, AmbulanceCrewAssignment, Dispatch, DispatchCrew, RouteLog | Shift, Allocation, LeaveRequest, Skill, StaffMemberSkill, WardStaffingRule | EquipmentCategory, EquipmentItem, **Bed**, PharmacyCategory, PharmacyItem, PharmacyTransaction, MaintenanceSchedule, Warning, ActionRequest | Patient, PatientAccount, PatientMedicalProfile, Admission, Ward, BedAssignment, Discharge, DischargeChecklistItem, Appointment, Bill, BillLineItem, BillingRate, AdmissionFeeRate, CareRecommendation |
 | **React screens** | Live call board, manual/agent dispatch confirmation, fleet/current-crew board, cancellation review, route/map view, reports | Staff records CRUD, roster approval, ward coverage dashboard, leave approval | Stock dashboard, warning queue, procurement/maintenance approval | Admissions dashboard, patients board, intake, capacity, discharge confirmation, billing, medical profile editor, care draft review queue, occupancy report |
-| **Flutter screens** | Crew: acknowledge/decline dispatch, launch Google Maps, update status, handover | Staff: my shifts, clock in/out, request leave, request swap | Ward staff: report faulty equipment, view ward stock, take a bed out of service | Nurse: place a patient in a normal-ward bed, update status, complete details, maintain the medical profile, review care drafts, request discharge. Patient: emergency report/tracking/cancellation, my stay, my bill, book a visit, discharge instructions, **and while admitted, tell us how you are feeling and read the approved reply** |
+| **Flutter screens** | Crew: acknowledge/decline dispatch, launch Google Maps, update status, handover | Staff: my shifts, clock in/out, request leave, request swap | Ward staff: report faulty equipment, view ward stock, take a bed out of service | Patient only — reversed 2026-09-21, so there is no ward-nurse/reception/duty-manager/admin screen here at all: home, my stay (status, bill summary, discharge instructions), past visits, book/view appointments, my details, profile, lab reports, claim an unclaimed record by patient code, emergency report/tracking/cancellation, **and while admitted, tell us how you are feeling and read the approved reply** |
 | **AI agent** | Dispatch & Routing | Staff Allocation | Equipment Monitoring | Patient Care Advisory |
 | **Device feature** | GPS + Google Maps launch | Date/time picker for leave dates | Camera for fault photos | Local notifications on status change, date/time picker for booking |
 | **Third-party API** | Google route/ETA on the backend | — | — | — |
@@ -221,10 +221,12 @@ Dispatch & Routing Agent                             [M1]
   -> deterministic validation; Duty Manager confirms
         |
         v
-Bed & Patient Details Agent                        [M4]
+Bed placement                                        [M4]
   -> Emergency notification cannot block dispatch
-  -> checks bed availability, suggests a bed + alternatives
-  -> writes nothing; a human commits it
+  -> a nurse, manager or reception checks bed availability and assigns one by hand
+  -> *(Was a Bed & Patient Details Agent step through 2026-09-21 — same "suggest, human
+      commits" shape, no write tool of its own. Removed 2026-09-22: a human does this step
+      directly now, same endpoint the agent used to feed. See `patient-management-plan.md` §8.)*
         |
         v
 Staff Allocation Agent                               [M2]
@@ -242,7 +244,7 @@ Duty Manager reviews the whole plan                  [React — M1/M4]
 APPROVE   REJECT / REVISE
    |
    v
-Crew and ward nurse get their tasks                  [Flutter — M1/M4]
+Crew gets their task on Flutter, ward nurse on React  [M1/M4]
         |
         v
 Patient arrives, is admitted, and can see

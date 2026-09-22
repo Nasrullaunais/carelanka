@@ -178,5 +178,11 @@ public enum MessageCode
 
     NotCurrentlyAdmittedForCareQuery,
 
-    CareRecommendationNotPendingReview
+    CareRecommendationNotPendingReview,
+
+    PreAdmissionAlreadyExists,
+
+    AdmissionAlreadyClassified,
+
+    AdmissionNotYetClassified
 }

@@ -172,6 +172,11 @@ public sealed class BedSuggestionService : IBedSuggestionService
 
     private static void EnsureWaitingForABed(AdmissionEntity admission)
     {
+        if (admission.Category is null)
+        {
+            throw new ConflictException(MessageCode.AdmissionNotYetClassified, admission.Id);
+        }
+
         if (!BedPlacementRules.RequiresBed(admission.Category))
         {
             // An outpatient is admitted from the moment their record is opened, so the status check

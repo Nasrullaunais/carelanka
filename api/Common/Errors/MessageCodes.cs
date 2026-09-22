@@ -99,7 +99,10 @@ public static class MessageCodes
             [MessageCode.PatientCodeNotClaimable] = "cl_pat_037",
             [MessageCode.NotCurrentlyAdmittedForCareQuery] = "cl_pat_038",
             [MessageCode.BedSuggestionNotPossible] = "cl_pat_039",
-            [MessageCode.CareRecommendationNotPendingReview] = "cl_pat_040"
+            [MessageCode.CareRecommendationNotPendingReview] = "cl_pat_040",
+            [MessageCode.PreAdmissionAlreadyExists] = "cl_pat_041",
+            [MessageCode.AdmissionAlreadyClassified] = "cl_pat_042",
+            [MessageCode.AdmissionNotYetClassified] = "cl_pat_043"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

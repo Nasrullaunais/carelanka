@@ -1,4 +1,6 @@
 using System.Text.RegularExpressions;
+using CareLanka.Api.Common.Errors;
+using CareLanka.Api.Common.Exceptions;
 using CareLanka.Api.Data;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.Services.Patient;
@@ -107,7 +109,8 @@ public sealed class BedAgentTools : IBedAgentTools
         => new(
             admission.Id,
             patient.Id,
-            admission.Category,
+            admission.Category
+                ?? throw new ConflictException(MessageCode.AdmissionNotYetClassified, admission.Id),
             patient.Gender,
             patient.DateOfBirth,
             admission.IsInfectious,

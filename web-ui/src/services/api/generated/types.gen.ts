@@ -21,7 +21,7 @@ export type Admission = {
     id: string;
     patient?: PatientSummary;
     source: AdmissionSource;
-    admission_category: AdmissionCategory;
+    admission_category?: AdmissionCategory;
     urgency: AdmissionUrgency;
     status: AdmissionStatus;
     details_complete: boolean;
@@ -31,9 +31,9 @@ export type Admission = {
     expected_arrival?: string | null;
     admitted_at?: string | null;
     dispatch_id?: string | null;
-    category_set_by_staff_id: string;
+    category_set_by_staff_id?: string | null;
     category_set_by_staff_name?: string | null;
-    category_set_at: string;
+    category_set_at?: string | null;
     is_infectious: boolean;
     reported_by_user_id?: string | null;
     missing_fields: Array<string>;
@@ -71,7 +71,7 @@ export type AdmissionDetail = {
     id: string;
     patient?: PatientSummary;
     source: AdmissionSource;
-    admission_category: AdmissionCategory;
+    admission_category?: AdmissionCategory;
     urgency: AdmissionUrgency;
     status: AdmissionStatus;
     details_complete: boolean;
@@ -81,9 +81,9 @@ export type AdmissionDetail = {
     expected_arrival?: string | null;
     admitted_at?: string | null;
     dispatch_id?: string | null;
-    category_set_by_staff_id: string;
+    category_set_by_staff_id?: string | null;
     category_set_by_staff_name?: string | null;
-    category_set_at: string;
+    category_set_at?: string | null;
     is_infectious: boolean;
     reported_by_user_id?: string | null;
     missing_fields: Array<string>;
@@ -117,7 +117,7 @@ export type AdmissionSummary = {
     id: string;
     patient?: PatientSummary;
     source: AdmissionSource;
-    admission_category: AdmissionCategory;
+    admission_category?: AdmissionCategory;
     urgency: AdmissionUrgency;
     status: AdmissionStatus;
     details_complete: boolean;
@@ -566,6 +566,10 @@ export type ChecklistUpdateRequest = {
 export type ClaimByPatientCodeRequest = {
     patient_code?: string | null;
     nic?: string | null;
+};
+
+export type ClassifyAdmissionRequest = {
+    admission_category?: AdmissionCategory;
 };
 
 export type CompleteDetailsRequest = {
@@ -1486,6 +1490,18 @@ export type PharmacyTransactionPagedResult = {
 
 export type PharmacyTransactionType = 'received' | 'dispensed' | 'adjusted' | 'expired_removed';
 
+export type PreAdmitRequest = {
+    dispatch_id?: string | null;
+    patient_is_caller?: boolean;
+    caller_user_id?: string | null;
+    patient_id?: string | null;
+    expected_arrival?: string;
+    urgency?: AdmissionUrgency;
+    destination_ward_type_hint?: WardType;
+    provisional_name?: string | null;
+    provisional_gender?: Gender;
+};
+
 export type PreRegisterRequest = {
     nic: string;
     full_name: string;
@@ -1950,6 +1966,90 @@ export type GetAdmissionResponses = {
 };
 
 export type GetAdmissionResponse = GetAdmissionResponses[keyof GetAdmissionResponses];
+
+export type PreAdmitFromDispatchData = {
+    body?: PreAdmitRequest;
+    path?: never;
+    query?: never;
+    url: '/admissions/pre-admit';
+};
+
+export type PreAdmitFromDispatchErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type PreAdmitFromDispatchError = PreAdmitFromDispatchErrors[keyof PreAdmitFromDispatchErrors];
+
+export type PreAdmitFromDispatchResponses = {
+    /**
+     * Created
+     */
+    201: Admission;
+};
+
+export type PreAdmitFromDispatchResponse = PreAdmitFromDispatchResponses[keyof PreAdmitFromDispatchResponses];
+
+export type ClassifyAdmissionData = {
+    body?: ClassifyAdmissionRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/admissions/{id}/classify';
+};
+
+export type ClassifyAdmissionErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ClassifyAdmissionError = ClassifyAdmissionErrors[keyof ClassifyAdmissionErrors];
+
+export type ClassifyAdmissionResponses = {
+    /**
+     * OK
+     */
+    200: Admission;
+};
+
+export type ClassifyAdmissionResponse = ClassifyAdmissionResponses[keyof ClassifyAdmissionResponses];
 
 export type CompleteAdmissionDetailsData = {
     body?: CompleteDetailsRequest;

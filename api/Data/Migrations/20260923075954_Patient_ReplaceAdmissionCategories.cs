@@ -37,7 +37,7 @@ namespace CareLanka.Api.Data.Migrations
             migrationBuilder.AddCheckConstraint(
                 name: "ck_admissions_category",
                 table: "admissions",
-                sql: "category IN ('icu', 'general', 'surgical', 'maternity', 'emergency')");
+                sql: "category IS NULL OR category IN ('icu', 'general', 'surgical', 'maternity', 'emergency')");
 
             migrationBuilder.AddCheckConstraint(
                 name: "ck_admission_fee_rates_category",
@@ -59,7 +59,7 @@ namespace CareLanka.Api.Data.Migrations
             migrationBuilder.AddCheckConstraint(
                 name: "ck_admissions_category",
                 table: "admissions",
-                sql: "category IN ('icu', 'hdu', 'inpatient', 'day_case', 'outpatient')");
+                sql: "category IS NULL OR category IN ('icu', 'hdu', 'inpatient', 'day_case', 'outpatient')");
 
             migrationBuilder.AddCheckConstraint(
                 name: "ck_admission_fee_rates_category",

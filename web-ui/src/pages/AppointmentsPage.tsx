@@ -929,7 +929,13 @@ function CheckedInCard({
       <h2>Admitted</h2>
       <p className="muted">
         {admission.patient?.full_name ?? 'The patient'} is admitted and awaiting a bed. Care
-        level: <strong>{admissionCategoryLabels[admission.admission_category]}</strong>.
+        level:{' '}
+        <strong>
+          {admission.admission_category
+            ? admissionCategoryLabels[admission.admission_category]
+            : 'Not yet classified'}
+        </strong>
+        .
       </p>
 
       {admission.missing_fields.length > 0 && (

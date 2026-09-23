@@ -46,6 +46,10 @@ public sealed class DispatchConfiguration : IEntityTypeConfiguration<Dispatch>
             .WithMany()
             .HasForeignKey(dispatch => dispatch.SupersededByDispatchId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<DispatchProposal>()
+            .WithMany()
+            .HasForeignKey(dispatch => dispatch.DispatchProposalId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(dispatch => dispatch.AmbulanceId)
             .HasDatabaseName(ActiveAmbulanceUniqueIndex)

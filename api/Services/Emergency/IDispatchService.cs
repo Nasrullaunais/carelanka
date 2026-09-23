@@ -17,4 +17,6 @@ public interface IDispatchService
     Task<DispatchDetail> CancelAsync(Guid dispatchId, CancelDispatchRequest request, CancellationToken cancellationToken = default);
     Task CancelForApprovedCancellationRequestAsync(Guid emergencyCallId, CancellationToken cancellationToken = default);
     Task<DispatchDetail> ReassignAsync(Guid dispatchId, ReassignDispatchRequest request, CancellationToken cancellationToken = default);
+    Task<DispatchDetail> DispatchFromProposalAsync(Guid callId, Guid ambulanceId, Guid proposalId, CancellationToken cancellationToken = default);
+    Task<DispatchDetail> ApplyDiversionAsync(Guid sourceDispatchId, Guid newCallId, Guid replacementAmbulanceId, Guid proposalId, string? reason, CancellationToken cancellationToken = default);
 }

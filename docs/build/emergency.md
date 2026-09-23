@@ -2,7 +2,7 @@
 
 **Owner:** Nasrulla Unais (Member 1)
 
-**Status:** Phases 0–4 and 6 complete; Phase 3 hardened 2026-09-19; Phase 5 (crew Flutter app) complete
+**Status:** Phases 0–9 complete; Phase 10 (Dispatch & Routing Agent, backend) complete 2026-09-22; Phase 11 (reports and hardening) is next
 
 **Contract:** `specs/emergency-spec.yaml`
 
@@ -635,11 +635,21 @@ Already present:
   version check and stored reasons; caller tracking and crew location reporting.
 - One React page (`EmergencyPage.tsx`): call board, detail, priority, dispatch, fleet list and
   crew assignment, polling the selected call every 5 seconds.
-- Flutter: only the location reporter and a placeholder `my_run_screen.dart`.
+- Flutter crew run screens: acknowledge, decline, status buttons, Google Maps launch, handover
+  and run history.
+- Real road-distance ranking (`OsrmAmbulanceDistanceService`, straight-line fallback), reverse
+  geocoding, and stored route summaries.
+- Firebase push delivery (`PushDeliveryWorker`/`IPushSender`) to the assigned crew, with polling
+  as the recovery path.
+- Pre-admission notice to Patient Management after a dispatch, retryable and non-blocking.
+- The Dispatch & Routing Agent (`api/Agents/Emergency/`): proposes a free ambulance or a
+  pre-pickup diversion, ranked by real driving ETA; deterministic validation re-run at
+  confirm/approve time; `pending_confirmation` / `pending_approval` human gates; `DutyManager`
+  confirm, approve, reject endpoints on `/dispatch-proposals`.
 
 Not yet present:
 
-- The crew's Flutter run screens (acknowledge, decline, status buttons, handover, history).
-- Real Maps, Firebase delivery, pre-admission, the AI agent, reports.
+- A React screen for the dispatch-proposal queue (the API exists; nothing calls it yet).
+- Phase 11: reports, audit coverage, rate limits, and production hardening.
 
-Phase 5 (the crew's phone app) is next.
+Phase 11 (reports and hardening) is next.

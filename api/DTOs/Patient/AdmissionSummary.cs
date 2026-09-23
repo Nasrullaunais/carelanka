@@ -13,8 +13,7 @@ public class AdmissionSummary
     [Required]
     public AdmissionSource Source { get; set; }
 
-    [Required]
-    public AdmissionCategory AdmissionCategory { get; set; }
+    public AdmissionCategory? AdmissionCategory { get; set; }
 
     [Required]
     public AdmissionUrgency Urgency { get; set; }

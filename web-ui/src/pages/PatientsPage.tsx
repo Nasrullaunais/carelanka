@@ -745,8 +745,10 @@ function DetailsPanel({
             <table>
               <tbody>
                 <Field label="Arrived by">{admissionSourceLabels[visit.data.source]}</Field>
-                <Field label="Care level">
-                  {admissionCategoryLabels[visit.data.admission_category]}
+                <Field label="Care level" empty="Not yet classified">
+                  {visit.data.admission_category
+                    ? admissionCategoryLabels[visit.data.admission_category]
+                    : null}
                 </Field>
                 <Field label="Needs isolation">{visit.data.is_infectious ? 'Yes' : 'No'}</Field>
                 <Field label="Bed" empty="Not assigned yet">
@@ -760,8 +762,10 @@ function DetailsPanel({
                 <Field label="Admitted by" empty="Not recorded">
                   {visit.data.category_set_by_staff_name}
                 </Field>
-                <Field label="Care level chosen">
-                  {localDateTime(visit.data.category_set_at)}
+                <Field label="Care level chosen" empty="Not yet classified">
+                  {visit.data.category_set_at
+                    ? localDateTime(visit.data.category_set_at)
+                    : null}
                 </Field>
                 <Field label="Bed assigned by" empty="No bed assigned">
                   {liveBed?.approved_by_staff_name ?? (liveBed ? 'Not recorded' : null)}

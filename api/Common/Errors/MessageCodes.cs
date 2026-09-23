@@ -52,6 +52,7 @@ public static class MessageCodes
             [MessageCode.WarningClosed] = "cl_equ_028",
             [MessageCode.WarningNotResolved] = "cl_equ_029",
             [MessageCode.EquipmentCategoryInUse] = "cl_equ_030",
+            [MessageCode.ReorderSuggestionAlreadyRunning] = "cl_equ_031",
             [MessageCode.WardNameTaken] = "cl_pat_001",
             [MessageCode.PatientNicTaken] = "cl_pat_002",
             [MessageCode.PatientAlreadyHasAccount] = "cl_pat_003",
@@ -87,6 +88,9 @@ public static class MessageCodes
             [MessageCode.CrewMemberAlreadyAssigned] = "cl_emg_004",
             [MessageCode.AmbulanceNotEligible] = "cl_emg_005",
             [MessageCode.CallNotAwaitingDispatch] = "cl_emg_006",
+            [MessageCode.DispatchProposalConflict] = "cl_emg_007",
+            [MessageCode.DispatchProposalNotConfirmable] = "cl_emg_008",
+            [MessageCode.DispatchProposalNotApprovable] = "cl_emg_009",
             [MessageCode.NicLinkedToAnotherAccount] = "cl_pat_031",
             [MessageCode.NicDoesNotMatchYourRecord] = "cl_pat_032",
             [MessageCode.AccountHasNoPatientRecord] = "cl_pat_033",
@@ -95,7 +99,10 @@ public static class MessageCodes
             [MessageCode.NoBillRaised] = "cl_pat_036",
             [MessageCode.PatientCodeNotClaimable] = "cl_pat_037",
             [MessageCode.NotCurrentlyAdmittedForCareQuery] = "cl_pat_038",
-            [MessageCode.CareRecommendationNotPendingReview] = "cl_pat_040"
+            [MessageCode.CareRecommendationNotPendingReview] = "cl_pat_040",
+            [MessageCode.PreAdmissionAlreadyExists] = "cl_pat_041",
+            [MessageCode.AdmissionAlreadyClassified] = "cl_pat_042",
+            [MessageCode.AdmissionNotYetClassified] = "cl_pat_043"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

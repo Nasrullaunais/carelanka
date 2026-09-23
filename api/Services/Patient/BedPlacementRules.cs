@@ -10,6 +10,8 @@ public static class BedPlacementRules
 {
     public static bool RequiresBed(AdmissionCategory category) => true;
 
+    public static bool RequiresBed(AdmissionCategory? category) => true;
+
     public static int Rung(AdmissionCategory category) => category switch
     {
         AdmissionCategory.Icu => 0,

@@ -611,15 +611,19 @@ paths:
       tags: [Admissions, Integration]
       summary: Create a pre-admission from an ambulance dispatch
       description: |
-        Roles: AmbulanceCrew, DutyManager, and the Emergency Service component.
+        Roles: GeneralStaff, WardNurse, DutyManager (`Policies.PatientRegistrar`).
 
-        **OPEN.** AmbulanceCrew was removed from the patient-registration policy on 2026-09-11,
-        so this line and `Policies.PatientRegistrar` now disagree about that role. This endpoint
-        is not built yet, so nothing is broken today - but it has to be settled before it is.
-        `integration_of_functions.md` §11.9, addressed to M1.
+        Called by Emergency Service directly, in-process, once a dispatch commits, so a bed
+        can be found BEFORE the patient arrives instead of after. Since Patient and Emergency
+        share one ASP.NET process and one `Data.Enums` assembly, the real call is a same-process
+        call through `IAdmissionService`, not an HTTP round trip - `PreAdmissionGateway` bridges
+        the two components' request shapes. This endpoint stays published on the OpenAPI
+        contract regardless, so the same route is testable directly and so Swagger documents
+        the full picture.
 
-        Called by Emergency Service (Member 1) when an ambulance is dispatched to this hospital,
-        so staff can find a bed BEFORE the patient arrives instead of after.
+        The admission is created with `admission_category` unset - nobody has classified this
+        patient yet. **No component and no AI agent ever sets `admission_category`** (see the
+        top of this file); a clinician does, afterward, via `POST /admissions/{id}/classify`.
 
         `patient_is_caller` decides whose medical record this becomes. When true, `patient_id` is
         supplied and the admission links to that existing record - identity and history already
@@ -631,8 +635,9 @@ paths:
         to answer it than anyone reconstructing it afterwards. Filing one person's emergency
         under another person's record is the failure this prevents.
 
-        `destination_ward_type_hint` is a routing hint only. It never becomes
-        `admission_category` on its own - a human still sets that.
+        `destination_ward_type_hint` is a routing hint only. It is not persisted - it never
+        becomes `admission_category` on its own, and a human still sets that, later, via
+        `POST /admissions/{id}/classify`.
       operationId: preAdmitFromDispatch
       requestBody:
         required: true
@@ -650,6 +655,44 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
           description: A pre-admission already exists for this `dispatch_id`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /admissions/{id}/classify:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Admissions]
+      summary: Set the care category on a pre-admission
+      description: |
+        Roles: WardNurse, DutyManager (`Policies.AdmissionEditor`).
+
+        The other half of `POST /admissions/pre-admit`: a pre-admission from Emergency has no
+        `admission_category` until a clinician sets one here, by hand, having actually looked at
+        the patient. Can only be called once per admission - a second call is a 409, since
+        overwriting a clinician's classification silently is not a thing this endpoint does.
+
+        If the category turns out to be `outpatient`, the visit needs no bed after all and is
+        admitted immediately, the same as a walk-in outpatient at `POST /admissions`.
+      operationId: classifyAdmission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClassifyAdmissionRequest' }
+      responses:
+        '200':
+          description: Category set
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Admission' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This admission already has a care category.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -2686,12 +2729,14 @@ components:
     IllegalTransition:
       description: |
         Not a legal status change. The allowed moves are:
-        awaiting_bed -> awaiting_approval, cancelled;
+        awaiting_bed -> awaiting_approval, admitted, cancelled;
         awaiting_approval -> bed_reserved, awaiting_bed, cancelled;
         bed_reserved -> admitted, awaiting_bed, cancelled;
         admitted -> ready_for_discharge;
         ready_for_discharge -> discharged, admitted.
-        Anything else is rejected here rather than silently allowed.
+        Anything else is rejected here rather than silently allowed. (awaiting_bed straight to
+        admitted is POST /admissions/{id}/classify discovering the visit is outpatient after
+        all - the same jump a walk-in outpatient takes at creation, just discovered later.)
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -3314,6 +3359,12 @@ components:
             - $ref: '#/components/schemas/Gender'
           nullable: true
 
+    ClassifyAdmissionRequest:
+      type: object
+      required: [admission_category]
+      properties:
+        admission_category: { $ref: '#/components/schemas/AdmissionCategory' }
+
     CompleteDetailsRequest:
       type: object
       description: Any subset of the fields that were missing. Completeness is recalculated server-side.
@@ -3376,12 +3427,18 @@ components:
 
     AdmissionSummary:
       type: object
-      required: [id, source, admission_category, urgency, status, details_complete, requires_bed]
+      required: [id, source, urgency, status, details_complete, requires_bed]
       properties:
         id: { type: string, format: uuid }
         patient: { $ref: '#/components/schemas/PatientSummary' }
         source: { $ref: '#/components/schemas/AdmissionSource' }
-        admission_category: { $ref: '#/components/schemas/AdmissionCategory' }
+        admission_category:
+          allOf:
+            - $ref: '#/components/schemas/AdmissionCategory'
+          nullable: true
+          description: >-
+            Null on a pre-admission from Emergency until a clinician classifies it via
+            POST /admissions/{id}/classify. Always set on every other admission source.
         urgency: { $ref: '#/components/schemas/AdmissionUrgency' }
         status: { $ref: '#/components/schemas/AdmissionStatus' }
         details_complete: { type: boolean }
@@ -3389,9 +3446,10 @@ components:
           type: boolean
           description: |
             **Hard rule H0.** Whether this visit needs a bed at all. Always true - every
-            `admission_category` value now reserves a bed. A visit that needs no bed at all
-            (a scan, a blood test, a dressing change) is never an `Admission` in the first
-            place; it is billed straight off the appointment instead
+            `admission_category` value reserves a bed, including while `admission_category`
+            is still null on an unclassified pre-admission (the safe default). A visit that
+            needs no bed at all (a scan, a blood test, a dressing change) is never an
+            `Admission` in the first place; it is billed straight off the appointment instead
             (`POST /appointments/{id}/bill`).
 
             Derived from `admission_category` and never stored, so the two cannot disagree.
@@ -3411,10 +3469,14 @@ components:
         - $ref: '#/components/schemas/AdmissionSummary'
         - $ref: '#/components/schemas/AuditFields'
         - type: object
-          required: [category_set_by_staff_id, category_set_at, is_infectious, missing_fields]
+          required: [is_infectious, missing_fields]
           properties:
             dispatch_id: { type: string, nullable: true }
-            category_set_by_staff_id: { type: string, format: uuid }
+            category_set_by_staff_id:
+              type: string
+              format: uuid
+              nullable: true
+              description: Null until a clinician classifies the admission via POST /admissions/{id}/classify.
             category_set_by_staff_name:
               type: string
               nullable: true
@@ -3422,8 +3484,9 @@ components:
                 Who admitted this patient and chose their care level. For a walk-in that is
                 whoever was on the desk, and it is the closest thing this component stores to
                 "who did the intake" - there are no created_by columns anywhere, by group
-                convention. Absent when no staff member matches the id.
-            category_set_at: { type: string, format: date-time }
+                convention. Absent when no staff member matches the id, or when the admission
+                is not yet classified.
+            category_set_at: { type: string, format: date-time, nullable: true }
             is_infectious: { type: boolean }
             reported_by_user_id:
               type: string

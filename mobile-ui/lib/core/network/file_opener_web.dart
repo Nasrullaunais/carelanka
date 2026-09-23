@@ -1,5 +1,7 @@
-import 'dart:html' as html;
+import 'dart:js_interop';
 import 'dart:typed_data';
+
+import 'package:web/web.dart' as web;
 
 const bool isSupported = true;
 
@@ -12,7 +14,10 @@ Future<void> openFileBytes({
   required String contentType,
   required String fileName,
 }) async {
-  final blob = html.Blob([bytes], contentType);
-  final url = html.Url.createObjectUrlFromBlob(blob);
-  html.window.open(url, '_blank');
+  final blob = web.Blob(
+    [bytes.toJS].toJS,
+    web.BlobPropertyBag(type: contentType),
+  );
+  final url = web.URL.createObjectURL(blob);
+  web.window.open(url, '_blank');
 }

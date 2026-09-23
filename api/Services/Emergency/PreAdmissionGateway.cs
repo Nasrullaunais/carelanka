@@ -1,3 +1,4 @@
+using CareLanka.Api.Common.Errors;
 using CareLanka.Api.Common.Exceptions;
 using CareLanka.Api.DTOs.Patient;
 using CareLanka.Api.Services.Patient;
@@ -24,9 +25,13 @@ public sealed class PreAdmissionGateway(IAdmissionService admissions) : IPreAdmi
             await admissions.PreAdmitAsync(body, cancellationToken);
             return PreAdmissionOutcome.Created;
         }
-        catch (ConflictException)
+        catch (ConflictException exception) when (exception.Code == MessageCode.PreAdmissionAlreadyExists)
         {
             return PreAdmissionOutcome.AlreadyExists;
+        }
+        catch (ConflictException)
+        {
+            return PreAdmissionOutcome.Rejected;
         }
         catch (NotFoundException)
         {

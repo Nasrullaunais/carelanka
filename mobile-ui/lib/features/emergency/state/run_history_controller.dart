@@ -34,7 +34,9 @@ class RunHistoryController extends ChangeNotifier {
     try {
       final result = await _service.history(page: 1);
       _page = 1;
-      _state = AsyncData.ready(RunHistory(result.items, hasMore: result.page < result.totalPages));
+      _state = AsyncData.ready(
+        RunHistory(result.items, hasMore: result.page < result.totalPages),
+      );
     } on ApiException catch (error) {
       _state = AsyncData.failed(error);
     }
@@ -50,7 +52,12 @@ class RunHistoryController extends ChangeNotifier {
     try {
       final result = await _service.history(page: _page + 1);
       _page = result.page;
-      _state = AsyncData.ready(RunHistory([...current.items, ...result.items], hasMore: result.page < result.totalPages));
+      _state = AsyncData.ready(
+        RunHistory([
+          ...current.items,
+          ...result.items,
+        ], hasMore: result.page < result.totalPages),
+      );
     } on ApiException catch (error) {
       _moreError = error;
     }

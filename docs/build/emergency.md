@@ -2,7 +2,7 @@
 
 **Owner:** Nasrulla Unais (Member 1)
 
-**Status:** Phases 0–9 complete; Phase 10 (Dispatch & Routing Agent, backend) complete 2026-09-22; Phase 11 (reports and hardening) is next
+**Status:** Phases 0–10 complete; the Phase 11 report slice, Duty Manager UI and Emergency demo fixtures are complete. History, reconciliation, audit and broader resilience work remain.
 
 **Contract:** `specs/emergency-spec.yaml`
 
@@ -453,7 +453,7 @@ the app comes back to the front, which is the recovery for a missed push.
 **Not done.** A push is not withdrawn if the dispatch is cancelled before it is sent. The
 worker assumes one API instance. Android only; iPhone needs an Apple account.
 
-### Phase 9 — Hospital preparation and handover integration — **BUILT 2026-09-20, against a stub**
+### Phase 9 — Hospital preparation and handover integration — **BUILT; REAL PATIENT INTEGRATION VERIFIED 2026-09-23**
 
 **Goal:** prepare CareLanka Hospital without making the ambulance wait on bed selection.
 
@@ -483,12 +483,12 @@ estimate, because the route only covers the trip to the scene.
 the same patient, and a second pre-admission would open a second admission for them. Patient
 Management is given the first dispatch's id.
 
-**Not done.** `POST /admissions/pre-admit` does not exist yet, so `StubPreAdmissionGateway`
-(`STUBS.md` row 6) logs and reports success; swapping in the real call is one registration in
-`Program.cs`. The spec's `Roles:` line for that endpoint still disagrees with `Policies.cs`
-(`integration_of_functions.md` §11.9). `caller_user_id` and `patient_id` are sent, but
+`PreAdmissionGateway` now calls Patient Management's real `IAdmissionService.PreAdmitAsync`
+operation in-process, and `Program.cs` registers that implementation. Dispatch-id uniqueness
+makes duplicate delivery idempotent; other admission conflicts are rejected rather than
+misreported as successful duplicates. `caller_user_id` and `patient_id` are sent, but
 `provisional_name` and `provisional_gender` are not, because the call does not record the
-patient's name. Nothing shows the dispatcher that a pre-admission failed except the row and
+patient’s name. Nothing shows the dispatcher that a pre-admission failed except the row and
 the log.
 
 ### Phase 10 — Dispatch & Routing AI agent
@@ -625,7 +625,7 @@ Already present:
 - Fleet eligibility decisions with configured crew minimum and explicit block reasons.
 - Repository-wide FluentValidation MVC integration; Emergency ambulance requests and query
   validation use separate validators.
-- A straight-line `IAmbulanceDistanceService` stub.
+- Real OSRM road-distance ranking with a straight-line fallback when routing is unavailable.
 - A documented `IStaffLookupService` stub until Staff Management publishes its implementation.
 - Emergency OpenAPI and ambulance endpoint tests.
 - Emergency-call create, caller-scoped list, Duty Manager board/detail/update endpoints,
@@ -633,8 +633,8 @@ Already present:
 
 - Manual dispatch, acknowledge, decline, progress, handover, cancel and reassign, with a
   version check and stored reasons; caller tracking and crew location reporting.
-- One React page (`EmergencyPage.tsx`): call board, detail, priority, dispatch, fleet list and
-  crew assignment, polling the selected call every 5 seconds.
+- Routed Duty Manager screens for live calls, proposal and diversion review, fleet board/map,
+  ambulance registration and crew assignment, cancellation review, and reports.
 - Flutter crew run screens: acknowledge, decline, status buttons, Google Maps launch, handover
   and run history.
 - Real road-distance ranking (`OsrmAmbulanceDistanceService`, straight-line fallback), reverse
@@ -647,9 +647,6 @@ Already present:
   confirm/approve time; `pending_confirmation` / `pending_approval` human gates; `DutyManager`
   confirm, approve, reject endpoints on `/dispatch-proposals`.
 
-Not yet present:
-
-- A React screen for the dispatch-proposal queue (the API exists; nothing calls it yet).
-- Phase 11: reports, audit coverage, rate limits, and production hardening.
-
-Phase 11 (reports and hardening) is next.
+Still outstanding from Phase 11: dispatch and crew histories, retry reconciliation, expanded
+audit coverage, patient-call rate limits, resilience/accessibility verification, and complete
+demo fixtures. The report slice is implemented.

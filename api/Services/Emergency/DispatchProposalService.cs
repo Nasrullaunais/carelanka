@@ -291,6 +291,30 @@ public sealed class DispatchProposalService : IDispatchProposalService
         var workflow = await _db.AgentWorkflows.AsNoTracking().SingleOrDefaultAsync(x => x.Id == proposal.WorkflowId, ct);
 
         var validation = (workflow is null ? null : DispatchWorkflowJson.Read<List<DispatchValidationResult>>(workflow.ValidationResults)) ?? [];
+        var proposedAmbulance = proposal.ProposedAmbulanceId is { } proposedId
+            ? await _db.Ambulances.AsNoTracking()
+                .Where(ambulance => ambulance.Id == proposedId)
+                .Select(ambulance => new
+                {
+                    ambulance.IsActive,
+                    ambulance.Status,
+                    ambulance.CurrentLatitude,
+                    ambulance.CurrentLongitude,
+                    ambulance.LocationUpdatedAt,
+                    CrewCount = ambulance.CrewAssignments.Count(assignment => assignment.UnassignedAt == null),
+                    HasActiveDispatch = ambulance.Dispatches.Any(dispatch => DispatchStatusExtensions.LiveStatuses.Contains(dispatch.Status))
+                })
+                .SingleOrDefaultAsync(ct)
+            : null;
+        var proposedEligibility = proposedAmbulance is null
+            ? null
+            : _eligibility.Decide(new AmbulanceEligibilityFacts(
+                proposedAmbulance.IsActive,
+                proposedAmbulance.Status,
+                proposedAmbulance.CrewCount,
+                proposedAmbulance.HasActiveDispatch ? proposal.SourceDispatchId ?? Guid.Empty : null,
+                proposedAmbulance.CurrentLatitude.HasValue && proposedAmbulance.CurrentLongitude.HasValue,
+                proposedAmbulance.LocationUpdatedAt));
 
         return new DispatchProposalDetail
         {
@@ -306,6 +330,8 @@ public sealed class DispatchProposalService : IDispatchProposalService
             CreatedAt = proposal.CreatedAt,
             Objective = Objective,
             ProposedAmbulanceId = proposal.ProposedAmbulanceId,
+            ProposedAmbulanceCurrentCrewCount = proposedAmbulance?.CrewCount,
+            ProposedAmbulanceRequiredCrewCount = proposedEligibility?.RequiredCrewCount,
             Rationale = proposal.Rationale,
             DiversionImpact = proposal.IsDiversion && proposal.SourceDispatchId is { } sourceId
                 ? new DiversionImpact

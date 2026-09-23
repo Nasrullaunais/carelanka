@@ -137,6 +137,32 @@ public sealed class PreAdmissionTests
     }
 
     [Fact]
+    public async Task The_real_gateway_creates_exactly_one_pre_admission()
+    {
+        var seed = await SeedAsync(CallPriority.Critical);
+        var now = DateTimeOffset.UtcNow.AddSeconds(1);
+
+        await SendWithRealGatewayAsync(now);
+        await SendWithRealGatewayAsync(now);
+
+        using var scope = _application.Services.CreateScope();
+        var admissions = await scope.ServiceProvider.GetRequiredService<CareLankaDbContext>()
+            .Admissions.AsNoTracking()
+            .Where(x => x.DispatchId == seed.DispatchId.ToString())
+            .ToListAsync();
+        var admission = Assert.Single(admissions);
+        Assert.Equal(AdmissionSource.Emergency, admission.Source);
+        Assert.Equal(AdmissionStatus.AwaitingBed, admission.Status);
+        Assert.Equal(AdmissionUrgency.Emergency, admission.Urgency);
+        Assert.NotNull(admission.ExpectedArrivalAt);
+        Assert.Equal(
+            seed.DispatchedAt.AddMinutes(30),
+            admission.ExpectedArrivalAt.Value,
+            TimeSpan.FromSeconds(1));
+        Assert.Equal(PreAdmissionStatus.Sent, (await NoticeAsync(seed.CallId)).Status);
+    }
+
+    [Fact]
     public async Task A_cancelled_call_is_not_pre_admitted()
     {
         var seed = await SeedAsync(callStatus: CallStatus.Cancelled);
@@ -156,6 +182,17 @@ public sealed class PreAdmissionTests
         var processor = new PreAdmissionProcessor(
             scope.ServiceProvider.GetRequiredService<CareLankaDbContext>(),
             gateway,
+            new FixedClock(now),
+            Options.Create(new EmergencyOptions { PreAdmission = { BatchSize = 1000 } }));
+        await processor.SendDueAsync();
+    }
+
+    private async Task SendWithRealGatewayAsync(DateTimeOffset now)
+    {
+        using var scope = _application.Services.CreateScope();
+        var processor = new PreAdmissionProcessor(
+            scope.ServiceProvider.GetRequiredService<CareLankaDbContext>(),
+            scope.ServiceProvider.GetRequiredService<IPreAdmissionGateway>(),
             new FixedClock(now),
             Options.Create(new EmergencyOptions { PreAdmission = { BatchSize = 1000 } }));
         await processor.SendDueAsync();

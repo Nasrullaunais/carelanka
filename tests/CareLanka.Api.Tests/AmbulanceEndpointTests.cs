@@ -2,7 +2,10 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using CareLanka.Api.Data;
+using CareLanka.Api.Data.Enums;
 using CareLanka.Api.Services.Emergency;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -95,6 +98,12 @@ public sealed class AmbulanceEndpointTests
         using var reinstatedBody = JsonDocument.Parse(await reinstated.Content.ReadAsStringAsync());
         Assert.True(reinstatedBody.RootElement.GetProperty("is_active").GetBoolean());
         Assert.Equal("available", reinstatedBody.RootElement.GetProperty("status").GetString());
+
+        await using var scope = _application.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        var history = await db.AmbulanceStatusHistory.Where(item => item.AmbulanceId == id)
+            .OrderBy(item => item.StartedAt).Select(item => item.Status).ToListAsync();
+        Assert.Equal([AmbulanceStatus.Available, AmbulanceStatus.OutOfService, AmbulanceStatus.Available], history);
     }
 
     [Fact]

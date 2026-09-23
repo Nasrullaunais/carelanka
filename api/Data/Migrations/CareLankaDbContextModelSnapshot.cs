@@ -752,6 +752,43 @@ namespace CareLanka.Api.Data.Migrations
                     b.ToTable("ambulance_crew_assignments", (string)null);
                 });
 
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.AmbulanceStatusHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AmbulanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ambulance_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ambulance_status_history");
+
+                    b.HasIndex("AmbulanceId", "StartedAt")
+                        .HasDatabaseName("ix_ambulance_status_history_ambulance_id_started_at");
+
+                    b.ToTable("ambulance_status_history", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_ambulance_status_history_status", "status IN ('available', 'dispatched', 'en_route', 'at_scene', 'transporting', 'out_of_service')");
+                        });
+                });
+
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.Dispatch", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3313,6 +3350,18 @@ namespace CareLanka.Api.Data.Migrations
                     b.Navigation("Ambulance");
                 });
 
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.AmbulanceStatusHistory", b =>
+                {
+                    b.HasOne("CareLanka.Api.Data.Entities.Emergency.Ambulance", "Ambulance")
+                        .WithMany("StatusHistory")
+                        .HasForeignKey("AmbulanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_ambulance_status_history_ambulances_ambulance_id");
+
+                    b.Navigation("Ambulance");
+                });
+
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.Dispatch", b =>
                 {
                     b.HasOne("CareLanka.Api.Data.Entities.Emergency.Ambulance", "Ambulance")
@@ -3710,6 +3759,8 @@ namespace CareLanka.Api.Data.Migrations
                     b.Navigation("CrewAssignments");
 
                     b.Navigation("Dispatches");
+
+                    b.Navigation("StatusHistory");
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Emergency.Dispatch", b =>

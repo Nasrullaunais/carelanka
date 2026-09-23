@@ -93,11 +93,14 @@ var connectionString = builder.Configuration.GetConnectionString("CareLanka")
         "ConnectionStrings:CareLanka is not configured. See api/README.md for local setup.");
 
 builder.Services.AddSingleton<TimestampInterceptor>();
+builder.Services.AddSingleton<AmbulanceStatusHistoryInterceptor>();
 
 builder.Services.AddDbContext<CareLankaDbContext>((provider, options) => options
     .UseNpgsql(connectionString)
     .UseSnakeCaseNamingConvention()
-    .AddInterceptors(provider.GetRequiredService<TimestampInterceptor>()));
+    .AddInterceptors(
+        provider.GetRequiredService<AmbulanceStatusHistoryInterceptor>(),
+        provider.GetRequiredService<TimestampInterceptor>()));
 
 builder.Services
     .AddOptions<JwtOptions>()
@@ -411,6 +414,7 @@ builder.Services.AddScoped<IAmbulanceService, AmbulanceService>();
 builder.Services.AddScoped<IAmbulanceCrewService, AmbulanceCrewService>();
 builder.Services.AddScoped<IEmergencyCallService, EmergencyCallService>();
 builder.Services.AddScoped<IDispatchService, DispatchService>();
+builder.Services.AddScoped<IEmergencyReportService, EmergencyReportService>();
 builder.Services.AddScoped<IDeviceTokenService, DeviceTokenService>();
 builder.Services.AddScoped<IPushNotifications, PushNotifications>();
 builder.Services.AddScoped<PushDeliveryProcessor>();

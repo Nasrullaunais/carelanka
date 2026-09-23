@@ -10,9 +10,6 @@ AdmissionSummary _$AdmissionSummaryFromJson(Map<String, dynamic> json) =>
     AdmissionSummary(
       id: json['id'] as String,
       source: AdmissionSource.fromJson(json['source'] as String),
-      admissionCategory: AdmissionCategory.fromJson(
-        json['admission_category'] as String,
-      ),
       urgency: AdmissionUrgency.fromJson(json['urgency'] as String),
       status: AdmissionStatus.fromJson(json['status'] as String),
       detailsComplete: json['details_complete'] as bool,
@@ -20,6 +17,9 @@ AdmissionSummary _$AdmissionSummaryFromJson(Map<String, dynamic> json) =>
       patient: json['patient'] == null
           ? null
           : PatientSummary.fromJson(json['patient'] as Map<String, dynamic>),
+      admissionCategory: json['admission_category'] == null
+          ? null
+          : AdmissionCategory.fromJson(json['admission_category'] as String),
       wardName: json['ward_name'] as String?,
       bedNumber: json['bed_number'] as String?,
       expectedArrival: json['expected_arrival'] == null

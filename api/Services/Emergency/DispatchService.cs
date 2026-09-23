@@ -213,6 +213,13 @@ public sealed class DispatchService : IDispatchService
         if (!ProgressProjection.TryGetValue(target, out var ambulanceStatus))
             throw new IllegalTransitionException("Dispatch", dispatch.Status.ToString(), target.ToString());
         Move(dispatch, target);
+        if (dispatch.RouteLog is not null)
+        {
+            if (target == DispatchStatus.EnRouteToScene)
+                dispatch.RouteLog.DepartedAt ??= _clock.GetUtcNow();
+            if (target == DispatchStatus.AtScene)
+                dispatch.RouteLog.ArrivedAt ??= _clock.GetUtcNow();
+        }
         dispatch.Ambulance.Status = ambulanceStatus;
         dispatch.EmergencyCall.Status = CallStatus.EnRoute;
         if (request.Latitude.HasValue)
@@ -349,7 +356,7 @@ public sealed class DispatchService : IDispatchService
     }
 
     private async Task<Dispatch> LoadAsync(Guid id, CancellationToken ct) => await _db.Dispatches
-        .Include(x => x.Crew).Include(x => x.Ambulance).Include(x => x.EmergencyCall)
+        .Include(x => x.Crew).Include(x => x.Ambulance).Include(x => x.EmergencyCall).Include(x => x.RouteLog)
         .SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw new NotFoundException("Dispatch", id);
 
     private static void RequirePrePickup(Dispatch dispatch, DispatchStatus target)
@@ -389,7 +396,8 @@ public sealed class DispatchService : IDispatchService
         AcknowledgedAt = dispatch.AcknowledgedAt, AcknowledgedByStaffId = dispatch.AcknowledgedByStaffId,
         DeclinedReason = dispatch.DeclinedReason, CancellationReason = dispatch.CancellationReason,
         ReassignmentReason = dispatch.ReassignmentReason, HandoverNotes = dispatch.HandoverNotes,
-        PatientCondition = dispatch.PatientCondition, CrewCount = dispatch.Crew.Count,
+        PatientCondition = dispatch.PatientCondition, SceneAddressLabel = dispatch.EmergencyCall.AddressLabel,
+        CrewCount = dispatch.Crew.Count,
         AcknowledgementOverdue = dispatch.IsAcknowledgementOverdue(_clock.GetUtcNow(), _options.AcknowledgementTimeoutSeconds),
         CrewStaffIds = dispatch.Crew.Select(x => x.StaffMemberId).ToList()
     };

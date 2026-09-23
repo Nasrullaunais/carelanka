@@ -324,6 +324,8 @@ public sealed class EmergencyCallService : IEmergencyCallService
         if (request.Status is { } status) query = query.Where(call => call.CancellationRequestStatus == status);
         var totalItems = await query.CountAsync(cancellationToken);
         var items = await query
+            .Include(call => call.Dispatches)
+                .ThenInclude(dispatch => dispatch.Ambulance)
             .OrderBy(call => call.CancellationRequestStatus == CancellationRequestStatus.Pending ? 0 : 1)
             .ThenByDescending(call => call.CancellationRequestedAt)
             .ThenBy(call => call.Id)
@@ -383,6 +385,7 @@ public sealed class EmergencyCallService : IEmergencyCallService
     private async Task<EmergencyCallEntity> MineAsync(Guid id, CancellationToken cancellationToken)
     {
         var call = await _db.EmergencyCalls.Include(call => call.Dispatches)
+            .ThenInclude(dispatch => dispatch.Ambulance)
             .SingleOrDefaultAsync(call => call.Id == id, cancellationToken)
             ?? throw new NotFoundException("Emergency call", id);
         if (call.CallerUserId != PatientCallerId()) throw new ForbiddenException(MessageCode.Forbidden);
@@ -391,7 +394,10 @@ public sealed class EmergencyCallService : IEmergencyCallService
 
     private async Task<EmergencyCallEntity> LoadPendingCancellationAsync(Guid id, CancellationToken cancellationToken)
     {
-        var call = await _db.EmergencyCalls.SingleOrDefaultAsync(call => call.Id == id, cancellationToken)
+        var call = await _db.EmergencyCalls
+            .Include(item => item.Dispatches)
+                .ThenInclude(dispatch => dispatch.Ambulance)
+            .SingleOrDefaultAsync(call => call.Id == id, cancellationToken)
             ?? throw new NotFoundException("Emergency call", id);
         if (call.CancellationRequestStatus != CancellationRequestStatus.Pending)
             throw new ConflictException(MessageCode.IllegalTransition);
@@ -415,6 +421,16 @@ public sealed class EmergencyCallService : IEmergencyCallService
     private static EmergencyCancellationRequest ToCancellationRequest(EmergencyCallEntity call) => new()
     {
         EmergencyCallId = call.Id,
+        CallPriority = call.Priority,
+        CallStatus = call.Status,
+        CallerName = call.CallerName,
+        AddressLabel = call.AddressLabel,
+        CallCreatedAt = call.CreatedAt,
+        ActiveAmbulanceRegistration = call.Dispatches
+            .Where(dispatch => dispatch.Status.IsLive())
+            .OrderByDescending(dispatch => dispatch.DispatchedAt)
+            .Select(dispatch => dispatch.Ambulance.RegistrationNumber)
+            .FirstOrDefault(),
         Status = call.CancellationRequestStatus!.Value,
         Reason = call.CancellationRequestReason!,
         RequestedAt = call.CancellationRequestedAt!.Value,

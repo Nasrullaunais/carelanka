@@ -3,7 +3,11 @@ import 'package:flutter/widgets.dart';
 import '../services/crew_location_reporter.dart';
 
 final class CrewLocationLifecycle extends StatefulWidget {
-  const CrewLocationLifecycle({super.key, required this.reporter, required this.child});
+  const CrewLocationLifecycle({
+    super.key,
+    required this.reporter,
+    required this.child,
+  });
 
   final CrewLocationReporter reporter;
   final Widget child;
@@ -12,7 +16,8 @@ final class CrewLocationLifecycle extends StatefulWidget {
   State<CrewLocationLifecycle> createState() => _CrewLocationLifecycleState();
 }
 
-final class _CrewLocationLifecycleState extends State<CrewLocationLifecycle> with WidgetsBindingObserver {
+final class _CrewLocationLifecycleState extends State<CrewLocationLifecycle>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();

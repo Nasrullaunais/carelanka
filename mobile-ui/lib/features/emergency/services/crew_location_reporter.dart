@@ -13,7 +13,14 @@ import '../models/run_step.dart';
 
 enum CrewLocationPermission { granted, denied, permanentlyDenied, unavailable }
 
-enum CrewLocationReportingState { stopped, reporting, permissionDenied, permissionPermanentlyDenied, unavailable, failed }
+enum CrewLocationReportingState {
+  stopped,
+  reporting,
+  permissionDenied,
+  permissionPermanentlyDenied,
+  unavailable,
+  failed,
+}
 
 final class CrewPosition {
   const CrewPosition(this.latitude, this.longitude);
@@ -22,7 +29,10 @@ final class CrewPosition {
   final double longitude;
 
   @override
-  bool operator ==(Object other) => other is CrewPosition && other.latitude == latitude && other.longitude == longitude;
+  bool operator ==(Object other) =>
+      other is CrewPosition &&
+      other.latitude == latitude &&
+      other.longitude == longitude;
 
   @override
   int get hashCode => Object.hash(latitude, longitude);
@@ -53,8 +63,8 @@ final class CrewLocationReporter extends ChangeNotifier {
     required CrewDispatchGateway dispatches,
     required CrewLocationGateway location,
     this.interval = const Duration(seconds: 12),
-  })  : _dispatches = dispatches,
-        _location = location;
+  }) : _dispatches = dispatches,
+       _location = location;
 
   final CrewDispatchGateway _dispatches;
   final CrewLocationGateway _location;
@@ -70,10 +80,13 @@ final class CrewLocationReporter extends ChangeNotifier {
     try {
       final permission = await _location.requestPermission();
       if (permission != CrewLocationPermission.granted) {
-      _setState(switch (permission) {
-          CrewLocationPermission.denied => CrewLocationReportingState.permissionDenied,
-          CrewLocationPermission.permanentlyDenied => CrewLocationReportingState.permissionPermanentlyDenied,
-          CrewLocationPermission.unavailable => CrewLocationReportingState.unavailable,
+        _setState(switch (permission) {
+          CrewLocationPermission.denied =>
+            CrewLocationReportingState.permissionDenied,
+          CrewLocationPermission.permanentlyDenied =>
+            CrewLocationReportingState.permissionPermanentlyDenied,
+          CrewLocationPermission.unavailable =>
+            CrewLocationReportingState.unavailable,
           CrewLocationPermission.granted => CrewLocationReportingState.stopped,
         });
         return;
@@ -99,7 +112,9 @@ final class CrewLocationReporter extends ChangeNotifier {
     _timer?.cancel();
     _timer = null;
     _reporting = false;
-    if (_state == CrewLocationReportingState.reporting) _setState(CrewLocationReportingState.stopped);
+    if (_state == CrewLocationReportingState.reporting) {
+      _setState(CrewLocationReportingState.stopped);
+    }
   }
 
   Future<void> _reportCurrent() async {
@@ -141,12 +156,18 @@ final class CrewLocationReporter extends ChangeNotifier {
 final class GeolocatorCrewLocationGateway implements CrewLocationGateway {
   @override
   Future<CrewLocationPermission> requestPermission() async {
-    if (!await Geolocator.isLocationServiceEnabled()) return CrewLocationPermission.unavailable;
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      return CrewLocationPermission.unavailable;
+    }
     var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) permission = await Geolocator.requestPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
     return switch (permission) {
-      LocationPermission.always || LocationPermission.whileInUse => CrewLocationPermission.granted,
-      LocationPermission.deniedForever => CrewLocationPermission.permanentlyDenied,
+      LocationPermission.always ||
+      LocationPermission.whileInUse => CrewLocationPermission.granted,
+      LocationPermission.deniedForever =>
+        CrewLocationPermission.permanentlyDenied,
       _ => CrewLocationPermission.denied,
     };
   }
@@ -166,7 +187,9 @@ final class GeneratedCrewDispatchGateway implements CrewDispatchGateway {
   @override
   Future<CrewDispatch?> activeDispatch() async {
     try {
-      return _toCrewDispatch(await callApi(() => _api.myRun.getMyActiveDispatch()));
+      return _toCrewDispatch(
+        await callApi(() => _api.myRun.getMyActiveDispatch()),
+      );
     } on ApiException catch (error) {
       if (error.isNotFound) return null;
       rethrow;
@@ -175,11 +198,14 @@ final class GeneratedCrewDispatchGateway implements CrewDispatchGateway {
 
   @override
   Future<void> report(String ambulanceId, CrewPosition position) => callApi(
-        () => _api.ambulances.reportAmbulanceLocation(
-          id: ambulanceId,
-          body: ReportAmbulanceLocationRequest(latitude: position.latitude, longitude: position.longitude),
-        ),
-      );
+    () => _api.ambulances.reportAmbulanceLocation(
+      id: ambulanceId,
+      body: ReportAmbulanceLocationRequest(
+        latitude: position.latitude,
+        longitude: position.longitude,
+      ),
+    ),
+  );
 
   CrewDispatch? _toCrewDispatch(DispatchDetail dispatch) {
     final id = dispatch.id;

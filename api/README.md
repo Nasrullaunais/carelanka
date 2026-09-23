@@ -66,9 +66,16 @@ dotnet ef database update --project api
 psql -U postgres -d carelanka -f docs/seed/001_identity.sql
 psql -U postgres -d carelanka -f docs/seed/002_patient_wards.sql
 psql -U postgres -d carelanka -f docs/seed/003_equipment_beds.sql
+psql -U postgres -d carelanka -f docs/seed/004_patient_demo_data.sql
+psql -U postgres -d carelanka -f docs/seed/005_patient_medical_profiles.sql
+psql -U postgres -d carelanka -f docs/seed/006_emergency_demo_data.sql
 ```
 
-All three seeds are idempotent — re-run them any time, in that order.
+Run the full sequence in that order on a clean demo database. To rebuild an existing demo,
+run `docs/seed/000_reset_demo.sql` first; the patient fixtures are not safe to replay after
+medical profiles have been added. The Emergency seed itself is idempotent and must run after
+the patient demo data because it links the dedicated Emergency patient account and creates
+reconciliable completed-run report fixtures.
 
 002 is the ward board: ten wards. Run on a database that already has hand-typed
 placeholder wards, it renames them onto their real names rather than replacing them,
@@ -124,6 +131,7 @@ Seeded by `docs/seed/001_identity.sql`. All seven staff passwords are
 | `nurse.perera@carelanka.lk` | `ward_nurse` |
 | `dr.silva@carelanka.lk` | `doctor` |
 | `crew.fernando@carelanka.lk` | `ambulance_crew` |
+| `crew.perera@carelanka.lk` | `ambulance_crew` |
 | `staff.jayasuriya@carelanka.lk` | `general_staff` |
 | `duty.rajapaksa@carelanka.lk` | `duty_manager` |
 | `admin.wickrama@carelanka.lk` | `hospital_administrator` |

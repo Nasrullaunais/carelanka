@@ -23,6 +23,7 @@ public class CareLankaDbContext : DbContext
 
     public DbSet<EmergencyCall> EmergencyCalls => Set<EmergencyCall>();
     public DbSet<Ambulance> Ambulances => Set<Ambulance>();
+    public DbSet<AmbulanceStatusHistory> AmbulanceStatusHistory => Set<AmbulanceStatusHistory>();
     public DbSet<AmbulanceCrewAssignment> AmbulanceCrewAssignments => Set<AmbulanceCrewAssignment>();
     public DbSet<Dispatch> Dispatches => Set<Dispatch>();
     public DbSet<DispatchCrew> DispatchCrew => Set<DispatchCrew>();

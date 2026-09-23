@@ -30,6 +30,7 @@ class DispatchDetail {
     this.reassignmentReason,
     this.handoverNotes,
     this.patientCondition,
+    this.sceneAddressLabel,
     this.crewStaffIds,
   });
   
@@ -69,6 +70,8 @@ class DispatchDetail {
   final String? handoverNotes;
   @JsonKey(name: 'patient_condition')
   final String? patientCondition;
+  @JsonKey(name: 'scene_address_label')
+  final String? sceneAddressLabel;
   @JsonKey(name: 'crew_staff_ids')
   final List<String>? crewStaffIds;
 

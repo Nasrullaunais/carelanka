@@ -2089,6 +2089,7 @@ components:
         id: { type: string, format: uuid }
         registration_number: { type: string }
         status: { $ref: '#/components/schemas/AmbulanceStatus' }
+        is_active: { type: boolean }
         current_latitude: { type: number, format: double, nullable: true }
         current_longitude: { type: number, format: double, nullable: true }
         location_updated_at: { type: string, format: date-time, nullable: true }
@@ -2101,6 +2102,10 @@ components:
           type: array
           items: { $ref: '#/components/schemas/AmbulanceEligibilityBlockReason' }
         active_dispatch_id: { type: string, format: uuid, nullable: true }
+        active_dispatch:
+          allOf:
+            - $ref: '#/components/schemas/DispatchSummary'
+          nullable: true
         is_divertible:
           type: boolean
           description: |
@@ -2204,6 +2209,8 @@ components:
           properties:
             objective: { type: string }
             proposed_ambulance_id: { type: string, format: uuid, nullable: true }
+            proposed_ambulance_current_crew_count: { type: integer, nullable: true }
+            proposed_ambulance_required_crew_count: { type: integer, nullable: true }
             rationale:
               type: string
               nullable: true
@@ -2389,6 +2396,10 @@ components:
               type: array
               items: { $ref: '#/components/schemas/DispatchCrewMember' }
             call: { $ref: '#/components/schemas/EmergencyCallSummary' }
+            scene_address_label:
+              type: string
+              nullable: true
+              description: Reverse-geocoded scene address shown to the assigned crew.
             handover_notes: { type: string, nullable: true }
             patient_condition: { type: string, nullable: true }
 
@@ -2500,6 +2511,12 @@ components:
         changes the dispatch; only Duty Manager approval can apply cancellation.
       properties:
         emergency_call_id: { type: string, format: uuid }
+        call_priority: { $ref: '#/components/schemas/CallPriority' }
+        call_status: { $ref: '#/components/schemas/CallStatus' }
+        caller_name: { type: string, nullable: true }
+        address_label: { type: string, nullable: true }
+        call_created_at: { type: string, format: date-time }
+        active_ambulance_registration: { type: string, nullable: true }
         status: { $ref: '#/components/schemas/CancellationRequestStatus' }
         reason: { type: string }
         requested_at: { type: string, format: date-time }

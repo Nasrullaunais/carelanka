@@ -6,6 +6,8 @@ public sealed class DispatchProposalDetail : DispatchProposalSummary
 {
     public string Objective { get; set; } = string.Empty;
     public Guid? ProposedAmbulanceId { get; set; }
+    public int? ProposedAmbulanceCurrentCrewCount { get; set; }
+    public int? ProposedAmbulanceRequiredCrewCount { get; set; }
     public string? Rationale { get; set; }
     public DiversionImpact? DiversionImpact { get; set; }
     public IReadOnlyList<DispatchPlanStep> Plan { get; set; } = [];

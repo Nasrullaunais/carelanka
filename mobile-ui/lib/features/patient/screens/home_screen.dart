@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -8,6 +9,7 @@ import '../../../core/widgets/async_view.dart';
 import '../../../services/api_client/models/my_admission.dart';
 import '../../../services/api_client/models/my_appointment.dart';
 import '../../../services/api_client/models/my_profile.dart';
+import '../../emergency/emergency_routes.dart';
 import '../state/appointments_controller.dart';
 import '../state/my_stay_controller.dart';
 import '../state/profile_controller.dart';
@@ -505,6 +507,13 @@ class _QuickActions extends StatelessWidget {
       crossAxisSpacing: 12,
       childAspectRatio: 1.55,
       children: [
+        _ActionTile(
+          icon: Icons.emergency_outlined,
+          label: 'Request ambulance',
+          caption: 'Share your location',
+          tone: _ActionTone.urgent,
+          onTap: () => context.push(EmergencyPaths.patientReport),
+        ),
         _ActionTile(
           icon: Icons.add_circle_outline,
           label: 'Book a visit',

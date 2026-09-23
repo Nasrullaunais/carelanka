@@ -15,9 +15,9 @@
 @layer components {
   .gx-table {
     --table-card-radius: 8px;
-    border: 1px solid var(--border);
-    border-radius: 13px;
-    background: var(--surface-secondary);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--canvas);
     box-shadow: var(--surface-shadow);
   }
 
@@ -39,26 +39,26 @@
 
   .gx-table .table__column::after {
     height: 14px;
-    background: var(--separator);
+    background: var(--line);
   }
 
   .gx-table .table__cell {
     padding: 10px 12px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--line);
     background: var(--surface);
     vertical-align: top;
   }
 
   .gx-table .table__body tr:first-child td {
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--line);
   }
 
   .gx-table .table__body td:first-child {
-    border-inline-start: 1px solid var(--border);
+    border-inline-start: 1px solid var(--line);
   }
 
   .gx-table .table__body td:last-child {
-    border-inline-end: 1px solid var(--border);
+    border-inline-end: 1px solid var(--line);
   }
 
   .gx-table .table__body tr:first-child td:first-child {

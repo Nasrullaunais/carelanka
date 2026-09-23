@@ -1,3 +1,4 @@
+import { Table } from '../../components/Table';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -139,7 +140,7 @@ export function ItemDetailCard({ id, onClose }: { id: string; onClose: () => voi
       {item.open_warnings.length === 0 ? (
         <p className="muted small">Nothing open against this item.</p>
       ) : (
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Severity</th>
@@ -162,14 +163,14 @@ export function ItemDetailCard({ id, onClose }: { id: string; onClose: () => voi
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
 
       <h3>Maintenance history</h3>
       {item.maintenance_history.length === 0 ? (
         <p className="muted small">No servicing recorded yet.</p>
       ) : (
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Scheduled</th>
@@ -188,7 +189,7 @@ export function ItemDetailCard({ id, onClose }: { id: string; onClose: () => voi
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
     </div>
   );

@@ -1,3 +1,4 @@
+import { Table } from '../components/Table';
 import { useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -110,7 +111,7 @@ function PatientSearch({
       )}
 
       {patients.isSuccess && patients.data.items.length > 0 && (
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Code</th>
@@ -142,7 +143,7 @@ function PatientSearch({
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
     </div>
   );
@@ -195,7 +196,7 @@ function ReportList({ patient }: { patient: Chosen }) {
       )}
 
       {rows.length > 0 && (
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Test</th>
@@ -220,7 +221,7 @@ function ReportList({ patient }: { patient: Chosen }) {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
 
       {totalPages > 1 && (

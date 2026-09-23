@@ -1,3 +1,4 @@
+import { Table } from '../../components/Table';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -56,7 +57,7 @@ export function BatchList({
 
   return (
     <>
-      <table>
+      <Table>
         <thead>
           <tr>
             <th>Batch</th>
@@ -101,7 +102,7 @@ export function BatchList({
             </tr>
           ))}
         </tbody>
-        </table>
+        </Table>
 
       {moving && (
         <BatchMovementDialog

@@ -1,3 +1,4 @@
+import { Table } from '../components/Table';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -231,7 +232,7 @@ function ItemTable({
   }
 
   return (
-    <table>
+    <Table>
       <thead>
         <tr>
           <th>Item</th>
@@ -254,7 +255,7 @@ function ItemTable({
           />
         ))}
       </tbody>
-    </table>
+    </Table>
   );
 }
 

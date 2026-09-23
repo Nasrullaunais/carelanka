@@ -39,7 +39,7 @@ export function DataTable<Row extends object>({ ariaLabel, rows, columns, rowKey
 
   return (
     <div className="flex flex-col gap-3">
-      <TableRoot>
+      <TableRoot className="gx-table">
         <TableScrollContainer>
           <TableContent
             aria-label={ariaLabel}

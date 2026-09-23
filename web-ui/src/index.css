@@ -12,6 +12,82 @@
 @import "@heroui/styles/utilities";
 @import "@heroui/styles/variants";
 
+@layer components {
+  .gx-table {
+    --table-card-radius: 8px;
+    border: 1px solid var(--border);
+    border-radius: 13px;
+    background: var(--surface-secondary);
+    box-shadow: var(--surface-shadow);
+  }
+
+  .gx-table .table__header {
+    border: 0;
+    background: transparent;
+  }
+
+  .gx-table .table__column {
+    padding: 10px 12px 10px 13px;
+    background: transparent;
+    color: var(--foreground);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .gx-table .table__column::after {
+    height: 14px;
+    background: var(--separator);
+  }
+
+  .gx-table .table__cell {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    vertical-align: top;
+  }
+
+  .gx-table .table__body tr:first-child td {
+    border-top: 1px solid var(--border);
+  }
+
+  .gx-table .table__body td:first-child {
+    border-inline-start: 1px solid var(--border);
+  }
+
+  .gx-table .table__body td:last-child {
+    border-inline-end: 1px solid var(--border);
+  }
+
+  .gx-table .table__body tr:first-child td:first-child {
+    border-start-start-radius: var(--table-card-radius);
+  }
+
+  .gx-table .table__body tr:first-child td:last-child {
+    border-start-end-radius: var(--table-card-radius);
+  }
+
+  .gx-table .table__body tr:last-child td:first-child {
+    border-end-start-radius: var(--table-card-radius);
+  }
+
+  .gx-table .table__body tr:last-child td:last-child {
+    border-end-end-radius: var(--table-card-radius);
+  }
+
+  @media (hover: hover) {
+    .gx-table .table__row:hover .table__cell {
+      background: var(--surface-hover);
+    }
+  }
+
+  .gx-table .table__row[data-selected="true"] .table__cell {
+    background: var(--accent-soft);
+  }
+}
+
 :root {
   --ink: #10241f;
   --ink-soft: #556b66;
@@ -216,10 +292,31 @@ button.secondary {
   color: var(--accent);
 }
 
-table {
+.table-frame {
+  --table-inset: 4px;
+  padding: 0 var(--table-inset) var(--table-inset);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--canvas);
+  box-shadow: 0 2px 8px rgb(16 36 31 / 4%);
+}
+
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.app-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 0.9rem;
+}
+
+.app-table caption {
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
 }
 
 /* Rows wrap unevenly the moment one column's text runs to a second line — a status
@@ -227,32 +324,79 @@ table {
    cell keeps every row's first line on one shared baseline regardless of how tall its
    neighbours grow, instead of the action button drifting to the middle of a tall row
    while the row's own text sits at the top. */
-th {
+.app-table th {
   text-align: left;
   vertical-align: top;
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--ink-soft);
-  border-bottom: 1px solid var(--line);
-  padding: 0.5rem 0.6rem;
+  color: var(--ink);
+  padding: 0.65rem 0.75rem;
 }
 
-td {
+.app-table td {
   vertical-align: top;
-  padding: 0.6rem;
+  padding: 0.65rem 0.75rem;
   border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.app-table tbody tr:first-child > :is(td, th) {
+  border-top: 1px solid var(--line);
+}
+
+.app-table tbody tr > :first-child {
+  border-left: 1px solid var(--line);
+}
+
+.app-table tbody tr > :last-child {
+  border-right: 1px solid var(--line);
+}
+
+.app-table tbody tr:first-child > :first-child {
+  border-top-left-radius: 8px;
+}
+
+.app-table tbody tr:first-child > :last-child {
+  border-top-right-radius: 8px;
+}
+
+.app-table tbody tr:last-child > :first-child {
+  border-bottom-left-radius: 8px;
+}
+
+.app-table tbody tr:last-child > :last-child {
+  border-bottom-right-radius: 8px;
+}
+
+@media (hover: hover) {
+  .app-table tbody tr:not(.drawer):hover > :is(td, th) {
+    background: var(--accent-soft);
+  }
+}
+
+.app-table tbody tr.selected > :is(td, th) {
+  background: var(--accent-soft);
+}
+
+.app-table th[scope='row'] {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 /* A handful of columns are always one short, fixed word or two ("At the desk", "Ready") —
    wrapping those to a second line only because their column happens to be narrow makes
    the row taller than its content needs, which is what throws neighbouring rows out of
    rhythm. */
-td.nowrap {
+.app-table td.nowrap {
   white-space: nowrap;
 }
 
-tr:last-child td {
+.app-table tr:last-child td {
   border-bottom: none;
 }
 
@@ -737,6 +881,18 @@ tr.drawer > td {
   .printable table {
     width: 100%;
     border-collapse: collapse;
+  }
+
+  .printable .table-frame {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .printable .table-scroll {
+    overflow: visible;
   }
 
   .printable th,

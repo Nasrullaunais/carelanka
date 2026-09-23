@@ -1,3 +1,4 @@
+import { Table } from '../components/Table';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -221,7 +222,7 @@ function WardTable({
   }
 
   return (
-    <table>
+    <Table>
       <thead>
         <tr>
           <th>Name</th>
@@ -248,6 +249,6 @@ function WardTable({
           </tr>
         ))}
       </tbody>
-    </table>
+    </Table>
   );
 }

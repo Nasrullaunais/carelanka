@@ -1,3 +1,4 @@
+import { Table } from '../components/Table';
 import { Fragment, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -238,7 +239,7 @@ export function PatientsPage() {
               : 'No patients are expected or admitted.'}
           </p>
         ) : (
-          <table>
+          <Table>
             <thead>
               <tr>
                 <th>Patient</th>
@@ -328,7 +329,7 @@ export function PatientsPage() {
                 </Fragment>
               ))}
             </tbody>
-          </table>
+          </Table>
         )}
 
         {board.data && board.data.total_items > 0 && (
@@ -699,7 +700,7 @@ function DetailsPanel({
 
       {patient.data && !editing && (
         <>
-          <table>
+          <Table>
             <tbody>
               <Field label={patient.data.nic ? 'NIC' : 'Reference'}>
                 {patientIdentifier(patient.data)}
@@ -722,7 +723,7 @@ function DetailsPanel({
                 {patient.data.has_account ? 'Linked' : 'None'}
               </Field>
             </tbody>
-          </table>
+          </Table>
 
           {canEditPatient(role) && (
             <button
@@ -742,7 +743,7 @@ function DetailsPanel({
         </h4>
           {visit.isLoading && <p className="empty">Loading…</p>}
           {visit.data && (
-            <table>
+            <Table>
               <tbody>
                 <Field label="Arrived by">{admissionSourceLabels[visit.data.source]}</Field>
                 <Field label="Care level" empty="Not yet classified">
@@ -782,7 +783,7 @@ function DetailsPanel({
                   {visit.data.discharged_at ? localDateTime(visit.data.discharged_at) : null}
                 </Field>
               </tbody>
-            </table>
+            </Table>
           )}
 
           {visit.data && visit.data.missing_fields.length > 0 && (

@@ -1,3 +1,4 @@
+import { Table } from '../components/Table';
 import { Fragment, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -89,7 +90,7 @@ export function DischargePage() {
           ) : rows.length === 0 ? (
             <p className="empty">No patients are currently admitted.</p>
           ) : (
-            <table>
+            <Table>
               <thead>
                 <tr>
                   <th>Patient</th>
@@ -113,7 +114,7 @@ export function DischargePage() {
                   />
                 ))}
               </tbody>
-            </table>
+            </Table>
           )}
 
           <p className="hint">
@@ -136,7 +137,7 @@ export function DischargePage() {
           ) : finished.length === 0 ? (
             <p className="empty">No discharges recorded yet.</p>
           ) : (
-            <table>
+            <Table>
               <thead>
                 <tr>
                   <th>Patient</th>
@@ -160,7 +161,7 @@ export function DischargePage() {
                   />
                 ))}
               </tbody>
-            </table>
+            </Table>
           )}
         </div>
       )}

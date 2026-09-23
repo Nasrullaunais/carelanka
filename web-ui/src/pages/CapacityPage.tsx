@@ -1,3 +1,4 @@
+import { Table } from '../components/Table';
 import { Fragment, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -97,7 +98,7 @@ export function CapacityPage() {
             ) : wards.length === 0 ? (
               <p className="empty">There are no wards yet.</p>
             ) : (
-              <table>
+              <Table>
                 <thead>
                   <tr>
                     <th>Ward</th>
@@ -155,7 +156,7 @@ export function CapacityPage() {
                     </Fragment>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             )}
 
             <p className="hint">
@@ -215,7 +216,7 @@ function WardOccupancyPanel({ ward, onClose }: { ward: WardCapacity; onClose: ()
             enough. Counts patients in a bed only; patients on their way are on the last line.
           </p>
 
-          <table>
+          <Table>
             <tbody>
               {Object.entries(occupancy.data.patients_by_category).map(([category, count]) => (
                 <tr key={category}>
@@ -234,7 +235,7 @@ function WardOccupancyPanel({ ward, onClose }: { ward: WardCapacity; onClose: ()
                 </td>
               </tr>
             </tbody>
-          </table>
+          </Table>
 
           <p className="hint">
             Every care level is listed even at zero, so no line disappears when it empties.

@@ -1,3 +1,4 @@
+import { Table } from './Table';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -86,7 +87,7 @@ export function WardPatientPicker({
       )}
 
       {rows.length > 0 && (
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Ward</th>
@@ -113,7 +114,7 @@ export function WardPatientPicker({
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
 
       {totalPages > 1 && (

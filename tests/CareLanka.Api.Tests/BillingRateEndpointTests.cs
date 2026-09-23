@@ -204,7 +204,7 @@ public sealed class BillingRateEndpointTests
         {
             patient_id = patientBody.RootElement.GetProperty("id").GetString(),
             source = "walk_in",
-            admission_category = "inpatient",
+            admission_category = "general",
             category_set_by_staff_id = await NurseIdAsync(),
             urgency = "routine",
             is_infectious = false

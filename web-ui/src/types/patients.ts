@@ -2,11 +2,12 @@ import type {
   AdmissionCategory,
   AdmissionSource,
   AdmissionStatus,
-  AdmissionUrgency,
   Gender,
 } from '../services/api/generated';
 
 export const genders: Gender[] = ['male', 'female', 'other', 'unknown'];
+
+export const selectableGenders: Gender[] = ['male', 'female'];
 
 export const genderLabels: Record<Gender, string> = {
   male: 'Male',
@@ -17,34 +18,27 @@ export const genderLabels: Record<Gender, string> = {
 
 export const admissionCategories: AdmissionCategory[] = [
   'icu',
-  'hdu',
-  'inpatient',
-  'day_case',
-  'outpatient',
+  'general',
+  'surgical',
+  'maternity',
+  'emergency',
 ];
 
 export const admissionCategoryLabels: Record<AdmissionCategory, string> = {
-  icu: 'ICU - intensive care',
-  hdu: 'HDU - high dependency',
-  inpatient: 'Inpatient - staying in',
-  day_case: 'Day case - in and out today',
-  outpatient: 'Outpatient - no bed needed',
+  icu: 'ICU - life support / constant monitoring',
+  general: 'General ward - normal admission',
+  surgical: 'Surgical - pre- or post-operative care',
+  maternity: 'Maternity - pregnancy and birth',
+  emergency: 'Emergency - brief record, admit now',
 };
 
 export const admissionCategoryHints: Record<AdmissionCategory, string> = {
   icu: 'Life support or constant monitoring.',
-  hdu: 'Needs watching more closely than a general ward can manage, but not intensive care.',
-  inpatient: 'Admitted to a ward, staying at least one night.',
-  day_case: 'A procedure today, home the same day. Still needs a bed for a few hours.',
-  outpatient: 'Seen and sent home. No bed is held.',
-};
-
-export const admissionUrgencies: AdmissionUrgency[] = ['routine', 'urgent', 'emergency'];
-
-export const admissionUrgencyLabels: Record<AdmissionUrgency, string> = {
-  routine: 'Routine - can wait',
-  urgent: 'Urgent - seen today',
-  emergency: 'Emergency - seen now',
+  general: 'An ordinary ward stay.',
+  surgical: 'Before or after an operation.',
+  maternity: 'Pregnancy, birth, or postnatal care.',
+  emergency:
+    'Skips full registration - record just the NIC, admit, pick a bed. Fill in the rest later.',
 };
 
 export const admissionSourceLabels: Record<AdmissionSource, string> = {
@@ -78,8 +72,8 @@ export const patientDetailFieldLabels: Record<string, string> = {
   date_of_birth: 'Date of birth',
   phone: 'Phone number',
   address: 'Address',
-  emergency_contact_name: 'Emergency contact name',
-  emergency_contact_phone: 'Emergency contact phone',
+  emergency_contact_name: 'Emergency/guardian contact name',
+  emergency_contact_phone: 'Emergency/guardian contact number',
 };
 
 export function detailFieldLabel(field: string): string {

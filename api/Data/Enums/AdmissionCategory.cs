@@ -7,8 +7,8 @@ namespace CareLanka.Api.Data.Enums;
 public enum AdmissionCategory
 {
     Icu,
-    Hdu,
-    Inpatient,
-    DayCase,
-    Outpatient
+    General,
+    Surgical,
+    Maternity,
+    Emergency
 }

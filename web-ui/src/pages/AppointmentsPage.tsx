@@ -16,7 +16,6 @@ import {
 import type {
   Admission,
   AdmissionCategory,
-  AdmissionUrgency,
   Appointment,
   AppointmentStatus,
   PatientSummary,
@@ -41,8 +40,6 @@ import { hasPassed, localDateTime, localInputValue, localTime, utcDay } from '..
 import {
   admissionCategoryHints,
   admissionCategoryLabels,
-  admissionUrgencies,
-  admissionUrgencyLabels,
   detailFieldLabel,
   patientIdentifier,
 } from '../types/patients';
@@ -818,8 +815,7 @@ function CheckInPanel({
 
   const levels = canSetHighCare ? dutyManagerCareLevels : deskCareLevels;
 
-  const [category, setCategory] = useState<AdmissionCategory>('outpatient');
-  const [urgency, setUrgency] = useState<AdmissionUrgency>('routine');
+  const [category, setCategory] = useState<AdmissionCategory>('general');
   const [isInfectious, setIsInfectious] = useState(false);
 
   const checkIn = useMutation({
@@ -849,7 +845,7 @@ function CheckInPanel({
       body: {
         admission_category: category,
         category_set_by_staff_id: staffId,
-        urgency,
+        urgency: 'routine',
         is_infectious: isInfectious,
       },
     });
@@ -870,46 +866,29 @@ function CheckInPanel({
       </p>
 
       <form onSubmit={submit}>
-        <div className="row">
-          <div className="field">
-            <label htmlFor="checkin-category">Care level</label>
-            <select
-              id="checkin-category"
-              value={category}
-              onChange={(event) => setCategory(event.target.value as AdmissionCategory)}
-            >
-              {levels.map((value) => (
-                <option key={value} value={value}>
-                  {admissionCategoryLabels[value]}
-                </option>
-              ))}
-            </select>
+        <div className="field">
+          <label htmlFor="checkin-category">Care level</label>
+          <select
+            id="checkin-category"
+            value={category}
+            onChange={(event) => setCategory(event.target.value as AdmissionCategory)}
+          >
+            {levels.map((value) => (
+              <option key={value} value={value}>
+                {admissionCategoryLabels[value]}
+              </option>
+            ))}
+          </select>
+          <p className="hint">
+            {admissionCategoryHints[category]} This is your decision and is recorded against
+            your name.
+          </p>
+          {!canSetHighCare && (
             <p className="hint">
-              {admissionCategoryHints[category]} This is your decision and is recorded against
-              your name.
+              Intensive care is the duty manager&rsquo;s decision, so it is not on this list.
+              If the patient needs it, ask the duty manager to check them in.
             </p>
-            {!canSetHighCare && (
-              <p className="hint">
-                Intensive care and high dependency are the duty manager&rsquo;s decision, so
-                they are not on this list. If the patient needs either, ask the duty manager to
-                check them in.
-              </p>
-            )}
-          </div>
-          <div className="field">
-            <label htmlFor="checkin-urgency">Urgency</label>
-            <select
-              id="checkin-urgency"
-              value={urgency}
-              onChange={(event) => setUrgency(event.target.value as AdmissionUrgency)}
-            >
-              {admissionUrgencies.map((value) => (
-                <option key={value} value={value}>
-                  {admissionUrgencyLabels[value]}
-                </option>
-              ))}
-            </select>
-          </div>
+          )}
         </div>
 
         <div className="field">
@@ -922,7 +901,7 @@ function CheckInPanel({
             />{' '}
             Needs isolation
           </label>
-          <p className="hint">Forces an isolation-capable bed when the bed agent runs.</p>
+          <p className="hint">Forces an isolation-capable bed when a bed is assigned.</p>
         </div>
 
         <div className="row">

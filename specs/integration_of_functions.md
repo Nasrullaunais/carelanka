@@ -369,7 +369,7 @@ Every patient now carries a second identifier, and the two do different jobs:
 
 > **No component, and no AI agent, decides a patient's care category.**
 
-`admission_category` (`icu` / `hdu` / `inpatient` / `day_case` / `outpatient`) is set by clinical staff and recorded with `category_set_by_staff_id`. It is an **input** to Patient Management's agent, never an output.
+`admission_category` (`icu` / `general` / `surgical` / `maternity` / `emergency`) is set by clinical staff and recorded with `category_set_by_staff_id`. It is an **input** to Patient Management's agent, never an output.
 
 This is not caution — it is written into the group plan:
 

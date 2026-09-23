@@ -1197,7 +1197,31 @@ On check-in this becomes an `Admission` with `Source = Booked`.
 + CancelNote: string(500) (nullable)                    -- (Rev 2.10 — new)
 ```
 **Table:** `admissions` — **built.** `Patient_AddAdmission`, then
-`Patient_AddOpenAdmissionIndex` and `Patient_AddCancelNote`.
+`Patient_AddOpenAdmissionIndex`, `Patient_AddCancelNote`, and
+`Patient_ReplaceAdmissionCategories`.
+
+*(Rev 4.3 — 2026-09-23)* **`AdmissionCategory` replaced: `Icu, Hdu, Inpatient, DayCase,
+Outpatient` → `Icu, General, Surgical, Maternity, Emergency`.** The old five read as one
+acuity ladder but were really two different questions dressed the same — "how sick" and
+"how long are they staying" — which is what made the walk-in intake form feel redundant
+next to `Urgency`. `RequiresBed` is now always `true`: there is no "no bed needed" value
+left, since that case (a scan, a blood test) was already routed through
+`POST /appointments/{id}/bill` without ever creating an `Admission`, not through this enum.
+
+`Emergency` is a **process** decision, not a ward destination — it tells Walk-in intake to
+skip full patient registration and jump straight to bed selection. It places against
+`general`-typed wards through the same rung system as any other rung-2 category; it does
+not require or create a `WardType.Emergency` ward (deliberately unseeded — see
+`WardType` below). `Hdu` dropped out of the category list; HDU wards still exist
+physically and stay reachable through the duty-manager bed-mismatch override, same path
+any other mismatch already uses.
+
+**`Urgency` is unchanged in the schema** — still set automatically on ambulance
+pre-admissions via Emergency's `CallPriority` translation — but as of this revision no
+staff-facing screen in Patient Management shows or asks for it. It was two names for one
+"how bad is it" question sitting next to `Category` with no distinction drawn between them,
+and it never actually drove the bed-placement rules in `BedPlacementRules.cs` (only
+`Category` and `IsInfectious` do — see Rev 2 below).
 
 *(Rev 2.10)* **`CancelNote` added; `Status`'s transitions are code, not schema.** The spec's
 cancel body has always carried an optional `note` and there was no column for it. The seven
@@ -1939,21 +1963,21 @@ replaces every `AdmissionFee` and `BedStay` line and leaves every `Manual` one a
 a `Manual` line can be deleted (`cl_pat_027`). Without this column, re-preparing a bill would
 either wipe the charges reception typed or duplicate the bed days.
 
-### AdmissionCategory *(Rev 2 — changed; Rev 2.2 — wire values pinned)*
+### AdmissionCategory *(Rev 2 — changed; Rev 2.2 — wire values pinned; Rev 4.3 — replaced)*
 ```
-ICU, HighDependency, Inpatient, DayCase, Outpatient
+Icu, General, Surgical, Maternity, Emergency
 ```
-Serialized as `icu`, **`hdu`**, `inpatient`, `day_case`, `outpatient`.
+Serialized as `icu`, `general`, `surgical`, `maternity`, `emergency`.
 
-*(Rev 2.2)* `HighDependency` serializes to **`hdu`**, not `high_dependency`.
-`patient-spec.yaml` publishes `hdu` in both this enum and `WardType`, and its downgrade
-ladder is documented as `icu -> hdu -> inpatient`. Rev 2.1 said enum literals were
-"normalised to snake_case to match your wire values", which for this member produced
-`high_dependency` and silently broke the match. The C# member keeps the readable name and
-`HasConversion<string>()` maps it to `hdu`.
+*(Rev 4.3)* Replaces `Icu, HighDependency, Inpatient, DayCase, Outpatient`. See the
+`Admission` entity's Rev 4.3 note above for why and what each old value became. Rung 0 is
+`icu` alone; every other value is rung 2 — `general`/`surgical`/`maternity`/`emergency` are
+equal acuity for bed placement, distinguished only by which ward they belong in (or, for
+`emergency`, by skipping full registration rather than by ward at all).
 
-Ordered most to least acute so bed placement's downgrade logic ("offers the next best
-thing") is a simple ordinal step.
+*(Rev 2.2, historical)* `HighDependency` serialized to `hdu`, not `high_dependency` — kept
+here because the same `HasConversion<string>()` pattern (readable C# member, pinned wire
+value) still applies to every member of this enum.
 
 ### WardType *(Rev 2.2 — new; three members added 2026-09-11)*
 ```
@@ -1961,8 +1985,14 @@ Icu, Hdu, General, Maternity, Pediatric, Isolation, Surgical, Emergency, MentalH
 ```
 Serialized as `icu`, `hdu`, `general`, `maternity`, `pediatric`, `isolation`, `surgical`,
 `emergency`, `mental_health` — as published in `patient-spec.yaml`. `Ward.Type` used to reuse
-`AdmissionCategory`, which could not express a maternity, pediatric or isolation ward. Overlaps
-`AdmissionCategory` on `icu`/`hdu` only; the two lists are not interchangeable.
+`AdmissionCategory`, which could not express a maternity, pediatric or isolation ward.
+
+*(Rev 4.3)* Now overlaps `AdmissionCategory` on all five of its values, not just `icu`/`hdu`
+as Rev 2.2 noted — the two lists still are not interchangeable, though: `WardType.Emergency`
+has no seeded ward (`docs/seed/002_patient_wards.sql` deliberately has none — an ETU's beds
+are typed `general`), while `AdmissionCategory.Emergency` is a real, selectable value. An
+`Emergency`-category admission places against `general`-typed wards through the ordinary
+rung system; it does not require a `WardType.Emergency` ward to exist.
 
 **Why `surgical`, `emergency` and `mental_health` are types rather than ward names.** The
 bed-day rate is read off the ward type. A surgical ward called a `general` one prices a

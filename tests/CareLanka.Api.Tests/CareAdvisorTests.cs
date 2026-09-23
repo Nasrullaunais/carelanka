@@ -88,7 +88,7 @@ public sealed class CareAdvisorTests
             "My headache is worse today and it hurts more when I lie flat.",
             RedFlagMatched: false,
             new CareMedicalProfileFacts("Type 2 diabetes", "Penicillin", "Headache since admission", null),
-            new CareCurrentAdmissionFacts(AdmissionCategory.Inpatient, AdmissionUrgency.Routine, false, "General B", DateTimeOffset.UtcNow),
+            new CareCurrentAdmissionFacts(AdmissionCategory.General, AdmissionUrgency.Routine, false, "General B", DateTimeOffset.UtcNow),
             new CarePatientHistoryFacts(34, Gender.Female, [], []));
 
     private sealed class FakeLanguageModel : ILanguageModel

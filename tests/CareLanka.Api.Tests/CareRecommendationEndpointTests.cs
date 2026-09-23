@@ -41,7 +41,7 @@ public sealed class CareRecommendationEndpointTests
     {
         var (patient, patientId) = await NewAdmittablePatientAsync();
         using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
-        await AdmitAsOutpatientAsync(nurse, patientId);
+        await AdmitAndMarkAdmittedAsync(nurse, patientId);
 
         using var summary = await SubmitAndWaitAsync(
             patient, "My headache is worse today and it hurts more when I lie flat.");
@@ -66,7 +66,7 @@ public sealed class CareRecommendationEndpointTests
     {
         var (patient, patientId) = await NewAdmittablePatientAsync();
         using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
-        await AdmitAsOutpatientAsync(nurse, patientId);
+        await AdmitAndMarkAdmittedAsync(nurse, patientId);
 
         using var summary = await SubmitAndWaitAsync(patient, "I have sudden chest pain and I feel dizzy.");
 
@@ -87,7 +87,7 @@ public sealed class CareRecommendationEndpointTests
     {
         var (patient, patientId) = await NewAdmittablePatientAsync();
         using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
-        await AdmitAsOutpatientAsync(nurse, patientId);
+        await AdmitAndMarkAdmittedAsync(nurse, patientId);
 
         using var summary = await SubmitAndWaitAsync(patient, "I feel a little more tired than usual today.");
         var recommendationId = summary.RootElement.GetProperty("recommendation_id").GetString()!;
@@ -115,7 +115,7 @@ public sealed class CareRecommendationEndpointTests
     {
         var (patient, patientId) = await NewAdmittablePatientAsync();
         using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
-        await AdmitAsOutpatientAsync(nurse, patientId);
+        await AdmitAndMarkAdmittedAsync(nurse, patientId);
 
         using var summary = await SubmitAndWaitAsync(patient, "Just checking in, feeling okay.");
         var recommendationId = summary.RootElement.GetProperty("recommendation_id").GetString()!;
@@ -140,7 +140,7 @@ public sealed class CareRecommendationEndpointTests
     {
         var (patient, patientId) = await NewAdmittablePatientAsync();
         using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
-        await AdmitAsOutpatientAsync(nurse, patientId);
+        await AdmitAndMarkAdmittedAsync(nurse, patientId);
 
         using var summary = await SubmitAndWaitAsync(patient, "Feeling a bit unsettled today.");
         var recommendationId = summary.RootElement.GetProperty("recommendation_id").GetString()!;
@@ -191,13 +191,13 @@ public sealed class CareRecommendationEndpointTests
         return (client, record.Id);
     }
 
-    private async Task AdmitAsOutpatientAsync(HttpClient nurse, Guid patientId)
+    private async Task AdmitAndMarkAdmittedAsync(HttpClient nurse, Guid patientId)
     {
         var created = await nurse.PostAsJsonAsync("/api/admissions", new
         {
             patient_id = patientId,
             source = "walk_in",
-            admission_category = "outpatient",
+            admission_category = "general",
             category_set_by_staff_id = await NurseIdAsync(),
             urgency = "routine",
             is_infectious = false
@@ -206,7 +206,15 @@ public sealed class CareRecommendationEndpointTests
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
 
         using var body = await ReadJsonAsync(created);
-        Assert.Equal("admitted", body.RootElement.GetProperty("status").GetString());
+        var admissionId = Guid.Parse(body.RootElement.GetProperty("id").GetString()!);
+
+        // Every category now requires a bed - skip bed placement for this test, which only
+        // cares that an admission is in the "admitted" state, not which bed it's in.
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        var admission = await db.Admissions.FirstAsync(a => a.Id == admissionId);
+        admission.Status = Data.Enums.AdmissionStatus.Admitted;
+        await db.SaveChangesAsync();
     }
 
     /// <summary>

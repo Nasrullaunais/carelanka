@@ -35,6 +35,11 @@ export function appointmentOutcome(appointment: {
     : 'Seen and went home';
 }
 
-export const deskCareLevels: AdmissionCategory[] = ['outpatient', 'day_case', 'inpatient'];
+export const deskCareLevels: AdmissionCategory[] = [
+  'general',
+  'surgical',
+  'maternity',
+  'emergency',
+];
 
-export const dutyManagerCareLevels: AdmissionCategory[] = [...deskCareLevels, 'hdu', 'icu'];
+export const dutyManagerCareLevels: AdmissionCategory[] = [...deskCareLevels, 'icu'];

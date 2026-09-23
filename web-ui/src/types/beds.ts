@@ -16,10 +16,10 @@ export const bedAvailabilityLabels: Record<BedAvailability, string> = {
 
 const categoryRung: Record<AdmissionCategory, number> = {
   icu: 0,
-  hdu: 1,
-  inpatient: 2,
-  day_case: 2,
-  outpatient: 2,
+  general: 2,
+  surgical: 2,
+  maternity: 2,
+  emergency: 2,
 };
 
 const wardRung: Record<WardType, number> = {

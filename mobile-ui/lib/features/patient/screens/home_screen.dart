@@ -544,7 +544,7 @@ class _QuickActions extends StatelessWidget {
         else
           _ActionTile(
             icon: Icons.contact_phone_outlined,
-            label: 'Emergency contact',
+            label: 'Emergency/guardian contact',
             caption: 'Not added yet',
             onTap: () =>
                 openMyDetails(context, context.read<ProfileController>()),

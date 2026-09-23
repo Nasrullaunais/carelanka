@@ -197,11 +197,11 @@ BEGIN
          admitted_at, discharged_at, missing_fields, details_completed_at,
          created_at, updated_at)
     VALUES
-        (v_ad1, v_p1, 'walk_in', 'inpatient', 'routine', 'awaiting_bed', false,
+        (v_ad1, v_p1, 'walk_in', 'general', 'routine', 'awaiting_bed', false,
          v_nurse, now() - interval '3 hours',
          NULL, NULL, '{}'::text[], now() - interval '3 hours',
          now() - interval '3 hours', now() - interval '3 hours'),
-        (v_ad2, v_p2, 'walk_in', 'inpatient', 'urgent', 'awaiting_bed', false,
+        (v_ad2, v_p2, 'walk_in', 'general', 'urgent', 'awaiting_bed', false,
          v_nurse, now() - interval '90 minutes',
          NULL, NULL, '{}'::text[], now() - interval '90 minutes',
          now() - interval '90 minutes', now() - interval '90 minutes');
@@ -228,11 +228,11 @@ BEGIN
          admitted_at, discharged_at, missing_fields, details_completed_at,
          created_at, updated_at)
     VALUES
-        (v_ad3, v_p3, 'walk_in', 'inpatient', 'routine', 'admitted', false,
+        (v_ad3, v_p3, 'walk_in', 'general', 'routine', 'admitted', false,
          v_nurse, now() - interval '1 day',
          v_admitted_3, NULL, '{}'::text[], now() - interval '1 day',
          now() - interval '1 day', v_admitted_3),
-        (v_ad4, v_p4, 'walk_in', 'inpatient', 'urgent', 'admitted', false,
+        (v_ad4, v_p4, 'walk_in', 'general', 'urgent', 'admitted', false,
          v_nurse, now() - interval '2 days',
          v_admitted_4, NULL, '{}'::text[], now() - interval '2 days',
          now() - interval '2 days', v_admitted_4);
@@ -343,11 +343,11 @@ BEGIN
          admitted_at, discharged_at, missing_fields, details_completed_at,
          created_at, updated_at)
     VALUES
-        (v_ad9, v_p9, 'walk_in', 'inpatient', 'routine', 'discharged', false,
+        (v_ad9, v_p9, 'walk_in', 'general', 'routine', 'discharged', false,
          v_doctor, v_admitted_9 - interval '1 day',
          v_admitted_9, v_discharged_9, '{}'::text[], v_admitted_9 - interval '1 day',
          v_admitted_9 - interval '1 day', v_discharged_9),
-        (v_ad10, v_p10, 'walk_in', 'inpatient', 'urgent', 'discharged', false,
+        (v_ad10, v_p10, 'walk_in', 'general', 'urgent', 'discharged', false,
          v_doctor, v_admitted_10 - interval '1 day',
          v_admitted_10, v_discharged_10, '{}'::text[], v_admitted_10 - interval '1 day',
          v_admitted_10 - interval '1 day', v_discharged_10);

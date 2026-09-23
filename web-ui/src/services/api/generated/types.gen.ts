@@ -65,7 +65,7 @@ export type AdmissionBedPagedResult = {
     total_pages: number;
 };
 
-export type AdmissionCategory = 'icu' | 'hdu' | 'inpatient' | 'day_case' | 'outpatient';
+export type AdmissionCategory = 'icu' | 'general' | 'surgical' | 'maternity' | 'emergency';
 
 export type AdmissionDetail = {
     id: string;

@@ -1,3 +1,4 @@
+import { Table } from '../../components/Table';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -86,7 +87,7 @@ export function PrescriptionsCard() {
       )}
 
       {rows.length > 0 && (
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Received</th>
@@ -158,7 +159,7 @@ export function PrescriptionsCard() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
 
       {rejecting && (

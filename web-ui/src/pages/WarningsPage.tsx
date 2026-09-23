@@ -1,3 +1,4 @@
+import { Table } from '../components/Table';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -163,7 +164,7 @@ export function WarningsPage() {
         )}
 
         {hasChecked && rows.length > 0 && (
-          <table>
+          <Table>
             <thead>
               <tr>
                 <th>Severity</th>
@@ -231,7 +232,7 @@ export function WarningsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         )}
 
         {totalPages > 1 && (

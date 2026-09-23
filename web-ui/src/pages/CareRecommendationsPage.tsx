@@ -1,3 +1,4 @@
+import { Table } from '../components/Table';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -117,7 +118,7 @@ export function CareRecommendationsPage() {
         ) : rows.length === 0 ? (
           <p className="empty">Nothing here right now.</p>
         ) : (
-          <table>
+          <Table>
             <thead>
               <tr>
                 <th>Patient</th>
@@ -168,7 +169,7 @@ export function CareRecommendationsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         )}
       </div>
 

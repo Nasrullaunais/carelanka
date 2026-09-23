@@ -1,3 +1,4 @@
+import { Table } from '../../components/Table';
 import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -92,7 +93,7 @@ export function ItemHistoryCard({ id, onClose }: { id: string; onClose: () => vo
         </p>
       ) : (
         <>
-          <table>
+          <Table>
             <thead>
               <tr>
                 <th>When</th>
@@ -128,7 +129,7 @@ export function ItemHistoryCard({ id, onClose }: { id: string; onClose: () => vo
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Table>
           <p className="hint">
             This is the audit trail, so nothing here is ever edited or deleted. It is also
             what the consumption report and the low-stock sweep will read.

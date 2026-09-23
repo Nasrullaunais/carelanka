@@ -1,3 +1,4 @@
+import { Table } from '../../components/Table';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -119,7 +120,7 @@ export function ConfirmMaintenanceCard() {
       )}
 
       {rows.length > 0 && (
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Item</th>
@@ -148,7 +149,7 @@ export function ConfirmMaintenanceCard() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
 
       {confirming && (

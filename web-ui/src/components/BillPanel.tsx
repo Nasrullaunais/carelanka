@@ -1,3 +1,4 @@
+import { Table } from './Table';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -503,7 +504,7 @@ export function BillPrintout({
         </div>
       </dl>
 
-      <table>
+      <Table>
         <thead>
           <tr>
             <th>Description</th>
@@ -533,7 +534,7 @@ export function BillPrintout({
             </td>
           </tr>
         </tbody>
-      </table>
+      </Table>
 
       <p className="print-only print-foot">
         {bill.settled

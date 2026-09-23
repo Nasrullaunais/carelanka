@@ -1,3 +1,4 @@
+import { Table } from '../components/Table';
 import { Fragment, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
@@ -344,7 +345,7 @@ function AppointmentTable({
   }
 
   return (
-    <table>
+    <Table>
       <thead>
         <tr>
           <th>{showDate ? 'When' : 'Time'}</th>
@@ -489,7 +490,7 @@ function AppointmentTable({
           </Fragment>
         ))}
       </tbody>
-    </table>
+    </Table>
   );
 }
 
@@ -711,7 +712,7 @@ function BookVisitCard() {
           )}
 
           {!patients.isFetching && (patients.data?.items.length ?? 0) > 0 && (
-            <table>
+            <Table>
               <tbody>
                 {patients.data?.items.map((found) => (
                   <tr key={found.id}>
@@ -737,7 +738,7 @@ function BookVisitCard() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
           )}
         </>
       ) : (

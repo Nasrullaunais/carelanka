@@ -1,3 +1,4 @@
+import { Table } from '../components/Table';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -915,7 +916,7 @@ function PatientCard({ patient }: { patient: Patient | PatientSummary }) {
   const reference = patientIdentifier(patient);
 
   return (
-    <table>
+    <Table>
       <tbody>
         <tr>
           <th scope="row">Patient ID</th>
@@ -968,6 +969,6 @@ function PatientCard({ patient }: { patient: Patient | PatientSummary }) {
           </>
         )}
       </tbody>
-    </table>
+    </Table>
   );
 }

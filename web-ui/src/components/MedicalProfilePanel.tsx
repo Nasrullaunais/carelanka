@@ -1,3 +1,4 @@
+import { Table } from './Table';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -119,7 +120,7 @@ export function MedicalProfilePanel({
             Nobody has recorded anything about this patient's health yet.
           </p>
         ) : (
-          <table>
+          <Table>
             <tbody>
               <ProfileField label="Known conditions">
                 {profile.data?.known_conditions}
@@ -132,7 +133,7 @@ export function MedicalProfilePanel({
                 {profile.data?.recent_situation}
               </ProfileField>
             </tbody>
-          </table>
+          </Table>
         )}
 
         {written && (

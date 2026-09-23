@@ -1,3 +1,4 @@
+import { Table } from './Table';
 import type { Ward } from '../services/api/generated';
 import type { Placement } from '../types/beds';
 import { genderPolicyLabels, wardTypeLabels } from '../types/wards';
@@ -46,7 +47,7 @@ export function BedCandidateTable({
 
   return (
     <>
-      <table>
+      <Table>
         <thead>
           <tr>
             <th>Bed</th>
@@ -93,7 +94,7 @@ export function BedCandidateTable({
             </tr>
           ))}
         </tbody>
-      </table>
+      </Table>
 
       {usable.length === 0 && (
         <p className="empty">

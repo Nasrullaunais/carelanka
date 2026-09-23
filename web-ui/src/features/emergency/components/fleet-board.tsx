@@ -7,6 +7,7 @@ import { DataTable, type DataTableColumn } from '../../../components/ui/data-tab
 import { QueryState } from '../../../components/ui/query-state';
 import { PaginationControls } from '../../../components/ui/pagination-controls';
 import { StatusChip } from '../../../components/ui/status-chip';
+import { ActionDialog } from '../../../components/ui/action-dialog';
 import { ambulanceStatusLabels, ambulanceStatusTones, formatTimestamp } from '../domain';
 import { CrewManagement } from './crew-management';
 
@@ -49,7 +50,9 @@ export function FleetBoard() {
           )}
         </QueryState>
       </CardContent></Card>
-      {selected && <CrewManagement ambulanceId={selected.id} registrationNumber={selected.registration_number} />}
+      <ActionDialog title={`Manage crew · ${selected?.registration_number ?? ''}`} isOpen={selected != null} onClose={() => setSelected(undefined)}>
+        {selected && <CrewManagement ambulanceId={selected.id} registrationNumber={selected.registration_number} />}
+      </ActionDialog>
     </div>
   );
 }

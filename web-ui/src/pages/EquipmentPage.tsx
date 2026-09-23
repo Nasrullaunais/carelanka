@@ -21,6 +21,7 @@ import type {
   WardPatient,
 } from '../services/api/generated';
 import { WardPatientPicker } from '../components/WardPatientPicker';
+import { ActionDialog } from '../components/ui/action-dialog';
 import { useSession } from '../services/auth/useSession';
 import {
   canConfirmEquipment,
@@ -47,6 +48,7 @@ export function EquipmentPage() {
   const [wardId, setWardId] = useState('');
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<string | null>(null);
+  const [registerOpen, setRegisterOpen] = useState(false);
 
   const categories = useQuery(listEquipmentCategoriesOptions());
   const awaitingConfirmation = useQuery({
@@ -175,12 +177,16 @@ export function EquipmentPage() {
       {canConfirmEquipment(role) && <RemoveCategoriesCard />}
 
       {canManageEquipment(role) && (
-        <RegisterItemCard
+        <>
+        <button type="button" onClick={() => setRegisterOpen(true)}>Register equipment</button>
+        <ActionDialog title="Register equipment" isOpen={registerOpen} onClose={() => setRegisterOpen(false)}>
+        {registerOpen && <RegisterItemCard
           categories={(categories.data ?? []).map((c) => ({ id: c.id, name: c.name }))}
           wards={(wards.data ?? []).map((w) => ({ id: w.id, name: w.name }))}
           onDone={() => {
             refreshItems();
             page1();
+            setRegisterOpen(false);
           }}
           onCategoryCreated={() => {
             queryClient.invalidateQueries({
@@ -189,7 +195,9 @@ export function EquipmentPage() {
                 'listEquipmentCategories',
             });
           }}
-        />
+        />}
+        </ActionDialog>
+        </>
       )}
 
       <div className="card">
@@ -242,7 +250,9 @@ export function EquipmentPage() {
         )}
       </div>
 
-      {selected && <ItemDetailCard id={selected} onClose={() => setSelected(null)} />}
+      <ActionDialog title="Equipment details" isOpen={selected != null} onClose={() => setSelected(null)}>
+        {selected && <ItemDetailCard id={selected} onClose={() => setSelected(null)} />}
+      </ActionDialog>
     </>
   );
 }
@@ -583,17 +593,9 @@ export function Dialog({
   children: ReactNode;
 }) {
   return (
-    <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-label={title}>
-      <div className="dialog card">
-        <div className="dialog-head">
-          <h2>{title}</h2>
-          <button type="button" className="secondary" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
+    <ActionDialog title={title} isOpen onClose={onClose} size="compact">
+      {children}
+    </ActionDialog>
   );
 }
 

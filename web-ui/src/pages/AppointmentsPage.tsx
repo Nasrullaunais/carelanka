@@ -1,5 +1,5 @@
 import { Table } from '../components/Table';
-import { Fragment, useState } from 'react';
+import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -23,6 +23,8 @@ import type {
 } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
 import { BillPanel } from '../components/BillPanel';
+import { ActionDialog } from '../components/ui/action-dialog';
+import { ConfirmDialog } from '../components/ui/confirm-dialog';
 import {
   canBillAppointment,
   canOpenAppointmentBoard,
@@ -57,6 +59,8 @@ export function AppointmentsPage() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState<{ appointment: Appointment; action: DeskAction } | null>(null);
   const [admitted, setAdmitted] = useState<Admission | null>(null);
+  const [noShowCandidate, setNoShowCandidate] = useState<Appointment | null>(null);
+  const [bookingOpen, setBookingOpen] = useState(false);
 
   // Two different questions: who may see the list, and who may act on a
   // booking. The administrator can bill a finished visit but cannot check
@@ -116,6 +120,7 @@ export function AppointmentsPage() {
       toast.success(`${updated.patient.full_name} marked as not attended.`);
       void refreshBookings();
       setOpen(null);
+      setNoShowCandidate(null);
     },
   });
 
@@ -142,7 +147,7 @@ export function AppointmentsPage() {
   }
 
   function markNotAttended(appointment: Appointment) {
-    noShow.mutate({ path: { id: appointment.id } });
+    setNoShowCandidate(appointment);
   }
 
   return (
@@ -203,7 +208,10 @@ export function AppointmentsPage() {
         )}
       </div>
 
-      {isDesk && <BookVisitCard />}
+      {isDesk && <button type="button" onClick={() => setBookingOpen(true)}>Book a visit</button>}
+      <ActionDialog title="Book a visit" isOpen={bookingOpen} onClose={() => setBookingOpen(false)}>
+        {bookingOpen && <BookVisitCard onBooked={() => setBookingOpen(false)} />}
+      </ActionDialog>
 
       {admitted && <CheckedInCard admission={admitted} onDismiss={() => setAdmitted(null)} />}
 
@@ -219,6 +227,7 @@ export function AppointmentsPage() {
           isError={appointments.isError}
           onRetry={() => void appointments.refetch()}
           onAction={toggle}
+          onCloseAction={() => setOpen(null)}
           onSeenAndBill={seenAndBill}
           onNotAttended={markNotAttended}
           canAct={isDesk}
@@ -226,6 +235,7 @@ export function AppointmentsPage() {
           showDate={date === ''}
           openId={open?.appointment.id ?? null}
           openAction={open?.action ?? null}
+          activeAppointment={open?.appointment ?? null}
           renderDrawer={(appointment) => {
             if (open?.action === 'confirm') {
               return (
@@ -260,6 +270,15 @@ export function AppointmentsPage() {
               />
             );
           }}
+        />
+        <ConfirmDialog
+          isOpen={noShowCandidate != null}
+          onOpenChange={(open) => { if (!open) setNoShowCandidate(null); }}
+          title={`Mark ${noShowCandidate?.patient.full_name ?? 'patient'} as not attended?`}
+          description="This closes the booking as a missed visit. Check that the booked time has passed and the patient did not arrive."
+          confirmLabel={noShow.isPending ? 'Saving…' : 'Mark not attended'}
+          isPending={noShow.isPending}
+          onConfirm={() => { if (noShowCandidate) noShow.mutate({ path: { id: noShowCandidate.id } }); }}
         />
 
         {appointments.data && appointments.data.total_items > 0 && (
@@ -302,6 +321,7 @@ function AppointmentTable({
   isError,
   onRetry,
   onAction,
+  onCloseAction,
   onSeenAndBill,
   onNotAttended,
   canAct,
@@ -309,6 +329,7 @@ function AppointmentTable({
   showDate,
   openId,
   openAction,
+  activeAppointment,
   renderDrawer,
 }: {
   appointments: Appointment[];
@@ -316,6 +337,7 @@ function AppointmentTable({
   isError: boolean;
   onRetry: () => void;
   onAction: (appointment: Appointment, action: DeskAction) => void;
+  onCloseAction: () => void;
   onSeenAndBill: (appointment: Appointment) => void;
   onNotAttended: (appointment: Appointment) => void;
   canAct: boolean;
@@ -323,6 +345,7 @@ function AppointmentTable({
   showDate: boolean;
   openId: string | null;
   openAction: DeskAction | null;
+  activeAppointment: Appointment | null;
   renderDrawer: (appointment: Appointment) => ReactNode;
 }) {
   if (isLoading) {
@@ -345,6 +368,7 @@ function AppointmentTable({
   }
 
   return (
+    <>
     <Table>
       <thead>
         <tr>
@@ -358,8 +382,7 @@ function AppointmentTable({
       </thead>
       <tbody>
         {appointments.map((appointment) => (
-          <Fragment key={appointment.id}>
-            <tr className={openId === appointment.id ? 'open' : undefined}>
+            <tr key={appointment.id} className={openId === appointment.id ? 'open' : undefined}>
               <td>
                 <strong>
                   {showDate
@@ -482,15 +505,17 @@ function AppointmentTable({
               </td>
             </tr>
 
-            {openId === appointment.id && (
-              <tr className="drawer">
-                <td colSpan={6}>{renderDrawer(appointment)}</td>
-              </tr>
-            )}
-          </Fragment>
         ))}
       </tbody>
     </Table>
+    <ActionDialog
+      title={`${openAction === 'check-in' ? 'Admit' : openAction === 'confirm' ? 'Confirm' : openAction === 'cancel' ? 'Cancel' : 'Bill'} · ${activeAppointment?.patient.full_name ?? 'appointment'}`}
+      isOpen={openId != null}
+      onClose={onCloseAction}
+    >
+      {activeAppointment && renderDrawer(activeAppointment)}
+    </ActionDialog>
+    </>
   );
 }
 
@@ -616,7 +641,7 @@ function CancelPanel({
   );
 }
 
-function BookVisitCard() {
+function BookVisitCard({ onBooked }: { onBooked: () => void }) {
   const queryClient = useQueryClient();
 
   const [search, setSearch] = useState('');
@@ -649,6 +674,7 @@ function BookVisitCard() {
       setSubmitted('');
       setWhen('');
       setReason('');
+      onBooked();
     },
   });
 

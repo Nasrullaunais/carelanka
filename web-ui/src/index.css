@@ -162,6 +162,25 @@ h3 {
   flex: 1;
 }
 
+@media (max-width: 640px) {
+  .shell-header {
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .shell-nav {
+    order: 3;
+    flex: 0 0 100%;
+    min-width: 0;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding-bottom: 0.25rem;
+  }
+
+  .whoami { margin-left: auto; }
+}
+
 .shell-nav a {
   padding: 0.35rem 0.7rem;
   border-radius: var(--radius);
@@ -191,6 +210,10 @@ main {
   max-width: 60rem;
   margin: 0 auto;
   padding: 1.75rem 1.5rem 4rem;
+}
+
+@media (max-width: 640px) {
+  main { padding: 1.25rem 1rem 3rem; }
 }
 
 /* ---------- cards, forms, tables ---------- */
@@ -260,6 +283,31 @@ button {
   background: var(--accent);
   color: #fff;
   cursor: pointer;
+  transition: filter 140ms ease, transform 140ms ease;
+}
+
+button:not(:disabled):hover {
+  filter: brightness(0.94);
+}
+
+button:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+button:focus-visible,
+a:focus-visible,
+[role='button']:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button { transition: none; }
+}
+
+@media (max-width: 640px) {
+  button { min-height: 44px; }
 }
 
 button:disabled {
@@ -690,6 +738,36 @@ tr.selected {
   max-height: 90vh;
   overflow-y: auto;
   margin: 0;
+}
+
+.action-dialog {
+  width: min(56rem, calc(100vw - 2rem));
+  max-width: 56rem;
+  max-height: min(90vh, 56rem);
+}
+
+.action-dialog--compact {
+  width: min(32rem, calc(100vw - 2rem));
+  max-width: 32rem;
+}
+
+.action-dialog-header {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 1rem;
+  text-align: left;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+}
+
+.action-dialog-body {
+  overflow: auto;
+  min-height: 0;
+  padding-bottom: 1.5rem;
 }
 
 textarea {

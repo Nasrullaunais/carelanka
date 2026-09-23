@@ -7,6 +7,7 @@ import type { CreateEmergencyCallRequest } from '../../../services/api/generated
 import { invalidateEmergencyQueries } from '../query-invalidation';
 import { CallBoard } from './call-board';
 import { CallDetail } from './call-detail';
+import { ActionDialog } from '../../../components/ui/action-dialog';
 import { LogCallDialog } from './log-call-dialog';
 
 const PAGE_SIZE = 25;
@@ -56,9 +57,9 @@ export function EmergencyDesk() {
           <CallBoard calls={calls.data?.items} selectedId={selectedCallId} isLoading={calls.isPending} error={calls.error} onRetry={() => void calls.refetch()} onSelect={setSelectedCallId} page={page} totalPages={calls.data?.total_pages ?? 1} onPageChange={setPage} />
         </CardContent>
       </Card>
-      {selectedCallId && (
-        <Card><CardContent><CallDetail callId={selectedCallId} query={selectedCall} ambulances={ambulances} /></CardContent></Card>
-      )}
+      <ActionDialog title={`Emergency call · ${selectedCall.data?.caller_name ?? 'details'}`} isOpen={selectedCallId != null} onClose={() => setSelectedCallId(undefined)}>
+        {selectedCallId && <CallDetail callId={selectedCallId} query={selectedCall} ambulances={ambulances} />}
+      </ActionDialog>
       <LogCallDialog isOpen={logCallOpen} isPending={createCall.isPending} onOpenChange={setLogCallOpen} onSubmit={(body: CreateEmergencyCallRequest) => createCall.mutate({ body })} />
     </div>
   );

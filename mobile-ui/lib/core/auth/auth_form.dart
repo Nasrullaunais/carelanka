@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class AuthScaffold extends StatelessWidget {
   const AuthScaffold({
@@ -64,6 +65,7 @@ class AuthTextField extends StatelessWidget {
     this.onSubmitted,
     this.suffix,
     this.serverErrors,
+    this.inputFormatters,
   });
 
   final TextEditingController controller;
@@ -76,6 +78,7 @@ class AuthTextField extends StatelessWidget {
   final void Function(String)? onSubmitted;
   final Widget? suffix;
   final List<String>? serverErrors;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   Widget build(BuildContext context) {
@@ -88,6 +91,7 @@ class AuthTextField extends StatelessWidget {
         keyboardType: keyboardType,
         textInputAction: textInputAction,
         onFieldSubmitted: onSubmitted,
+        inputFormatters: inputFormatters,
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),
@@ -133,6 +137,14 @@ String? validateUsername(String? value) {
   if (!RegExp(r'^[a-zA-Z0-9._-]+$').hasMatch(text)) {
     return 'Letters, numbers, dots, underscores and hyphens only';
   }
+  return null;
+}
+
+String? validatePassword(String? value) {
+  final text = value ?? '';
+  if (text.length < 8) return 'Use at least 8 characters';
+  if (text.length > 20) return 'Use 20 characters or fewer';
+  if (!RegExp(r'[A-Z]').hasMatch(text)) return 'Include at least one capital letter';
   return null;
 }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -69,6 +70,7 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                 enabled: !_busy,
                 keyboardType: TextInputType.text,
                 serverErrors: fieldErrors['username'],
+                inputFormatters: [FilteringTextInputFormatter.deny(RegExp(r'\s'))],
                 validator: validateUsername,
               ),
               AuthTextField(
@@ -81,8 +83,7 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                   icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
                   onPressed: () => setState(() => _obscure = !_obscure),
                 ),
-                validator: (value) =>
-                    (value == null || value.length < 8) ? 'Use at least 8 characters' : null,
+                validator: validatePassword,
               ),
               AuthTextField(
                 controller: _confirm,

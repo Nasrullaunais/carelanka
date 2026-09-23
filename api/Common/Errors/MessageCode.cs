@@ -74,6 +74,8 @@ public enum MessageCode
 
     EquipmentCategoryInUse,
 
+    ReorderSuggestionAlreadyRunning,
+
     PharmacyCategoryNameTaken,
 
     PharmacyItemNameTaken,

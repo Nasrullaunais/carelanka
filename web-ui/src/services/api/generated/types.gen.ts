@@ -138,6 +138,20 @@ export type AdmissionSummaryPagedResult = {
 
 export type AdmissionUrgency = 'routine' | 'urgent' | 'emergency';
 
+export type AllocationStatus = 'proposed' | 'confirmed' | 'released' | 'cancelled';
+
+export type AllocationSummaryDto = {
+    allocation_id: string;
+    shift_id: string;
+    ward_name: string;
+    date: string;
+    start_time: string;
+    end_time: string;
+    staff_member_id: string;
+    staff_name: string;
+    status: AllocationStatus;
+};
+
 export type Ambulance = {
     id: string;
     registration_number: string;
@@ -639,6 +653,11 @@ export type CreatePharmacyTransactionRequest = {
     note?: string | null;
 };
 
+export type CreateSkillRequest = {
+    name: string;
+    description?: string | null;
+};
+
 export type CreateWardRequest = {
     name: string;
     ward_type: WardType;
@@ -1053,6 +1072,12 @@ export type Gender = 'male' | 'female' | 'other' | 'unknown';
 
 export type GenderPolicy = 'male' | 'female' | 'mixed';
 
+export type GrantStaffSkillRequest = {
+    skill_id: string;
+    valid_from?: string | null;
+    expires_at?: string | null;
+};
+
 export type HealthStatus = {
     status?: string | null;
     database?: string | null;
@@ -1082,6 +1107,10 @@ export type LabReportPagedResult = {
 
 export type LinkPatientAccountRequest = {
     user_account_id: string;
+};
+
+export type LookupStaffRequest = {
+    staff_ids: Array<string>;
 };
 
 export type MaintenanceSchedule = {
@@ -1566,6 +1595,33 @@ export type RelatedEntityType = 'pharmacy_item' | 'equipment_item' | 'bed';
 
 export type ReleaseReason = 'discharged' | 'hold_expired' | 'cancelled' | 'transferred' | 'rejected' | 'corrected';
 
+export type ReorderSuggestionAccepted = {
+    workflow_id?: string;
+    suggestion_id?: string;
+    status?: string | null;
+    poll_url?: string | null;
+};
+
+export type ReorderSuggestionSource = 'model' | 'model_unavailable' | 'model_rejected';
+
+export type ReorderWorkflowStatus = 'running' | 'completed' | 'failed';
+
+export type ReorderWorkflowSummary = {
+    workflow_id?: string;
+    suggestion_id?: string;
+    pharmacy_item_id?: string;
+    objective?: string | null;
+    status?: ReorderWorkflowStatus;
+    plan?: Array<string> | null;
+    steps?: Array<CareAgentStep> | null;
+    current_threshold?: number;
+    current_quantity_on_hand?: number;
+    suggested_threshold?: number | null;
+    reasoning?: string | null;
+    source?: ReorderSuggestionSource;
+    retries?: number;
+};
+
 export type ReportAmbulanceLocationRequest = {
     latitude?: number | null;
     longitude?: number | null;
@@ -1608,6 +1664,10 @@ export type ReviewCancellationRequest = {
     notes?: string | null;
 };
 
+export type RevokeStaffSkillResponse = {
+    affected_allocations: Array<AllocationSummaryDto>;
+};
+
 export type RouteLog = {
     dispatch_id?: string;
     origin_latitude?: number;
@@ -1625,11 +1685,37 @@ export type SettleBillRequest = {
     settlement_note?: string | null;
 };
 
+export type SkillDto = {
+    id: string;
+    name: string;
+    description?: string | null;
+    staff_count: number;
+};
+
 export type SortDirection = 'asc' | 'desc';
 
 export type StaffLoginRequest = {
     email: string;
     password: string;
+};
+
+export type StaffLookupResult = {
+    staff_id: string;
+    found: boolean;
+    full_name?: string | null;
+    role?: StaffRole;
+    is_active?: boolean | null;
+};
+
+export type StaffRole = 'ward_nurse' | 'doctor' | 'ambulance_crew' | 'general_staff' | 'duty_manager' | 'hospital_administrator' | 'equipment_manager';
+
+export type StaffSkillDto = {
+    skill_id: string;
+    skill_name: string;
+    valid_from?: string | null;
+    expires_at?: string | null;
+    is_valid: boolean;
+    granted_at: string;
 };
 
 export type UpdateAmbulanceRequest = {
@@ -1690,6 +1776,15 @@ export type UpdatePatientRequest = {
     address?: string | null;
     emergency_contact_name?: string | null;
     emergency_contact_phone?: string | null;
+};
+
+export type UpdateReorderThresholdRequest = {
+    reorder_threshold: number;
+};
+
+export type UpdateSkillRequest = {
+    name: string;
+    description?: string | null;
 };
 
 export type ValidationProblemDetails = {
@@ -5631,6 +5726,35 @@ export type GetHealthResponses = {
 
 export type GetHealthResponse = GetHealthResponses[keyof GetHealthResponses];
 
+export type LookupStaffData = {
+    body?: LookupStaffRequest;
+    path?: never;
+    query?: never;
+    url: '/staff/lookup';
+};
+
+export type LookupStaffErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+};
+
+export type LookupStaffError = LookupStaffErrors[keyof LookupStaffErrors];
+
+export type LookupStaffResponses = {
+    /**
+     * OK
+     */
+    200: Array<StaffLookupResult>;
+};
+
+export type LookupStaffResponse = LookupStaffResponses[keyof LookupStaffResponses];
+
 export type GetWardCapacityData = {
     body?: never;
     path?: never;
@@ -7871,6 +7995,119 @@ export type RecordPharmacyBatchTransactionResponses = {
 
 export type RecordPharmacyBatchTransactionResponse = RecordPharmacyBatchTransactionResponses[keyof RecordPharmacyBatchTransactionResponses];
 
+export type UpdateReorderThresholdData = {
+    body?: UpdateReorderThresholdRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/pharmacy-items/{id}/reorder-threshold';
+};
+
+export type UpdateReorderThresholdErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type UpdateReorderThresholdError = UpdateReorderThresholdErrors[keyof UpdateReorderThresholdErrors];
+
+export type UpdateReorderThresholdResponses = {
+    /**
+     * OK
+     */
+    200: PharmacyItem;
+};
+
+export type UpdateReorderThresholdResponse = UpdateReorderThresholdResponses[keyof UpdateReorderThresholdResponses];
+
+export type SubmitReorderSuggestionData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/pharmacy-items/{id}/reorder-suggestion';
+};
+
+export type SubmitReorderSuggestionErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type SubmitReorderSuggestionError = SubmitReorderSuggestionErrors[keyof SubmitReorderSuggestionErrors];
+
+export type SubmitReorderSuggestionResponses = {
+    /**
+     * Accepted
+     */
+    202: ReorderSuggestionAccepted;
+};
+
+export type SubmitReorderSuggestionResponse = SubmitReorderSuggestionResponses[keyof SubmitReorderSuggestionResponses];
+
+export type GetReorderSuggestionWorkflowData = {
+    body?: never;
+    path: {
+        workflowId: string;
+    };
+    query?: never;
+    url: '/pharmacy-items/reorder-suggestions/{workflowId}';
+};
+
+export type GetReorderSuggestionWorkflowErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetReorderSuggestionWorkflowError = GetReorderSuggestionWorkflowErrors[keyof GetReorderSuggestionWorkflowErrors];
+
+export type GetReorderSuggestionWorkflowResponses = {
+    /**
+     * OK
+     */
+    200: ReorderWorkflowSummary;
+};
+
+export type GetReorderSuggestionWorkflowResponse = GetReorderSuggestionWorkflowResponses[keyof GetReorderSuggestionWorkflowResponses];
+
 export type ListPrescriptionsData = {
     body?: never;
     path?: never;
@@ -8170,6 +8407,262 @@ export type GetEmergencyAgentPerformanceReportResponses = {
 };
 
 export type GetEmergencyAgentPerformanceReportResponse = GetEmergencyAgentPerformanceReportResponses[keyof GetEmergencyAgentPerformanceReportResponses];
+
+export type ListSkillsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        search?: string;
+    };
+    url: '/skills';
+};
+
+export type ListSkillsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+};
+
+export type ListSkillsError = ListSkillsErrors[keyof ListSkillsErrors];
+
+export type ListSkillsResponses = {
+    /**
+     * OK
+     */
+    200: Array<SkillDto>;
+};
+
+export type ListSkillsResponse = ListSkillsResponses[keyof ListSkillsResponses];
+
+export type CreateSkillData = {
+    body?: CreateSkillRequest;
+    path?: never;
+    query?: never;
+    url: '/skills';
+};
+
+export type CreateSkillErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CreateSkillError = CreateSkillErrors[keyof CreateSkillErrors];
+
+export type CreateSkillResponses = {
+    /**
+     * Created
+     */
+    201: SkillDto;
+};
+
+export type CreateSkillResponse = CreateSkillResponses[keyof CreateSkillResponses];
+
+export type RetireSkillData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/skills/{id}';
+};
+
+export type RetireSkillErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RetireSkillError = RetireSkillErrors[keyof RetireSkillErrors];
+
+export type RetireSkillResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type RetireSkillResponse = RetireSkillResponses[keyof RetireSkillResponses];
+
+export type UpdateSkillData = {
+    body?: UpdateSkillRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/skills/{id}';
+};
+
+export type UpdateSkillErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type UpdateSkillError = UpdateSkillErrors[keyof UpdateSkillErrors];
+
+export type UpdateSkillResponses = {
+    /**
+     * OK
+     */
+    200: SkillDto;
+};
+
+export type UpdateSkillResponse = UpdateSkillResponses[keyof UpdateSkillResponses];
+
+export type ListStaffSkillsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/staff/{id}/skills';
+};
+
+export type ListStaffSkillsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type ListStaffSkillsError = ListStaffSkillsErrors[keyof ListStaffSkillsErrors];
+
+export type ListStaffSkillsResponses = {
+    /**
+     * OK
+     */
+    200: Array<StaffSkillDto>;
+};
+
+export type ListStaffSkillsResponse = ListStaffSkillsResponses[keyof ListStaffSkillsResponses];
+
+export type GrantStaffSkillData = {
+    body?: GrantStaffSkillRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/staff/{id}/skills';
+};
+
+export type GrantStaffSkillErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type GrantStaffSkillError = GrantStaffSkillErrors[keyof GrantStaffSkillErrors];
+
+export type GrantStaffSkillResponses = {
+    /**
+     * Created
+     */
+    201: StaffSkillDto;
+};
+
+export type GrantStaffSkillResponse = GrantStaffSkillResponses[keyof GrantStaffSkillResponses];
+
+export type RevokeStaffSkillData = {
+    body?: never;
+    path: {
+        staffId: string;
+        skillId: string;
+    };
+    query?: never;
+    url: '/staff/{staffId}/skills/{skillId}';
+};
+
+export type RevokeStaffSkillErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type RevokeStaffSkillError = RevokeStaffSkillErrors[keyof RevokeStaffSkillErrors];
+
+export type RevokeStaffSkillResponses = {
+    /**
+     * OK
+     */
+    200: RevokeStaffSkillResponse;
+};
+
+export type RevokeStaffSkillResponse2 = RevokeStaffSkillResponses[keyof RevokeStaffSkillResponses];
 
 export type ListBedAvailabilityData = {
     body?: never;

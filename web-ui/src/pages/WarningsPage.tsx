@@ -33,17 +33,21 @@ export function WarningsPage() {
   const [type, setType] = useState<WarningType | ''>('');
   const [page, setPage] = useState(1);
   const [clearing, setClearing] = useState<Warning | null>(null);
+  // The list stays hidden until the user presses Run check themselves.
+  const [hasChecked, setHasChecked] = useState(false);
 
   const warnings = useQuery({
     ...listWarningsOptions({
       query: { status, type: type || undefined, page, pageSize: PAGE_SIZE },
     }),
-    enabled: allowed,
+    enabled: allowed && hasChecked,
   });
 
   const sweep = useMutation({
     ...runWarningSweepMutation(),
     onSuccess: (result) => {
+      setHasChecked(true);
+
       const changes = [
         result.raised > 0 ? `${result.raised} new` : null,
         result.updated > 0 ? `${result.updated} updated` : null,
@@ -135,9 +139,13 @@ export function WarningsPage() {
           ))}
         </div>
 
-        {warnings.isPending && <p className="empty">Loading warnings…</p>}
+        {!hasChecked && (
+          <p className="empty">Press Run check to look for warnings.</p>
+        )}
 
-        {warnings.isError && (
+        {hasChecked && warnings.isPending && <p className="empty">Loading warnings…</p>}
+
+        {hasChecked && warnings.isError && (
           <p className="empty">
             Warnings could not be loaded.{' '}
             <button type="button" className="secondary" onClick={() => warnings.refetch()}>
@@ -146,7 +154,7 @@ export function WarningsPage() {
           </p>
         )}
 
-        {warnings.isSuccess && rows.length === 0 && (
+        {hasChecked && warnings.isSuccess && rows.length === 0 && (
           <p className="empty">
             {status === 'open'
               ? 'Nothing needs attention. Run check to look again.'
@@ -154,7 +162,7 @@ export function WarningsPage() {
           </p>
         )}
 
-        {rows.length > 0 && (
+        {hasChecked && rows.length > 0 && (
           <table>
             <thead>
               <tr>

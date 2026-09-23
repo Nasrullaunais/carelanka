@@ -150,6 +150,22 @@ public sealed class PharmacyItemService : IPharmacyItemService
         await _db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<PharmacyItem> UpdateReorderThresholdAsync(
+        Guid id, int reorderThreshold, CancellationToken cancellationToken = default)
+    {
+        var item = await _db.PharmacyItems
+            .Include(i => i.Category)
+            .Include(i => i.Batches)
+            .FirstOrDefaultAsync(i => i.Id == id, cancellationToken)
+            ?? throw new NotFoundException("Pharmacy item", id);
+
+        item.ReorderThreshold = reorderThreshold;
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return ToDto(item);
+    }
+
     public async Task<IReadOnlyList<PharmacyBatch>> ListBatchesAsync(
         Guid id, CancellationToken cancellationToken = default)
     {

@@ -81,28 +81,34 @@ class _NotAdmitted extends StatelessWidget {
             ..load(),
       child: RefreshableMessage(
         onRefresh: onRefresh,
-        child: ListView(
+        // A Column, not a ListView: RefreshableMessage already supplies the one scrollable
+        // here (a SingleChildScrollView) — a second scrollable nested inside it has no
+        // bounded height to lay out against and crashes with "unbounded height".
+        child: Padding(
           padding: const EdgeInsets.fromLTRB(AppTheme.gutter, 4, AppTheme.gutter, 32),
-          children: [
-            EmptyView(
-              icon: Icons.event_available_outlined,
-              title: 'Not currently admitted',
-              message: 'Your ward, bed and progress will appear here once '
-                  'hospital staff admit you.',
-              action: onBookVisit == null
-                  ? null
-                  : FilledButton.icon(
-                      onPressed: onBookVisit,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Book a visit'),
-                      style: FilledButton.styleFrom(minimumSize: const Size(200, 48)),
-                    ),
-            ),
-            const SizedBox(height: 24),
-            Text('Past visits', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 4),
-            const PastVisitsList(padding: EdgeInsets.only(top: 10), shrinkWrap: true),
-          ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              EmptyView(
+                icon: Icons.event_available_outlined,
+                title: 'Not currently admitted',
+                message: 'Your ward, bed and progress will appear here once '
+                    'hospital staff admit you.',
+                action: onBookVisit == null
+                    ? null
+                    : FilledButton.icon(
+                        onPressed: onBookVisit,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Book a visit'),
+                        style: FilledButton.styleFrom(minimumSize: const Size(200, 48)),
+                      ),
+              ),
+              const SizedBox(height: 24),
+              Text('Past visits', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 4),
+              const PastVisitsList(padding: EdgeInsets.only(top: 10), shrinkWrap: true),
+            ],
+          ),
         ),
       ),
     );

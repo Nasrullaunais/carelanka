@@ -98,8 +98,6 @@ class _VisitCard extends StatelessWidget {
 
   final MyAdmission visit;
 
-  static const _instructionsLabel = 'Discharge instructions';
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -109,96 +107,128 @@ class _VisitCard extends StatelessWidget {
       visit.bedNumber,
     ].whereType<String>().join(' · ');
     final when = visit.dischargedAt ?? visit.admittedAt;
-    final instructions = visit.dischargeInstructions;
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (when != null) ...[
-                  DateBlock(date: when, muted: true),
-                  const SizedBox(width: 14),
-                ],
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (when != null)
-                        Text(
-                          FriendlyDate.dayAndMonth(when),
-                          style: theme.textTheme.titleMedium,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => PastVisitDetailScreen(visit: visit)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (when != null) ...[
+                DateBlock(date: when, muted: true),
+                const SizedBox(width: 14),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (when != null)
+                      Text(
+                        FriendlyDate.dayAndMonth(when),
+                        style: theme.textTheme.titleMedium,
+                      ),
+                    if (place.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        place,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
                         ),
-                      if (place.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          place,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 10),
-                      StatusChip.admission(
-                        status: visit.status,
-                        label: visit.statusText,
-                        scheme: scheme,
-                        compact: true,
                       ),
                     ],
-                  ),
+                    const SizedBox(height: 10),
+                    StatusChip.admission(
+                      status: visit.status,
+                      label: visit.statusText,
+                      scheme: scheme,
+                      compact: true,
+                    ),
+                  ],
                 ),
-              ],
+              ),
+              Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class PastVisitDetailScreen extends StatelessWidget {
+  const PastVisitDetailScreen({super.key, required this.visit});
+
+  final MyAdmission visit;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final instructions = visit.dischargeInstructions;
+
+    return PhoneWidth(
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Visit details')),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(AppTheme.gutter, 12, AppTheme.gutter, 32),
+          children: [
+            StatusChip.admission(
+              status: visit.status,
+              label: visit.statusText,
+              scheme: scheme,
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                if (instructions != null)
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => showDialog<void>(
-                        context: context,
-                        builder: (dialogContext) => AlertDialog(
-                          title: const Text(_instructionsLabel),
-                          content: SingleChildScrollView(
-                            child: Text(instructions),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () =>
-                                  Navigator.of(dialogContext).pop(),
-                              child: const Text('Close'),
-                            ),
-                          ],
-                        ),
-                      ),
-                      icon: const Icon(Icons.assignment_outlined, size: 18),
-                      label: const Text('Instructions'),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(44),
-                      ),
-                    ),
+            const SizedBox(height: 16),
+            SectionCard(
+              title: 'Location and dates',
+              icon: Icons.place_outlined,
+              child: Column(
+                children: [
+                  DetailRow(
+                    label: 'Ward',
+                    value: visit.wardName,
+                    icon: Icons.meeting_room_outlined,
                   ),
-                if (instructions != null) const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => showBillSheet(
-                      context,
-                      service: PatientService(context.read<CareLankaApi>()),
-                      admissionId: visit.admissionId,
-                    ),
-                    icon: const Icon(Icons.receipt_long_outlined, size: 18),
-                    label: const Text('Bill'),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(44),
-                    ),
+                  DetailRow(label: 'Bed', value: visit.bedNumber, icon: Icons.bed_outlined),
+                  DetailRow(
+                    label: 'Admitted',
+                    value: visit.admittedAt == null
+                        ? null
+                        : FriendlyDate.full(visit.admittedAt!),
+                    icon: Icons.login_outlined,
                   ),
-                ),
-              ],
+                  DetailRow(
+                    label: 'Discharged',
+                    value: visit.dischargedAt == null
+                        ? null
+                        : FriendlyDate.full(visit.dischargedAt!),
+                    icon: Icons.logout_outlined,
+                  ),
+                ],
+              ),
+            ),
+            if (instructions != null) ...[
+              const SizedBox(height: 16),
+              SectionCard(
+                title: 'Discharge instructions',
+                icon: Icons.assignment_outlined,
+                child: Text(instructions, style: theme.textTheme.bodyMedium),
+              ),
+            ],
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: () => showBillSheet(
+                context,
+                service: PatientService(context.read<CareLankaApi>()),
+                admissionId: visit.admissionId,
+              ),
+              icon: const Icon(Icons.receipt_long_outlined, size: 18),
+              label: const Text('View bill'),
+              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
             ),
           ],
         ),

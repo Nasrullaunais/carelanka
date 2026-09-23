@@ -19,6 +19,7 @@ import type {
 } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
 import { canReadCareQueue, canReviewCareRecommendation } from '../types/permissions';
+import { ActionDialog } from '../components/ui/action-dialog';
 
 const urgencyLabels: Record<CareUrgency, string> = {
   low: 'Low',
@@ -173,14 +174,9 @@ export function CareRecommendationsPage() {
         )}
       </div>
 
-      {selectedId && (
-        <div className="card">
-          <RecommendationDetail
-            recommendationId={selectedId}
-            onDone={() => setSelectedId(null)}
-          />
-        </div>
-      )}
+      <ActionDialog title="Care recommendation" isOpen={selectedId != null} onClose={() => setSelectedId(null)}>
+        {selectedId && <RecommendationDetail recommendationId={selectedId} onDone={() => setSelectedId(null)} />}
+      </ActionDialog>
     </>
   );
 }

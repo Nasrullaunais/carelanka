@@ -1,5 +1,5 @@
 import { Table } from '../components/Table';
-import { Fragment, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
@@ -19,6 +19,8 @@ import {
 import type { PrincipalRole, WorklistRow } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
 import { MedicalProfilePanel } from '../components/MedicalProfilePanel';
+import { ActionDialog } from '../components/ui/action-dialog';
+import { ConfirmDialog } from '../components/ui/confirm-dialog';
 import { BedCandidateTable } from '../components/BedCandidateTable';
 import {
   canAssignBed,
@@ -253,8 +255,8 @@ export function PatientsPage() {
             </thead>
             <tbody>
               {rows.map((row) => (
-                <Fragment key={row.id}>
                   <tr
+                    key={row.id}
                     className={openId === row.id || assigningId === row.id ? 'open' : undefined}
                   >
                     <td>
@@ -307,26 +309,6 @@ export function PatientsPage() {
                     </td>
                   </tr>
 
-                  {assigningId === row.id && (
-                    <tr className="drawer">
-                      <td colSpan={5}>
-                        <AssignBedPanel
-                          row={row}
-                          mode={bedMode}
-                          onDone={() => setAssigningId(null)}
-                        />
-                      </td>
-                    </tr>
-                  )}
-
-                  {openId === row.id && (
-                    <tr className="drawer">
-                      <td colSpan={5}>
-                        <DetailsPanel row={row} role={role} onClose={() => setOpenId(null)} />
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
               ))}
             </tbody>
           </Table>
@@ -359,6 +341,12 @@ export function PatientsPage() {
           </div>
         )}
       </div>
+      <ActionDialog title={`${bedMode === 'correct' ? 'Correct bed' : 'Assign bed'} · ${rows.find((row) => row.id === assigningId)?.patient.full_name ?? 'patient'}`} isOpen={assigningId != null} onClose={() => setAssigningId(null)}>
+        {rows.find((row) => row.id === assigningId) && <AssignBedPanel row={rows.find((row) => row.id === assigningId)!} mode={bedMode} onDone={() => setAssigningId(null)} />}
+      </ActionDialog>
+      <ActionDialog title={`Patient details · ${rows.find((row) => row.id === openId)?.patient.full_name ?? 'patient'}`} isOpen={openId != null} onClose={() => setOpenId(null)}>
+        {rows.find((row) => row.id === openId) && <DetailsPanel row={rows.find((row) => row.id === openId)!} role={role} onClose={() => setOpenId(null)} />}
+      </ActionDialog>
     </>
   );
 }
@@ -400,6 +388,7 @@ function RowActions({
   onDetails: () => void;
 }) {
   const invalidate = useBoardInvalidation();
+  const [confirmComplete, setConfirmComplete] = useState(false);
 
   const arrive = useMutation({
     ...markArrivedMutation(),
@@ -414,6 +403,7 @@ function RowActions({
     onSuccess: () => {
       toast.success(`${row.patient.full_name}'s visit is complete.`);
       invalidate();
+      setConfirmComplete(false);
     },
   });
 
@@ -450,7 +440,7 @@ function RowActions({
         <button
           type="button"
           disabled={pending}
-          onClick={() => complete.mutate({ path: { id: row.id } })}
+          onClick={() => setConfirmComplete(true)}
         >
           {complete.isPending ? 'Saving…' : 'Complete visit'}
         </button>
@@ -458,6 +448,15 @@ function RowActions({
       <button type="button" className="secondary" onClick={onDetails}>
         {open ? 'Hide' : 'Details'}
       </button>
+      <ConfirmDialog
+        isOpen={confirmComplete}
+        onOpenChange={(open) => setConfirmComplete(open)}
+        title={`Complete ${row.patient.full_name}'s visit?`}
+        description="The visit will move out of the active patient board. Check that care and documentation are finished."
+        confirmLabel={complete.isPending ? 'Completing…' : 'Complete visit'}
+        isPending={complete.isPending}
+        onConfirm={() => complete.mutate({ path: { id: row.id } })}
+      />
     </>
   );
 }

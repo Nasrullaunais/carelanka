@@ -13,6 +13,7 @@ import type { PharmacyItem, PrincipalRole } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
 import { canManageEquipment } from '../types/permissions';
 import { Dialog } from './EquipmentPage';
+import { ActionDialog } from '../components/ui/action-dialog';
 import { StockDialog } from './pharmacy/StockDialog';
 import { ItemHistoryCard } from './pharmacy/ItemHistoryCard';
 import { AddBatchDialog, BatchList } from './pharmacy/BatchList';
@@ -32,6 +33,9 @@ export function PharmacyPage() {
   const [availableOnly, setAvailableOnly] = useState(false);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<string | null>(null);
+  const [batchesItem, setBatchesItem] = useState<PharmacyItem | null>(null);
+  const [suggestingItem, setSuggestingItem] = useState<PharmacyItem | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
 
   const categories = useQuery(listPharmacyCategoriesOptions());
 
@@ -134,11 +138,15 @@ export function PharmacyPage() {
       </div>
 
       {canManageEquipment(role) && (
-        <AddItemCard
+        <>
+        <button type="button" onClick={() => setAddOpen(true)}>Add medicine</button>
+        <ActionDialog title="Add medicine" isOpen={addOpen} onClose={() => setAddOpen(false)}>
+        {addOpen && <AddItemCard
           categories={(categories.data ?? []).map((c) => ({ id: c.id, name: c.name }))}
           onDone={() => {
             refresh();
             page1();
+            setAddOpen(false);
           }}
           onCategoryAdded={() =>
             queryClient.invalidateQueries({
@@ -147,7 +155,9 @@ export function PharmacyPage() {
                 'listPharmacyCategories',
             })
           }
-        />
+        />}
+        </ActionDialog>
+        </>
       )}
 
       <div className="card">
@@ -159,6 +169,8 @@ export function PharmacyPage() {
           items={paged?.items ?? []}
           selectedId={selected}
           onSelect={(id) => setSelected((current) => (current === id ? null : id))}
+          onOpenBatches={setBatchesItem}
+          onSuggest={setSuggestingItem}
           role={role}
           onChanged={refresh}
         />
@@ -188,7 +200,15 @@ export function PharmacyPage() {
         )}
       </div>
 
-      {selected && <ItemHistoryCard id={selected} onClose={() => setSelected(null)} />}
+      <ActionDialog title="Medicine details" isOpen={selected != null} onClose={() => setSelected(null)}>
+        {selected && <ItemHistoryCard id={selected} onClose={() => setSelected(null)} />}
+      </ActionDialog>
+      <ActionDialog title={`Batches · ${batchesItem?.name ?? 'medicine'}`} isOpen={batchesItem != null} onClose={() => setBatchesItem(null)}>
+        {batchesItem && <BatchList item={batchesItem} manage={canManageEquipment(role)} onChanged={refresh} />}
+      </ActionDialog>
+      <ActionDialog title={`Suggest threshold · ${suggestingItem?.name ?? 'medicine'}`} isOpen={suggestingItem != null} onClose={() => setSuggestingItem(null)}>
+        {suggestingItem && <ReorderSuggestionPanel item={suggestingItem} onClose={() => setSuggestingItem(null)} onChanged={refresh} />}
+      </ActionDialog>
     </>
   );
 }
@@ -200,6 +220,8 @@ function ItemTable({
   onRetry,
   selectedId,
   onSelect,
+  onOpenBatches,
+  onSuggest,
   role,
   onChanged,
 }: {
@@ -209,6 +231,8 @@ function ItemTable({
   onRetry: () => void;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onOpenBatches: (item: PharmacyItem) => void;
+  onSuggest: (item: PharmacyItem) => void;
   role: PrincipalRole | undefined;
   onChanged: () => void;
 }) {
@@ -250,6 +274,8 @@ function ItemTable({
             item={item}
             selectedId={selectedId}
             onSelect={onSelect}
+            onOpenBatches={onOpenBatches}
+            onSuggest={onSuggest}
             role={role}
             onChanged={onChanged}
           />
@@ -264,21 +290,22 @@ function ItemRows({
   item,
   selectedId,
   onSelect,
+  onOpenBatches,
+  onSuggest,
   role,
   onChanged,
 }: {
   item: PharmacyItem;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onOpenBatches: (item: PharmacyItem) => void;
+  onSuggest: (item: PharmacyItem) => void;
   role: PrincipalRole | undefined;
   onChanged: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [suggesting, setSuggesting] = useState(false);
   const manage = canManageEquipment(role);
 
   return (
-    <>
       <tr className={selectedId === item.id ? 'selected' : undefined}>
         <td>
           <button type="button" className="linklike" onClick={() => onSelect(item.id)}>
@@ -289,10 +316,9 @@ function ItemRows({
             <button
               type="button"
               className="linklike small"
-              aria-expanded={open}
-              onClick={() => setOpen((current) => !current)}
+              onClick={() => onOpenBatches(item)}
             >
-              {open ? '▾' : '▸'} {item.batch_count} {item.batch_count === 1 ? 'batch' : 'batches'}
+              View {item.batch_count} {item.batch_count === 1 ? 'batch' : 'batches'}
             </button>
           )}
         </td>
@@ -310,33 +336,12 @@ function ItemRows({
         {manage && (
           <td>
             <MoveStockButton item={item} onChanged={onChanged} />{' '}
-            <button type="button" className="secondary" onClick={() => setSuggesting(true)}>
+            <button type="button" className="secondary" onClick={() => onSuggest(item)}>
               Suggest threshold
             </button>
           </td>
         )}
       </tr>
-
-      {open && (
-        <tr>
-          <td colSpan={manage ? 6 : 5}>
-            <BatchList item={item} manage={manage} onChanged={onChanged} />
-          </td>
-        </tr>
-      )}
-
-      {suggesting && (
-        <tr className="drawer">
-          <td colSpan={manage ? 6 : 5}>
-            <ReorderSuggestionPanel
-              item={item}
-              onClose={() => setSuggesting(false)}
-              onChanged={onChanged}
-            />
-          </td>
-        </tr>
-      )}
-    </>
   );
 }
 

@@ -10,6 +10,7 @@ import {
 import type { GenderPolicy, Ward, WardType } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
 import { canCreateWard } from '../types/permissions';
+import { ActionDialog } from '../components/ui/action-dialog';
 import {
   genderPolicies,
   genderPolicyLabels,
@@ -24,6 +25,7 @@ export function WardsPage() {
 
   const [wardType, setWardType] = useState<WardType | ''>('');
   const [isActive, setIsActive] = useState(true);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const wards = useQuery(
     listWardsOptions({ query: { ...(wardType ? { wardType } : {}), isActive } }),
@@ -81,10 +83,15 @@ export function WardsPage() {
       </div>
 
       {canCreateWard(session?.principal.role) && (
-        <CreateWardCard
-          isPending={create.isPending}
-          onCreate={(body, done) => create.mutate({ body }, { onSuccess: done })}
-        />
+        <>
+          <button type="button" onClick={() => setCreateOpen(true)}>Add ward</button>
+          <ActionDialog title="Add ward" isOpen={createOpen} onClose={() => setCreateOpen(false)}>
+            {createOpen && <CreateWardCard
+              isPending={create.isPending}
+              onCreate={(body, done) => create.mutate({ body }, { onSuccess: () => { done(); setCreateOpen(false); } })}
+            />}
+          </ActionDialog>
+        </>
       )}
 
       <div className="card">

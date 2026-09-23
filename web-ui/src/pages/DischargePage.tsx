@@ -1,5 +1,5 @@
 import { Table } from '../components/Table';
-import { Fragment, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -10,6 +10,7 @@ import {
 } from '../services/api/generated/@tanstack/react-query.gen';
 import type { ChecklistItem, DischargeCandidate } from '../services/api/generated';
 import { BillPanel } from '../components/BillPanel';
+import { ActionDialog } from '../components/ui/action-dialog';
 import { useSession } from '../services/auth/useSession';
 import {
   canConfirmDischarge,
@@ -110,7 +111,6 @@ export function DischargePage() {
                     onSelect={() =>
                       setSelectedId(row.admission_id === selectedId ? null : row.admission_id)
                     }
-                    onClose={() => setSelectedId(null)}
                   />
                 ))}
               </tbody>
@@ -157,7 +157,6 @@ export function DischargePage() {
                     onSelect={() =>
                       setSelectedId(row.admission_id === selectedId ? null : row.admission_id)
                     }
-                    onClose={() => setSelectedId(null)}
                   />
                 ))}
               </tbody>
@@ -165,6 +164,9 @@ export function DischargePage() {
           )}
         </div>
       )}
+      <ActionDialog title={`Discharge · ${all.find((row) => row.admission_id === selectedId)?.patient.full_name ?? 'patient'}`} isOpen={selectedId != null} onClose={() => setSelectedId(null)}>
+        {selectedId && <DischargeDetail admissionId={selectedId} onClose={() => setSelectedId(null)} onDischarged={() => setSelectedId(null)} />}
+      </ActionDialog>
     </>
   );
 }
@@ -173,17 +175,14 @@ function CandidateRow({
   row,
   selected,
   onSelect,
-  onClose,
 }: {
   row: DischargeCandidate;
   selected: boolean;
   onSelect: () => void;
-  onClose: () => void;
 }) {
   const outstanding = row.outstanding_items;
 
   return (
-    <Fragment>
       <tr className={selected ? 'open' : undefined}>
         <td>
           <strong>{row.patient.full_name}</strong>
@@ -219,18 +218,6 @@ function CandidateRow({
         </td>
       </tr>
 
-      {selected && (
-        <tr className="drawer">
-          <td colSpan={6}>
-            <DischargeDetail
-              admissionId={row.admission_id}
-              onClose={onClose}
-              onDischarged={onClose}
-            />
-          </td>
-        </tr>
-      )}
-    </Fragment>
   );
 }
 

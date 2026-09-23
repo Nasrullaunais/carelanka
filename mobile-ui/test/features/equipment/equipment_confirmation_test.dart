@@ -129,6 +129,18 @@ void main() {
       await tester.tap(find.text('Confirm'));
       await tester.pumpAndSettle();
 
+      expect(find.text('Confirm Ventilator?'), findsOneWidget);
+      expect(service.confirmed, isEmpty);
+
+      await tester.tap(find.text('Review again'));
+      await tester.pumpAndSettle();
+      expect(service.confirmed, isEmpty);
+
+      await tester.tap(find.text('Confirm'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirm equipment'));
+      await tester.pumpAndSettle();
+
       expect(service.confirmed, ['item-1']);
       expect(find.text('Ventilator confirmed. It now shows on the web dashboard.'), findsOneWidget);
       expect(find.text('Nothing to confirm'), findsOneWidget);

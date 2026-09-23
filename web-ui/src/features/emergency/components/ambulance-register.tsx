@@ -20,6 +20,7 @@ import { ambulanceStatusLabels, ambulanceStatusTones } from '../domain';
 import { invalidateEmergencyQueries } from '../query-invalidation';
 import { AmbulanceDialog } from './ambulance-dialog';
 import { CrewManagement } from './crew-management';
+import { ActionDialog } from '../../../components/ui/action-dialog';
 
 type DialogState = { kind: 'create' } | { kind: 'edit'; ambulance: AmbulanceDetail };
 type ConfirmAction = { kind: 'retire' | 'reinstate'; ambulance: AmbulanceSummary };
@@ -78,7 +79,9 @@ export function AmbulanceRegister() {
           {(data) => <DataTable ariaLabel="Ambulance register" rows={data.items} columns={columns} rowKey={(row) => row.id} rowText={(row) => row.registration_number} pagination={{ page, totalPages: data.total_pages, onPageChange: setPage }} />}
         </QueryState>
       </CardContent></Card>
-      {crewAmbulance && <CrewManagement ambulanceId={crewAmbulance.id} registrationNumber={crewAmbulance.registration_number} />}
+      <ActionDialog title={`Manage crew · ${crewAmbulance?.registration_number ?? ''}`} isOpen={crewAmbulance != null} onClose={() => setCrewAmbulance(undefined)}>
+        {crewAmbulance && <CrewManagement ambulanceId={crewAmbulance.id} registrationNumber={crewAmbulance.registration_number} />}
+      </ActionDialog>
       <AmbulanceDialog
         isOpen={dialog != null}
         ambulance={dialog?.kind === 'edit' ? dialog.ambulance : undefined}

@@ -1,5 +1,5 @@
 import { Table } from '../components/Table';
-import { Fragment, useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   getWardCapacityOptions,
@@ -10,6 +10,7 @@ import { useSession } from '../services/auth/useSession';
 import { canReadCapacity } from '../types/permissions';
 import { admissionCategoryLabels } from '../types/patients';
 import { genderPolicyLabels, wardTypeLabels } from '../types/wards';
+import { ActionDialog } from '../components/ui/action-dialog';
 
 export function CapacityPage() {
   const session = useSession();
@@ -112,8 +113,7 @@ export function CapacityPage() {
                 </thead>
                 <tbody>
                   {wards.map((ward) => (
-                    <Fragment key={ward.ward_id}>
-                      <tr className={selected?.ward_id === ward.ward_id ? 'open' : undefined}>
+                    <tr key={ward.ward_id} className={selected?.ward_id === ward.ward_id ? 'open' : undefined}>
                         <td>
                           <strong>{ward.name}</strong>
                         </td>
@@ -141,19 +141,10 @@ export function CapacityPage() {
                               )
                             }
                           >
-                            {selected?.ward_id === ward.ward_id ? 'Hide' : 'Details'}
+                            {selected?.ward_id === ward.ward_id ? 'Close' : 'View beds'}
                           </button>
                         </td>
-                      </tr>
-
-                      {selected?.ward_id === ward.ward_id && (
-                        <tr className="drawer">
-                          <td colSpan={7}>
-                            <WardOccupancyPanel ward={ward} onClose={() => setSelected(null)} />
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
+                    </tr>
                   ))}
                 </tbody>
               </Table>
@@ -163,6 +154,9 @@ export function CapacityPage() {
               A ward with no beds is not an error. Beds are registered by Equipment, and a ward
               exists before any beds are added to it.
             </p>
+            <ActionDialog title={`${selected?.name ?? 'Ward'} beds`} isOpen={selected != null} onClose={() => setSelected(null)}>
+              {selected && <WardOccupancyPanel ward={selected} onClose={() => setSelected(null)} />}
+            </ActionDialog>
           </div>
         </>
       )}

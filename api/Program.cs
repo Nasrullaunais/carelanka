@@ -465,6 +465,7 @@ builder.Services.AddScoped<IDischargeService, DischargeService>();
 builder.Services.AddScoped<IBillingService, BillingService>();
 builder.Services.AddScoped<IBillingRateService, BillingRateService>();
 builder.Services.AddScoped<IMeService, MeService>();
+builder.Services.AddScoped<ISkillService, SkillService>();
 
 builder.Services.AddScoped<IBedRegistryService, BedRegistryService>();
 

@@ -1,7 +1,7 @@
 # Patient Management - Component Design
 
 **CareLanka Hospital Management System · SE3090 Assignment 1**
-**Owner:** Member 4 · **Status:** built through step 9b; both agents redesigned and not yet built · **Version:** 0.2 (2026-09-16)
+**Owner:** Member 4 · **Status:** fully built (steps 1–16 of `docs/build/patient.md`); the bed suggestion agent (§8.1–§8.9) was built, then removed 2026-09-22 in favour of the Patient Care Advisory agent (§8.10 onward), which is live · **Version:** 0.3 (2026-09-22)
 
 This is the design document for the Patient Management component. It explains what the component does, what data it owns, how it talks to the other three components, and how its AI agent works.
 
@@ -38,7 +38,7 @@ It answers five questions:
 | The bed register itself — adding beds, repairs, taking them out of service | Equipment Management (Member 3). We read it; see §3.1. |
 | Doctor calendars, time slots, availability search | Out of scope — see §11. Simple booking (patient picks a date) **is** in scope. |
 
-> **The line we do not cross:** the AI never decides *what care a patient needs*. The bed agent only *suggests where to physically put them*, given a care level a human already chose — and since 2026-09-16 it cannot even do that much on its own, because it holds no write tool at all (§8.1–§8.9). The care advisory agent only *drafts a note for a nurse or doctor to check* (§8.10 onward) — it never reaches the patient on its own. Both agents stop at the same wall; they just stand on either side of a human.
+> **The line we do not cross:** the AI never decides *what care a patient needs*. The bed suggestion agent only ever *suggested where to physically put them*, given a care level a human already chose — and from 2026-09-16 until its removal on 2026-09-22 it could not even do that much on its own, because it held no write tool at all (§8.1–§8.9, now historical). The care advisory agent — the one still live — only *drafts a note for a nurse or doctor to check* (§8.10 onward); it never reaches the patient on its own. Both agents stopped at the same wall; they just stood on either side of a human.
 
 ---
 
@@ -46,7 +46,7 @@ It answers five questions:
 
 | Role | App | What they can do here |
 | :--- | :--- | :--- |
-| **Ward Nurse** | React | Register patients, admit, complete missing details, update status, place a patient in a normal-ward bed (by hand or by confirming an agent suggestion), maintain the medical profile, tick discharge checklist items, request discharge, and review/edit/approve/reject a care advisory draft (§8.16). *(Reversed 2026-09-21 — was Flutter. Patient Management has no staff-facing screen on mobile: reception, the ward nurse, the duty manager and the administrator all work through the web app, full stop. The `NurseWorklistScreen`, its bed-suggestion screen and its medical-profile editor were removed from `mobile-ui/` the same day; §10 below no longer lists a nurse table.)* |
+| **Ward Nurse** | React | Register patients, admit, complete missing details, update status, place a patient in a normal-ward bed by hand, maintain the medical profile, tick discharge checklist items, request discharge, and review/edit/approve/reject a care advisory draft (§8.16). *(Reversed 2026-09-21 — was Flutter. Patient Management has no staff-facing screen on mobile: reception, the ward nurse, the duty manager and the administrator all work through the web app, full stop. The `NurseWorklistScreen`, its bed-suggestion screen and its medical-profile editor were removed from `mobile-ui/` the same day; §10 below no longer lists a nurse table. The bed-suggestion screen was removed a second time, along with the agent behind it, on 2026-09-22 — by then it only existed in React anyway.)* |
 | **Duty / Dispatch Manager** | React | Everything a nurse can do, plus approve ICU/HDU beds, approve downgrades, confirm ICU discharges, cancel admissions, view all wards |
 | **Hospital Administrator** | React | Manage the ward register (create and deactivate wards). Beds belong to Equipment. Read-only on patients. May settle a bill, though reception usually does. |
 | **General Staff (reception)** | React | The front desk. Register patients and open an admission, read the patient register and the ward board, and **settle bills** — the only role whose day is mostly money. *Added 2026-09-11.* |
@@ -383,19 +383,21 @@ Mixing these into one field means every piece of code has to work out which one 
 
 ## 5. The bed assignment workflow
 
-### 5.1 How a bed gets assigned — three paths
+### 5.1 How a bed gets assigned — one path
 
-*(Rewritten 2026-09-16 to match §8.6b — the three paths are now three ways of reaching **one** write.)*
+*(Rewritten 2026-09-16 to route two agent-assisted paths and one manual path through **one**
+write. Rewritten again 2026-09-22: the agent-assisted paths are gone with the agent — see
+§8's banner. What is below is history of how this section evolved, not three live options.)*
 
-| Path | Who decides | When it's used |
+| Path | Who decides | Status |
 | :--- | :--- | :--- |
-| Agent suggests → human presses the button on its top pick | Agent + nurse/manager | The normal path, and the demo |
-| Agent suggests → human presses the button on an **alternative** | Human | The agent's ranking was fine, the nurse knows something it doesn't |
-| Human assigns directly, no agent at all | Nurse, manager or reception | AI service is down, agent was blocked, or it's obvious |
+| ~~Agent suggests → human presses the button on its top pick~~ | ~~Agent + nurse/manager~~ | **Removed 2026-09-22** |
+| ~~Agent suggests → human presses the button on an alternative~~ | ~~Human~~ | **Removed 2026-09-22** |
+| Human assigns directly, no agent | Nurse, manager or reception | **The only path** |
 
-**All three end at the same endpoint.** `POST /admissions/{id}/assign-bed` writes the `BedAssignment`, runs H0–H6 under a row lock, checks the role, and records `assigned_by` — `agent` when a `workflow_id` came with the request, `user` when it did not. There is no second write path and no agent-only endpoint.
+**Every assignment goes through the same endpoint.** `POST /admissions/{id}/assign-bed` writes the `BedAssignment`, runs H0–H6 under a row lock, and checks the role. It no longer records who or what proposed the bed — the `assigned_by` (`agent`/`user`) and `workflow_id` columns existed only to distinguish an agent-confirmed write from a manual one, so `Patient_RemoveBedAgentWorkflowLink` (2026-09-22) dropped both along with the agent. `ApprovedByStaffMemberId` — which staff member actually assigned it — is untouched; that was never the agent-vs-human flag, and it still answers "who did this" on every row.
 
-**The manual path must always work** — if the only way to admit a patient is through the AI, the hospital stops when the AI stops. Since 2026-09-16 that is structural rather than a promise: the manual path is the *only* path, and the agent is a way of filling in the form.
+**The manual path must always work** — if the only way to admit a patient is through the AI, the hospital stops when the AI stops. As of 2026-09-22 that is no longer a design constraint being satisfied, it is simply the only path there is: the agent that used to fill in the form is gone, and the form is filled in by hand.
 
 ### 5.2 Who is allowed to approve
 
@@ -420,7 +422,7 @@ So the gate moved to where the decision actually is: **the mismatch.** A step do
 
 ### 5.3 The hold, and why it expires
 
-When a bed is assigned — by hand or by confirming a suggestion — it is marked `reserved` with a `reserved_until` timestamp:
+When a bed is assigned by hand, it is marked `reserved` with a `reserved_until` timestamp:
 
 ```
 reserved_until = max(expected_arrival, now) + 30 minutes
@@ -760,18 +762,26 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 
 Creating, retiring and taking beds out of service are **Equipment's endpoints, not ours** (`integration_of_functions.md` §6.1).
 
-### 7.4 Bed assignment and the agent
+### 7.4 Bed assignment
 
-*(Rewritten 2026-09-16 — two routes added, two withdrawn. §8.6b is the reasoning.)*
+*(Rewritten 2026-09-16 for the agent-assisted design — two routes added, two withdrawn.
+**Rewritten again 2026-09-22: the agent and its two routes are gone.** What is below is the
+live table today; the row history is kept underneath it rather than deleted, same as §8's
+banner.)*
 
 | Method | Route | Role | Notes |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/bed-suggestions` | Nurse, Manager | **Agent entry point.** Body carries **either** `admission_id` **or** `patient_identifier` (an NIC or a patient code — §8.2). Starts the workflow, returns a `workflow_id`. Replaces `POST /api/admissions/{id}/bed-suggestion`, which could only ever be reached from a record already on the board |
-| `GET` | `/api/bed-workflows/{workflowId}` | Nurse, Manager | Plan, steps, tool calls, timings, validation results, the patient, the suggested bed, the alternatives, the blocker, status |
-| `POST` | `/api/admissions/{id}/assign-bed` | Nurse, Manager | **The only way a bed is ever claimed** — by hand or by confirming an agent suggestion. **Built** (step 6). *(Rev 2026-09-16)* Takes an optional `workflow_id`; when present the resulting `BedAssignment` is stamped `assigned_by = agent`. Nurse for a matching bed; ICU, HDU and any downgrade are the manager's, refused with `cl_pat_012` / `cl_pat_013` |
-| ~~`POST`~~ | ~~`/api/bed-assignments/{id}/approve`~~ | — | **Withdrawn 2026-09-16, never built.** The agent no longer writes a proposal, so there is nothing to approve afterwards — pressing "Use this bed" *is* the approval, and it runs the manual path above with all its checks. §8.6b |
-| ~~`POST`~~ | ~~`/api/bed-assignments/{id}/reject`~~ | — | **Withdrawn 2026-09-16, never built.** Rejecting a suggestion is closing the panel. Nothing was held, so nothing is released |
+| `POST` | `/api/admissions/{id}/assign-bed` | Nurse, Manager | **The only way a bed is ever claimed.** **Built** (step 6). Nurse for a matching bed; ICU, HDU and any downgrade are the manager's, refused with `cl_pat_012` / `cl_pat_013`. No longer takes a `workflow_id` and no longer stamps `assigned_by` — `Patient_RemoveBedAgentWorkflowLink` (2026-09-22) dropped both, see below |
 | `POST` | `/api/admissions/{id}/correct-bed` | Nurse, Manager | **A bed chosen by mistake, swapped for the right one.** *(Added 2026-09-11.)* Same permission and the same hard rules as assigning one. The old assignment closes as `corrected` and **bills nothing**; status and `occupied_at` carry over, so the stay is still priced from when the patient actually got into a bed. Not a ward transfer — a real move must charge the nights actually spent, and that path does not exist yet. `cl_pat_028` when they hold no bed, `cl_pat_029` when it is the bed they are already in. |
+
+**Removed 2026-09-22, historical only — do not build against these:**
+
+| Method | Route | Notes |
+| :--- | :--- | :--- |
+| ~~`POST`~~ | ~~`/api/bed-suggestions`~~ | **Agent entry point, removed with the agent.** Body carried **either** `admission_id` **or** `patient_identifier` (an NIC or a patient code — §8.2, historical). Started the workflow, returned a `workflow_id` |
+| ~~`GET`~~ | ~~`/api/bed-workflows/{workflowId}`~~ | Plan, steps, tool calls, timings, validation results, the patient, the suggested bed, the alternatives, the blocker, status — all removed with the agent |
+| ~~`POST`~~ | ~~`/api/bed-assignments/{id}/approve`~~ | **Withdrawn 2026-09-16, never built even before the removal.** The agent never wrote a proposal to approve — pressing "Use this bed" *was* the approval, running the same manual path above. §8.6b (historical) |
+| ~~`POST`~~ | ~~`/api/bed-assignments/{id}/reject`~~ | **Withdrawn 2026-09-16, never built.** Rejecting a suggestion was closing the panel. Nothing was held, so nothing needed releasing |
 
 ### 7.5 Discharge
 
@@ -856,7 +866,7 @@ Appointment bills are **not** exposed here. A `Bill` carries either an `admissio
 | Method | Route | Role | Notes |
 | :--- | :--- | :--- | :--- |
 | `POST` | `/api/me/care-queries` | Patient, **while admitted** | **Agent entry point.** Describe how you feel, in your own words. Starts the workflow, returns a `workflow_id`. *(Rev 2026-09-16)* **409 `cl_pat_038` when the caller has no open admission** — §8.10b |
-| `GET` | `/api/care-workflows/{workflowId}` | Nurse, Doctor, Manager | Plan, steps, the keyword screen result, what the agent read, validation, status — same shape as `/api/bed-workflows/{workflowId}` in §7.4 |
+| `GET` | `/api/care-workflows/{workflowId}` | Nurse, Doctor, Manager | Plan, steps, the keyword screen result, what the agent read, validation, status — the same shape `/api/bed-workflows/{workflowId}` used to publish, back when that route existed (§7.4, historical) |
 | `GET` | `/api/care-recommendations` | Nurse, Doctor, Manager | Review queue. Filter by `status`. Paginated, sortable. |
 | `GET` | `/api/care-recommendations/{id}` | Nurse, Doctor, Manager | Full detail: the patient's text, the agent's draft, the red-flag flag, the medical profile and history the agent read |
 | `POST` | `/api/care-recommendations/{id}/approve` | **Doctor or Nurse** | **High-impact gate.** Optionally edits the message before it becomes visible to the patient. *(Rev 2026-09-16 — widened from Doctor-only, §8.16)* |
@@ -867,25 +877,40 @@ Approve and reject are open to **a Doctor or a Ward Nurse** — checked from the
 
 **`clinical_clearance` on the discharge checklist (§6.1) did not move and is still Doctor-only.** Letting somebody leave the hospital and telling somebody a nurse will look in on them are not the same weight of decision.
 
-### 7.8 Reports
+### 7.8 Reports — designed, **not yet built**
+
+**None of the three routes below exist in `api/Controllers/Patient/` today.** This section is
+the plan, not the contract — `patient-spec.yaml` does not publish them either. `docs/build/patient.md`
+and `CLAUDE.md`'s Patient row both list "the reports" under what's left.
 
 | Method | Route | Role | Notes |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/reports/occupancy` | Manager, Admin | Bed occupancy over a date range, by ward |
 | `GET` | `/api/reports/length-of-stay` | Manager, Admin | Average stay by category and ward |
-| `GET` | `/api/reports/patient/agent-performance` | Manager | Approved vs rejected vs overridden agent proposals, and average time to approval |
+| `GET` | `/api/reports/patient/agent-performance` | Manager | Approved vs rejected vs overridden agent proposals, and average time to approval — written with the bed agent in mind; whether it still makes sense now that Patient Management runs one agent instead of two is an open question, not a rewrite made here |
 
-That last one is the agent's own observability, which the assignment explicitly asks for.
+That last one was meant as the agent's own observability, which the assignment explicitly asks for.
 
 ---
 
 ## 8. The AI agents
 
-This component runs **two** agents, not one. §8.1–§8.9 is the first — the **Bed & Patient Details Agent**. §8.10 onward is the second — **Patient Care Advisory**, added on the lecturer's direction during topic finalization: a component called Patient Management whose only AI behaviour is picking a bed does not read as patient-facing. Both agents hold the same line — neither ever makes a clinical call alone — they just stand on either side of a human doing it.
+> **Removed from the running system 2026-09-22.** §8.1–§8.9 below describes the **Bed & Patient
+> Details Agent** as it was built and later redesigned — none of it is live code any more. Bed
+> placement is `POST /admissions/{id}/assign-bed`, manual only, same endpoint it always was.
+> **Left in place rather than deleted or rewritten**, because §8.4–§8.9 is cited by name as the
+> worked "gather → filter → rank → propose → validate → human gate → execute" template from
+> `emergency-management-plan.md`, `equipment-management-plan.md`, `ai-orchestration-workflow.md`,
+> `docs/ADR.md` and `CLAUDE.md` — removing it here would break a reference the rest of the group's
+> agent designs still point to. Read it as design history and as that template, not as a
+> description of what `api/` currently does. §8.10 onward — **Patient Care Advisory** — is current
+> and live.
+
+This component ran **two** agents, not one. §8.1–§8.9 was the first — the **Bed & Patient Details Agent**. §8.10 onward is the second — **Patient Care Advisory**, added on the lecturer's direction during topic finalization: a component called Patient Management whose only AI behaviour is picking a bed does not read as patient-facing. Both agents held the same line — neither ever makes a clinical call alone — they just stand on either side of a human doing it.
 
 **Both agents were redesigned on 2026-09-16, after the rest of the component was built and tested.** What changed, and why, is recorded per section below. The short version: the bed agent no longer writes anything at all, and the care agent now reads a real medical profile instead of pretending demographics were enough.
 
-> **Naming note.** The agent's *display* name is now "Bed & Patient Details Agent". The `AgentType` enum value stays `patient_admission_bed`, because that enum lives in `common-spec.yaml` and is group-owned — renaming it is a five-spec change for no behavioural gain (`CLAUDE.md`, shared-type rule).
+> **Naming note (historical).** While this agent was live, its *display* name was "Bed & Patient Details Agent" and it held its own `AgentType` enum value, `patient_admission_bed`. The 2026-09-22 removal deleted that value from `AgentType` — it was Patient's own entry in a group-owned enum, so removing it did not touch `DispatchRouting`, `StaffAllocation` or `EquipmentMonitoring`. `PatientCareAdvisory` is the only Patient-owned value left.
 
 ### 8.1 Responsibility
 
@@ -1443,15 +1468,18 @@ Steps 1, 3 and 6 are the safety net, and none of them involves the LLM — the s
 
 Same fields as §8.8: workflow id, objective, plan, completed steps, tool calls with inputs/outputs/timings, validation results, errors and retries, approval status, final outcome. Links to `CareRecommendation` the same way `AgentWorkflow` links to `BedAssignment` — via `(EntityType, EntityId)`, per `entity_diagram.md`'s `AgentWorkflow` note. No new shared table, no new column on `AgentWorkflow` or `AgentProposedChange`.
 
-### 8.20 What both agents still need
+### 8.20 What the surviving agent needs
 
-**`AgentWorkflow` and `AgentProposedChange` exist** *(built by the group in PR #80, 2026-09-20 — tables `agent_workflows` and `agent_proposed_changes`, migration `Common_AddAgentWorkflows`)*. `BedAssignment.workflow_id` had been a column pointing at a missing table since step 2; it is now a real foreign key, added in `Patient_LinkBedAssignmentWorkflow`.
+*(Written for both agents while both existed; corrected 2026-09-22 to describe only what
+Patient Care Advisory — the one still running — actually uses today.)*
 
-**Only the tables landed.** The common `/api/workflows` endpoints in `common-spec.yaml` — list, read, approve, reject, request revision — are still unbuilt. The bed agent does not need them: `patient-spec.yaml` publishes its own `GET /bed-workflows/{workflowId}`, and §8.6b removed the approval endpoint entirely.
+**`AgentWorkflow` and `AgentProposedChange` exist** *(built by the group in PR #80, 2026-09-20 — tables `agent_workflows` and `agent_proposed_changes`, migration `Common_AddAgentWorkflows`)*. The care advisory agent writes `CareRecommendation.WorkflowId` onto them. **`BedAssignment.WorkflowId` also briefly pointed here** — added in `Patient_LinkBedAssignmentWorkflow` to link a bed assignment back to the bed-suggestion-agent run that proposed it — but that column was the removed agent's own, and `Patient_RemoveBedAgentWorkflowLink` (2026-09-22) dropped it along with the agent. `BedAssignment` carries no workflow link of any kind now.
 
-**Nothing here is stubbed any more.** `ILanguageModel` and `GeminiLanguageModel` are built in `api/Agents/` exactly as ADR 2 describes, and `GeminiBedRationaleWriter` writes the one sentence shown under a suggested bed. With no key configured the API starts normally and `NoLanguageModel` is registered instead, so `DeterministicBedRationaleWriter` composes the sentence from the same facts the ranking used — which is also what happens when a key is dead, a quota is spent or the call times out. The model's polish is the only thing at risk; the suggestion is not.
+**Only the tables landed.** The common `/api/workflows` endpoints in `common-spec.yaml` — list, read, approve, reject, request revision — are still unbuilt. The care advisory agent does not need them: `patient-spec.yaml` publishes its own `GET /care-workflows/{workflowId}` (§7.7).
 
-**The run is asynchronous, as the contract always said.** `POST /bed-suggestions` persists the plan, hands the workflow id to an in-process queue and answers 202 with `status: running`; `BedAgentWorker` runs it in its own scope and writes the result onto the row. One case does not queue: a lookup that matched no patient, or a patient with no open visit, is a single read and no model call, so it is settled before the 202 and comes back `completed`.
+**`ILanguageModel` and `GeminiLanguageModel` are built in `api/Agents/` exactly as ADR 2 describes**, and `GeminiCareAdvisor` drafts the reply a doctor or nurse reviews. With no key configured the API starts normally and `NoLanguageModel` is registered instead, so `DeterministicCareAdvisor` composes a fixed backup sentence — which is also what happens when a key is dead, a quota is spent or the call times out. *(The bed agent had the equivalent pair, `GeminiBedRationaleWriter` / `DeterministicBedRationaleWriter` — both removed with it on 2026-09-22.)*
+
+**The run is asynchronous, as the contract always said.** `POST /me/care-queries` persists the plan, hands the workflow id to `CareRunQueue` and answers 202 with `status: running`; `CareAgentWorker` runs it in its own scope and writes the result onto the row. *(`POST /bed-suggestions` used to work the same way through `BedAgentWorker` — both gone with the agent.)*
 
 ---
 
@@ -1459,15 +1487,20 @@ Same fields as §8.8: workflow id, objective, plan, completed steps, tool calls 
 
 | Screen | Contents |
 | :--- | :--- |
-| **Bed board** | Live grid of every ward and bed, colour-coded free / reserved / occupied / out-of-service. The centrepiece. |
-| **Bed suggestion panel** | *(Rewritten 2026-09-16 — it was an "approvals queue" over `awaiting_approval`, and that status is no longer used; §8.6b.)* Opened from a row on the patients board, or from the desk by typing an NIC or patient code. Shows **who the patient is** and **one bed**, with the agent's reason and the sentences behind its score underneath it. *(Rewritten 2026-09-20 — it used to list every alternative straight away, which made it a second copy of the bed board.)* **"Choose another bed" reveals every alternative**, each still its own row with its own "Use this bed" button. A blocked run shows `blocker.message` in plain words and offers manual assignment instead. **This is the demo screen.** |
+| **Bed board** | Live grid of every ward and bed, colour-coded free / reserved / occupied / out-of-service. The centrepiece. `PatientsPage` — assign or correct a bed by hand from a row on the board. |
 | **Admissions list** | Search, filter by status/ward/category, sort, paginate |
 | **Admission detail** | Timeline of every status change, every bed assignment, every agent run and human decision |
 | **Discharge review** | Flagged candidates, checklist state, confirm |
 | **Ward & bed admin** | Create wards, add beds, mark out of service |
-| **Care recommendation queue** *(Doctor, Ward Nurse)* | Everything in `pending_review`. Patient's own text, the agent's draft, `red_flag`/`urgency_flag`, and **the medical profile and history the agent read**, so the reviewer can see what it was working from. Approve (with optional edit) / Reject with reason. The second demo screen — the human gate for §8.10. |
+| **Care recommendation queue** *(Doctor, Ward Nurse)* | Everything in `pending_review`. Patient's own text, the agent's draft, `red_flag`/`urgency_flag`, and **the medical profile and history the agent read**, so the reviewer can see what it was working from. Approve (with optional edit) / Reject with reason. **This is the agent demo screen** — `CareRecommendationsPage`, the human gate for §8.10. |
 | **Medical profile editor** | *(New 2026-09-16.)* Four free-text boxes on the patient detail page — conditions, allergies, current symptoms, recent situation — with who last wrote it and when. Nurse and Doctor only; reception and the billing desk do not see the control at all |
-| **Reports** | Occupancy chart, length of stay, agent performance |
+| **Reports** *(designed, not built — §7.8)* | Occupancy chart, length of stay, agent performance |
+
+**Removed 2026-09-22, historical only:** a **Bed suggestion panel** used to sit here — opened
+from a row on the patients board or by typing an NIC or patient code, showing who the patient
+was and a ranked bed with the agent's reasoning underneath. It was the bed agent's own UI and
+went with it; `BedCandidateTable` (the ranked-list component it used) survives only because
+the manual bed board also uses it to show alternatives when correcting a bed.
 
 Protected routes by role, loading / empty / success / error states throughout. The care recommendation queue's approve/reject actions render for `Doctor` and `WardNurse` and are **hidden, not merely disabled**, for anyone else, per the approval-gating rule in `CLAUDE.md`. A Duty Manager can see the queue exists — it is not a secret workflow — and cannot act on it.
 
@@ -1623,16 +1656,20 @@ This matches the group plan, which already states that Emergency and Staff read 
 
 | Layer | Tests |
 | :--- | :--- |
-| **Unit** | The state machine — every legal transition passes, every illegal one throws. The hard-rule validator — one test per rule H0–H6. The blocker-sentence builder — one test per `blocker.code` in §8.6. The care-advisory validator — one test per rule CR1–CR5, plus the red-flag keyword screen. |
+| **Unit** | The state machine — every legal transition passes, every illegal one throws. The hard-rule validator — one test per rule H0–H6. The care-advisory validator — one test per rule CR1–CR5, plus the red-flag keyword screen. *(There used to be a row here for the bed agent's blocker-sentence builder, one test per `blocker.code` in §8.6 — removed with `BedBlockers`/`BedSuggestionValidator` on 2026-09-22.)* |
 | **Service** | Hold expiry, downgrade ladder, duplicate NIC prevention, `details_complete` recalculation, medical-profile create-or-replace (writing twice makes one row, not two) |
-| **Controller** | Auth on every endpoint; a nurse gets 403 assigning an ICU bed; a patient gets 403 reading someone else's admission; reception gets 403 writing a medical profile; a patient with no open admission gets 409 `cl_pat_038` on `/me/care-queries` |
-| **Database** | Migrations run clean; `UNIQUE(ward_id, bed_number)` holds; `UNIQUE(patient_id)` on the profile holds under two concurrent writes; **the concurrent-assignment test** — two confirmations of the same suggested bed, one wins, one gets 409 |
-| **React** | The suggestion panel renders the patient, the best bed and every alternative; "Use this bed" calls `assign-bed` with the `workflow_id`; a blocked outcome renders `blocker.message` and offers manual assignment instead; error state on 409; protected routes redirect; the care recommendation queue renders approve/reject for `Doctor` **and** `WardNurse` and for nobody else |
+| **Controller** | Auth on every endpoint; a nurse gets 403 assigning an ICU bed; a patient gets 403 reading someone else's admission; reception gets 403 writing a medical profile; a patient with no open admission gets 409 `cl_pat_038` on `/me/care-queries`. `BedAssignmentEndpointTests`/`BedEndpointTests` cover the manual assign/correct/availability/occupancy routes end to end |
+| **Database** | Migrations run clean; `UNIQUE(ward_id, bed_number)` holds; `UNIQUE(patient_id)` on the profile holds under two concurrent writes; **the concurrent-assignment test** — two nurses assigning the same bed at once, one wins, one gets 409 *(used to be phrased as "two confirmations of the same suggested bed" — same index, same test, just no agent suggesting it any more)* |
+| **React** | Manual bed assignment: `AssignBedPanel` renders free candidates from `BedCandidateTable`, "Assign"/"Correct" calls `assign-bed`/`correct-bed`, error state on 409, protected routes redirect; the care recommendation queue renders approve/reject for `Doctor` **and** `WardNurse` and for nobody else. *(A suggestion-panel row describing an agent-driven flow with a `workflow_id` used to be here — that panel and the field it tested were both removed 2026-09-22.)* |
 | **Flutter** | Registration form validation; notification fires on bed assignment and on discharge; date picker sets `expected_arrival`; secure token storage; patient sees only their own data; **the "how are you feeling" card only renders inside My Stay, and only while admitted**; a patient never receives `agent_message` or `rejection_reason` over the wire, checked at the DTO level not just the UI |
-| **Agent** | Golden cases — see below, for both agents |
-| **End to end** | Nurse types an NIC into the web app → agent returns the patient and a bed → nurse presses one button → the patient's phone shows the ward and bed. Second flow: admitted patient describes a symptom in Flutter → agent drafts → nurse approves in React → Flutter shows the approved message. |
+| **Agent** | Golden cases for the one agent still running — see below. *(The bed agent had its own golden-case set too, through `BedAdvisorTests`; removed with it.)* |
+| **End to end** | A nurse or reception opens the bed board, assigns a bed by hand, and the patient's phone shows the ward and bed. Second flow: admitted patient describes a symptom in Flutter → agent drafts → nurse or doctor approves in React → Flutter shows the approved message. *(A first flow used to run through the bed agent instead of the nurse's own hand — same endpoint, same outcome, one fewer step now.)* |
 
 ### Agent golden cases
+
+**Bed agent golden cases — historical, removed 2026-09-22.** These were `BedAdvisorTests`'
+cases while the agent existed; kept here as a worked example of what a golden-case table
+looks like, same reason §8.1–§8.9 stayed in place. None of this runs against `api/` today.
 
 | Case | Expected |
 | :--- | :--- |

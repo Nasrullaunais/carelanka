@@ -47,6 +47,40 @@ public sealed class DispatchService : IDispatchService
         return ToDetail(dispatch);
     }
 
+    public async Task<DispatchDetail> DispatchFromProposalAsync(
+        Guid callId, Guid ambulanceId, Guid proposalId, CancellationToken ct = default)
+    {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        var dispatch = await CreateCoreAsync(callId, ambulanceId, ct);
+        dispatch.DispatchProposalId = proposalId;
+        await SaveAsync(ct);
+        await transaction.CommitAsync(ct);
+        QueueRoutePlan(dispatch);
+        return ToDetail(dispatch);
+    }
+
+    public async Task<DispatchDetail> ApplyDiversionAsync(
+        Guid sourceDispatchId, Guid newCallId, Guid replacementAmbulanceId, Guid proposalId, string? reason, CancellationToken ct = default)
+    {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        var source = await LoadAsync(sourceDispatchId, ct);
+        RequirePrePickup(source, DispatchStatus.Reassigned);
+        source.Status = DispatchStatus.Reassigned;
+        source.ReassignmentReason = string.IsNullOrWhiteSpace(reason)
+            ? "Diverted to a more urgent call" : reason.Trim();
+        source.CompletedAt = _clock.GetUtcNow();
+        source.Ambulance.Status = AmbulanceStatus.Available;
+        source.EmergencyCall.Status = CallStatus.Received;
+        await SaveAsync(ct);
+        var replacement = await CreateCoreAsync(newCallId, replacementAmbulanceId, ct);
+        replacement.DispatchProposalId = proposalId;
+        source.SupersededByDispatchId = replacement.Id;
+        await SaveAsync(ct);
+        await transaction.CommitAsync(ct);
+        QueueRoutePlan(replacement);
+        return ToDetail(replacement);
+    }
+
     public async Task<RouteLogView> GetRouteAsync(Guid id, CancellationToken ct = default)
     {
         var dispatch = await _db.Dispatches.AsNoTracking()

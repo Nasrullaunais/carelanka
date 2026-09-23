@@ -329,7 +329,11 @@ function DischargeDetail({
       <div className="dialog-head no-print">
         <h3>
           {visit.patient?.full_name ?? 'Admission'}{' '}
-          <span className="badge">{admissionCategoryLabels[visit.admission_category]}</span>
+          <span className="badge">
+            {visit.admission_category
+              ? admissionCategoryLabels[visit.admission_category]
+              : 'Not yet classified'}
+          </span>
         </h3>
         <div className="actions">
           <button type="button" className="secondary small" onClick={() => window.print()}>
@@ -372,7 +376,11 @@ function DischargeDetail({
         </div>
         <div>
           <dt>Care level</dt>
-          <dd>{admissionCategoryLabels[visit.admission_category]}</dd>
+          <dd>
+            {visit.admission_category
+              ? admissionCategoryLabels[visit.admission_category]
+              : 'Not yet classified'}
+          </dd>
         </div>
         <div>
           <dt>Admitted</dt>

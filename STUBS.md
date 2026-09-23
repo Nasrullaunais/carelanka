@@ -66,15 +66,14 @@ actually published.
 
 ## Open stubs
 
-**Three open.** Common auth was never stubbed: it was built and merged in PR #11. Row 2 is
-Equipment waiting on Patient Management, and rows 5 and 6 are Emergency dependencies.
-**Rows 1, 3, 4 and 7 are gone** — see Replaced below.
+**Two open.** Common auth was never stubbed: it was built and merged in PR #11. Row 2 is
+Equipment waiting on Patient Management, and row 5 is an Emergency dependency.
+**Rows 1, 3, 4, 6 and 7 are gone** — see Replaced below.
 
 | # | What is faked | Where it lives | Standing in for | Owner of the real thing | Added |
 | :-- | :--- | :--- | :--- | :--- | :--- |
 | 2 | Ward names on a bed — every ward is called `Stub ward <id fragment>` | `api/Services/Equipment/Stubs/StubWardDirectory.cs` | `GET /wards` — `patient-spec.yaml` | **M4 Lochana** | 2026-09-09 |
 | 5 | Staff name, active state and role lookup from the existing auth staff records | `api/Services/Emergency/Stubs/StubStaffLookupService.cs` | `POST /staff/lookup` — `staff-spec.yaml` | **M2 Kaveesha** | 2026-09-13 |
-| 6 | Pre-admission from a dispatch — logs a warning and reports success; no admission is created | `api/Services/Emergency/Stubs/StubPreAdmissionGateway.cs` | `POST /admissions/pre-admit` — `patient-spec.yaml` | **M4 Lochana** | 2026-09-20 |
 
 **Row 7 was opened and closed on the same day** — see Replaced below. `ILanguageModel` is built.
 
@@ -111,7 +110,6 @@ each says so in the spec:
 
 | What | Why | Arrives with |
 | :--- | :--- | :--- |
-| `AdmissionDetail.workflows` | **No longer blocked.** The common tables landed in PR #80 and the bed agent writes rows to them, so an admission's runs are knowable. Still unpublished: `AdmissionDetail` was not touched by step 12, and adding an untested key was not worth it | Next commit on this track |
 | `AdmissionDetail.discharge` | No discharge row is written yet | Step 7 |
 | `wardId` filter on `GET /admissions` | **No longer blocked** — a live `BedAssignment` now says which ward an admission is in. Still unpublished: this step did not need it, and adding an untested filter was not worth it | Next commit on this track |
 | **Nurses scoped to their own ward** on `GET /admissions` and `GET /admissions/{id}` | Half unblocked: an admission's ward is now knowable. Still waiting on **M2** to publish which ward a nurse works in | M2 |
@@ -137,6 +135,7 @@ against" is answerable later.
 
 | # | What it was | Replaced by | Commit | Date |
 | :-- | :--- | :--- | :--- | :--- |
+| 6 | Pre-admission from a dispatch — logs a warning and reports success; no admission is created | `api/Services/Emergency/PreAdmissionGateway.cs`, an in-process call into Patient's `IAdmissionService.PreAdmitAsync`, plus the real `POST /admissions/pre-admit` and `POST /admissions/{id}/classify` on Patient's side | `feat/emergency-phase-3-dispatch` | 2026-09-22 |
 | 4 | Ambulance distance — straight-line distance instead of road distance | `api/Services/Emergency/OsrmAmbulanceDistanceService.cs` (road times from OSRM, no key needed; falls back to `StraightLineDistance`) | `feat/emergency-road-ranking` | 2026-09-20 |
 | 1 | Bed counts per ward — every ward reported exactly 6 beds | `api/Services/Patient/BedRegistryService.cs`, a delegating adapter over `IBedService.CountBedsByWardAsync` | `feat/patient-real-bed-counts` | 2026-09-10 |
 | 3 | Is this bed occupied — always answered **yes** | `api/Services/Equipment/BedOccupancyAdapter.cs`, over Patient Management's `IBedOccupancyService` | `feat/patient-manual-bed-assignment` | 2026-09-11 |
@@ -167,23 +166,12 @@ contract as the port it was replacing, so the swap is an adapter and a DI line.
 
 ---
 
-**Row 7 — the bed agent's `rationale` sentence.** *Opened and replaced 2026-09-20.* It was
-composed in C# for a few hours while `ILanguageModel` did not exist. `api/Agents/ILanguageModel.cs`
-and `GeminiLanguageModel.cs` are now built (ADR 2).
-
-**What the model does changed the same day.** Writing a sentence under a choice already made is
-not work, and it showed: the panel offered a list of beds a nurse could already see. The model is
-now asked one question per run — of the shortlisted beds, which suits this patient, and why
-(`GeminiBedAdvisor`). It reads the clinician's notes on the patient's medical profile, which is
-the one input no rule in `BedFitScoring` can weigh. `DeterministicBedRationaleWriter` stays
-registered and writes the sentence under every bed the advisor did not speak for.
-
-**That fallback is not a stub, and the distinction matters.** A stub stands in for work nobody has
-done. This stands in for a key that is missing, a quota that is spent or wifi that is down on the
-day — conditions ADR 2 says out loud will happen. With no key configured the API starts normally
-and every run still answers, with the deterministically ranked bed and a written sentence. The
-model can only reorder a shortlist the rules already approved; the hard rules, the blocker and the
-deterministic re-check were never its to decide.
+**Row 7 — the bed agent's `rationale` sentence.** *Opened 2026-09-20, closed for good
+2026-09-22.* The bed suggestion agent this row tracked — `GeminiBedAdvisor`,
+`DeterministicBedRationaleWriter`, `BedFitScoring` and the rest of `api/Agents/Patient/`'s
+bed-agent files — was removed entirely; bed placement is the manual path only now. ADR 2's
+shared `ILanguageModel` / `GeminiLanguageModel` this row also tracked are unaffected — the
+care advisory agent still uses them.
 
 ## Cross-component dependencies that will probably need stubbing
 
@@ -194,7 +182,7 @@ needs from others" sections of `integration_of_functions.md` (§10, §16, §21,
 | Needed by | What | From | Contract |
 | :--- | :--- | :--- | :--- |
 | ~~M4 Patient~~ | ~~Bed register — id, ward, number, condition, isolation, distance~~ | ~~**M3**~~ | **BUILT 2026-09-10 — not a stub any more.** Read through `IBedRegistryService`, the one file in Patient Management that knows Equipment's bed table exists |
-| ~~M4 Patient~~ | ~~`AgentWorkflow` / `AgentProposedChange` — the record of what an agent did~~ | ~~**Common (the group)**~~ | **BUILT 2026-09-20 — not a stub any more.** PR #80 added both tables, their configurations and the `Common_AddAgentWorkflows` migration. Patient Management wired `BedAssignment.WorkflowId` to `agent_workflows.id` in `Patient_LinkBedAssignmentWorkflow` — the column had been pointing at a missing table since step 2. **Only the tables landed**: the common `/api/workflows` endpoints in `common-spec.yaml` are still unbuilt, and the bed agent does not need them, because `patient-spec.yaml` publishes its own `GET /bed-workflows/{workflowId}` |
+| ~~M4 Patient~~ | ~~`AgentWorkflow` / `AgentProposedChange` — the record of what an agent did~~ | ~~**Common (the group)**~~ | **BUILT 2026-09-20 — not a stub any more.** PR #80 added both tables, their configurations and the `Common_AddAgentWorkflows` migration. Patient Management wired `BedAssignment.WorkflowId` to `agent_workflows.id` in `Patient_LinkBedAssignmentWorkflow`, but that was the bed agent's own link — `Patient_RemoveBedAgentWorkflowLink` (2026-09-22) dropped the column along with the agent. The care advisory agent still writes `CareRecommendation.WorkflowId` onto the same common tables. **Only the tables landed**: the common `/api/workflows` endpoints in `common-spec.yaml` are still unbuilt, and the care advisory agent does not need them, because `patient-spec.yaml` publishes its own `GET /care-workflows/{workflowId}` |
 | M1, M3, M4 | Staff name and role by ID | **M2** | `POST /staff/lookup`. Needed by three people to render "Approved by …" — small, high value, worth building early |
 | ~~M1 Emergency~~ | ~~Free bed counts per ward~~ | ~~**M4**~~ | **BUILT 2026-09-11 — not a stub any more.** `GET /api/capacity/wards` is live and every staff role may read it. Shape: `WardCapacitySummary` in `specs/patient-spec.yaml`. `free_beds` is usable, unoccupied and not under a live hold; **a hold past its `reserved_until` counts as free**, and that expiry rule lives in `CapacityService` so nobody re-implements it |
 | M1 Emergency | Create a pre-admission from a dispatch | **M4** | `POST /admissions/pre-admit` |

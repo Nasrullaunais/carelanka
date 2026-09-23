@@ -2,6 +2,7 @@ using CareLanka.Api.Data.Entities.Common;
 using CareLanka.Api.Data.Entities.Emergency;
 using CareLanka.Api.Data.Entities.Equipment;
 using CareLanka.Api.Data.Entities.Patient;
+using CareLanka.Api.Data.Entities.Staff;
 using Microsoft.EntityFrameworkCore;
 using PatientEntity = CareLanka.Api.Data.Entities.Patient.Patient;
 
@@ -28,6 +29,14 @@ public class CareLankaDbContext : DbContext
     public DbSet<DispatchCrew> DispatchCrew => Set<DispatchCrew>();
     public DbSet<RouteLog> RouteLogs => Set<RouteLog>();
     public DbSet<PreAdmissionNotice> PreAdmissionNotices => Set<PreAdmissionNotice>();
+    public DbSet<DispatchProposal> DispatchProposals => Set<DispatchProposal>();
+
+    public DbSet<Skill> Skills => Set<Skill>();
+    public DbSet<StaffMemberSkill> StaffMemberSkills => Set<StaffMemberSkill>();
+    public DbSet<Shift> Shifts => Set<Shift>();
+    public DbSet<Allocation> Allocations => Set<Allocation>();
+    public DbSet<LeaveRequest> LeaveRequests => Set<LeaveRequest>();
+    public DbSet<WardStaffingRule> WardStaffingRules => Set<WardStaffingRule>();
 
     public DbSet<Bed> Beds => Set<Bed>();
     public DbSet<EquipmentCategory> EquipmentCategories => Set<EquipmentCategory>();

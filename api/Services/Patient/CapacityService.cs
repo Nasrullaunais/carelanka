@@ -77,7 +77,7 @@ public sealed class CapacityService : ICapacityService
                 .Where(BedHold.LiveOn(now))
                 .Select(assignment => new Claim(
                     assignment.Status,
-                    assignment.Admission.Category,
+                    assignment.Admission.Category!.Value,
                     assignment.Admission.Status,
                     assignment.Admission.ExpectedArrivalAt))
                 .ToListAsync(ct);

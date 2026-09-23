@@ -84,13 +84,13 @@ public sealed class ReorderAgentExecutor
 
     private void Record(AgentWorkflow workflow, ReorderSuggestionEntity suggestion, ReorderAgentRun run)
     {
-        workflow.CompletedSteps = BedWorkflowJson.Write(run.Steps);
-        workflow.ValidationResults = BedWorkflowJson.Write(new ReorderWorkflowValidationRecord
+        workflow.CompletedSteps = CareWorkflowJson.Write(run.Steps);
+        workflow.ValidationResults = CareWorkflowJson.Write(new ReorderWorkflowValidationRecord
         {
             Passed = run.ValidationPassed,
             FailedRule = run.FailedRule
         });
-        workflow.Errors = run.Errors.Count == 0 ? null : BedWorkflowJson.Write(run.Errors);
+        workflow.Errors = run.Errors.Count == 0 ? null : CareWorkflowJson.Write(run.Errors);
         workflow.FinalOutcome = EnumWire.ToWire(run.Outcome);
         workflow.AttemptCount = run.Attempts;
         workflow.CompletedAt = DateTimeOffset.UtcNow;
@@ -117,9 +117,9 @@ public sealed class ReorderAgentExecutor
 
     private static void RecordFailure(AgentWorkflow workflow)
     {
-        workflow.ValidationResults = BedWorkflowJson.Write(
+        workflow.ValidationResults = CareWorkflowJson.Write(
             new ReorderWorkflowValidationRecord { Passed = false });
-        workflow.Errors = BedWorkflowJson.Write(new[] { "The reorder agent could not complete this run." });
+        workflow.Errors = CareWorkflowJson.Write(new[] { "The reorder agent could not complete this run." });
         workflow.FinalOutcome = EnumWire.ToWire(DTOs.Equipment.ReorderAgentOutcome.Failed);
         workflow.Status = AgentWorkflowStatus.Failed;
         workflow.CompletedAt = DateTimeOffset.UtcNow;

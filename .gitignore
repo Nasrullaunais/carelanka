@@ -27,10 +27,9 @@ RUN.md
 IMPORTANT.md
 PR_DRAFT.md
 OVERALL_EXPLANATION.md
+graft/
 SE3110 Assignment.md
 SE3090_G020_Assignment1_Report.docx
 
 # Firebase phone-app config, kept out of git
 mobile-ui/android/app/google-services.json
-
-

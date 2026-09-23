@@ -11,7 +11,7 @@ namespace CareLanka.Api.Agents.Equipment;
 /// </summary>
 public sealed class ReorderAgentJournal
 {
-    private readonly List<BedAgentStep> _steps = [];
+    private readonly List<CareAgentStep> _steps = [];
     private readonly List<string> _errors = [];
 
     public bool ValidationPassed { get; set; } = true;
@@ -92,7 +92,7 @@ public sealed class ReorderAgentJournal
     {
         clock.Stop();
 
-        _steps.Add(new BedAgentStep
+        _steps.Add(new CareAgentStep
         {
             Step = step,
             Tool = tool,
@@ -106,7 +106,7 @@ public sealed class ReorderAgentJournal
 
 public sealed record ReorderAgentRun(
     IReadOnlyList<string> Plan,
-    IReadOnlyList<BedAgentStep> Steps,
+    IReadOnlyList<CareAgentStep> Steps,
     ReorderAgentOutcome Outcome,
     ReorderDraftCandidate? Draft,
     bool ValidationPassed,

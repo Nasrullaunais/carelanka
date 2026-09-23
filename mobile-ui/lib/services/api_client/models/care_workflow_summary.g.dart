@@ -19,7 +19,7 @@ CareWorkflowSummary _$CareWorkflowSummaryFromJson(Map<String, dynamic> json) =>
           : CareAgentOutcome.fromJson(json['outcome'] as String),
       plan: (json['plan'] as List<dynamic>?)?.map((e) => e as String).toList(),
       steps: (json['steps'] as List<dynamic>?)
-          ?.map((e) => BedAgentStep.fromJson(e as Map<String, dynamic>))
+          ?.map((e) => CareAgentStep.fromJson(e as Map<String, dynamic>))
           .toList(),
       redFlag: json['red_flag'] as bool?,
       validation: json['validation'] == null

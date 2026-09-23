@@ -1,4 +1,4 @@
-import type { BedAgentStep } from '../services/api/generated';
+import type { CareAgentStep } from '../services/api/generated';
 
 /**
  * What an agent has worked out so far, not a spinner with a caption bolted on. The plan comes
@@ -14,7 +14,7 @@ export function AgentProgress({
   captions,
 }: {
   plan: string[] | null | undefined;
-  steps: BedAgentStep[] | null | undefined;
+  steps: CareAgentStep[] | null | undefined;
   captions: Record<string, string>;
 }) {
   const order = plan && plan.length > 0 ? plan : Object.keys(captions);

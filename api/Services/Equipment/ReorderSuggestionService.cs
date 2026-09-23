@@ -75,7 +75,7 @@ public sealed class ReorderSuggestionService : IReorderSuggestionService
             EntityId = suggestionRow.Id,
             CorrelationId = Guid.NewGuid(),
             Objective = Objective,
-            Plan = BedWorkflowJson.Write(ReorderAgent.Plan),
+            Plan = CareWorkflowJson.Write(ReorderAgent.Plan),
             Status = AgentWorkflowStatus.Pending,
             StartedAt = DateTimeOffset.UtcNow,
             AttemptCount = 0
@@ -111,7 +111,7 @@ public sealed class ReorderSuggestionService : IReorderSuggestionService
             .FirstOrDefaultAsync(row => row.Id == workflow.EntityId, ct)
             ?? throw new NotFoundException("ReorderSuggestion", workflow.EntityId);
 
-        var validation = BedWorkflowJson.Read<ReorderWorkflowValidationRecord>(workflow.ValidationResults);
+        var validation = CareWorkflowJson.Read<ReorderWorkflowValidationRecord>(workflow.ValidationResults);
 
         return new ReorderWorkflowSummary
         {
@@ -120,8 +120,8 @@ public sealed class ReorderSuggestionService : IReorderSuggestionService
             PharmacyItemId = suggestion.PharmacyItemId,
             Objective = workflow.Objective,
             Status = Status(workflow),
-            Plan = BedWorkflowJson.Read<List<string>>(workflow.Plan) ?? [],
-            Steps = BedWorkflowJson.Read<List<BedAgentStep>>(workflow.CompletedSteps) ?? [],
+            Plan = CareWorkflowJson.Read<List<string>>(workflow.Plan) ?? [],
+            Steps = CareWorkflowJson.Read<List<CareAgentStep>>(workflow.CompletedSteps) ?? [],
             CurrentThreshold = suggestion.CurrentThreshold,
             CurrentQuantityOnHand = suggestion.CurrentQuantityOnHand,
             SuggestedThreshold = suggestion.SuggestedThreshold,

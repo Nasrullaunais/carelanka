@@ -156,6 +156,12 @@ public enum MessageCode
 
     CallNotAwaitingDispatch,
 
+    DispatchProposalConflict,
+
+    DispatchProposalNotConfirmable,
+
+    DispatchProposalNotApprovable,
+
     NicLinkedToAnotherAccount,
 
     NicDoesNotMatchYourRecord,
@@ -170,9 +176,13 @@ public enum MessageCode
 
     PatientCodeNotClaimable,
 
-    BedSuggestionNotPossible,
-
     NotCurrentlyAdmittedForCareQuery,
 
-    CareRecommendationNotPendingReview
+    CareRecommendationNotPendingReview,
+
+    PreAdmissionAlreadyExists,
+
+    AdmissionAlreadyClassified,
+
+    AdmissionNotYetClassified
 }

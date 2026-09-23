@@ -21,7 +21,7 @@ public sealed class ReorderWorkflowSummary
 
     public IReadOnlyList<string> Plan { get; set; } = Array.Empty<string>();
 
-    public IReadOnlyList<BedAgentStep> Steps { get; set; } = Array.Empty<BedAgentStep>();
+    public IReadOnlyList<CareAgentStep> Steps { get; set; } = Array.Empty<CareAgentStep>();
 
     public int CurrentThreshold { get; set; }
 

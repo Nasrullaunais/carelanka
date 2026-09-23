@@ -14,12 +14,10 @@ BedAssignment _$BedAssignmentFromJson(Map<String, dynamic> json) =>
       wardName: json['ward_name'] as String,
       bedNumber: json['bed_number'] as String,
       status: AssignmentStatus.fromJson(json['status'] as String),
-      assignedBy: AssignedBy.fromJson(json['assigned_by'] as String),
       isDowngrade: json['is_downgrade'] as bool,
       reservedUntil: json['reserved_until'] == null
           ? null
           : DateTime.parse(json['reserved_until'] as String),
-      workflowId: json['workflow_id'] as String?,
       approvedByStaffId: json['approved_by_staff_id'] as String?,
       approvedByStaffName: json['approved_by_staff_name'] as String?,
       approvedAt: json['approved_at'] == null
@@ -49,8 +47,6 @@ Map<String, dynamic> _$BedAssignmentToJson(BedAssignment instance) =>
       'bed_number': instance.bedNumber,
       'status': instance.status,
       'reserved_until': instance.reservedUntil?.toIso8601String(),
-      'assigned_by': instance.assignedBy,
-      'workflow_id': instance.workflowId,
       'is_downgrade': instance.isDowngrade,
       'approved_by_staff_id': instance.approvedByStaffId,
       'approved_by_staff_name': instance.approvedByStaffName,

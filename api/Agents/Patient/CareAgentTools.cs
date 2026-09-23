@@ -55,7 +55,7 @@ public sealed class CareAgentTools : ICareAgentTools
             .OrderByDescending(admission => admission.CreatedAt)
             .Take(HistoryLimit)
             .Select(admission => new CarePastAdmission(
-                admission.Category, admission.Urgency, admission.AdmittedAt))
+                admission.Category!.Value, admission.Urgency, admission.AdmittedAt))
             .ToListAsync(ct);
 
         var pastRecommendations = await _db.CareRecommendations
@@ -90,7 +90,7 @@ public sealed class CareAgentTools : ICareAgentTools
             : null;
 
         return new CareCurrentAdmissionFacts(
-            admission.Category, admission.Urgency, admission.IsInfectious, wardName, admission.AdmittedAt);
+            admission.Category!.Value, admission.Urgency, admission.IsInfectious, wardName, admission.AdmittedAt);
     }
 
     private static int? Age(DateOnly? dateOfBirth)

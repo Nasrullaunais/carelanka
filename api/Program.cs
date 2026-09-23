@@ -15,9 +15,11 @@ using CareLanka.Api.Services.Equipment.Stubs;
 using CareLanka.Api.Services.Emergency;
 using CareLanka.Api.Services.Emergency.Stubs;
 using CareLanka.Api.Agents;
+using CareLanka.Api.Agents.Emergency;
 using CareLanka.Api.Agents.Equipment;
 using CareLanka.Api.Agents.Patient;
 using CareLanka.Api.Services.Patient;
+using CareLanka.Api.Services.Staff;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -419,16 +421,26 @@ builder.Services.AddSingleton<IPushSender>(services =>
         ? ActivatorUtilities.CreateInstance<LoggingPushSender>(services)
         : ActivatorUtilities.CreateInstance<FirebasePushSender>(services));
 builder.Services.AddHostedService<PushDeliveryWorker>();
-builder.Services.AddScoped<IStaffLookupService, StubStaffLookupService>();
+builder.Services.AddScoped<CareLanka.Api.Services.Emergency.IStaffLookupService, StubStaffLookupService>();
 builder.Services.AddHttpClient<IAmbulanceDistanceService, OsrmAmbulanceDistanceService>();
 builder.Services.AddHttpClient<IReverseGeocoder, NominatimReverseGeocoder>();
 builder.Services.AddSingleton<SceneLookupQueue>();
 builder.Services.AddSingleton<ISceneLookupQueue>(services => services.GetRequiredService<SceneLookupQueue>());
 builder.Services.AddScoped<SceneLookupProcessor>();
 builder.Services.AddHostedService<SceneLookupWorker>();
-builder.Services.AddScoped<IPreAdmissionGateway, StubPreAdmissionGateway>();
+builder.Services.AddScoped<IPreAdmissionGateway, PreAdmissionGateway>();
 builder.Services.AddScoped<PreAdmissionProcessor>();
 builder.Services.AddHostedService<PreAdmissionWorker>();
+
+// The Dispatch & Routing Agent. Three read-only tools, no write tool at all - a dispatch only
+// exists once a Duty Manager confirms or approves through the proposal API. Its own queue and
+// worker, separate from the bed and care agents' for the same single-reader-channel reason.
+builder.Services.AddScoped<IDispatchAgentTools, DispatchAgentTools>();
+builder.Services.AddScoped<IDispatchAgent, DispatchAgent>();
+builder.Services.AddScoped<IDispatchProposalService, DispatchProposalService>();
+builder.Services.AddScoped<DispatchProposalExecutor>();
+builder.Services.AddSingleton<IDispatchRunQueue, DispatchRunQueue>();
+builder.Services.AddHostedService<DispatchProposalWorker>();
 
 builder.Services.AddScoped<IBedService, BedService>();
 builder.Services.AddScoped<IEquipmentCategoryService, EquipmentCategoryService>();
@@ -454,27 +466,15 @@ builder.Services.AddScoped<IDischargeService, DischargeService>();
 builder.Services.AddScoped<IBillingService, BillingService>();
 builder.Services.AddScoped<IBillingRateService, BillingRateService>();
 builder.Services.AddScoped<IMeService, MeService>();
+builder.Services.AddScoped<ISkillService, SkillService>();
 
 builder.Services.AddScoped<IBedRegistryService, BedRegistryService>();
 
-// The Bed and Patient Details Agent. The tools are the allow-list, so they are registered as one
-// interface and nothing else can widen them. The advisor is the only seam a language model plugs
-// into, and it may only choose between beds the rules have already allowed.
-builder.Services.AddScoped<IBedAgentTools, BedAgentTools>();
-builder.Services.AddScoped<IBedRationaleWriter, DeterministicBedRationaleWriter>();
-builder.Services.AddScoped<IBedAdvisor, GeminiBedAdvisor>();
-builder.Services.AddScoped<IBedAgent, BedAgent>();
-builder.Services.AddScoped<IBedWorkflowRecorder, BedWorkflowRecorder>();
-builder.Services.AddScoped<IBedSuggestionService, BedSuggestionService>();
-builder.Services.AddScoped<BedAgentExecutor>();
-builder.Services.AddSingleton<IAgentRunQueue, AgentRunQueue>();
-builder.Services.AddHostedService<BedAgentWorker>();
+builder.Services.AddScoped<CareLanka.Api.Services.Staff.IStaffLookupService, StaffLookupService>();
 
 // The Patient Care Advisory Agent. Three read tools, no write tool of its own - the draft it
 // produces is written by CareAgentExecutor once the model (or its deterministic fallback)
-// answers, never by the agent directly. Its own queue and worker, separate from the bed agent's:
-// two agents on one single-reader channel would mean whichever one reads first processes an id
-// it does not understand.
+// answers, never by the agent directly.
 builder.Services.AddScoped<ICareAgentTools, CareAgentTools>();
 builder.Services.AddScoped<ICareAdvisor, GeminiCareAdvisor>();
 builder.Services.AddScoped<ICareAgent, CareAgent>();

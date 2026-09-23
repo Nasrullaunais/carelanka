@@ -12,10 +12,10 @@ of that component was built and tested. Three schema-visible consequences, all m
   fields a clinician types. It exists because the Patient Care Advisory Agent had nothing to
   reason over. Owned by Patient Management. See
   [`PatientMedicalProfile`](#patientmedicalprofile-extends-auditedentity-rev-32--new).
-- **`AdmissionStatus.AwaitingApproval` is no longer reached.** The bed agent holds no write
-  tool, so there is no proposal sitting in the domain waiting to be approved; the pause lives
-  on the `AgentWorkflow` row. The value stays in the enum — Equipment's ward-patient list reads
-  it, and removing a value from a shared enum is a cross-component change for no gain.
+- **`AdmissionStatus.AwaitingApproval` is no longer reached.** First because the bed agent held
+  no write tool, then because it was removed outright (2026-09-22) — bed placement is manual
+  only. The value stays in the enum — Equipment's ward-patient list reads it, and removing a
+  value from a shared enum is a cross-component change for no gain.
 - **`CareRecommendation`'s review gate widened to `Doctor` OR `WardNurse`**, with a new
   deterministic rule (CR5) against `PatientMedicalProfile.Allergies` holding the line instead
   of the role alone.
@@ -184,9 +184,12 @@ already used everywhere else in this document.
 - **`CareRecommendation` (new)** — see
   [`CareRecommendation`](#carerecommendation-extends-auditedentity-rev-26--new). Owned by
   Patient Management, alongside the existing entities.
-- **`AgentType.PatientCareAdvisory` (new)** — the fifth agent value. The existing
-  `PatientAdmissionBed` is untouched; this project now has two agents in one component
-  rather than a replacement.
+- **`AgentType.PatientCareAdvisory` (new)** — the fifth agent value, at the time this was
+  written. The existing `PatientAdmissionBed` was untouched then; this project ran two
+  agents in one component rather than a replacement. *(No longer true — `PatientAdmissionBed`
+  was removed from the enum on 2026-09-22 along with the bed agent itself. `PatientCareAdvisory`
+  is Patient Management's only `AgentType` value today. See the `AssignedBy` entry above and
+  `patient-management-plan.md` §8 for the removal.)*
 - **`ProposedChangeType.CreateCareRecommendation` (new)** — the write this agent's
   workflow proposes, following the same `AgentProposedChange` shape every other agent
   already uses. No new column was needed on that shared table — see the entity note for
@@ -1165,7 +1168,7 @@ to refuse it outright rather than relying on the generator to remember.
 chosen by a clinician at the desk on check-in — `CheckInRequest` carries
 `admission_category` and `category_set_by_staff_id` — so storing a guess at booking time
 gave the same fact two homes and no rule about which one wins. `Reason` is free text shown
-to staff and never read by the bed agent: free text stays data, never instructions.
+to staff only.
 **Note:** *(Rev 2)* Covers the patient flow's third arrival path — "they booked a visit
 beforehand". Previously an `Admission` could only be emergency-linked or unexplained.
 On check-in this becomes an `Admission` with `Source = Booked`.
@@ -1212,9 +1215,8 @@ with two places to disagree. `DischargedAt` is returned by the spec and had no c
 **BEFORE** they arrive, so a bed is ready when they get here". That state was
 unrepresentable: `AdmittedAt` was non-null and `AdmissionStatus` was only
 `{Active, Discharged}`.
-`Urgency` and `IsInfectious` are the patient-side inputs to the bed agent's filter and
-ranking rules; both are set by clinical staff, never by the agent — the same wall that
-keeps `Category` a human decision.
+`Urgency` and `IsInfectious` are the patient-side inputs to bed placement's hard rules; both
+are set by clinical staff — the same wall that keeps `Category` a human decision.
 
 *(Rev 2.2)* **Renamed to the names `patient-spec.yaml` already publishes.** Rev 2 invented
 `AcuityLevel` and `RequiresIsolation` for fields the committed spec already had as
@@ -1280,14 +1282,12 @@ Deliberately **separate from `Status`**: how far through their stay a patient is
 complete their paperwork is are independent facts. A fully-admitted ICU patient can still be
 missing a NIC, and collapsing the two would make one unrepresentable.
 
-#### BedAssignment extends AuditedEntity *(Rev 2.9 — changed)*
+#### BedAssignment extends AuditedEntity *(Rev 2.9 — changed; AssignedBy/WorkflowId dropped 2026-09-22)*
 ```
 + AdmissionId: Guid (non-null) FK → Admission.Id
 + BedId: Guid (non-null)                                -- no FK: beds is Equipment's table
 + Status: AssignmentStatus (non-null)                   -- (Rev 2.9 — new)
 + ReservedUntil: DateTimeOffset (nullable)              -- (Rev 2.9 — the 30-minute hold)
-+ AssignedBy: AssignedBy (non-null)                     -- (Rev 2.9: agent or human)
-+ WorkflowId: Guid (nullable) → AgentWorkflow.Id        -- (Rev 2: no FK until that table exists)
 + IsDowngrade: bool = false (non-null)                  -- (Rev 2)
 + ApprovedByStaffMemberId: Guid (nullable) FK → StaffMember.Id  -- (Rev 2)
 + ApprovedAt: DateTimeOffset (nullable)                 -- (Rev 2.9 — new)
@@ -1315,17 +1315,20 @@ auditable.
 separate table until the spec was implemented; it publishes one bed row whose `status` walks
 `reserved → occupied → released`, and no reservation schema at all. One row per claim means
 "this bed is taken" has exactly one home, which is the same argument this document makes for
-keeping occupancy off `Bed`. A background sweep moves `reserved` rows past `ReservedUntil` to
-`released` with `ReleaseReason = HoldExpired`.
+keeping occupancy off `Bed`. **There is no background sweep** — a lapsed `reserved` row is
+read as free everywhere, and the next `INSERT` that would claim its bed closes it first, as
+`ReleaseReason = HoldExpired`, at write time. See `patient-management-plan.md` §5.3.
 
-**`BedId` is a plain column, not a foreign key.** `beds` belongs to Health Equipment
-(Member 3) and does not exist yet. The constraint goes in when their table lands; until then
-`STUBS.md` row 109 stands.
+**`BedId` is a plain column, not a foreign key — permanently, by design, not because
+Equipment's table is missing.** `beds` belongs to Health Equipment (Member 3) and has existed
+since `Equipment_AddBed`; the column stays FK-less because a cross-component foreign key would
+put Patient's schema in the way of Equipment being the sole writer of its own table (`CLAUDE.md`,
+"one writer per table"). `BedAssignmentConfiguration` indexes `BedId` but never constrains it.
 
 #### Discharge extends AuditedEntity *(Rev 2.9 — changed)*
 ```
 + AdmissionId: Guid (unique, non-null) FK → Admission.Id
-+ FlaggedBy: AssignedBy (non-null)                      -- (Rev 2.9: agent or human)
++ FlaggedBy: AssignedBy (non-null)                      -- (Rev 2.9: agent or human; `DischargeService` only ever writes `User` today — no agent flags a discharge)
 + FlaggedAt: DateTimeOffset (non-null)                  -- (Rev 2.9 — new)
 + ConfirmedByStaffMemberId: Guid (nullable) FK → StaffMember.Id  -- (Rev 2.9: was DischargedByStaffMemberId)
 + ConfirmedAt: DateTimeOffset (nullable)                -- (Rev 2.9: was DischargedAt)
@@ -1334,8 +1337,7 @@ keeping occupancy off `Bed`. A background sweep moves `reserved` rows past `Rese
 **Table:** `discharges` — **built.** `Patient_AddAdmission`.
 **Note:** 1:1 companion row created **at admission time**, with its checklist rows unticked,
 not only once discharge actually happens — this gives clinical staff somewhere to
-update readiness during the stay, and gives the Bed & Patient Details Agent a
-persistent target to monitor. `DischargedAt`/`DischargeSummary` stay null until
+update readiness during the stay. `DischargedAt`/`DischargeSummary` stay null until
 confirmed. *(Decisions 10, 32)*
 *(Rev 2.9)* **`ReadinessStatus` is gone entirely.** Rev 2 already made it derived — `Ready`
 once every checklist item was complete — and a derived value still stored is a value that can
@@ -1506,7 +1508,7 @@ patient's own words and saying it had no history to work from.
 **`Allergies` is the field that earns the table.** CR5 rejects any agent draft naming a
 substance recorded there, deterministically, before a reviewer sees it — and that check is
 only possible because the allergy is a stored field rather than a sentence buried in a note.
-That is the same instinct as the bed agent's hard rules: the thing that must never fail is
+That is the same instinct as bed placement's hard rules: the thing that must never fail is
 plain C# reading a column, not the model being asked nicely.
 
 ---
@@ -1950,7 +1952,7 @@ ladder is documented as `icu -> hdu -> inpatient`. Rev 2.1 said enum literals we
 `high_dependency` and silently broke the match. The C# member keeps the readable name and
 `HasConversion<string>()` maps it to `hdu`.
 
-Ordered most to least acute so the bed agent's downgrade logic ("offers the next best
+Ordered most to least acute so bed placement's downgrade logic ("offers the next best
 thing") is a simple ordinal step.
 
 ### WardType *(Rev 2.2 — new; three members added 2026-09-11)*
@@ -2064,18 +2066,14 @@ Rev 2's `BedReservationStatus {Held, Confirmed, Expired, Released}` belonged to 
 a hold ended is a different fact from the state it ended in, and keeping them apart means
 "why is this bed free again?" has one answer instead of two half-answers.
 
-### AssignedBy *(Rev 2.9 — new)*
+### AssignedBy *(Rev 2.9 — new; dropped from `BedAssignment` 2026-09-22)*
 ```
 Agent, User
 ```
-Serialized as `agent`, `user`. Used on `BedAssignment.AssignedBy` and `Discharge.FlaggedBy`,
-and it is what the agent-performance report reads.
-
-*(Rev 3.2)* **What `Agent` means changed, and it is worth being exact.** It no longer means
-"the agent wrote this row" — the bed agent cannot write anything. It means **a human committed
-a bed the agent had suggested**: `POST /admissions/{id}/assign-bed` was called with a
-`workflow_id`, so the assignment is attributable to a run. Every row is written by a person
-either way; this column records whether a model was involved in choosing it.
+Serialized as `agent`, `user`. Used on `Discharge.FlaggedBy` only now — `Patient_RemoveBedAgentWorkflowLink`
+dropped the column off `BedAssignment`. It recorded whether a bed-suggestion-agent run had
+proposed the bed a human then committed; with that agent removed, every bed assignment is a
+human one and the column had nothing left to say.
 
 ### ReleaseReason *(Rev 2.9 — new)*
 ```
@@ -2099,7 +2097,7 @@ middle states of the flow. `Expected` is now `AwaitingBed`; `Active` is now `Adm
 | Status | Meaning | `AdmittedAt` |
 | :-- | :-- | :--: |
 | `AwaitingBed` | Record exists, no bed found yet. The emergency pre-arrival state. | null |
-| `AwaitingApproval` | **Reserved, and no longer reached.** *(Rev 3.2)* It meant "the bed agent proposed a bed and a human has not approved it". The agent no longer writes a proposal — it holds no write tool at all — so the pause lives on the `AgentWorkflow` row and the admission stays at `AwaitingBed` until somebody commits a bed. Kept in the enum because Equipment's ward-patient list already reads it and removing a value from a shared enum is a cross-component change for no gain. Nothing sets it; nothing should. See `patient-management-plan.md` §8.6b | null |
+| `AwaitingApproval` | **Reserved, and no longer reached.** *(Rev 3.2)* It meant "the bed agent proposed a bed and a human has not approved it", first while the agent held no write tool, then unreachable outright once the agent was removed (2026-09-22) — the admission now stays at `AwaitingBed` until somebody commits a bed manually. Kept in the enum because Equipment's ward-patient list already reads it and removing a value from a shared enum is a cross-component change for no gain. Nothing sets it; nothing should. See `patient-management-plan.md` §8.6b | null |
 | `BedReserved` | Approved and held (`BedAssignment.Status = Reserved`); patient not yet in it. | null |
 | `Admitted` | In the bed. Live `BedAssignment` with `EndAt IS NULL`. | set |
 | `ReadyForDischarge` | Every `DischargeChecklistItem` complete; awaiting confirmation. | set |
@@ -2656,9 +2654,9 @@ the first half of that contrast disappears.
 - `patient-spec.yaml` now publishes the booking endpoints: `POST /me/appointments`,
   `GET /me/appointments`, `POST /me/appointments/{id}/cancel`, and the staff side
   `GET /appointments`, `POST /appointments`, `POST /appointments/{id}/check-in`.
-  Check-in creates an ordinary `Admission` with `source = pre_registered`, so the bed agent
-  path is unchanged. Doctor calendars, time slots and availability search remain out of
-  scope. *Done: Member 4.*
+  Check-in creates an ordinary `Admission` with `source = pre_registered`, so the manual
+  bed-assignment path is unchanged. Doctor calendars, time slots and availability search
+  remain out of scope. *Done: Member 4.*
 
 Note for Member 4's own design: patient notifications are local (the app checks its own
 status), not push, so `DeviceToken` is not on the Patient Management critical path either

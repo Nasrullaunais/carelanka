@@ -77,7 +77,7 @@ public sealed class CareRecommendationService : ICareRecommendationService
             EntityId = recommendation.Id,
             CorrelationId = Guid.NewGuid(),
             Objective = Objective,
-            Plan = BedWorkflowJson.Write(CareAgent.Plan),
+            Plan = CareWorkflowJson.Write(CareAgent.Plan),
             Status = AgentWorkflowStatus.Pending,
             StartedAt = DateTimeOffset.UtcNow,
             AttemptCount = 0
@@ -121,7 +121,7 @@ public sealed class CareRecommendationService : ICareRecommendationService
             EntityId = recommendation.Id,
             CorrelationId = Guid.NewGuid(),
             Objective = Objective,
-            Plan = BedWorkflowJson.Write(CareAgent.Plan),
+            Plan = CareWorkflowJson.Write(CareAgent.Plan),
             Status = AgentWorkflowStatus.Pending,
             StartedAt = DateTimeOffset.UtcNow,
             AttemptCount = 0
@@ -158,7 +158,7 @@ public sealed class CareRecommendationService : ICareRecommendationService
             .AsNoTracking()
             .FirstOrDefaultAsync(row => row.Id == workflow.EntityId, ct);
 
-        var validation = BedWorkflowJson.Read<CareWorkflowValidationRecord>(workflow.ValidationResults)
+        var validation = CareWorkflowJson.Read<CareWorkflowValidationRecord>(workflow.ValidationResults)
             ?? new CareWorkflowValidationRecord();
 
         return new CareWorkflowSummary
@@ -168,8 +168,8 @@ public sealed class CareRecommendationService : ICareRecommendationService
             Objective = workflow.Objective,
             Status = Status(workflow, recommendation),
             Outcome = workflow.FinalOutcome is null ? null : EnumWire.FromWire<CareAgentOutcome>(workflow.FinalOutcome),
-            Plan = BedWorkflowJson.Read<List<string>>(workflow.Plan) ?? [],
-            Steps = BedWorkflowJson.Read<List<BedAgentStep>>(workflow.CompletedSteps) ?? [],
+            Plan = CareWorkflowJson.Read<List<string>>(workflow.Plan) ?? [],
+            Steps = CareWorkflowJson.Read<List<CareAgentStep>>(workflow.CompletedSteps) ?? [],
             RedFlag = recommendation?.RedFlag ?? false,
             Validation = new CareWorkflowValidation
             {

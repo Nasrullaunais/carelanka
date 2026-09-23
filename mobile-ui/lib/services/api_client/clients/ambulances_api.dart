@@ -55,14 +55,13 @@ abstract class AmbulancesApi {
   });
 
   @POST('/ambulances')
-  Future<Ambulance> createAmbulance({
-    @Body() CreateAmbulanceRequest? body,
-  });
+  Future<Ambulance> createAmbulance({@Body() CreateAmbulanceRequest? body});
+
+  @GET('/ambulances/mine')
+  Future<Ambulance> getMyAmbulanceAssignment();
 
   @GET('/ambulances/{id}')
-  Future<AmbulanceDetail> getAmbulance({
-    @Path('id') required String id,
-  });
+  Future<AmbulanceDetail> getAmbulance({@Path('id') required String id});
 
   @PATCH('/ambulances/{id}')
   Future<Ambulance> updateAmbulance({
@@ -77,9 +76,7 @@ abstract class AmbulancesApi {
   });
 
   @POST('/ambulances/{id}/reinstate')
-  Future<Ambulance> reinstateAmbulance({
-    @Path('id') required String id,
-  });
+  Future<Ambulance> reinstateAmbulance({@Path('id') required String id});
 
   @POST('/ambulances/{id}/location')
   Future<void> reportAmbulanceLocation({

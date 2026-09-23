@@ -63,10 +63,19 @@ public sealed class EmergencyCallService : IEmergencyCallService
 
         await EnsurePatientLinkBelongsToCallerAsync(request, principalType, principalId, cancellationToken);
 
+        var patientId = request.PatientId;
+        if (principalType == PrincipalType.Patient && request.PatientIsCaller!.Value && patientId is null)
+        {
+            patientId = await _db.Patients.AsNoTracking()
+                .Where(patient => patient.UserAccountId == principalId)
+                .Select(patient => (Guid?)patient.Id)
+                .SingleOrDefaultAsync(cancellationToken);
+        }
+
         var call = new EmergencyCallEntity
         {
             Id = Guid.NewGuid(),
-            PatientId = request.PatientId,
+            PatientId = patientId,
             CallerUserId = callerUserId,
             PatientIsCaller = request.PatientIsCaller!.Value,
             CallerName = Clean(request.CallerName),
@@ -268,23 +277,23 @@ public sealed class EmergencyCallService : IEmergencyCallService
             .Where(item => item.Id == id)
             .Select(item => new
             {
-                item.Id, item.CallerUserId, item.Status, item.CancellationRequestStatus,
+                item.Id, item.CallerUserId, item.Status, item.CancellationRequestStatus, item.UpdatedAt,
                 Dispatch = item.Dispatches.Where(dispatch => DispatchStatusExtensions.LiveStatuses.Contains(dispatch.Status))
                     .Select(dispatch => new { dispatch.Status, dispatch.DispatchedAt, dispatch.Ambulance.CurrentLatitude, dispatch.Ambulance.CurrentLongitude, dispatch.Ambulance.LocationUpdatedAt })
                     .FirstOrDefault()
             }).SingleOrDefaultAsync(cancellationToken)
             ?? throw new NotFoundException("Emergency call", id);
         if (call.CallerUserId != callerId) throw new ForbiddenException(MessageCode.Forbidden);
-        if (call.Dispatch is null) throw new NotFoundException("Live emergency tracking", id);
-        var updatedAt = call.Dispatch.LocationUpdatedAt ?? call.Dispatch.DispatchedAt;
-        var stale = _timeProvider.GetUtcNow() - updatedAt > TimeSpan.FromMinutes(_options.LocationMaxAgeMinutes);
+        var updatedAt = call.Dispatch?.LocationUpdatedAt ?? call.Dispatch?.DispatchedAt ?? call.UpdatedAt;
+        var stale = call.Dispatch is not null &&
+            _timeProvider.GetUtcNow() - updatedAt > TimeSpan.FromMinutes(_options.LocationMaxAgeMinutes);
         return new MyCallTracking
         {
             EmergencyCallId = call.Id,
             CallStatus = call.Status,
-            AmbulanceIsOnTheWay = call.Dispatch.Status is DispatchStatus.Assigned or DispatchStatus.Acknowledged or DispatchStatus.EnRouteToScene,
-            AmbulanceLatitude = call.Dispatch.CurrentLatitude,
-            AmbulanceLongitude = call.Dispatch.CurrentLongitude,
+            AmbulanceIsOnTheWay = call.Dispatch?.Status is DispatchStatus.Assigned or DispatchStatus.Acknowledged or DispatchStatus.EnRouteToScene,
+            AmbulanceLatitude = call.Dispatch?.CurrentLatitude,
+            AmbulanceLongitude = call.Dispatch?.CurrentLongitude,
             AmbulanceLocationIsStale = stale,
             EstimatedMinutesToArrival = null,
             CancellationRequestStatus = call.CancellationRequestStatus,
@@ -342,6 +351,7 @@ public sealed class EmergencyCallService : IEmergencyCallService
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         var call = await LoadPendingCancellationAsync(id, cancellationToken);
         await _dispatches.CancelForApprovedCancellationRequestAsync(id, cancellationToken);
+        call.Status = CallStatus.Cancelled;
         ReviewCancellation(call, CancellationRequestStatus.Approved, request.Notes);
         await _db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);

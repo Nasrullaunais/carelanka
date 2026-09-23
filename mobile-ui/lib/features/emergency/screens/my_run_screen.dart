@@ -24,7 +24,9 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    context.read<MyRunController>().startPolling();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<MyRunController>().startPolling();
+    });
   }
 
   @override
@@ -62,7 +64,7 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
         ),
         body: Column(
           children: [
-            if (locationNotice != null && controller.state.valueOrNull != null)
+            if (locationNotice != null)
               MaterialBanner(
                 content: Text(locationNotice),
                 actions: const [SizedBox.shrink()],
@@ -148,7 +150,8 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
   }
 
   String? _locationNotice(CrewLocationReportingState state) => switch (state) {
-    CrewLocationReportingState.reporting ||
+    CrewLocationReportingState.reporting =>
+      'Sharing your assigned ambulance location while this screen is open.',
     CrewLocationReportingState.stopped => null,
     CrewLocationReportingState.permissionDenied =>
       'Location permission is needed to report this ambulance position.',
@@ -157,6 +160,6 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
     CrewLocationReportingState.unavailable =>
       'Location services are unavailable on this device.',
     CrewLocationReportingState.failed =>
-      'Location reporting stopped. Reopen this screen to try again.',
+      'Could not update ambulance location. Retrying shortly.',
   };
 }

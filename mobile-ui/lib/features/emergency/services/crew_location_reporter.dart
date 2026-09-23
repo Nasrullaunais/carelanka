@@ -6,10 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../../core/network/api.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../services/api_client/care_lanka_api.dart';
-import '../../../services/api_client/models/dispatch_detail.dart';
-import '../../../services/api_client/models/dispatch_status.dart';
 import '../../../services/api_client/models/report_ambulance_location_request.dart';
-import '../models/run_step.dart';
 
 enum CrewLocationPermission { granted, denied, permanentlyDenied, unavailable }
 
@@ -38,23 +35,13 @@ final class CrewPosition {
   int get hashCode => Object.hash(latitude, longitude);
 }
 
-final class CrewDispatch {
-  const CrewDispatch(this.id, this.ambulanceId, this.status);
-
-  final String id;
-  final String ambulanceId;
-  final DispatchStatus status;
-
-  bool get isLive => status.isLive;
-}
-
 abstract interface class CrewLocationGateway {
   Future<CrewLocationPermission> requestPermission();
   Future<CrewPosition> currentPosition();
 }
 
 abstract interface class CrewDispatchGateway {
-  Future<CrewDispatch?> activeDispatch();
+  Future<String?> assignedAmbulanceId();
   Future<void> report(String ambulanceId, CrewPosition position);
 }
 
@@ -75,10 +62,14 @@ final class CrewLocationReporter extends ChangeNotifier {
 
   CrewLocationReportingState get state => _state;
 
+  int _generation = 0;
+
   Future<void> resume() async {
-    await stop();
+    _stop();
+    final generation = _generation;
     try {
       final permission = await _location.requestPermission();
+      if (generation != _generation) return;
       if (permission != CrewLocationPermission.granted) {
         _setState(switch (permission) {
           CrewLocationPermission.denied =>
@@ -91,59 +82,59 @@ final class CrewLocationReporter extends ChangeNotifier {
         });
         return;
       }
-      final dispatch = await _dispatches.activeDispatch();
-      if (dispatch == null || !dispatch.isLive) {
-        _setState(CrewLocationReportingState.stopped);
-        return;
-      }
-      _setState(CrewLocationReportingState.reporting);
-      await _report(dispatch);
-      if (_state != CrewLocationReportingState.reporting) return;
-      _timer = Timer.periodic(interval, (_) => _reportCurrent());
+      await _reportCurrent(generation);
+      if (generation != _generation) return;
+      _timer = Timer.periodic(interval, (_) => _reportCurrent(generation));
     } catch (_) {
-      _setState(CrewLocationReportingState.failed);
-      await stop();
+      if (generation == _generation) {
+        _setState(CrewLocationReportingState.failed);
+      }
     }
   }
 
   Future<void> pause() => stop();
 
-  Future<void> stop() async {
+  Future<void> stop() async => _stop();
+
+  void _stop() {
+    _generation++;
     _timer?.cancel();
     _timer = null;
-    _reporting = false;
     if (_state == CrewLocationReportingState.reporting) {
       _setState(CrewLocationReportingState.stopped);
     }
   }
 
-  Future<void> _reportCurrent() async {
-    if (_reporting) return;
-    try {
-      final dispatch = await _dispatches.activeDispatch();
-      if (dispatch == null || !dispatch.isLive) {
-        await stop();
-        return;
-      }
-      await _report(dispatch);
-    } catch (_) {
-      _setState(CrewLocationReportingState.failed);
-      await stop();
-    }
-  }
-
-  Future<void> _report(CrewDispatch dispatch) async {
-    if (_reporting) return;
+  Future<void> _reportCurrent(int generation) async {
+    if (_reporting || generation != _generation) return;
     _reporting = true;
     try {
+      final ambulanceId = await _dispatches.assignedAmbulanceId();
+      if (generation != _generation) return;
+      if (ambulanceId == null) {
+        _setState(CrewLocationReportingState.stopped);
+        return;
+      }
       final position = await _location.currentPosition();
-      await _dispatches.report(dispatch.ambulanceId, position);
+      if (generation != _generation) return;
+      await _dispatches.report(ambulanceId, position);
+      if (generation == _generation) {
+        _setState(CrewLocationReportingState.reporting);
+      }
     } catch (_) {
-      _setState(CrewLocationReportingState.failed);
-      await stop();
+      if (generation == _generation) {
+        _setState(CrewLocationReportingState.failed);
+      }
     } finally {
       _reporting = false;
     }
+  }
+
+  @override
+  void dispose() {
+    _generation++;
+    _timer?.cancel();
+    super.dispose();
   }
 
   void _setState(CrewLocationReportingState state) {
@@ -185,11 +176,11 @@ final class GeneratedCrewDispatchGateway implements CrewDispatchGateway {
   final CareLankaApi _api;
 
   @override
-  Future<CrewDispatch?> activeDispatch() async {
+  Future<String?> assignedAmbulanceId() async {
     try {
-      return _toCrewDispatch(
-        await callApi(() => _api.myRun.getMyActiveDispatch()),
-      );
+      return (await callApi(
+        () => _api.ambulances.getMyAmbulanceAssignment(),
+      )).id;
     } on ApiException catch (error) {
       if (error.isNotFound) return null;
       rethrow;
@@ -206,12 +197,4 @@ final class GeneratedCrewDispatchGateway implements CrewDispatchGateway {
       ),
     ),
   );
-
-  CrewDispatch? _toCrewDispatch(DispatchDetail dispatch) {
-    final id = dispatch.id;
-    final ambulanceId = dispatch.ambulanceId;
-    final status = dispatch.status;
-    if (id == null || ambulanceId == null || status == null) return null;
-    return CrewDispatch(id, ambulanceId, status);
-  }
 }

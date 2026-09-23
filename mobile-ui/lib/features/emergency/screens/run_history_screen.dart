@@ -18,7 +18,9 @@ class _RunHistoryScreenState extends State<RunHistoryScreen> {
   @override
   void initState() {
     super.initState();
-    context.read<RunHistoryController>().load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<RunHistoryController>().load();
+    });
   }
 
   @override

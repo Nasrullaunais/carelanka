@@ -28,13 +28,15 @@ BEGIN
     WHERE email = 'crew.perera@carelanka.lk' AND is_active;
     SELECT id INTO v_patient_account FROM patient_accounts
     WHERE username = 'demo.emergency' AND is_active;
-    SELECT id INTO v_patient FROM patients ORDER BY patient_code LIMIT 1;
+    SELECT id INTO v_patient FROM patients WHERE patient_code = 'P6N4Y8Z2';
 
     IF v_manager IS NULL OR v_crew_one IS NULL OR v_crew_two IS NULL
        OR v_patient_account IS NULL OR v_patient IS NULL THEN
         RAISE EXCEPTION 'Emergency fixtures require identity seed 001 and patient seed 004';
     END IF;
 
+    UPDATE patients SET user_account_id = NULL, updated_at = now()
+    WHERE user_account_id = v_patient_account AND id <> v_patient;
     UPDATE patients SET user_account_id = v_patient_account, updated_at = now()
     WHERE id = v_patient AND user_account_id IS NULL;
 

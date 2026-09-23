@@ -24,7 +24,9 @@ class _ReportEmergencyScreenState extends State<ReportEmergencyScreen> {
   @override
   void initState() {
     super.initState();
-    context.read<PatientEmergencyController>().load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<PatientEmergencyController>().load();
+    });
   }
 
   @override

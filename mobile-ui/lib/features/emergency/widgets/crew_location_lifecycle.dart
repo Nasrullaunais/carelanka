@@ -22,7 +22,9 @@ final class _CrewLocationLifecycleState extends State<CrewLocationLifecycle>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    widget.reporter.resume();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.reporter.resume();
+    });
   }
 
   @override

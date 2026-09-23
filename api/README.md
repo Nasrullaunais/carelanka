@@ -1,5 +1,7 @@
 # CareLanka API — running it locally
 
+For the Docker based API and PostgreSQL setup, see [LOCAL_SETUP.md](../LOCAL_SETUP.md).
+
 Four people need this to start on four machines. Three commands, then it runs.
 
 ---

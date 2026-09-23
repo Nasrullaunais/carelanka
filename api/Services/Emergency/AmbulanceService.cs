@@ -304,6 +304,21 @@ public sealed class AmbulanceService : IAmbulanceService
         return ToResponse(ambulance);
     }
 
+    public async Task<AmbulanceResponse> GetMyAssignmentAsync(CancellationToken cancellationToken = default)
+    {
+        var liveAmbulanceId = await _db.DispatchCrew
+            .Where(crew => crew.StaffMemberId == _currentUser.Id
+                && DispatchStatusExtensions.LiveStatuses.Contains(crew.Dispatch.Status))
+            .Select(crew => (Guid?)crew.Dispatch.AmbulanceId)
+            .SingleOrDefaultAsync(cancellationToken);
+        var ambulanceId = liveAmbulanceId ?? await _db.AmbulanceCrewAssignments
+            .Where(assignment => assignment.StaffMemberId == _currentUser.Id && assignment.UnassignedAt == null)
+            .Select(assignment => (Guid?)assignment.AmbulanceId)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (ambulanceId is null) throw new NotFoundException("Assigned ambulance", _currentUser.Id);
+        return ToResponse(await GetEntityAsync(ambulanceId.Value, cancellationToken));
+    }
+
     public async Task ReportLocationAsync(Guid id, ReportAmbulanceLocationRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -311,7 +326,16 @@ public sealed class AmbulanceService : IAmbulanceService
         var ownsLiveRun = await _db.DispatchCrew.AnyAsync(crew =>
             crew.StaffMemberId == _currentUser.Id && crew.Dispatch.AmbulanceId == id
             && DispatchStatusExtensions.LiveStatuses.Contains(crew.Dispatch.Status), cancellationToken);
-        if (!ownsLiveRun) throw new ForbiddenException(MessageCode.Forbidden);
+        if (!ownsLiveRun)
+        {
+            var hasLiveRun = await _db.Dispatches.AnyAsync(dispatch => dispatch.AmbulanceId == id
+                && DispatchStatusExtensions.LiveStatuses.Contains(dispatch.Status), cancellationToken);
+            var assigned = await _db.AmbulanceCrewAssignments.AnyAsync(assignment =>
+                assignment.AmbulanceId == id && assignment.StaffMemberId == _currentUser.Id
+                && assignment.UnassignedAt == null, cancellationToken);
+            if (hasLiveRun || !assigned || !ambulance.IsActive)
+                throw new ForbiddenException(MessageCode.Forbidden);
+        }
         ambulance.CurrentLatitude = request.Latitude!.Value;
         ambulance.CurrentLongitude = request.Longitude!.Value;
         ambulance.LocationUpdatedAt = _timeProvider.GetUtcNow();

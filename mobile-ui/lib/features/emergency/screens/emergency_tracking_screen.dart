@@ -21,7 +21,9 @@ class _EmergencyTrackingScreenState extends State<EmergencyTrackingScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    context.read<PatientEmergencyController>().watch(widget.callId);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<PatientEmergencyController>().watch(widget.callId);
+    });
   }
 
   @override

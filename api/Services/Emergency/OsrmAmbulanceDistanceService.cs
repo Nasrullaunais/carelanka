@@ -19,6 +19,7 @@ public sealed class OsrmAmbulanceDistanceService : IAmbulanceDistanceService
         _logger = logger;
         _http.BaseAddress = new Uri(options.Value.Routing.BaseUrl);
         _http.Timeout = TimeSpan.FromSeconds(options.Value.Routing.TimeoutSeconds);
+        _http.DefaultRequestHeaders.UserAgent.ParseAdd("CareLanka/1.0");
     }
 
     public async Task<DistanceMeasurement> MeasureAsync(

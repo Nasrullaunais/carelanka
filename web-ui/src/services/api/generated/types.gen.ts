@@ -2906,6 +2906,39 @@ export type CreateAmbulanceResponses = {
 
 export type CreateAmbulanceResponse = CreateAmbulanceResponses[keyof CreateAmbulanceResponses];
 
+export type GetMyAmbulanceAssignmentData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/ambulances/mine';
+};
+
+export type GetMyAmbulanceAssignmentErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetMyAmbulanceAssignmentError = GetMyAmbulanceAssignmentErrors[keyof GetMyAmbulanceAssignmentErrors];
+
+export type GetMyAmbulanceAssignmentResponses = {
+    /**
+     * OK
+     */
+    200: Ambulance;
+};
+
+export type GetMyAmbulanceAssignmentResponse = GetMyAmbulanceAssignmentResponses[keyof GetMyAmbulanceAssignmentResponses];
+
 export type GetAmbulanceData = {
     body?: never;
     path: {

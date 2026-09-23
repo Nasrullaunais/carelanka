@@ -67,7 +67,7 @@ without it · reads patient details and lab reports · reads the discharge board
 ### Duty manager
 Everything reception and the ward nurse can do, plus the two things that need authority:
 **assigning a bed that does not match the assessed care level** (either direction), and
-**checking a patient in at ICU or HDU level**. Also handles emergency calls and ambulances,
+**checking a patient in at ICU level**. Also handles emergency calls and ambulances,
 and can start an agent workflow.
 
 ### Hospital administrator
@@ -122,7 +122,7 @@ It takes four people on purpose. One account will not do the whole thing.
 | Register and admit | Reception |
 | Assign the bed | Reception, nurse or duty manager. Duty manager only if the ward does not match the care level |
 | Mark them arrived | Reception, nurse or duty manager |
-| Check in a booked visit | Nurse or duty manager. Duty manager for ICU or HDU |
+| Check in a booked visit | Nurse or duty manager. Duty manager for ICU |
 | Tick clinical clearance | **Doctor** |
 | Raise and settle the bill | Reception |
 | Confirm the discharge | Reception, nurse or duty manager |

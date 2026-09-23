@@ -8,10 +8,10 @@ info:
     Manages a patient's stay from arrival to discharge: who they are, whether they are
     currently in the hospital, which bed they are in, and whether they can go home.
 
-    **The line this component does not cross.** `admission_category` (icu / hdu / inpatient /
-    day_case / outpatient) is a clinical decision, set by a human and recorded with
-    `category_set_by_staff_id`. It is an INPUT to bed placement, never an output. No endpoint
-    here lets an AI set or change it.
+    **The line this component does not cross.** `admission_category` (icu / general /
+    surgical / maternity / emergency) is a clinical decision, set by a human and recorded
+    with `category_set_by_staff_id`. It is an INPUT to bed placement, never an output. No
+    endpoint here lets an AI set or change it.
 
     **Design rationale** is in `patient-management-plan.md`.
     **Cross-component boundaries** are in `integration_of_functions.md`.
@@ -721,9 +721,9 @@ paths:
         Roles: any authenticated staff. Consumed by Staff Management (Member 2) to work out
         staffing demand.
 
-        `patients_by_category` is the useful part: fifteen routine inpatients and two
-        high-dependency patients need very different staffing, even though both are
-        "seventeen patients".
+        `patients_by_category` is the useful part: fifteen general-ward patients and two
+        ICU patients need very different staffing, even though both are "seventeen
+        patients".
 
         `incoming_next_2h` lets the Staff Allocation Agent staff AHEAD of a rush instead of
         reacting to one.
@@ -2240,8 +2240,8 @@ paths:
       tags: [Admissions]
       summary: Check in an expected patient
       description: |
-        Roles: WardNurse and GeneralStaff for outpatient, day_case and inpatient. DutyManager
-        for ICU and HDU.
+        Roles: WardNurse and GeneralStaff for general, surgical, maternity and emergency.
+        DutyManager for ICU.
 
         **Business op.** Turns an `Appointment` into an `Admission` with
         `source = pre_registered`, in one transaction: the appointment moves to `completed`
@@ -2255,8 +2255,8 @@ paths:
         and `category_set_by_staff_id` records who chose it.
 
         **The role split depends on the body, not the route.** A WardNurse or GeneralStaff may
-        check somebody in as `outpatient`, `day_case` or `inpatient`; `icu` and `hdu` are the
-        DutyManager's alone, and anyone else asking for either is a 403 carrying `cl_pat_011`.
+        check somebody in as `general`, `surgical`, `maternity` or `emergency`; `icu` is the
+        DutyManager's alone, and anyone else asking for it is a 403 carrying `cl_pat_011`.
 
         Returns the **admission**, not the appointment - the admission is what the desk works
         from next, and the booking is finished with. From here the patient is on
@@ -2716,9 +2716,14 @@ components:
     AdmissionCategory:
       type: string
       description: |
-        The care level. Set by clinical staff, never by an AI agent. Ordered most to least
-        intensive; the downgrade ladder walks icu -> hdu -> inpatient.
-      enum: [icu, hdu, inpatient, day_case, outpatient]
+        The care level. Set by clinical staff, never by an AI agent. Every value now
+        requires a bed - the only ladder left is icu (rung 0) against everything else
+        (rung 2); general/surgical/maternity/emergency carry equal acuity for bed
+        placement and differ only in which ward they belong in. emergency is a process
+        decision (skip full registration, admit now), not a physical ward type - it
+        places against general-typed wards via the rung system, same as any other rung-2
+        category.
+      enum: [icu, general, surgical, maternity, emergency]
 
     AppointmentStatus:
       type: string
@@ -2975,7 +2980,7 @@ components:
         status: { $ref: '#/components/schemas/WorklistStatus' }
         requires_bed:
           type: boolean
-          description: False for an outpatient, who is seen and goes home.
+          description: Always true - every `admission_category` value now reserves a bed.
         source:
           allOf:
             - $ref: '#/components/schemas/AdmissionSource'
@@ -3383,10 +3388,11 @@ components:
         requires_bed:
           type: boolean
           description: |
-            **Hard rule H0.** Whether this visit needs a bed at all. False for an
-            `outpatient` - a scan, a blood test, a dressing change - who is seen and sent
-            home. True for every other care level, `day_case` included: a day case is on a
-            real bed for hours and it is a bed nobody else can have.
+            **Hard rule H0.** Whether this visit needs a bed at all. Always true - every
+            `admission_category` value now reserves a bed. A visit that needs no bed at all
+            (a scan, a blood test, a dressing change) is never an `Admission` in the first
+            place; it is billed straight off the appointment instead
+            (`POST /appointments/{id}/bill`).
 
             Derived from `admission_category` and never stored, so the two cannot disagree.
             Published rather than left to the client, because a screen that works it out for
@@ -3570,7 +3576,8 @@ components:
         patients_by_category:
           type: object
           description: |
-            Care mix. Fifteen inpatients and two HDU patients need different staffing.
+            Care mix. Fifteen general-ward patients and two ICU patients need different
+            staffing.
 
             Keyed by `AdmissionCategory` wire value. **Every category is present, zeros
             included** - a category that vanished when it dropped to zero would disappear
@@ -3725,7 +3732,7 @@ components:
         patient: { $ref: '#/components/schemas/PatientSummary' }
         ward_name:
           type: string
-          description: Empty when the patient holds no bed, e.g. an outpatient.
+          description: Empty when the patient has not yet been assigned a bed.
         bed_number: { type: string }
         admission_category: { $ref: '#/components/schemas/AdmissionCategory' }
         admitted_at: { type: string, format: date-time, nullable: true }

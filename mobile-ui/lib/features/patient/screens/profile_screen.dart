@@ -251,7 +251,7 @@ class _EmergencyContact extends StatelessWidget {
 
     if (phone == null && name == null) {
       return SectionCard(
-        title: 'Emergency contact',
+        title: 'Emergency/guardian contact',
         icon: Icons.emergency_outlined,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -273,7 +273,7 @@ class _EmergencyContact extends StatelessWidget {
     }
 
     return SectionCard(
-      title: 'Emergency contact',
+      title: 'Emergency/guardian contact',
       icon: Icons.emergency_outlined,
       child: Row(
         children: [

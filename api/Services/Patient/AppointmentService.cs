@@ -30,8 +30,7 @@ public sealed class AppointmentService : IAppointmentService
 
     private static readonly AdmissionCategory[] DutyManagerOnly =
     [
-        AdmissionCategory.Icu,
-        AdmissionCategory.Hdu
+        AdmissionCategory.Icu
     ];
 
     private readonly CareLankaDbContext _db;

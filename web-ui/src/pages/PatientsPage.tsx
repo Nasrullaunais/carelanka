@@ -1,6 +1,7 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   assignBedManuallyMutation,
@@ -12,6 +13,7 @@ import {
   listPatientWorklistOptions,
   listWardsOptions,
   markArrivedMutation,
+  updatePatientMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
 import type { PrincipalRole, WorklistRow } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
@@ -20,10 +22,20 @@ import { BedCandidateTable } from '../components/BedCandidateTable';
 import {
   canAssignBed,
   canCompleteVisit,
+  canEditPatient,
   canMarkArrived,
   canReadMedicalProfile,
   canReadPatientDetails,
 } from '../types/permissions';
+import {
+  PatientFields,
+  emptyPatientForm,
+  onSubmit,
+  patientFormBody,
+  patientFormFrom,
+  patientFormProblems,
+  usePatientForm,
+} from './intake-form';
 import { localDateTime } from '../types/datetime';
 import { placementFor } from '../types/beds';
 import type { Placement } from '../types/beds';
@@ -36,7 +48,6 @@ import {
 import {
   admissionCategoryLabels,
   admissionSourceLabels,
-  admissionUrgencyLabels,
   detailFieldLabel,
   genderLabels,
   patientIdentifier,
@@ -70,6 +81,44 @@ export function PatientsPage() {
     }),
     enabled: canRead,
   });
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pendingAssignId = searchParams.get('assignBed');
+
+  const pendingAdmission = useQuery({
+    ...getAdmissionOptions({ path: { id: pendingAssignId ?? '' } }),
+    enabled: canRead && pendingAssignId !== null,
+  });
+
+  // Coming straight from an emergency admission: search for that patient's row so it is on
+  // the current page, then fall through to the effect below that opens the assign panel.
+  useEffect(() => {
+    const code = pendingAdmission.data?.patient?.patient_code;
+
+    if (!pendingAssignId || !code) {
+      return;
+    }
+
+    setSearch(code);
+    setSubmitted(code);
+    setPage(1);
+  }, [pendingAssignId, pendingAdmission.data]);
+
+  useEffect(() => {
+    const row = (board.data?.items ?? []).find((item) => item.id === pendingAssignId);
+
+    if (!pendingAssignId || !row || !canAssignBed(role)) {
+      return;
+    }
+
+    setOpenId(null);
+    setBedMode('assign');
+    setAssigningId(row.id);
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('assignBed');
+    setSearchParams(next, { replace: true });
+  }, [pendingAssignId, board.data, role, searchParams, setSearchParams]);
 
   if (!canRead) {
     return (
@@ -223,10 +272,6 @@ export function PatientsPage() {
                       {row.admission_category ? (
                         <>
                           {admissionCategoryLabels[row.admission_category]}
-                          <br />
-                          <span className="muted">
-                            {row.urgency ? admissionUrgencyLabels[row.urgency] : ''}
-                          </span>
                           {row.is_infectious && (
                             <>
                               <br />
@@ -633,6 +678,8 @@ function DetailsPanel({
 
   const visit = useQuery(getAdmissionOptions({ path: { id: row.id } }));
 
+  const [editing, setEditing] = useState(false);
+
   const liveBed = visit.data?.bed_assignments?.find(
     (assignment) => assignment.status !== 'released',
   );
@@ -641,31 +688,52 @@ function DetailsPanel({
     <div className="drawer-body">
       <h3>Patient details</h3>
       {patient.isLoading && <p className="empty">Loading…</p>}
-      {patient.data && (
-        <table>
-          <tbody>
-            <Field label={patient.data.nic ? 'NIC' : 'Reference'}>
-              {patientIdentifier(patient.data)}
-            </Field>
-            <Field label="Gender">{genderLabels[patient.data.gender]}</Field>
-            <Field label="Date of birth">{patient.data.date_of_birth}</Field>
-            <Field label="Phone">{patient.data.phone}</Field>
-            <Field label="Address">{patient.data.address}</Field>
-            <Field label="Emergency contact">
-              {patient.data.emergency_contact_name
-                ? `${patient.data.emergency_contact_name} · ${
-                    patient.data.emergency_contact_phone ?? 'no number'
-                  }`
-                : null}
-            </Field>
-            <Field label="Registered">
-              {patient.data.created_at ? localDateTime(patient.data.created_at) : null}
-            </Field>
-            <Field label="Mobile app account">
-              {patient.data.has_account ? 'Linked' : 'None'}
-            </Field>
-          </tbody>
-        </table>
+
+      {patient.data && editing && (
+        <EditPatientPanel
+          patientId={patient.data.id}
+          identified={patient.data.nic !== null}
+          onDone={() => setEditing(false)}
+        />
+      )}
+
+      {patient.data && !editing && (
+        <>
+          <table>
+            <tbody>
+              <Field label={patient.data.nic ? 'NIC' : 'Reference'}>
+                {patientIdentifier(patient.data)}
+              </Field>
+              <Field label="Gender">{genderLabels[patient.data.gender]}</Field>
+              <Field label="Date of birth">{patient.data.date_of_birth}</Field>
+              <Field label="Phone">{patient.data.phone}</Field>
+              <Field label="Address">{patient.data.address}</Field>
+              <Field label="Emergency/guardian contact">
+                {patient.data.emergency_contact_name
+                  ? `${patient.data.emergency_contact_name} · ${
+                      patient.data.emergency_contact_phone ?? 'no number'
+                    }`
+                  : null}
+              </Field>
+              <Field label="Registered">
+                {patient.data.created_at ? localDateTime(patient.data.created_at) : null}
+              </Field>
+              <Field label="Mobile app account">
+                {patient.data.has_account ? 'Linked' : 'None'}
+              </Field>
+            </tbody>
+          </table>
+
+          {canEditPatient(role) && (
+            <button
+              type="button"
+              style={{ marginTop: '0.6rem' }}
+              onClick={() => setEditing(true)}
+            >
+              Edit patient details
+            </button>
+          )}
+        </>
       )}
 
       <>
@@ -680,15 +748,8 @@ function DetailsPanel({
                 <Field label="Care level">
                   {admissionCategoryLabels[visit.data.admission_category]}
                 </Field>
-                <Field label="Urgency">{admissionUrgencyLabels[visit.data.urgency]}</Field>
-                <Field label="Needs a bed">
-                  {visit.data.requires_bed ? 'Yes' : 'No — outpatient, no bed is held'}
-                </Field>
                 <Field label="Needs isolation">{visit.data.is_infectious ? 'Yes' : 'No'}</Field>
-                <Field
-                  label="Bed"
-                  empty={visit.data.requires_bed ? 'Not assigned yet' : 'None needed'}
-                >
+                <Field label="Bed" empty="Not assigned yet">
                   {visit.data.ward_name
                     ? `${visit.data.ward_name} · ${visit.data.bed_number}`
                     : null}
@@ -756,6 +817,82 @@ function DetailsPanel({
         Close
       </button>
     </div>
+  );
+}
+
+function EditPatientPanel({
+  patientId,
+  identified,
+  onDone,
+}: {
+  patientId: string;
+  identified: boolean;
+  onDone: () => void;
+}) {
+  const queryClient = useQueryClient();
+
+  const existing = useQuery(getPatientOptions({ path: { id: patientId } }));
+
+  const form = usePatientForm(emptyPatientForm(false));
+  const problems = patientFormProblems(form.value, identified, existing.data?.nic ?? '');
+
+  const [loadedId, setLoadedId] = useState<string | null>(null);
+
+  if (existing.data && loadedId !== existing.data.id) {
+    setLoadedId(existing.data.id);
+    form.replace(patientFormFrom(existing.data));
+  }
+
+  const save = useMutation({
+    ...updatePatientMutation(),
+    onSuccess: (saved) => {
+      toast.success(`${saved.full_name} updated.`);
+
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const id = (query.queryKey[0] as { _id?: string } | undefined)?._id;
+
+          return id === 'listPatients' || id === 'getPatient' || id === 'listPatientWorklist';
+        },
+      });
+
+      onDone();
+    },
+  });
+
+  if (existing.isLoading || !existing.data) {
+    return <p className="empty">Loading…</p>;
+  }
+
+  const patient = existing.data;
+
+  return (
+    <form
+      onSubmit={onSubmit(() =>
+        save.mutate({
+          path: { id: patientId },
+          body: patientFormBody(form.value, patient.nic ?? null),
+        }),
+      )}
+    >
+      <PatientFields
+        value={form.value}
+        set={form.set}
+        idPrefix="board-edit"
+        identified={identified}
+        allowUnknownGender={!identified}
+        nic={patient.nic ?? ''}
+      />
+
+      <div className="row">
+        <button type="submit" disabled={save.isPending || problems.blocked}>
+          {save.isPending ? 'Saving...' : 'Save'}
+        </button>
+        <button type="button" className="secondary" onClick={onDone}>
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }
 

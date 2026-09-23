@@ -272,8 +272,6 @@ public sealed class BillingService : IBillingService
             _db.BillLineItems.Remove(line);
         }
 
-        var prices = await _rates.GetPriceListAsync(ct);
-
         Add(bill, new BillLineEntity
         {
             Id = Guid.NewGuid(),
@@ -281,7 +279,7 @@ public sealed class BillingService : IBillingService
             Source = BillLineSource.ConsultationFee,
             Description = "Consultation fee",
             Quantity = 1m,
-            UnitPrice = prices.AdmissionFee(AdmissionCategory.Outpatient)
+            UnitPrice = BillingRates.ConsultationFee
         });
     }
 

@@ -8,13 +8,11 @@ namespace CareLanka.Api.Services.Patient;
 
 public static class BedPlacementRules
 {
-    public static bool RequiresBed(AdmissionCategory category)
-        => category != AdmissionCategory.Outpatient;
+    public static bool RequiresBed(AdmissionCategory category) => true;
 
     public static int Rung(AdmissionCategory category) => category switch
     {
         AdmissionCategory.Icu => 0,
-        AdmissionCategory.Hdu => 1,
         _ => 2
     };
 

@@ -146,9 +146,9 @@ public sealed class DischargeBillingEndpointTests
     }
 
     [Fact]
-    public async Task A_visit_with_no_bed_is_billed_the_fee_alone()
+    public async Task A_visit_billed_before_a_bed_is_assigned_carries_the_fee_alone()
     {
-        var admissionId = await NewAdmissionAsync(category: "outpatient");
+        var admissionId = await NewAdmissionAsync(category: "general");
 
         using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
         using var body = await ReadJsonAsync(
@@ -158,7 +158,7 @@ public sealed class DischargeBillingEndpointTests
 
         Assert.Single(lines);
         Assert.Equal("admission_fee", lines[0].GetProperty("source").GetString());
-        Assert.Equal(1500m, body.RootElement.GetProperty("total").GetDecimal());
+        Assert.Equal(3000m, body.RootElement.GetProperty("total").GetDecimal());
     }
 
     [Fact]
@@ -582,7 +582,7 @@ public sealed class DischargeBillingEndpointTests
     private sealed record TestVisit(string AdmissionId, Guid BedId, string BedNumber);
 
     private async Task<TestVisit> AdmittedVisitAsync(
-        string wardType = "general", string category = "inpatient")
+        string wardType = "general", string category = "general")
     {
         var ward = await NewWardAsync(wardType);
         var (bedId, bedNumber) = await AddBedAsync(ward);
@@ -604,7 +604,7 @@ public sealed class DischargeBillingEndpointTests
     }
 
     private async Task<TestVisit> ReadyToGoAsync(
-        string wardType = "general", string category = "inpatient")
+        string wardType = "general", string category = "general")
     {
         var visit = await AdmittedVisitAsync(wardType, category);
 

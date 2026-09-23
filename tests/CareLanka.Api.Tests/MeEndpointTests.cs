@@ -738,7 +738,7 @@ public sealed class MeEndpointTests
         {
             patient_id = patientId,
             source = "walk_in",
-            admission_category = "inpatient",
+            admission_category = "general",
             category_set_by_staff_id = await NurseIdAsync(),
             urgency = "routine",
             is_infectious = false

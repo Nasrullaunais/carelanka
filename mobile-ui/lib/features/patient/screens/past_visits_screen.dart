@@ -242,18 +242,15 @@ class _Skeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(
-        AppTheme.gutter,
-        12,
-        AppTheme.gutter,
-        32,
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(AppTheme.gutter, 12, AppTheme.gutter, 32),
+      child: Column(
+        children: [
+          Skeleton(height: 120, radius: AppTheme.radiusL),
+          SizedBox(height: 10),
+          Skeleton(height: 120, radius: AppTheme.radiusL),
+        ],
       ),
-      children: const [
-        Skeleton(height: 120, radius: AppTheme.radiusL),
-        SizedBox(height: 10),
-        Skeleton(height: 120, radius: AppTheme.radiusL),
-      ],
     );
   }
 }

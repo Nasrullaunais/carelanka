@@ -852,6 +852,25 @@ makes an `Include` silently drop history rows once an item is retired — the tr
 outlive the thing it describes. An `adjusted` row requires a `Note`; a stocktake correction
 nobody explained cannot be audited later.
 
+#### ReorderSuggestion extends AuditedEntity *(new, 2026-09-22)*
+```
++ PharmacyItemId: Guid (non-null) FK → PharmacyItem.Id
++ CurrentThreshold: int (non-null) -- snapshot at submit time
++ CurrentQuantityOnHand: int (non-null) -- snapshot at submit time
++ SuggestedThreshold: int (nullable) -- set once the run completes
++ Reasoning: string (nullable, max 280) -- one sentence for the reviewer, never raw model output
++ Source: ReorderSuggestionSource (nullable) -- model | model_unavailable | model_rejected
++ CompletedAt: DateTimeOffset (nullable)
+```
+**Table:** `reorder_suggestions`
+**Constraints:** CHECK(source IN the enum)
+**Index:** `PharmacyItemId`
+**Note:** The reorder-threshold advisor's record — one row per run, created before the agent
+runs so `AgentWorkflow.entity_id` has something to point at, filled in once the run completes.
+Applying `SuggestedThreshold` is a separate write on `PharmacyItem.ReorderThreshold` a human
+makes afterwards; nothing here ever changes the threshold itself. See
+`equipment-management-plan.md` §8.10.
+
 #### Prescription extends AuditedEntity *(Rev 4.1 — new, 2026-09-17)*
 ```
 + PatientId: Guid (non-null) -- Patient Management's patient, id only
@@ -1836,6 +1855,15 @@ Serialized as `received`, `dispensed`, `adjusted`, `expired_removed`.
 Quantity on a transaction is always positive; **this is what gives it a sign**, so a row can
 never be read two ways. `Dispensed` and `ExpiredRemoved` take stock and are guarded;
 `Received` and `Adjusted` add it.
+
+### ReorderSuggestionSource *(new, 2026-09-22)*
+```
+Model, ModelUnavailable, ModelRejected
+```
+Serialized as `model`, `model_unavailable`, `model_rejected`. Mirrors Patient's
+`CareDraftSource`: only `Model` is the language model's own reasoning about this medicine;
+the other two are the same deterministic formula, and the reviewer needs to be told which one
+they are looking at.
 
 **Open:** `equipment-management-plan.md` §5.1 describes `Adjusted` as `±quantity`, but the
 published request carries a positive quantity with no sign and the documented 409 names only

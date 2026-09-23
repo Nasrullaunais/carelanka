@@ -10,11 +10,12 @@ import {
   listWardsOptions,
   requestBedSuggestionMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
-import type { BedAgentStep, PrincipalRole, SuggestedBed } from '../services/api/generated';
+import type { PrincipalRole, SuggestedBed } from '../services/api/generated';
 import { canSetHighCareLevel } from '../types/permissions';
 import { placementFor } from '../types/beds';
 import type { Placement } from '../types/beds';
 import { admissionCategoryLabels, admissionUrgencyLabels, genderLabels } from '../types/patients';
+import { AgentProgress } from './AgentProgress';
 import { BedCandidateTable } from './BedCandidateTable';
 import type { BedCandidateBed } from './BedCandidateTable';
 
@@ -222,7 +223,7 @@ export function BedSuggestionPanel({
       <h3>Bed suggestion</h3>
 
       {(workflow.isLoading || running) && (
-        <AgentProgress plan={workflow.data?.plan} steps={workflow.data?.steps} />
+        <AgentProgress plan={workflow.data?.plan} steps={workflow.data?.steps} captions={STEP_CAPTIONS} />
       )}
 
       {workflow.isError && (
@@ -422,48 +423,3 @@ function BedCard({
   );
 }
 
-/**
- * What the agent has worked out so far, not a spinner with a caption bolted on. The plan comes
- * back the instant the run starts (§8.7), and `steps` fills in as the run actually completes
- * them, so this reads the real state of the run rather than a guess timed to feel about right.
- */
-function AgentProgress({
-  plan,
-  steps,
-}: {
-  plan: string[] | null | undefined;
-  steps: BedAgentStep[] | null | undefined;
-}) {
-  const order = plan && plan.length > 0 ? plan : Object.keys(STEP_CAPTIONS);
-  const done = new Set((steps ?? []).filter((step) => step.ok !== false).map((step) => step.step));
-  const currentIndex = order.findIndex((step) => !done.has(step));
-
-  return (
-    <ul className="agent-progress" style={{ listStyle: 'none', margin: '0.5rem 0 0', padding: 0 }}>
-      {order.map((step, index) => {
-        const isDone = done.has(step);
-        const isCurrent = !isDone && index === currentIndex;
-        const caption = STEP_CAPTIONS[step] ?? step;
-
-        return (
-          <li
-            key={step}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.2rem 0',
-              opacity: isDone || isCurrent ? 1 : 0.45,
-            }}
-          >
-            <span aria-hidden="true">{isDone ? '✓' : isCurrent ? '…' : '·'}</span>
-            <span className={isCurrent ? '' : 'muted'}>
-              {caption}
-              {isCurrent ? '…' : ''}
-            </span>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}

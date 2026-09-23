@@ -17,6 +17,7 @@ import { ItemHistoryCard } from './pharmacy/ItemHistoryCard';
 import { AddBatchDialog, BatchList } from './pharmacy/BatchList';
 import { RemoveMedicineDialog } from './pharmacy/RemoveMedicineDialog';
 import { PrescriptionsCard } from './pharmacy/PrescriptionsCard';
+import { ReorderSuggestionPanel } from './pharmacy/ReorderSuggestionPanel';
 
 const PAGE_SIZE = 10;
 
@@ -272,6 +273,7 @@ function ItemRows({
   onChanged: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
   const manage = canManageEquipment(role);
 
   return (
@@ -306,7 +308,10 @@ function ItemRows({
         </td>
         {manage && (
           <td>
-            <MoveStockButton item={item} onChanged={onChanged} />
+            <MoveStockButton item={item} onChanged={onChanged} />{' '}
+            <button type="button" className="secondary" onClick={() => setSuggesting(true)}>
+              Suggest threshold
+            </button>
           </td>
         )}
       </tr>
@@ -315,6 +320,18 @@ function ItemRows({
         <tr>
           <td colSpan={manage ? 6 : 5}>
             <BatchList item={item} manage={manage} onChanged={onChanged} />
+          </td>
+        </tr>
+      )}
+
+      {suggesting && (
+        <tr className="drawer">
+          <td colSpan={manage ? 6 : 5}>
+            <ReorderSuggestionPanel
+              item={item}
+              onClose={() => setSuggesting(false)}
+              onChanged={onChanged}
+            />
           </td>
         </tr>
       )}
@@ -415,7 +432,6 @@ function AddItemCard({
   const [expiryDate, setExpiryDate] = useState('');
   const [unit, setUnit] = useState('box');
   const [quantity, setQuantity] = useState('0');
-  const [threshold, setThreshold] = useState('10');
   const [unitPrice, setUnitPrice] = useState('');
 
   const [newCategory, setNewCategory] = useState('');
@@ -455,7 +471,6 @@ function AddItemCard({
         expiry_date: expiryDate || null,
         unit: unit.trim(),
         quantity_on_hand: Number(quantity),
-        reorder_threshold: Number(threshold),
         unit_price: unitPrice ? Number(unitPrice) : null,
       },
     });
@@ -472,7 +487,9 @@ function AddItemCard({
 
       <p className="muted" style={{ marginBottom: '0.9rem' }}>
         The quantity here is opening stock. After this, it only ever changes through a
-        recorded movement, so the shelf and the history can never disagree.
+        recorded movement, so the shelf and the history can never disagree. The reorder
+        threshold starts at 10 — there is no dispensing history yet for Suggest threshold to
+        reason from, so set it once the medicine has some.
       </p>
 
       {categories.length === 0 && (
@@ -564,17 +581,6 @@ function AddItemCard({
               min={0}
               value={quantity}
               onChange={(event) => setQuantity(event.target.value)}
-              required
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="ph-threshold">Reorder threshold</label>
-            <input
-              id="ph-threshold"
-              type="number"
-              min={0}
-              value={threshold}
-              onChange={(event) => setThreshold(event.target.value)}
               required
             />
           </div>

@@ -15,6 +15,7 @@ using CareLanka.Api.Services.Equipment.Stubs;
 using CareLanka.Api.Services.Emergency;
 using CareLanka.Api.Services.Emergency.Stubs;
 using CareLanka.Api.Agents;
+using CareLanka.Api.Agents.Equipment;
 using CareLanka.Api.Agents.Patient;
 using CareLanka.Api.Services.Patient;
 using FluentValidation;
@@ -481,6 +482,17 @@ builder.Services.AddScoped<ICareRecommendationService, CareRecommendationService
 builder.Services.AddScoped<CareAgentExecutor>();
 builder.Services.AddSingleton<ICareRunQueue, CareRunQueue>();
 builder.Services.AddHostedService<CareAgentWorker>();
+
+// The reorder-threshold advisor. One read tool, no write tool at all - applying a suggestion is
+// a plain PharmacyItemService edit a human makes separately, never something this agent does.
+// Its own queue and worker, same reasoning as the care agent's: agents do not share a channel.
+builder.Services.AddScoped<IReorderAgentTools, ReorderAgentTools>();
+builder.Services.AddScoped<IReorderAdvisor, GeminiReorderAdvisor>();
+builder.Services.AddScoped<IReorderAgent, ReorderAgent>();
+builder.Services.AddScoped<IReorderSuggestionService, ReorderSuggestionService>();
+builder.Services.AddScoped<ReorderAgentExecutor>();
+builder.Services.AddSingleton<IReorderRunQueue, ReorderRunQueue>();
+builder.Services.AddHostedService<ReorderAgentWorker>();
 
 // ADR 2: the provider is one registration and nothing in an agent knows which model answered.
 // With no key the API still starts and every agent still answers - see NoLanguageModel.

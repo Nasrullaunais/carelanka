@@ -1453,6 +1453,33 @@ export type RelatedEntityType = 'pharmacy_item' | 'equipment_item' | 'bed';
 
 export type ReleaseReason = 'discharged' | 'hold_expired' | 'cancelled' | 'transferred' | 'rejected' | 'corrected';
 
+export type ReorderSuggestionAccepted = {
+    workflow_id?: string;
+    suggestion_id?: string;
+    status?: string | null;
+    poll_url?: string | null;
+};
+
+export type ReorderSuggestionSource = 'model' | 'model_unavailable' | 'model_rejected';
+
+export type ReorderWorkflowStatus = 'running' | 'completed' | 'failed';
+
+export type ReorderWorkflowSummary = {
+    workflow_id?: string;
+    suggestion_id?: string;
+    pharmacy_item_id?: string;
+    objective?: string | null;
+    status?: ReorderWorkflowStatus;
+    plan?: Array<string> | null;
+    steps?: Array<BedAgentStep> | null;
+    current_threshold?: number;
+    current_quantity_on_hand?: number;
+    suggested_threshold?: number | null;
+    reasoning?: string | null;
+    source?: ReorderSuggestionSource;
+    retries?: number;
+};
+
 export type ReportAmbulanceLocationRequest = {
     latitude?: number | null;
     longitude?: number | null;
@@ -1567,6 +1594,10 @@ export type UpdatePatientRequest = {
     address?: string | null;
     emergency_contact_name?: string | null;
     emergency_contact_phone?: string | null;
+};
+
+export type UpdateReorderThresholdRequest = {
+    reorder_threshold: number;
 };
 
 export type ValidationProblemDetails = {
@@ -7507,6 +7538,119 @@ export type RecordPharmacyBatchTransactionResponses = {
 };
 
 export type RecordPharmacyBatchTransactionResponse = RecordPharmacyBatchTransactionResponses[keyof RecordPharmacyBatchTransactionResponses];
+
+export type UpdateReorderThresholdData = {
+    body?: UpdateReorderThresholdRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/pharmacy-items/{id}/reorder-threshold';
+};
+
+export type UpdateReorderThresholdErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type UpdateReorderThresholdError = UpdateReorderThresholdErrors[keyof UpdateReorderThresholdErrors];
+
+export type UpdateReorderThresholdResponses = {
+    /**
+     * OK
+     */
+    200: PharmacyItem;
+};
+
+export type UpdateReorderThresholdResponse = UpdateReorderThresholdResponses[keyof UpdateReorderThresholdResponses];
+
+export type SubmitReorderSuggestionData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/pharmacy-items/{id}/reorder-suggestion';
+};
+
+export type SubmitReorderSuggestionErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type SubmitReorderSuggestionError = SubmitReorderSuggestionErrors[keyof SubmitReorderSuggestionErrors];
+
+export type SubmitReorderSuggestionResponses = {
+    /**
+     * Accepted
+     */
+    202: ReorderSuggestionAccepted;
+};
+
+export type SubmitReorderSuggestionResponse = SubmitReorderSuggestionResponses[keyof SubmitReorderSuggestionResponses];
+
+export type GetReorderSuggestionWorkflowData = {
+    body?: never;
+    path: {
+        workflowId: string;
+    };
+    query?: never;
+    url: '/pharmacy-items/reorder-suggestions/{workflowId}';
+};
+
+export type GetReorderSuggestionWorkflowErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetReorderSuggestionWorkflowError = GetReorderSuggestionWorkflowErrors[keyof GetReorderSuggestionWorkflowErrors];
+
+export type GetReorderSuggestionWorkflowResponses = {
+    /**
+     * OK
+     */
+    200: ReorderWorkflowSummary;
+};
+
+export type GetReorderSuggestionWorkflowResponse = GetReorderSuggestionWorkflowResponses[keyof GetReorderSuggestionWorkflowResponses];
 
 export type ListPrescriptionsData = {
     body?: never;

@@ -1101,6 +1101,97 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /pharmacy-items/{id}/reorder-threshold:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    patch:
+      tags: [Pharmacy]
+      summary: Set a medicine's reorder threshold
+      description: |
+        Roles: InventoryAdministrator.
+
+        A plain edit of one field, distinct from the atomic stock-quantity movements above.
+        Whether the new number came from typing it in or from reading a reorder-suggestion
+        run's output, applying it is always this same deliberate write - the agent below never
+        calls this itself.
+      operationId: updateReorderThreshold
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateReorderThresholdRequest' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PharmacyItem' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /pharmacy-items/{id}/reorder-suggestion:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Pharmacy]
+      summary: Run the reorder-threshold advisor for one medicine
+      description: |
+        Roles: InventoryAdministrator.
+
+        Agent entry point, narrower than the standing sweep: reads this one medicine's recent
+        `dispensed` transactions and asks the model to suggest a new reorder threshold, with a
+        one-sentence reason - a trend a flat threshold/3-day-supply rule can't see, such as
+        usage doubling over two weeks. Starts the workflow and returns immediately with a
+        `workflow_id`; poll `/pharmacy-items/reorder-suggestions/{workflowId}`.
+
+        One read tool, no write tool at all. The agent never sets the threshold itself -
+        `PATCH /pharmacy-items/{id}/reorder-threshold` is a separate, deliberate action a human
+        takes after reading the suggestion. 409 if a suggestion is already running for this
+        medicine.
+      operationId: submitReorderSuggestion
+      responses:
+        '202':
+          description: Workflow started
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReorderSuggestionAccepted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: A suggestion for this medicine is already running.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /pharmacy-items/reorder-suggestions/{workflowId}:
+    parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Pharmacy]
+      summary: Reorder-suggestion agent execution summary
+      description: |
+        Roles: InventoryAdministrator.
+
+        Plan, completed steps, tool calls with timings, validation result, and - once
+        completed - the suggested threshold and its reason. The model's raw internal reasoning
+        is NOT stored, only the one-sentence summary.
+      operationId: getReorderSuggestionWorkflow
+      responses:
+        '200':
+          description: Execution summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReorderWorkflowSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   # ------------------------------------------------------------------
   # Laboratory
   # ------------------------------------------------------------------
@@ -2482,6 +2573,61 @@ components:
               type: boolean
               description: Computed as quantity_on_hand > 0, never stored - the literal availability check from the component plan.
             below_threshold: { type: boolean }
+
+    UpdateReorderThresholdRequest:
+      type: object
+      required: [reorder_threshold]
+      properties:
+        reorder_threshold: { type: integer, minimum: 0 }
+
+    ReorderSuggestionAccepted:
+      type: object
+      properties:
+        workflow_id: { type: string, format: uuid }
+        suggestion_id: { type: string, format: uuid }
+        status: { type: string, example: running }
+        poll_url: { type: string, example: /api/pharmacy-items/reorder-suggestions/3fa85f64-5717-4562-b3fc-2c963f66afa6 }
+
+    ReorderWorkflowSummary:
+      type: object
+      description: |
+        Persisted agent execution state for the reorder-threshold advisor. Raw model reasoning
+        is not stored, only the one-sentence summary the reviewer reads.
+      properties:
+        workflow_id: { type: string, format: uuid }
+        suggestion_id: { type: string, format: uuid }
+        pharmacy_item_id: { type: string, format: uuid }
+        objective: { type: string, enum: [suggest_reorder_threshold] }
+        status:
+          type: string
+          enum: [running, completed, failed]
+        plan:
+          type: array
+          items: { type: string }
+        steps:
+          type: array
+          items:
+            type: object
+            properties:
+              step: { type: string }
+              tool: { type: string, nullable: true }
+              started_at: { type: string, format: date-time }
+              duration_ms: { type: integer }
+              ok: { type: boolean }
+              error: { type: string, nullable: true }
+        current_threshold: { type: integer }
+        current_quantity_on_hand: { type: integer }
+        suggested_threshold: { type: integer, nullable: true }
+        reasoning:
+          type: string
+          nullable: true
+          description: A one-sentence reason for the reviewer, at most 280 characters.
+        source:
+          type: string
+          enum: [model, model_unavailable, model_rejected]
+          nullable: true
+          description: Whether the number is the model's own reasoning or the deterministic formula - null while the run is still going.
+        retries: { type: integer }
 
     CreatePharmacyTransactionRequest:
       type: object

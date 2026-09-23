@@ -24,12 +24,16 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    context.read<MyRunController>().startPolling();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<MyRunController>().startPolling();
+    });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) context.read<MyRunController>().load(showLoading: false);
+    if (state == AppLifecycleState.resumed) {
+      context.read<MyRunController>().load(showLoading: false);
+    }
   }
 
   @override
@@ -60,12 +64,20 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
         ),
         body: Column(
           children: [
-            if (locationNotice != null && controller.state.valueOrNull != null)
-              MaterialBanner(content: Text(locationNotice), actions: const [SizedBox.shrink()]),
+            if (locationNotice != null)
+              MaterialBanner(
+                content: Text(locationNotice),
+                actions: const [SizedBox.shrink()],
+              ),
             if (error != null)
               MaterialBanner(
                 content: Text(error.message),
-                actions: [TextButton(onPressed: controller.clearActionError, child: const Text('Dismiss'))],
+                actions: [
+                  TextButton(
+                    onPressed: controller.clearActionError,
+                    child: const Text('Dismiss'),
+                  ),
+                ],
               ),
             Expanded(
               child: AsyncView(
@@ -77,13 +89,15 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
                         child: const EmptyView(
                           icon: Icons.local_hospital_outlined,
                           title: 'No run right now',
-                          message: 'When the duty manager sends you to a call it will appear here.',
+                          message:
+                              'When the duty manager sends you to a call it will appear here.',
                         ),
                       )
                     : RunCard(
                         run: run,
                         busy: controller.busy,
-                        onStep: () => _step(context, controller, run.status?.nextStep),
+                        onStep: () =>
+                            _step(context, controller, run.status?.nextStep),
                         onDecline: () => _decline(context, controller),
                         onNavigate: () => _navigate(context, controller),
                       ),
@@ -95,13 +109,22 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
     );
   }
 
-  Future<void> _step(BuildContext context, MyRunController controller, RunStep? step) async {
+  Future<void> _step(
+    BuildContext context,
+    MyRunController controller,
+    RunStep? step,
+  ) async {
     switch (step) {
       case RunStep.acknowledge:
         await controller.acknowledge();
       case RunStep.handOver:
         final details = await askHandoverDetails(context);
-        if (details != null) await controller.handOver(notes: details.notes, patientCondition: details.patientCondition);
+        if (details != null) {
+          await controller.handOver(
+            notes: details.notes,
+            patientCondition: details.patientCondition,
+          );
+        }
       case null:
         break;
       default:
@@ -109,22 +132,34 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _decline(BuildContext context, MyRunController controller) async {
+  Future<void> _decline(
+    BuildContext context,
+    MyRunController controller,
+  ) async {
     final reason = await askDeclineReason(context);
     if (reason != null) await controller.decline(reason);
   }
 
-  Future<void> _navigate(BuildContext context, MyRunController controller) async {
+  Future<void> _navigate(
+    BuildContext context,
+    MyRunController controller,
+  ) async {
     final target = await controller.navigationTarget();
     final url = target?.googleMapsUrl;
     if (url != null && context.mounted) await openInMaps(context, url);
   }
 
   String? _locationNotice(CrewLocationReportingState state) => switch (state) {
-        CrewLocationReportingState.reporting || CrewLocationReportingState.stopped => null,
-        CrewLocationReportingState.permissionDenied => 'Location permission is needed to report this ambulance position.',
-        CrewLocationReportingState.permissionPermanentlyDenied => 'Enable location permission in device settings to report this ambulance position.',
-        CrewLocationReportingState.unavailable => 'Location services are unavailable on this device.',
-        CrewLocationReportingState.failed => 'Location reporting stopped. Reopen this screen to try again.',
-      };
+    CrewLocationReportingState.reporting =>
+      'Sharing your assigned ambulance location while this screen is open.',
+    CrewLocationReportingState.stopped => null,
+    CrewLocationReportingState.permissionDenied =>
+      'Location permission is needed to report this ambulance position.',
+    CrewLocationReportingState.permissionPermanentlyDenied =>
+      'Enable location permission in device settings to report this ambulance position.',
+    CrewLocationReportingState.unavailable =>
+      'Location services are unavailable on this device.',
+    CrewLocationReportingState.failed =>
+      'Could not update ambulance location. Retrying shortly.',
+  };
 }

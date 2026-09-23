@@ -1,5 +1,7 @@
 # web-ui — the React app
 
+For the current Docker API, web UI, and USB phone setup, see [LOCAL_SETUP.md](../LOCAL_SETUP.md).
+
 Plain React + Vite. Server state in TanStack Query. **The API client is generated,
 never hand-written.**
 
@@ -16,12 +18,12 @@ You need three things up, in this order.
 2. The API, on port 5231
        dotnet run --project api --launch-profile http
 
-3. This app, on port 5173
+3. This app, on port 5174
        npm install
        npm run dev
 ```
 
-Then open http://localhost:5173 and sign in with an account from `TEST_ACCOUNTS.md`.
+Then open http://localhost:5174 and sign in with an account from `TEST_ACCOUNTS.md`.
 
 **Start the API before this app.** Vite proxies `/api` to `localhost:5231`; without it
 every request toasts "Could not reach the server".

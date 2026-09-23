@@ -1,6 +1,8 @@
 import { toast } from 'sonner';
 import { client } from './generated/client.gen';
 import { clearSession, getAccessToken } from '../auth/session';
+import { problemMessage } from './errors';
+import type { ProblemDetails } from './generated';
 
 client.interceptors.request.use((request) => {
   const token = getAccessToken();
@@ -38,7 +40,11 @@ client.interceptors.error.use((error, response, request) => {
     return error;
   }
 
-  toast.error(messageOf(error) ?? `Request failed (${response.status}).`);
+  if (response.status === 409) {
+    return error;
+  }
+
+  toast.error(problemMessage(error as ProblemDetails) ?? `Request failed (${response.status}).`);
 
   return error;
 });
@@ -69,32 +75,4 @@ function pathOf(request: Request | undefined): string {
   } catch {
     return request.url;
   }
-}
-
-function messageOf(error: unknown): string | undefined {
-  if (typeof error !== 'object' || error === null) {
-    return typeof error === 'string' ? error : undefined;
-  }
-
-  const problem = error as { detail?: unknown; title?: unknown; errors?: unknown };
-  const detail = typeof problem.detail === 'string' ? problem.detail : undefined;
-  const fields = fieldErrors(problem.errors);
-
-  if (detail && fields) {
-    return `${detail} ${fields}`;
-  }
-
-  return detail ?? (typeof problem.title === 'string' ? problem.title : undefined);
-}
-
-function fieldErrors(errors: unknown): string | undefined {
-  if (typeof errors !== 'object' || errors === null) {
-    return undefined;
-  }
-
-  const messages = Object.values(errors as Record<string, unknown>)
-    .flatMap((value) => (Array.isArray(value) ? value : []))
-    .filter((value): value is string => typeof value === 'string');
-
-  return messages.length > 0 ? messages.join(' ') : undefined;
 }

@@ -22,6 +22,7 @@ Sign in with an email: `POST /api/auth/login`
 | Hospital administrator | `admin.wickrama@carelanka.lk` | `CareLanka#2026` |
 | Equipment manager | `equip.bandara@carelanka.lk` | `CareLanka#2026` |
 | Ambulance crew | `crew.fernando@carelanka.lk` | `CareLanka#2026` |
+| Ambulance crew | `crew.perera@carelanka.lk` | `CareLanka#2026` |
 | **Deactivated** | `former.gunasekara@carelanka.lk` | `CareLanka#2026` |
 
 The last one exists to fail. The password is right and login still returns 401, the same
@@ -35,6 +36,7 @@ Sign in with a username: `POST /api/auth/patient/login`
 | Username | Password |
 | :--- | :--- |
 | `chathura.w` | `Patient#2026` |
+| `demo.emergency` | `Patient#2026` |
 
 This account has no `patients` row behind it, which is the ordinary state for a fresh
 sign-up. `GET /api/auth/me` returns `patient_id: null` and every `/api/me/*` route except
@@ -42,6 +44,10 @@ sign-up. `GET /api/auth/me` returns `patient_id: null` and every `/api/me/*` rou
 
 Registration is open — `POST /api/auth/patient/register` with a username and a password
 makes a new one and signs you straight in.
+
+`demo.emergency` is linked to a demo patient by `docs/seed/006_emergency_demo_data.sql`.
+Use it for the complete ambulance-to-pre-admission demonstration while keeping
+`chathura.w` available for the unlinked-account scenario.
 
 ---
 

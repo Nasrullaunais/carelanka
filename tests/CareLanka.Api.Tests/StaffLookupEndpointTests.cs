@@ -243,7 +243,7 @@ public sealed class StaffLookupEndpointTests
         });
         Assert.Equal(HttpStatusCode.OK, nurseLogin.StatusCode);
         using var nurseBody = JsonDocument.Parse(await nurseLogin.Content.ReadAsStringAsync());
-        var nurseId = nurseBody.RootElement.GetProperty("staff_member").GetProperty("id").GetGuid();
+        var nurseId = nurseBody.RootElement.GetProperty("principal").GetProperty("id").GetGuid();
 
         var unknownId = Guid.NewGuid();
 

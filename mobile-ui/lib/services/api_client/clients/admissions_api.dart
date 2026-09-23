@@ -20,10 +20,12 @@ import '../models/bed_assignment.dart';
 import '../models/cancel_admission_request.dart';
 import '../models/cancel_appointment_request.dart';
 import '../models/check_in_request.dart';
+import '../models/classify_admission_request.dart';
 import '../models/complete_details_request.dart';
 import '../models/correct_bed_request.dart';
 import '../models/create_admission_request.dart';
 import '../models/create_appointment_request.dart';
+import '../models/pre_admit_request.dart';
 import '../models/sort_direction.dart';
 import '../models/worklist_row_paged_result.dart';
 
@@ -54,6 +56,17 @@ abstract class AdmissionsApi {
   @GET('/admissions/{id}')
   Future<AdmissionDetail> getAdmission({
     @Path('id') required String id,
+  });
+
+  @POST('/admissions/pre-admit')
+  Future<Admission> preAdmitFromDispatch({
+    @Body() PreAdmitRequest? body,
+  });
+
+  @POST('/admissions/{id}/classify')
+  Future<Admission> classifyAdmission({
+    @Path('id') required String id,
+    @Body() ClassifyAdmissionRequest? body,
   });
 
   @PATCH('/admissions/{id}/details')

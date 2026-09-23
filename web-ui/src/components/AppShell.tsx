@@ -1,5 +1,6 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Button } from '@heroui/react';
 import { logoutMutation } from '../services/api/generated/@tanstack/react-query.gen';
 import { clearSession, getSession } from '../services/auth/session';
 import { useSession } from '../services/auth/useSession';
@@ -40,11 +41,11 @@ export function AppShell() {
               <strong>{session.principal.display_name}</strong>
               {roleLabels[session.principal.role]}
             </div>
-            <button
-              type="button"
-              className="secondary"
-              disabled={logout.isPending}
-              onClick={() => {
+            <Button
+              variant="secondary"
+              size="sm"
+              isDisabled={logout.isPending}
+              onPress={() => {
                 const refreshToken = getSession()?.refreshToken;
 
                 if (refreshToken) {
@@ -56,7 +57,7 @@ export function AppShell() {
               }}
             >
               Sign out
-            </button>
+            </Button>
           </>
         )}
       </header>

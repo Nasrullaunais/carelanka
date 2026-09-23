@@ -1,0 +1,72 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: carelanka
+      POSTGRES_USER: carelanka
+      POSTGRES_PASSWORD: carelanka_dev
+    volumes:
+      - carelanka_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U carelanka -d carelanka"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+      target: migrate
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__CareLanka: Host=db;Port=5432;Database=carelanka;Username=carelanka;Password=carelanka_dev
+      Jwt__SigningKey: ${CARELANKA_JWT_SIGNING_KEY:?Set CARELANKA_JWT_SIGNING_KEY in .env}
+    command: ["dotnet", "ef", "database", "update", "--project", "api", "--startup-project", "api", "--configuration", "Release", "--no-build"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  seed:
+    image: postgres:16
+    environment:
+      PGHOST: db
+      PGDATABASE: carelanka
+      PGUSER: carelanka
+      PGPASSWORD: carelanka_dev
+    volumes:
+      - ./docs/seed:/seed:ro
+    command:
+      - sh
+      - -ec
+      - |
+        if [ "$$(psql -Atc "SELECT to_regclass('public.local_seed_complete') IS NOT NULL")" = t ]; then
+          echo 'Demo data already seeded'; exit 0
+        fi
+        for file in /seed/001_identity.sql /seed/002_patient_wards.sql /seed/002_pharmacy_categories.sql /seed/003_equipment_beds.sql /seed/004_patient_demo_data.sql /seed/005_patient_medical_profiles.sql /seed/006_emergency_demo_data.sql; do
+          psql -v ON_ERROR_STOP=1 -f "$$file"
+        done
+        psql -v ON_ERROR_STOP=1 -c 'CREATE TABLE local_seed_complete (seeded_at timestamptz NOT NULL DEFAULT now())'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+      target: runtime
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__CareLanka: Host=db;Port=5432;Database=carelanka;Username=carelanka;Password=carelanka_dev
+      Jwt__SigningKey: ${CARELANKA_JWT_SIGNING_KEY:?Set CARELANKA_JWT_SIGNING_KEY in .env}
+    ports:
+      - "127.0.0.1:5231:5231"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+volumes:
+  carelanka_db:

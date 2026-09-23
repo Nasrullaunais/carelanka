@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { AppointmentsPage } from './pages/AppointmentsPage';
@@ -7,7 +8,6 @@ import { CareRecommendationsPage } from './pages/CareRecommendationsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DischargePage } from './pages/DischargePage';
 import { EquipmentPage } from './pages/EquipmentPage';
-import { EmergencyPage } from './pages/EmergencyPage';
 import { IntakePage } from './pages/IntakePage';
 import { LaboratoryPage } from './pages/LaboratoryPage';
 import { LoginPage } from './pages/LoginPage';
@@ -18,6 +18,8 @@ import { PharmacyPage } from './pages/PharmacyPage';
 import { WardsPage } from './pages/WardsPage';
 import { clearSession } from './services/auth/session';
 import { useSession } from './services/auth/useSession';
+
+const EmergencyRoutes = lazy(() => import('./features/emergency/emergency-routes').then((module) => ({ default: module.EmergencyRoutes })));
 
 export function App() {
   const session = useSession();
@@ -63,7 +65,7 @@ export function App() {
         <Route path="/capacity" element={<CapacityPage />} />
         <Route path="/wards" element={<WardsPage />} />
         <Route path="/equipment" element={<EquipmentPage />} />
-        <Route path="/emergency" element={<EmergencyPage />} />
+        <Route path="emergency/*" element={<Suspense fallback={<p className="muted">Loading emergency desk…</p>}><EmergencyRoutes /></Suspense>} />
         <Route path="/maintenance-unit" element={<MaintenanceUnitPage />} />
         <Route path="/warnings" element={<WarningsPage />} />
         <Route path="/laboratory" element={<LaboratoryPage />} />

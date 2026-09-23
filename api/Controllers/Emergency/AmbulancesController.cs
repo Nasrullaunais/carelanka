@@ -28,6 +28,15 @@ public sealed class AmbulancesController : ControllerBase
         CancellationToken cancellationToken = default)
         => Ok(await _ambulances.ListAsync(request, cancellationToken));
 
+    [Authorize(Policy = Policies.AmbulanceCrew)]
+    [HttpGet("mine", Name = "getMyAmbulanceAssignment")]
+    [ProducesResponseType(typeof(Ambulance), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<ActionResult<Ambulance>> Mine(CancellationToken cancellationToken)
+        => Ok(await _ambulances.GetMyAssignmentAsync(cancellationToken));
+
     [Authorize(Policy = Policies.EmergencyResponder)]
     [HttpGet("{id:guid}", Name = "getAmbulance")]
     [ProducesResponseType(typeof(AmbulanceDetail), StatusCodes.Status200OK)]

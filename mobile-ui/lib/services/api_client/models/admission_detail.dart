@@ -21,23 +21,23 @@ class AdmissionDetail {
   const AdmissionDetail({
     required this.id,
     required this.source,
-    required this.admissionCategory,
     required this.urgency,
     required this.status,
     required this.detailsComplete,
     required this.requiresBed,
-    required this.categorySetByStaffId,
-    required this.categorySetAt,
     required this.isInfectious,
     required this.missingFields,
     required this.bedAssignments,
     this.patient,
+    this.admissionCategory,
     this.wardName,
     this.bedNumber,
     this.expectedArrival,
     this.admittedAt,
     this.dispatchId,
+    this.categorySetByStaffId,
     this.categorySetByStaffName,
+    this.categorySetAt,
     this.reportedByUserId,
     this.dischargedAt,
     this.cancelReason,
@@ -54,7 +54,7 @@ class AdmissionDetail {
   final PatientSummary? patient;
   final AdmissionSource source;
   @JsonKey(name: 'admission_category')
-  final AdmissionCategory admissionCategory;
+  final AdmissionCategory? admissionCategory;
   final AdmissionUrgency urgency;
   final AdmissionStatus status;
   @JsonKey(name: 'details_complete')
@@ -72,11 +72,11 @@ class AdmissionDetail {
   @JsonKey(name: 'dispatch_id')
   final String? dispatchId;
   @JsonKey(name: 'category_set_by_staff_id')
-  final String categorySetByStaffId;
+  final String? categorySetByStaffId;
   @JsonKey(name: 'category_set_by_staff_name')
   final String? categorySetByStaffName;
   @JsonKey(name: 'category_set_at')
-  final DateTime categorySetAt;
+  final DateTime? categorySetAt;
   @JsonKey(name: 'is_infectious')
   final bool isInfectious;
   @JsonKey(name: 'reported_by_user_id')

@@ -46,11 +46,19 @@ public sealed class PreAdmissionProcessor(
             .Where(x => x.Id == notice.DispatchId)
             .Select(x => x.DispatchedAt)
             .SingleAsync(ct);
+        var patientId = call.PatientId;
+        if (call.PatientIsCaller && patientId is null && call.CallerUserId is { } callerId)
+        {
+            patientId = await db.Patients.AsNoTracking()
+                .Where(patient => patient.UserAccountId == callerId)
+                .Select(patient => (Guid?)patient.Id)
+                .SingleOrDefaultAsync(ct);
+        }
         var request = new PreAdmissionRequest(
             notice.DispatchId,
             call.CallerUserId,
-            call.PatientIsCaller,
-            call.PatientId,
+            call.PatientIsCaller && patientId is not null,
+            patientId,
             dispatchedAt.AddMinutes(_options.ArrivalAllowanceMinutes),
             PreAdmissionUrgency.From(call.Priority));
 

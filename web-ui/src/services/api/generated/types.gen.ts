@@ -203,6 +203,7 @@ export type AmbulanceSummary = {
     id: string;
     registration_number: string;
     status: AmbulanceStatus;
+    is_active?: boolean;
     current_latitude?: number | null;
     current_longitude?: number | null;
     location_updated_at?: string | null;
@@ -211,6 +212,7 @@ export type AmbulanceSummary = {
     is_eligible?: boolean;
     eligibility_block_reasons?: Array<AmbulanceEligibilityBlockReason> | null;
     active_dispatch_id?: string | null;
+    active_dispatch?: DispatchSummary;
     is_divertible: boolean;
     distance_km?: number | null;
     drive_minutes?: number | null;
@@ -742,6 +744,7 @@ export type DispatchDetail = {
     reassignment_reason?: string | null;
     handover_notes?: string | null;
     patient_condition?: string | null;
+    scene_address_label?: string | null;
     crew_staff_ids?: Array<string> | null;
 };
 
@@ -768,6 +771,8 @@ export type DispatchProposalDetail = {
     created_at?: string;
     objective?: string | null;
     proposed_ambulance_id?: string | null;
+    proposed_ambulance_current_crew_count?: number | null;
+    proposed_ambulance_required_crew_count?: number | null;
     rationale?: string | null;
     diversion_impact?: DiversionImpact;
     plan?: Array<DispatchPlanStep> | null;
@@ -869,6 +874,24 @@ export type DiversionImpact = {
     minutes_saved_for_this_call?: number;
 };
 
+export type EmergencyAgentPerformanceReport = {
+    from?: string;
+    to?: string;
+    proposals_raised?: number;
+    confirmed?: number;
+    confirmed_without_change_rate?: number;
+    diversions_proposed?: number;
+    diversions_approved?: number;
+    diversions_rejected?: number;
+    no_ambulance_available_count?: number;
+    validation_failure_rate?: number;
+    median_seconds_proposal_to_confirm?: number;
+    median_minutes_call_to_dispatch?: number;
+    rejection_reasons?: {
+        [key: string]: number;
+    } | null;
+};
+
 export type EmergencyCallDetail = {
     id?: string;
     patient_id?: string | null;
@@ -920,6 +943,12 @@ export type EmergencyCallSummaryPagedResult = {
 
 export type EmergencyCancellationRequest = {
     emergency_call_id?: string;
+    call_priority?: CallPriority;
+    call_status?: CallStatus;
+    caller_name?: string | null;
+    address_label?: string | null;
+    call_created_at?: string;
+    active_ambulance_registration?: string | null;
     status?: CancellationRequestStatus;
     reason?: string | null;
     requested_at?: string;
@@ -1022,6 +1051,21 @@ export type EquipmentStatus = 'available' | 'assigned' | 'maintenance' | 'retire
 export type ExpenseRate = {
     expense_key: string;
     amount: number;
+};
+
+export type FleetUtilisationReport = {
+    from?: string;
+    to?: string;
+    rows?: Array<FleetUtilisationReportRow> | null;
+};
+
+export type FleetUtilisationReportRow = {
+    ambulance_id?: string;
+    registration_number?: string | null;
+    run_count?: number;
+    hours_committed?: number;
+    idle_share?: number;
+    out_of_service_hours?: number;
 };
 
 export type Gender = 'male' | 'female' | 'other' | 'unknown';
@@ -1589,6 +1633,27 @@ export type ReportFaultRequest = {
 
 export type RequestCancellationRequest = {
     reason?: string | null;
+};
+
+export type ResponseTimeReport = {
+    from?: string;
+    to?: string;
+    rows?: Array<ResponseTimeReportRow> | null;
+    totals?: ResponseTimeReportTotals;
+};
+
+export type ResponseTimeReportRow = {
+    priority?: CallPriority;
+    call_count?: number;
+    median_minutes_to_dispatch?: number;
+    median_minutes_to_arrival?: number;
+    slowest_minutes_to_arrival?: number;
+};
+
+export type ResponseTimeReportTotals = {
+    call_count?: number;
+    median_minutes_to_dispatch?: number;
+    median_minutes_to_arrival?: number;
 };
 
 export type RetireAmbulanceRequest = {
@@ -2840,6 +2905,39 @@ export type CreateAmbulanceResponses = {
 };
 
 export type CreateAmbulanceResponse = CreateAmbulanceResponses[keyof CreateAmbulanceResponses];
+
+export type GetMyAmbulanceAssignmentData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/ambulances/mine';
+};
+
+export type GetMyAmbulanceAssignmentErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetMyAmbulanceAssignmentError = GetMyAmbulanceAssignmentErrors[keyof GetMyAmbulanceAssignmentErrors];
+
+export type GetMyAmbulanceAssignmentResponses = {
+    /**
+     * OK
+     */
+    200: Ambulance;
+};
+
+export type GetMyAmbulanceAssignmentResponse = GetMyAmbulanceAssignmentResponses[keyof GetMyAmbulanceAssignmentResponses];
 
 export type GetAmbulanceData = {
     body?: never;
@@ -8233,6 +8331,115 @@ export type RejectPrescriptionResponses = {
 };
 
 export type RejectPrescriptionResponse = RejectPrescriptionResponses[keyof RejectPrescriptionResponses];
+
+export type GetEmergencyResponseTimeReportData = {
+    body?: never;
+    path?: never;
+    query?: {
+        from?: string;
+        to?: string;
+        priority?: CallPriority;
+    };
+    url: '/reports/emergency/response-times';
+};
+
+export type GetEmergencyResponseTimeReportErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type GetEmergencyResponseTimeReportError = GetEmergencyResponseTimeReportErrors[keyof GetEmergencyResponseTimeReportErrors];
+
+export type GetEmergencyResponseTimeReportResponses = {
+    /**
+     * OK
+     */
+    200: ResponseTimeReport;
+};
+
+export type GetEmergencyResponseTimeReportResponse = GetEmergencyResponseTimeReportResponses[keyof GetEmergencyResponseTimeReportResponses];
+
+export type GetFleetUtilisationReportData = {
+    body?: never;
+    path?: never;
+    query?: {
+        from?: string;
+        to?: string;
+    };
+    url: '/reports/emergency/fleet-utilisation';
+};
+
+export type GetFleetUtilisationReportErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type GetFleetUtilisationReportError = GetFleetUtilisationReportErrors[keyof GetFleetUtilisationReportErrors];
+
+export type GetFleetUtilisationReportResponses = {
+    /**
+     * OK
+     */
+    200: FleetUtilisationReport;
+};
+
+export type GetFleetUtilisationReportResponse = GetFleetUtilisationReportResponses[keyof GetFleetUtilisationReportResponses];
+
+export type GetEmergencyAgentPerformanceReportData = {
+    body?: never;
+    path?: never;
+    query?: {
+        from?: string;
+        to?: string;
+    };
+    url: '/reports/emergency/agent-performance';
+};
+
+export type GetEmergencyAgentPerformanceReportErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type GetEmergencyAgentPerformanceReportError = GetEmergencyAgentPerformanceReportErrors[keyof GetEmergencyAgentPerformanceReportErrors];
+
+export type GetEmergencyAgentPerformanceReportResponses = {
+    /**
+     * OK
+     */
+    200: EmergencyAgentPerformanceReport;
+};
+
+export type GetEmergencyAgentPerformanceReportResponse = GetEmergencyAgentPerformanceReportResponses[keyof GetEmergencyAgentPerformanceReportResponses];
 
 export type ListSkillsData = {
     body?: never;

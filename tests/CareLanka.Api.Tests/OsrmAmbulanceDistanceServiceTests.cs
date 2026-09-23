@@ -31,6 +31,7 @@ public sealed class OsrmAmbulanceDistanceServiceTests
         Assert.Equal(new AmbulanceTravel(8.2, 900), result.ByAmbulance[Far]);
         Assert.Equal(new AmbulanceTravel(1.9, 240), result.ByAmbulance[Near]);
         Assert.DoesNotContain(NoPosition, result.ByAmbulance.Keys);
+        Assert.Equal("CareLanka/1.0", handler.LastRequest!.Headers.UserAgent.ToString());
         Assert.Equal(
             "table/v1/driving/79.90,6.95;79.87,6.92;79.8686,6.9186?sources=0;1&destinations=2&annotations=duration,distance",
             handler.LastRequest!.RequestUri!.PathAndQuery.TrimStart('/'));

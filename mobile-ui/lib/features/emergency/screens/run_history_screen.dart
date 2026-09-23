@@ -18,7 +18,9 @@ class _RunHistoryScreenState extends State<RunHistoryScreen> {
   @override
   void initState() {
     super.initState();
-    context.read<RunHistoryController>().load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<RunHistoryController>().load();
+    });
   }
 
   @override
@@ -36,7 +38,8 @@ class _RunHistoryScreenState extends State<RunHistoryScreen> {
                 child: const EmptyView(
                   icon: Icons.history,
                   title: 'No past runs',
-                  message: 'Runs you have finished, declined or that were cancelled will be listed here.',
+                  message:
+                      'Runs you have finished, declined or that were cancelled will be listed here.',
                 ),
               )
             : RefreshIndicator(
@@ -64,12 +67,16 @@ class _RunTile extends StatelessWidget {
     final crew = run.crewCount;
 
     return ListTile(
-      title: Text('${run.ambulanceRegistration ?? 'Ambulance'} · ${run.status?.crewLabel ?? ''}'),
-      subtitle: Text([
-        if (dispatchedAt != null) FriendlyDate.full(dispatchedAt),
-        if (crew != null) '$crew crew on board',
-        if (run.callPriority != null) 'Priority ${run.callPriority!.name}',
-      ].join(' · ')),
+      title: Text(
+        '${run.ambulanceRegistration ?? 'Ambulance'} · ${run.status?.crewLabel ?? ''}',
+      ),
+      subtitle: Text(
+        [
+          if (dispatchedAt != null) FriendlyDate.full(dispatchedAt),
+          if (crew != null) '$crew crew on board',
+          if (run.callPriority != null) 'Priority ${run.callPriority!.name}',
+        ].join(' · '),
+      ),
     );
   }
 }
@@ -92,7 +99,12 @@ class _LoadMore extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (error != null) Text(error.message),
-                  TextButton(onPressed: controller.loadMore, child: Text(error == null ? 'Show older runs' : 'Try again')),
+                  TextButton(
+                    onPressed: controller.loadMore,
+                    child: Text(
+                      error == null ? 'Show older runs' : 'Try again',
+                    ),
+                  ),
                 ],
               ),
       ),

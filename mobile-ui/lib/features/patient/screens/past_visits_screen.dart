@@ -22,51 +22,73 @@ class PastVisitsScreen extends StatelessWidget {
       create: (context) =>
           PastVisitsController(PatientService(context.read<CareLankaApi>()))
             ..load(),
-      child: const _PastVisitsView(),
+      child: PhoneWidth(
+        child: Scaffold(
+          appBar: AppBar(title: const Text('Past visits')),
+          body: const PastVisitsList(),
+        ),
+      ),
     );
   }
 }
 
-class _PastVisitsView extends StatelessWidget {
-  const _PastVisitsView();
+/// The past-visits list on its own, with no [Scaffold] or [AppBar], so a screen that
+/// already has both (like [MyStayScreen] for a patient with no current admission) can
+/// embed it directly. Reads [PastVisitsController] from context — the caller provides one.
+///
+/// [shrinkWrap] renders the cards in a plain, non-scrolling [Column] instead of their own
+/// [ListView] — needed when embedding inside another scrollable, which a nested unbounded
+/// [ListView] would fail to lay out.
+class PastVisitsList extends StatelessWidget {
+  const PastVisitsList({super.key, this.padding, this.shrinkWrap = false});
+
+  final EdgeInsetsGeometry? padding;
+  final bool shrinkWrap;
 
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<PastVisitsController>();
 
-    return PhoneWidth(
-      child: Scaffold(
-        appBar: AppBar(title: const Text('Past visits')),
-        body: AsyncView<List<MyAdmission>>(
-          state: controller.visits,
-          onRetry: controller.load,
-          loading: const _Skeleton(),
-          builder: (context, visits) {
-            if (visits.isEmpty) {
-              return const EmptyView(
-                icon: Icons.history,
-                title: 'No past visits',
-                message: 'Completed stays will appear here.',
-              );
-            }
+    return AsyncView<List<MyAdmission>>(
+      state: controller.visits,
+      onRetry: controller.load,
+      loading: const _Skeleton(),
+      builder: (context, visits) {
+        if (visits.isEmpty) {
+          return const EmptyView(
+            icon: Icons.history,
+            title: 'No past visits',
+            message: 'Completed stays will appear here.',
+          );
+        }
 
-            return RefreshIndicator(
-              onRefresh: controller.load,
-              child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(
-                  AppTheme.gutter,
-                  12,
-                  AppTheme.gutter,
-                  32,
-                ),
-                itemCount: visits.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, index) => _VisitCard(visit: visits[index]),
-              ),
-            );
-          },
-        ),
-      ),
+        final effectivePadding = padding ??
+            const EdgeInsets.fromLTRB(AppTheme.gutter, 12, AppTheme.gutter, 32);
+
+        if (shrinkWrap) {
+          return Padding(
+            padding: effectivePadding,
+            child: Column(
+              children: [
+                for (final visit in visits) ...[
+                  _VisitCard(visit: visit),
+                  if (visit != visits.last) const SizedBox(height: 10),
+                ],
+              ],
+            ),
+          );
+        }
+
+        return RefreshIndicator(
+          onRefresh: controller.load,
+          child: ListView.separated(
+            padding: effectivePadding,
+            itemCount: visits.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (_, index) => _VisitCard(visit: visits[index]),
+          ),
+        );
+      },
     );
   }
 }

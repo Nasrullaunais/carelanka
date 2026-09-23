@@ -73,7 +73,11 @@ class HomeScreen extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   const SizedBox(height: 12),
-                  _QuickActions(profile: profile, onOpenTab: onOpenTab),
+                  _QuickActions(
+                    profile: profile,
+                    onOpenTab: onOpenTab,
+                    admitted: stay.state.valueOrNull is MyStayCurrent,
+                  ),
                 ],
         ),
       ),
@@ -488,10 +492,18 @@ class _CompleteDetailsBanner extends StatelessWidget {
 }
 
 class _QuickActions extends StatelessWidget {
-  const _QuickActions({required this.profile, required this.onOpenTab});
+  const _QuickActions({
+    required this.profile,
+    required this.onOpenTab,
+    required this.admitted,
+  });
 
   final MyProfile profile;
   final void Function(PatientTab tab) onOpenTab;
+
+  // While admitted, My stay already shows the current stay, not past ones — the tile here
+  // would be redundant. Past visits stays reachable from Profile regardless.
+  final bool admitted;
 
   @override
   Widget build(BuildContext context) {
@@ -517,14 +529,15 @@ class _QuickActions extends StatelessWidget {
           caption: 'Current admission',
           onTap: () => onOpenTab(PatientTab.myStay),
         ),
-        _ActionTile(
-          icon: Icons.history,
-          label: 'Past visits',
-          caption: 'Completed stays',
-          onTap: () => Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (_) => const PastVisitsScreen())),
-        ),
+        if (!admitted)
+          _ActionTile(
+            icon: Icons.history,
+            label: 'Past visits',
+            caption: 'Completed stays',
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const PastVisitsScreen())),
+          ),
         _ActionTile(
           icon: Icons.description_outlined,
           label: 'My reports',

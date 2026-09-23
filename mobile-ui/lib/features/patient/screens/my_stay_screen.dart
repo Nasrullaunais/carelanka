@@ -4,14 +4,18 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/friendly_date.dart';
 import '../../../core/widgets/async_view.dart';
+import '../../../services/api_client/care_lanka_api.dart';
 import '../../../services/api_client/models/my_admission.dart';
 import '../../../services/api_client/models/my_bill.dart';
+import '../services/patient_service.dart';
 import '../state/my_stay_controller.dart';
+import '../state/past_visits_controller.dart';
 import '../state/profile_controller.dart';
 import '../widgets/bill_view.dart';
 import '../widgets/care_query_card.dart';
 import '../widgets/panels.dart';
 import 'claim_record_screen.dart';
+import 'past_visits_screen.dart';
 import '../widgets/stay_journey.dart';
 import '../widgets/status_presentation.dart';
 
@@ -49,9 +53,38 @@ class MyStayScreen extends StatelessWidget {
               ),
             ),
           ),
-          MyStayNoAdmission() => RefreshableMessage(
+          MyStayNoAdmission() => _NotAdmitted(onBookVisit: onBookVisit, onRefresh: refresh),
+          MyStayCurrent(:final admission, :final bill) => _Admission(
+            admission: admission,
+            bill: bill,
             onRefresh: refresh,
-            child: EmptyView(
+          ),
+        },
+      ),
+    );
+  }
+}
+
+// Not admitted right now, so there is nothing current to track — show what there is
+// instead: past stays, in place, rather than sending the patient off to Profile for them.
+class _NotAdmitted extends StatelessWidget {
+  const _NotAdmitted({required this.onBookVisit, required this.onRefresh});
+
+  final VoidCallback? onBookVisit;
+  final Future<void> Function() onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (context) =>
+          PastVisitsController(PatientService(context.read<CareLankaApi>()))
+            ..load(),
+      child: RefreshableMessage(
+        onRefresh: onRefresh,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(AppTheme.gutter, 4, AppTheme.gutter, 32),
+          children: [
+            EmptyView(
               icon: Icons.event_available_outlined,
               title: 'Not currently admitted',
               message: 'Your ward, bed and progress will appear here once '
@@ -65,13 +98,12 @@ class MyStayScreen extends StatelessWidget {
                       style: FilledButton.styleFrom(minimumSize: const Size(200, 48)),
                     ),
             ),
-          ),
-          MyStayCurrent(:final admission, :final bill) => _Admission(
-            admission: admission,
-            bill: bill,
-            onRefresh: refresh,
-          ),
-        },
+            const SizedBox(height: 24),
+            Text('Past visits', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            const PastVisitsList(padding: EdgeInsets.only(top: 10), shrinkWrap: true),
+          ],
+        ),
       ),
     );
   }

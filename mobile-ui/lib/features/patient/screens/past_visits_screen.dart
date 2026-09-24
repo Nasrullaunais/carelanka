@@ -5,7 +5,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/friendly_date.dart';
 import '../../../core/widgets/async_view.dart';
 import '../../../core/widgets/phone_width.dart';
-import '../../../services/api_client/care_lanka_api.dart';
 import '../../../services/api_client/models/my_admission.dart';
 import '../services/patient_service.dart';
 import '../state/past_visits_controller.dart';
@@ -13,15 +12,27 @@ import '../widgets/panels.dart';
 import '../widgets/status_presentation.dart';
 import 'bill_sheet.dart';
 
+// A pushed route sits above the patient area's providers, so the service is read here, from
+// the caller's context, and handed to the new screen.
+void openPastVisits(BuildContext context) {
+  final service = context.read<PatientService>();
+  Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => PastVisitsScreen(service: service)),
+  );
+}
+
 class PastVisitsScreen extends StatelessWidget {
-  const PastVisitsScreen({super.key});
+  const PastVisitsScreen({super.key, required this.service});
+
+  final PatientService service;
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) =>
-          PastVisitsController(PatientService(context.read<CareLankaApi>()))
-            ..load(),
+    return MultiProvider(
+      providers: [
+        Provider<PatientService>.value(value: service),
+        ChangeNotifierProvider(create: (_) => PastVisitsController(service)..load()),
+      ],
       child: PhoneWidth(
         child: Scaffold(
           appBar: AppBar(title: const Text('Past visits')),
@@ -111,9 +122,14 @@ class _VisitCard extends StatelessWidget {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => PastVisitDetailScreen(visit: visit)),
-        ),
+        onTap: () {
+          final service = context.read<PatientService>();
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => PastVisitDetailScreen(visit: visit, service: service),
+            ),
+          );
+        },
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -161,9 +177,10 @@ class _VisitCard extends StatelessWidget {
 }
 
 class PastVisitDetailScreen extends StatelessWidget {
-  const PastVisitDetailScreen({super.key, required this.visit});
+  const PastVisitDetailScreen({super.key, required this.visit, required this.service});
 
   final MyAdmission visit;
+  final PatientService service;
 
   @override
   Widget build(BuildContext context) {
@@ -223,7 +240,7 @@ class PastVisitDetailScreen extends StatelessWidget {
             OutlinedButton.icon(
               onPressed: () => showBillSheet(
                 context,
-                service: PatientService(context.read<CareLankaApi>()),
+                service: service,
                 admissionId: visit.admissionId,
               ),
               icon: const Icon(Icons.receipt_long_outlined, size: 18),

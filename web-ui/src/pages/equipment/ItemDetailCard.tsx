@@ -16,6 +16,7 @@ import {
   warningSeverityLabels,
 } from '../../types/equipment';
 import { StatusBadge } from '../EquipmentPage';
+import { AppSelect } from '../../components/ui/app-select';
 
 export function ItemDetailCard({ id, onClose }: { id: string; onClose: () => void }) {
   const session = useSession();
@@ -99,22 +100,17 @@ export function ItemDetailCard({ id, onClose }: { id: string; onClose: () => voi
       {canManageEquipment(session?.principal.role) && (
         <div className="row" style={{ marginTop: '1rem', alignItems: 'end' }}>
           <div className="field">
-            <label htmlFor="move-to">Move to</label>
-            <select
+            <AppSelect
               id="move-to"
+              label="Move to"
               value={moveTo}
-              disabled={moves.length === 0}
-              onChange={(event) => setMoveTo(event.target.value as EquipmentStatus | '')}
-            >
-              <option value="">
-                {moves.length === 0 ? 'Retired is the end of the line' : 'Choose…'}
-              </option>
-              {moves.map((next) => (
-                <option key={next} value={next}>
-                  {equipmentStatusLabels[next]}
-                </option>
-              ))}
-            </select>
+              isDisabled={moves.length === 0}
+              onValueChange={(value) => setMoveTo(value as EquipmentStatus | '')}
+              options={[
+                { value: '', label: moves.length === 0 ? 'Retired is the end of the line' : 'Choose…' },
+                ...moves.map((next) => ({ value: next, label: equipmentStatusLabels[next] })),
+              ]}
+            />
           </div>
           <div className="field">
             <button

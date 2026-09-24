@@ -38,12 +38,15 @@ export function EmergencyRoutes() {
   const activeTab = location.pathname === '/emergency'
     ? 'calls'
     : location.pathname.split('/')[2] ?? 'calls';
+  const pageDescription = activeTab === 'cancellations'
+    ? 'Review requests to stop an emergency response.'
+    : 'Live calls, ready ambulances, and current response crews.';
 
   return (
     <div className="flex flex-col gap-4">
       <div>
         <h1>Emergency dispatch</h1>
-        <p className="muted">Live calls, ready ambulances, and current response crews.</p>
+        <p className="muted">{pageDescription}</p>
       </div>
       <Tabs
         selectedKey={activeTab}
@@ -52,10 +55,10 @@ export function EmergencyRoutes() {
           if (tab) navigate(tab.path === '' ? '/emergency' : `/emergency/${tab.path}`);
         }}
       >
-        <TabListContainer>
+        <TabListContainer className="emergency-tabs">
           <TabList>
             {emergencyTabs.map((tab) => (
-              <Tab key={tab.id} id={tab.id}>
+              <Tab key={tab.id} id={tab.id} className={activeTab === tab.id ? 'emergency-tab-active' : undefined}>
                 <TabIndicator />
                 <span className="flex items-center gap-2">
                   {tab.label}

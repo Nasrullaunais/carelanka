@@ -17,6 +17,7 @@ import {
 } from '@heroui/react';
 import type { AmbulanceDetail, AmbulanceStatus, CreateAmbulanceRequest, UpdateAmbulanceRequest } from '../../../services/api/generated';
 import { ambulanceStatusLabels } from '../domain';
+import { AppSelect } from '../../../components/ui/app-select';
 
 const editableStatuses: AmbulanceStatus[] = ['available', 'out_of_service'];
 
@@ -64,13 +65,17 @@ export function AmbulanceDialog({ isOpen, ambulance, isPending, onOpenChange, on
             <InputGroup><InputGroupInput required /></InputGroup>
           </TextField>
           {ambulance && (
-            <label className="flex flex-col gap-1 text-sm">
-              Status
-              <select className="rounded-lg border border-default-200 bg-background px-3 py-2" value={status} onChange={(event) => setStatus(event.target.value as AmbulanceStatus)}>
-                {!editableStatuses.includes(ambulance.status) && <option value={ambulance.status}>{ambulanceStatusLabels[ambulance.status]} (current)</option>}
-                {editableStatuses.map((value) => <option key={value} value={value}>{ambulanceStatusLabels[value]}</option>)}
-              </select>
-            </label>
+            <AppSelect
+              label="Status"
+              value={status}
+              onValueChange={(value) => setStatus(value as AmbulanceStatus)}
+              options={[
+                ...(!editableStatuses.includes(ambulance.status)
+                  ? [{ value: ambulance.status, label: `${ambulanceStatusLabels[ambulance.status]} (current)` }]
+                  : []),
+                ...editableStatuses.map((value) => ({ value, label: ambulanceStatusLabels[value] })),
+              ]}
+            />
           )}
           {ambulance && status === 'out_of_service' && (
             <TextField value={reason} onChange={setReason}>

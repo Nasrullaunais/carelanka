@@ -32,6 +32,10 @@ describe('CancellationQueue', () => {
     expect(cards[0]).toHaveTextContent('N. Silva');
     expect(screen.getAllByText('WP-CA-1234')).toHaveLength(2);
     expect(screen.getByText('Taking private transport')).toBeInTheDocument();
+    expect(screen.getByText(/approving cancels the emergency call/i)).toBeInTheDocument();
+    expect(screen.getAllByText('Why the caller wants to cancel')).toHaveLength(2);
+    expect(screen.getByText('Response continued')).toBeInTheDocument();
+    expect(screen.getByText('Keep emergency response active')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Approve cancellation' }));
     expect(mocks.approve).not.toHaveBeenCalled();

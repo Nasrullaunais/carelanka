@@ -36,4 +36,14 @@ public sealed class StaffController : ControllerBase
         var results = await _staffLookup.LookupAsync(request.StaffIds, cancellationToken);
         return Ok(results);
     }
+
+    [Authorize(Policy = Policies.DutyManager)]
+    [HttpGet("crew-candidates", Name = "searchAvailableCrew")]
+    [ProducesResponseType(typeof(IReadOnlyList<CrewCandidate>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    public async Task<ActionResult<IReadOnlyList<CrewCandidate>>> SearchAvailableCrew(
+        [FromQuery] string? search,
+        CancellationToken cancellationToken = default)
+        => Ok(await _staffLookup.SearchAvailableCrewAsync(search, cancellationToken));
 }

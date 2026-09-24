@@ -25,6 +25,7 @@ import { useSession } from '../services/auth/useSession';
 import { BillPanel } from '../components/BillPanel';
 import { ActionDialog } from '../components/ui/action-dialog';
 import { ConfirmDialog } from '../components/ui/confirm-dialog';
+import { AppSelect } from '../components/ui/app-select';
 import {
   canBillAppointment,
   canOpenAppointmentBoard,
@@ -171,21 +172,18 @@ export function AppointmentsPage() {
             />
           </div>
           <div>
-            <label htmlFor="filter-status">Status</label>
-            <select
+            <AppSelect
               id="filter-status"
+              label="Status"
               value={status}
-              onChange={(event) =>
-                resetTo(() => setStatus(event.target.value as AppointmentStatus | ''))
+              onValueChange={(value) =>
+                resetTo(() => setStatus(value as AppointmentStatus | ''))
               }
-            >
-              <option value="">Any status</option>
-              {appointmentStatuses.map((value) => (
-                <option key={value} value={value}>
-                  {appointmentStatusLabels[value]}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: 'Any status' },
+                ...appointmentStatuses.map((value) => ({ value, label: appointmentStatusLabels[value] })),
+              ]}
+            />
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-end' }}>
             <button
@@ -894,18 +892,13 @@ function CheckInPanel({
 
       <form onSubmit={submit}>
         <div className="field">
-          <label htmlFor="checkin-category">Care level</label>
-          <select
+          <AppSelect
             id="checkin-category"
+            label="Care level"
             value={category}
-            onChange={(event) => setCategory(event.target.value as AdmissionCategory)}
-          >
-            {levels.map((value) => (
-              <option key={value} value={value}>
-                {admissionCategoryLabels[value]}
-              </option>
-            ))}
-          </select>
+            onValueChange={(value) => setCategory(value as AdmissionCategory)}
+            options={levels.map((value) => ({ value, label: admissionCategoryLabels[value] }))}
+          />
           <p className="hint">
             {admissionCategoryHints[category]} This is your decision and is recorded against
             your name.

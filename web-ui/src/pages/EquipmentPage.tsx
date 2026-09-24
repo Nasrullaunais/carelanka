@@ -22,6 +22,7 @@ import type {
 } from '../services/api/generated';
 import { WardPatientPicker } from '../components/WardPatientPicker';
 import { ActionDialog } from '../components/ui/action-dialog';
+import { AppSelect } from '../components/ui/app-select';
 import { useSession } from '../services/auth/useSession';
 import {
   canConfirmEquipment,
@@ -116,58 +117,49 @@ export function EquipmentPage() {
             />
           </div>
           <div>
-            <label htmlFor="filter-category">Category</label>
-            <select
+            <AppSelect
               id="filter-category"
+              label="Category"
               value={categoryId}
-              onChange={(event) => {
-                setCategoryId(event.target.value);
+              onValueChange={(value) => {
+                setCategoryId(value);
                 page1();
               }}
-            >
-              <option value="">All categories</option>
-              {(categories.data ?? []).map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: 'All categories' },
+                ...(categories.data ?? []).map((category) => ({ value: category.id, label: category.name })),
+              ]}
+            />
           </div>
           <div>
-            <label htmlFor="filter-status">Status</label>
-            <select
+            <AppSelect
               id="filter-status"
+              label="Status"
               value={status}
-              onChange={(event) => {
-                setStatus(event.target.value as EquipmentStatus | '');
+              onValueChange={(value) => {
+                setStatus(value as EquipmentStatus | '');
                 page1();
               }}
-            >
-              <option value="">Any status</option>
-              {equipmentStatuses.map((value) => (
-                <option key={value} value={value}>
-                  {equipmentStatusLabels[value]}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: 'Any status' },
+                ...equipmentStatuses.map((value) => ({ value, label: equipmentStatusLabels[value] })),
+              ]}
+            />
           </div>
           <div>
-            <label htmlFor="filter-ward">Ward</label>
-            <select
+            <AppSelect
               id="filter-ward"
+              label="Ward"
               value={wardId}
-              onChange={(event) => {
-                setWardId(event.target.value);
+              onValueChange={(value) => {
+                setWardId(value);
                 page1();
               }}
-            >
-              <option value="">Anywhere</option>
-              {(wards.data ?? []).map((ward) => (
-                <option key={ward.id} value={ward.id}>
-                  {ward.name}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: 'Anywhere' },
+                ...(wards.data ?? []).map((ward) => ({ value: ward.id, label: ward.name })),
+              ]}
+            />
           </div>
         </div>
       </div>
@@ -712,20 +704,17 @@ function RegisterItemCard({
             />
           </div>
           <div className="field">
-            <label htmlFor="item-category">Category</label>
-            <select
+            <AppSelect
               id="item-category"
+              label="Category"
               value={categoryId}
-              onChange={(event) => setCategoryId(event.target.value)}
-              required
-            >
-              <option value="">Choose…</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+              onValueChange={setCategoryId}
+              isRequired
+              options={[
+                { value: '', label: 'Choose…' },
+                ...categories.map((category) => ({ value: category.id, label: category.name })),
+              ]}
+            />
           </div>
           <div className="field">
             <label htmlFor="item-tag">Asset tag</label>
@@ -786,19 +775,16 @@ function RegisterItemCard({
             />
           </div>
           <div className="field">
-            <label htmlFor="item-ward">Ward</label>
-            <select
+            <AppSelect
               id="item-ward"
+              label="Ward"
               value={wardId}
-              onChange={(event) => setWardId(event.target.value)}
-            >
-              <option value="">Central store</option>
-              {wards.map((ward) => (
-                <option key={ward.id} value={ward.id}>
-                  {ward.name}
-                </option>
-              ))}
-            </select>
+              onValueChange={setWardId}
+              options={[
+                { value: '', label: 'Central store' },
+                ...wards.map((ward) => ({ value: ward.id, label: ward.name })),
+              ]}
+            />
           </div>
         </div>
 

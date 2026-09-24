@@ -215,6 +215,11 @@ public sealed class StaffLookupValidationTests
             IReadOnlyList<Guid> staffIds,
             CancellationToken ct = default)
             => Task.FromResult(_results);
+
+        public Task<IReadOnlyList<CrewCandidate>> SearchAvailableCrewAsync(
+            string? search,
+            CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<CrewCandidate>>([]);
     }
 }
 

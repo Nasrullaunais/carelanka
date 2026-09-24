@@ -1,4 +1,5 @@
 import { Table } from './Table';
+import { AppSelect } from './ui/app-select';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -266,18 +267,13 @@ export function BillPanel({
           >
             <div className="row">
               <div className="field">
-                <label htmlFor="charge-kind">Charge type</label>
-                <select
+                <AppSelect
                   id="charge-kind"
+                  label="Charge type"
                   value={templateKey}
-                  onChange={(event) => chooseTemplate(event.target.value)}
-                >
-                  {templates.map((option) => (
-                    <option key={option.key} value={option.key}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={chooseTemplate}
+                  options={templates.map((option) => ({ value: option.key, label: option.label }))}
+                />
               </div>
               <div className="field">
                 <label htmlFor="charge-description">Description on the bill</label>

@@ -1,4 +1,5 @@
 ﻿using CareLanka.Api.Data;
+using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Staff;
 using Microsoft.EntityFrameworkCore;
 
@@ -72,5 +73,32 @@ public sealed class StaffLookupService : IStaffLookupService
         }
 
         return results;
+    }
+
+    public async Task<IReadOnlyList<CrewCandidate>> SearchAvailableCrewAsync(
+        string? search,
+        CancellationToken ct = default)
+    {
+        var term = search?.Trim().ToLowerInvariant() ?? string.Empty;
+        var staff = _db.StaffMembers.AsNoTracking()
+            .Where(member => member.IsActive && member.Role == StaffRole.AmbulanceCrew)
+            .Where(member => !_db.AmbulanceCrewAssignments.Any(assignment =>
+                assignment.StaffMemberId == member.Id && assignment.UnassignedAt == null));
+
+        if (term.Length > 0)
+        {
+            staff = staff.Where(member =>
+                (member.FirstName + " " + member.LastName).ToLower().Contains(term));
+        }
+
+        return await staff.OrderBy(member => member.FirstName)
+            .ThenBy(member => member.LastName)
+            .Take(30)
+            .Select(member => new CrewCandidate
+            {
+                StaffMemberId = member.Id,
+                FullName = member.FirstName + " " + member.LastName
+            })
+            .ToListAsync(ct);
     }
 }

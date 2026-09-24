@@ -665,6 +665,11 @@ export type CreateWardRequest = {
     is_active?: boolean;
 };
 
+export type CrewCandidate = {
+    staff_member_id: string;
+    full_name: string;
+};
+
 export type CurrentPrincipal = {
     id: string;
     principal_type: PrincipalType;
@@ -8696,6 +8701,37 @@ export type RevokeStaffSkillResponses = {
 };
 
 export type RevokeStaffSkillResponse2 = RevokeStaffSkillResponses[keyof RevokeStaffSkillResponses];
+
+export type SearchAvailableCrewData = {
+    body?: never;
+    path?: never;
+    query?: {
+        search?: string;
+    };
+    url: '/staff/crew-candidates';
+};
+
+export type SearchAvailableCrewErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type SearchAvailableCrewError = SearchAvailableCrewErrors[keyof SearchAvailableCrewErrors];
+
+export type SearchAvailableCrewResponses = {
+    /**
+     * OK
+     */
+    200: Array<CrewCandidate>;
+};
+
+export type SearchAvailableCrewResponse = SearchAvailableCrewResponses[keyof SearchAvailableCrewResponses];
 
 export type ListBedAvailabilityData = {
     body?: never;

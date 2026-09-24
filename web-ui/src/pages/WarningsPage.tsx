@@ -20,6 +20,7 @@ import {
   warningTypes,
 } from '../types/warnings';
 import { ClearWarningDialog } from './warnings/ClearWarningDialog';
+import { AppSelect } from '../components/ui/app-select';
 
 const PAGE_SIZE = 15;
 
@@ -105,22 +106,19 @@ export function WarningsPage() {
 
         <div className="row">
           <div>
-            <label htmlFor="warning-type">Kind</label>
-            <select
+            <AppSelect
               id="warning-type"
+              label="Kind"
               value={type}
-              onChange={(event) => {
-                setType(event.target.value as WarningType | '');
+              onValueChange={(value) => {
+                setType(value as WarningType | '');
                 setPage(1);
               }}
-            >
-              <option value="">Every kind</option>
-              {warningTypes.map((value) => (
-                <option key={value} value={value}>
-                  {warningTypeLabels[value]}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: 'Every kind' },
+                ...warningTypes.map((value) => ({ value, label: warningTypeLabels[value] })),
+              ]}
+            />
           </div>
         </div>
 

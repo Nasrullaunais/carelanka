@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, CardContent, CardTitle } from '@heroui/react';
+import { Button } from '@heroui/react';
 import { toast } from 'sonner';
 import type { CancellationRequestStatus, EmergencyCancellationRequest } from '../../../services/api/generated';
 import {
@@ -24,12 +24,22 @@ import {
   priorityTones,
 } from '../domain';
 import { invalidateEmergencyQueries } from '../query-invalidation';
+import './cancellation-queue.css';
 
 const cancellationStatusTones = {
   pending: 'warning',
   approved: 'success',
   rejected: 'danger',
 } as const satisfies Record<CancellationRequestStatus, 'warning' | 'success' | 'danger'>;
+
+function elapsedMinutes(iso?: string | null): string {
+  if (!iso) return 'Unknown';
+  const start = Date.parse(iso);
+  if (Number.isNaN(start)) return 'Unknown';
+  const minutes = Math.max(0, Math.floor((Date.now() - start) / 60_000));
+  if (minutes < 60) return `${minutes} min`;
+  return `${Math.floor(minutes / 60)} hr ${minutes % 60} min`;
+}
 
 export function CancellationQueue() {
   const [page, setPage] = useState(1);
@@ -46,20 +56,35 @@ export function CancellationQueue() {
     }),
     [query.data?.items],
   );
+  const pendingOnPage = requests.filter((request) => (request.status ?? 'pending') === 'pending').length;
 
   return (
-    <QueryState
-      query={query}
-      isEmpty={(data) => data.items.length === 0}
-      emptyMessage="No cancellation requests to review."
-      errorContext="Could not load cancellation requests."
-      skeletonRows={4}
-    >
-      {(data) => <div className="flex flex-col gap-4">
-        {requests.map((request) => <CancellationCard key={request.emergency_call_id} request={request} />)}
-        <PaginationControls label="Cancellation requests" page={page} totalPages={data.total_pages} onPageChange={setPage} />
-      </div>}
-    </QueryState>
+    <section className="cancellation-queue" aria-labelledby="cancellation-heading">
+      <div className="cancellation-intro">
+        <div>
+          <p className="cancellation-eyebrow">Decision queue</p>
+          <h2 id="cancellation-heading">Cancellation requests</h2>
+          <p>Review the caller’s reason and the live response before deciding whether the ambulance should stand down.</p>
+        </div>
+        {query.data && <div className="cancellation-count" aria-label={`${pendingOnPage} awaiting review on this page`}><strong>{pendingOnPage}</strong><span>awaiting review<br />on this page</span></div>}
+      </div>
+      <div className="cancellation-guidance" role="note">
+        <span className="cancellation-guidance-icon" aria-hidden="true">i</span>
+        <p><strong>Before you decide:</strong> approving cancels the emergency call and recalls any assigned ambulance. Rejecting keeps the response active and requires an explanation.</p>
+      </div>
+      <QueryState
+        query={query}
+        isEmpty={(data) => data.items.length === 0}
+        emptyMessage="No cancellation requests to review. New requests will appear here automatically."
+        errorContext="Could not load cancellation requests."
+        skeletonRows={4}
+      >
+        {(data) => <div className="cancellation-list">
+          {requests.map((request) => <CancellationCard key={request.emergency_call_id} request={request} />)}
+          <PaginationControls label="Cancellation requests" page={page} totalPages={data.total_pages} onPageChange={setPage} />
+        </div>}
+      </QueryState>
+    </section>
   );
 }
 
@@ -91,7 +116,7 @@ function CancellationCard({ request }: { request: EmergencyCancellationRequest }
   });
   const reject = useMutation({
     ...rejectEmergencyCancellationRequestMutation(),
-    onSuccess: () => complete('Cancellation request rejected.'),
+    onSuccess: () => complete('Cancellation request rejected. The emergency response continues.'),
     onError: (error) => failed(error as ApiProblem),
   });
 
@@ -99,48 +124,58 @@ function CancellationCard({ request }: { request: EmergencyCancellationRequest }
   const status = request.status ?? 'pending';
   const priority = request.call_priority ?? 'high';
   const callStatus = request.call_status ?? 'received';
-  const waitingMinutes = request.call_created_at == null
-    ? undefined
-    : Math.max(0, Math.floor((Date.now() - Date.parse(request.call_created_at)) / 60_000));
   const pending = approve.isPending || reject.isPending;
+  const isPending = status === 'pending';
+  const caller = request.caller_name?.trim() || 'Caller name unavailable';
+  const location = request.address_label?.trim() || 'Location not recorded';
 
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <CardTitle>{request.caller_name ?? request.address_label ?? 'Emergency call'}</CardTitle>
-            <p className="text-sm text-muted">Requested {formatTimestamp(request.requested_at)}</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <StatusChip tone={priorityTones[priority]}>{priorityLabels[priority]}</StatusChip>
-            <StatusChip tone={callStatusTones[callStatus]}>{callStatusLabels[callStatus]}</StatusChip>
-            <StatusChip tone={cancellationStatusTones[status]}>{cancellationStatusLabels[status]}</StatusChip>
-          </div>
+    <article className={`cancellation-card ${isPending ? 'cancellation-card--pending' : 'cancellation-card--reviewed'}`} aria-label={`Cancellation request for ${caller}`}>
+      <div className="cancellation-card-head">
+        <div className="cancellation-card-heading">
+          <p className="cancellation-card-kicker">{isPending ? 'Needs a decision' : 'Review complete'}</p>
+          <h3>{caller}</h3>
+          <p className="cancellation-card-time">Requested {formatTimestamp(request.requested_at)}</p>
         </div>
-        <div>
-          <p className="text-sm font-medium">Caller’s reason</p>
-          <p>{request.reason?.trim() || 'No reason provided.'}</p>
+        <div className="cancellation-statuses" aria-label="Request, call, and priority statuses">
+          <div><span>Request</span><StatusChip tone={cancellationStatusTones[status]}>{cancellationStatusLabels[status]}</StatusChip></div>
+          <div><span>Response</span><StatusChip tone={callStatusTones[callStatus]}>{callStatusLabels[callStatus]}</StatusChip></div>
+          <div><span>Priority</span><StatusChip tone={priorityTones[priority]}>{priorityLabels[priority]}</StatusChip></div>
         </div>
-        <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
-          <div><dt className="text-muted">Waiting</dt><dd>{waitingMinutes == null ? 'Unknown' : `${waitingMinutes} min`}</dd></div>
-          <div><dt className="text-muted">Assigned ambulance</dt><dd>{request.active_ambulance_registration ?? 'None'}</dd></div>
-          <div><dt className="text-muted">Location</dt><dd>{request.address_label ?? 'Not recorded'}</dd></div>
+      </div>
+
+      <div className="cancellation-card-body">
+        <div className="cancellation-reason">
+          <span className="cancellation-field-label">Why the caller wants to cancel</span>
+          <p>{request.reason?.trim() || 'No reason provided by the caller.'}</p>
+        </div>
+        <dl className="cancellation-facts">
+          <div><dt>Response location</dt><dd>{location}</dd></div>
+          <div><dt>Assigned ambulance</dt><dd>{request.active_ambulance_registration ?? 'None assigned'}</dd></div>
+          <div><dt>{isPending ? 'Time since call' : 'Reviewed'}</dt><dd>{isPending ? elapsedMinutes(request.call_created_at) : formatTimestamp(request.reviewed_at)}</dd></div>
         </dl>
-        {status === 'pending' ? (
-          <div className="flex flex-wrap gap-2">
-            <Button variant="danger" isDisabled={pending} onPress={() => setApproveOpen(true)}>Approve cancellation</Button>
-            <Button variant="outline" isDisabled={pending} onPress={() => setRejectOpen(true)}>Reject request</Button>
+      </div>
+
+      {isPending ? (
+        <div className="cancellation-actions">
+          <div className="cancellation-actions-copy"><strong>Choose what happens next</strong><span>The decision is confirmed before it takes effect.</span></div>
+          <div className="cancellation-action-buttons">
+            <div><Button variant="danger" isDisabled={pending} onPress={() => setApproveOpen(true)}>Approve cancellation</Button><span>End response and recall ambulance</span></div>
+            <div><Button variant="outline" isDisabled={pending} onPress={() => setRejectOpen(true)}>Reject request</Button><span>Keep emergency response active</span></div>
           </div>
-        ) : request.review_notes ? (
-          <div><p className="text-sm font-medium">Review notes</p><p>{request.review_notes}</p></div>
-        ) : null}
-      </CardContent>
+        </div>
+      ) : (
+        <div className="cancellation-review-result">
+          <strong>{status === 'approved' ? 'Response cancelled' : 'Response continued'}</strong>
+          <span>{status === 'approved' ? 'The cancellation was approved and any assigned ambulance was recalled.' : 'The cancellation was rejected and the emergency response stayed active.'}</span>
+          {request.review_notes && <p><span className="cancellation-field-label">Review notes</span>{request.review_notes}</p>}
+        </div>
+      )}
       <ConfirmDialog
         isOpen={approveOpen}
         onOpenChange={setApproveOpen}
         title="Approve cancellation request?"
-        description="This cancels the active dispatch and recalls the ambulance, making it available for other calls."
+        description="This cancels the active dispatch and recalls the ambulance, making it available for other calls. Check that stopping this response is safe."
         confirmLabel={approve.isPending ? 'Approving…' : 'Approve and recall'}
         isPending={approve.isPending}
         onConfirm={() => approve.mutate({ path: { id: callId }, body: {} })}
@@ -149,7 +184,7 @@ function CancellationCard({ request }: { request: EmergencyCancellationRequest }
         isOpen={rejectOpen}
         onOpenChange={setRejectOpen}
         title="Reject cancellation request"
-        description="Explain why the emergency response should continue. The patient can see this review result."
+        description="The emergency response will continue. Explain why it cannot be stopped; the patient can see this review result."
         notesLabel="Review notes"
         notesPlaceholder="Explain why the request cannot be approved"
         notesRequired
@@ -157,6 +192,6 @@ function CancellationCard({ request }: { request: EmergencyCancellationRequest }
         isPending={reject.isPending}
         onConfirm={({ notes }) => reject.mutate({ path: { id: callId }, body: { notes } })}
       />
-    </Card>
+    </article>
   );
 }

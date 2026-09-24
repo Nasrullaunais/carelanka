@@ -159,6 +159,35 @@ public sealed class AmbulanceCrewEndpointTests
     }
 
     [Fact]
+    public async Task Duty_manager_search_finds_only_active_unassigned_ambulance_crew()
+    {
+        using var manager = await AuthenticatedClientAsync(ApiApplication.ManagerEmail);
+        var ambulanceId = await CreateAmbulanceAsync(manager);
+        var name = $"Findable{Guid.NewGuid():N}";
+        var availableId = await CreateStaffAsync(StaffRole.AmbulanceCrew, name);
+        var assignedId = await CreateStaffAsync(StaffRole.AmbulanceCrew, name);
+        await CreateStaffAsync(StaffRole.AmbulanceCrew, name, isActive: false);
+        await CreateStaffAsync(StaffRole.Doctor, name);
+
+        using var assignment = await manager.PostAsJsonAsync($"/api/ambulances/{ambulanceId}/crew", new
+        {
+            staff_member_id = assignedId
+        });
+        Assert.Equal(HttpStatusCode.Created, assignment.StatusCode);
+
+        using var response = await manager.GetAsync($"/api/staff/crew-candidates?search={name.ToUpperInvariant()}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var candidate = Assert.Single(body.RootElement.EnumerateArray());
+        Assert.Equal(availableId, candidate.GetProperty("staff_member_id").GetGuid());
+        Assert.Contains(name, candidate.GetProperty("full_name").GetString());
+
+        using var crew = await AuthenticatedClientAsync(ApiApplication.AmbulanceEmail);
+        using var forbidden = await crew.GetAsync($"/api/staff/crew-candidates?search={name}");
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+    }
+
+    [Fact]
     public async Task Database_has_both_partial_unique_indexes_and_rejects_double_assignment()
     {
         using var client = await AuthenticatedClientAsync(ApiApplication.ManagerEmail);
@@ -246,7 +275,7 @@ public sealed class AmbulanceCrewEndpointTests
         return body.RootElement.GetProperty("items")[0].Clone();
     }
 
-    private async Task<Guid> CreateStaffAsync(StaffRole role)
+    private async Task<Guid> CreateStaffAsync(StaffRole role, string firstName = "Phase", bool isActive = true)
     {
         using var scope = _application.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
@@ -255,10 +284,10 @@ public sealed class AmbulanceCrewEndpointTests
             Id = Guid.NewGuid(),
             Email = $"crew-{Guid.NewGuid():N}@carelanka.invalid",
             PasswordHash = "not-used-by-this-test",
-            FirstName = "Phase",
+            FirstName = firstName,
             LastName = "One Crew",
             Role = role,
-            IsActive = true
+            IsActive = isActive
         };
         db.StaffMembers.Add(staff);
         await db.SaveChangesAsync();

@@ -4,8 +4,6 @@ import {
   InputGroup,
   InputGroupTextArea,
   Label,
-  ListBox,
-  ListBoxItem,
   Modal,
   ModalBackdrop,
   ModalBody,
@@ -14,13 +12,9 @@ import {
   ModalFooter,
   ModalHeader,
   ModalHeading,
-  Select,
-  SelectIndicator,
-  SelectPopover,
-  SelectTrigger,
-  SelectValue,
   TextField,
 } from '@heroui/react';
+import { AppSelect } from './app-select';
 
 export interface ReasonDialogResult {
   option?: string;
@@ -65,24 +59,13 @@ export function ReasonDialog({ isOpen, onOpenChange, title, description, options
             <ModalBody className="flex flex-col gap-4">
               {description && <p className="muted">{description}</p>}
               {options && (
-                <Select
-                  selectedKey={option}
-                  onSelectionChange={(key) => key !== undefined && setOption(String(key))}
+                <AppSelect
+                  value={option ?? ''}
+                  onValueChange={setOption}
+                  options={options}
+                  label={optionLabel}
                   isInvalid={optionMissing}
-                >
-                  <Label>{optionLabel}</Label>
-                  <SelectTrigger>
-                    <SelectValue />
-                    <SelectIndicator />
-                  </SelectTrigger>
-                  <SelectPopover>
-                    <ListBox>
-                      {options.map((item) => (
-                        <ListBoxItem key={item.value} id={item.value}>{item.label}</ListBoxItem>
-                      ))}
-                    </ListBox>
-                  </SelectPopover>
-                </Select>
+                />
               )}
               {notesLabel && (
                 <TextField value={notes} onChange={setNotes} isInvalid={notesMissing || undefined}>

@@ -19,6 +19,7 @@ import type {
 } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
 import { fieldLimits, nicProblem } from '../types/identifiers';
+import { AppSelect } from '../components/ui/app-select';
 import {
   PatientFields,
   emptyPatientForm,
@@ -823,17 +824,13 @@ function AdmitStep({
             </>
           ) : (
             <>
-              <select
+              <AppSelect
                 id="admit-category"
+                aria-label="Care level"
                 value={category}
-                onChange={(event) => setChosenCategory(event.target.value as AdmissionCategory)}
-              >
-                {availableCategories.map((value) => (
-                  <option key={value} value={value}>
-                    {admissionCategoryLabels[value]}
-                  </option>
-                ))}
-              </select>
+                onValueChange={(value) => setChosenCategory(value as AdmissionCategory)}
+                options={availableCategories.map((value) => ({ value, label: admissionCategoryLabels[value] }))}
+              />
               <p className="hint">
                 {admissionCategoryHints[category]} This is your decision and is recorded against
                 your name.

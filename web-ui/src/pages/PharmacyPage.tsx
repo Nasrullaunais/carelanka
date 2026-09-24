@@ -20,6 +20,7 @@ import { AddBatchDialog, BatchList } from './pharmacy/BatchList';
 import { RemoveMedicineDialog } from './pharmacy/RemoveMedicineDialog';
 import { PrescriptionsCard } from './pharmacy/PrescriptionsCard';
 import { ReorderSuggestionPanel } from './pharmacy/ReorderSuggestionPanel';
+import { AppSelect } from '../components/ui/app-select';
 
 const PAGE_SIZE = 10;
 
@@ -99,36 +100,34 @@ export function PharmacyPage() {
             />
           </div>
           <div>
-            <label htmlFor="ph-category">Category</label>
-            <select
+            <AppSelect
               id="ph-category"
+              label="Category"
               value={categoryId}
-              onChange={(event) => {
-                setCategoryId(event.target.value);
+              onValueChange={(value) => {
+                setCategoryId(value);
                 page1();
               }}
-            >
-              <option value="">All categories</option>
-              {(categories.data ?? []).map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: 'All categories' },
+                ...(categories.data ?? []).map((category) => ({ value: category.id, label: category.name })),
+              ]}
+            />
           </div>
           <div>
-            <label htmlFor="ph-available">Availability</label>
-            <select
+            <AppSelect
               id="ph-available"
+              label="Availability"
               value={availableOnly ? 'in-stock' : 'all'}
-              onChange={(event) => {
-                setAvailableOnly(event.target.value === 'in-stock');
+              onValueChange={(value) => {
+                setAvailableOnly(value === 'in-stock');
                 page1();
               }}
-            >
-              <option value="all">Everything in the catalog</option>
-              <option value="in-stock">On the shelf now</option>
-            </select>
+              options={[
+                { value: 'all', label: 'Everything in the catalog' },
+                { value: 'in-stock', label: 'On the shelf now' },
+              ]}
+            />
           </div>
         </div>
         <p className="hint">
@@ -518,20 +517,17 @@ function AddItemCard({
             />
           </div>
           <div className="field">
-            <label htmlFor="ph-new-category">Category</label>
-            <select
+            <AppSelect
               id="ph-new-category"
+              label="Category"
               value={categoryId}
-              onChange={(event) => setCategoryId(event.target.value)}
-              required
-            >
-              <option value="">Choose…</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+              onValueChange={setCategoryId}
+              isRequired
+              options={[
+                { value: '', label: 'Choose…' },
+                ...categories.map((category) => ({ value: category.id, label: category.name })),
+              ]}
+            />
           </div>
           <div className="field">
             <label htmlFor="ph-unit">Unit</label>
@@ -631,15 +627,16 @@ function AddItemCard({
             />
           </div>
           <div className="field">
-            <label htmlFor="ph-cat-rx">Prescription</label>
-            <select
+            <AppSelect
               id="ph-cat-rx"
+              label="Prescription"
               value={prescription ? 'yes' : 'no'}
-              onChange={(event) => setPrescription(event.target.value === 'yes')}
-            >
-              <option value="no">Not required</option>
-              <option value="yes">Required</option>
-            </select>
+              onValueChange={(value) => setPrescription(value === 'yes')}
+              options={[
+                { value: 'no', label: 'Not required' },
+                { value: 'yes', label: 'Required' },
+              ]}
+            />
           </div>
           <div className="actions">
             <button

@@ -21,6 +21,7 @@ import { invalidateEmergencyQueries } from '../query-invalidation';
 import { AmbulanceDialog } from './ambulance-dialog';
 import { CrewManagement } from './crew-management';
 import { ActionDialog } from '../../../components/ui/action-dialog';
+import { AppSelect } from '../../../components/ui/app-select';
 
 type DialogState = { kind: 'create' } | { kind: 'edit'; ambulance: AmbulanceDetail };
 type ConfirmAction = { kind: 'retire' | 'reinstate'; ambulance: AmbulanceSummary };
@@ -72,9 +73,16 @@ export function AmbulanceRegister() {
     <div className="flex flex-col gap-4">
       <Card><CardContent className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3"><CardTitle>Ambulance register</CardTitle><Button onPress={() => setDialog({ kind: 'create' })}>Add ambulance</Button></div>
-        <label className="flex max-w-xs flex-col gap-1 text-sm">Status filter<select className="rounded-lg border border-default-200 bg-background px-3 py-2" value={status} onChange={(event) => { setStatus(event.target.value as AmbulanceStatus | ''); setPage(1); }}>
-          <option value="">All statuses</option>{Object.entries(ambulanceStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select></label>
+        <AppSelect
+          className="max-w-xs"
+          label="Status filter"
+          value={status}
+          onValueChange={(value) => { setStatus(value as AmbulanceStatus | ''); setPage(1); }}
+          options={[
+            { value: '', label: 'All statuses' },
+            ...Object.entries(ambulanceStatusLabels).map(([value, label]) => ({ value, label })),
+          ]}
+        />
         <QueryState query={list} errorContext="Could not load the ambulance register." isEmpty={(data) => data.items.length === 0} emptyMessage="No ambulances are registered.">
           {(data) => <DataTable ariaLabel="Ambulance register" rows={data.items} columns={columns} rowKey={(row) => row.id} rowText={(row) => row.registration_number} pagination={{ page, totalPages: data.total_pages, onPageChange: setPage }} />}
         </QueryState>

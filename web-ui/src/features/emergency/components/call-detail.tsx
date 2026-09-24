@@ -9,6 +9,7 @@ import {
   updateEmergencyCallMutation,
 } from '../../../services/api/generated/@tanstack/react-query.gen';
 import { DetailField } from '../../../components/ui/detail-field';
+import { AppSelect } from '../../../components/ui/app-select';
 import { QueryState } from '../../../components/ui/query-state';
 import { StatusChip } from '../../../components/ui/status-chip';
 import { isConflict } from '../../../services/api/errors';
@@ -133,17 +134,20 @@ function PriorityControl({ current, pending, onSave }: { current: CallPriority; 
   const [priority, setPriority] = useState(current);
   useEffect(() => setPriority(current), [current]);
   return (
-    <label className="flex flex-col gap-1 text-sm">
-      <span className="font-medium">Priority</span>
+    <div className="flex flex-col gap-1 text-sm">
       <span className="flex gap-2">
-        <select value={priority} onChange={(event) => setPriority(event.target.value as CallPriority)}>
-          {Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
+        <AppSelect
+          className="min-w-40"
+          label="Priority"
+          value={priority}
+          onValueChange={(value) => setPriority(value as CallPriority)}
+          options={Object.entries(priorityLabels).map(([value, label]) => ({ value, label }))}
+        />
         <Button size="sm" isDisabled={pending || priority === current} onPress={() => onSave(priority)}>
           {pending ? 'Saving…' : 'Update'}
         </Button>
       </span>
-    </label>
+    </div>
   );
 }
 

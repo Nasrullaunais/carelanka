@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/friendly_date.dart';
 import '../../../core/widgets/async_view.dart';
-import '../../../services/api_client/care_lanka_api.dart';
 import '../../../services/api_client/models/my_admission.dart';
 import '../../../services/api_client/models/my_bill.dart';
 import '../services/patient_service.dart';
@@ -76,9 +75,7 @@ class _NotAdmitted extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (context) =>
-          PastVisitsController(PatientService(context.read<CareLankaApi>()))
-            ..load(),
+      create: (context) => PastVisitsController(context.read<PatientService>())..load(),
       child: RefreshableMessage(
         onRefresh: onRefresh,
         // A Column, not a ListView: RefreshableMessage already supplies the one scrollable

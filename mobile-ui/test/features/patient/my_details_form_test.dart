@@ -69,8 +69,12 @@ void main() {
   }
 
   Future<void> fillTextFields(WidgetTester tester) async {
+    // The date of birth has to match the birth year in the NIC. pickDateOfBirth accepts the
+    // picker's starting date, thirty years back, so the NIC is built to carry that same year.
+    final nic = '${DateTime.now().year - 30}12345678';
+
     await tester.enterText(find.widgetWithText(TextFormField, 'Full name'), 'Chathura');
-    await tester.enterText(find.widgetWithText(TextFormField, 'NIC'), '199012345678');
+    await tester.enterText(find.widgetWithText(TextFormField, 'NIC'), nic);
     await tester.enterText(find.widgetWithText(TextFormField, 'Phone'), '0771234567');
   }
 

@@ -543,9 +543,7 @@ class _QuickActions extends StatelessWidget {
             icon: Icons.history,
             label: 'Past visits',
             caption: 'Completed stays',
-            onTap: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const PastVisitsScreen())),
+            onTap: () => openPastVisits(context),
           ),
         _ActionTile(
           icon: Icons.description_outlined,

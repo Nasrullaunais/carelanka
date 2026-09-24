@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/friendly_date.dart';
 import '../../../core/widgets/async_view.dart';
-import '../../../services/api_client/care_lanka_api.dart';
 import '../../../services/api_client/models/appointment_status.dart';
 import '../../../services/api_client/models/my_appointment.dart';
 import '../services/patient_service.dart';
@@ -291,11 +290,9 @@ class _AppointmentCard extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: () => showAppointmentBillSheet(
                   context,
-                  service: PatientService(context.read<CareLankaApi>()),
+                  service: context.read<PatientService>(),
                   appointmentId: appointment.appointmentId,
-                  onViewPastVisits: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const PastVisitsScreen()),
-                  ),
+                  onViewPastVisits: () => openPastVisits(context),
                 ),
                 icon: const Icon(Icons.receipt_long_outlined, size: 18),
                 label: const Text('Bill'),

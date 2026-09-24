@@ -114,9 +114,7 @@ class ProfileScreen extends StatelessWidget {
                   title: const Text('Past visits'),
                   subtitle: const Text('Completed stays'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(
-                    context,
-                  ).push(MaterialPageRoute(builder: (_) => const PastVisitsScreen())),
+                  onTap: () => openPastVisits(context),
                 ),
                 const Divider(indent: 20, endIndent: 20),
                 ListTile(

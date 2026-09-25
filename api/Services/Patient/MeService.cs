@@ -464,7 +464,7 @@ public sealed class MeService : IMeService
                 appointment.Status, appointment.CancelledByStaffMemberId is not null),
             Reason = appointment.Reason,
 
-            CanCancel = appointment.Status == AppointmentStatus.Scheduled,
+            CanCancel = AppointmentService.OpenStatuses.Contains(appointment.Status),
             CancellationReason = appointment.CancellationReason,
             CancelledByHospital = appointment.CancelledByStaffMemberId is not null
         };

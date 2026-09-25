@@ -175,6 +175,19 @@ public sealed class DischargeService : IDischargeService
             live.ReleaseReason = ReleaseReason.Discharged;
         }
 
+        var unanswered = await _db.CareRecommendations
+            .Where(row => row.AdmissionId == admission.Id
+                && row.Status == CareRecommendationStatus.PendingReview)
+            .ToListAsync(ct);
+
+        foreach (var row in unanswered)
+        {
+            row.Status = CareRecommendationStatus.Rejected;
+            row.RejectionReason = "Closed automatically: the patient was discharged before this was answered.";
+            row.ReviewedByStaffMemberId = _currentUser.Id;
+            row.ReviewedAt = now;
+        }
+
         await _db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
 

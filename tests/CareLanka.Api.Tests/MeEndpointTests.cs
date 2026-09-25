@@ -225,6 +225,33 @@ public sealed class MeEndpointTests
     }
 
     [Fact]
+    public async Task A_confirmed_visit_can_still_be_cancelled_but_a_completed_one_cannot()
+    {
+        using var patient = await NewPatientAccountAsync();
+        await PreRegisterAsync(patient, NewNic(), "Confirmed Visit Cancellation");
+
+        using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
+        using var booked = await ReadJsonAsync(await BookAsync(patient, DateTimeOffset.UtcNow.AddDays(3)));
+        var appointmentId = booked.RootElement.GetProperty("appointment_id").GetString()!;
+
+        var confirmed = await nurse.PostAsync($"/api/appointments/{appointmentId}/confirm", null);
+        Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
+
+        using var confirmedList = await ReadJsonAsync(await patient.GetAsync("/api/me/appointments"));
+        var confirmedAppointment = confirmedList.RootElement.GetProperty("items").EnumerateArray()
+            .Single(item => item.GetProperty("appointment_id").GetString() == appointmentId);
+        Assert.True(confirmedAppointment.GetProperty("can_cancel").GetBoolean());
+
+        var completed = await nurse.PostAsync($"/api/appointments/{appointmentId}/complete", null);
+        Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
+
+        using var completedList = await ReadJsonAsync(await patient.GetAsync("/api/me/appointments"));
+        var completedAppointment = completedList.RootElement.GetProperty("items").EnumerateArray()
+            .Single(item => item.GetProperty("appointment_id").GetString() == appointmentId);
+        Assert.False(completedAppointment.GetProperty("can_cancel").GetBoolean());
+    }
+
+    [Fact]
     public async Task Booking_before_filling_in_your_details_is_refused_with_the_reason()
     {
         using var patient = await NewPatientAccountAsync();

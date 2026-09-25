@@ -52,6 +52,18 @@ public class AppointmentsController : ControllerBase
     }
 
     [Authorize(Policy = Policies.AppointmentDesk)]
+    [HttpPost("walk-in", Name = "createWalkInAppointment")]
+    [ProducesResponseType(typeof(AppointmentResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<AppointmentResponse>> CreateWalkInAppointment(
+        [FromBody] CreateWalkInAppointmentRequest request, CancellationToken ct)
+        => Created((string?)null, await _appointments.CreateWalkInAsync(request, ct));
+
+    [Authorize(Policy = Policies.AppointmentDesk)]
     [HttpPost("{id:guid}/confirm", Name = "confirmAppointment")]
     [ProducesResponseType(typeof(AppointmentResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]

@@ -1136,6 +1136,26 @@ reads it.
 
 ---
 
+**11.22 (FYI — announced by M4 on 2026-09-25) — first-time patients and walk-ins on
+Appointments. Additive only.**
+
+**New:** `POST /appointments/walk-in` (`createWalkInAppointment`, schema
+`CreateWalkInAppointmentRequest`) — a visit recorded at the current time and already confirmed,
+for a test, scan or check-up with no booking. Desk roles only. No existing route, schema or rule
+changed.
+
+**For the laboratory (M3), nothing to do.** The desk can now register a patient with only a
+name, mobile number and gender, for a visit that never becomes an admission. Such a patient is in
+no ward, so `GET /ward-patients` does not list them — by design, it lists who is in a bed. They
+are found through the lab page's existing search by code, name or NIC (`GET /patients`), and
+`POST /lab-reports` already accepts any patient id.
+
+**The web client was regenerated**, and that also brought in the Staff routes
+(`listStaff`, `createStaffMember`, …) that were in the API but missing from the committed client.
+Generated output only; no Staff code changed.
+
+---
+
 ## 12. For the other three members
 
 This file originally described every boundary **from the Patient Management side**, because that was the first component designed. Equipment Management (§13–§16) added its own sections, written against `equipment-management-plan.md` and `equipment-spec.yaml`. Staff Management (§17–§21) and Emergency (§22–§26) now have theirs too, written against `staff-spec.yaml` and `emergency-management-plan.md`/`emergency-spec.yaml` respectively. If something here is wrong about your component, raise it in §11 rather than working around it.

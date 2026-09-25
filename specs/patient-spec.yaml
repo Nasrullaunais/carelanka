@@ -1937,7 +1937,7 @@ paths:
   /appointments:
     get:
       tags: [Admissions]
-      summary: Expected visits worklist
+      summary: Appointments worklist
       description: |
         Roles: WardNurse, DutyManager, GeneralStaff, HospitalAdministrator.
 
@@ -1965,7 +1965,7 @@ paths:
           schema: { $ref: '#/components/schemas/AppointmentStatus' }
       responses:
         '200':
-          description: Expected visits
+          description: Appointments
           content:
             application/json:
               schema:
@@ -1996,6 +1996,42 @@ paths:
       responses:
         '201':
           description: Booked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Appointment' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: That patient already has an open appointment or admission.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /appointments/walk-in:
+    post:
+      tags: [Admissions]
+      summary: Record a walk-in visit starting now
+      description: |
+        Roles: WardNurse, GeneralStaff, DutyManager.
+
+        For someone at the counter now with no booking - a blood test, a scan, a check-up.
+        `POST /appointments` refuses a time that has passed, so this is the desk's route for
+        "now". The visit is created at the current time and already `confirmed`, stamped with
+        whoever is signed in as both booker and confirmer, so the day-of actions
+        (`/check-in`, `/complete`) are open at once. The same one-open-booking and
+        not-already-admitted rules apply. There is no patient equivalent under `/me`: a
+        patient in the app books ahead.
+      operationId: createWalkInAppointment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateWalkInAppointmentRequest' }
+      responses:
+        '201':
+          description: Recorded, confirmed
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Appointment' }
@@ -2996,6 +3032,16 @@ components:
           nullable: true
           description: Optional free text, for the desk to read.
 
+    CreateWalkInAppointmentRequest:
+      type: object
+      required: [patient_id]
+      properties:
+        patient_id: { type: string, format: uuid }
+        reason:
+          type: string
+          nullable: true
+          maxLength: 300
+          description: Optional free text, for the desk to read - "Blood test", "Chest X-ray".
     CreateAppointmentRequest:
       type: object
       required: [patient_id, scheduled_at]
@@ -3006,8 +3052,8 @@ components:
           format: date-time
           description: |
             When the patient intends to come in. **Must be in the future** - a visit booked
-            for a time that has passed is always a typo, and somebody already in the building
-            is admitted rather than booked. Rejected with a 400.
+            for a time that has passed is always a typo. Rejected with a 400. Somebody already
+            at the counter is recorded with `POST /appointments/walk-in` instead.
         reason:
           type: string
           nullable: true

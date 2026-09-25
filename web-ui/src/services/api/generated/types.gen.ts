@@ -654,6 +654,22 @@ export type CreateSkillRequest = {
     description?: string | null;
 };
 
+export type CreateStaffMemberRequest = {
+    first_name: string;
+    last_name: string;
+    email: string;
+    temporary_password: string;
+    phone_number?: string | null;
+    role: StaffRole;
+    department?: string | null;
+    skill_ids?: Array<string> | null;
+};
+
+export type CreateWalkInAppointmentRequest = {
+    patient_id: string;
+    reason?: string | null;
+};
+
 export type CreateWardRequest = {
     name: string;
     ward_type: WardType;
@@ -674,6 +690,11 @@ export type CurrentPrincipal = {
     email?: string | null;
     phone_number?: string | null;
     patient_id?: string | null;
+};
+
+export type DeactivateStaffMemberRequest = {
+    reason: string;
+    effective_date?: string | null;
 };
 
 export type DeclineDispatchRequest = {
@@ -1707,6 +1728,39 @@ export type StaffLookupResult = {
     is_active?: boolean | null;
 };
 
+export type StaffMemberDetailDto = {
+    id: string;
+    employee_number: string;
+    first_name: string;
+    last_name: string;
+    full_name: string;
+    email: string;
+    phone_number?: string | null;
+    role: StaffRole;
+    department?: string | null;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+    skills: Array<StaffSkillDto>;
+    upcoming_allocations: Array<AllocationSummaryDto>;
+    leave_balance_days?: number | null;
+};
+
+export type StaffMemberDto = {
+    id: string;
+    employee_number: string;
+    first_name: string;
+    last_name: string;
+    full_name: string;
+    email: string;
+    phone_number?: string | null;
+    role: StaffRole;
+    department?: string | null;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
 export type StaffRole = 'ward_nurse' | 'doctor' | 'ambulance_crew' | 'general_staff' | 'duty_manager' | 'hospital_administrator' | 'equipment_manager';
 
 export type StaffSkillDto = {
@@ -1716,6 +1770,23 @@ export type StaffSkillDto = {
     expires_at?: string | null;
     is_valid: boolean;
     granted_at: string;
+};
+
+export type StaffSummaryDto = {
+    id: string;
+    full_name: string;
+    role: StaffRole;
+    department?: string | null;
+    is_active: boolean;
+    skill_count: number;
+};
+
+export type StaffSummaryDtoPagedResult = {
+    items: Array<StaffSummaryDto>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
 };
 
 export type UpdateAmbulanceRequest = {
@@ -1784,6 +1855,19 @@ export type UpdateReorderThresholdRequest = {
 export type UpdateSkillRequest = {
     name: string;
     description?: string | null;
+};
+
+export type UpdateStaffMemberRequest = {
+    first_name?: string | null;
+    last_name?: string | null;
+    phone_number?: string | null;
+    role?: StaffRole;
+    department?: string | null;
+};
+
+export type UpdateStaffMemberResponse = {
+    staff_member: StaffMemberDto;
+    affected_allocations: Array<AllocationSummaryDto>;
 };
 
 export type ValidationProblemDetails = {
@@ -2424,6 +2508,47 @@ export type CreateAppointmentResponses = {
 };
 
 export type CreateAppointmentResponse = CreateAppointmentResponses[keyof CreateAppointmentResponses];
+
+export type CreateWalkInAppointmentData = {
+    body?: CreateWalkInAppointmentRequest;
+    path?: never;
+    query?: never;
+    url: '/appointments/walk-in';
+};
+
+export type CreateWalkInAppointmentErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CreateWalkInAppointmentError = CreateWalkInAppointmentErrors[keyof CreateWalkInAppointmentErrors];
+
+export type CreateWalkInAppointmentResponses = {
+    /**
+     * Created
+     */
+    201: Appointment;
+};
+
+export type CreateWalkInAppointmentResponse = CreateWalkInAppointmentResponses[keyof CreateWalkInAppointmentResponses];
 
 export type ConfirmAppointmentData = {
     body?: never;
@@ -8663,6 +8788,234 @@ export type RevokeStaffSkillResponses = {
 };
 
 export type RevokeStaffSkillResponse2 = RevokeStaffSkillResponses[keyof RevokeStaffSkillResponses];
+
+export type ListStaffData = {
+    body?: never;
+    path?: never;
+    query?: {
+        search?: string;
+        role?: StaffRole;
+        skill?: string;
+        department?: string;
+        includeInactive?: boolean;
+        page?: number;
+        pageSize?: number;
+        sortBy?: string;
+        sortDir?: string;
+    };
+    url: '/staff';
+};
+
+export type ListStaffErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListStaffError = ListStaffErrors[keyof ListStaffErrors];
+
+export type ListStaffResponses = {
+    /**
+     * OK
+     */
+    200: StaffSummaryDtoPagedResult;
+};
+
+export type ListStaffResponse = ListStaffResponses[keyof ListStaffResponses];
+
+export type CreateStaffMemberData = {
+    body?: CreateStaffMemberRequest;
+    path?: never;
+    query?: never;
+    url: '/staff';
+};
+
+export type CreateStaffMemberErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CreateStaffMemberError = CreateStaffMemberErrors[keyof CreateStaffMemberErrors];
+
+export type CreateStaffMemberResponses = {
+    /**
+     * Created
+     */
+    201: StaffMemberDto;
+};
+
+export type CreateStaffMemberResponse = CreateStaffMemberResponses[keyof CreateStaffMemberResponses];
+
+export type GetStaffMemberData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/staff/{id}';
+};
+
+export type GetStaffMemberErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetStaffMemberError = GetStaffMemberErrors[keyof GetStaffMemberErrors];
+
+export type GetStaffMemberResponses = {
+    /**
+     * OK
+     */
+    200: StaffMemberDetailDto;
+};
+
+export type GetStaffMemberResponse = GetStaffMemberResponses[keyof GetStaffMemberResponses];
+
+export type UpdateStaffMemberData = {
+    body?: UpdateStaffMemberRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/staff/{id}';
+};
+
+export type UpdateStaffMemberErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type UpdateStaffMemberError = UpdateStaffMemberErrors[keyof UpdateStaffMemberErrors];
+
+export type UpdateStaffMemberResponses = {
+    /**
+     * OK
+     */
+    200: UpdateStaffMemberResponse;
+};
+
+export type UpdateStaffMemberResponse2 = UpdateStaffMemberResponses[keyof UpdateStaffMemberResponses];
+
+export type DeactivateStaffMemberData = {
+    body?: DeactivateStaffMemberRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/staff/{id}/deactivate';
+};
+
+export type DeactivateStaffMemberErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type DeactivateStaffMemberError = DeactivateStaffMemberErrors[keyof DeactivateStaffMemberErrors];
+
+export type DeactivateStaffMemberResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeactivateStaffMemberResponse = DeactivateStaffMemberResponses[keyof DeactivateStaffMemberResponses];
+
+export type ReactivateStaffMemberData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/staff/{id}/reactivate';
+};
+
+export type ReactivateStaffMemberErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ReactivateStaffMemberError = ReactivateStaffMemberErrors[keyof ReactivateStaffMemberErrors];
+
+export type ReactivateStaffMemberResponses = {
+    /**
+     * OK
+     */
+    200: StaffMemberDto;
+};
+
+export type ReactivateStaffMemberResponse = ReactivateStaffMemberResponses[keyof ReactivateStaffMemberResponses];
 
 export type SearchAvailableCrewData = {
     body?: never;

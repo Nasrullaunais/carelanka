@@ -103,6 +103,84 @@ public sealed class AppointmentEndpointTests
     }
 
     [Fact]
+    public async Task A_walk_in_starts_now_already_confirmed_so_the_desk_can_finish_it_at_once()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var patientId = await NewPatientAsync(nurse, "Walk In Blood Test");
+        var before = DateTimeOffset.UtcNow;
+
+        var created = await nurse.PostAsJsonAsync(
+            "/api/appointments/walk-in", new { patient_id = patientId, reason = "Blood test" });
+        using var body = await ReadJsonAsync(created);
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        Assert.Equal("confirmed", body.RootElement.GetProperty("status").GetString());
+        Assert.Equal("Blood test", body.RootElement.GetProperty("reason").GetString());
+        Assert.Equal(await NurseIdAsync(), body.RootElement.GetProperty("booked_by_staff_id").GetString());
+        Assert.Equal(await NurseIdAsync(), body.RootElement.GetProperty("confirmed_by_staff_id").GetString());
+        Assert.InRange(
+            body.RootElement.GetProperty("scheduled_at").GetDateTimeOffset(),
+            before.AddSeconds(-1),
+            DateTimeOffset.UtcNow.AddSeconds(1));
+
+        var id = body.RootElement.GetProperty("id").GetString();
+        var completed = await nurse.PostAsync($"/api/appointments/{id}/complete", content: null);
+
+        Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_walk_in_keeps_the_one_open_booking_rule()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var patientId = await NewPatientAsync(nurse, "Walk In Already Booked");
+        await BookAsync(nurse, patientId, SoonUtc());
+
+        var walkIn = await nurse.PostAsJsonAsync(
+            "/api/appointments/walk-in", new { patient_id = patientId });
+        using var body = await ReadJsonAsync(walkIn);
+
+        Assert.Equal(HttpStatusCode.Conflict, walkIn.StatusCode);
+        Assert.Equal("cl_pat_009", body.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task A_walk_in_with_no_patient_is_refused_before_anything_is_looked_up()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+
+        var missing = await nurse.PostAsJsonAsync("/api/appointments/walk-in", new { reason = "Scan" });
+        var empty = await nurse.PostAsJsonAsync(
+            "/api/appointments/walk-in", new { patient_id = Guid.Empty });
+        using var emptyBody = await ReadJsonAsync(empty);
+
+        Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, empty.StatusCode);
+        Assert.Equal("cl_err_400", emptyBody.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Only_the_desk_records_a_walk_in()
+    {
+        using var doctor = await ClientAsync(ApiApplication.DoctorEmail);
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
+        using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
+
+        var body = new { patient_id = Guid.NewGuid() };
+
+        foreach (var refused in new[] { doctor, administrator })
+        {
+            Assert.Equal(
+                HttpStatusCode.Forbidden,
+                (await refused.PostAsJsonAsync("/api/appointments/walk-in", body)).StatusCode);
+        }
+
+        Assert.Equal(
+            HttpStatusCode.NotFound,
+            (await reception.PostAsJsonAsync("/api/appointments/walk-in", body)).StatusCode);
+    }
+
+    [Fact]
     public async Task A_patient_who_is_already_in_the_building_cannot_be_booked_a_visit()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);

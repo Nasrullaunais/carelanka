@@ -1865,30 +1865,23 @@ paths:
       - $ref: '#/components/parameters/PathId'
     post:
       tags: [Monitoring]
-      summary: Mark a resolved warning done
+      summary: Mark a resolved or dismissed warning done
       description: |
-        Roles: HospitalAdministrator, with the confirmation code (`X-Confirmation-Code`, the
-        same code as equipment confirmation). A missing or wrong code answers 403 `cl_equ_017`.
-        *(Rev 3, 2026-09-19.)*
+        Roles: EquipmentManager or HospitalAdministrator. No confirmation code. *(Rev 4,
+        2026-09-25; before this it was the administrator with the code.)*
 
-        Only an `action_taken` (resolved) warning; anything else answers 409 `cl_equ_029`. It
-        leaves every warnings list for good, and the row stays in the database with
-        `cleared_at` and who cleared it.
+        Only an `action_taken` (resolved) or `dismissed` warning; anything else answers 409
+        `cl_equ_029`. It leaves every warnings list for good, and the row stays in the database
+        with `cleared_at` and who cleared it.
       operationId: clearWarning
-      parameters:
-        - $ref: '#/components/parameters/ConfirmationCode'
       responses:
         '204':
           description: Marked done and taken off the list
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403':
-          description: Not the hospital administrator, or the confirmation code is missing or wrong.
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: The warning is not resolved.
+          description: The warning is not resolved or dismissed.
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }

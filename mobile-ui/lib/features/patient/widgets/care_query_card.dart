@@ -66,12 +66,34 @@ class _CareQueryCardState extends State<CareQueryCard> {
     setState(() => _submitting = true);
 
     try {
-      await _service.submitCareQuery(_text.text);
+      final accepted = await _service.submitCareQuery(_text.text);
       if (!mounted) return;
 
       _text.clear();
       FocusScope.of(context).unfocus();
       _loadHistory();
+
+      if (accepted.redFlag == true) {
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            icon: const Icon(Icons.warning_amber_rounded),
+            title: const Text('Tell a nurse now'),
+            content: const Text(
+              'What you described may need help straight away. Press your call bell or '
+              'tell the nearest nurse now - do not wait for a reply here.',
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Sent. A nurse or doctor will look at this.'),

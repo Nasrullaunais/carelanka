@@ -22,6 +22,9 @@ import '../models/pharmacy_transaction_paged_result.dart';
 import '../models/prescription.dart';
 import '../models/prescription_status.dart';
 import '../models/reject_prescription_request.dart';
+import '../models/reorder_suggestion_accepted.dart';
+import '../models/reorder_workflow_summary.dart';
+import '../models/update_reorder_threshold_request.dart';
 
 part 'pharmacy_api.g.dart';
 
@@ -103,6 +106,22 @@ abstract class PharmacyApi {
     @Path('id') required String id,
     @Path('batchId') required String batchId,
     @Body() CreatePharmacyTransactionRequest? body,
+  });
+
+  @PATCH('/pharmacy-items/{id}/reorder-threshold')
+  Future<PharmacyItem> updateReorderThreshold({
+    @Path('id') required String id,
+    @Body() UpdateReorderThresholdRequest? body,
+  });
+
+  @POST('/pharmacy-items/{id}/reorder-suggestion')
+  Future<ReorderSuggestionAccepted> submitReorderSuggestion({
+    @Path('id') required String id,
+  });
+
+  @GET('/pharmacy-items/reorder-suggestions/{workflowId}')
+  Future<ReorderWorkflowSummary> getReorderSuggestionWorkflow({
+    @Path('workflowId') required String workflowId,
   });
 
   @GET('/prescriptions')

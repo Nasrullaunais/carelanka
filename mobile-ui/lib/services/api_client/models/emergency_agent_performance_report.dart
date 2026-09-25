@@ -23,10 +23,9 @@ class EmergencyAgentPerformanceReport {
     this.medianMinutesCallToDispatch,
     this.rejectionReasons,
   });
-
-  factory EmergencyAgentPerformanceReport.fromJson(Map<String, Object?> json) =>
-      _$EmergencyAgentPerformanceReportFromJson(json);
-
+  
+  factory EmergencyAgentPerformanceReport.fromJson(Map<String, Object?> json) => _$EmergencyAgentPerformanceReportFromJson(json);
+  
   final DateTime? from;
   final DateTime? to;
   @JsonKey(name: 'proposals_raised')
@@ -51,6 +50,5 @@ class EmergencyAgentPerformanceReport {
   @JsonKey(name: 'rejection_reasons')
   final Map<String, int>? rejectionReasons;
 
-  Map<String, Object?> toJson() =>
-      _$EmergencyAgentPerformanceReportToJson(this);
+  Map<String, Object?> toJson() => _$EmergencyAgentPerformanceReportToJson(this);
 }

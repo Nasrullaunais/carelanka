@@ -16,10 +16,9 @@ class FleetUtilisationReportRow {
     this.idleShare,
     this.outOfServiceHours,
   });
-
-  factory FleetUtilisationReportRow.fromJson(Map<String, Object?> json) =>
-      _$FleetUtilisationReportRowFromJson(json);
-
+  
+  factory FleetUtilisationReportRow.fromJson(Map<String, Object?> json) => _$FleetUtilisationReportRowFromJson(json);
+  
   @JsonKey(name: 'ambulance_id')
   final String? ambulanceId;
   @JsonKey(name: 'registration_number')

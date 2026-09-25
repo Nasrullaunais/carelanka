@@ -35,11 +35,8 @@ export function appointmentOutcome(appointment: {
     : 'Seen and went home';
 }
 
-export const deskCareLevels: AdmissionCategory[] = [
-  'general',
-  'surgical',
-  'maternity',
-  'emergency',
-];
+/// What the desk decides when a confirmed patient turns up: a care level admits them exactly
+/// like a walk-in, and `no_bed` records a check-up, scan or test that is billed on this booking.
+export type CheckInChoice = AdmissionCategory | 'no_bed';
 
-export const dutyManagerCareLevels: AdmissionCategory[] = [...deskCareLevels, 'icu'];
+export const noBedLabel = 'No bed needed - check-up, scan or test';

@@ -11,11 +11,15 @@ part 'response_time_report.g.dart';
 
 @JsonSerializable()
 class ResponseTimeReport {
-  const ResponseTimeReport({this.from, this.to, this.rows, this.totals});
-
-  factory ResponseTimeReport.fromJson(Map<String, Object?> json) =>
-      _$ResponseTimeReportFromJson(json);
-
+  const ResponseTimeReport({
+    this.from,
+    this.to,
+    this.rows,
+    this.totals,
+  });
+  
+  factory ResponseTimeReport.fromJson(Map<String, Object?> json) => _$ResponseTimeReportFromJson(json);
+  
   final DateTime? from;
   final DateTime? to;
   final List<ResponseTimeReportRow>? rows;

@@ -294,31 +294,11 @@ public sealed class AppointmentEndpointTests
     }
 
     [Fact]
-    public async Task A_nurse_may_not_check_somebody_in_at_icu_but_the_duty_manager_may()
-    {
-        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
-        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
-
-        var refusedFor = await ConfirmedIdAsync(
-            nurse, await NewPatientAsync(nurse, "Nurse Tries ICU"), SoonUtc());
-        var allowedFor = await ConfirmedIdAsync(
-            nurse, await NewPatientAsync(nurse, "Manager Does ICU"), SoonUtc());
-
-        var refused = await CheckInAsync(nurse, refusedFor, category: "icu");
-        using var body = await ReadJsonAsync(refused);
-        var allowed = await CheckInAsync(manager, allowedFor, category: "icu");
-
-        Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
-        Assert.Equal("cl_pat_011", body.RootElement.GetProperty("code").GetString());
-        Assert.Equal(HttpStatusCode.Created, allowed.StatusCode);
-    }
-
-    [Fact]
-    public async Task A_nurse_may_still_check_somebody_in_at_the_four_levels_that_are_theirs()
+    public async Task A_nurse_may_check_somebody_in_at_every_level_walk_in_intake_offers()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
 
-        foreach (var category in new[] { "general", "surgical", "maternity", "emergency" })
+        foreach (var category in new[] { "icu", "general", "surgical", "emergency" })
         {
             var appointmentId = await ConfirmedIdAsync(
                 nurse, await NewPatientAsync(nurse, $"Nurse Checks In {category}"), SoonUtc());
@@ -662,12 +642,32 @@ public sealed class AppointmentEndpointTests
             is_infectious = false
         });
 
-    private static async Task<string> NewPatientAsync(HttpClient nurse, string fullName)
+    [Fact]
+    public async Task Maternity_is_refused_for_a_male_patient_and_allowed_for_a_female_one()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+
+        var forHim = await ConfirmedIdAsync(
+            nurse, await NewPatientAsync(nurse, "Maternity Him"), SoonUtc());
+        var forHer = await ConfirmedIdAsync(
+            nurse, await NewPatientAsync(nurse, "Maternity Her", gender: "female"), SoonUtc());
+
+        var refused = await CheckInAsync(nurse, forHim, category: "maternity");
+        using var body = await ReadJsonAsync(refused);
+        var allowed = await CheckInAsync(nurse, forHer, category: "maternity");
+
+        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+        Assert.Equal("cl_pat_048", body.RootElement.GetProperty("code").GetString());
+        Assert.Equal(HttpStatusCode.Created, allowed.StatusCode);
+    }
+
+    private static async Task<string> NewPatientAsync(
+        HttpClient nurse, string fullName, string gender = "male")
     {
         var created = await nurse.PostAsJsonAsync("/api/patients", new
         {
             full_name = fullName,
-            gender = "male",
+            gender,
             nic = $"P{Guid.NewGuid():N}"[..12]
         });
 

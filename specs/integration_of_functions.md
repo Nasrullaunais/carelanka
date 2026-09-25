@@ -465,10 +465,10 @@ derived from the two stored statuses rather than being a third one. Other compon
 keep reading `GET /api/capacity/wards` and `GET /api/wards/{id}/occupancy` for counts — this
 one carries patient identities and is the desk's view, not an aggregate.
 
-**`POST /api/admissions/{id}/complete` finishes a visit that never needed a bed** — an
-`outpatient` scan or blood test. Not the discharge workflow: a visit holding a bed is refused
-with `cl_pat_020`, because discharge releases a bed and Equipment's register has to see that
-happen. Nothing outside Patient calls it.
+~~**`POST /api/admissions/{id}/complete`**~~ **was removed on 2026-09-25** (§11.21). Every care
+level needs a bed since the `outpatient` category went, so it could only ever answer 409. A
+check-up, scan or test is an appointment completed and billed on the booking. Nothing outside
+Patient called it.
 
 All JWT-protected and role-restricted. Aggregate endpoints return **counts, never patient identities** — `CapacityEndpointTests` asserts a patient's name appears in neither response body.
 
@@ -1102,6 +1102,24 @@ are ours — the same split as `LabReport`, except that here Equipment also serv
 
 **No data crosses the other way.** The prescription stores the patient id only; the pharmacy shows
 code and name read through `IPatientService` at display time.
+
+**11.21 (FYI — announced by M4 on 2026-09-25) — Patient Management review fixes. Nothing here
+changes anything another component calls, but three things left the contract.**
+
+**Removed from `patient-spec.yaml`:** `POST /admissions/{id}/complete` (`completeVisit`); the
+`requires_bed` field on `AdmissionSummary`, `Admission` and `WorklistRow` (it was always `true`);
+and the `awaiting_bed -> admitted` status move. Swept before removing: no Equipment, Emergency or
+Staff code reads any of them — `WardPatientService` and `PreAdmissionGateway` go through
+`IAdmissionService` methods that did not change. Both generated clients were regenerated.
+
+**New rules, Patient's own:** ward fit on bed assignment (`cl_pat_047`, duty manager may overrule),
+`maternity` refused for a patient recorded as male (`cl_pat_048`), bills and the discharge checklist
+only while the patient is on the ward (`cl_pat_044`–`046`), three care reports a minute per patient
+(`cl_pat_050`), and approving a care draft refused while the agent is still writing it
+(`cl_pat_049`). `cl_pat_011`, `cl_pat_020` and `cl_pat_021` are retired and will not be reused.
+
+**For Emergency, specifically:** a pre-admission classified as `maternity` for a male patient is now
+409 at `POST /admissions/{id}/classify`. `PreAdmitAsync` itself is untouched.
 
 ---
 

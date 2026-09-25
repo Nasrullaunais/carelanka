@@ -277,10 +277,6 @@
     <value>A visit cannot be booked for a time that has already passed.</value>
     <comment>Always a typo at the desk. Somebody already here is admitted, not booked.</comment>
   </data>
-  <data name="cl_pat_011" xml:space="preserve">
-    <value>Only a duty manager may check a patient in at {0} level.</value>
-    <comment>Intensive and high-dependency care are the duty manager's to authorise, wherever the admission comes from.</comment>
-  </data>
   <data name="cl_pat_012" xml:space="preserve">
     <value>{0} (ward type {1}) gives more intensive care than the {2} level this patient was assessed at. Only a duty manager may approve that.</value>
     <comment>The step up. Revised 2026-09-12: this used to refuse every ICU and HDU ward regardless of the patient, which stopped a nurse bedding an ICU patient in the ICU bed that matched them. The rule is now the match alone - see patient-management-plan.md 5.2.</comment>
@@ -312,14 +308,6 @@
   <data name="cl_pat_019" xml:space="preserve">
     <value>Bed {0} is in a ward that is no longer in service.</value>
     <comment>Hard rule H5. The bed is real; its ward has been retired, so nobody can be admitted into it.</comment>
-  </data>
-  <data name="cl_pat_020" xml:space="preserve">
-    <value>A {0} visit is discharged, not completed, because it has a bed to give back.</value>
-    <comment>POST /admissions/{id}/complete only finishes a visit that never needed a bed. Anything else is the discharge workflow.</comment>
-  </data>
-  <data name="cl_pat_021" xml:space="preserve">
-    <value>A {0} visit does not need a bed.</value>
-    <comment>Hard rule H0. Refuses a bed assignment for an outpatient, who is seen and sent home.</comment>
   </data>
   <data name="cl_pat_022" xml:space="preserve">
     <value>{0} is ticked by a {1}, not by you.</value>
@@ -400,5 +388,33 @@
   <data name="cl_pat_043" xml:space="preserve">
     <value>Admission {0} needs a care category before a bed can be assigned.</value>
     <comment>A pre-admission from Emergency has no admission_category until a clinician classifies it via POST /admissions/{{id}}/classify - bed assignment cannot run before that.</comment>
+  </data>
+  <data name="cl_pat_044" xml:space="preserve">
+    <value>A bill is raised while the patient is on the ward. This admission is {0}.</value>
+    <comment>Admission bills. Before admitted there are no nights to charge and an unclassified pre-admission has no care level to price; after discharge or cancellation the stay is over.</comment>
+  </data>
+  <data name="cl_pat_045" xml:space="preserve">
+    <value>Only a finished visit can be billed. This booking is {0}.</value>
+    <comment>Appointment bills. A booking that was cancelled, missed or has not happened yet has no consultation to charge for.</comment>
+  </data>
+  <data name="cl_pat_046" xml:space="preserve">
+    <value>The discharge checklist is for a patient on the ward. This admission is {0}.</value>
+    <comment>Ticking or unticking clinical clearance on an admission that has not arrived, or has already left, would rewrite a record that is not open.</comment>
+  </data>
+  <data name="cl_pat_047" xml:space="preserve">
+    <value>{0} is a {1} ward, which is not where {2} patients normally go. Only a duty manager may place them there.</value>
+    <comment>Ward fit. Each care level has a set of wards that suit it (BedPlacementRules.FitsWard); anything outside that set is the duty manager's call, the same as a step up or down in acuity.</comment>
+  </data>
+  <data name="cl_pat_048" xml:space="preserve">
+    <value>Maternity care is only for female patients.</value>
+    <comment>A patient recorded as male cannot be given the maternity care level. A patient whose gender is not yet recorded is allowed, because the brief emergency record leaves it blank.</comment>
+  </data>
+  <data name="cl_pat_049" xml:space="preserve">
+    <value>The agent is still writing its draft. Wait for it to finish, then review.</value>
+    <comment>Approve or reject while an agent run for the same report is still going. Approving now would send the patient the generic note and then lose the draft that lands a moment later.</comment>
+  </data>
+  <data name="cl_pat_050" xml:space="preserve">
+    <value>You have sent {0} messages in the last minute. Wait a moment before sending another. If this is urgent, press your call bell or tell a nurse.</value>
+    <comment>POST /me/care-queries is limited per patient, counted from their own saved reports. Every report can start a model call, and the free Gemini allowance is small.</comment>
   </data>
 </root>

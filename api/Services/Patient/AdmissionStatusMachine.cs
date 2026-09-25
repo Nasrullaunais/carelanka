@@ -12,7 +12,6 @@ public static class AdmissionStatusMachine
             [AdmissionStatus.AwaitingBed] =
             [
                 AdmissionStatus.AwaitingApproval,
-                AdmissionStatus.Admitted,
                 AdmissionStatus.Cancelled
             ],
             [AdmissionStatus.AwaitingApproval] =

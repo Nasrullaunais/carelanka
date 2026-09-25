@@ -38,7 +38,7 @@
 | 4 | **The 7-state admission status machine** | **Done.** `awaiting_bed → bed_reserved → admitted → ready_for_discharge → discharged`, plus `cancelled`. Illegal transitions → 409. *(`awaiting_approval` is still in the enum and the machine but **nothing sets it**, first since 2026-09-16 when the bed agent stopped writing proposals, and unreachable outright since the agent was removed 2026-09-22. §8.6b)* |
 | 5 | `GET /capacity/wards` + `GET /wards/{id}/occupancy` | **Done.** M1 and M2 are unblocked. Hold expiry lives in `CapacityService` and nowhere else |
 | 6 | **Manual bed assignment, no AI** | **Done.** Pick a bed by hand, with the 30-minute hold. The concurrency guarantee lives in the partial unique index, not in code |
-| 6b | **Visits that need no bed (H0) + the patients board** | **Done.** An `outpatient` never enters `awaiting_bed`. `GET /api/patient-worklist` unions bookings and visits so the board can say "not arrived". **No migration** |
+| 6b | ~~Visits that need no bed (H0)~~ + the patients board | **H0 retired 2026-09-25.** The `outpatient` category went on 2026-09-23, every care level needs a bed, and a check-up/scan/test is an appointment billed on the booking — see step 17. The patients board stays |
 | 7 | Discharge checklist + confirmation | **Done.** `clinical_clearance` gated on the `doctor` role claim. **Billing came with it** — `billing_settled` cannot be an honest tick with nothing behind it |
 | 8 | Codegen gate | **Done.** `bun run check:codegen` in `web-ui/` regenerates and fails on any diff under `src/services/api/generated`. Reads the document off a **running** API on `:5231` |
 | 9 | React: admissions dashboard, bed board, occupancy report | **Done.** `DashboardPage`, `PatientsPage` (the board, with assign / correct bed on the row), `IntakePage`, `AppointmentsPage`, `CapacityPage`, `DischargePage`, `WardsPage`, `BillingSettingsPage` |
@@ -49,6 +49,7 @@
 | 13 | ~~React: the suggestion panel~~ | **Removed with step 12.** `POST /admissions/{id}/assign-bed` (step 6) is the only bed-placement path now, with no `workflow_id` field |
 | 14 | `CareRecommendation` entity + configuration + migration | **Done 2026-09-21, merged to `main` (PR #87).** `Patient_AddCareRecommendation`. Independent of the bed workflow — no dependency on steps 1–13 beyond `Patient`, `Admission` and step 11 |
 | 15 | **The care advisory agent, last** | **Done 2026-09-21.** `api/Agents/Patient/CareAgent.cs` and friends — screen (§8.13, deterministic, before the model), gather (medical profile + history + current admission, three read-only tools), draft (`GeminiCareAdvisor`, falls back to `DeterministicCareAdvisor` with no key/dead quota/timeout — never a hard failure), validate (CR1–CR5, deterministic, `CareRecommendationValidator.cs`), pause. Own queue and worker (`CareRunQueue` / `CareAgentWorker`). Entry point (`POST /me/care-queries`) refuses anybody not admitted, `409 cl_pat_038`, before a workflow row or the model is ever touched |
+| 17 | **Review fixes** | **Done 2026-09-25**, branch `fix/patient-review-fixes`. Settling a bill rebuilds its generated lines (a bill raised on day 1 and settled on day 5 used to charge one night). Admission bills only while on the ward (`cl_pat_044`), appointment bills only on a finished booking (`cl_pat_045`), checklist only while on the ward (`cl_pat_046`). Ward fit H7 (`BedPlacementRules.FitsWard`, `cl_pat_047`, duty manager may overrule). `maternity` refused for a male patient (`cl_pat_048`). Appointments: one **Check in** panel whose list is the walk-in list plus **No bed needed** (the latter completes the booking and bills it there); the ICU-only-for-duty-manager rule at check-in retired (`cl_pat_011`). Care agent: 3 reports a minute (`cl_pat_050`), red flag returned at once and shown in Flutter, text normalised before the keyword screen, Approve/Reject/Redraft shut while a run is going (`cl_pat_049`), card shown only while admitted. Dead no-bed code removed: `RequiresBed`, `requires_bed`, `POST /admissions/{id}/complete`, `awaiting_bed → admitted`, `cl_pat_020`/`021`. Expected visits list uses the Sri Lanka calendar day. A corrected bed on a lapsed hold gets a fresh hold |
 | 16 | React: the review queue, and the patient's side | **Done 2026-09-21, merged to `main` (PR #87, tuned in PR #88).** `web-ui/src/pages/CareRecommendationsPage.tsx`, routed at `/care-recommendations`. Queue is **Doctor or Ward Nurse** to approve/reject (§8.16, `Policies.CareRecommendationReviewer`), **Doctor, Ward Nurse or Duty Manager** to read it (`Policies.CareQueueReader`), and shows the profile the agent read (fetched from the existing medical-profile endpoint, not a new field) — **in React for both roles**. Patient side is `mobile-ui/lib/features/patient/widgets/care_query_card.dart`, a card inside `my_stay_screen.dart`, only while admitted, never a top-level screen; never renders `agent_message` or `rejection_reason` — only `doctor_message` once approved, or a generic "reviewed" status otherwise |
 
 **The thing steps 14–16 sat behind has landed.** `AgentWorkflow` and `AgentProposedChange` were
@@ -82,10 +83,9 @@ endpoints read was already on `main`. Four things settled while building them:
   before a digit, so `IncomingNext2h` serialised as `incoming_next2h` and the contract says
   `incoming_next_2h`. The only property in this component with a number in it, and
   `PatientOpenApiContractTests` is what found it.
-- **The check-in role split reads the body, not the route.** A ward nurse may check somebody in
-  as `outpatient`, `day_case` or `inpatient`; `icu` and `hdu` are the duty manager's. That
-  cannot be a policy on the action, so it is a check in `AppointmentService` returning
-  `cl_pat_011`.
+- ~~**The check-in role split reads the body, not the route.**~~ *Retired 2026-09-25 (step 17):
+  check-in now offers the same care levels as walk-in intake to the same roles, and
+  `cl_pat_011` is gone. The duty manager's sign-off lives at bed assignment instead.*
 - **"One open booking at a time" is a read with no index behind it**, unlike the open-admission
   rule. Closing it properly is a partial unique index and therefore a migration. Left open on
   purpose: the damage is two rows on a worklist, and the second check-in is still refused by
@@ -182,6 +182,10 @@ integration tests through HTTP. Things settled while building it:
 
 **Step 6b: an outpatient does not need a bed, and the board is two tables.** Added after
 step 6, because using the screen found a bug step 6 could not see.
+
+> **Superseded 2026-09-25 (step 17).** Everything below about H0, `requires_bed`, a visit born
+> `admitted` and `POST /admissions/{id}/complete` is history: the category change left every care
+> level needing a bed, so it was all removed. Kept for the record of why it existed.
 
 **What was wrong.** `CreateAsync` started *every* admission at `awaiting_bed`, and the only
 edge into `admitted` runs `awaiting_bed → awaiting_approval → bed_reserved → admitted`. Every
@@ -330,8 +334,9 @@ Eight things settled while building it:
   are checked. Nothing observes the middle state. Adding the edge would have meant editing the
   workflow in three documents plus two drift tests to save one line.
 - **H2 refuses an *upgrade* as well as an unapproved downgrade.** Ward types map onto three
-  rungs — icu, hdu, everything else — and `day_case` / `outpatient` sit on the bottom rung with
-  `inpatient` because there is no ward type below `general`. A general patient into an ICU bed is
+  rungs — icu, hdu, everything else — and `general`, `surgical`, `maternity` and `emergency` all
+  sit on the bottom rung because there is no ward type below `general`. *(Categories as of
+  2026-09-23; step 17 adds ward fit, H7, on top of the rungs.)* A general patient into an ICU bed is
   a 409: it is not generosity, it is the last ICU bed spent on somebody who does not need it.
   **Revised 2026-09-12 — the duty manager may now overrule this** (see the step 6 addendum
   below); a nurse or reception gets a 403 first and never reaches the 409.

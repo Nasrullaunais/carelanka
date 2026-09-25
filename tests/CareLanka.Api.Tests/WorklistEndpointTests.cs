@@ -18,40 +18,28 @@ public sealed class WorklistEndpointTests
     public WorklistEndpointTests(ApiApplication application) => _application = application;
 
     [Fact]
-    public async Task A_visit_that_does_need_a_bed_still_starts_on_the_bed_board()
+    public async Task A_new_visit_starts_on_the_bed_board()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         var visit = await NewVisitAsync(nurse, category: "general");
 
         Assert.Equal("awaiting_bed", visit.GetProperty("status").GetString());
-        Assert.True(visit.GetProperty("requires_bed").GetBoolean());
+        Assert.False(visit.TryGetProperty("requires_bed", out _));
         Assert.Equal(JsonValueKind.Null, visit.GetProperty("admitted_at").ValueKind);
     }
 
     [Fact]
-    public async Task A_visit_with_a_bed_cannot_be_completed_and_is_told_to_discharge_instead()
+    public async Task There_is_no_complete_visit_route_any_more()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         var visit = await NewVisitAsync(nurse, category: "general");
 
-        var refused = await nurse.PostAsync(
+        var response = await nurse.PostAsync(
             $"/api/admissions/{visit.GetProperty("id").GetString()}/complete", null);
 
-        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
-
-        using var body = await ReadJsonAsync(refused);
-
-        Assert.Equal("cl_pat_020", body.RootElement.GetProperty("code").GetString());
-    }
-
-    [Fact]
-    public async Task Completing_something_that_does_not_exist_is_a_404()
-    {
-        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
-
-        var missing = await nurse.PostAsync($"/api/admissions/{Guid.NewGuid()}/complete", null);
-
-        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        Assert.True(
+            response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed,
+            $"Expected no route, got {(int)response.StatusCode}.");
     }
 
     /// The board is people who are here. A booking is worked from the expected visits screen
@@ -94,7 +82,6 @@ public sealed class WorklistEndpointTests
 
         Assert.Single(rows);
         Assert.Equal("awaiting_bed", rows[0].GetProperty("status").GetString());
-        Assert.True(rows[0].GetProperty("requires_bed").GetBoolean());
     }
 
     [Fact]
@@ -107,7 +94,6 @@ public sealed class WorklistEndpointTests
         var row = await BoardRowAsync(nurse, patient.Name);
 
         Assert.Equal("awaiting_bed", row.GetProperty("status").GetString());
-        Assert.True(row.GetProperty("requires_bed").GetBoolean());
         Assert.Equal(JsonValueKind.Null, row.GetProperty("bed_number").ValueKind);
     }
 

@@ -642,10 +642,28 @@ public sealed class MeEndpointTests
         Assert.Equal(HttpStatusCode.OK, (await PreRegisterAsync(patient, nic, "Billed Patient")).StatusCode);
 
         await AdmitAsync(nurse, patientId);
+        await MarkOnTheWardAsync(patientId);
 
         using var body = await ReadJsonAsync(await patient.GetAsync("/api/me/admission"));
 
         return body.RootElement.GetProperty("admission_id").GetString()!;
+    }
+
+    /// A bill is only raised while the patient is on the ward, and which bed they are in is not
+    /// what these tests are about, so the stay is moved to admitted directly.
+    private async Task MarkOnTheWardAsync(string patientId)
+    {
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        var id = Guid.Parse(patientId);
+        var admission = await db.Admissions
+            .FirstAsync(a => a.PatientId == id && a.Status == AdmissionStatus.AwaitingBed);
+
+        admission.Status = AdmissionStatus.Admitted;
+        admission.AdmittedAt = DateTimeOffset.UtcNow;
+
+        await db.SaveChangesAsync();
     }
 
     private static Task<HttpResponseMessage> ClaimAsync(

@@ -32,6 +32,7 @@ import {
 import { canEditPatient, canRegisterPatient } from '../types/permissions';
 import {
   admissionCategories,
+  admissionCategoriesFor,
   admissionCategoryHints,
   admissionCategoryLabels,
   detailFieldLabel,
@@ -748,10 +749,7 @@ function AdmitStep({
   const queryClient = useQueryClient();
 
   const categoryChosenEarlier = initialCategory !== undefined;
-  const availableCategories =
-    patient.gender === 'female'
-      ? admissionCategories
-      : admissionCategories.filter((value) => value !== 'maternity');
+  const availableCategories = admissionCategoriesFor(patient.gender);
 
   const [chosenCategory, setChosenCategory] = useState<AdmissionCategory>(
     initialCategory ?? 'general',

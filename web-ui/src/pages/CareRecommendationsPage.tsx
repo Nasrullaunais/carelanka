@@ -433,19 +433,23 @@ function RecommendationDetail({
               rows={5}
               maxLength={2000}
               value={draftedMessage}
-              placeholder="No draft — write the reply yourself."
+              disabled={agentRunning}
+              placeholder={
+                agentRunning ? 'Waiting for the agent…' : 'No draft — write the reply yourself.'
+              }
               onChange={(event) => setDoctorMessage(event.target.value)}
             />
             <p className="hint">
-              This is the agent&apos;s draft. Approve it as it stands, or correct it first — the
-              patient reads exactly what is in this box.
+              {agentRunning
+                ? 'The agent is still writing its draft. Approve and Reject open up when it is here.'
+                : "This is the agent's draft. Approve it as it stands, or correct it first — the patient reads exactly what is in this box."}
             </p>
           </div>
 
           <div className="actions">
             <button
               type="button"
-              disabled={approve.isPending}
+              disabled={approve.isPending || agentRunning}
               onClick={() =>
                 approve.mutate({
                   path: { id: recommendationId },
@@ -455,7 +459,12 @@ function RecommendationDetail({
             >
               {approve.isPending ? 'Approving…' : 'Approve'}
             </button>
-            <button type="button" className="secondary" onClick={() => setShowReject(true)}>
+            <button
+              type="button"
+              className="secondary"
+              disabled={agentRunning}
+              onClick={() => setShowReject(true)}
+            >
               Reject
             </button>
           </div>

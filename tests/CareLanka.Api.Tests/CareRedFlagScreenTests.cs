@@ -24,4 +24,14 @@ public sealed class CareRedFlagScreenTests
     [Fact]
     public void The_match_is_case_insensitive()
         => Assert.True(CareRedFlagScreen.Matches("Chest Pain started an hour ago"));
+
+    [Theory]
+    [InlineData("I can\u2019t breathe")]
+    [InlineData("i cant breathe")]
+    [InlineData("I   can't    breathe")]
+    [InlineData("I feel short of breath")]
+    [InlineData("He passed out in the bathroom")]
+    [InlineData("I was coughing up blood")]
+    public void A_phone_apostrophe_a_missing_one_or_a_common_phrasing_still_matches(string text)
+        => Assert.True(CareRedFlagScreen.Matches(text));
 }

@@ -10,11 +10,14 @@ part 'fleet_utilisation_report.g.dart';
 
 @JsonSerializable()
 class FleetUtilisationReport {
-  const FleetUtilisationReport({this.from, this.to, this.rows});
-
-  factory FleetUtilisationReport.fromJson(Map<String, Object?> json) =>
-      _$FleetUtilisationReportFromJson(json);
-
+  const FleetUtilisationReport({
+    this.from,
+    this.to,
+    this.rows,
+  });
+  
+  factory FleetUtilisationReport.fromJson(Map<String, Object?> json) => _$FleetUtilisationReportFromJson(json);
+  
   final DateTime? from;
   final DateTime? to;
   final List<FleetUtilisationReportRow>? rows;

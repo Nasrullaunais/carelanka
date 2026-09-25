@@ -116,10 +116,6 @@ export function canOpenAppointmentBoard(role: PrincipalRole | undefined): boolea
   return canWorkAppointmentDesk(role) || canWorkBillingDesk(role);
 }
 
-export function canSetHighCareLevel(role: PrincipalRole | undefined): boolean {
-  return role === 'duty_manager';
-}
-
 export function canManageEmergency(role: PrincipalRole | undefined): boolean {
   return role === 'duty_manager';
 }
@@ -161,10 +157,6 @@ export function canWorkBillingDesk(role: PrincipalRole | undefined): boolean {
 /// discharge checklist and stays reception's alone.
 export function canBillAppointment(role: PrincipalRole | undefined): boolean {
   return canWorkBillingDesk(role) || role === 'ward_nurse';
-}
-
-export function canCompleteVisit(role: PrincipalRole | undefined): boolean {
-  return role === 'ward_nurse' || role === 'duty_manager';
 }
 
 export function canMarkArrived(role: PrincipalRole | undefined): boolean {

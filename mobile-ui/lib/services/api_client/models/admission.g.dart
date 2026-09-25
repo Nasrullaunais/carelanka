@@ -12,7 +12,6 @@ Admission _$AdmissionFromJson(Map<String, dynamic> json) => Admission(
   urgency: AdmissionUrgency.fromJson(json['urgency'] as String),
   status: AdmissionStatus.fromJson(json['status'] as String),
   detailsComplete: json['details_complete'] as bool,
-  requiresBed: json['requires_bed'] as bool,
   isInfectious: json['is_infectious'] as bool,
   missingFields: (json['missing_fields'] as List<dynamic>)
       .map((e) => e as String)
@@ -61,7 +60,6 @@ Map<String, dynamic> _$AdmissionToJson(Admission instance) => <String, dynamic>{
   'urgency': instance.urgency,
   'status': instance.status,
   'details_complete': instance.detailsComplete,
-  'requires_bed': instance.requiresBed,
   'ward_name': instance.wardName,
   'bed_number': instance.bedNumber,
   'expected_arrival': instance.expectedArrival?.toIso8601String(),

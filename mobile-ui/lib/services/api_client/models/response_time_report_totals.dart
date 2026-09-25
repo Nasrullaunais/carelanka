@@ -13,10 +13,9 @@ class ResponseTimeReportTotals {
     this.medianMinutesToDispatch,
     this.medianMinutesToArrival,
   });
-
-  factory ResponseTimeReportTotals.fromJson(Map<String, Object?> json) =>
-      _$ResponseTimeReportTotalsFromJson(json);
-
+  
+  factory ResponseTimeReportTotals.fromJson(Map<String, Object?> json) => _$ResponseTimeReportTotalsFromJson(json);
+  
   @JsonKey(name: 'call_count')
   final int? callCount;
   @JsonKey(name: 'median_minutes_to_dispatch')

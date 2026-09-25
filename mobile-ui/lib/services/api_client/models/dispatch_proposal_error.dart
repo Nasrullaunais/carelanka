@@ -8,11 +8,14 @@ part 'dispatch_proposal_error.g.dart';
 
 @JsonSerializable()
 class DispatchProposalError {
-  const DispatchProposalError({this.step, this.message, this.occurredAt});
-
-  factory DispatchProposalError.fromJson(Map<String, Object?> json) =>
-      _$DispatchProposalErrorFromJson(json);
-
+  const DispatchProposalError({
+    this.step,
+    this.message,
+    this.occurredAt,
+  });
+  
+  factory DispatchProposalError.fromJson(Map<String, Object?> json) => _$DispatchProposalErrorFromJson(json);
+  
   final String? step;
   final String? message;
   @JsonKey(name: 'occurred_at')

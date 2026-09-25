@@ -80,11 +80,6 @@ abstract class AdmissionsApi {
     @Path('id') required String id,
   });
 
-  @POST('/admissions/{id}/complete')
-  Future<Admission> completeVisit({
-    @Path('id') required String id,
-  });
-
   @POST('/admissions/{id}/cancel')
   Future<Admission> cancelAdmission({
     @Path('id') required String id,

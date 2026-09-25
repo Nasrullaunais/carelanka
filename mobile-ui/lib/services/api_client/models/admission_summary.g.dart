@@ -13,7 +13,6 @@ AdmissionSummary _$AdmissionSummaryFromJson(Map<String, dynamic> json) =>
       urgency: AdmissionUrgency.fromJson(json['urgency'] as String),
       status: AdmissionStatus.fromJson(json['status'] as String),
       detailsComplete: json['details_complete'] as bool,
-      requiresBed: json['requires_bed'] as bool,
       patient: json['patient'] == null
           ? null
           : PatientSummary.fromJson(json['patient'] as Map<String, dynamic>),
@@ -39,7 +38,6 @@ Map<String, dynamic> _$AdmissionSummaryToJson(AdmissionSummary instance) =>
       'urgency': instance.urgency,
       'status': instance.status,
       'details_complete': instance.detailsComplete,
-      'requires_bed': instance.requiresBed,
       'ward_name': instance.wardName,
       'bed_number': instance.bedNumber,
       'expected_arrival': instance.expectedArrival?.toIso8601String(),

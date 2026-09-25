@@ -24,9 +24,6 @@ public class AdmissionSummary
     [Required]
     public bool DetailsComplete { get; set; }
 
-    [Required]
-    public bool RequiresBed { get; set; }
-
     public string? WardName { get; set; }
 
     public string? BedNumber { get; set; }

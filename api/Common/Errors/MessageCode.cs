@@ -106,8 +106,6 @@ public enum MessageCode
 
     AppointmentInThePast,
 
-    CareLevelNeedsDutyManager,
-
     BedNeedsDutyManager,
 
     BedDowngradeNeedsDutyManager,
@@ -123,10 +121,6 @@ public enum MessageCode
     BedNeedsIsolation,
 
     BedWardNotInService,
-
-    VisitNeedsDischargeNotComplete,
-
-    VisitNeedsNoBed,
 
     ChecklistItemWrongRole,
 
@@ -184,5 +178,19 @@ public enum MessageCode
 
     AdmissionAlreadyClassified,
 
-    AdmissionNotYetClassified
+    AdmissionNotYetClassified,
+
+    BillNotOpenForStay,
+
+    AppointmentNotBillable,
+
+    DischargeChecklistNotOnWard,
+
+    BedWardWrongKind,
+
+    MaternityNeedsFemalePatient,
+
+    CareAgentStillDrafting,
+
+    TooManyCareQueries
 }

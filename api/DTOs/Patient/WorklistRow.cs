@@ -14,9 +14,6 @@ public class WorklistRow
     [Required]
     public WorklistStatus Status { get; set; }
 
-    [Required]
-    public bool RequiresBed { get; set; }
-
     public AdmissionSource? Source { get; set; }
 
     public AdmissionCategory? AdmissionCategory { get; set; }

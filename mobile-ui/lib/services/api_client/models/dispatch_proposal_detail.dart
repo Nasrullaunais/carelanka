@@ -48,10 +48,9 @@ class DispatchProposalDetail {
     this.reviewNotes,
     this.rejectionReason,
   });
-
-  factory DispatchProposalDetail.fromJson(Map<String, Object?> json) =>
-      _$DispatchProposalDetailFromJson(json);
-
+  
+  factory DispatchProposalDetail.fromJson(Map<String, Object?> json) => _$DispatchProposalDetailFromJson(json);
+  
   final String? id;
   @JsonKey(name: 'workflow_id')
   final String? workflowId;

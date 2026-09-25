@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import {
   assignBedManuallyMutation,
   correctBedMutation,
-  completeVisitMutation,
   getAdmissionOptions,
   getPatientOptions,
   listBedAvailabilityOptions,
@@ -21,11 +20,9 @@ import type { PrincipalRole, WorklistRow } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
 import { MedicalProfilePanel } from '../components/MedicalProfilePanel';
 import { ActionDialog } from '../components/ui/action-dialog';
-import { ConfirmDialog } from '../components/ui/confirm-dialog';
 import { BedCandidateTable } from '../components/BedCandidateTable';
 import {
   canAssignBed,
-  canCompleteVisit,
   canEditPatient,
   canMarkArrived,
   canReadMedicalProfile,
@@ -362,8 +359,6 @@ function RowActions({
   onDetails: () => void;
 }) {
   const invalidate = useBoardInvalidation();
-  const [confirmComplete, setConfirmComplete] = useState(false);
-
   const arrive = useMutation({
     ...markArrivedMutation(),
     onSuccess: () => {
@@ -372,28 +367,18 @@ function RowActions({
     },
   });
 
-  const complete = useMutation({
-    ...completeVisitMutation(),
-    onSuccess: () => {
-      toast.success(`${row.patient.full_name}'s visit is complete.`);
-      invalidate();
-      setConfirmComplete(false);
-    },
-  });
-
-  const pending = arrive.isPending || complete.isPending;
+  const pending = arrive.isPending;
 
   return (
     <>
 
-      {row.status === 'awaiting_bed' && row.requires_bed && canAssignBed(role) && (
+      {row.status === 'awaiting_bed' && canAssignBed(role) && (
         <button type="button" onClick={() => onAssign('assign')}>
           {assigning ? 'Cancel' : 'Assign bed'}
         </button>
       )}
 
       {(row.status === 'bed_ready' || row.status === 'admitted') &&
-        row.requires_bed &&
         canAssignBed(role) && (
           <button type="button" className="secondary" onClick={() => onAssign('correct')}>
             {assigning ? 'Cancel' : 'Change bed'}
@@ -409,28 +394,10 @@ function RowActions({
           {arrive.isPending ? 'Saving…' : 'Mark arrived'}
         </button>
       )}
-
-      {row.status === 'admitted' && !row.requires_bed && canCompleteVisit(role) && (
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => setConfirmComplete(true)}
-        >
-          {complete.isPending ? 'Saving…' : 'Complete visit'}
-        </button>
-      )}{' '}
+{' '}
       <button type="button" className="secondary" onClick={onDetails}>
         {open ? 'Hide' : 'Details'}
       </button>
-      <ConfirmDialog
-        isOpen={confirmComplete}
-        onOpenChange={(open) => setConfirmComplete(open)}
-        title={`Complete ${row.patient.full_name}'s visit?`}
-        description="The visit will move out of the active patient board. Check that care and documentation are finished."
-        confirmLabel={complete.isPending ? 'Completing…' : 'Complete visit'}
-        isPending={complete.isPending}
-        onConfirm={() => complete.mutate({ path: { id: row.id } })}
-      />
     </>
   );
 }

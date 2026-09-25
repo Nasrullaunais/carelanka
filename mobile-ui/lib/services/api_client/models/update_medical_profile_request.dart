@@ -12,7 +12,6 @@ class UpdateMedicalProfileRequest {
     this.knownConditions,
     this.allergies,
     this.currentSymptoms,
-    this.recentSituation,
   });
   
   factory UpdateMedicalProfileRequest.fromJson(Map<String, Object?> json) => _$UpdateMedicalProfileRequestFromJson(json);
@@ -22,8 +21,6 @@ class UpdateMedicalProfileRequest {
   final String? allergies;
   @JsonKey(name: 'current_symptoms')
   final String? currentSymptoms;
-  @JsonKey(name: 'recent_situation')
-  final String? recentSituation;
 
   Map<String, Object?> toJson() => _$UpdateMedicalProfileRequestToJson(this);
 }

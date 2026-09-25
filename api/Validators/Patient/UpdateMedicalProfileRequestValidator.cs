@@ -5,7 +5,7 @@ using FluentValidation;
 namespace CareLanka.Api.Validators.Patient;
 
 /// <summary>
-/// Length is the only rule there is. These are four boxes a clinician types prose into, so there
+/// Length is the only rule there is. These are three boxes a clinician types prose into, so there
 /// is no format to enforce - and an empty profile is a legitimate save, not a validation failure.
 /// Rules run against the trimmed value so they see exactly the string that gets stored.
 /// </summary>
@@ -31,11 +31,6 @@ public sealed class UpdateMedicalProfileRequestValidator
             .Must(value => Fits(value, Long))
             .WithMessage(TooLong("Current symptoms", Long))
             .When(request => !string.IsNullOrWhiteSpace(request.CurrentSymptoms));
-
-        RuleFor(request => request.RecentSituation)
-            .Must(value => Fits(value, Long))
-            .WithMessage(TooLong("Recent situation", Long))
-            .When(request => !string.IsNullOrWhiteSpace(request.RecentSituation));
     }
 
     private static string TooLong(string label, int maxLength)

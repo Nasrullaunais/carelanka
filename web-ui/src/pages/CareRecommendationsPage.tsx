@@ -338,8 +338,7 @@ function RecommendationDetail({
       ) : !profile.data ||
         (!profile.data.known_conditions &&
           !profile.data.allergies &&
-          !profile.data.current_symptoms &&
-          !profile.data.recent_situation) ? (
+          !profile.data.current_symptoms) ? (
         <p className="muted">No medical profile is on record for this patient.</p>
       ) : (
         <dl className="detail-grid">
@@ -354,10 +353,6 @@ function RecommendationDetail({
           <div>
             <dt>Current symptoms</dt>
             <dd>{profile.data.current_symptoms || <span className="muted">Not recorded</span>}</dd>
-          </div>
-          <div>
-            <dt>Recent situation</dt>
-            <dd>{profile.data.recent_situation || <span className="muted">Not recorded</span>}</dd>
           </div>
         </dl>
       )}

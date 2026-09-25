@@ -20,7 +20,7 @@ public interface ICareAgentTools
 }
 
 public sealed record CareMedicalProfileFacts(
-    string? KnownConditions, string? Allergies, string? CurrentSymptoms, string? RecentSituation);
+    string? KnownConditions, string? Allergies, string? CurrentSymptoms);
 
 public sealed record CarePastAdmission(AdmissionCategory Category, AdmissionUrgency Urgency, DateTimeOffset? AdmittedAt);
 

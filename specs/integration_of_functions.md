@@ -118,7 +118,7 @@ The second version keeps working when hold expiry, out-of-service beds or a new 
 | **`Bed`** — exists, number, condition, repairs | **Equipment (M3)** | Patient (to find candidates) | Equipment only |
 | **`LabReport`** — a finished laboratory result and the file itself | **Equipment (M3)** — *claimed 2026-09-13, see §11.15* | Doctor, ward nurse, duty manager | Equipment only (the laboratory) |
 | `Patient`, `Admission`, `Appointment`, `Discharge`, `DischargeChecklistItem` | **Patient (M4)** | Emergency, Staff (aggregates only) | Patient only |
-| **`PatientMedicalProfile`** — conditions, allergies, current symptoms, recent situation | **Patient (M4)** — *added 2026-09-16, see §11.17* | Nobody else. Not published cross-component and not patient-readable | Patient only — ward nurse or doctor |
+| **`PatientMedicalProfile`** — conditions, allergies, current symptoms | **Patient (M4)** — *added 2026-09-16, see §11.17* | Nobody else. Not published cross-component and not patient-readable | Patient only — ward nurse or doctor |
 | **`CareRecommendation`** — a patient's own report and the drafted reply | **Patient (M4)** | Nobody else | Patient only |
 | **`Bill`, `BillLineItem`** — what a visit costs and whether it is paid | **Patient (M4)** — *claimed 2026-09-11, see §11.10* | Nobody yet | Patient only |
 | **`BillingRate`, `AdmissionFeeRate`** — what the hospital charges | **Patient (M4)** — *added 2026-09-11, see §11.13* | Nobody yet | Read: any staff. Write: administrator only |
@@ -987,8 +987,8 @@ an `admission_id` or an NIC / patient code. `AdmissionStatus.AwaitingApproval` i
 removing a value from a shared enum is a cross-component change for no gain. **M3: nothing
 breaks, but no admission will ever appear in that state again.**
 
-**2. A new table, `PatientMedicalProfile`.** One row per patient, four free-text fields a nurse
-types: conditions, allergies, current symptoms, recent situation. It exists because the care
+**2. A new table, `PatientMedicalProfile`.** One row per patient, three free-text fields a nurse
+types: conditions, allergies, current symptoms (a fourth, recent situation, was folded into current symptoms on 2026-09-25, §11.21). It exists because the care
 advisory agent was reading demographics and the administrative shape of past visits, which is
 nothing to reason over. **Not published cross-component, not patient-readable, and not an EHR** —
 no vitals, no lab results, no coded diagnosis. Announced rather than asked, on the same footing
@@ -1128,6 +1128,11 @@ caller still sending it is not broken - the field is ignored.
 
 **For Emergency, specifically:** a pre-admission classified as `maternity` for a male patient is now
 409 at `POST /admissions/{id}/classify`. `PreAdmitAsync` itself is untouched.
+
+**The medical profile is three fields, not four.** `recent_situation` is gone from `PatientMedicalProfile`,
+`UpdateMedicalProfileRequest` and the table; the migration (`Patient_RemoveMedicalProfileRecentSituation`)
+appends any text it held to `current_symptoms` first. Staff-facing and Patient-only — no other component
+reads it.
 
 ---
 

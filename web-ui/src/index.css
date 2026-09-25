@@ -721,6 +721,14 @@ tr.selected {
   padding-bottom: 1.5rem;
 }
 
+/* HeroUI greys out every dialog body by default, which made the whole content of a popup look
+   disabled. Popup text is ordinary text; grey is kept for what is meant to recede (`.muted`). */
+.modal__body,
+.alert-dialog__body,
+.drawer__body {
+  color: var(--ink);
+}
+
 textarea {
   width: 100%;
   font: inherit;
@@ -853,7 +861,7 @@ tr.drawer > td {
    print dialog saves to PDF anyway, and one screen does not justify a
    document-generation dependency.
 
-   Everything outside `.printable` is hidden, so what prints is the statement and
+   Everything outside `.printable` is removed, so what prints is the statement and
    not a photograph of the app.
    --------------------------------------------------------------------------- */
 
@@ -862,21 +870,38 @@ tr.drawer > td {
 }
 
 @media print {
-  /* Hide the whole page, then walk `.printable` and its ancestors back into
-     view. Simpler than tagging every wrapper that should disappear, and it
-     cannot be forgotten when a new one is added. */
-  body * {
-    visibility: hidden;
+  /* Removed, not just made invisible: an invisible page behind the statement
+     still takes up room, and pushed it a third of the way down the paper. */
+  body *:not(.printable):not(.printable *):not(:has(.printable)) {
+    display: none !important;
   }
 
-  .printable,
-  .printable * {
-    visibility: visible;
+  /* The statement usually sits in a dialog, which is pinned to the screen (so
+     the browser repeats it on every page) and scrolls inside a fixed height
+     (so everything below the fold is cut off). Every box that holds the
+     statement is flattened back into ordinary page flow for printing. */
+  html:has(.printable),
+  body:has(.printable),
+  body *:has(.printable) {
+    display: block !important;
+    position: static !important;
+    inset: auto !important;
+    width: auto !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    transform: none !important;
+    animation: none !important;
+    box-shadow: none !important;
+    background: #fff !important;
   }
 
   .printable {
-    position: absolute;
-    inset: 0;
     width: 100%;
     padding: 0;
     color: #000;

@@ -1496,8 +1496,7 @@ bill correctly before anybody has opened the settings screen.
 + PatientId: Guid (non-null) FK → Patient.Id           -- UNIQUE, one profile per patient
 + KnownConditions: string (nullable)                   -- diabetes, asthma, hypertension
 + Allergies: string (nullable)                         -- read deterministically by CR5
-+ CurrentSymptoms: string (nullable)                   -- what they are in with this time
-+ RecentSituation: string (nullable)                   -- a fall last week, a finished course
++ CurrentSymptoms: string (nullable)                   -- what they are in with this time, and what led up to it
 + UpdatedByStaffMemberId: Guid (non-null) FK → StaffMember.Id
 ```
 **Table:** `patient_medical_profiles`

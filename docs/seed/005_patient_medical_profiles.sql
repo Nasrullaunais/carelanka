@@ -3,7 +3,7 @@
 -- **Why this file exists:** the Patient Care Advisory Agent reads
 -- `patient_medical_profiles`, and with an empty table it has nothing to reason over but
 -- demographics — which is the exact complaint that caused the 2026-09-16 redesign. Nobody
--- is going to type four paragraphs of clinical history live in front of an examiner, so the
+-- is going to type three paragraphs of clinical history live in front of an examiner, so the
 -- demo patients arrive with one.
 --
 -- **What it touches:** `patient_medical_profiles` only — Patient Management's own table.
@@ -39,11 +39,11 @@ BEGIN
     -- conclusion the system reached, and there is no diagnosis, no vitals and no lab result
     -- in it — that line is what keeps this out of being an electronic health record.
     INSERT INTO patient_medical_profiles
-        (id, patient_id, known_conditions, allergies, current_symptoms, recent_situation,
+        (id, patient_id, known_conditions, allergies, current_symptoms,
          updated_by_staff_member_id, created_at, updated_at)
     SELECT
         gen_random_uuid(), p.id, v.known_conditions, v.allergies, v.current_symptoms,
-        v.recent_situation, v.author, now() - v.written_ago, now() - v.written_ago
+        v.author, now() - v.written_ago, now() - v.written_ago
     FROM (VALUES
         -- Admitted, bed assigned. Penicillin is here because it is what rule CR5 checks
         -- against: an agent draft naming it is rejected before any reviewer sees it, and
@@ -51,15 +51,13 @@ BEGIN
         ('P4K9R3T6',
          'Type 2 diabetes, diagnosed 2019. Hypertension, on medication.',
          'Penicillin',
-         'Headache since admission, mild fever on arrival.',
-         'Admitted after two days of dizziness at home.',
+         'Admitted after two days of dizziness at home. Headache since admission, mild fever on arrival.',
          v_nurse, interval '18 hours'),
 
         ('P5M2W7X4',
          'Asthma since childhood. Uses an inhaler most days.',
          'Dust, pollen. No known drug allergies.',
-         'Shortness of breath and a tight chest since yesterday evening.',
-         'Finished a course of antibiotics for a chest infection last week.',
+         'Shortness of breath and a tight chest since yesterday evening. Finished a course of antibiotics for a chest infection last week.',
          v_doctor, interval '26 hours'),
 
         -- Discharged, so the profile is last visit's. Deliberate: the table is one row per
@@ -69,15 +67,13 @@ BEGIN
         ('PA2C7F5H',
          'High cholesterol. Family history of heart disease.',
          'None recorded.',
-         'Chest tightness on exertion, settled during the stay.',
-         'Came in after feeling faint at work.',
+         'Came in after feeling faint at work. Chest tightness on exertion, settled during the stay.',
          v_doctor, interval '3 days'),
 
         ('PB4D9G2K',
          'None recorded.',
          'Seafood.',
-         'Abdominal pain, resolved before discharge.',
-         'Two days of nausea before coming in.',
+         'Two days of nausea before coming in. Abdominal pain, resolved before discharge.',
          v_nurse, interval '5 days'),
 
         -- Outpatients. Thin on purpose: somebody in for a scan gets a line or two, not a
@@ -86,17 +82,15 @@ BEGIN
         ('PC5E8H3M',
          'Hypertension, well controlled.',
          NULL,
-         NULL,
          'Here for a routine scan.',
          v_nurse, interval '2 days')
-    ) AS v(patient_code, known_conditions, allergies, current_symptoms, recent_situation,
+    ) AS v(patient_code, known_conditions, allergies, current_symptoms,
            author, written_ago)
     JOIN patients p ON p.patient_code = v.patient_code AND p.is_active
     ON CONFLICT (patient_id) DO UPDATE SET
         known_conditions           = EXCLUDED.known_conditions,
         allergies                  = EXCLUDED.allergies,
         current_symptoms           = EXCLUDED.current_symptoms,
-        recent_situation           = EXCLUDED.recent_situation,
         updated_by_staff_member_id = EXCLUDED.updated_by_staff_member_id,
         updated_at                 = EXCLUDED.updated_at;
 END $$;

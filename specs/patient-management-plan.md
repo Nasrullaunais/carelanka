@@ -22,7 +22,7 @@ It answers five questions:
 5. **What does the visit cost, and has it been paid?** — the bill (§6.5). *Added 2026-09-11; it used
    to be a scope-guard row in §11, and §11.10 of `integration_of_functions.md` records the claim.*
 6. **What does the hospital already know about this person's health?** — the medical profile
-   (§8.10c): known conditions, allergies, current symptoms, recent situation, all typed by staff.
+   (§8.10c): known conditions, allergies, current symptoms, all typed by staff.
    *Added 2026-09-16, so the care advisory agent has something real to reason over. It is a record
    of what clinicians wrote down, not of anything this system worked out.*
 
@@ -275,14 +275,13 @@ all since 2026-09-23 — it is billed on its appointment with a flat consultatio
 | `patient_id` | uuid, FK → Patient | **UNIQUE** — one profile per patient, created lazily the first time somebody writes one |
 | `known_conditions` | text, nullable | Long-lived: diabetes, asthma, hypertension |
 | `allergies` | text, nullable | What they must not be given. Read by CR5 (§8.15) |
-| `current_symptoms` | text, nullable | What they are in with this time |
-| `recent_situation` | text, nullable | Recent events worth knowing — a fall last week, a finished course of antibiotics |
+| `current_symptoms` | text, nullable | What they are in with this time, and what led up to it — a fall last week, a finished course of antibiotics. A separate `recent_situation` field was folded into this one on 2026-09-25: two boxes for one visit's story meant nurses had to guess which to use |
 | `updated_by_staff_member_id` | uuid, FK → Staff | Who last wrote it. Not nullable: an unattributed clinical note is worse than none |
 | `created_at` / `updated_at` | timestamptz | From `AuditedEntity` |
 
 Four decisions worth defending:
 
-1. **Per patient, not per admission.** Conditions and allergies outlive a visit, and a profile that resets each admission is one a nurse has to retype every time — which means it stops being filled in. `current_symptoms` and `recent_situation` are the per-visit-flavoured fields, and they are kept here rather than on `Admission` so there is **one** place a nurse looks and one place they edit. The cost is honest: read the profile of a patient discharged six months ago and `current_symptoms` describes that visit, not this one. §11 records it as a limitation.
+1. **Per patient, not per admission.** Conditions and allergies outlive a visit, and a profile that resets each admission is one a nurse has to retype every time — which means it stops being filled in. `current_symptoms` is the per-visit-flavoured field, and it is kept here rather than on `Admission` so there is **one** place a nurse looks and one place they edit. The cost is honest: read the profile of a patient discharged six months ago and `current_symptoms` describes that visit, not this one. §11 records it as a limitation.
 2. **All free text, all nullable.** A structured condition list needs a coding system (ICD-10 or similar), and inventing half of one is worse than plain text a clinician can read. An empty profile is an ordinary state, not an error (§8.10c).
 3. **Not soft-deletable.** It is `AuditedEntity`, not `SoftDeletableEntity`. There is no such thing as retiring a patient's medical history — the patient record itself is the soft-deletable thing, and the profile goes with it.
 4. **Not exposed to the patient.** There is no `/api/me/medical-profile`. Patients reading their own clinical record raises questions about wording, correction rights and what happens when they disagree with it — a real feature, not a free one, and out of scope (§11).
@@ -1284,7 +1283,7 @@ Per the assignment: workflow id, objective, plan, completed steps, tool calls wi
 
 **What changed:**
 
-1. **It now reads a real medical profile** — the patient's known conditions, allergies, current symptoms and recent situation, recorded by staff (§8.10c). The agent's value is that it combines *what the patient just said* with *what the hospital already knows about them*, which is work, not rephrasing.
+1. **It now reads a real medical profile** — the patient's known conditions, allergies and current symptoms, recorded by staff (§8.10c). The agent's value is that it combines *what the patient just said* with *what the hospital already knows about them*, which is work, not rephrasing.
 2. **It is only available to admitted patients**, from the My Stay tab (§8.10b). Advice about a stay, given during the stay, to somebody a nurse can walk over and look at.
 
 Deliberately *not* in this agent's remit: diagnosis, prescriptions, changing anybody's care level. It does not read as a second opinion; it reads as a draft note a busy ward gets to check quickly instead of writing from scratch.
@@ -1319,8 +1318,7 @@ One new table, one row per patient, owned by Patient Management:
 | :--- | :--- |
 | `known_conditions` | Long-lived things — diabetes, asthma, hypertension |
 | `allergies` | What they must not be given |
-| `current_symptoms` | What they are in with this time |
-| `recent_situation` | Recent events worth knowing — a fall last week, a course of antibiotics finished |
+| `current_symptoms` | What they are in with this time, and what led up to it |
 | `updated_by_staff_member_id` | Who last wrote it |
 
 All free text, all entered by staff, all optional. It is maintained at `PUT /api/patients/{id}/medical-profile` by a nurse or doctor, and seeded for the demo patients so the agent has something real to reason over on the day (`docs/seed/`).
@@ -1352,8 +1350,7 @@ An empty profile is an ordinary state, not an error — the agent proceeds on th
   "medical_profile": {
     "known_conditions": "Type 2 diabetes, diagnosed 2019. Hypertension, on medication.",
     "allergies": "Penicillin",
-    "current_symptoms": "Headache since admission, mild fever on arrival.",
-    "recent_situation": "Admitted after two days of dizziness at home."
+    "current_symptoms": "Admitted after two days of dizziness at home. Headache since admission, mild fever on arrival."
   },
   "patient_history": {
     "age": 34,
@@ -1408,7 +1405,7 @@ A match forces `red_flag = true` and `urgency_flag = high`, unconditionally. The
 
 | Tool | Access | Purpose |
 | :--- | :--- | :--- |
-| `get_medical_profile(patient_id)` | read | Known conditions, allergies, current symptoms, recent situation. *(New 2026-09-16.)* |
+| `get_medical_profile(patient_id)` | read | Known conditions, allergies, current symptoms. *(New 2026-09-16.)* |
 | `get_patient_history(patient_id)` | read | Demographics, past admissions (category/urgency only), past `CareRecommendation` rows |
 | `get_current_admission(patient_id)` | read | The open admission — category, urgency, ward, when they came in |
 | `draft_recommendation(recommendation_id, urgency_flag, message)` | **write — draft only** | Creates a `CareRecommendation` row with `status = pending_review`. Cannot set `status = approved`. |
@@ -1529,7 +1526,7 @@ Patient Care Advisory — the one still running — actually uses today.)*
 | **Discharge review** | Flagged candidates, checklist state, confirm |
 | **Ward & bed admin** | Create wards, add beds, mark out of service |
 | **Care recommendation queue** *(Doctor, Ward Nurse)* | Everything in `pending_review`. Patient's own text, the agent's draft, `red_flag`/`urgency_flag`, and **the medical profile and history the agent read**, so the reviewer can see what it was working from. Approve (with optional edit) / Reject with reason. **This is the agent demo screen** — `CareRecommendationsPage`, the human gate for §8.10. |
-| **Medical profile editor** | *(New 2026-09-16.)* Four free-text boxes on the patient detail page — conditions, allergies, current symptoms, recent situation — with who last wrote it and when. Nurse and Doctor only; reception and the billing desk do not see the control at all |
+| **Medical profile editor** | *(New 2026-09-16.)* Three free-text boxes on the patient detail page — conditions, allergies, current symptoms — with who last wrote it and when. Nurse and Doctor only; reception and the billing desk do not see the control at all |
 | **Reports** *(designed, not built — §7.8)* | Occupancy chart, length of stay, agent performance |
 
 **Removed 2026-09-22, historical only:** a **Bed suggestion panel** used to sit here — opened
@@ -1659,7 +1656,7 @@ Every trigger already exists as a status change, so nothing new is needed on the
 | Patient transfers between wards mid-stay | Nice to have. Only if time allows — the data model already supports it (a second `BedAssignment` with `release_reason = transferred`). |
 | ~~Billing beyond a checklist tick~~ | **No longer true — changed 2026-09-11.** Billing is Patient Management's; see §6.5 for what it is and §11.10 of `integration_of_functions.md` for the claim. What stays out is payment gateways, insurance claims, part payments, refunds, tax and discounts. |
 | Diagnosis, treatment, prescriptions, and anything else clinical | The line from §1. The care advisory agent (§8.10) drafts a reply; it does not cross this line, because nothing it produces reaches a patient without a nurse's or doctor's approval standing in between, and CR1/CR5 mean it can never give a dose, never introduce a medicine, and never say anything but "do not take" about one, whoever approves it. |
-| A real electronic health record — vitals, lab results, structured clinical notes, coded diagnoses | Still out, and this is the row that moved most on 2026-09-16. `PatientMedicalProfile` (§8.10c) adds **four free-text fields a nurse types**: conditions, allergies, current symptoms, recent situation. That is what the care agent reads. It is not an EHR — no vitals, no lab results, no coded diagnosis, no clinical assessment, no history of changes beyond `updated_at` and who wrote it. Stating that plainly is the point; a demo that implies a real health record and cannot show one is worse than a small honest table. |
+| A real electronic health record — vitals, lab results, structured clinical notes, coded diagnoses | Still out, and this is the row that moved most on 2026-09-16. `PatientMedicalProfile` (§8.10c) adds **three free-text fields a nurse types**: conditions, allergies, current symptoms. That is what the care agent reads. It is not an EHR — no vitals, no lab results, no coded diagnosis, no clinical assessment, no history of changes beyond `updated_at` and who wrote it. Stating that plainly is the point; a demo that implies a real health record and cannot show one is worse than a small honest table. |
 | Per-visit medical history | `PatientMedicalProfile` is one row per patient, so `current_symptoms` describes whatever visit it was last written during. A patient discharged six months ago has a stale profile and nothing flags it. Accepted deliberately — §3.1 decision 1 — because a per-admission profile is one a nurse has to retype every visit, and the one that gets retyped is the one that stops being filled in. |
 | Patients reading their own medical profile | There is no `/api/me/medical-profile`. Showing somebody their own clinical record raises correction rights and wording questions that are a feature in their own right, not a free one. |
 

@@ -375,76 +375,78 @@ function AppointmentTable({
                   </>
                 )}
               </td>
-              <td className="row" style={{ gap: '0.4rem', justifyContent: 'flex-end' }}>
-                {/* Nothing on the day is offered until the desk has read the booking, so a
-                    visit weeks away can never start a bed search by mistake. */}
-                {canAct && appointment.can_confirm && (
-                  <button type="button" onClick={() => onAction(appointment, 'confirm')}>
-                    {openId === appointment.id && openAction === 'confirm'
-                      ? 'Close'
-                      : 'Check and confirm'}
-                  </button>
-                )}
+              <td>
+                <div className="row" style={{ gap: '0.4rem', justifyContent: 'flex-end' }}>
+                  {/* Nothing on the day is offered until the desk has read the booking, so a
+                      visit weeks away can never start a bed search by mistake. */}
+                  {canAct && appointment.can_confirm && (
+                    <button type="button" onClick={() => onAction(appointment, 'confirm')}>
+                      {openId === appointment.id && openAction === 'confirm'
+                        ? 'Close'
+                        : 'Check and confirm'}
+                    </button>
+                  )}
 
-                {canAct && appointment.can_complete && (
-                  <button type="button" onClick={() => onAction(appointment, 'check-in')}>
-                    {openId === appointment.id && openAction === 'check-in'
-                      ? 'Close'
-                      : 'Check in'}
-                  </button>
-                )}
+                  {canAct && appointment.can_complete && (
+                    <button type="button" onClick={() => onAction(appointment, 'check-in')}>
+                      {openId === appointment.id && openAction === 'check-in'
+                        ? 'Close'
+                        : 'Check in'}
+                    </button>
+                  )}
 
-                {canAct && appointment.can_complete && (
-                  <button
-                    type="button"
-                    className="secondary"
-                    disabled={!hasPassed(appointment.scheduled_at)}
-                    title={
-                      hasPassed(appointment.scheduled_at)
-                        ? undefined
-                        : 'Not yet — this can only be marked once the booked time has passed.'
-                    }
-                    onClick={() => onNotAttended(appointment)}
-                  >
-                    Did not come
-                  </button>
-                )}
+                  {canAct && appointment.can_complete && (
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={!hasPassed(appointment.scheduled_at)}
+                      title={
+                        hasPassed(appointment.scheduled_at)
+                          ? undefined
+                          : 'Not yet — this can only be marked once the booked time has passed.'
+                      }
+                      onClick={() => onNotAttended(appointment)}
+                    >
+                      Did not come
+                    </button>
+                  )}
 
-                {canAct && appointment.can_cancel && (
-                  <button
-                    type="button"
-                    className="secondary"
-                    disabled={hasPassed(appointment.scheduled_at)}
-                    title={
-                      hasPassed(appointment.scheduled_at)
-                        ? 'The booked time has passed — use Did not come or Check in instead.'
-                        : undefined
-                    }
-                    onClick={() => onAction(appointment, 'cancel')}
-                  >
-                    {openId === appointment.id && openAction === 'cancel'
-                      ? 'Close'
-                      : 'Cancel booking'}
-                  </button>
-                )}
+                  {canAct && appointment.can_cancel && (
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={hasPassed(appointment.scheduled_at)}
+                      title={
+                        hasPassed(appointment.scheduled_at)
+                          ? 'The booked time has passed — use Did not come or Check in instead.'
+                          : undefined
+                      }
+                      onClick={() => onAction(appointment, 'cancel')}
+                    >
+                      {openId === appointment.id && openAction === 'cancel'
+                        ? 'Close'
+                        : 'Cancel booking'}
+                    </button>
+                  )}
 
-                {/* An admitted patient is billed on their admission at discharge, so this
-                    row has no bill of its own. */}
-                {canBill && appointment.status === 'completed' && !appointment.admission_id && (
-                  <button
-                    type="button"
-                    className="secondary"
-                    onClick={() => onAction(appointment, 'bill')}
-                  >
-                    {openId === appointment.id && openAction === 'bill' ? 'Close' : 'Bill'}
-                  </button>
-                )}
+                  {/* An admitted patient is billed on their admission at discharge, so this
+                      row has no bill of its own. */}
+                  {canBill && appointment.status === 'completed' && !appointment.admission_id && (
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => onAction(appointment, 'bill')}
+                    >
+                      {openId === appointment.id && openAction === 'bill' ? 'Close' : 'Bill'}
+                    </button>
+                  )}
 
-                {appointment.status === 'completed' && appointment.admission_id && (
-                  <Link to="/patients" className="muted" style={{ fontSize: '0.82rem' }}>
-                    On the ward board
-                  </Link>
-                )}
+                  {appointment.status === 'completed' && appointment.admission_id && (
+                    <Link to="/patients" className="muted" style={{ fontSize: '0.82rem' }}>
+                      On the ward board
+                    </Link>
+                  )}
+                </div>
               </td>
             </tr>
 

@@ -288,9 +288,10 @@ paths:
       description: |
         Roles: WardNurse, Doctor, DutyManager.
 
-        Added 2026-09-16. Four free-text fields a clinician typed: known conditions, allergies,
-        current symptoms, recent situation. This is what the Patient Care Advisory Agent reads,
-        and before it existed that agent had nothing to reason over but demographics.
+        Added 2026-09-16. Three free-text fields a clinician typed: known conditions, allergies,
+        current symptoms. This is what the Patient Care Advisory Agent reads, and before it
+        existed that agent had nothing to reason over but demographics. A fourth, recent
+        situation, was folded into current symptoms on 2026-09-25.
 
         It is NOT an electronic health record and does not pretend to be one. No vitals, no lab
         results, no coded diagnosis, no clinical assessment, no history of changes beyond who
@@ -320,7 +321,7 @@ paths:
         Roles: WardNurse, Doctor. Reception and the billing desk are deliberately not on that
         list - they take names and money, not clinical history.
 
-        A full replace, not a patch. With four free-text fields a partial update cannot tell
+        A full replace, not a patch. With three free-text fields a partial update cannot tell
         "clear this field" from "I did not send it", and a clinical note silently kept alive by
         an omitted key is the wrong way round.
 
@@ -2451,8 +2452,8 @@ paths:
         screen that already exists. In Flutter this is a card inside My Stay, so the 409 is a
         backstop rather than something ordinary use can reach.
 
-        The agent reads your medical profile (conditions, allergies, current symptoms, recent
-        situation - all typed by staff, never concluded by this system), your current
+        The agent reads your medical profile (conditions, allergies, current symptoms - all
+        typed by staff, never concluded by this system), your current
         admission, and the administrative shape of past visits. It then drafts a note. That
         draft is NOT returned here and is never shown to you directly. It is staff-facing
         only, held on the record until a Doctor or Ward Nurse approves, edits or rejects it.
@@ -3191,23 +3192,18 @@ components:
         current_symptoms:
           type: string
           nullable: true
-          example: Headache since admission, mild fever on arrival.
-        recent_situation:
-          type: string
-          nullable: true
-          example: Admitted after two days of dizziness at home.
+          example: Admitted after two days of dizziness at home. Headache since admission, mild fever on arrival.
         updated_by_staff_id: { type: string, format: uuid, nullable: true }
         updated_by_staff_name: { type: string, nullable: true }
         updated_at: { type: string, format: date-time, nullable: true }
 
     UpdateMedicalProfileRequest:
       type: object
-      description: All four fields optional; sending null or omitting one clears it.
+      description: All three fields optional; sending null or omitting one clears it.
       properties:
         known_conditions: { type: string, maxLength: 2000, nullable: true }
         allergies: { type: string, maxLength: 1000, nullable: true }
         current_symptoms: { type: string, maxLength: 2000, nullable: true }
-        recent_situation: { type: string, maxLength: 2000, nullable: true }
 
     # ---------- common ----------
 

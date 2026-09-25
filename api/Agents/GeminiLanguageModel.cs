@@ -109,10 +109,15 @@ public sealed class GeminiLanguageModel : ILanguageModel
                 lastError = $"The language model timed out after {_options.TimeoutSeconds}s.";
                 lastFailure = LanguageModelFailure.Timeout;
             }
+            catch (ProviderRefusedException exception)
+            {
+                lastError = $"The language model could not be reached: {exception.Message}";
+                lastFailure = exception.Failure;
+            }
             catch (HttpRequestException exception)
             {
                 lastError = $"The language model could not be reached: {exception.Message}";
-                lastFailure = Classify(exception.StatusCode);
+                lastFailure = LanguageModelFailure.Unreachable;
             }
             catch (JsonException exception)
             {
@@ -167,9 +172,17 @@ public sealed class GeminiLanguageModel : ILanguageModel
         return TimeSpan.FromSeconds(Math.Min(seconds, Math.Max(0, _options.MaxBackoffSeconds)));
     }
 
-    private static LanguageModelFailure Classify(HttpStatusCode? status) => status switch
+    /// <summary>
+    /// A 429 is either the per-minute rate limit, which clears on its own and is worth waiting
+    /// out, or the daily allowance, which is spent until tomorrow. Only the body tells them apart:
+    /// Google names the quota that was hit (<c>...PerMinute...</c> or <c>...PerDay...</c>).
+    /// </summary>
+    private static LanguageModelFailure Classify(HttpStatusCode status, string body) => status switch
     {
-        HttpStatusCode.TooManyRequests => LanguageModelFailure.QuotaExhausted,
+        HttpStatusCode.TooManyRequests
+            when body.Contains("PerDay", StringComparison.OrdinalIgnoreCase)
+            => LanguageModelFailure.QuotaExhausted,
+        HttpStatusCode.TooManyRequests => LanguageModelFailure.ProviderOverloaded,
         HttpStatusCode.PaymentRequired => LanguageModelFailure.QuotaExhausted,
         HttpStatusCode.ServiceUnavailable => LanguageModelFailure.ProviderOverloaded,
         HttpStatusCode.InternalServerError => LanguageModelFailure.ProviderOverloaded,
@@ -201,10 +214,12 @@ public sealed class GeminiLanguageModel : ILanguageModel
         {
             // The provider says why in the body - a rejected field, a spent quota, a blocked key.
             // Without it every failure reads as the same opaque status code.
-            var detail = await ReasonAsync(response, timeout.Token);
+            var refusal = await BodyAsync(response, timeout.Token);
 
-            throw new HttpRequestException(
-                $"the provider answered {(int)response.StatusCode}{detail}", null, response.StatusCode);
+            throw new ProviderRefusedException(
+                $"the provider answered {(int)response.StatusCode}{Reason(refusal)}",
+                response.StatusCode,
+                Classify(response.StatusCode, refusal));
         }
 
         await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
@@ -218,12 +233,22 @@ public sealed class GeminiLanguageModel : ILanguageModel
     /// Read for a log line, so it must never throw: a failure reading why a call failed would
     /// replace the reason with a second, less useful one.
     /// </summary>
-    private static async Task<string> ReasonAsync(HttpResponseMessage response, CancellationToken ct)
+    private static async Task<string> BodyAsync(HttpResponseMessage response, CancellationToken ct)
     {
         try
         {
-            var body = await response.Content.ReadAsStringAsync(ct);
+            return await response.Content.ReadAsStringAsync(ct);
+        }
+        catch (Exception)
+        {
+            return string.Empty;
+        }
+    }
 
+    private static string Reason(string body)
+    {
+        try
+        {
             if (string.IsNullOrWhiteSpace(body))
             {
                 return string.Empty;
@@ -262,4 +287,13 @@ public sealed class GeminiLanguageModel : ILanguageModel
             && parts[0].TryGetProperty("text", out var text)
                 ? text.GetString()
                 : null;
+
+    private sealed class ProviderRefusedException : HttpRequestException
+    {
+        public ProviderRefusedException(string message, HttpStatusCode status, LanguageModelFailure failure)
+            : base(message, null, status)
+            => Failure = failure;
+
+        public LanguageModelFailure Failure { get; }
+    }
 }

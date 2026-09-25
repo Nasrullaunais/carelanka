@@ -37,6 +37,7 @@ class FakePatientService extends PatientService {
   );
   Object? submitCareQueryResult;
   String? lastCareQueryText;
+  int careRecommendationLoadCalls = 0;
 
   /// What the details form last sent, so a test can assert the form refused to
   /// submit at all rather than submitting something incomplete.
@@ -74,8 +75,10 @@ class FakePatientService extends PatientService {
   Future<MyCareRecommendationPagedResult> loadMyCareRecommendations({
     int page = 1,
     int pageSize = 20,
-  }) async =>
-      _unwrap(careRecommendationsResult);
+  }) async {
+    careRecommendationLoadCalls++;
+    return _unwrap(careRecommendationsResult);
+  }
 
   @override
   Future<CareWorkflowAccepted> submitCareQuery(String reportedText) async {

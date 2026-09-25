@@ -134,7 +134,7 @@ void main() {
     await tapSave(tester);
 
     expect(find.text('You already have a hospital record'), findsOneWidget);
-    expect(find.text('Use my patient code'), findsOneWidget);
+    expect(find.text('I have a patient code'), findsOneWidget);
   });
 
   testWidgets('address and emergency contact are not required', (tester) async {

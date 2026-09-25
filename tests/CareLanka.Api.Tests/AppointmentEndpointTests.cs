@@ -145,6 +145,57 @@ public sealed class AppointmentEndpointTests
     }
 
     [Fact]
+    public async Task Searching_matches_the_patients_name_code_nic_and_phone()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var patientId = await NewPatientAsync(nurse, "Kamala Perera Searchable");
+        await BookAsync(nurse, patientId, SoonUtc());
+
+        using var patientBody = await ReadJsonAsync(
+            await nurse.GetAsync($"/api/patients/{patientId}"));
+        var code = patientBody.RootElement.GetProperty("patient_code").GetString();
+
+        using var byName = await ReadJsonAsync(
+            await nurse.GetAsync("/api/appointments?search=Kamala+Perera+Searchable&pageSize=100"));
+        using var byCode = await ReadJsonAsync(
+            await nurse.GetAsync($"/api/appointments?search={code}&pageSize=100"));
+        using var noMatch = await ReadJsonAsync(
+            await nurse.GetAsync("/api/appointments?search=Nobody+Matches+This&pageSize=100"));
+
+        Assert.Contains(
+            byName.RootElement.GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("patient").GetProperty("id").GetString() == patientId);
+        Assert.Contains(
+            byCode.RootElement.GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("patient").GetProperty("id").GetString() == patientId);
+        Assert.DoesNotContain(
+            noMatch.RootElement.GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("patient").GetProperty("id").GetString() == patientId);
+    }
+
+    [Fact]
+    public async Task Finished_bookings_are_left_off_the_list_until_asked_for()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var patientId = await NewPatientAsync(nurse, "Finished Visit Hidden By Default");
+        var id = await ConfirmedIdAsync(nurse, patientId, SoonUtc());
+
+        Assert.Equal(
+            HttpStatusCode.OK, (await nurse.PostAsync($"/api/appointments/{id}/complete", content: null)).StatusCode);
+
+        using var byDefault = await ReadJsonAsync(
+            await nurse.GetAsync("/api/appointments?pageSize=100"));
+        using var withFinished = await ReadJsonAsync(
+            await nurse.GetAsync("/api/appointments?includeFinished=true&pageSize=100"));
+        using var byStatus = await ReadJsonAsync(
+            await nurse.GetAsync("/api/appointments?status=completed&pageSize=100"));
+
+        Assert.DoesNotContain(Ids(byDefault), item => item == id);
+        Assert.Contains(Ids(withFinished), item => item == id);
+        Assert.Contains(Ids(byStatus), item => item == id);
+    }
+
+    [Fact]
     public async Task A_walk_in_with_no_patient_is_refused_before_anything_is_looked_up()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);

@@ -12,6 +12,8 @@ public interface IAppointmentService
     Task<PagedResult<AppointmentResponse>> ListAsync(
         DateOnly? date,
         AppointmentStatus? status,
+        string? search,
+        bool includeFinished,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default);

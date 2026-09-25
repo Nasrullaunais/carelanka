@@ -1963,6 +1963,19 @@ paths:
         - name: status
           in: query
           schema: { $ref: '#/components/schemas/AppointmentStatus' }
+        - name: search
+          in: query
+          description: >-
+            Matched against the patient's name, patient code, NIC and phone. Same fields as
+            `GET /patients`'s `search`.
+          schema: { type: string }
+        - name: includeFinished
+          in: query
+          description: >-
+            Off by default, so a day's list is what still needs the desk: `scheduled` and
+            `confirmed` only. On, every status is included regardless of `status`'s absence.
+            Ignored when `status` is set - a single status already says exactly what to show.
+          schema: { type: boolean, default: false }
       responses:
         '200':
           description: Appointments

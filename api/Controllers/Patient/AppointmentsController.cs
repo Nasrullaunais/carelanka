@@ -30,10 +30,12 @@ public class AppointmentsController : ControllerBase
     public async Task<ActionResult<PagedResult<AppointmentResponse>>> ListAppointments(
         [FromQuery] DateOnly? date,
         [FromQuery] AppointmentStatus? status,
+        [FromQuery] string? search,
+        [FromQuery] bool includeFinished = false,
         [FromQuery][Range(1, int.MaxValue)] int page = 1,
         [FromQuery][Range(1, 100)] int pageSize = 20,
         CancellationToken ct = default)
-        => Ok(await _appointments.ListAsync(date, status, page, pageSize, ct));
+        => Ok(await _appointments.ListAsync(date, status, search, includeFinished, page, pageSize, ct));
 
     [Authorize(Policy = Policies.AppointmentDesk)]
     [HttpPost(Name = "createAppointment")]

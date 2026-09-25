@@ -73,6 +73,9 @@ export function AppointmentsPage() {
 
   const [date, setDate] = useState(() => localDay(new Date()));
   const [status, setStatus] = useState<AppointmentStatus | ''>('');
+  const [search, setSearch] = useState('');
+  const [submittedSearch, setSubmittedSearch] = useState('');
+  const [includeFinished, setIncludeFinished] = useState(false);
   const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
   const [open, setOpen] = useState<{ appointment: Appointment; action: DeskAction } | null>(null);
@@ -92,6 +95,8 @@ export function AppointmentsPage() {
       query: {
         ...(date ? { date } : {}),
         ...(status ? { status } : {}),
+        ...(submittedSearch ? { search: submittedSearch } : {}),
+        includeFinished,
         page,
         pageSize: PAGE_SIZE,
       },
@@ -156,6 +161,11 @@ export function AppointmentsPage() {
     setNoShowCandidate(appointment);
   }
 
+  function submitSearch(event: FormEvent) {
+    event.preventDefault();
+    resetTo(() => setSubmittedSearch(search.trim()));
+  }
+
   return (
     <>
       <h1>Appointments</h1>
@@ -166,42 +176,90 @@ export function AppointmentsPage() {
 
       <div className="card">
         <h2>Filter</h2>
-        <div className="row">
-          <div>
-            <label htmlFor="filter-date">Day</label>
-            <input
-              id="filter-date"
-              type="date"
-              value={date}
-              onChange={(event) => resetTo(() => setDate(event.target.value))}
-            />
+        <form onSubmit={submitSearch}>
+          <div className="row">
+            <div className="field">
+              <label htmlFor="filter-search">Search</label>
+              <input
+                id="filter-search"
+                value={search}
+                maxLength={100}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Patient name, NIC, phone or code"
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-end', marginBottom: '0.85rem' }}>
+              <button type="submit">Search</button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-end', marginBottom: '0.85rem' }}>
+              <button
+                type="button"
+                className="secondary"
+                disabled={search === '' && submittedSearch === ''}
+                onClick={() => resetTo(() => {
+                  setSearch('');
+                  setSubmittedSearch('');
+                })}
+              >
+                Clear
+              </button>
+            </div>
           </div>
-          <div>
-            <AppSelect
-              id="filter-status"
-              label="Status"
-              value={status}
-              onValueChange={(value) =>
-                resetTo(() => setStatus(value as AppointmentStatus | ''))
-              }
-              options={[
-                { value: '', label: 'Any status' },
-                ...appointmentStatuses.map((value) => ({ value, label: appointmentStatusLabels[value] })),
-              ]}
-            />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => resetTo(() => setDate(''))}
-              disabled={date === ''}
-            >
-              All days
-            </button>
-          </div>
-        </div>
 
+          <div className="row">
+            <div>
+              <label htmlFor="filter-date">Day</label>
+              <input
+                id="filter-date"
+                type="date"
+                value={date}
+                onChange={(event) => resetTo(() => setDate(event.target.value))}
+              />
+            </div>
+            <div>
+              <AppSelect
+                id="filter-status"
+                label="Status"
+                value={status}
+                onValueChange={(value) =>
+                  resetTo(() => setStatus(value as AppointmentStatus | ''))
+                }
+                options={[
+                  { value: '', label: 'Any status' },
+                  ...appointmentStatuses.map((value) => ({ value, label: appointmentStatusLabels[value] })),
+                ]}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => resetTo(() => setDate(''))}
+                disabled={date === ''}
+              >
+                All days
+              </button>
+            </div>
+          </div>
+
+          <div className="field">
+            <label htmlFor="filter-finished">
+              <input
+                id="filter-finished"
+                type="checkbox"
+                checked={includeFinished || status !== ''}
+                disabled={status !== ''}
+                onChange={(event) => resetTo(() => setIncludeFinished(event.target.checked))}
+              />{' '}
+              Show finished visits
+            </label>
+            <p className="hint">
+              {status !== ''
+                ? 'A chosen status already shows finished visits when it is one of them.'
+                : 'Off by default: seen, cancelled and missed bookings are left off the list.'}
+            </p>
+          </div>
+        </form>
       </div>
 
       {isDesk && <button type="button" onClick={() => setBookingOpen(true)}>Book a visit</button>}

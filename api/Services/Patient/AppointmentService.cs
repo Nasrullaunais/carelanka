@@ -44,6 +44,8 @@ public sealed class AppointmentService : IAppointmentService
     public async Task<PagedResult<AppointmentResponse>> ListAsync(
         DateOnly? date,
         AppointmentStatus? status,
+        string? search,
+        bool includeFinished,
         int page,
         int pageSize,
         CancellationToken ct = default)
@@ -64,6 +66,24 @@ public sealed class AppointmentService : IAppointmentService
         if (status is { } wanted)
         {
             query = query.Where(a => a.Status == wanted);
+        }
+        else if (!includeFinished)
+        {
+            // The default view is what still needs the desk's attention. A booking that is
+            // over - seen, cancelled or missed - is left out until asked for, so the list does
+            // not fill up with visits nobody needs to act on any more.
+            query = query.Where(a => OpenStatuses.Contains(a.Status));
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var pattern = $"%{search.Trim()}%";
+
+            query = query.Where(a =>
+                EF.Functions.ILike(a.Patient.FullName, pattern)
+                || EF.Functions.ILike(a.Patient.PatientCode, pattern)
+                || (a.Patient.Nic != null && EF.Functions.ILike(a.Patient.Nic, pattern))
+                || (a.Patient.Phone != null && EF.Functions.ILike(a.Patient.Phone, pattern)));
         }
 
         var totalItems = await query.CountAsync(ct);

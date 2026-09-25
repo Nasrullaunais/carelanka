@@ -2436,6 +2436,8 @@ export type ListAppointmentsData = {
     query?: {
         date?: string;
         status?: AppointmentStatus;
+        search?: string;
+        includeFinished?: boolean;
         page?: number;
         pageSize?: number;
     };

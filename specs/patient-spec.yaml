@@ -176,7 +176,7 @@ paths:
     put:
       tags: [Patients]
       summary: Update a patient record
-      description: 'Roles: WardNurse, DutyManager.'
+      description: 'Roles: GeneralStaff, WardNurse, DutyManager, HospitalAdministrator. Once a NIC is recorded, only HospitalAdministrator may change the patient''s full name, gender or NIC.'
       operationId: updatePatient
       requestBody:
         required: true

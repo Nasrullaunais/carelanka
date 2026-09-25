@@ -418,4 +418,8 @@
     <value>You already have a record at this hospital. Choose "I have a patient code" instead. Your code is on the slip the hospital gave you, or ask at the hospital desk.</value>
     <comment>Patient self-service, pre-register. The NIC matches a record staff created that has no app account yet. Typing a NIC is not proof of who someone is, so that record is only joined through POST /me/claim with the patient code the desk hands over in person.</comment>
   </data>
+  <data name="cl_pat_052" xml:space="preserve">
+    <value>Only an administrator can change a patient's name, gender or NIC once a NIC is recorded.</value>
+    <comment>PUT /patients/{id} and PATCH /admissions/{id}/details. A record with no NIC yet is an unidentified arrival and stays open to the desk and ward; once a NIC is on it, changing who the record identifies is an administrator's decision.</comment>
+  </data>
 </root>

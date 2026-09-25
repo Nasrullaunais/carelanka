@@ -54,16 +54,18 @@ Use it for the complete ambulance-to-pre-admission demonstration while keeping
 ## What each role can do
 
 ### Reception (general staff)
-Registers walk-in patients and edits their details · assigns a bed · marks a patient
-arrived · raises, itemises and settles a bill · confirms a discharge · reads the bookings
-list, wards and bed capacity.
-**Cannot:** check a booking in, tick clinical clearance, or set prices.
+Registers and admits walk-in patients and edits their details · assigns a bed · marks a patient
+arrived · checks in a booking · raises, itemises and settles a bill · confirms a discharge · reads
+the bookings list, wards and bed capacity.
+**Cannot:** tick clinical clearance, set prices, or change a patient's name, gender or NIC once a
+NIC is on the record (an unidentified patient with no NIC yet can still be fully edited).
 
 ### Ward nurse
 Everything reception does, plus: admits a patient and moves the admission through its
 states · checks a booked patient in · cancels a booking · completes missing patient
 details · ticks the non-clinical discharge items · reads lab reports.
-**Cannot:** tick clinical clearance, or set prices.
+**Cannot:** tick clinical clearance, set prices, or change a patient's name, gender or NIC once a
+NIC is on the record.
 
 ### Doctor
 Ticks **clinical clearance** — the one item nobody else can tick, and no discharge happens
@@ -78,6 +80,8 @@ and can start an agent workflow.
 
 ### Hospital administrator
 **Sets prices** — the admission fee per care level and every ward's rates. Nobody else can.
+**Edits patient details**, and is the only role that can change a patient's name, gender or NIC
+once a NIC is on the record.
 **Creates and retires wards.** Reads patient details, the bookings list and the discharge
 board. **Removes unwanted equipment categories** on the web Equipment page (the Remove categories
 card, same code; only categories no item uses). **Confirms new equipment** in the mobile app or on the web Equipment page — an item the

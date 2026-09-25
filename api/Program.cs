@@ -257,7 +257,8 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.PatientEditor, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.GeneralStaff),
         EnumWire.ToWire(StaffRole.WardNurse),
-        EnumWire.ToWire(StaffRole.DutyManager)));
+        EnumWire.ToWire(StaffRole.DutyManager),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
 
     options.AddPolicy(Policies.MedicalProfileReader, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.WardNurse),

@@ -91,7 +91,9 @@ public sealed class AdmissionService : IAdmissionService
             query = query.Where(a =>
                 EF.Functions.ILike(a.Patient.FullName, pattern)
                 || EF.Functions.ILike(a.Patient.PatientCode, pattern)
-                || (a.Patient.Nic != null && EF.Functions.ILike(a.Patient.Nic, pattern)));
+                || (a.Patient.Nic != null && EF.Functions.ILike(a.Patient.Nic, pattern))
+                || (a.Patient.TempReference != null
+                    && EF.Functions.ILike(a.Patient.TempReference, pattern)));
         }
 
         var totalItems = await query.CountAsync(ct);
@@ -359,6 +361,13 @@ public sealed class AdmissionService : IAdmissionService
 
         var patient = admission.Patient;
         var nic = Clean(request.Nic);
+
+        PatientIdentityRules.EnsureMayChange(
+            patient,
+            Clean(request.FullName) ?? patient.FullName,
+            nic ?? patient.Nic,
+            patient.Gender,
+            _currentUser.Role);
 
         if (nic is not null && nic != patient.Nic)
         {

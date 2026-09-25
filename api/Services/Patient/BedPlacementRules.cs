@@ -132,7 +132,7 @@ public static class BedPlacementRules
         return IsDowngrade(category, ward.WardType);
     }
 
-    private static bool AcceptsGender(GenderPolicy policy, Gender gender) => policy switch
+    internal static bool AcceptsGender(GenderPolicy policy, Gender gender) => policy switch
     {
         GenderPolicy.Mixed => true,
         GenderPolicy.Male => gender == Gender.Male,

@@ -471,6 +471,7 @@ builder.Services.AddScoped<IAllocationService, AllocationService>();
 builder.Services.AddScoped<ILeaveRequestService, LeaveRequestService>();
 builder.Services.AddScoped<IMyRosterService, MyRosterService>();
 builder.Services.AddScoped<IWardCoverageService, WardCoverageService>();
+builder.Services.AddScoped<IStaffReportsService, StaffReportsService>();
 
 builder.Services.AddScoped<IBedRegistryService, BedRegistryService>();
 

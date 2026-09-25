@@ -444,7 +444,7 @@ function RecommendationDetail({
           <div className="actions">
             <button
               type="button"
-              disabled={approve.isPending || agentRunning}
+              disabled={approve.isPending || agentRunning || draftedMessage.trim().length === 0}
               onClick={() =>
                 approve.mutate({
                   path: { id: recommendationId },
@@ -454,6 +454,9 @@ function RecommendationDetail({
             >
               {approve.isPending ? 'Approving…' : 'Approve'}
             </button>
+            {draftedMessage.trim().length === 0 && !agentRunning && (
+              <p className="hint">Write a reply, or Reject.</p>
+            )}
             <button
               type="button"
               className="secondary"

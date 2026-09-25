@@ -7,6 +7,7 @@ import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   assignBedManuallyMutation,
+  cancelAdmissionMutation,
   correctBedMutation,
   getAdmissionOptions,
   getPatientOptions,
@@ -16,18 +17,22 @@ import {
   markArrivedMutation,
   updatePatientMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
-import type { PrincipalRole, WorklistRow } from '../services/api/generated';
+import type { CancelReason, PrincipalRole, WorklistRow } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
 import { MedicalProfilePanel } from '../components/MedicalProfilePanel';
 import { ActionDialog } from '../components/ui/action-dialog';
+import { ConfirmDialog } from '../components/ui/confirm-dialog';
+import { AppSelect } from '../components/ui/app-select';
 import { BedCandidateTable } from '../components/BedCandidateTable';
 import {
   canAssignBed,
+  canChangePatientIdentity,
   canEditPatient,
   canMarkArrived,
   canReadMedicalProfile,
   canReadPatientDetails,
 } from '../types/permissions';
+import { nicProblem } from '../types/identifiers';
 import {
   PatientFields,
   emptyPatientForm,
@@ -55,6 +60,14 @@ import {
 } from '../types/patients';
 
 const PAGE_SIZE = 20;
+
+const cancelReasonLabels: Record<CancelReason, string> = {
+  diverted_to_other_hospital: 'Transferred to another hospital',
+  false_alarm: 'False alarm',
+  died_en_route: 'Died en route',
+  patient_refused: 'Patient refused admission',
+  no_show: 'Did not arrive',
+};
 
 export function PatientsPage() {
   const session = useSession();
@@ -620,6 +633,20 @@ function DetailsPanel({
   const visit = useQuery(getAdmissionOptions({ path: { id: row.id } }));
 
   const [editing, setEditing] = useState(false);
+  const [cancelReason, setCancelReason] = useState<CancelReason | ''>('');
+  const [cancelNote, setCancelNote] = useState('');
+  const invalidate = useBoardInvalidation();
+  const cancel = useMutation({
+    ...cancelAdmissionMutation(),
+    onSuccess: () => {
+      toast.success('Admission cancelled.');
+      setCancelReason('');
+      setCancelNote('');
+      setCancelOpen(false);
+      invalidate();
+    },
+  });
+  const [cancelOpen, setCancelOpen] = useState(false);
 
   const liveBed = visit.data?.bed_assignments?.find(
     (assignment) => assignment.status !== 'released',
@@ -634,6 +661,7 @@ function DetailsPanel({
         <EditPatientPanel
           patientId={patient.data.id}
           identified={patient.data.nic !== null}
+          role={role}
           onDone={() => setEditing(false)}
         />
       )}
@@ -674,6 +702,19 @@ function DetailsPanel({
               Edit patient details
             </button>
           )}
+
+          {role === 'duty_manager' &&
+            visit.data &&
+            ['awaiting_bed', 'awaiting_approval', 'bed_reserved'].includes(visit.data.status) && (
+              <button
+                type="button"
+                className="secondary"
+                style={{ marginTop: '0.6rem' }}
+                onClick={() => setCancelOpen(true)}
+              >
+                Cancel admission
+              </button>
+            )}
         </>
       )}
 
@@ -761,6 +802,52 @@ function DetailsPanel({
       >
         Close
       </button>
+      <ConfirmDialog
+        isOpen={cancelOpen}
+        onOpenChange={(open) => {
+          setCancelOpen(open);
+          if (!open) {
+            setCancelReason('');
+            setCancelNote('');
+          }
+        }}
+        title="Cancel admission"
+        description={
+          <>
+            <div className="field">
+              <AppSelect
+                id="cancel-admission-reason"
+                label="Reason"
+                value={cancelReason}
+                onValueChange={(value) => setCancelReason(value as CancelReason | '')}
+                options={[
+                  { value: '', label: 'Choose a reason' },
+                  ...Object.entries(cancelReasonLabels).map(([value, label]) => ({ value, label })),
+                ]}
+              />
+            </div>
+            <div className="field" style={{ marginTop: '0.8rem' }}>
+              <label htmlFor="cancel-admission-note">Note (optional)</label>
+              <textarea
+                id="cancel-admission-note"
+                maxLength={500}
+                value={cancelNote}
+                onChange={(event) => setCancelNote(event.target.value)}
+              />
+            </div>
+          </>
+        }
+        confirmLabel={cancel.isPending ? 'Cancelling…' : 'Confirm cancellation'}
+        isPending={cancel.isPending}
+        confirmDisabled={cancelReason === ''}
+        onConfirm={() => {
+          if (!cancelReason) return;
+          cancel.mutate({
+            path: { id: row.id },
+            body: { reason: cancelReason, note: cancelNote.trim() || null },
+          });
+        }}
+      />
     </div>
   );
 }
@@ -768,10 +855,12 @@ function DetailsPanel({
 function EditPatientPanel({
   patientId,
   identified,
+  role,
   onDone,
 }: {
   patientId: string;
   identified: boolean;
+  role: PrincipalRole | undefined;
   onDone: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -779,13 +868,15 @@ function EditPatientPanel({
   const existing = useQuery(getPatientOptions({ path: { id: patientId } }));
 
   const form = usePatientForm(emptyPatientForm(false));
-  const problems = patientFormProblems(form.value, identified, existing.data?.nic ?? '');
+  const [nicInput, setNicInput] = useState('');
+  const problems = patientFormProblems(form.value, identified, nicInput);
 
   const [loadedId, setLoadedId] = useState<string | null>(null);
 
   if (existing.data && loadedId !== existing.data.id) {
     setLoadedId(existing.data.id);
     form.replace(patientFormFrom(existing.data));
+    setNicInput(existing.data.nic ?? '');
   }
 
   const save = useMutation({
@@ -810,27 +901,50 @@ function EditPatientPanel({
   }
 
   const patient = existing.data;
+  const canChangeIdentity = canChangePatientIdentity(role, !!patient.nic);
+  const currentNicProblem = nicProblem(nicInput);
 
   return (
     <form
       onSubmit={onSubmit(() =>
         save.mutate({
           path: { id: patientId },
-          body: patientFormBody(form.value, patient.nic ?? null),
+          body: patientFormBody(
+            form.value,
+            canChangeIdentity ? nicInput.trim() || null : patient.nic ?? null,
+          ),
         }),
       )}
     >
+      {canChangeIdentity && (
+        <div className="field">
+          <label htmlFor="board-edit-nic">NIC</label>
+          <input
+            id="board-edit-nic"
+            value={nicInput}
+            maxLength={20}
+            aria-invalid={currentNicProblem !== null}
+            onChange={(event) => setNicInput(event.target.value)}
+            placeholder="199534501V"
+          />
+          {currentNicProblem && <p className="field-error">{currentNicProblem}</p>}
+        </div>
+      )}
       <PatientFields
         value={form.value}
         set={form.set}
         idPrefix="board-edit"
         identified={identified}
         allowUnknownGender={!identified}
-        nic={patient.nic ?? ''}
+        identityLocked={!canChangeIdentity}
+        nic={nicInput}
       />
 
       <div className="row">
-        <button type="submit" disabled={save.isPending || problems.blocked}>
+        <button
+          type="submit"
+          disabled={save.isPending || problems.blocked || currentNicProblem !== null}
+        >
           {save.isPending ? 'Saving...' : 'Save'}
         </button>
         <button type="button" className="secondary" onClick={onDone}>

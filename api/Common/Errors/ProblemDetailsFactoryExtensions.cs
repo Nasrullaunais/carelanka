@@ -63,6 +63,15 @@ public static class ProblemDetailsFactoryExtensions
                 problem.Detail = deactivationConflict.CustomMessage;
             }
         }
+        else if (exception is AllocationRejectedException allocationRejected)
+        {
+            problem.Extensions["failed_checks"] = allocationRejected.FailedChecks;
+
+            if (!string.IsNullOrWhiteSpace(allocationRejected.CustomMessage))
+            {
+                problem.Detail = allocationRejected.CustomMessage;
+            }
+        }
         else if (exception is InvalidSkillsBadRequestException invalidSkills)
         {
             problem.Extensions["invalid_skill_ids"] = invalidSkills.InvalidSkillIds;

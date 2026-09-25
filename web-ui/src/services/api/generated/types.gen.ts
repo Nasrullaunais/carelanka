@@ -6346,9 +6346,6 @@ export type AcknowledgeWarningResponse = AcknowledgeWarningResponses[keyof Ackno
 
 export type ClearWarningData = {
     body?: never;
-    headers: {
-        'X-Confirmation-Code': string;
-    };
     path: {
         id: string;
     };

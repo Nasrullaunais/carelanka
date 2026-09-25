@@ -764,6 +764,15 @@ has to be chased through a ward nurse.
 **Scope.** `PUT /patients/{id}` only. `AdmissionEditor` is untouched and is still ward nurse and
 duty manager — chasing a visit's paperwork is a different job from fixing a name.
 
+**Narrowed 2026-09-26 (M4, own component).** Correcting a typo is still the desk's job, but
+changing *who a record identifies* no longer is. Once a patient has a NIC, only
+`HospitalAdministrator` may change their full name, gender or NIC — `403 cl_pat_052`, enforced in
+`PatientIdentityRules` on both `PUT /patients/{id}` and `PATCH /admissions/{id}/details`. A record
+with no NIC yet (an unidentified arrival) stays fully editable by reception, the ward nurse and the
+duty manager, which is how it gets identified. `HospitalAdministrator` joined `PatientEditor` for
+this. Phone, address, date of birth and emergency contact are unaffected. No other component
+calls these routes.
+
 **11.13 (OPEN — announced by M4 on 2026-09-11) — prices are a table now, and the administrator
 owns them.**
 

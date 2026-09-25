@@ -48,7 +48,7 @@ It answers five questions:
 | :--- | :--- | :--- |
 | **Ward Nurse** | React | Register patients, admit, complete missing details, update status, place a patient in a normal-ward bed by hand, maintain the medical profile, tick discharge checklist items, request discharge, and review/edit/approve/reject a care advisory draft (§8.16). *(Reversed 2026-09-21 — was Flutter. Patient Management has no staff-facing screen on mobile: reception, the ward nurse, the duty manager and the administrator all work through the web app, full stop. The `NurseWorklistScreen`, its bed-suggestion screen and its medical-profile editor were removed from `mobile-ui/` the same day; §10 below no longer lists a nurse table. The bed-suggestion screen was removed a second time, along with the agent behind it, on 2026-09-22 — by then it only existed in React anyway.)* |
 | **Duty / Dispatch Manager** | React | Everything a nurse can do, plus approve ICU/HDU beds, approve downgrades, confirm ICU discharges, cancel admissions, view all wards |
-| **Hospital Administrator** | React | Manage the ward register (create and deactivate wards). Beds belong to Equipment. Read-only on patients. May settle a bill, though reception usually does. |
+| **Hospital Administrator** | React | Manage the ward register (create and deactivate wards). Beds belong to Equipment. Edits patient records, and is the only role that may change a patient's name, gender or NIC once a NIC is recorded *(added 2026-09-26 — was read-only on patients)*. May settle a bill, though reception usually does. |
 | **General Staff (reception)** | React | The front desk. Register patients and open an admission, read the patient register and the ward board, and **settle bills** — the only role whose day is mostly money. *Added 2026-09-11.* |
 | **Ambulance Crew** | Flutter | Create a pre-admission for a patient they are bringing in. **Nothing else — and as of 2026-09-11 they no longer register patients either** (`integration_of_functions.md` §11.9, addressed to M1). |
 | **Doctor** | React | Ticks `clinical_clearance` on discharge (§6.1) — **still the only role that can**. Maintains the medical profile. *(Rev — §8.10)* Reviews, edits, approves or rejects the care advisory agent's draft, alongside the ward nurse (§8.16). |
@@ -739,7 +739,7 @@ All endpoints are JWT-protected. All list endpoints support `?page=`, `?pageSize
 | `POST` | `/api/patients` | Nurse, Crew | Register. Minimum: name + (NIC or phone), or auto-generate `temp_reference`. |
 | `GET` | `/api/patients` | Nurse, Manager, Admin | `?search=` matches name/NIC/phone. Paginated. |
 | `GET` | `/api/patients/{id}` | Nurse, Manager, Admin | Includes visit history |
-| `PUT` | `/api/patients/{id}` | Nurse, Manager | |
+| `PUT` | `/api/patients/{id}` | Reception, Nurse, Manager, Admin | Once a NIC is recorded, only the Admin may change name, gender or NIC (`403 cl_pat_052`); a record with no NIC stays fully editable. A gender the current single-sex ward refuses is `409 cl_pat_017` for everyone *(2026-09-26)* |
 | `POST` | `/api/patients/lookup` | Nurse, Crew | **Business op.** Given an NIC, find an existing patient or report none. Prevents duplicates. |
 | `POST` | `/api/patients/{id}/link-account` | Manager | Attach a patient login to an existing record |
 | `GET` | `/api/patients/{id}/medical-profile` | Nurse, Doctor, Manager | *(New 2026-09-16.)* What the hospital knows about this person's health. **200 with every field null** when nobody has written one — an empty profile is the ordinary state, not a 404 |

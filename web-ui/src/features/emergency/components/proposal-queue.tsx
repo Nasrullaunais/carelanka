@@ -15,15 +15,15 @@ import { invalidateEmergencyQueries } from '../query-invalidation';
 
 const rejectionOptions = Object.entries(rejectionReasonLabels).map(([value, label]) => ({ value, label }));
 
-export function ProposalQueue() {
+export function ProposalQueue({ onOpenCall }: { onOpenCall?: (id: string) => void }) {
   const proposals = useActionableProposals();
   if (proposals.isPending) return <QuerySkeleton rows={4} />;
   if (proposals.error != null) return <QueryError error={proposals.error} context="Could not load dispatch proposals." onRetry={() => void proposals.refetch()} />;
-  if (proposals.items.length === 0) return <p className="muted">No dispatch proposals need review.</p>;
-  return <div className="flex flex-col gap-4">{proposals.items.map((proposal) => proposal.id && <ProposalCard key={proposal.id} proposal={proposal} />)}</div>;
+  if (proposals.items.length === 0) return <section className="workflow-empty"><h2>No recommendations awaiting review</h2><p className="muted">Open a call and choose Ask the agent to check available ambulances. New recommendations appear here automatically.</p></section>;
+  return <section className="flex flex-col gap-4" aria-labelledby="proposal-heading"><div><h2 id="proposal-heading">Dispatch recommendations</h2><p className="muted">Review the agent’s reasoning and live crew readiness before sending a response.</p></div>{proposals.items.map((proposal) => proposal.id && <ProposalCard key={proposal.id} proposal={proposal} onOpenCall={onOpenCall} />)}{proposals.hasNextPage && <Button variant="outline" isDisabled={proposals.isFetchingNextPage} onPress={() => void proposals.fetchNextPage()}>{proposals.isFetchingNextPage ? 'Loading…' : 'Load more recommendations'}</Button>}</section>;
 }
 
-function ProposalCard({ proposal }: { proposal: DispatchProposalSummary }) {
+function ProposalCard({ proposal, onOpenCall }: { proposal: DispatchProposalSummary; onOpenCall?: (id: string) => void }) {
   const proposalId = proposal.id ?? '';
   const queryClient = useQueryClient();
   const [rejectOpen, setRejectOpen] = useState(false);
@@ -57,7 +57,8 @@ function ProposalCard({ proposal }: { proposal: DispatchProposalSummary }) {
   const data = detail.data;
   const status = data.status ?? 'pending';
   const priority = data.call_priority ?? 'high';
-  const persistedFailures = (data.validation ?? []).filter((check) => check.passed === false).map((check) => check.detail ?? check.check ?? 'Validation failed');
+  const latestChecks = [...new Map((data.validation ?? []).map((check) => [check.check, check])).values()];
+  const persistedFailures = latestChecks.filter((check) => check.passed === false && check.check !== 'source_call_has_replacement').map((check) => check.detail ?? check.check ?? 'Validation failed');
   const errors = [...new Set([...inlineErrors, ...persistedFailures, ...(data.errors ?? []).map((error) => error.message ?? 'Proposal processing failed')])];
   const pending = confirm.isPending || approve.isPending || reject.isPending;
 
@@ -72,8 +73,9 @@ function ProposalCard({ proposal }: { proposal: DispatchProposalSummary }) {
           <p className="font-medium">{data.proposed_ambulance_registration ?? 'No ambulance proposed'}</p>
           <p className="text-sm text-muted">{data.estimated_minutes_to_scene == null ? 'ETA unavailable' : `${data.estimated_minutes_to_scene} min to scene`}</p>
           {data.proposed_ambulance_registration && <p className="text-sm text-muted">Crew readiness: {crewReadiness(data)}</p>}
-          <p className="mt-2">{data.rationale ?? (data.outcome ? proposalOutcomeLabels[data.outcome] : 'The agent did not provide reasoning.')}</p>
+          <p className="mt-2">{data.rationale ?? (data.outcome ? proposalOutcomeLabels[data.outcome] : status === 'pending' ? 'The agent is checking available crews and routes. This recommendation updates automatically.' : 'No reasoning is available.')}</p>
         </div>
+        {data.emergency_call_id && onOpenCall && <Button variant="outline" onPress={() => onOpenCall(data.emergency_call_id!)}>{status === 'failed' ? 'Return to call and retry or dispatch manually' : 'View emergency call'}</Button>}
         {data.is_diversion && data.diversion_impact && <DiversionImpact detail={data} />}
         {errors.length > 0 && <InlineErrors errors={errors} />}
         {(status === 'pending_confirmation' || status === 'pending_approval') && (
@@ -112,9 +114,9 @@ function DiversionImpact({ detail }: { detail: DispatchProposalDetail }) {
         <div><dt className="text-muted">Call losing ambulance</dt><dd>{impact.source_call_address_label ?? impact.source_call_id ?? 'Unknown call'}</dd></div>
         <div><dt className="text-muted">Priority and state</dt><dd>{priorityLabels[sourcePriority]} · {dispatchStatusLabels[sourceStatus]}</dd></div>
         <div><dt className="text-muted">Already waiting</dt><dd>{impact.source_call_waiting_minutes_so_far ?? 0} min</dd></div>
-        <div><dt className="text-muted">Extra wait imposed</dt><dd>{impact.source_call_additional_wait_minutes ?? 0} min</dd></div>
+        <div><dt className="text-muted">Extra wait imposed</dt><dd>{impact.source_call_additional_wait_minutes == null ? 'Unknown — no replacement assigned' : `${impact.source_call_additional_wait_minutes} min`}</dd></div>
         <div><dt className="text-muted">Replacement</dt><dd>{impact.replacement_ambulance_registration ?? 'None free'}</dd></div>
-        <div><dt className="text-muted">Critical-call time saved</dt><dd>{impact.minutes_saved_for_this_call ?? 0} min</dd></div>
+        <div><dt className="text-muted">Critical-call time saved</dt><dd>{impact.minutes_saved_for_this_call == null ? 'Not estimated' : `${impact.minutes_saved_for_this_call} min`}</dd></div>
       </dl>
     </div>
   );

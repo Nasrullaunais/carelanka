@@ -1,3 +1,4 @@
+import { PaginationControls } from '../components/ui/pagination-controls';
 import { Table } from '../components/Table';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -97,7 +98,7 @@ export function WarningsPage() {
         the problem is gone: stock delivered, the batch used up, or the service booked.
       </p>
 
-      <div className="card">
+      <div className="table-section">
         <div className="actions">
           <button type="button" disabled={sweep.isPending} onClick={() => sweep.mutate({})}>
             {sweep.isPending ? 'Checking…' : 'Run check'}
@@ -162,7 +163,7 @@ export function WarningsPage() {
         )}
 
         {hasChecked && rows.length > 0 && (
-          <Table>
+          <Table footer={<PaginationControls label="Warnings" page={page} totalPages={totalPages} onPageChange={setPage} />}>
             <thead>
               <tr>
                 <th>Severity</th>
@@ -231,30 +232,6 @@ export function WarningsPage() {
               ))}
             </tbody>
           </Table>
-        )}
-
-        {totalPages > 1 && (
-          <div className="pager">
-            <button
-              type="button"
-              className="secondary"
-              disabled={page <= 1}
-              onClick={() => setPage((current) => current - 1)}
-            >
-              Previous
-            </button>
-            <span className="muted">
-              Page {page} of {totalPages}
-            </span>
-            <button
-              type="button"
-              className="secondary"
-              disabled={page >= totalPages}
-              onClick={() => setPage((current) => current + 1)}
-            >
-              Next
-            </button>
-          </div>
         )}
       </div>
 

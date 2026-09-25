@@ -156,12 +156,18 @@ public sealed class DispatchProposalService : IDispatchProposalService
             throw new ConflictException(MessageCode.DispatchProposalNotApprovable, "not pending approval");
         }
 
-        var source = await _db.Dispatches.AsNoTracking().SingleOrDefaultAsync(x => x.Id == sourceDispatchId, ct);
+        var source = await _db.Dispatches.AsNoTracking().Include(x => x.EmergencyCall).SingleOrDefaultAsync(x => x.Id == sourceDispatchId, ct);
+        var targetPriority = await _db.EmergencyCalls.Where(x => x.Id == proposal.EmergencyCallId).Select(x => x.Priority).SingleAsync(ct);
+        if (source is not null && source.EmergencyCall.Priority <= targetPriority)
+        {
+            throw new DispatchProposalRejectedException(MessageCode.DispatchProposalNotApprovable, null,
+                ["call_priority_still_higher"], "The destination call is no longer more urgent than the source call. Request a new recommendation.");
+        }
         var sourceStillPrePickup = source is not null && source.Status.IsPrePickup();
         var prePickupCheck = DispatchProposalValidator.SourcePrePickup(source?.Status ?? DispatchStatus.HandedOver, _clock.GetUtcNow());
         await AppendValidationAsync(proposal, prePickupCheck, ct);
 
-        var eligible = await IsEligibleAsync(ambulanceId, ct);
+        var eligible = source?.AmbulanceId == ambulanceId && await IsEligibleAsync(ambulanceId, ct, sourceDispatchId);
         var eligibleCheck = DispatchProposalValidator.AmbulanceEligible(eligible, _clock.GetUtcNow());
         await AppendValidationAsync(proposal, eligibleCheck, ct);
 
@@ -241,14 +247,14 @@ public sealed class DispatchProposalService : IDispatchProposalService
         workflow.ValidationResults = DispatchWorkflowJson.Write(checks);
     }
 
-    private async Task<bool> IsEligibleAsync(Guid ambulanceId, CancellationToken ct)
+    private async Task<bool> IsEligibleAsync(Guid ambulanceId, CancellationToken ct, Guid? releasingDispatchId = null)
     {
         var ambulance = await _db.Ambulances.Include(x => x.CrewAssignments)
             .SingleOrDefaultAsync(x => x.Id == ambulanceId, ct);
         if (ambulance is null) return false;
 
         var activeDispatchId = await _db.Dispatches
-            .Where(x => x.AmbulanceId == ambulanceId && DispatchStatusExtensions.LiveStatuses.Contains(x.Status))
+            .Where(x => x.AmbulanceId == ambulanceId && x.Id != releasingDispatchId && DispatchStatusExtensions.LiveStatuses.Contains(x.Status))
             .Select(x => (Guid?)x.Id).FirstOrDefaultAsync(ct);
         var crewCount = ambulance.CrewAssignments.Count(x => x.UnassignedAt == null);
 
@@ -342,10 +348,10 @@ public sealed class DispatchProposalService : IDispatchProposalService
                     SourceCallAddressLabel = proposal.SourceCallAddressLabel,
                     SourceDispatchStatus = proposal.SourceDispatchStatus ?? DispatchStatus.Assigned,
                     SourceCallWaitingMinutesSoFar = proposal.SourceCallWaitingMinutesSoFar ?? 0,
-                    SourceCallAdditionalWaitMinutes = proposal.SourceCallAdditionalWaitMinutes ?? 0,
+                    SourceCallAdditionalWaitMinutes = proposal.SourceCallAdditionalWaitMinutes,
                     ReplacementAmbulanceId = proposal.ReplacementAmbulanceId,
                     ReplacementAmbulanceRegistration = proposal.ReplacementAmbulanceId is { } r && registrations.TryGetValue(r, out var rReg) ? rReg : null,
-                    MinutesSavedForThisCall = proposal.MinutesSavedForThisCall ?? 0
+                    MinutesSavedForThisCall = proposal.MinutesSavedForThisCall
                 }
                 : null,
             Plan = (workflow is null ? null : DispatchWorkflowJson.Read<List<DispatchPlanStep>>(workflow.Plan)) ?? [],

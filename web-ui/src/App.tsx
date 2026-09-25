@@ -1,5 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { RouteAccess } from './components/RouteAccess';
+import { ProfilePage } from './pages/ProfilePage';
 import { AppShell } from './components/AppShell';
 import { AppointmentsPage } from './pages/AppointmentsPage';
 import { BillingSettingsPage } from './pages/BillingSettingsPage';
@@ -54,22 +56,25 @@ export function App() {
     <Routes>
       <Route element={<AppShell />}>
         <Route path="/" element={<DashboardPage />} />
-        <Route path="/intake" element={<IntakePage />} />
-        <Route path="/patients" element={<PatientsPage />} />
-        <Route path="/appointments" element={<AppointmentsPage />} />
-        <Route path="/discharge" element={<DischargePage />} />
-        <Route path="/care-recommendations" element={<CareRecommendationsPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route element={<RouteAccess />}>
+          <Route path="/intake" element={<IntakePage />} />
+          <Route path="/patients" element={<PatientsPage />} />
+          <Route path="/appointments" element={<AppointmentsPage />} />
+          <Route path="/discharge" element={<DischargePage />} />
+          <Route path="/care-recommendations" element={<CareRecommendationsPage />} />
 
-        <Route path="/billing" element={<Navigate to="/discharge" replace />} />
-        <Route path="/billing-settings" element={<BillingSettingsPage />} />
-        <Route path="/capacity" element={<CapacityPage />} />
-        <Route path="/wards" element={<WardsPage />} />
-        <Route path="/equipment" element={<EquipmentPage />} />
-        <Route path="emergency/*" element={<Suspense fallback={<p className="muted">Loading emergency desk…</p>}><EmergencyRoutes /></Suspense>} />
-        <Route path="/maintenance-unit" element={<MaintenanceUnitPage />} />
-        <Route path="/warnings" element={<WarningsPage />} />
-        <Route path="/laboratory" element={<LaboratoryPage />} />
-        <Route path="/pharmacy" element={<PharmacyPage />} />
+          <Route path="/billing" element={<Navigate to="/discharge" replace />} />
+          <Route path="/billing-settings" element={<BillingSettingsPage />} />
+          <Route path="/capacity" element={<CapacityPage />} />
+          <Route path="/wards" element={<WardsPage />} />
+          <Route path="/equipment" element={<EquipmentPage />} />
+          <Route path="emergency/*" element={<Suspense fallback={<p className="muted">Loading emergency desk…</p>}><EmergencyRoutes /></Suspense>} />
+          <Route path="/maintenance-unit" element={<MaintenanceUnitPage />} />
+          <Route path="/warnings" element={<WarningsPage />} />
+          <Route path="/laboratory" element={<LaboratoryPage />} />
+          <Route path="/pharmacy" element={<PharmacyPage />} />
+        </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

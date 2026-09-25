@@ -1,3 +1,4 @@
+import { PaginationControls } from '../components/ui/pagination-controls';
 import { Table } from '../components/Table';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
@@ -66,7 +67,7 @@ export function MaintenanceUnitPage() {
 
       <ScheduleMaintenanceCard />
 
-      <div className="card">
+      <div className="table-section">
         <h2>Open jobs</h2>
 
         {queue.isPending && <p className="empty">Loading the queue…</p>}
@@ -85,7 +86,7 @@ export function MaintenanceUnitPage() {
         )}
 
         {rows.length > 0 && (
-          <Table>
+          <Table footer={<PaginationControls label="Maintenance" page={page} totalPages={totalPages} totalItems={queue.data?.total_items} onPageChange={setPage} />}>
             <thead>
               <tr>
                 <th>Item</th>
@@ -121,30 +122,6 @@ export function MaintenanceUnitPage() {
               ))}
             </tbody>
           </Table>
-        )}
-
-        {totalPages > 1 && (
-          <div className="pager">
-            <button
-              type="button"
-              className="secondary"
-              disabled={page <= 1}
-              onClick={() => setPage((current) => current - 1)}
-            >
-              Previous
-            </button>
-            <span className="muted">
-              Page {page} of {totalPages}
-            </span>
-            <button
-              type="button"
-              className="secondary"
-              disabled={page >= totalPages}
-              onClick={() => setPage((current) => current + 1)}
-            >
-              Next
-            </button>
-          </div>
         )}
       </div>
 

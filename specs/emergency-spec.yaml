@@ -2296,7 +2296,8 @@ components:
         source_call_waiting_minutes_so_far: { type: integer }
         source_call_additional_wait_minutes:
           type: integer
-          description: How much longer the other patient waits if this is approved. The number that decides it.
+          nullable: true
+          description: Estimated extra wait for the displaced call; null when no reliable estimate is available.
         replacement_ambulance_id:
           type: string
           format: uuid
@@ -2308,7 +2309,8 @@ components:
         replacement_ambulance_registration: { type: string, nullable: true }
         minutes_saved_for_this_call:
           type: integer
-          description: The benefit side — how much sooner the critical call is reached.
+          nullable: true
+          description: Estimated response time saved; null when no reliable comparison is available.
 
     DispatchPlanStep:
       type: object

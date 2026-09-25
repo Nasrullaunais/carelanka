@@ -3,11 +3,12 @@ import type { AmbulanceSummary, ListAmbulancesError } from '../../../services/ap
 import { QueryError, QuerySkeleton } from '../../../components/ui/query-state';
 import { blockReasonLabels, formatDriveMinutes, formatKilometres } from '../domain';
 
-export function EligibleAmbulanceList({ ambulances, isLoading, error, dispatchingId, onDispatch, onRetry }: {
+export function EligibleAmbulanceList({ ambulances, isLoading, error, dispatchingId, isDisabled = false, onDispatch, onRetry }: {
   ambulances: AmbulanceSummary[] | undefined;
   isLoading: boolean;
   error: ListAmbulancesError | null;
   dispatchingId?: string;
+  isDisabled?: boolean;
   onDispatch: (id: string) => void;
   onRetry: () => void;
 }) {
@@ -38,7 +39,7 @@ export function EligibleAmbulanceList({ ambulances, isLoading, error, dispatchin
               )}
             </div>
             <Button
-              isDisabled={!ambulance.is_eligible || dispatchingId !== undefined}
+              isDisabled={isDisabled || !ambulance.is_eligible || dispatchingId !== undefined}
               onPress={() => onDispatch(ambulance.id)}
             >
               {dispatchingId === ambulance.id ? 'Dispatching…' : 'Dispatch'}

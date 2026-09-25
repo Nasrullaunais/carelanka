@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Card, CardContent, CardTitle, InputGroup, InputGroupInput, Label, Tab, TabIndicator, TabList, TabListContainer, Tabs, TextField } from '@heroui/react';
+import { Button, InputGroup, InputGroupInput, Label, Tab, TabIndicator, TabList, TabListContainer, Tabs, TextField } from '@heroui/react';
 import type { EmergencyAgentPerformanceReport, FleetUtilisationReport, FleetUtilisationReportRow, ResponseTimeReport, ResponseTimeReportRow } from '../../../services/api/generated';
 import { getEmergencyAgentPerformanceReportOptions, getEmergencyResponseTimeReportOptions, getFleetUtilisationReportOptions } from '../../../services/api/generated/@tanstack/react-query.gen';
 import { DataTable, type DataTableColumn } from '../../../components/ui/data-table';
@@ -26,14 +26,14 @@ export function EmergencyReports() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Card><CardContent className="flex flex-col gap-3">
-        <CardTitle>Emergency reports</CardTitle>
+      <section className="flex flex-col gap-3" aria-labelledby="emergency-reports-heading">
+        <h2 id="emergency-reports-heading" className="m-0">Emergency reports</h2>
         <form className="flex flex-wrap items-end gap-3" onSubmit={apply}>
           <DateField label="From" value={draft.from} onChange={(from) => setDraft({ ...draft, from })} />
           <DateField label="To" value={draft.to} onChange={(to) => setDraft({ ...draft, to })} />
           <Button type="submit" isDisabled={draft.from === '' || draft.to === '' || draft.from > draft.to}>Apply range</Button>
         </form>
-      </CardContent></Card>
+      </section>
       <QueryState query={response} errorContext="Could not load response-time reports." skeletonRows={4}>
         {(responseData) => <QueryState query={fleet} errorContext="Could not load fleet-utilisation reports." skeletonRows={4}>
           {(fleetData) => <QueryState query={agent} errorContext="Could not load agent-performance reports." skeletonRows={4}>

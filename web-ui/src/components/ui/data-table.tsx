@@ -35,10 +35,9 @@ export function DataTable<Row extends object>({ ariaLabel, rows, columns, rowKey
   if (error != null) {
     return <QueryError error={error} context={`Could not load ${ariaLabel.toLowerCase()}.`} onRetry={onRetry ?? (() => {})} />;
   }
-  if (data.length === 0) return <p className="muted">{emptyMessage}</p>;
+  if (data.length === 0) return <div className="table-frame"><p className="empty" role="status">{emptyMessage}</p>{pagination && <div className="table-footer"><PaginationControls label={ariaLabel} {...pagination} /></div>}</div>;
 
   return (
-    <div className="flex flex-col gap-3">
       <TableRoot className="gx-table">
         <TableScrollContainer>
           <TableContent
@@ -58,8 +57,7 @@ export function DataTable<Row extends object>({ ariaLabel, rows, columns, rowKey
             </TableBody>
           </TableContent>
         </TableScrollContainer>
+        {pagination && <div className="table-footer"><PaginationControls label={ariaLabel} {...pagination} /></div>}
       </TableRoot>
-      {pagination && <PaginationControls label={ariaLabel} {...pagination} />}
-    </div>
   );
 }

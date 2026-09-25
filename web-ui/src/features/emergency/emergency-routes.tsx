@@ -1,4 +1,4 @@
-import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Chip, ChipLabel, Tab, TabIndicator, TabList, TabListContainer, Tabs } from '@heroui/react';
 import { useSession } from '../../services/auth/useSession';
 import { canManageEmergency } from '../../types/permissions';
@@ -72,8 +72,10 @@ export function EmergencyRoutes() {
         </TabListContainer>
       </Tabs>
       <Routes>
-        <Route index element={<EmergencyDesk />} />
-        <Route path="proposals" element={<ProposalQueue />} />
+        <Route index element={<EmergencyDesk initialCallId={new URLSearchParams(location.search).get("call") ?? undefined} onReviewProposal={() => navigate("/emergency/proposals")} />} />
+        <Route path="calls" element={<Navigate to="/emergency" replace />} />
+        <Route path="*" element={<Navigate to="/emergency" replace />} />
+        <Route path="proposals" element={<ProposalQueue onOpenCall={(id) => navigate(`/emergency?call=${encodeURIComponent(id)}`)} />} />
         <Route path="fleet" element={<FleetBoard />} />
         <Route path="register" element={<AmbulanceRegister />} />
         <Route path="cancellations" element={<CancellationQueue />} />

@@ -1,3 +1,5 @@
+import { ArrowUpRight, BedDouble, CircleCheck, Clock3, Info } from 'lucide-react';
+import { PaginationControls } from '../components/ui/pagination-controls';
 import { Table } from '../components/Table';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -31,11 +33,13 @@ export function DischargePage() {
   const role = session?.principal.role;
   const canWork = canOpenDischargeBoard(role);
 
+  const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const candidates = useQuery({
-    ...listDischargeCandidatesOptions({ query: { includeDischarged: true, pageSize: 50 } }),
+    ...listDischargeCandidatesOptions({ query: { includeDischarged: true, page, pageSize: 25 } }),
     enabled: canWork,
+    refetchInterval: 15_000,
   });
 
   if (!canWork) {
@@ -55,14 +59,15 @@ export function DischargePage() {
   const rows = all.filter((row) => !row.is_discharged);
   const finished = all.filter((row) => row.is_discharged);
   const ready = rows.filter((row) => row.outstanding_items.length === 0);
+  const paginated = (candidates.data?.total_pages ?? 1) > 1;
+  const pagination = candidates.data && <PaginationControls label="Discharge board" page={page} totalPages={candidates.data.total_pages} totalItems={candidates.data.total_items} onPageChange={setPage} />;
 
   return (
     <>
-      <h1>Discharge</h1>
-      <p className="muted">
-        Current admissions, what is outstanding on each, and the bill. Open a row to raise or
-        settle the bill and confirm the discharge.
-      </p>
+      <header className="page-intro">
+        <h1>Discharge and billing</h1>
+        <p className="muted">Review readiness, settle bills, and complete each patient’s hospital stay.</p>
+      </header>
 
       {candidates.isError ? (
         <div className="card">
@@ -74,32 +79,34 @@ export function DischargePage() {
           </div>
         </div>
       ) : (
-        <div className="card">
-          <h2>Current admissions</h2>
-
-          <div className="stats">
-            <Stat caption="Admitted" value={rows.length} />
+        <section className="table-section discharge-section" aria-labelledby="current-admissions-heading">
+          {paginated && <p className="muted small">Summary for page {page}. Use the table navigation to review all admissions.</p>}
+          <div className="stats discharge-stats">
+            <Stat caption="Current admissions" value={candidates.isPending ? null : rows.length} icon={BedDouble} />
             <Stat
               caption="Ready for discharge"
-              value={ready.length}
-              tone={ready.length === 0 ? 'none' : 'free'}
+              value={candidates.isPending ? null : ready.length}
+              icon={CircleCheck}
+              tone={ready.length > 0 ? 'free' : undefined}
             />
+            <Stat caption="Awaiting completion" value={candidates.isPending ? null : rows.length - ready.length} icon={Clock3} />
           </div>
+          <div className="section-heading"><div><h2 id="current-admissions-heading">Current admissions</h2><p className="muted small">{(candidates.data?.total_pages ?? 1) > 1 ? 'Admissions shown on this page.' : 'Patients preparing to leave the hospital.'}</p></div></div>
 
           {candidates.isLoading ? (
             <p className="empty">Loading…</p>
           ) : rows.length === 0 ? (
-            <p className="empty">No patients are currently admitted.</p>
+            <p className="empty">No current admissions on this page.</p>
           ) : (
-            <Table>
+            <Table footer={finished.length === 0 ? pagination : undefined}>
               <thead>
                 <tr>
                   <th>Patient</th>
                   <th>Ward and bed</th>
                   <th>Care level</th>
-                  <th>Days</th>
-                  <th>Outstanding</th>
-                  <th />
+                  <th>Days in care</th>
+                  <th>Readiness</th>
+                  <th aria-label="Actions" />
                 </tr>
               </thead>
               <tbody>
@@ -117,35 +124,31 @@ export function DischargePage() {
             </Table>
           )}
 
-          <p className="hint">
-            Ready for discharge means both required items are done: a doctor has cleared the
-            patient, and the bill is settled.
-          </p>
-        </div>
+          <p className="discharge-guidance"><Info size={16} aria-hidden="true" /> A patient is ready once a doctor has cleared them and their bill is settled.</p>
+        </section>
       )}
 
       {!candidates.isError && (
-        <div className="card">
-          <h2>Discharged</h2>
+        <section className="table-section discharge-section" aria-labelledby="discharged-heading">
+          <h2 id="discharged-heading">Completed discharges</h2>
           <p className="muted">
-            Completed discharges. These are read-only records. Open one for the checklist, the
-            sign-off and the bill as it was issued.
+            View the final checklist, sign-off, and issued bill. Completed records are read-only.
           </p>
 
           {candidates.isLoading ? (
             <p className="empty">Loading…</p>
           ) : finished.length === 0 ? (
-            <p className="empty">No discharges recorded yet.</p>
+            <p className="empty">No completed discharges on this page.</p>
           ) : (
-            <Table>
+            <Table footer={pagination}>
               <thead>
                 <tr>
                   <th>Patient</th>
                   <th>Ward and bed</th>
                   <th>Care level</th>
-                  <th>Days</th>
+                  <th>Days in care</th>
                   <th>Discharged</th>
-                  <th />
+                  <th aria-label="Actions" />
                 </tr>
               </thead>
               <tbody>
@@ -162,8 +165,9 @@ export function DischargePage() {
               </tbody>
             </Table>
           )}
-        </div>
+        </section>
       )}
+      {all.length === 0 && pagination}
       <ActionDialog title={`Discharge · ${all.find((row) => row.admission_id === selectedId)?.patient.full_name ?? 'patient'}`} isOpen={selectedId != null} onClose={() => setSelectedId(null)}>
         {selectedId && <DischargeDetail admissionId={selectedId} onClose={() => setSelectedId(null)} onDischarged={() => setSelectedId(null)} />}
       </ActionDialog>
@@ -208,12 +212,12 @@ function CandidateRow({
           ) : outstanding.length === 0 ? (
             <span className="badge status-available">Ready</span>
           ) : (
-            <span className="small">{outstanding.map(checklistLabel).join(', ')}</span>
+            <div className="readiness-items">{outstanding.map((item) => <span key={item} className="readiness-item"><Clock3 size={13} aria-hidden="true" />{item === "billing_settled" ? "Awaiting payment" : item === "clinical_clearance" ? "Awaiting doctor clearance" : `Pending: ${checklistLabel(item)}`}</span>)}</div>
           )}
         </td>
         <td>
-          <button type="button" className="secondary small" onClick={onSelect}>
-            {selected ? 'Close' : 'Open'}
+          <button type="button" className="secondary small discharge-open" aria-label={`${row.is_discharged ? "View record" : "Review discharge"} for ${row.patient.full_name}`} onClick={onSelect}>
+            {row.is_discharged ? 'View record' : 'Review'} <ArrowUpRight size={14} aria-hidden="true" />
           </button>
         </td>
       </tr>
@@ -542,14 +546,16 @@ function Stat({
   caption,
   value,
   tone,
+  icon: Icon,
 }: {
   caption: string;
-  value: number;
+  value: number | null;
   tone?: 'free' | 'none';
+  icon: typeof BedDouble;
 }) {
   return (
     <div className={tone ? `stat ${tone}` : 'stat'}>
-      <div className="value">{value}</div>
+      <Icon size={20} aria-hidden="true" /><div className="value">{value ?? "—"}</div>
       <div className="caption">{caption}</div>
     </div>
   );

@@ -266,6 +266,15 @@ public sealed class EmergencyOpenApiContractTests
             names);
     }
 
+    [Fact]
+    public async Task Unknown_diversion_estimates_are_nullable()
+    {
+        using var document = await GenerateAsync();
+        var properties = document.RootElement.GetProperty("components").GetProperty("schemas").GetProperty("DiversionImpact").GetProperty("properties");
+        Assert.True(properties.GetProperty("source_call_additional_wait_minutes").GetProperty("nullable").GetBoolean());
+        Assert.True(properties.GetProperty("minutes_saved_for_this_call").GetProperty("nullable").GetBoolean());
+    }
+
     private static async Task<JsonDocument> GenerateAsync()
     {
         using var environment = TestEnvironment.Use();

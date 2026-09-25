@@ -8,6 +8,7 @@ import {
   dispatchEmergencyCallMutation,
   updateEmergencyCallMutation,
 } from '../../../services/api/generated/@tanstack/react-query.gen';
+import { PaginationControls } from '../../../components/ui/pagination-controls';
 import { DetailField } from '../../../components/ui/detail-field';
 import { AppSelect } from '../../../components/ui/app-select';
 import { QueryState } from '../../../components/ui/query-state';
@@ -20,8 +21,11 @@ import type { UseQueryResult } from '@tanstack/react-query';
 
 const LocationPicker = lazy(() => import('./location-picker').then((module) => ({ default: module.LocationPicker })));
 
-export function CallDetail({ callId, query, ambulances }: {
+export function CallDetail({ callId, query, ambulances, onReviewProposal, ambulancePage = 1, onAmbulancePageChange }: {
+  ambulancePage?: number;
+  onAmbulancePageChange?: (page: number) => void;
   callId: string;
+  onReviewProposal?: () => void;
   query: UseQueryResult<EmergencyCallDetail, ProblemDetails>;
   ambulances: UseQueryResult<AmbulanceSummaryPagedResult, ListAmbulancesError>;
 }) {
@@ -67,6 +71,8 @@ export function CallDetail({ callId, query, ambulances }: {
     <QueryState query={query} errorContext="Could not load this call.">
       {(call) => {
         const status = call.status ?? 'received';
+        const canDispatch = status === 'received' && !(call.dispatches ?? []).some((item) => ['assigned', 'acknowledged', 'en_route_to_scene', 'at_scene', 'transporting_to_hospital'].includes(item.status ?? ''));
+        const busy = dispatch.isPending || proposal.isPending || priorityUpdate.isPending;
         return (
           <div className="flex flex-col gap-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -94,35 +100,39 @@ export function CallDetail({ callId, query, ambulances }: {
                 </Suspense>
               </section>
             )}
-            <div className="flex flex-wrap items-end gap-3">
+            {status !== 'completed' && status !== 'cancelled' && <div className="flex flex-wrap items-end gap-3">
               <PriorityControl
                 current={call.priority ?? 'high'}
-                pending={priorityUpdate.isPending}
+                pending={busy}
                 onSave={(priority) => priorityUpdate.mutate({ path: { id: callId }, body: { priority } })}
               />
-              <Button
+              {canDispatch && <Button
                 variant="outline"
-                isDisabled={proposal.isPending || Boolean(call.open_proposal_id)}
+                isDisabled={busy || Boolean(call.open_proposal_id)}
                 onPress={() => proposal.mutate({ body: { emergency_call_id: callId, allow_diversion: true } })}
               >
                 {call.open_proposal_id ? 'Recommendation pending' : proposal.isPending ? 'Requesting…' : 'Ask the agent'}
-              </Button>
-            </div>
+              </Button>}
+            </div>}
+            {(call.open_proposal_id || proposal.isSuccess) && onReviewProposal && <div className="workflow-notice" role="status"><p>The agent recommendation is available in Proposals. Review it before sending an ambulance.</p><Button variant="outline" onPress={onReviewProposal}>Review recommendation</Button></div>}
+            {!canDispatch && <p className="workflow-notice">{status === 'completed' || status === 'cancelled' ? 'This call is closed. Its response history is shown below.' : 'A response is already active. Follow its progress below; another ambulance cannot be assigned to this call.'}</p>}
             <DispatchHistory dispatches={call.dispatches ?? []} />
-            <section className="flex flex-col gap-2">
+            {canDispatch && <section className="flex flex-col gap-2">
               <h3 className="font-semibold">Ambulance choices</h3>
               <EligibleAmbulanceList
                 ambulances={ambulances.data?.items}
                 isLoading={ambulances.isPending}
                 error={ambulances.error}
                 dispatchingId={dispatchingId}
+                isDisabled={busy}
                 onRetry={() => void ambulances.refetch()}
                 onDispatch={(ambulanceId) => {
                   setDispatchingId(ambulanceId);
                   dispatch.mutate({ path: { id: callId }, body: { ambulance_id: ambulanceId } });
                 }}
               />
-            </section>
+              {ambulances.data && onAmbulancePageChange && <PaginationControls label="Ambulance choices" page={ambulancePage} totalPages={ambulances.data.total_pages} onPageChange={onAmbulancePageChange} />}
+            </section>}
           </div>
         );
       }}

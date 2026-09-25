@@ -93,7 +93,7 @@ export function CareRecommendationsPage() {
         nurse or doctor to approve or correct before it reaches them.
       </p>
 
-      <div className="card">
+      <div className="table-section">
         <div className="filters">
           {statusFilters.map((filter) => (
             <button

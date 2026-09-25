@@ -1,15 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Button } from '@heroui/react';
-import type { CallStatus, EmergencyCallSummary, ListEmergencyCallsError } from '../../../services/api/generated';
+import type { EmergencyCallSummary, ListEmergencyCallsError } from '../../../services/api/generated';
 import { DataTable, type DataTableColumn } from '../../../components/ui/data-table';
 import { StatusChip } from '../../../components/ui/status-chip';
 import { callStatusLabels, callStatusTones, formatWaiting, priorityLabels, priorityTones } from '../domain';
 
-type BoardFilter = 'open' | 'all';
-
-const openStatuses = new Set<CallStatus>(['received', 'dispatched', 'en_route']);
-
-export function CallBoard({ calls, selectedId, isLoading, error, onRetry, onSelect, page, totalPages, onPageChange }: {
+export function CallBoard({ calls, selectedId, isLoading, error, onRetry, onSelect, page, totalPages, onPageChange, filter, onFilterChange }: {
+  filter: 'received' | 'all';
+  onFilterChange: (filter: 'received' | 'all') => void;
   calls: EmergencyCallSummary[] | undefined;
   selectedId?: string;
   isLoading: boolean;
@@ -20,15 +18,9 @@ export function CallBoard({ calls, selectedId, isLoading, error, onRetry, onSele
   totalPages: number;
   onPageChange: (page: number) => void;
 }) {
-  const [filter, setFilter] = useState<BoardFilter>('open');
-  const rows = useMemo(() => {
-    const visible = filter === 'all'
-      ? calls ?? []
-      : (calls ?? []).filter((call) => openStatuses.has(call.status ?? 'received'));
-    return [...visible].sort((left, right) =>
-      priorityRank(right.priority) - priorityRank(left.priority)
-      || (right.waiting_minutes ?? 0) - (left.waiting_minutes ?? 0));
-  }, [calls, filter]);
+  const rows = useMemo(() => [...(calls ?? [])].sort((left, right) =>
+    priorityRank(right.priority) - priorityRank(left.priority)
+    || (right.waiting_minutes ?? 0) - (left.waiting_minutes ?? 0)), [calls]);
 
   const columns: Array<DataTableColumn<EmergencyCallSummary>> = [
     {
@@ -64,8 +56,8 @@ export function CallBoard({ calls, selectedId, isLoading, error, onRetry, onSele
   return (
     <div className="flex flex-col gap-3">
       <div className="flex gap-2" aria-label="Call status filter">
-        <Button size="sm" variant={filter === 'open' ? 'primary' : 'outline'} onPress={() => setFilter('open')}>Open calls</Button>
-        <Button size="sm" variant={filter === 'all' ? 'primary' : 'outline'} onPress={() => setFilter('all')}>All calls</Button>
+        <Button size="sm" aria-pressed={filter === 'received'} variant={filter === 'received' ? 'primary' : 'outline'} onPress={() => onFilterChange('received')}>Awaiting dispatch</Button>
+        <Button size="sm" aria-pressed={filter === 'all'} variant={filter === 'all' ? 'primary' : 'outline'} onPress={() => onFilterChange('all')}>All calls</Button>
       </div>
       <DataTable
         ariaLabel="Emergency calls"
@@ -76,7 +68,7 @@ export function CallBoard({ calls, selectedId, isLoading, error, onRetry, onSele
         isLoading={isLoading}
         error={error}
         onRetry={onRetry}
-        emptyMessage={filter === 'open' ? 'No open calls need dispatcher attention.' : 'No emergency calls were found.'}
+        emptyMessage={filter === 'received' ? 'No calls are awaiting dispatch.' : 'No emergency calls were found.'}
         onRowAction={onSelect}
         pagination={{ page, totalPages, onPageChange }}
       />

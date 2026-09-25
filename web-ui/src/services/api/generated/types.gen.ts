@@ -496,7 +496,6 @@ export type CareWorkflowValidation = {
 
 export type CheckInRequest = {
     admission_category: AdmissionCategory;
-    category_set_by_staff_id: string;
     urgency: AdmissionUrgency;
     is_infectious?: boolean;
 };
@@ -547,7 +546,6 @@ export type CreateAdmissionRequest = {
     source: AdmissionSource;
     dispatch_id?: string | null;
     admission_category: AdmissionCategory;
-    category_set_by_staff_id: string;
     urgency: AdmissionUrgency;
     is_infectious?: boolean;
     expected_arrival?: string | null;

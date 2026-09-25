@@ -100,8 +100,6 @@ public enum MessageCode
 
     DispatchIdRequired,
 
-    CategoryStaffNotFound,
-
     PatientHasOpenAppointment,
 
     AppointmentInThePast,
@@ -192,5 +190,7 @@ public enum MessageCode
 
     CareAgentStillDrafting,
 
-    TooManyCareQueries
+    TooManyCareQueries,
+
+    NicHasHospitalRecord
 }

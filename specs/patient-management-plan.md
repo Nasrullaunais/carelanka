@@ -105,7 +105,7 @@ Constraint: `nic IS NOT NULL OR temp_reference IS NOT NULL` — every patient mu
 | `dispatch_id` | text, nullable | Emergency Service's reference. Filled only when `source = emergency`. |
 | `reported_by_user_id` | uuid, FK, nullable | The app user who raised the emergency call, **when they are not the patient**. See §5.6. |
 | `admission_category` | enum, nullable | `icu` `general` `surgical` `maternity` `emergency` *(replaced 2026-09-23 — was `icu` `hdu` `inpatient` `day_case` `outpatient`)*. Null only on an Emergency pre-admission until `POST /admissions/{id}/classify`. Every value needs a bed; `maternity` is refused for a patient recorded as male (`cl_pat_048`) |
-| `category_set_by_staff_id` | uuid, FK → Staff | **Proof a human chose it.** Not nullable. |
+| `category_set_by_staff_id` | uuid, FK → Staff, nullable | **Proof a human chose it — always the signed-in staff member**, never a value from the request *(changed 2026-09-25; the request used to carry it, so a caller could name someone else)*. Null only on an Emergency pre-admission until `/classify` |
 | `category_set_at` | timestamptz | |
 | `urgency` | enum | `routine` `urgent` `emergency` |
 | `is_infectious` | boolean | Set by staff. Drives isolation rules. |
@@ -813,7 +813,7 @@ banner.)*
 
 | Method | Route | Role | Notes |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/me/pre-register` | Patient | **Details only.** Creates or links a record via NIC match. Creates no admission — see below. Answers 200, because called twice it is the same record both times |
+| `POST` | `/api/me/pre-register` | Patient | **Details only.** Creates the patient's record if the NIC is new to the hospital. **A NIC already on a hospital record is refused with 409 `cl_pat_051`**, pointing to "I have a patient code" — typing a NIC is not proof of who you are *(changed 2026-09-25; it used to link that record to whoever typed the NIC)*. Creates no admission. Answers 200, because called twice it is the same record both times |
 | `POST` | `/api/me/claim/preview` | Patient | **Masked** look-up of the record a patient code belongs to. Writes nothing — see §7.6b |
 | `POST` | `/api/me/claim` | Patient | Links this login to that record. One record per login (`cl_pat_004`) |
 | `GET` | `/api/me/profile` | Patient | Their own details, and what is still blank. 404 while the login has no record linked |
@@ -835,6 +835,8 @@ The patient response is a **different DTO**, not a filtered one. It cannot leak 
 ### 7.6b Claiming a record with a patient code
 
 *Added 2026-09-16.*
+
+> **Update 2026-09-25:** the patient code is now the *only* way to join a record the desk made. `/me/pre-register` no longer links by NIC at all — a NIC already on a hospital record gets 409 `cl_pat_051` and the app offers "Use my patient code". Typing someone's NIC used to hand you their record. The paragraph below is the original reason the claim flow was added.
 
 **The problem in one sentence: `/me/pre-register` matches on NIC, and `CreatePatientRequest.Nic` is optional.** A walk-in or an emergency arrival can be registered at the desk with no NIC at all — that is what `temp_reference` exists for. When that patient installs the app afterwards and fills in the details form, nothing matches, so they get a **second, empty record** while their actual stay sits on the one staff created. The patient code on their hospital slip is the only handle that record has.
 

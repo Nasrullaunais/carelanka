@@ -922,6 +922,8 @@ record the desk created, using the patient code.**
 Here because it sits next to common auth without being part of it, and everybody should be able
 to see where the line was drawn.
 
+> *Update 2026-09-25 (§11.21): pre-register no longer links by NIC at all; the patient code is the only way in to a desk-made record.*
+
 **The problem.** `POST /me/pre-register` links a login to an existing record by matching on NIC,
 and `CreatePatientRequest.Nic` is optional — a walk-in or an emergency arrival is often
 registered without one, which is what `temp_reference` is for. That patient installs the app
@@ -1116,7 +1118,13 @@ Staff code reads any of them — `WardPatientService` and `PreAdmissionGateway` 
 `maternity` refused for a patient recorded as male (`cl_pat_048`), bills and the discharge checklist
 only while the patient is on the ward (`cl_pat_044`–`046`), three care reports a minute per patient
 (`cl_pat_050`), and approving a care draft refused while the agent is still writing it
-(`cl_pat_049`). `cl_pat_011`, `cl_pat_020` and `cl_pat_021` are retired and will not be reused.
+(`cl_pat_049`). `cl_pat_011`, `cl_pat_008`, `cl_pat_020` and `cl_pat_021` are retired and will not be reused.
+
+**Two identity changes.** `POST /me/pre-register` no longer links a login to a record the desk
+made just because the NIC matches — that is 409 `cl_pat_051`, and the patient uses their patient
+code (`POST /me/claim`) instead. And `category_set_by_staff_id` is no longer in
+`CreateAdmissionRequest` or `CheckInRequest`: the server records whoever is signed in. An old
+caller still sending it is not broken - the field is ignored.
 
 **For Emergency, specifically:** a pre-admission classified as `maternity` for a male patient is now
 409 at `POST /admissions/{id}/classify`. `PreAdmitAsync` itself is untouched.

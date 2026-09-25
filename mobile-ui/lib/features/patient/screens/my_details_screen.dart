@@ -6,9 +6,11 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/friendly_date.dart';
 import '../../../core/widgets/phone_width.dart';
 import '../../../services/api_client/models/gender.dart';
+import '../services/patient_service.dart';
 import '../state/profile_controller.dart';
 import '../validation/patient_fields.dart';
 import '../widgets/panels.dart';
+import 'claim_record_screen.dart';
 
 class MyDetailsScreen extends StatefulWidget {
   const MyDetailsScreen({super.key});
@@ -99,6 +101,11 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     if (!mounted) return;
 
     if (!saved) {
+      if (controller.saveError?.code == PatientService.nicHasHospitalRecordCode) {
+        await _offerPatientCode(controller);
+        return;
+      }
+
       // Field errors already render under their fields — only toast when there's no field to blame.
       if (controller.fieldErrors.isEmpty) {
         final message =
@@ -113,6 +120,41 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Your details have been saved.')),
+    );
+  }
+
+  Future<void> _offerPatientCode(ProfileController controller) async {
+    final usePatientCode = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('You already have a hospital record'),
+        content: Text(
+          controller.saveError?.message ??
+              'Use "I have a patient code" instead. Your code is on the slip the hospital '
+                  'gave you, or ask at the hospital desk.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Use my patient code'),
+          ),
+        ],
+      ),
+    );
+
+    if (usePatientCode != true || !mounted) return;
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => ChangeNotifierProvider<ProfileController>.value(
+          value: controller,
+          child: const ClaimRecordScreen(),
+        ),
+      ),
     );
   }
 

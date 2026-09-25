@@ -239,7 +239,6 @@ export function AppointmentsPage() {
             return (
               <CheckInPanel
                 appointment={appointment}
-                staffId={session?.principal.id ?? ''}
                 noBedPending={complete.isPending}
                 onCancel={() => setOpen(null)}
                 onNoBed={() => complete.mutate({ path: { id: appointment.id } })}
@@ -771,14 +770,12 @@ function BookVisitCard({ onBooked }: { onBooked: () => void }) {
 
 function CheckInPanel({
   appointment,
-  staffId,
   noBedPending,
   onCancel,
   onNoBed,
   onCheckedIn,
 }: {
   appointment: Appointment;
-  staffId: string;
   noBedPending: boolean;
   onCancel: () => void;
   onNoBed: () => void;
@@ -821,7 +818,6 @@ function CheckInPanel({
       path: { id: appointment.id },
       body: {
         admission_category: choice,
-        category_set_by_staff_id: staffId,
         urgency: 'routine',
         is_infectious: isInfectious,
       },

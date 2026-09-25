@@ -10,7 +10,8 @@ info:
 
     **The line this component does not cross.** `admission_category` (icu / general /
     surgical / maternity / emergency) is a clinical decision, set by a human and recorded
-    with `category_set_by_staff_id`. It is an INPUT to bed placement, never an output. No
+    with `category_set_by_staff_id` - always the signed-in staff member, never a value from
+    the request. It is an INPUT to bed placement, never an output. No
     endpoint here lets an AI set or change it.
 
     **Design rationale** is in `patient-management-plan.md`.
@@ -355,9 +356,11 @@ paths:
 
         Creates a visit in status `awaiting_bed`.
 
-        `admission_category` and `category_set_by_staff_id` are both required. The second one is
-        deliberate: it is the recorded proof that a human clinician chose the care level. There
-        is no code path in this API that lets an agent supply it.
+        `admission_category` is required. Who chose it is recorded as `category_set_by_staff_id`
+        on the admission, and it is **always the signed-in staff member** - it is not in the
+        request at all (changed 2026-09-25; the body used to carry it, so a caller could record
+        someone else as having decided). There is no code path in this API that lets an agent
+        supply it.
 
         `maternity` is refused for a patient recorded as male (`cl_pat_048`). A patient whose
         gender is not recorded yet - the brief emergency record - may still be given it.
@@ -1425,10 +1428,14 @@ paths:
         Details only - this does not book a date and **does not admit you**.
         `POST /me/appointments` is the booking; being admitted happens at the desk.
 
-        Matches on NIC first. An existing record is linked to the account rather than duplicated,
-        which is what stops the signup form creating the second identity that would otherwise
-        split a returning patient's history in two. Nothing already on a matched record is
-        overwritten - see `PreRegisterRequest.nic` for why.
+        **A NIC already on a hospital record is refused, not linked** (changed 2026-09-25). If
+        the desk registered this person first, typing their NIC is not proof that the person
+        typing is them - an NIC is printed on too many forms. So the answer is 409 `cl_pat_051`,
+        telling the patient to use "I have a patient code" (`POST /me/claim`) with the code the
+        desk hands over in person. It used to link the record to whoever typed the NIC.
+
+        A NIC that is new to the hospital creates the record and links it, so a patient who
+        signs up in the app first is found by the desk under their NIC later.
 
         Neither this nor the booking brings in doctor calendars, time slots or availability
         search. That is the component-sized part, and it stays out of scope.
@@ -1460,9 +1467,10 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
           description: |
-            Those details belong to a record the hospital already holds for someone else
-            (`cl_pat_031`), or your record is registered under a different NIC (`cl_pat_032`).
-            Both are desk work - the app may not decide which human a login belongs to.
+            The NIC is on a hospital record with no app login yet - use your patient code instead
+            (`cl_pat_051`); the NIC is on a record another login already holds (`cl_pat_031`); or
+            your record is registered under a different NIC (`cl_pat_032`). All three are desk
+            work - the app may not decide which human a login belongs to.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -2318,7 +2326,8 @@ paths:
 
         The care level is set here, by the staff member checking them in - not by the patient
         at booking time and not by the agent. Same rule every other admission path follows,
-        and `category_set_by_staff_id` records who chose it.
+        and `category_set_by_staff_id` records who chose it - the signed-in staff member, never
+        a value from the body.
 
         **No role split by care level any more** (changed 2026-09-25). This used to keep `icu`
         for the duty manager (`cl_pat_011`, now retired), which only applied here and not at
@@ -3016,13 +3025,9 @@ components:
         `admission_category` and `urgency` are required and have no default. An omitted
         `admission_category` would check the patient in at `icu`, the most expensive care
         level in the hospital, because it is declared first.
-      required: [admission_category, category_set_by_staff_id, urgency]
+      required: [admission_category, urgency]
       properties:
         admission_category: { $ref: '#/components/schemas/AdmissionCategory' }
-        category_set_by_staff_id:
-          type: string
-          format: uuid
-          description: The staff member who chose the care level at the desk. Recorded proof a human decided it.
         urgency: { $ref: '#/components/schemas/AdmissionUrgency' }
         is_infectious:
           type: boolean
@@ -3354,7 +3359,7 @@ components:
 
     CreateAdmissionRequest:
       type: object
-      required: [patient_id, source, admission_category, category_set_by_staff_id, urgency]
+      required: [patient_id, source, admission_category, urgency]
       properties:
         patient_id: { type: string, format: uuid }
         source: { $ref: '#/components/schemas/AdmissionSource' }
@@ -3363,10 +3368,6 @@ components:
           nullable: true
           description: Emergency Service's reference. Required when source is `emergency`.
         admission_category: { $ref: '#/components/schemas/AdmissionCategory' }
-        category_set_by_staff_id:
-          type: string
-          format: uuid
-          description: The clinician who chose the category. Recorded proof a human decided it.
         urgency: { $ref: '#/components/schemas/AdmissionUrgency' }
         is_infectious:
           type: boolean
@@ -3517,7 +3518,9 @@ components:
               type: string
               format: uuid
               nullable: true
-              description: Null until a clinician classifies the admission via POST /admissions/{id}/classify.
+              description: >-
+                Who chose the care level - the signed-in staff member at creation, check-in or
+                classify. Null until a clinician classifies a pre-admission.
             category_set_by_staff_name:
               type: string
               nullable: true
@@ -4118,12 +4121,12 @@ components:
           maxLength: 20
           pattern: '^(\d{9}[VvXx]|\d{12}|(?=.*[A-Za-z])[A-Za-z0-9]{6,15})$'
           description: |
-            Required here, unlike at the desk, because it is the only thing that can match this
-            signup to a record the hospital already holds.
+            Required here, unlike at the desk, so the desk can find a patient who signed up in the
+            app first.
 
             **NIC alone is not proof of identity.** Nothing verifies that the person typing it
-            owns it, so linking to an existing record never overwrites what is already on that
-            record. A production system puts an OTP or a desk check in front of this.
+            owns it, so a NIC that is already on a hospital record is refused (`cl_pat_051`) and
+            that record is only joined with the patient code from the desk.
 
             **Same shape as `CreatePatientRequest.nic` (tightened 2026-09-15.)** This endpoint
             previously took any string up to 20 characters, so the app could store an NIC the

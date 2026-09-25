@@ -266,9 +266,6 @@
     <value>An emergency admission needs the dispatch reference from Emergency Service.</value>
     <comment>Without it there is no link back to their record of the same journey.</comment>
   </data>
-  <data name="cl_pat_008" xml:space="preserve">
-    <value>No staff member {0} was found to record as having chosen the care level.</value>
-  </data>
   <data name="cl_pat_009" xml:space="preserve">
     <value>{0} already has a visit booked. Check them in or cancel it rather than booking a second.</value>
     <comment>One open booking at a time, so the app cannot be used to hold several slots.</comment>
@@ -416,5 +413,9 @@
   <data name="cl_pat_050" xml:space="preserve">
     <value>You have sent {0} messages in the last minute. Wait a moment before sending another. If this is urgent, press your call bell or tell a nurse.</value>
     <comment>POST /me/care-queries is limited per patient, counted from their own saved reports. Every report can start a model call, and the free Gemini allowance is small.</comment>
+  </data>
+  <data name="cl_pat_051" xml:space="preserve">
+    <value>You already have a record at this hospital. Choose "I have a patient code" instead. Your code is on the slip the hospital gave you, or ask at the hospital desk.</value>
+    <comment>Patient self-service, pre-register. The NIC matches a record staff created that has no app account yet. Typing a NIC is not proof of who someone is, so that record is only joined through POST /me/claim with the patient code the desk hands over in person.</comment>
   </data>
 </root>

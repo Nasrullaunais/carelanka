@@ -284,7 +284,6 @@ public sealed class AppointmentService : IAppointmentService
             Source = AdmissionSource.PreRegistered,
 
             AdmissionCategory = category,
-            CategorySetByStaffId = request.CategorySetByStaffId,
             Urgency = request.Urgency!.Value,
             IsInfectious = request.IsInfectious,
 

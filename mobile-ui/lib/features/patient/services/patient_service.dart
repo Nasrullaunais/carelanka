@@ -40,6 +40,10 @@ class PatientService {
   // ever renders while admitted, so this is a backstop rather than something ordinary use hits.
   static const notCurrentlyAdmittedForCareQueryCode = 'cl_pat_038';
 
+  /// The NIC is on a record the hospital made. That record is joined with the patient code
+  /// from the desk, never by typing a NIC.
+  static const nicHasHospitalRecordCode = 'cl_pat_051';
+
   Future<MyProfile> loadMyProfile() {
     return callApi(_api.patientSelfService.getMyProfile);
   }

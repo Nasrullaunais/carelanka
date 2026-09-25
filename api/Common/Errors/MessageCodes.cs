@@ -60,7 +60,6 @@ public static class MessageCodes
             [MessageCode.TempReferenceExhausted] = "cl_pat_005",
             [MessageCode.PatientHasOpenAdmission] = "cl_pat_006",
             [MessageCode.DispatchIdRequired] = "cl_pat_007",
-            [MessageCode.CategoryStaffNotFound] = "cl_pat_008",
             [MessageCode.PatientHasOpenAppointment] = "cl_pat_009",
             [MessageCode.AppointmentInThePast] = "cl_pat_010",
             [MessageCode.BedNeedsDutyManager] = "cl_pat_012",
@@ -106,7 +105,8 @@ public static class MessageCodes
             [MessageCode.BedWardWrongKind] = "cl_pat_047",
             [MessageCode.MaternityNeedsFemalePatient] = "cl_pat_048",
             [MessageCode.CareAgentStillDrafting] = "cl_pat_049",
-            [MessageCode.TooManyCareQueries] = "cl_pat_050"
+            [MessageCode.TooManyCareQueries] = "cl_pat_050",
+            [MessageCode.NicHasHospitalRecord] = "cl_pat_051"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

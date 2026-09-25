@@ -6,6 +6,7 @@ using CareLanka.Api.Data.Configurations.Patient;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Patient;
+using CareLanka.Api.Services.Common;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using AdmissionEntity = CareLanka.Api.Data.Entities.Patient.Admission;
@@ -30,17 +31,20 @@ public sealed class AdmissionService : IAdmissionService
     private readonly IBedRegistryService _beds;
     private readonly IDischargeService _discharges;
     private readonly IBillingService _billing;
+    private readonly ICurrentUser _currentUser;
 
     public AdmissionService(
         CareLankaDbContext db,
         IBedRegistryService beds,
         IDischargeService discharges,
-        IBillingService billing)
+        IBillingService billing,
+        ICurrentUser currentUser)
     {
         _db = db;
         _beds = beds;
         _discharges = discharges;
         _billing = billing;
+        _currentUser = currentUser;
     }
 
     public async Task<PagedResult<AdmissionSummary>> ListAsync(
@@ -154,15 +158,6 @@ public sealed class AdmissionService : IAdmissionService
             throw new ConflictException(MessageCode.PatientHasOpenAdmission, patient.FullName);
         }
 
-        var staffExists = await _db.StaffMembers
-            .AnyAsync(s => s.Id == request.CategorySetByStaffId, ct);
-
-        if (!staffExists)
-        {
-            throw new BadRequestException(
-                MessageCode.CategoryStaffNotFound, request.CategorySetByStaffId);
-        }
-
         var admission = new AdmissionEntity
         {
             Id = Guid.NewGuid(),
@@ -174,7 +169,8 @@ public sealed class AdmissionService : IAdmissionService
             Status = AdmissionStatus.AwaitingBed,
 
             IsInfectious = request.IsInfectious,
-            CategorySetByStaffMemberId = request.CategorySetByStaffId,
+            // Whoever is signed in chose it. Never taken from the request body.
+            CategorySetByStaffMemberId = _currentUser.Id,
             CategorySetAt = DateTimeOffset.UtcNow,
             DispatchId = string.IsNullOrWhiteSpace(request.DispatchId) ? null : request.DispatchId.Trim(),
             ExpectedArrivalAt = request.ExpectedArrival,

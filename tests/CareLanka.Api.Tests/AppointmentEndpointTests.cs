@@ -325,17 +325,19 @@ public sealed class AppointmentEndpointTests
     }
 
     [Fact]
-    public async Task A_check_in_naming_a_clinician_who_does_not_exist_is_refused()
+    public async Task A_check_in_records_whoever_is_signed_in_as_choosing_the_care_level()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         var appointmentId = await ConfirmedIdAsync(
-            nurse, await NewPatientAsync(nurse, "Check In With Unknown Staff"), SoonUtc());
+            nurse, await NewPatientAsync(nurse, "Check In Claimed Staff"), SoonUtc());
 
         var response = await CheckInAsync(nurse, appointmentId, staffId: Guid.NewGuid().ToString());
         using var body = await ReadJsonAsync(response);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Equal("cl_pat_008", body.RootElement.GetProperty("code").GetString());
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(
+            await NurseIdAsync(),
+            body.RootElement.GetProperty("category_set_by_staff_id").GetString());
     }
 
     [Fact]

@@ -6,6 +6,7 @@ using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Patient;
 using CareLanka.Api.Services.Common;
+using CareLanka.Api.Services.Equipment;
 using Microsoft.EntityFrameworkCore;
 using AdmissionResponse = CareLanka.Api.DTOs.Patient.Admission;
 using AppointmentEntity = CareLanka.Api.Data.Entities.Patient.Appointment;
@@ -26,11 +27,6 @@ public sealed class AppointmentService : IAppointmentService
     [
         AdmissionStatus.Discharged,
         AdmissionStatus.Cancelled
-    ];
-
-    private static readonly AdmissionCategory[] DutyManagerOnly =
-    [
-        AdmissionCategory.Icu
     ];
 
     private readonly CareLankaDbContext _db;
@@ -56,7 +52,10 @@ public sealed class AppointmentService : IAppointmentService
 
         if (date is { } day)
         {
-            var from = new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            // The hospital's calendar day, so an early-morning booking is not listed under yesterday.
+            var midnight = day.ToDateTime(TimeOnly.MinValue);
+            var from = new DateTimeOffset(midnight, HospitalTime.Zone.GetUtcOffset(midnight))
+                .ToUniversalTime();
             var to = from.AddDays(1);
 
             query = query.Where(a => a.ScheduledAt >= from && a.ScheduledAt < to);
@@ -266,12 +265,6 @@ public sealed class AppointmentService : IAppointmentService
     {
         var category = request.AdmissionCategory!.Value;
 
-        if (DutyManagerOnly.Contains(category) && _currentUser.Role != PrincipalRole.DutyManager)
-        {
-            throw new ForbiddenException(
-                MessageCode.CareLevelNeedsDutyManager, EnumWire.ToWire(category));
-        }
-
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
 
         await _db.Database.ExecuteSqlAsync(
@@ -291,7 +284,6 @@ public sealed class AppointmentService : IAppointmentService
             Source = AdmissionSource.PreRegistered,
 
             AdmissionCategory = category,
-            CategorySetByStaffId = request.CategorySetByStaffId,
             Urgency = request.Urgency!.Value,
             IsInfectious = request.IsInfectious,
 

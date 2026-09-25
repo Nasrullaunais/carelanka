@@ -11,7 +11,6 @@ CheckInRequest _$CheckInRequestFromJson(Map<String, dynamic> json) =>
       admissionCategory: AdmissionCategory.fromJson(
         json['admission_category'] as String,
       ),
-      categorySetByStaffId: json['category_set_by_staff_id'] as String,
       urgency: AdmissionUrgency.fromJson(json['urgency'] as String),
       isInfectious: json['is_infectious'] as bool? ?? false,
     );
@@ -19,7 +18,6 @@ CheckInRequest _$CheckInRequestFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$CheckInRequestToJson(CheckInRequest instance) =>
     <String, dynamic>{
       'admission_category': instance.admissionCategory,
-      'category_set_by_staff_id': instance.categorySetByStaffId,
       'urgency': instance.urgency,
       'is_infectious': instance.isInfectious,
     };

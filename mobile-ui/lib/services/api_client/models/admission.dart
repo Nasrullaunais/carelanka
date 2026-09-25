@@ -21,7 +21,6 @@ class Admission {
     required this.urgency,
     required this.status,
     required this.detailsComplete,
-    required this.requiresBed,
     required this.isInfectious,
     required this.missingFields,
     this.patient,
@@ -53,8 +52,6 @@ class Admission {
   final AdmissionStatus status;
   @JsonKey(name: 'details_complete')
   final bool detailsComplete;
-  @JsonKey(name: 'requires_bed')
-  final bool requiresBed;
   @JsonKey(name: 'ward_name')
   final String? wardName;
   @JsonKey(name: 'bed_number')

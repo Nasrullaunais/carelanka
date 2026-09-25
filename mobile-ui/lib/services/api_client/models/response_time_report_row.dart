@@ -17,10 +17,9 @@ class ResponseTimeReportRow {
     this.medianMinutesToArrival,
     this.slowestMinutesToArrival,
   });
-
-  factory ResponseTimeReportRow.fromJson(Map<String, Object?> json) =>
-      _$ResponseTimeReportRowFromJson(json);
-
+  
+  factory ResponseTimeReportRow.fromJson(Map<String, Object?> json) => _$ResponseTimeReportRowFromJson(json);
+  
   final CallPriority? priority;
   @JsonKey(name: 'call_count')
   final int? callCount;

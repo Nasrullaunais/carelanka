@@ -119,6 +119,24 @@ void main() {
     expect(find.text('Enter your phone number'), findsOneWidget);
   });
 
+  testWidgets('a NIC the hospital already holds points the patient to their patient code',
+      (tester) async {
+    final service = await pumpFirstRunForm(tester);
+    service.savedProfileResult = const ApiException(
+      message: 'You already have a record at this hospital.',
+      statusCode: 409,
+      code: 'cl_pat_051',
+    );
+
+    await fillTextFields(tester);
+    await chooseGender(tester, 'Male');
+    await pickDateOfBirth(tester);
+    await tapSave(tester);
+
+    expect(find.text('You already have a hospital record'), findsOneWidget);
+    expect(find.text('Use my patient code'), findsOneWidget);
+  });
+
   testWidgets('address and emergency contact are not required', (tester) async {
     final service = await pumpFirstRunForm(tester);
 

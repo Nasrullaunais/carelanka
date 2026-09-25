@@ -14,7 +14,6 @@ CreateAdmissionRequest _$CreateAdmissionRequestFromJson(
   admissionCategory: AdmissionCategory.fromJson(
     json['admission_category'] as String,
   ),
-  categorySetByStaffId: json['category_set_by_staff_id'] as String,
   urgency: AdmissionUrgency.fromJson(json['urgency'] as String),
   isInfectious: json['is_infectious'] as bool? ?? false,
   dispatchId: json['dispatch_id'] as String?,
@@ -30,7 +29,6 @@ Map<String, dynamic> _$CreateAdmissionRequestToJson(
   'source': instance.source,
   'dispatch_id': instance.dispatchId,
   'admission_category': instance.admissionCategory,
-  'category_set_by_staff_id': instance.categorySetByStaffId,
   'urgency': instance.urgency,
   'is_infectious': instance.isInfectious,
   'expected_arrival': instance.expectedArrival?.toIso8601String(),

@@ -8,10 +8,6 @@ namespace CareLanka.Api.Services.Patient;
 
 public static class BedPlacementRules
 {
-    public static bool RequiresBed(AdmissionCategory category) => true;
-
-    public static bool RequiresBed(AdmissionCategory? category) => true;
-
     public static int Rung(AdmissionCategory category) => category switch
     {
         AdmissionCategory.Icu => 0,
@@ -33,6 +29,34 @@ public static class BedPlacementRules
 
     public static bool NeedsDutyManager(AdmissionCategory category, WardType wardType)
         => IsDowngrade(category, wardType) || IsMoreAcuteThanNeeded(category, wardType);
+
+    /// <summary>
+    /// Whether this kind of ward suits this care level, on top of the acuity rungs. Deliberately
+    /// generous: a general ward takes any patient below ICU, and the ICU/HDU/children's wards are
+    /// left to the rungs and the age rule. Only a specialist ward the patient does not belong in
+    /// is outside it - and even that is the duty manager's call, not a refusal.
+    /// </summary>
+    public static bool FitsWard(AdmissionCategory category, WardType wardType, bool isInfectious)
+        => wardType switch
+        {
+            WardType.Surgical => category is AdmissionCategory.Surgical or AdmissionCategory.Emergency,
+            WardType.Maternity => category == AdmissionCategory.Maternity,
+            WardType.Emergency => category == AdmissionCategory.Emergency,
+            WardType.MentalHealth => category == AdmissionCategory.General,
+            WardType.Isolation => isInfectious,
+            _ => true
+        };
+
+    public static bool MayHaveCategory(AdmissionCategory category, Gender gender)
+        => category != AdmissionCategory.Maternity || gender != Gender.Male;
+
+    public static void EnsureMayHaveCategory(AdmissionCategory category, Gender gender)
+    {
+        if (!MayHaveCategory(category, gender))
+        {
+            throw new ConflictException(MessageCode.MaternityNeedsFemalePatient);
+        }
+    }
 
     public const int PediatricAgeLimit = 18;
 

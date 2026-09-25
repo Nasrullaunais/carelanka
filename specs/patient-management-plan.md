@@ -1,7 +1,7 @@
 # Patient Management - Component Design
 
 **CareLanka Hospital Management System · SE3090 Assignment 1**
-**Owner:** Member 4 · **Status:** fully built (steps 1–16 of `docs/build/patient.md`); the bed suggestion agent (§8.1–§8.9) was built, then removed 2026-09-22 in favour of the Patient Care Advisory agent (§8.10 onward), which is live · **Version:** 0.3 (2026-09-22)
+**Owner:** Member 4 · **Status:** fully built (steps 1–16 of `docs/build/patient.md`); the bed suggestion agent (§8.1–§8.9) was built, then removed 2026-09-22 in favour of the Patient Care Advisory agent (§8.10 onward), which is live · **Version:** 0.4 (2026-09-25 — review fixes: bill refreshed on settle, bill/checklist status rules, ward fit (H7), one Check in action with a No bed needed choice, care-query limit and early red flag, review gated on the draft; H0 and the no-bed admission path retired)
 
 This is the design document for the Patient Management component. It explains what the component does, what data it owns, how it talks to the other three components, and how its AI agent works.
 
@@ -104,8 +104,8 @@ Constraint: `nic IS NOT NULL OR temp_reference IS NOT NULL` — every patient mu
 | `source` | enum | `emergency` `walk_in` `pre_registered` |
 | `dispatch_id` | text, nullable | Emergency Service's reference. Filled only when `source = emergency`. |
 | `reported_by_user_id` | uuid, FK, nullable | The app user who raised the emergency call, **when they are not the patient**. See §5.6. |
-| `admission_category` | enum | `icu` `hdu` `inpatient` `day_case` `outpatient` |
-| `category_set_by_staff_id` | uuid, FK → Staff | **Proof a human chose it.** Not nullable. |
+| `admission_category` | enum, nullable | `icu` `general` `surgical` `maternity` `emergency` *(replaced 2026-09-23 — was `icu` `hdu` `inpatient` `day_case` `outpatient`)*. Null only on an Emergency pre-admission until `POST /admissions/{id}/classify`. Every value needs a bed; `maternity` is refused for a patient recorded as male (`cl_pat_048`) |
+| `category_set_by_staff_id` | uuid, FK → Staff, nullable | **Proof a human chose it — always the signed-in staff member**, never a value from the request *(changed 2026-09-25; the request used to carry it, so a caller could name someone else)*. Null only on an Emergency pre-admission until `/classify` |
 | `category_set_at` | timestamptz | |
 | `urgency` | enum | `routine` `urgent` `emergency` |
 | `is_infectious` | boolean | Set by staff. Drives isolation rules. |
@@ -239,11 +239,12 @@ unique in this component, so retiring a rate does not block ever creating anothe
 | Field | Type | Notes |
 | :--- | :--- | :--- |
 | `id` | uuid, PK | |
-| `category` | enum | `icu` `hdu` `inpatient` `day_case` `outpatient` |
+| `category` | enum | `icu` `general` `surgical` `maternity` `emergency` |
 | `amount` | numeric(12,2) | CHECK >= 0 |
 
 UNIQUE(`category`) **WHERE `is_active`**. Separate from `BillingRate` because it is keyed by
-care level, not by ward — an outpatient pays a fee and occupies no ward at all.
+care level, not by ward. *(A check-up, scan or test that needs no bed is not an admission at
+all since 2026-09-23 — it is billed on its appointment with a flat consultation fee.)*
 
 **CareRecommendation** — one row per symptom or concern a patient raises. See §8.10.
 
@@ -644,11 +645,17 @@ real price list was given to us, and the file says so rather than looking author
 | Care level | Admission fee | | Ward type | Per day |
 | :--- | ---: | :--- | :--- | ---: |
 | `icu` | 7,500 | | `icu` | 25,000 |
-| `hdu` | 5,000 | | `hdu` | 15,000 |
-| `inpatient` | 3,000 | | `isolation` | 12,000 |
-| `day_case` | 2,500 | | `maternity` | 9,000 |
-| `outpatient` | 1,500 | | `pediatric` | 8,000 |
+| `general` | 3,000 | | `hdu` | 15,000 |
+| `surgical` | 4,500 | | `isolation` | 12,000 |
+| `maternity` | 4,000 | | `surgical` | 12,000 |
+| `emergency` | 5,000 | | `emergency` | 10,000 |
+| | | | `maternity` | 9,000 |
+| | | | `pediatric` | 8,000 |
+| | | | `mental_health` | 7,000 |
 | | | | `general` | 6,000 |
+
+A finished appointment that admitted nobody is one `consultation_fee` line of 1,500.
+*(Table refreshed 2026-09-25 to the defaults in `BillingRates.cs` after the category change.)*
 
 **Superseded on 2026-09-11 — the rates are editable rows now.** This section used to say a
 static table in C# was enough, because "nothing in this project changes a price, and a table
@@ -806,7 +813,7 @@ banner.)*
 
 | Method | Route | Role | Notes |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/me/pre-register` | Patient | **Details only.** Creates or links a record via NIC match. Creates no admission — see below. Answers 200, because called twice it is the same record both times |
+| `POST` | `/api/me/pre-register` | Patient | **Details only.** Creates the patient's record if the NIC is new to the hospital. **A NIC already on a hospital record is refused with 409 `cl_pat_051`**, pointing to "I have a patient code" — typing a NIC is not proof of who you are *(changed 2026-09-25; it used to link that record to whoever typed the NIC)*. Creates no admission. Answers 200, because called twice it is the same record both times |
 | `POST` | `/api/me/claim/preview` | Patient | **Masked** look-up of the record a patient code belongs to. Writes nothing — see §7.6b |
 | `POST` | `/api/me/claim` | Patient | Links this login to that record. One record per login (`cl_pat_004`) |
 | `GET` | `/api/me/profile` | Patient | Their own details, and what is still blank. 404 while the login has no record linked |
@@ -828,6 +835,8 @@ The patient response is a **different DTO**, not a filtered one. It cannot leak 
 ### 7.6b Claiming a record with a patient code
 
 *Added 2026-09-16.*
+
+> **Update 2026-09-25:** the patient code is now the *only* way to join a record the desk made. `/me/pre-register` no longer links by NIC at all — a NIC already on a hospital record gets 409 `cl_pat_051` and the app offers "Use my patient code". Typing someone's NIC used to hand you their record. The paragraph below is the original reason the claim flow was added.
 
 **The problem in one sentence: `/me/pre-register` matches on NIC, and `CreatePatientRequest.Nic` is optional.** A walk-in or an emergency arrival can be registered at the desk with no NIC at all — that is what `temp_reference` exists for. When that patient installs the app afterwards and fills in the details form, nothing matches, so they get a **second, empty record** while their actual stay sits on the one staff created. The patient code on their hospital slip is the only handle that record has.
 
@@ -1035,13 +1044,18 @@ One consequence worth stating plainly, because it is the sort of thing an examin
 
 ### 8.5 The rules the agent works with
 
+> **Still live after the agent was removed (2026-09-22).** The agent is gone; these rules are not.
+> Every manual `assign-bed` and `correct-bed` runs them, through `BedPlacementRules`. The table
+> below is current as of 2026-09-25.
+
 **Hard rules — enforced by a deterministic validator in C#, not by the model.** A suggestion that breaks one is dropped before any human sees it.
 
 | | Rule |
 | :--- | :--- |
-| H0 | The visit must need a bed at all |
+| ~~H0~~ | ~~The visit must need a bed at all~~ — **retired 2026-09-25.** Every care level needs a bed since the categories were replaced; a visit that needs none is an appointment, never an admission |
 | H1 | The bed must be free and `usable` |
-| H2 | Ward type must match the admission category, or be an approved downgrade (§8.6) |
+| H2 | Ward acuity must match the care level (icu rung 0, hdu rung 1, everything else rung 2), or be a duty-manager-approved step up or down |
+| H7 | **Ward fit** *(added 2026-09-25)*: the kind of ward must suit the care level — see the bullet below. Outside it is the duty manager's call, `cl_pat_047` for anyone else |
 | H3 | The ward's `gender_policy` must accept this patient's gender |
 | H4 | An infectious patient must get a bed with `has_isolation = true` |
 | H5 | The ward must be `is_active` |
@@ -1051,24 +1065,31 @@ One consequence worth stating plainly, because it is the sort of thing an examin
 
 Six things worth knowing:
 
-- **H0 was missing, and its absence was a live bug.** Every admission was created at
-  `awaiting_bed`, and the only edge into `admitted` runs through a bed being assigned and
-  approved. So a patient in for a scan or a blood test — who is never going to be given a bed —
-  sat on the bed board forever, was offered an "Assign bed" button, and could not be discharged
-  by any route at all. `BedPlacementRules.RequiresBed` is the rule: **`outpatient` needs no
-  bed; every other care level does.** `day_case` is on the bed side deliberately — a day case is
-  minor surgery or dialysis, they are on a real bed for hours, and it is a bed nobody else can
-  have. Only `outpatient` means "seen standing up".
+- **H0 is retired** *(2026-09-25)*. It used to let an `outpatient` visit skip the bed board
+  (`BedPlacementRules.RequiresBed`, `requires_bed` on the wire, `cl_pat_020`/`cl_pat_021`,
+  `POST /admissions/{id}/complete`). The 2026-09-23 category change left every care level
+  needing a bed, so all of it had become dead code that always said "needs a bed", and it was
+  removed rather than left to mislead. A check-up, scan or test is now an appointment the desk
+  records as seen and bills on the booking (§ Appointments below).
+- **H7 — ward fit** *(2026-09-25)*. The acuity rungs alone let a maternity patient go into a
+  surgical ward, or a general patient into a maternity ward, with no warning.
+  `BedPlacementRules.FitsWard` adds the ward kind, and is deliberately generous so it never
+  refuses a sensible bed:
 
-  Derived from `admission_category`, never stored, and published as `requires_bed` on
-  `AdmissionSummary` so no client re-derives it. A visit with `requires_bed: false` is
-  `admitted` from the moment its record is opened, and `POST /admissions/{id}/assign-bed`
-  refuses it with `cl_pat_021`. The agent returns `visit_needs_no_bed` rather than an empty
-  list — "there is no bed for this patient because they do not need one" is a different
-  answer from "the hospital is full", and a screen that cannot tell them apart is a screen
-  that sends a nurse hunting for a bed that was never required.
+  | Ward type | Suits |
+  | :--- | :--- |
+  | `surgical` | `surgical`, `emergency` |
+  | `maternity` | `maternity` |
+  | `emergency` | `emergency` |
+  | `mental_health` | `general` |
+  | `isolation` | any patient marked infectious |
+  | `general`, `hdu`, `icu`, `pediatric` | anything the rungs and the age rule allow |
+
+  A bed outside the table is not refused: the duty manager may place it, anyone else gets 403
+  `cl_pat_047`, exactly like an H2 step up or down. The React bed picker mirrors it in
+  `types/beds.ts` so the button reads "duty manager only" before anybody clicks.
 - **H1 is split in two.** "Usable" is a property of the bed and is checked here. "Free" is a race and is not: no read can settle it, and `ux_bed_assignments_live_bed` is what does. Adding a prior read would make the index look like belt-and-braces rather than the rule.
-- **H2 refuses an upgrade too — except for the duty manager.** Ward types sit on three rungs — `icu`, `hdu`, and everything else — with `day_case` and `outpatient` on the bottom rung alongside `inpatient`, because there is no ward type below `general`. A general patient into an ICU bed is a 409 for the agent and a 403 (`cl_pat_012`) for a nurse or reception; **since 2026-09-12 the duty manager may overrule it** (§5.2). Note this is about the *mismatch*, not about ICU: an **ICU patient** into an ICU bed is a match and anybody who may place a patient may make it.
+- **H2 refuses an upgrade too — except for the duty manager.** Ward types sit on three rungs — `icu`, `hdu`, and everything else — with `general`, `surgical`, `maternity` and `emergency` all on the bottom rung, because there is no ward type below `general`. A general patient into an ICU bed is a 409 for the agent and a 403 (`cl_pat_012`) for a nurse or reception; **since 2026-09-12 the duty manager may overrule it** (§5.2). Note this is about the *mismatch*, not about ICU: an **ICU patient** into an ICU bed is a match and anybody who may place a patient may make it.
 
   **The override does not extend to the agent**, and the distinction is worth being precise about. A duty manager overruling H2 is a human taking responsibility for a rule they can see. The agent suggesting the same bed is a model deciding the rule did not apply. So the agent never ranks an upgrade as `best`. Where an upgrade is the *only* thing free, it says so through `blocker` and stops (§8.6) — the manager can then do it by hand, on their own authority, with their name on it.
 - **H3 sends `other` and `unknown` to a mixed ward only.** Exactly what `Gender.Unknown` was added for: an unidentified arrival lands somewhere by rule rather than on a guess about which single-sex ward they belong in.
@@ -1282,7 +1303,9 @@ Three reasons, in order of how much they matter:
 2. **The agent has something to read.** The medical profile is filled in at admission. Between visits it is stale by definition, and stale clinical text is worse than none.
 3. **It makes the safe thing the obvious thing.** A patient at home describing chest pain should be calling an ambulance, not typing into an app and waiting. The app's answer for that person is the emergency call screen, which already exists, and which is Emergency's record and our screen (`integration_of_functions.md` §4.1).
 
-In Flutter this is a card **inside the My Stay tab**, not a top-level menu item — so it only exists on a screen that only exists while the patient is admitted, and the 409 is a backstop rather than something a patient can hit by normal use.
+In Flutter this is a card **inside the My Stay tab**, not a top-level menu item, shown only while the stay is `admitted` or `ready_for_discharge` — so the 409 is a backstop rather than something a patient can hit by normal use. *(Fixed 2026-09-25: My Stay also shows a patient still waiting for a bed, and the card used to appear there too, where the server then refused every message.)*
+
+**Three reports a minute per patient** *(added 2026-09-25)*, 429 `cl_pat_050`, counted from the patient's own saved reports. Each report can start a model call, and the free Gemini allowance is about twenty calls a day for the whole project.
 
 ### 8.10c What it reads — `PatientMedicalProfile`
 
@@ -1336,7 +1359,7 @@ An empty profile is an ordinary state, not an error — the agent proceeds on th
     "age": 34,
     "gender": "female",
     "past_admissions": [
-      { "admission_category": "outpatient", "urgency": "routine", "admitted_at": "2025-11-02" }
+      { "admission_category": "general", "urgency": "routine", "admitted_at": "2025-11-02" }
     ],
     "past_recommendations": [
       { "reported_text": "occasional migraines", "urgency_flag": "low", "reported_at": "2025-09-14" }
@@ -1371,7 +1394,11 @@ The reason for the change: a nurse or doctor at the queue is not a copywriter. A
 
 ### 8.13 The red-flag screen — deterministic, runs before the model
 
-A fixed keyword list (`chest pain`, `can't breathe` / `cannot breathe`, `severe bleeding`, `loss of consciousness`, `stroke`, `suicidal`, and a handful more — the list is data, editable without a code change) is checked against `reported_text` **before the LLM ever runs.**
+A fixed keyword list (`chest pain`, `can't breathe`, `short of breath`, `severe bleeding`, `coughing up blood`, `passed out`, `stroke`, `suicidal`, and a couple of dozen more — the list is data, editable without a code change) is checked against `reported_text` **before the LLM ever runs.**
+
+**The text is cleaned before matching** *(2026-09-25)*: lower-cased, every kind of apostrophe removed, spaces squeezed. Phones type a curly apostrophe (`can’t`), so "can't breathe" from an iPhone used to slip straight past a list written with a straight one.
+
+**The screen also runs when the report is saved**, and `POST /me/care-queries` returns its result as `red_flag`. On a match the app tells the patient at once to press the call bell or tell a nurse, instead of showing "a nurse will look at this" and leaving them waiting for a review.
 
 A match forces `red_flag = true` and `urgency_flag = high`, unconditionally. The model can raise urgency further in its reasoning, but it can never lower a flag the keyword screen already raised. This is the same design decision as the bed agent's hard rules (§8.5) — the thing that must never fail is enforced in plain C#, not requested of the model.
 
@@ -1430,13 +1457,22 @@ The reasoning: the patient is admitted and on a ward (§8.10b), and the person w
 - CR5 means it can never contradict a recorded allergy.
 - `doctor_message` is written by the human at approval time, and the reviewer can always cut the draft back to "A nurse will come and check on you." *(Weaker than it was before 2026-09-21: the draft now arrives already written to the patient, so doing nothing releases it. Reading it is the reviewer's actual job.)*
 
+**Not before the draft is there** *(added 2026-09-25)*. Approve, Reject and Try again are shut
+while a run for the report is still going — greyed out in React, and 409 `cl_pat_049` from the
+API. Approving mid-run used to send the patient the generic "staff has reviewed your report"
+line, and then the real draft landed a few seconds later on a row that was already closed. Two
+safety nets stop a report getting stuck behind this: a run still open after ten minutes counts
+as failed (the queue lives in memory, so a restart can strand one), and the worker checks the
+report is still pending both before it calls the model and before it saves — a human decision
+made in the meantime always wins over a late draft.
+
 **The discharge gate did not move.** `clinical_clearance` on the discharge checklist (§6.1) is still Doctor-only and always will be. That is a decision about whether somebody may leave the hospital; this is a note about whether somebody should be looked at sooner. Different weights, different gates.
 
 ### 8.17 Security notes specific to this agent
 
 Everything in §8.9 applies unchanged, except the model-call budget. Three additions:
 
-**A busy provider is waited out, not given up on** *(changed 2026-09-21)*. Still three attempts — a provider refusing on the third try is having a bad minute, and a fourth call spends quota to learn that again — but each one now gets **45 seconds instead of 20**, with a doubling backoff between them and a 150-second total budget.
+**A busy provider is waited out, not given up on** *(changed 2026-09-21)*. Still three attempts — a provider refusing on the third try is having a bad minute, and a fourth call spends quota to learn that again — but each one now gets **60 seconds instead of 20**, with a doubling backoff between them and a 190-second total budget. *(First raised to 45/150, then to 60/190 the same day after real calls kept landing just past 45 — `LanguageModelOptions.cs` has the measurements.)*
 
 The 20 was the real defect, and it was ours. Timed against the free tier on 2026-09-21, a call that *succeeds* takes **12–41 seconds**. Every attempt was being cancelled at 20, so answers that were on their way were thrown away and the reviewer got the fixed backup reply. Two in three calls also came back 503 after 30–60 seconds of waiting — that part is the provider being genuinely overloaded, and no amount of retrying fixes it.
 
@@ -1798,7 +1834,7 @@ The cost the leader raised is real: a second auth path and patient-scoped author
 
 There is a demo cost to removing them too. Our emergency path leans on the contrast between a logged-in caller whose identity and history we already hold, and an unidentified arrival registered as `UNKNOWN-2026-0142` (§15.3). Drop patient accounts and the first half of that contrast goes with it.
 
-**Specified:** `POST /me/appointments` (book), `GET /me/appointments` (my visits), `POST /me/appointments/{id}/cancel`, plus the staff side — `GET /appointments` (expected-visits worklist), `POST /appointments` (book on a patient's behalf) and `POST /appointments/{id}/check-in`, which turns the booking into an ordinary admission the bed agent then runs on.
+**Specified:** `POST /me/appointments` (book), `GET /me/appointments` (my visits), `POST /me/appointments/{id}/cancel`, plus the staff side — `GET /appointments` (expected-visits worklist), `POST /appointments` (book on a patient's behalf) and `POST /appointments/{id}/check-in`, which turns the booking into an ordinary admission that waits for a bed like any walk-in.
 
 **Built 2026-09-11: the staff three.** `GET /api/appointments`, `POST /api/appointments` and `POST /api/appointments/{id}/check-in` are live, with 24 tests. **The three `/me/*` ones landed the day after, on 2026-09-12, as part of step 9b** — all six are now real, and the Flutter screens that use them are built and tested. This heading once said "Built" of all six before any of them existed, which was a description of the design reading as a description of the code; it is now true of both.
 
@@ -1821,7 +1857,27 @@ the start and nothing could ever write it. The desk presses it; nothing flips ov
 because there is no scheduled job in this application and a status that changed by itself
 with no process behind it would be a lie in the audit trail.
 
-The care level is still set by staff at check-in, never by the patient at booking time — the same rule every other admission path follows. **A ward nurse or reception may set `outpatient`, `day_case` or `inpatient`; `icu` and `hdu` are the duty manager's** and anyone else asking for either is a 403 carrying `cl_pat_011`. That rule reads the request body rather than the route, so it is a check in `AppointmentService` and not a policy on the action.
+The care level is still set by staff at check-in, never by the patient at booking time — the same rule every other admission path follows.
+
+**One "Check in" action, one question** *(reworked 2026-09-25)*. When a confirmed patient turns
+up, the desk opens one panel and answers "What do they need?" from one list:
+
+| Choice | What happens | Where it is billed |
+| :--- | :--- | :--- |
+| `icu`, `general`, `surgical`, `maternity`, `emergency` — the same list as walk-in intake, `maternity` hidden for a male patient | `POST /appointments/{id}/check-in`. An ordinary admission: the patient moves to the Patients page, gets a bed, is marked arrived, cleared by a doctor and discharged — exactly the walk-in flow | On the admission, at discharge |
+| **No bed needed** — a check-up, scan or test | `POST /appointments/{id}/complete`. No admission is created | On the booking, from the same Expected visits page |
+
+It replaced two buttons ("Seen and bill" and "Needs a ward — admit") that asked the same
+question in two places. **The duty-manager-only rule for `icu` at check-in is gone**
+(`cl_pat_011` retired). It only ever applied here — walk-in intake let reception choose ICU —
+so one decision had two rules depending on the screen. The duty manager's say stays where it
+protects a bed: placing a patient in a bed off their care level, or outside the wards that suit
+it (H2, H7).
+
+An appointment bill needs a `completed` booking with no admission behind it (`cl_pat_045`,
+`cl_pat_035`), so a cancelled or missed booking cannot be charged. The Expected visits list
+reads its day in Sri Lanka time; it used to be the UTC day, which put an early-morning booking
+under the day before.
 
 ### The patients board is everyone who is here
 
@@ -1885,14 +1941,14 @@ in the middle of neither half, so a row is shown twice while another is never sh
 | Transactions | §3.3 — the row-locked bed write, §8.6b step 10 |
 | Audit fields | `created_at` / `updated_at` on every table |
 | JWT + role-based authorization | §2, §7 |
-| Two distinct agents, each with a defined I/O contract | §8.2/§8.3 (bed agent), §8.11/§8.12 (care advisory agent) |
-| Allow-listed tools, least privilege | §8.4 (bed agent), §8.14 (care advisory agent) |
-| Deterministic validation | §8.5 hard rules H0–H6 + §5.5 re-check under a row lock (bed agent); §8.13 red-flag screen + §8.15 CR1–CR5 (care advisory agent). **All of it plain C#, none of it the model** |
-| Human approval on a high-impact action | §8.6b confirming a bed, §6.3 discharge, §7.7 care recommendation approval — three gates. The bed one is the strongest of the three: **nothing at all is written until the human presses the button** |
-| Persisted workflow state | §8.8 (bed agent), §8.19 (care advisory agent). **Blocked on `AgentWorkflow`, which is group-owned and does not exist — §8.20** |
-| Observability | §8.8, §7.8 agent-performance report |
-| Safe failure | §8.6 — every blocked outcome carries a `blocker` code and a plain sentence naming the rule that stopped it, not a bare "no bed available"; malformed model output and validation failure, §13 golden cases |
-| Prompt-injection resistance | §8.9 (bed agent), §8.17 (care advisory agent), both tested in §13 |
+| An agent with a defined I/O contract | §8.11/§8.12 — the Patient Care Advisory Agent. *(Updated 2026-09-25: this row used to claim two agents. The bed agent was removed on 2026-09-22; see the note at the top of §8.)* |
+| Allow-listed tools, least privilege | §8.14 — three read-only tools; its only write is the draft on its own `CareRecommendation` row |
+| Deterministic validation | §8.13 red-flag screen + §8.15 CR1–CR5 for the agent; §8.5 hard rules H1–H7 + §5.5 row-locked re-check for every manual bed. **All of it plain C#, none of it the model** |
+| Human approval on a high-impact action | §7.7 care recommendation approval (nothing reaches the patient until a doctor or ward nurse approves — and since 2026-09-25 Approve/Reject stay shut until the draft has arrived), §6.3 discharge checklist and confirm, §5.2 duty-manager sign-off on a bed off the care level or outside the wards that suit it |
+| Persisted workflow state | §8.19 — `AgentWorkflow` / `AgentProposedChange` (common tables, built in PR #80), polled at `GET /care-workflows/{workflowId}` |
+| Observability | §8.19 the workflow row: plan, completed steps, validation results, errors, draft source and retry count, shown live on the React review screen. The §7.8 agent-performance report is not built |
+| Safe failure | Three model attempts, then the fixed deterministic note; a draft that breaks CR1/CR5 is thrown away for the same note and the reason is shown to the reviewer. A run that dies mid-flight is treated as failed after ten minutes so the report is never stuck. A report a human reviewed first keeps the human's decision. Patients are limited to three reports a minute (`cl_pat_050`) |
+| Prompt-injection resistance | §8.17 — `reported_text` is data, never instructions, and CR1/CR5 are the backstop whatever the model writes |
 | Flutter device feature | §10 — local notifications on status change, plus date/time picker for booking |
 | Cross-platform workflow | §13 end-to-end row |
 | Tests across all layers | §13 |

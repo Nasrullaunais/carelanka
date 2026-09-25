@@ -32,6 +32,7 @@ import {
 import { canEditPatient, canRegisterPatient } from '../types/permissions';
 import {
   admissionCategories,
+  admissionCategoriesFor,
   admissionCategoryHints,
   admissionCategoryLabels,
   detailFieldLabel,
@@ -153,7 +154,6 @@ export function IntakePage() {
       {step === 'emergency-register' && (
         <EmergencyRegisterStep
           nic={knownNic}
-          staffId={session?.principal.id ?? ''}
           onBack={() => setStep('level')}
           onAdmitted={afterAdmission}
         />
@@ -173,7 +173,6 @@ export function IntakePage() {
       {step === 'admit' && patient && (
         <AdmitStep
           patient={patient}
-          staffId={session?.principal.id ?? ''}
           canEdit={canEditPatient(role)}
           initialCategory={pendingCategory}
           onEdit={() => {
@@ -409,12 +408,10 @@ function LevelStep({
 
 function EmergencyRegisterStep({
   nic,
-  staffId,
   onBack,
   onAdmitted,
 }: {
   nic: string;
-  staffId: string;
   onBack: () => void;
   onAdmitted: (admission: Admission) => void;
 }) {
@@ -460,7 +457,6 @@ function EmergencyRegisterStep({
         patient_id: patient.id,
         source: 'walk_in',
         admission_category: 'emergency',
-        category_set_by_staff_id: staffId,
         urgency: 'routine',
         is_infectious: isInfectious,
       },
@@ -730,7 +726,6 @@ function EditStep({
 
 function AdmitStep({
   patient,
-  staffId,
   canEdit,
   initialCategory,
   onEdit,
@@ -738,7 +733,6 @@ function AdmitStep({
   onAdmitted,
 }: {
   patient: Patient | PatientSummary;
-  staffId: string;
   canEdit: boolean;
   initialCategory?: AdmissionCategory;
   onEdit: () => void;
@@ -748,10 +742,7 @@ function AdmitStep({
   const queryClient = useQueryClient();
 
   const categoryChosenEarlier = initialCategory !== undefined;
-  const availableCategories =
-    patient.gender === 'female'
-      ? admissionCategories
-      : admissionCategories.filter((value) => value !== 'maternity');
+  const availableCategories = admissionCategoriesFor(patient.gender);
 
   const [chosenCategory, setChosenCategory] = useState<AdmissionCategory>(
     initialCategory ?? 'general',
@@ -782,7 +773,6 @@ function AdmitStep({
         patient_id: patient.id,
         source: 'walk_in',
         admission_category: category,
-        category_set_by_staff_id: staffId,
         urgency: 'routine',
         is_infectious: isInfectious,
       },

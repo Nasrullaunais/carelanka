@@ -50,6 +50,30 @@ export function isMoreAcuteThanNeeded(
   return wardRung[wardType] < categoryRung[category];
 }
 
+/// Mirrors BedPlacementRules.FitsWard: which kinds of ward suit a care level, on top of the
+/// acuity rungs. A general ward takes anyone below ICU; only a specialist ward the patient does
+/// not belong in falls outside, and even that is the duty manager's call.
+export function fitsWard(
+  category: AdmissionCategory,
+  wardType: WardType,
+  isInfectious: boolean,
+): boolean {
+  switch (wardType) {
+    case 'surgical':
+      return category === 'surgical' || category === 'emergency';
+    case 'maternity':
+      return category === 'maternity';
+    case 'emergency':
+      return category === 'emergency';
+    case 'mental_health':
+      return category === 'general';
+    case 'isolation':
+      return isInfectious;
+    default:
+      return true;
+  }
+}
+
 export const pediatricAgeLimit = 18;
 
 export function isChild(dateOfBirth: string | null | undefined): boolean {
@@ -112,7 +136,9 @@ export function placementFor(
     ? 'Lower care level than assessed'
     : isMoreAcuteThanNeeded(admission.admission_category, ward.ward_type)
       ? 'Higher care level than assessed'
-      : null;
+      : !fitsWard(admission.admission_category, ward.ward_type, admission.is_infectious)
+        ? 'Not the usual ward for this care level'
+        : null;
 
   if (mismatch !== null && role !== 'duty_manager') {
     return { kind: 'refused', why: `${mismatch} — duty manager only` };

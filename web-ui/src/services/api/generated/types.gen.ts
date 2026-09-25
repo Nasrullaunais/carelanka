@@ -25,7 +25,6 @@ export type Admission = {
     urgency: AdmissionUrgency;
     status: AdmissionStatus;
     details_complete: boolean;
-    requires_bed: boolean;
     ward_name?: string | null;
     bed_number?: string | null;
     expected_arrival?: string | null;
@@ -75,7 +74,6 @@ export type AdmissionDetail = {
     urgency: AdmissionUrgency;
     status: AdmissionStatus;
     details_complete: boolean;
-    requires_bed: boolean;
     ward_name?: string | null;
     bed_number?: string | null;
     expected_arrival?: string | null;
@@ -121,7 +119,6 @@ export type AdmissionSummary = {
     urgency: AdmissionUrgency;
     status: AdmissionStatus;
     details_complete: boolean;
-    requires_bed: boolean;
     ward_name?: string | null;
     bed_number?: string | null;
     expected_arrival?: string | null;
@@ -472,6 +469,7 @@ export type CareWorkflowAccepted = {
     recommendation_id?: string;
     status?: string | null;
     poll_url?: string | null;
+    red_flag?: boolean;
 };
 
 export type CareWorkflowStatus = 'running' | 'pending_review' | 'completed' | 'failed';
@@ -498,7 +496,6 @@ export type CareWorkflowValidation = {
 
 export type CheckInRequest = {
     admission_category: AdmissionCategory;
-    category_set_by_staff_id: string;
     urgency: AdmissionUrgency;
     is_infectious?: boolean;
 };
@@ -549,7 +546,6 @@ export type CreateAdmissionRequest = {
     source: AdmissionSource;
     dispatch_id?: string | null;
     admission_category: AdmissionCategory;
-    category_set_by_staff_id: string;
     urgency: AdmissionUrgency;
     is_infectious?: boolean;
     expected_arrival?: string | null;
@@ -1919,7 +1915,6 @@ export type WorklistRow = {
     id: string;
     patient: PatientSummary;
     status: WorklistStatus;
-    requires_bed: boolean;
     source?: AdmissionSource;
     admission_category?: AdmissionCategory;
     urgency?: AdmissionUrgency;
@@ -2223,45 +2218,6 @@ export type MarkArrivedResponses = {
 };
 
 export type MarkArrivedResponse = MarkArrivedResponses[keyof MarkArrivedResponses];
-
-export type CompleteVisitData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/admissions/{id}/complete';
-};
-
-export type CompleteVisitErrors = {
-    /**
-     * Unauthorized
-     */
-    401: ProblemDetails;
-    /**
-     * Forbidden
-     */
-    403: ProblemDetails;
-    /**
-     * Not Found
-     */
-    404: ProblemDetails;
-    /**
-     * Conflict
-     */
-    409: ProblemDetails;
-};
-
-export type CompleteVisitError = CompleteVisitErrors[keyof CompleteVisitErrors];
-
-export type CompleteVisitResponses = {
-    /**
-     * OK
-     */
-    200: Admission;
-};
-
-export type CompleteVisitResponse = CompleteVisitResponses[keyof CompleteVisitResponses];
 
 export type CancelAdmissionData = {
     body?: CancelAdmissionRequest;
@@ -4472,6 +4428,10 @@ export type RejectCareRecommendationErrors = {
      * Not Found
      */
     404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
 };
 
 export type RejectCareRecommendationError = RejectCareRecommendationErrors[keyof RejectCareRecommendationErrors];
@@ -7199,6 +7159,10 @@ export type SubmitCareQueryErrors = {
      * Conflict
      */
     409: ProblemDetails;
+    /**
+     * Too Many Requests
+     */
+    429: ProblemDetails;
 };
 
 export type SubmitCareQueryError = SubmitCareQueryErrors[keyof SubmitCareQueryErrors];

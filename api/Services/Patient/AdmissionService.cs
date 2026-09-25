@@ -6,6 +6,7 @@ using CareLanka.Api.Data.Configurations.Patient;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Patient;
+using CareLanka.Api.Services.Common;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using AdmissionEntity = CareLanka.Api.Data.Entities.Patient.Admission;
@@ -30,17 +31,20 @@ public sealed class AdmissionService : IAdmissionService
     private readonly IBedRegistryService _beds;
     private readonly IDischargeService _discharges;
     private readonly IBillingService _billing;
+    private readonly ICurrentUser _currentUser;
 
     public AdmissionService(
         CareLankaDbContext db,
         IBedRegistryService beds,
         IDischargeService discharges,
-        IBillingService billing)
+        IBillingService billing,
+        ICurrentUser currentUser)
     {
         _db = db;
         _beds = beds;
         _discharges = discharges;
         _billing = billing;
+        _currentUser = currentUser;
     }
 
     public async Task<PagedResult<AdmissionSummary>> ListAsync(
@@ -144,21 +148,14 @@ public sealed class AdmissionService : IAdmissionService
         var patient = await _db.Patients.FirstOrDefaultAsync(p => p.Id == request.PatientId, ct)
             ?? throw new NotFoundException("Patient", request.PatientId);
 
+        BedPlacementRules.EnsureMayHaveCategory(request.AdmissionCategory!.Value, patient.Gender);
+
         var alreadyAdmitted = await _db.Admissions
             .AnyAsync(a => a.PatientId == patient.Id && !ClosedStatuses.Contains(a.Status), ct);
 
         if (alreadyAdmitted)
         {
             throw new ConflictException(MessageCode.PatientHasOpenAdmission, patient.FullName);
-        }
-
-        var staffExists = await _db.StaffMembers
-            .AnyAsync(s => s.Id == request.CategorySetByStaffId, ct);
-
-        if (!staffExists)
-        {
-            throw new BadRequestException(
-                MessageCode.CategoryStaffNotFound, request.CategorySetByStaffId);
         }
 
         var admission = new AdmissionEntity
@@ -169,14 +166,14 @@ public sealed class AdmissionService : IAdmissionService
             Category = request.AdmissionCategory!.Value,
             Urgency = request.Urgency!.Value,
 
-            Status = NewVisitStatus(request.AdmissionCategory!.Value),
+            Status = AdmissionStatus.AwaitingBed,
 
             IsInfectious = request.IsInfectious,
-            CategorySetByStaffMemberId = request.CategorySetByStaffId,
+            // Whoever is signed in chose it. Never taken from the request body.
+            CategorySetByStaffMemberId = _currentUser.Id,
             CategorySetAt = DateTimeOffset.UtcNow,
             DispatchId = string.IsNullOrWhiteSpace(request.DispatchId) ? null : request.DispatchId.Trim(),
-            ExpectedArrivalAt = NewVisitExpectedArrival(request),
-            AdmittedAt = NewVisitAdmittedAt(request.AdmissionCategory!.Value),
+            ExpectedArrivalAt = request.ExpectedArrival,
             MissingFields = PatientDetailChecklist.MissingFor(patient)
         };
 
@@ -273,19 +270,11 @@ public sealed class AdmissionService : IAdmissionService
             throw new ConflictException(MessageCode.AdmissionAlreadyClassified, id);
         }
 
+        BedPlacementRules.EnsureMayHaveCategory(request.AdmissionCategory, admission.Patient.Gender);
+
         admission.Category = request.AdmissionCategory;
         admission.CategorySetByStaffMemberId = staffId;
         admission.CategorySetAt = DateTimeOffset.UtcNow;
-
-        if (!BedPlacementRules.RequiresBed(request.AdmissionCategory)
-            && admission.Status == AdmissionStatus.AwaitingBed)
-        {
-            AdmissionStatusMachine.EnsureMove(
-                admission.Status, AdmissionStatus.Admitted, AdmissionStatus.AwaitingBed);
-
-            admission.Status = AdmissionStatus.Admitted;
-            admission.AdmittedAt = DateTimeOffset.UtcNow;
-        }
 
         await _db.SaveChangesAsync(ct);
 
@@ -407,42 +396,6 @@ public sealed class AdmissionService : IAdmissionService
         return await FillAsync(
             new AdmissionResponse(), admission, await LabelBedsAsync(new[] { admission }, ct), ct);
     }
-
-    private static AdmissionStatus NewVisitStatus(AdmissionCategory category)
-        => BedPlacementRules.RequiresBed(category)
-            ? AdmissionStatus.AwaitingBed
-            : AdmissionStatus.Admitted;
-
-    private static DateTimeOffset? NewVisitAdmittedAt(AdmissionCategory category)
-        => BedPlacementRules.RequiresBed(category) ? null : DateTimeOffset.UtcNow;
-
-    private static DateTimeOffset? NewVisitExpectedArrival(CreateAdmissionRequest request)
-        => BedPlacementRules.RequiresBed(request.AdmissionCategory!.Value)
-            ? request.ExpectedArrival
-            : null;
-
-    public Task<AdmissionResponse> CompleteAsync(Guid id, CancellationToken ct = default)
-        => InTransitionAsync(id, admission =>
-        {
-            if (BedPlacementRules.RequiresBed(admission.Category))
-            {
-                throw new ConflictException(
-                    MessageCode.VisitNeedsDischargeNotComplete,
-                    EnumWire.ToWire(admission.Category!.Value));
-            }
-
-            AdmissionStatusMachine.EnsureMove(
-                admission.Status,
-                AdmissionStatus.ReadyForDischarge,
-                AdmissionStatus.Admitted);
-            AdmissionStatusMachine.EnsureMove(
-                AdmissionStatus.ReadyForDischarge,
-                AdmissionStatus.Discharged,
-                AdmissionStatus.ReadyForDischarge);
-
-            admission.Status = AdmissionStatus.Discharged;
-            admission.DischargedAt = DateTimeOffset.UtcNow;
-        }, ct);
 
     public Task<AdmissionResponse> MarkArrivedAsync(Guid id, CancellationToken ct = default)
         => InTransitionAsync(id, admission =>
@@ -566,7 +519,6 @@ public sealed class AdmissionService : IAdmissionService
             Urgency = admission.Urgency,
             Status = admission.Status,
             DetailsComplete = admission.DetailsComplete,
-            RequiresBed = BedPlacementRules.RequiresBed(admission.Category),
 
             WardName = label?.WardName,
             BedNumber = label?.BedNumber,
@@ -686,7 +638,6 @@ public sealed class AdmissionService : IAdmissionService
         response.Urgency = summary.Urgency;
         response.Status = summary.Status;
         response.DetailsComplete = summary.DetailsComplete;
-        response.RequiresBed = summary.RequiresBed;
         response.WardName = summary.WardName;
         response.BedNumber = summary.BedNumber;
         response.ExpectedArrival = summary.ExpectedArrival;

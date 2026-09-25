@@ -13,10 +13,9 @@ class CreateDispatchProposalRequest {
     this.allowDiversion,
     this.excludeAmbulanceIds,
   });
-
-  factory CreateDispatchProposalRequest.fromJson(Map<String, Object?> json) =>
-      _$CreateDispatchProposalRequestFromJson(json);
-
+  
+  factory CreateDispatchProposalRequest.fromJson(Map<String, Object?> json) => _$CreateDispatchProposalRequestFromJson(json);
+  
   @JsonKey(name: 'emergency_call_id')
   final String? emergencyCallId;
   @JsonKey(name: 'allow_diversion')

@@ -9,4 +9,6 @@ public sealed class CareWorkflowAccepted
     public string Status { get; set; } = "running";
 
     public string PollUrl { get; set; } = string.Empty;
+
+    public bool RedFlag { get; set; }
 }

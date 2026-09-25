@@ -113,6 +113,13 @@ public sealed class DischargeService : IDischargeService
         }
 
         var admission = await LoadForWriteAsync(admissionId, ct);
+
+        if (!OnTheWard.Contains(admission.Status))
+        {
+            throw new ConflictException(
+                MessageCode.DischargeChecklistNotOnWard, EnumWire.ToWire(admission.Status));
+        }
+
         var discharge = await EnsureDischargeAsync(admission, ct);
 
         foreach (var (item, ticked) in wanted)

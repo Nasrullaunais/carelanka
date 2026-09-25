@@ -24,6 +24,14 @@ export const admissionCategories: AdmissionCategory[] = [
   'emergency',
 ];
 
+/// Mirrors BedPlacementRules.MayHaveCategory: maternity is refused only for a patient recorded
+/// as male, so the brief emergency record with no gender yet can still be given it.
+export function admissionCategoriesFor(gender: Gender | undefined): AdmissionCategory[] {
+  return gender === 'male'
+    ? admissionCategories.filter((value) => value !== 'maternity')
+    : admissionCategories;
+}
+
 export const admissionCategoryLabels: Record<AdmissionCategory, string> = {
   icu: 'ICU - life support / constant monitoring',
   general: 'General ward - normal admission',

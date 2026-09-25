@@ -99,6 +99,7 @@ public class CareRecommendationsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
     public async Task<ActionResult<CareRecommendationResponse>> RejectCareRecommendation(
         Guid id, [FromBody] RejectCareRecommendationRequest request, CancellationToken ct)
         => Ok(await _recommendations.RejectAsync(id, request, _currentUser.Id, ct));

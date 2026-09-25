@@ -197,6 +197,40 @@ void main() {
         expect(tester.takeException(), isNull);
       });
 
+      testWidgets('the care card is there while admitted', (tester) async {
+        await pumpPatientScreen(
+          tester,
+          const MyStayScreen(),
+          theme: theme,
+          size: normalPhone,
+          currentAdmission: admission,
+        );
+
+        expect(find.text('How are you feeling?'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('the care card is not offered while still waiting for a bed', (tester) async {
+        await pumpPatientScreen(
+          tester,
+          const MyStayScreen(),
+          theme: theme,
+          size: normalPhone,
+          currentAdmission: const MyAdmission(
+            admissionId: 'a2',
+            status: AdmissionStatus.awaitingBed,
+            statusText: 'We are finding you a bed.',
+            detailsComplete: true,
+            missingFields: [],
+          ),
+        );
+
+        // The server refuses a report until the patient is on the ward, so the card must not
+        // invite one.
+        expect(find.text('How are you feeling?'), findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+
       testWidgets('profile lays out with every field filled in', (tester) async {
         await pumpPatientScreen(tester, const ProfileScreen(), theme: theme, size: smallPhone);
 

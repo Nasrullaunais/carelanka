@@ -10,7 +10,8 @@ info:
 
     **The line this component does not cross.** `admission_category` (icu / general /
     surgical / maternity / emergency) is a clinical decision, set by a human and recorded
-    with `category_set_by_staff_id`. It is an INPUT to bed placement, never an output. No
+    with `category_set_by_staff_id` - always the signed-in staff member, never a value from
+    the request. It is an INPUT to bed placement, never an output. No
     endpoint here lets an AI set or change it.
 
     **Design rationale** is in `patient-management-plan.md`.
@@ -355,9 +356,14 @@ paths:
 
         Creates a visit in status `awaiting_bed`.
 
-        `admission_category` and `category_set_by_staff_id` are both required. The second one is
-        deliberate: it is the recorded proof that a human clinician chose the care level. There
-        is no code path in this API that lets an agent supply it.
+        `admission_category` is required. Who chose it is recorded as `category_set_by_staff_id`
+        on the admission, and it is **always the signed-in staff member** - it is not in the
+        request at all (changed 2026-09-25; the body used to carry it, so a caller could record
+        someone else as having decided). There is no code path in this API that lets an agent
+        supply it.
+
+        `maternity` is refused for a patient recorded as male (`cl_pat_048`). A patient whose
+        gender is not recorded yet - the brief emergency record - may still be given it.
       operationId: createAdmission
       requestBody:
         required: true
@@ -375,7 +381,9 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: This patient already has an open admission.
+          description: >-
+            This patient already has an open admission (`cl_pat_006`), or `maternity` was chosen
+            for a patient recorded as male (`cl_pat_048`).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -529,46 +537,6 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/IllegalTransition' }
 
-  /admissions/{id}/complete:
-    parameters:
-      - $ref: '#/components/parameters/PathId'
-    post:
-      tags: [Admissions]
-      summary: Finish a visit that never needed a bed
-      description: |
-        Roles: WardNurse, Doctor.
-
-        **Business op.** The scan or the test is done and the patient has gone home. Moves
-        `admitted` to `discharged` and stamps `discharged_at`.
-
-        **Only for a visit with `requires_bed: false`.** A visit at any other care level is
-        refused with 409 and `cl_pat_020`, because finishing that one is a *discharge*: it has
-        a checklist, a summary note, an approver and a bed to give back, and this endpoint does
-        none of those. It says so rather than half-doing it. The discharge workflow is step 7
-        of docs/build/patient.md.
-
-        Two hops through `ready_for_discharge`, the way manual bed assignment goes through
-        `awaiting_approval`: the published transition table has no `admitted -> discharged`
-        edge and this is not the place to invent one. For a visit with no bed and no checklist,
-        being ready to go and going are the same act. Nothing observes the middle state.
-      operationId: completeVisit
-      responses:
-        '200':
-          description: The visit, now discharged
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Admission' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409':
-          description: >-
-            Already finished or never started (`cl_err_*` illegal transition), or the visit has
-            a bed and must be discharged instead (`cl_pat_020`).
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ProblemDetails' }
-
   /admissions/{id}/cancel:
     parameters:
       - $ref: '#/components/parameters/PathId'
@@ -673,8 +641,9 @@ paths:
         the patient. Can only be called once per admission - a second call is a 409, since
         overwriting a clinician's classification silently is not a thing this endpoint does.
 
-        If the category turns out to be `outpatient`, the visit needs no bed after all and is
-        admitted immediately, the same as a walk-in outpatient at `POST /admissions`.
+        Every care level needs a bed, so the admission stays `awaiting_bed` and is given one at
+        `POST /admissions/{id}/assign-bed` like any other. `maternity` is refused for a patient
+        recorded as male (`cl_pat_048`).
       operationId: classifyAdmission
       requestBody:
         required: true
@@ -692,7 +661,9 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: This admission already has a care category.
+          description: >-
+            This admission already has a care category (`cl_pat_042`), or `maternity` was chosen
+            for a patient recorded as male (`cl_pat_048`).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -915,6 +886,23 @@ paths:
         acute than the patient needs. Which bed depends on the request body rather than the
         route, so a caller choosing one they may not is a 403 from the service.
 
+        **Ward fit** (`BedPlacementRules.FitsWard`, added 2026-09-25). On top of the acuity
+        rungs, the kind of ward has to suit the care level. It is deliberately generous - a
+        general, HDU or children's ward takes any care level the rungs allow - and only a
+        specialist ward is narrower:
+
+        | Ward type | Suits |
+        | :--- | :--- |
+        | `surgical` | `surgical`, `emergency` |
+        | `maternity` | `maternity` |
+        | `emergency` | `emergency` |
+        | `mental_health` | `general` |
+        | `isolation` | any patient marked infectious |
+        | anything else | any care level the rungs allow |
+
+        A bed outside that table is not refused outright: it is the duty manager's call, a 403
+        with `cl_pat_047` for anyone else, the same as a step up or down in acuity.
+
         The row-locked re-check and the hard rules apply every time: nobody may put an ICU
         patient in a general bed without it being recorded as a downgrade.
       operationId: assignBedManually
@@ -966,7 +954,8 @@ paths:
         the replacement inherits the original `occupied_at`, so the bill is priced from when
         they actually got into a bed rather than from when the paperwork was fixed. Correcting
         the bed of a patient who has not arrived leaves the hold a hold, with its original
-        expiry.
+        expiry - unless that expiry has already passed, in which case the new hold gets a fresh
+        window from now, the same as a new assignment.
       operationId: correctBed
       requestBody:
         required: true
@@ -1062,6 +1051,9 @@ paths:
         Every tick records who did it and when. Ticking the last mandatory item moves the
         admission to `ready_for_discharge`; unticking one moves it back to `admitted`.
 
+        Only for a patient on the ward (`admitted` or `ready_for_discharge`). Anything else is
+        409 `cl_pat_046` - a record that has not started or is already closed is not rewritten.
+
         Reception, not the Hospital Administrator, settles a bill - **changed 2026-09-11.** The
         administrator creates wards and runs the organisation; money is the front desk's job.
       operationId: updateDischargeChecklist
@@ -1084,6 +1076,13 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: >-
+            `billing_settled` was sent (`cl_pat_025`), or the patient is not on the ward
+            (`cl_pat_046`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /discharges/{admissionId}/confirm:
     parameters:
@@ -1185,7 +1184,9 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: The bill is settled and frozen (`cl_pat_026`).
+          description: >-
+            The bill is settled and frozen (`cl_pat_026`), or the patient is not on the ward
+            (`cl_pat_044`).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -1222,7 +1223,9 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: The bill is settled and frozen (`cl_pat_026`).
+          description: >-
+            The bill is settled and frozen (`cl_pat_026`), or the patient is not on the ward
+            (`cl_pat_044`).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -1256,7 +1259,10 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: A generated line (`cl_pat_027`), or the bill is settled (`cl_pat_026`).
+          description: >-
+            A generated line (`cl_pat_027`), the bill is settled (`cl_pat_026`), or the visit
+            cannot be billed - the patient is not on the ward (`cl_pat_044`), or the booking
+            is not finished (`cl_pat_045`).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -1277,8 +1283,14 @@ paths:
         transaction. `PATCH /discharges/{admissionId}/checklist` refuses that key outright, so
         the bill and the checklist cannot disagree about whether a patient has paid.
 
-        Settling a visit nobody prepared a bill for works the bill out first, so a visit with no
-        bill can never deadlock a discharge.
+        **The generated lines are rebuilt on every settle** (changed 2026-09-25). They used to be
+        worked out only when the bill was first raised, so a bill raised on day 1 and settled on
+        day 5 charged one night. Manual charges are kept as they are. A visit nobody prepared a
+        bill for is worked out the same way, so it can never deadlock a discharge.
+
+        Only while the patient is on the ward (`admitted` or `ready_for_discharge`), 409
+        `cl_pat_044` otherwise: before that there are no nights to charge, and an unclassified
+        pre-admission has no care level to price.
       operationId: settleBill
       requestBody:
         content:
@@ -1416,10 +1428,14 @@ paths:
         Details only - this does not book a date and **does not admit you**.
         `POST /me/appointments` is the booking; being admitted happens at the desk.
 
-        Matches on NIC first. An existing record is linked to the account rather than duplicated,
-        which is what stops the signup form creating the second identity that would otherwise
-        split a returning patient's history in two. Nothing already on a matched record is
-        overwritten - see `PreRegisterRequest.nic` for why.
+        **A NIC already on a hospital record is refused, not linked** (changed 2026-09-25). If
+        the desk registered this person first, typing their NIC is not proof that the person
+        typing is them - an NIC is printed on too many forms. So the answer is 409 `cl_pat_051`,
+        telling the patient to use "I have a patient code" (`POST /me/claim`) with the code the
+        desk hands over in person. It used to link the record to whoever typed the NIC.
+
+        A NIC that is new to the hospital creates the record and links it, so a patient who
+        signs up in the app first is found by the desk under their NIC later.
 
         Neither this nor the booking brings in doctor calendars, time slots or availability
         search. That is the component-sized part, and it stays out of scope.
@@ -1451,9 +1467,10 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
           description: |
-            Those details belong to a record the hospital already holds for someone else
-            (`cl_pat_031`), or your record is registered under a different NIC (`cl_pat_032`).
-            Both are desk work - the app may not decide which human a login belongs to.
+            The NIC is on a hospital record with no app login yet - use your patient code instead
+            (`cl_pat_051`); the NIC is on a record another login already holds (`cl_pat_031`); or
+            your record is registered under a different NIC (`cl_pat_032`). All three are desk
+            work - the app may not decide which human a login belongs to.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -1938,6 +1955,9 @@ paths:
         - $ref: '#/components/parameters/PageSize'
         - name: date
           in: query
+          description: >-
+            A calendar day in Sri Lanka time (Asia/Colombo), midnight to midnight. It used to be
+            the UTC day, which listed an early-morning booking under the day before.
           schema: { type: string, format: date }
         - name: status
           in: query
@@ -2157,6 +2177,9 @@ paths:
         **409 `cl_pat_035` when the visit ended in an admission.** A `completed` booking with
         `admission_id` set is billed on the admission at discharge, and charging it here as
         well would charge the same visit twice. All four appointment-bill endpoints refuse it.
+
+        **409 `cl_pat_045` unless the booking is `completed`.** A cancelled, missed or
+        not-yet-happened booking has no consultation to charge for.
       operationId: prepareAppointmentBill
       responses:
         '200':
@@ -2168,7 +2191,9 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: The bill is already settled and cannot be changed (`cl_pat_026`).
+          description: >-
+            The bill is already settled (`cl_pat_026`), the visit ended in an admission
+            (`cl_pat_035`), or the booking is not finished (`cl_pat_045`).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -2201,7 +2226,9 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: The bill is already settled and cannot be changed (`cl_pat_026`).
+          description: >-
+            The bill is already settled (`cl_pat_026`), the visit ended in an admission
+            (`cl_pat_035`), or the booking is not finished (`cl_pat_045`).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -2234,7 +2261,9 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: The bill is already settled and cannot be changed (`cl_pat_026`).
+          description: >-
+            The bill is already settled (`cl_pat_026`), the visit ended in an admission
+            (`cl_pat_035`), or the booking is not finished (`cl_pat_045`).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -2251,7 +2280,7 @@ paths:
       description: |
         Roles: GeneralStaff, WardNurse, HospitalAdministrator, DutyManager.
 
-        Freezes the bill. **Ticks no discharge checklist item**, unlike settling an admission
+        Rebuilds the consultation line, then freezes the bill. **Ticks no discharge checklist item**, unlike settling an admission
         bill - nobody was admitted, so there is no discharge to tick. That is exactly why the
         ward nurse is on this one and not on `POST /admissions/{admissionId}/bill/settle`.
       operationId: settleAppointmentBill
@@ -2271,7 +2300,9 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: The bill is already settled and cannot be changed (`cl_pat_026`).
+          description: >-
+            The bill is already settled (`cl_pat_026`), the visit ended in an admission
+            (`cl_pat_035`), or the booking is not finished (`cl_pat_045`).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -2283,8 +2314,8 @@ paths:
       tags: [Admissions]
       summary: Check in an expected patient
       description: |
-        Roles: WardNurse and GeneralStaff for general, surgical, maternity and emergency.
-        DutyManager for ICU.
+        Roles: GeneralStaff, WardNurse, DutyManager - for every care level, the same list the
+        walk-in intake offers.
 
         **Business op.** Turns an `Appointment` into an `Admission` with
         `source = pre_registered`, in one transaction: the appointment moves to `completed`
@@ -2295,19 +2326,27 @@ paths:
 
         The care level is set here, by the staff member checking them in - not by the patient
         at booking time and not by the agent. Same rule every other admission path follows,
-        and `category_set_by_staff_id` records who chose it.
+        and `category_set_by_staff_id` records who chose it - the signed-in staff member, never
+        a value from the body.
 
-        **The role split depends on the body, not the route.** A WardNurse or GeneralStaff may
-        check somebody in as `general`, `surgical`, `maternity` or `emergency`; `icu` is the
-        DutyManager's alone, and anyone else asking for it is a 403 carrying `cl_pat_011`.
+        **No role split by care level any more** (changed 2026-09-25). This used to keep `icu`
+        for the duty manager (`cl_pat_011`, now retired), which only applied here and not at
+        walk-in intake - the same decision had two rules depending on the screen. Check-in now
+        matches intake. The duty manager's say is where it matters, at bed assignment: a bed off
+        the patient's care level or outside the wards that suit it is theirs alone.
+        `maternity` is still refused for a patient recorded as male (`cl_pat_048`).
+
+        **A patient who needs no bed is not checked in.** A check-up, scan or test is
+        `POST /appointments/{id}/complete` instead, and billed on the booking. The web app
+        offers both from one "What do they need?" list.
 
         Returns the **admission**, not the appointment - the admission is what the desk works
         from next, and the booking is finished with. From here the patient is on
         `GET /patient-worklist`, and their bill is the admission's, settled at discharge.
         Billing the appointment as well is 409 `cl_pat_035`.
 
-        From this point the admission behaves like any other: it needs a bed, so the bed
-        agent runs on it exactly as it would for a walk-in.
+        From this point the admission behaves like any other: it waits for a bed on the
+        Patients page, is marked arrived, and is discharged and billed exactly as a walk-in is.
       operationId: checkInAppointment
       requestBody:
         required: true
@@ -2325,7 +2364,9 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: Already checked in, cancelled, or the patient has an open admission.
+          description: >-
+            Already checked in, cancelled, the patient has an open admission, or `maternity`
+            for a patient recorded as male (`cl_pat_048`).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -2420,7 +2461,15 @@ paths:
         A fixed keyword screen runs before the agent does. If your text matches a
         red-flag pattern (chest pain, can't breathe, severe bleeding, and similar), the
         report is escalated to the ward immediately rather than waiting in the ordinary
-        queue - but a human still decides what you are told.
+        queue - but a human still decides what you are told. The same screen also runs before
+        this call answers, and its result comes back as `red_flag`, so the app can tell the
+        patient to press the call bell straight away instead of waiting on a reply.
+        The screen ignores case and apostrophes, so a phone's curly "can’t", a typed "can't"
+        and "cant" all match.
+
+        **Limited to three reports a minute per patient** (429 `cl_pat_050`), counted from the
+        patient's own saved reports. Every report can start a model call, and the free model
+        allowance is small.
       operationId: submitCareQuery
       requestBody:
         required: true
@@ -2440,6 +2489,13 @@ paths:
           description: >-
             cl_pat_038 - you are not currently admitted. Nothing runs: no workflow row is
             created, the model is never called, and no quota is spent.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '429':
+          description: >-
+            cl_pat_050 - three reports in the last minute already. Nothing is saved and no
+            workflow starts.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -2568,7 +2624,10 @@ paths:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: This recommendation is not pending review.
+          description: >-
+            Not pending review (`cl_pat_040`), or the agent is still writing its draft
+            (`cl_pat_049`). A run that has not finished within ten minutes is treated as dead,
+            so a restart mid-run never leaves a report stuck.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -2605,6 +2664,13 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: >-
+            Not pending review (`cl_pat_040`), or the agent is still writing its draft
+            (`cl_pat_049`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /care-recommendations/{id}/redraft:
     parameters:
@@ -2638,7 +2704,10 @@ paths:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: This recommendation is not pending review.
+          description: >-
+            Not pending review (`cl_pat_040`), or the agent is still writing its draft
+            (`cl_pat_049`). A run that has not finished within ten minutes is treated as dead,
+            so a restart mid-run never leaves a report stuck.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -2729,14 +2798,14 @@ components:
     IllegalTransition:
       description: |
         Not a legal status change. The allowed moves are:
-        awaiting_bed -> awaiting_approval, admitted, cancelled;
+        awaiting_bed -> awaiting_approval, cancelled;
         awaiting_approval -> bed_reserved, awaiting_bed, cancelled;
         bed_reserved -> admitted, awaiting_bed, cancelled;
         admitted -> ready_for_discharge;
         ready_for_discharge -> discharged, admitted.
         Anything else is rejected here rather than silently allowed. (awaiting_bed straight to
-        admitted is POST /admissions/{id}/classify discovering the visit is outpatient after
-        all - the same jump a walk-in outpatient takes at creation, just discovered later.)
+        admitted was removed on 2026-09-25 along with the last care level that needed no bed:
+        every admission now goes through a bed hold before the patient arrives.)
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -2761,13 +2830,14 @@ components:
     AdmissionCategory:
       type: string
       description: |
-        The care level. Set by clinical staff, never by an AI agent. Every value now
-        requires a bed - the only ladder left is icu (rung 0) against everything else
-        (rung 2); general/surgical/maternity/emergency carry equal acuity for bed
-        placement and differ only in which ward they belong in. emergency is a process
-        decision (skip full registration, admit now), not a physical ward type - it
-        places against general-typed wards via the rung system, same as any other rung-2
-        category.
+        The care level. Set by clinical staff, never by an AI agent. Every value requires a
+        bed - a visit that needs none (check-up, scan, test) is an appointment completed and
+        billed on the booking, never an admission. The acuity ladder is icu (rung 0) against
+        everything else (rung 2); general/surgical/maternity/emergency carry equal acuity and
+        differ in which wards suit them - see ward fit on `POST /admissions/{id}/assign-bed`.
+        emergency is a process decision (skip full registration, admit now) that suits an
+        emergency, surgical or general ward. `maternity` is refused for a patient recorded as
+        male (`cl_pat_048`).
       enum: [icu, general, surgical, maternity, emergency]
 
     AppointmentStatus:
@@ -2955,13 +3025,9 @@ components:
         `admission_category` and `urgency` are required and have no default. An omitted
         `admission_category` would check the patient in at `icu`, the most expensive care
         level in the hospital, because it is declared first.
-      required: [admission_category, category_set_by_staff_id, urgency]
+      required: [admission_category, urgency]
       properties:
         admission_category: { $ref: '#/components/schemas/AdmissionCategory' }
-        category_set_by_staff_id:
-          type: string
-          format: uuid
-          description: The staff member who chose the care level at the desk. Recorded proof a human decided it.
         urgency: { $ref: '#/components/schemas/AdmissionUrgency' }
         is_infectious:
           type: boolean
@@ -3015,7 +3081,7 @@ components:
         Deliberately not `AdmissionSummary`. This is the board a nurse reads top to bottom,
         and it carries only what that reading needs; the admission schema answers a different
         question and is free to grow without widening every row here.
-      required: [id, patient, status, requires_bed, when]
+      required: [id, patient, status, when]
       properties:
         id:
           type: string
@@ -3023,9 +3089,6 @@ components:
           description: The admission id.
         patient: { $ref: '#/components/schemas/PatientSummary' }
         status: { $ref: '#/components/schemas/WorklistStatus' }
-        requires_bed:
-          type: boolean
-          description: Always true - every `admission_category` value now reserves a bed.
         source:
           allOf:
             - $ref: '#/components/schemas/AdmissionSource'
@@ -3296,7 +3359,7 @@ components:
 
     CreateAdmissionRequest:
       type: object
-      required: [patient_id, source, admission_category, category_set_by_staff_id, urgency]
+      required: [patient_id, source, admission_category, urgency]
       properties:
         patient_id: { type: string, format: uuid }
         source: { $ref: '#/components/schemas/AdmissionSource' }
@@ -3305,10 +3368,6 @@ components:
           nullable: true
           description: Emergency Service's reference. Required when source is `emergency`.
         admission_category: { $ref: '#/components/schemas/AdmissionCategory' }
-        category_set_by_staff_id:
-          type: string
-          format: uuid
-          description: The clinician who chose the category. Recorded proof a human decided it.
         urgency: { $ref: '#/components/schemas/AdmissionUrgency' }
         is_infectious:
           type: boolean
@@ -3427,7 +3486,7 @@ components:
 
     AdmissionSummary:
       type: object
-      required: [id, source, urgency, status, details_complete, requires_bed]
+      required: [id, source, urgency, status, details_complete]
       properties:
         id: { type: string, format: uuid }
         patient: { $ref: '#/components/schemas/PatientSummary' }
@@ -3442,23 +3501,6 @@ components:
         urgency: { $ref: '#/components/schemas/AdmissionUrgency' }
         status: { $ref: '#/components/schemas/AdmissionStatus' }
         details_complete: { type: boolean }
-        requires_bed:
-          type: boolean
-          description: |
-            **Hard rule H0.** Whether this visit needs a bed at all. Always true - every
-            `admission_category` value reserves a bed, including while `admission_category`
-            is still null on an unclassified pre-admission (the safe default). A visit that
-            needs no bed at all (a scan, a blood test, a dressing change) is never an
-            `Admission` in the first place; it is billed straight off the appointment instead
-            (`POST /appointments/{id}/bill`).
-
-            Derived from `admission_category` and never stored, so the two cannot disagree.
-            Published rather than left to the client, because a screen that works it out for
-            itself is a second copy of the rule.
-
-            A visit with `requires_bed: false` never enters `awaiting_bed`. It is `admitted`
-            from the moment the record is opened, and `POST /admissions/{id}/assign-bed`
-            refuses it with `cl_pat_021`.
         ward_name: { type: string, nullable: true }
         bed_number: { type: string, nullable: true }
         expected_arrival: { type: string, format: date-time, nullable: true }
@@ -3476,7 +3518,9 @@ components:
               type: string
               format: uuid
               nullable: true
-              description: Null until a clinician classifies the admission via POST /admissions/{id}/classify.
+              description: >-
+                Who chose the care level - the signed-in staff member at creation, check-in or
+                classify. Null until a clinician classifies a pre-admission.
             category_set_by_staff_name:
               type: string
               nullable: true
@@ -4077,12 +4121,12 @@ components:
           maxLength: 20
           pattern: '^(\d{9}[VvXx]|\d{12}|(?=.*[A-Za-z])[A-Za-z0-9]{6,15})$'
           description: |
-            Required here, unlike at the desk, because it is the only thing that can match this
-            signup to a record the hospital already holds.
+            Required here, unlike at the desk, so the desk can find a patient who signed up in the
+            app first.
 
             **NIC alone is not proof of identity.** Nothing verifies that the person typing it
-            owns it, so linking to an existing record never overwrites what is already on that
-            record. A production system puts an OTP or a desk check in front of this.
+            owns it, so a NIC that is already on a hospital record is refused (`cl_pat_051`) and
+            that record is only joined with the patient code from the desk.
 
             **Same shape as `CreatePatientRequest.nic` (tightened 2026-09-15.)** This endpoint
             previously took any string up to 20 characters, so the app could store an NIC the
@@ -4339,6 +4383,11 @@ components:
         recommendation_id: { type: string, format: uuid }
         status: { type: string, example: running }
         poll_url: { type: string, example: /api/care-workflows/3fa85f64-5717-4562-b3fc-2c963f66afa6 }
+        red_flag:
+          type: boolean
+          description: >-
+            The fixed keyword screen matched the report. Known the moment the report is saved,
+            so the app can tell the patient to get a nurse without waiting on the agent.
 
     CareWorkflowSummary:
       type: object

@@ -22,7 +22,7 @@ export function worklistStatusDetail(row: WorklistRow): string | null {
 
     case 'admitted':
       if (bed) return bed;
-      return row.requires_bed ? 'No bed recorded' : 'No bed needed';
+      return 'No bed recorded';
 
     case 'awaiting_bed':
       return 'Needs a bed';

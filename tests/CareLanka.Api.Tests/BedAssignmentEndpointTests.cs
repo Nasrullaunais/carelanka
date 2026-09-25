@@ -459,6 +459,55 @@ public sealed class BedAssignmentEndpointTests
     }
 
     [Fact]
+    public async Task A_nurse_may_not_put_a_general_patient_in_a_maternity_ward()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var ward = await NewWardAsync(wardType: "maternity");
+        var beds = await AddBedsAsync(ward, 1);
+        var admissionId = await NewAdmissionAsync(nurse, category: "general");
+
+        var assigned = await nurse.PostAsJsonAsync(
+            $"/api/admissions/{admissionId}/assign-bed", new { bed_id = beds[0] });
+        using var body = await ReadJsonAsync(assigned);
+
+        Assert.Equal(HttpStatusCode.Forbidden, assigned.StatusCode);
+        Assert.Equal("cl_pat_047", body.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task A_duty_manager_may_place_outside_the_wards_that_suit_the_care_level()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+        var ward = await NewWardAsync(wardType: "maternity");
+        var beds = await AddBedsAsync(ward, 1);
+        var admissionId = await NewAdmissionAsync(nurse, category: "general");
+
+        var assigned = await manager.PostAsJsonAsync(
+            $"/api/admissions/{admissionId}/assign-bed", new { bed_id = beds[0] });
+
+        Assert.Equal(HttpStatusCode.OK, assigned.StatusCode);
+    }
+
+    [Fact]
+    public async Task An_emergency_patient_may_go_to_a_surgical_ward_and_a_surgical_one_to_a_general_ward()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var surgical = await AddBedsAsync(await NewWardAsync(wardType: "surgical"), 1);
+        var general = await AddBedsAsync(await NewWardAsync(), 1);
+
+        var emergency = await nurse.PostAsJsonAsync(
+            $"/api/admissions/{await NewAdmissionAsync(nurse, category: "emergency")}/assign-bed",
+            new { bed_id = surgical[0] });
+        var surgicalPatient = await nurse.PostAsJsonAsync(
+            $"/api/admissions/{await NewAdmissionAsync(nurse, category: "surgical")}/assign-bed",
+            new { bed_id = general[0] });
+
+        Assert.Equal(HttpStatusCode.OK, emergency.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, surgicalPatient.StatusCode);
+    }
+
+    [Fact]
     public async Task Reception_may_assign_a_bed_that_matches_the_care_level()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);

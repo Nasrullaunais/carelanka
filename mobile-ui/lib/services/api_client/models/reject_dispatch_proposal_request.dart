@@ -10,11 +10,13 @@ part 'reject_dispatch_proposal_request.g.dart';
 
 @JsonSerializable()
 class RejectDispatchProposalRequest {
-  const RejectDispatchProposalRequest({this.reason, this.notes});
-
-  factory RejectDispatchProposalRequest.fromJson(Map<String, Object?> json) =>
-      _$RejectDispatchProposalRequestFromJson(json);
-
+  const RejectDispatchProposalRequest({
+    this.reason,
+    this.notes,
+  });
+  
+  factory RejectDispatchProposalRequest.fromJson(Map<String, Object?> json) => _$RejectDispatchProposalRequestFromJson(json);
+  
   final DispatchRejectionReason? reason;
   final String? notes;
 

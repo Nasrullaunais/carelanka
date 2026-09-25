@@ -63,55 +63,41 @@ public sealed class MeEndpointTests
     }
 
     [Fact]
-    public async Task A_returning_patient_is_linked_to_the_record_the_desk_already_holds()
+    public async Task Typing_the_nic_of_a_record_the_desk_made_does_not_link_it()
     {
         using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
         var nic = NewNic();
 
-        var existingId = await NewPatientAtTheDeskAsync(nurse, "Returning Patient", nic);
+        await NewPatientAtTheDeskAsync(nurse, "Kamal Perera", nic);
 
-        using var patient = await NewPatientAccountAsync();
-        var saved = await PreRegisterAsync(patient, nic, "Returning Patient");
+        using var stranger = await NewPatientAccountAsync();
+        var saved = await PreRegisterAsync(stranger, nic, "Kamal Perera");
         using var body = await ReadJsonAsync(saved);
 
-        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, saved.StatusCode);
+        Assert.Equal("cl_pat_051", body.RootElement.GetProperty("code").GetString());
 
-        Assert.Equal(existingId, await LinkedRecordIdAsync(patient));
-        Assert.Equal(nic, body.RootElement.GetProperty("nic").GetString());
+        // Nothing was linked: the account still has no record of its own.
+        Assert.Equal(HttpStatusCode.NotFound, (await stranger.GetAsync("/api/me/profile")).StatusCode);
     }
 
     [Fact]
-    public async Task Linking_to_an_existing_record_never_overwrites_what_is_already_on_it()
+    public async Task Signing_up_in_the_app_first_still_creates_a_record_the_desk_can_find_by_nic()
     {
         using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
         var nic = NewNic();
 
-        var existingId = await NewPatientAtTheDeskAsync(nurse, "Desk Typed This Name", nic);
-
-        await nurse.PutAsJsonAsync($"/api/patients/{existingId}", new
-        {
-            full_name = "Desk Typed This Name",
-            nic,
-            gender = "male",
-            address = "12 Galle Road, Colombo 3"
-        });
-
         using var patient = await NewPatientAccountAsync();
+        Assert.Equal(HttpStatusCode.OK, (await PreRegisterAsync(patient, nic, "App First")).StatusCode);
 
-        var saved = await patient.PostAsJsonAsync("/api/me/pre-register", new
-        {
-            nic,
-            full_name = "Someone Elses Guess",
-            gender = "female",
-            address = "Not their address at all"
-        });
+        var lookup = await nurse.PostAsJsonAsync("/api/patients/lookup", new { nic });
+        using var body = await ReadJsonAsync(lookup);
 
-        using var body = await ReadJsonAsync(saved);
-
-        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
-
-        Assert.Equal("Desk Typed This Name", body.RootElement.GetProperty("full_name").GetString());
-        Assert.Equal("12 Galle Road, Colombo 3", body.RootElement.GetProperty("address").GetString());
+        Assert.Equal(HttpStatusCode.OK, lookup.StatusCode);
+        Assert.True(body.RootElement.GetProperty("found").GetBoolean());
+        Assert.Equal(
+            await LinkedRecordIdAsync(patient),
+            body.RootElement.GetProperty("patient").GetProperty("id").GetString());
     }
 
     [Fact]
@@ -637,15 +623,33 @@ public sealed class MeEndpointTests
         HttpClient nurse, HttpClient patient)
     {
         var nic = NewNic();
-        var patientId = await NewPatientAtTheDeskAsync(nurse, "Billed Patient", nic);
+        var (patientId, patientCode) = await NewWalkInAtTheDeskAsync(nurse, "Billed Patient", nic);
 
-        Assert.Equal(HttpStatusCode.OK, (await PreRegisterAsync(patient, nic, "Billed Patient")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await ClaimAsync(patient, patientCode, nic)).StatusCode);
 
         await AdmitAsync(nurse, patientId);
+        await MarkOnTheWardAsync(patientId);
 
         using var body = await ReadJsonAsync(await patient.GetAsync("/api/me/admission"));
 
         return body.RootElement.GetProperty("admission_id").GetString()!;
+    }
+
+    /// A bill is only raised while the patient is on the ward, and which bed they are in is not
+    /// what these tests are about, so the stay is moved to admitted directly.
+    private async Task MarkOnTheWardAsync(string patientId)
+    {
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        var id = Guid.Parse(patientId);
+        var admission = await db.Admissions
+            .FirstAsync(a => a.PatientId == id && a.Status == AdmissionStatus.AwaitingBed);
+
+        admission.Status = AdmissionStatus.Admitted;
+        admission.AdmittedAt = DateTimeOffset.UtcNow;
+
+        await db.SaveChangesAsync();
     }
 
     private static Task<HttpResponseMessage> ClaimAsync(

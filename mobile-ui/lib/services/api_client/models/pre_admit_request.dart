@@ -23,10 +23,9 @@ class PreAdmitRequest {
     this.provisionalName,
     this.provisionalGender,
   });
-
-  factory PreAdmitRequest.fromJson(Map<String, Object?> json) =>
-      _$PreAdmitRequestFromJson(json);
-
+  
+  factory PreAdmitRequest.fromJson(Map<String, Object?> json) => _$PreAdmitRequestFromJson(json);
+  
   @JsonKey(name: 'dispatch_id')
   final String? dispatchId;
   @JsonKey(name: 'patient_is_caller')

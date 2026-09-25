@@ -153,7 +153,7 @@ class _Admission extends StatelessWidget {
               icon: Icons.route_outlined,
               child: StayJourneyTracker(journey: journey),
             ),
-          if (!journey.cancelled) ...[
+          if (journey.reached == JourneyStep.inHospital) ...[
             const SizedBox(height: 16),
             const CareQueryCard(),
           ],

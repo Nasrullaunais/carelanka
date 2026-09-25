@@ -102,7 +102,7 @@ public sealed class BedAssignmentService : IBedAssignmentService
         var category = admission.Category
             ?? throw new ConflictException(MessageCode.AdmissionNotYetClassified, admissionId);
 
-        EnsureMayApprove(category, ward);
+        EnsureMayApprove(category, admission.IsInfectious, ward);
 
         BedPlacementRules.EnsurePlaceable(
             category,
@@ -137,7 +137,7 @@ public sealed class BedAssignmentService : IBedAssignmentService
         var category = admission.Category
             ?? throw new ConflictException(MessageCode.AdmissionNotYetClassified, admissionId);
 
-        EnsureMayApprove(category, ward);
+        EnsureMayApprove(category, admission.IsInfectious, ward);
 
         BedPlacementRules.EnsurePlaceable(
             category,
@@ -183,7 +183,11 @@ public sealed class BedAssignmentService : IBedAssignmentService
 
         var wasOccupied = live.Status == AssignmentStatus.Occupied;
         var occupiedAt = live.OccupiedAt;
-        var reservedUntil = live.ReservedUntil;
+
+        // A hold that already ran out would make the new one lapse the moment it is written.
+        var reservedUntil = live.ReservedUntil is { } until && until > now
+            ? until
+            : BedHold.ExpiresAt(admission.ExpectedArrivalAt, now);
 
         live.Status = AssignmentStatus.Released;
         live.ReservedUntil = null;
@@ -253,12 +257,6 @@ public sealed class BedAssignmentService : IBedAssignmentService
         var category = admission.Category
             ?? throw new ConflictException(MessageCode.AdmissionNotYetClassified, admissionId);
 
-        if (!BedPlacementRules.RequiresBed(category))
-        {
-            throw new ConflictException(
-                MessageCode.VisitNeedsNoBed, EnumWire.ToWire(category));
-        }
-
         AdmissionStatusMachine.EnsureMove(
             admission.Status, AdmissionStatus.AwaitingApproval, AdmissionStatus.AwaitingBed);
         AdmissionStatusMachine.EnsureMove(
@@ -268,7 +266,7 @@ public sealed class BedAssignmentService : IBedAssignmentService
 
         var ward = await FindWardAsync(bed.WardId, ct);
 
-        EnsureMayApprove(category, ward);
+        EnsureMayApprove(category, admission.IsInfectious, ward);
 
         var isDowngrade = BedPlacementRules.EnsurePlaceable(
             category,
@@ -349,11 +347,24 @@ public sealed class BedAssignmentService : IBedAssignmentService
         }
     }
 
-    private void EnsureMayApprove(AdmissionCategory category, WardEntity? ward)
+    private void EnsureMayApprove(AdmissionCategory category, bool isInfectious, WardEntity? ward)
     {
-        if (ward is null || IsDutyManager
-            || !BedPlacementRules.NeedsDutyManager(category, ward.WardType))
+        if (ward is null || IsDutyManager)
         {
+            return;
+        }
+
+        if (!BedPlacementRules.NeedsDutyManager(category, ward.WardType))
+        {
+            if (!BedPlacementRules.FitsWard(category, ward.WardType, isInfectious))
+            {
+                throw new ForbiddenException(
+                    MessageCode.BedWardWrongKind,
+                    ward.Name,
+                    EnumWire.ToWire(ward.WardType),
+                    EnumWire.ToWire(category));
+            }
+
             return;
         }
 

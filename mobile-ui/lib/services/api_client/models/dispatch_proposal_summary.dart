@@ -24,10 +24,9 @@ class DispatchProposalSummary {
     this.estimatedMinutesToScene,
     this.createdAt,
   });
-
-  factory DispatchProposalSummary.fromJson(Map<String, Object?> json) =>
-      _$DispatchProposalSummaryFromJson(json);
-
+  
+  factory DispatchProposalSummary.fromJson(Map<String, Object?> json) => _$DispatchProposalSummaryFromJson(json);
+  
   final String? id;
   @JsonKey(name: 'workflow_id')
   final String? workflowId;

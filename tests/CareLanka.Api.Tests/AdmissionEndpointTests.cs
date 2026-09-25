@@ -164,16 +164,18 @@ public sealed class AdmissionEndpointTests
     }
 
     [Fact]
-    public async Task Naming_a_clinician_who_does_not_exist_is_a_400_not_a_foreign_key_500()
+    public async Task Who_chose_the_care_level_is_whoever_is_signed_in_whatever_the_body_claims()
     {
         using var client = await ClientAsync(ApiApplication.NurseEmail);
-        var patientId = await NewPatientAsync(client, "No Such Clinician");
+        var patientId = await NewPatientAsync(client, "Claimed Clinician");
 
         var response = await CreateAsync(client, patientId, Guid.NewGuid().ToString());
         using var body = await ReadJsonAsync(response);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Equal("cl_pat_008", body.RootElement.GetProperty("code").GetString());
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(
+            await NurseIdAsync(),
+            body.RootElement.GetProperty("category_set_by_staff_id").GetString());
     }
 
     [Fact]

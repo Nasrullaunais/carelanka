@@ -16,10 +16,9 @@ class DispatchToolCall {
     this.error,
     this.calledAt,
   });
-
-  factory DispatchToolCall.fromJson(Map<String, Object?> json) =>
-      _$DispatchToolCallFromJson(json);
-
+  
+  factory DispatchToolCall.fromJson(Map<String, Object?> json) => _$DispatchToolCallFromJson(json);
+  
   @JsonKey(name: 'tool_name')
   final String? toolName;
   final Map<String, dynamic>? arguments;

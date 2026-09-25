@@ -13,6 +13,7 @@ class CareWorkflowAccepted {
     this.recommendationId,
     this.status,
     this.pollUrl,
+    this.redFlag,
   });
   
   factory CareWorkflowAccepted.fromJson(Map<String, Object?> json) => _$CareWorkflowAcceptedFromJson(json);
@@ -24,6 +25,8 @@ class CareWorkflowAccepted {
   final String? status;
   @JsonKey(name: 'poll_url')
   final String? pollUrl;
+  @JsonKey(name: 'red_flag')
+  final bool? redFlag;
 
   Map<String, Object?> toJson() => _$CareWorkflowAcceptedToJson(this);
 }

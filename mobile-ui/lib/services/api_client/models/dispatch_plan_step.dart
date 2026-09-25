@@ -15,10 +15,9 @@ class DispatchPlanStep {
     this.startedAt,
     this.completedAt,
   });
-
-  factory DispatchPlanStep.fromJson(Map<String, Object?> json) =>
-      _$DispatchPlanStepFromJson(json);
-
+  
+  factory DispatchPlanStep.fromJson(Map<String, Object?> json) => _$DispatchPlanStepFromJson(json);
+  
   final int? sequence;
   final String? description;
   final String? status;

@@ -110,10 +110,9 @@ public sealed class BillingService : IBillingService
         Guid admissionId, SettleBillRequest request, CancellationToken ct = default)
         => InTransactionAsync(admissionId, async (admission, bill) =>
         {
-            if (bill.LineItems.Count == 0)
-            {
-                await RegenerateAsync(admission, bill, ct);
-            }
+            // Rebuilt on every settle: the lines were counted when the bill was raised, and the
+            // patient may have slept more nights or changed bed since then.
+            await RegenerateAsync(admission, bill, ct);
 
             bill.SettledAt = DateTimeOffset.UtcNow;
             bill.SettledByStaffMemberId = _currentUser.Id;
@@ -184,10 +183,7 @@ public sealed class BillingService : IBillingService
         Guid appointmentId, SettleBillRequest request, CancellationToken ct = default)
         => InAppointmentTransactionAsync(appointmentId, async (_, bill) =>
         {
-            if (bill.LineItems.Count == 0)
-            {
-                await RegenerateForAppointmentAsync(bill, ct);
-            }
+            await RegenerateForAppointmentAsync(bill, ct);
 
             bill.SettledAt = DateTimeOffset.UtcNow;
             bill.SettledByStaffMemberId = _currentUser.Id;
@@ -222,6 +218,12 @@ public sealed class BillingService : IBillingService
         if (bill.IsSettled)
         {
             throw new ConflictException(MessageCode.BillAlreadySettled, bill.BillNumber);
+        }
+
+        if (appointment.Status != AppointmentStatus.Completed)
+        {
+            throw new ConflictException(
+                MessageCode.AppointmentNotBillable, EnumWire.ToWire(appointment.Status));
         }
 
         await work(appointment, bill);
@@ -393,6 +395,12 @@ public sealed class BillingService : IBillingService
         if (bill.IsSettled)
         {
             throw new ConflictException(MessageCode.BillAlreadySettled, bill.BillNumber);
+        }
+
+        if (!StillOwing.Contains(admission.Status))
+        {
+            throw new ConflictException(
+                MessageCode.BillNotOpenForStay, EnumWire.ToWire(admission.Status));
         }
 
         await work(admission, bill);

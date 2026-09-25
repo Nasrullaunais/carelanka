@@ -17,11 +17,9 @@ class DispatchProposalSummaryPagedResult {
     required this.totalItems,
     required this.totalPages,
   });
-
-  factory DispatchProposalSummaryPagedResult.fromJson(
-    Map<String, Object?> json,
-  ) => _$DispatchProposalSummaryPagedResultFromJson(json);
-
+  
+  factory DispatchProposalSummaryPagedResult.fromJson(Map<String, Object?> json) => _$DispatchProposalSummaryPagedResultFromJson(json);
+  
   final List<DispatchProposalSummary> items;
   final int page;
   @JsonKey(name: 'page_size')
@@ -31,6 +29,5 @@ class DispatchProposalSummaryPagedResult {
   @JsonKey(name: 'total_pages')
   final int totalPages;
 
-  Map<String, Object?> toJson() =>
-      _$DispatchProposalSummaryPagedResultToJson(this);
+  Map<String, Object?> toJson() => _$DispatchProposalSummaryPagedResultToJson(this);
 }

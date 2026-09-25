@@ -28,6 +28,8 @@ import 'clients/patient_self_service_api.dart';
 import 'clients/patients_api.dart';
 import 'clients/pharmacy_api.dart';
 import 'clients/reports_api.dart';
+import 'clients/skills_api.dart';
+import 'clients/staff_api.dart';
 import 'clients/wards_and_beds_api.dart';
 
 /// CareLanka API `vv1`
@@ -67,6 +69,8 @@ class CareLankaApi {
   PatientsApi? _patients;
   PharmacyApi? _pharmacy;
   ReportsApi? _reports;
+  SkillsApi? _skills;
+  StaffApi? _staff;
   WardsAndBedsApi? _wardsAndBeds;
 
   AdmissionsApi get admissions => _admissions ??= AdmissionsApi(_dio, baseUrl: _baseUrl);
@@ -116,6 +120,10 @@ class CareLankaApi {
   PharmacyApi get pharmacy => _pharmacy ??= PharmacyApi(_dio, baseUrl: _baseUrl);
 
   ReportsApi get reports => _reports ??= ReportsApi(_dio, baseUrl: _baseUrl);
+
+  SkillsApi get skills => _skills ??= SkillsApi(_dio, baseUrl: _baseUrl);
+
+  StaffApi get staff => _staff ??= StaffApi(_dio, baseUrl: _baseUrl);
 
   WardsAndBedsApi get wardsAndBeds => _wardsAndBeds ??= WardsAndBedsApi(_dio, baseUrl: _baseUrl);
 }

@@ -17,7 +17,6 @@ import {
 } from '../services/api/generated/@tanstack/react-query.gen';
 import type {
   Admission,
-  AdmissionCategory,
   Appointment,
   AppointmentStatus,
   PatientSummary,
@@ -30,7 +29,6 @@ import { AppSelect } from '../components/ui/app-select';
 import {
   canBillAppointment,
   canOpenAppointmentBoard,
-  canSetHighCareLevel,
   canWorkAppointmentDesk,
 } from '../types/permissions';
 import {
@@ -38,11 +36,12 @@ import {
   appointmentStatusLabels,
   appointmentStatusTone,
   appointmentStatuses,
-  deskCareLevels,
-  dutyManagerCareLevels,
+  noBedLabel,
+  type CheckInChoice,
 } from '../types/appointments';
-import { hasPassed, localDateTime, localInputValue, localTime, utcDay } from '../types/datetime';
+import { hasPassed, localDateTime, localInputValue, localTime, localDay } from '../types/datetime';
 import {
+  admissionCategoriesFor,
   admissionCategoryHints,
   admissionCategoryLabels,
   detailFieldLabel,
@@ -55,7 +54,7 @@ export function AppointmentsPage() {
   const session = useSession();
   const role = session?.principal.role;
 
-  const [date, setDate] = useState(() => utcDay(new Date()));
+  const [date, setDate] = useState(() => localDay(new Date()));
   const [status, setStatus] = useState<AppointmentStatus | ''>('');
   const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
@@ -136,18 +135,6 @@ export function AppointmentsPage() {
     },
   });
 
-  /// Recording that the patient was seen and billing them are one action to
-  /// the desk, so completing happens on the way into the bill drawer rather
-  /// than as a button of its own that has to be remembered.
-  function seenAndBill(appointment: Appointment) {
-    if (appointment.status === 'completed') {
-      toggle(appointment, 'bill');
-      return;
-    }
-
-    complete.mutate({ path: { id: appointment.id } });
-  }
-
   function markNotAttended(appointment: Appointment) {
     setNoShowCandidate(appointment);
   }
@@ -198,13 +185,6 @@ export function AppointmentsPage() {
           </div>
         </div>
 
-        {date !== '' && (
-          <p className="hint">
-            A day runs midnight to midnight <strong>UTC</strong>, because that is what the
-            booking time is stored as. Sri Lanka is 5½ hours ahead, so this day starts at
-            5:30am local and ends at 5:29am tomorrow. Times in the table are your own clock.
-          </p>
-        )}
       </div>
 
       {isDesk && <button type="button" onClick={() => setBookingOpen(true)}>Book a visit</button>}
@@ -228,7 +208,6 @@ export function AppointmentsPage() {
           onRetry={() => void appointments.refetch()}
           onAction={toggle}
           onCloseAction={() => setOpen(null)}
-          onSeenAndBill={seenAndBill}
           onNotAttended={markNotAttended}
           canAct={isDesk}
           canBill={billing}
@@ -260,9 +239,9 @@ export function AppointmentsPage() {
             return (
               <CheckInPanel
                 appointment={appointment}
-                staffId={session?.principal.id ?? ''}
-                canSetHighCare={canSetHighCareLevel(role)}
+                noBedPending={complete.isPending}
                 onCancel={() => setOpen(null)}
+                onNoBed={() => complete.mutate({ path: { id: appointment.id } })}
                 onCheckedIn={(admission) => {
                   setOpen(null);
                   setAdmitted(admission);
@@ -297,7 +276,6 @@ function AppointmentTable({
   onRetry,
   onAction,
   onCloseAction,
-  onSeenAndBill,
   onNotAttended,
   canAct,
   canBill,
@@ -314,7 +292,6 @@ function AppointmentTable({
   onRetry: () => void;
   onAction: (appointment: Appointment, action: DeskAction) => void;
   onCloseAction: () => void;
-  onSeenAndBill: (appointment: Appointment) => void;
   onNotAttended: (appointment: Appointment) => void;
   canAct: boolean;
   canBill: boolean;
@@ -410,20 +387,10 @@ function AppointmentTable({
                 )}
 
                 {canAct && appointment.can_complete && (
-                  <button type="button" onClick={() => onSeenAndBill(appointment)}>
-                    {openId === appointment.id && openAction === 'bill' ? 'Close' : 'Seen and bill'}
-                  </button>
-                )}
-
-                {canAct && appointment.can_complete && (
-                  <button
-                    type="button"
-                    className="secondary"
-                    onClick={() => onAction(appointment, 'check-in')}
-                  >
+                  <button type="button" onClick={() => onAction(appointment, 'check-in')}>
                     {openId === appointment.id && openAction === 'check-in'
                       ? 'Close'
-                      : 'Needs a ward — admit'}
+                      : 'Check in'}
                   </button>
                 )}
 
@@ -450,7 +417,7 @@ function AppointmentTable({
                     disabled={hasPassed(appointment.scheduled_at)}
                     title={
                       hasPassed(appointment.scheduled_at)
-                        ? 'The booked time has passed — use Did not come, Seen and bill or Admit instead.'
+                        ? 'The booked time has passed — use Did not come or Check in instead.'
                         : undefined
                     }
                     onClick={() => onAction(appointment, 'cancel')}
@@ -803,22 +770,20 @@ function BookVisitCard({ onBooked }: { onBooked: () => void }) {
 
 function CheckInPanel({
   appointment,
-  staffId,
-  canSetHighCare,
+  noBedPending,
   onCancel,
+  onNoBed,
   onCheckedIn,
 }: {
   appointment: Appointment;
-  staffId: string;
-  canSetHighCare: boolean;
+  noBedPending: boolean;
   onCancel: () => void;
+  onNoBed: () => void;
   onCheckedIn: (admission: Admission) => void;
 }) {
   const queryClient = useQueryClient();
 
-  const levels = canSetHighCare ? dutyManagerCareLevels : deskCareLevels;
-
-  const [category, setCategory] = useState<AdmissionCategory>('general');
+  const [choice, setChoice] = useState<CheckInChoice>('general');
   const [isInfectious, setIsInfectious] = useState(false);
 
   const checkIn = useMutation({
@@ -843,68 +808,77 @@ function CheckInPanel({
 
   function submit(event: FormEvent) {
     event.preventDefault();
+
+    if (choice === 'no_bed') {
+      onNoBed();
+      return;
+    }
+
     checkIn.mutate({
       path: { id: appointment.id },
       body: {
-        admission_category: category,
-        category_set_by_staff_id: staffId,
+        admission_category: choice,
         urgency: 'routine',
         is_infectious: isInfectious,
       },
     });
   }
 
+  const pending = checkIn.isPending || noBedPending;
+
   return (
     <div className="drawer-body">
-      <h3>Admit {appointment.patient.full_name} to a ward</h3>
+      <h3>Check in {appointment.patient.full_name}</h3>
       <p className="muted" style={{ marginBottom: '0.9rem' }}>
         Booked for {localDateTime(appointment.scheduled_at)}
         {appointment.reason ? ` — ${appointment.reason}` : ''}. Only do this with the patient
-        in front of you, and only if they actually need ward care: from here it is an
-        ordinary admission, and the bed search runs exactly as it would for a walk-in.
-      </p>
-      <p className="muted" style={{ marginBottom: '0.9rem' }}>
-        A scan, a test, or a routine treatment does not need this — close this panel and use
-        <strong> Seen and bill</strong> instead.
+        in front of you.
       </p>
 
       <form onSubmit={submit}>
         <div className="field">
           <AppSelect
             id="checkin-category"
-            label="Care level"
-            value={category}
-            onValueChange={(value) => setCategory(value as AdmissionCategory)}
-            options={levels.map((value) => ({ value, label: admissionCategoryLabels[value] }))}
+            label="What do they need?"
+            value={choice}
+            onValueChange={(value) => setChoice(value as CheckInChoice)}
+            options={[
+              ...admissionCategoriesFor(appointment.patient.gender).map((value) => ({
+                value,
+                label: admissionCategoryLabels[value],
+              })),
+              { value: 'no_bed', label: noBedLabel },
+            ]}
           />
           <p className="hint">
-            {admissionCategoryHints[category]} This is your decision and is recorded against
-            your name.
+            {choice === 'no_bed'
+              ? 'The visit is recorded as finished and billed here, on this booking.'
+              : `${admissionCategoryHints[choice]} They move to the Patients page to be given a bed and marked as arrived, the same as a walk-in. This is your decision and is recorded against your name.`}
           </p>
-          {!canSetHighCare && (
-            <p className="hint">
-              Intensive care is the duty manager&rsquo;s decision, so it is not on this list.
-              If the patient needs it, ask the duty manager to check them in.
-            </p>
-          )}
         </div>
 
-        <div className="field">
-          <label htmlFor="checkin-infectious">
-            <input
-              id="checkin-infectious"
-              type="checkbox"
-              checked={isInfectious}
-              onChange={(event) => setIsInfectious(event.target.checked)}
-            />{' '}
-            Needs isolation
-          </label>
-          <p className="hint">Forces an isolation-capable bed when a bed is assigned.</p>
-        </div>
+        {choice !== 'no_bed' && (
+          <div className="field">
+            <label htmlFor="checkin-infectious">
+              <input
+                id="checkin-infectious"
+                type="checkbox"
+                checked={isInfectious}
+                onChange={(event) => setIsInfectious(event.target.checked)}
+              />{' '}
+              Needs isolation
+            </label>
+            <p className="hint">Forces an isolation-capable bed when a bed is assigned.</p>
+          </div>
+        )}
 
         <div className="row">
-          <button type="submit" disabled={checkIn.isPending}>
-            {checkIn.isPending ? 'Admitting…' : 'Admit to a ward'}
+          <button type="submit" disabled={pending}>
+            {pending
+              ? 'Saving…'
+              : choice === 'no_bed'
+                ? 'Record the visit and bill'
+                : 'Admit to a ward'}
           </button>
           <button type="button" className="secondary" onClick={onCancel}>
             Cancel

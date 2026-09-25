@@ -325,14 +325,11 @@ public sealed class PatientOpenApiContractTests
         Assert.Equal(new[] { "get" }, paths.GetProperty("/patient-worklist")
             .EnumerateObject().Select(verb => verb.Name).ToArray());
 
-        Assert.Equal(
-            "completeVisit",
-            paths.GetProperty("/admissions/{id}/complete").GetProperty("post")
-                .GetProperty("operationId").GetString());
+        Assert.False(paths.TryGetProperty("/admissions/{id}/complete", out _));
     }
 
     [Fact]
-    public async Task The_ward_board_and_complete_declare_their_failures_and_not_only_their_success()
+    public async Task The_ward_board_declares_its_failures_and_not_only_its_success()
     {
         var generated = await GenerateAsync();
         var paths = generated.RootElement.GetProperty("paths");
@@ -340,10 +337,6 @@ public sealed class PatientOpenApiContractTests
         Assert.Equal(
             new[] { "200", "400", "401", "403" },
             Responses(paths.GetProperty("/patient-worklist").GetProperty("get")));
-
-        Assert.Equal(
-            new[] { "200", "401", "403", "404", "409" },
-            Responses(paths.GetProperty("/admissions/{id}/complete").GetProperty("post")));
     }
 
     [Fact]

@@ -14,10 +14,9 @@ class DispatchValidationResult {
     this.detail,
     this.checkedAt,
   });
-
-  factory DispatchValidationResult.fromJson(Map<String, Object?> json) =>
-      _$DispatchValidationResultFromJson(json);
-
+  
+  factory DispatchValidationResult.fromJson(Map<String, Object?> json) => _$DispatchValidationResultFromJson(json);
+  
   final String? check;
   final bool? passed;
   final String? detail;

@@ -23,10 +23,9 @@ class DiversionImpact {
     this.replacementAmbulanceRegistration,
     this.minutesSavedForThisCall,
   });
-
-  factory DiversionImpact.fromJson(Map<String, Object?> json) =>
-      _$DiversionImpactFromJson(json);
-
+  
+  factory DiversionImpact.fromJson(Map<String, Object?> json) => _$DiversionImpactFromJson(json);
+  
   @JsonKey(name: 'source_dispatch_id')
   final String? sourceDispatchId;
   @JsonKey(name: 'source_call_id')

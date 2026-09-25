@@ -10,11 +10,12 @@ part 'classify_admission_request.g.dart';
 
 @JsonSerializable()
 class ClassifyAdmissionRequest {
-  const ClassifyAdmissionRequest({this.admissionCategory});
-
-  factory ClassifyAdmissionRequest.fromJson(Map<String, Object?> json) =>
-      _$ClassifyAdmissionRequestFromJson(json);
-
+  const ClassifyAdmissionRequest({
+    this.admissionCategory,
+  });
+  
+  factory ClassifyAdmissionRequest.fromJson(Map<String, Object?> json) => _$ClassifyAdmissionRequestFromJson(json);
+  
   @JsonKey(name: 'admission_category')
   final AdmissionCategory? admissionCategory;
 

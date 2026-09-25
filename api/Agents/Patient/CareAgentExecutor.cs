@@ -2,6 +2,7 @@ using CareLanka.Api.Common.Persistence;
 using CareLanka.Api.Data;
 using CareLanka.Api.Data.Entities.Common;
 using CareLanka.Api.Data.Enums;
+using CareLanka.Api.DTOs.Patient;
 using CareLanka.Api.Services.Patient;
 using Microsoft.EntityFrameworkCore;
 using CareRecommendationEntity = CareLanka.Api.Data.Entities.Patient.CareRecommendation;
@@ -74,7 +75,10 @@ public sealed class CareAgentExecutor
         {
             var run = await _agent.RunAsync(
                 new CareAgentRequest(
-                    recommendation.PatientId, recommendation.AdmissionId ?? Guid.Empty, recommendation.ReportedText),
+                    recommendation.PatientId,
+                    recommendation.AdmissionId ?? Guid.Empty,
+                    recommendation.ReportedText,
+                    steps => SaveProgressAsync(workflow, steps, ct)),
                 ct);
 
             // A reviewer may have acted while the model was answering, once the run outlived
@@ -97,6 +101,13 @@ public sealed class CareAgentExecutor
             RecordFailure(workflow);
         }
 
+        await _db.SaveChangesAsync(ct);
+    }
+
+    private async Task SaveProgressAsync(
+        AgentWorkflow workflow, IReadOnlyList<CareAgentStep> steps, CancellationToken ct)
+    {
+        workflow.CompletedSteps = CareWorkflowJson.Write(steps);
         await _db.SaveChangesAsync(ct);
     }
 

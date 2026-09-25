@@ -54,7 +54,7 @@ public sealed class CareAgent : ICareAgent
 
     public async Task<CareAgentRun> RunAsync(CareAgentRequest request, CancellationToken ct = default)
     {
-        var journal = new CareAgentJournal();
+        var journal = new CareAgentJournal(request.OnProgress);
 
         for (var attempt = 1; attempt <= MaxAttempts; attempt++)
         {
@@ -162,4 +162,8 @@ public interface ICareAgent
     Task<CareAgentRun> RunAsync(CareAgentRequest request, CancellationToken ct = default);
 }
 
-public sealed record CareAgentRequest(Guid PatientId, Guid AdmissionId, string ReportedText);
+public sealed record CareAgentRequest(
+    Guid PatientId,
+    Guid AdmissionId,
+    string ReportedText,
+    Func<IReadOnlyList<CareAgentStep>, Task>? OnProgress = null);

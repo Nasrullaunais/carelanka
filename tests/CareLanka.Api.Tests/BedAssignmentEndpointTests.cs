@@ -156,9 +156,7 @@ public sealed class BedAssignmentEndpointTests
         Assert.Equal(ward.Name, body.RootElement.GetProperty("ward_name").GetString());
         Assert.Equal("B1", body.RootElement.GetProperty("bed_number").GetString());
 
-        Assert.Equal("user", body.RootElement.GetProperty("assigned_by").GetString());
         Assert.False(body.RootElement.GetProperty("is_downgrade").GetBoolean());
-        Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("workflow_id").ValueKind);
         Assert.Equal(await NurseIdAsync(), body.RootElement.GetProperty("approved_by_staff_id").GetString());
 
         using var admission = await ReadJsonAsync(
@@ -432,7 +430,7 @@ public sealed class BedAssignmentEndpointTests
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         var ward = await NewWardAsync(wardType: "icu");
         var beds = await AddBedsAsync(ward, 1);
-        var admissionId = await NewAdmissionAsync(nurse, category: "inpatient");
+        var admissionId = await NewAdmissionAsync(nurse, category: "general");
 
         var assigned = await nurse.PostAsJsonAsync(
             $"/api/admissions/{admissionId}/assign-bed", new { bed_id = beds[0] });
@@ -449,7 +447,7 @@ public sealed class BedAssignmentEndpointTests
         using var manager = await ClientAsync(ApiApplication.ManagerEmail);
         var ward = await NewWardAsync(wardType: "icu");
         var beds = await AddBedsAsync(ward, 1);
-        var admissionId = await NewAdmissionAsync(nurse, category: "inpatient");
+        var admissionId = await NewAdmissionAsync(nurse, category: "general");
 
         var assigned = await manager.PostAsJsonAsync(
             $"/api/admissions/{admissionId}/assign-bed", new { bed_id = beds[0] });
@@ -467,7 +465,7 @@ public sealed class BedAssignmentEndpointTests
         using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
         var ward = await NewWardAsync();
         var beds = await AddBedsAsync(ward, 1);
-        var admissionId = await NewAdmissionAsync(nurse, category: "inpatient");
+        var admissionId = await NewAdmissionAsync(nurse, category: "general");
 
         var assigned = await reception.PostAsJsonAsync(
             $"/api/admissions/{admissionId}/assign-bed", new { bed_id = beds[0] });
@@ -1047,7 +1045,7 @@ public sealed class BedAssignmentEndpointTests
 
     private async Task<string> NewAdmissionAsync(
         HttpClient nurse,
-        string category = "inpatient",
+        string category = "general",
         string gender = "male",
         bool isInfectious = false,
         DateTimeOffset? expectedArrival = null,

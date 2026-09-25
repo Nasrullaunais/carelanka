@@ -19,6 +19,7 @@ dependencies:
   retrofit: ^4.4.1
   json_annotation: ^4.12.0
   http: ^1.2.0
+  web: ^1.1.1
 
   # Routing (core/routing)
   go_router: ^14.0.0
@@ -42,7 +43,11 @@ dependencies:
 
   # OPD lab reports: photograph a printed report, or attach its PDF.
   image_picker: ^1.1.2
-  file_picker: ^8.1.7
+  file_picker: ^8.3.7
+
+  # Push alerts for the ambulance crew when the app is closed (core/push).
+  firebase_core: ^4.2.0
+  firebase_messaging: ^16.0.4
 
 dev_dependencies:
   flutter_test:

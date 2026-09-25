@@ -2,6 +2,7 @@
 **/bin/
 **/obj/
 *.user
+.env
 
 ## Node / React
 node_modules/
@@ -27,3 +28,9 @@ RUN.md
 IMPORTANT.md
 PR_DRAFT.md
 OVERALL_EXPLANATION.md
+graft/
+SE3110 Assignment.md
+
+
+# Firebase phone-app config, kept out of git
+mobile-ui/android/app/google-services.json

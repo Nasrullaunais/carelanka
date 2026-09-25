@@ -29,6 +29,7 @@
     <None Include="../../specs/emergency-spec.yaml" Link="specs/emergency-spec.yaml" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../specs/equipment-spec.yaml" Link="specs/equipment-spec.yaml" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../specs/patient-spec.yaml" Link="specs/patient-spec.yaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../specs/staff-spec.yaml" Link="specs/staff-spec.yaml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

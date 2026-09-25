@@ -2,11 +2,14 @@ using CareLanka.Api.Data;
 using CareLanka.Api.Data.Entities.Common;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.Services.Common;
+using CareLanka.Api.Services.Emergency;
 using System.Collections.Concurrent;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Testcontainers.PostgreSql;
 using Xunit;
@@ -57,7 +60,20 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
 
         builder.ConfigureLogging(logging => logging.AddProvider(new CapturingLoggerProvider(Logs)));
         builder.ConfigureServices(services =>
-            services.AddControllers().AddApplicationPart(typeof(TestPolicyController).Assembly));
+        {
+            services.AddControllers().AddApplicationPart(typeof(TestPolicyController).Assembly);
+            // Tests drain SceneLookupQueue and run the processor themselves; the real worker would call the internet.
+            services.Remove(services.Single(service =>
+                service.ServiceType == typeof(IHostedService) && service.ImplementationType == typeof(SceneLookupWorker)));
+            services.Replace(ServiceDescriptor.Singleton<IReverseGeocoder, NoAddressGeocoder>());
+            // Tests run the delivery pass themselves and never talk to Firebase.
+            services.Remove(services.Single(service =>
+                service.ServiceType == typeof(IHostedService) && service.ImplementationType == typeof(PushDeliveryWorker)));
+            services.Replace(ServiceDescriptor.Singleton<IPushSender, RecordingPushSender>());
+            // Tests run the pre-admission pass themselves and never call Patient Management.
+            services.Remove(services.Single(service =>
+                service.ServiceType == typeof(IHostedService) && service.ImplementationType == typeof(PreAdmissionWorker)));
+        });
     }
 
     public async Task InitializeAsync()

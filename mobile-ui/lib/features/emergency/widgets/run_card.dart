@@ -33,7 +33,9 @@ class RunCard extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           'Priority: ${run.callPriority?.name ?? 'unknown'}',
-          style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 16),
         Card(
@@ -43,6 +45,8 @@ class RunCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _Row(label: 'Ambulance', value: run.ambulanceRegistration),
+                if (run.sceneAddressLabel?.trim().isNotEmpty == true)
+                  _Row(label: 'Scene', value: run.sceneAddressLabel),
                 _Row(label: 'Crew on board', value: run.crewCount?.toString()),
                 _Row(label: 'Going to ward', value: run.destinationWardName),
               ],
@@ -53,8 +57,15 @@ class RunCard extends StatelessWidget {
         if (step != null)
           FilledButton(
             onPressed: busy ? null : onStep,
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56)),
-            child: busy ? const SizedBox.square(dimension: 22, child: CircularProgressIndicator(strokeWidth: 2)) : Text(step.label),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(56),
+            ),
+            child: busy
+                ? const SizedBox.square(
+                    dimension: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Text(step.label),
           ),
         if (status?.canNavigate ?? false) ...[
           const SizedBox(height: 12),
@@ -62,12 +73,17 @@ class RunCard extends StatelessWidget {
             onPressed: busy ? null : onNavigate,
             icon: const Icon(Icons.navigation_outlined),
             label: const Text('Open in Google Maps'),
-            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+            ),
           ),
         ],
         if (status?.canDecline ?? false) ...[
           const SizedBox(height: 12),
-          TextButton(onPressed: busy ? null : onDecline, child: const Text('I cannot take this run')),
+          TextButton(
+            onPressed: busy ? null : onDecline,
+            child: const Text('I cannot take this run'),
+          ),
         ],
       ],
     );
@@ -82,10 +98,13 @@ class _Row extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [Text(label), Flexible(child: Text(value ?? 'Not set', textAlign: TextAlign.end))],
-        ),
-      );
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label),
+        Flexible(child: Text(value ?? 'Not set', textAlign: TextAlign.end)),
+      ],
+    ),
+  );
 }

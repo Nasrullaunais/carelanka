@@ -10,15 +10,10 @@ AdmissionDetail _$AdmissionDetailFromJson(Map<String, dynamic> json) =>
     AdmissionDetail(
       id: json['id'] as String,
       source: AdmissionSource.fromJson(json['source'] as String),
-      admissionCategory: AdmissionCategory.fromJson(
-        json['admission_category'] as String,
-      ),
       urgency: AdmissionUrgency.fromJson(json['urgency'] as String),
       status: AdmissionStatus.fromJson(json['status'] as String),
       detailsComplete: json['details_complete'] as bool,
       requiresBed: json['requires_bed'] as bool,
-      categorySetByStaffId: json['category_set_by_staff_id'] as String,
-      categorySetAt: DateTime.parse(json['category_set_at'] as String),
       isInfectious: json['is_infectious'] as bool,
       missingFields: (json['missing_fields'] as List<dynamic>)
           .map((e) => e as String)
@@ -29,6 +24,9 @@ AdmissionDetail _$AdmissionDetailFromJson(Map<String, dynamic> json) =>
       patient: json['patient'] == null
           ? null
           : PatientSummary.fromJson(json['patient'] as Map<String, dynamic>),
+      admissionCategory: json['admission_category'] == null
+          ? null
+          : AdmissionCategory.fromJson(json['admission_category'] as String),
       wardName: json['ward_name'] as String?,
       bedNumber: json['bed_number'] as String?,
       expectedArrival: json['expected_arrival'] == null
@@ -38,7 +36,11 @@ AdmissionDetail _$AdmissionDetailFromJson(Map<String, dynamic> json) =>
           ? null
           : DateTime.parse(json['admitted_at'] as String),
       dispatchId: json['dispatch_id'] as String?,
+      categorySetByStaffId: json['category_set_by_staff_id'] as String?,
       categorySetByStaffName: json['category_set_by_staff_name'] as String?,
+      categorySetAt: json['category_set_at'] == null
+          ? null
+          : DateTime.parse(json['category_set_at'] as String),
       reportedByUserId: json['reported_by_user_id'] as String?,
       dischargedAt: json['discharged_at'] == null
           ? null
@@ -78,7 +80,7 @@ Map<String, dynamic> _$AdmissionDetailToJson(AdmissionDetail instance) =>
       'dispatch_id': instance.dispatchId,
       'category_set_by_staff_id': instance.categorySetByStaffId,
       'category_set_by_staff_name': instance.categorySetByStaffName,
-      'category_set_at': instance.categorySetAt.toIso8601String(),
+      'category_set_at': instance.categorySetAt?.toIso8601String(),
       'is_infectious': instance.isInfectious,
       'reported_by_user_id': instance.reportedByUserId,
       'missing_fields': instance.missingFields,

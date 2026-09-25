@@ -61,6 +61,11 @@ tags:
     description: |
       Token issuing for both identities. Everything here is unauthenticated except
       `/auth/logout` and `/auth/me`.
+  - name: Device tokens
+    description: |
+      The phone addresses the push service needs to reach a signed-in staff member.
+      A push is only ever a nudge to open the app - the app still reads the real data
+      from the API, so a missed push loses nothing.
   - name: Workflows
     description: |
       The group-owned agent workflow record. Read the trace, approve or reject the one
@@ -268,6 +273,57 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/CurrentPrincipal' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ============================================================
+  # Device tokens - push delivery
+  # ============================================================
+
+  /device-tokens:
+    put:
+      tags: [Device tokens]
+      summary: Register this phone for push
+      description: |
+        Roles: any staff.
+
+        Idempotent by token: registering a token that already exists moves it to the
+        caller and switches it back on, so a phone handed to a colleague follows the
+        person currently signed in. Call it after every sign-in and whenever the push
+        service issues a new token.
+      operationId: registerDevice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterDeviceRequest' }
+      responses:
+        '200':
+          description: The registration
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceRegistration' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /device-tokens/{id}:
+    delete:
+      tags: [Device tokens]
+      summary: Stop pushes to this phone
+      description: |
+        Roles: any staff, for their own registrations only. Call it on sign-out, before
+        the session is dropped. Idempotent - a second call is still 204. Someone
+        else's registration is a 404, so ids cannot be probed.
+      operationId: unregisterDevice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Pushes stopped }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   # ============================================================
   # Workflows - the group-owned agent surface
@@ -685,6 +741,24 @@ components:
           description: Letters, digits, dots, underscores and hyphens. Stored lower-cased.
         password: { type: string, format: password, minLength: 8, maxLength: 128 }
 
+    RegisterDeviceRequest:
+      type: object
+      required: [token, platform]
+      properties:
+        token:
+          type: string
+          maxLength: 512
+          description: The registration token the push service issued to this phone.
+        platform: { type: string, enum: [android, ios, web] }
+
+    DeviceRegistration:
+      type: object
+      required: [id, platform, last_seen_at]
+      properties:
+        id: { type: string, format: uuid }
+        platform: { type: string, enum: [android, ios, web] }
+        last_seen_at: { type: string, format: date-time }
+
     RefreshTokenRequest:
       type: object
       required: [refresh_token]
@@ -753,7 +827,6 @@ components:
       enum:
         - coordinator
         - dispatch_routing
-        - patient_admission_bed
         - staff_allocation
         - equipment_monitoring
 
@@ -898,7 +971,6 @@ components:
     ProposedChangeType:
       type: string
       enum:
-        - reserve_bed
         - end_allocation
         - create_allocation
         - assign_ambulance

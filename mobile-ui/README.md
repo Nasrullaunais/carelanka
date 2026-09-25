@@ -1,5 +1,7 @@
 # CareLanka — Flutter Mobile App (`mobile-ui`)
 
+For a physical Android phone connected over USB to the local Docker API, see [LOCAL_SETUP.md](../LOCAL_SETUP.md).
+
 One Flutter app. Four members. Each member owns one folder under `lib/features/`.
 
 This file explains the structure and the rules. **Read it before you write code —

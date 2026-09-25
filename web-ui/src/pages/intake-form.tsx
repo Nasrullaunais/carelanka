@@ -7,10 +7,12 @@ import {
   daysInMonth,
   fieldLimits,
   monthNames,
+  nicBirthYearProblem,
   phoneProblem,
   toIsoDate,
 } from '../types/identifiers';
-import { genderLabels, genders } from '../types/patients';
+import { genderLabels, selectableGenders } from '../types/patients';
+import { AppSelect } from '../components/ui/app-select';
 
 export type PatientFormValue = {
   fullName: string;
@@ -25,10 +27,10 @@ export type PatientFormValue = {
   birthDay: number | null;
 };
 
-export function emptyPatientForm(unidentified: boolean): PatientFormValue {
+export function emptyPatientForm(unidentified: boolean, forcedGender?: Gender): PatientFormValue {
   return {
     fullName: unidentified ? 'Unidentified patient' : '',
-    gender: unidentified ? 'unknown' : 'male',
+    gender: forcedGender ?? (unidentified ? 'unknown' : 'male'),
     phone: '',
     address: '',
     contactName: '',
@@ -55,12 +57,13 @@ export function patientFormFrom(patient: Patient): PatientFormValue {
   };
 }
 
-export function patientFormProblems(value: PatientFormValue, identified = false) {
+export function patientFormProblems(value: PatientFormValue, identified = false, nic = '') {
   const dateOfBirth = toIsoDate(value.birthYear, value.birthMonth, value.birthDay);
 
   const phone = phoneProblem(value.phone);
   const contactPhone = phoneProblem(value.contactPhone);
   const dateOfBirthError = dateOfBirthProblem(dateOfBirth);
+  const nicBirthYear = nicBirthYearProblem(nic, value.birthYear);
 
   const dateIncomplete =
     (value.birthYear !== null || value.birthMonth !== null || value.birthDay !== null) &&
@@ -78,6 +81,7 @@ export function patientFormProblems(value: PatientFormValue, identified = false)
     contactPhone !== null ||
     dateOfBirthError !== null ||
     dateIncomplete ||
+    nicBirthYear !== null ||
     missing.phone ||
     missing.address ||
     missing.dateOfBirth;
@@ -87,6 +91,7 @@ export function patientFormProblems(value: PatientFormValue, identified = false)
     phone,
     contactPhone,
     dateOfBirth: dateOfBirthError,
+    nicBirthYear,
     dateIncomplete,
     missing,
     blocked,
@@ -137,6 +142,9 @@ export function PatientFields({
   set,
   idPrefix,
   identified = false,
+  lockGenderTo,
+  allowUnknownGender = false,
+  nic = '',
 }: {
   value: PatientFormValue;
   set: <K extends keyof PatientFormValue>(key: K, next: PatientFormValue[K]) => void;
@@ -144,8 +152,23 @@ export function PatientFields({
   idPrefix: string;
 
   identified?: boolean;
+  lockGenderTo?: Gender;
+  /// For an unidentified arrival only — hard rule H3 (patient-management-plan.md §9) sends
+  /// `unknown` to a mixed ward by rule rather than guessing a single-sex ward from appearance.
+  allowUnknownGender?: boolean;
+  /// The patient's NIC, if known — cross-checked against the birth year (Sri Lankan NICs
+  /// encode it in the leading digits). Omit for an unidentified arrival with no NIC yet.
+  nic?: string;
 }) {
-  const problems = patientFormProblems(value, identified);
+  const problems = patientFormProblems(value, identified, nic);
+
+  const baseGenderOptions: Gender[] = allowUnknownGender
+    ? [...selectableGenders, 'unknown']
+    : selectableGenders;
+
+  const genderOptions = baseGenderOptions.includes(value.gender)
+    ? baseGenderOptions
+    : [...baseGenderOptions, value.gender];
 
   return (
     <>
@@ -162,18 +185,17 @@ export function PatientFields({
           <Counter value={value.fullName} limit={fieldLimits.fullName} />
         </div>
         <div className="field">
-          <label htmlFor={`${idPrefix}-gender`}>Gender</label>
-          <select
+          <AppSelect
             id={`${idPrefix}-gender`}
+            label="Gender"
             value={value.gender}
-            onChange={(event) => set('gender', event.target.value as Gender)}
-          >
-            {genders.map((option) => (
-              <option key={option} value={option}>
-                {genderLabels[option]}
-              </option>
-            ))}
-          </select>
+            isDisabled={lockGenderTo !== undefined}
+            onValueChange={(nextValue) => set('gender', nextValue as Gender)}
+            options={genderOptions.map((option) => ({ value: option, label: genderLabels[option] }))}
+          />
+          {lockGenderTo && (
+            <p className="hint">Locked to {genderLabels[lockGenderTo]} for this care level.</p>
+          )}
         </div>
       </div>
 
@@ -181,52 +203,43 @@ export function PatientFields({
         <div className="field">
           <label htmlFor={`${idPrefix}-dob-day`}>Date of birth</label>
           <div className="row" style={{ gap: '0.4rem' }}>
-            <select
+            <AppSelect
               id={`${idPrefix}-dob-day`}
               aria-label="Day of birth"
-              value={value.birthDay ?? ''}
-              onChange={(event) =>
-                set('birthDay', event.target.value === '' ? null : Number(event.target.value))
+              value={String(value.birthDay ?? '')}
+              onValueChange={(nextValue) =>
+                set('birthDay', nextValue === '' ? null : Number(nextValue))
               }
-            >
-              <option value="">Day</option>
-              {Array.from(
-                { length: daysInMonth(value.birthYear, value.birthMonth) },
-                (_, index) => index + 1,
-              ).map((day) => (
-                <option key={day} value={day}>
-                  {day}
-                </option>
-              ))}
-            </select>
-            <select
+              options={[
+                { value: '', label: 'Day' },
+                ...Array.from(
+                  { length: daysInMonth(value.birthYear, value.birthMonth) },
+                  (_, index) => index + 1,
+                ).map((day) => ({ value: String(day), label: day })),
+              ]}
+            />
+            <AppSelect
               aria-label="Month of birth"
-              value={value.birthMonth ?? ''}
-              onChange={(event) =>
-                set('birthMonth', event.target.value === '' ? null : Number(event.target.value))
+              value={String(value.birthMonth ?? '')}
+              onValueChange={(nextValue) =>
+                set('birthMonth', nextValue === '' ? null : Number(nextValue))
               }
-            >
-              <option value="">Month</option>
-              {monthNames.map((name, index) => (
-                <option key={name} value={index + 1}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            <select
+              options={[
+                { value: '', label: 'Month' },
+                ...monthNames.map((name, index) => ({ value: String(index + 1), label: name })),
+              ]}
+            />
+            <AppSelect
               aria-label="Year of birth"
-              value={value.birthYear ?? ''}
-              onChange={(event) =>
-                set('birthYear', event.target.value === '' ? null : Number(event.target.value))
+              value={String(value.birthYear ?? '')}
+              onValueChange={(nextValue) =>
+                set('birthYear', nextValue === '' ? null : Number(nextValue))
               }
-            >
-              <option value="">Year</option>
-              {birthYears().map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: 'Year' },
+                ...birthYears().map((year) => ({ value: String(year), label: year })),
+              ]}
+            />
           </div>
           {problems.dateOfBirth && <p className="field-error">{problems.dateOfBirth}</p>}
           {problems.dateIncomplete && !problems.dateOfBirth && (
@@ -239,6 +252,7 @@ export function PatientFields({
               Required. Ward eligibility depends on the patient's age.
             </p>
           )}
+          {problems.nicBirthYear && <p className="field-error">{problems.nicBirthYear}</p>}
         </div>
       </div>
 
@@ -277,7 +291,8 @@ export function PatientFields({
         <div className="field">
 
           <label htmlFor={`${idPrefix}-contact-name`}>
-            Emergency contact name {identified && <span className="muted">(optional)</span>}
+            Emergency/guardian contact name{' '}
+            {identified && <span className="muted">(optional)</span>}
           </label>
           <input
             id={`${idPrefix}-contact-name`}
@@ -290,7 +305,8 @@ export function PatientFields({
         </div>
         <div className="field">
           <label htmlFor={`${idPrefix}-contact-phone`}>
-            Emergency contact phone {identified && <span className="muted">(optional)</span>}
+            Emergency/guardian contact number{' '}
+            {identified && <span className="muted">(optional)</span>}
           </label>
           <input
             id={`${idPrefix}-contact-phone`}

@@ -178,10 +178,10 @@ column, then read your row.
 
 **The two in bold are the ones that matter most.**
 
-`GET /beds` (M3 → M4) was the deepest dependency in the project — M4's bed agent has nothing
-to reason over without it. **Resolved 2026-09-10**: the register is real and M4 reads it
-through `IBedRegistryService`. The deepest *remaining* one is `AgentWorkflow`, which is
-common, unbuilt, and in front of all five agents — see §7 row 4b.
+`GET /beds` (M3 → M4) was the deepest dependency in the project — M4's manual bed assignment
+has nothing to place a patient into without it. **Resolved 2026-09-10**: the register is real
+and M4 reads it through `IBedRegistryService`. The deepest *remaining* one is `AgentWorkflow`,
+which is common, unbuilt, and in front of the agents still using it — see §7 row 4b.
 
 `GET /beds/{id}/occupancy` (M4 → M3) is the one place a stub is genuinely dangerous rather
 than merely temporary. Equipment calls it before taking a bed out of service, and a fake
@@ -201,7 +201,7 @@ rather than discovering at the demo.
 | 1 | **First real cross-component read** | M3 → M4 | Equipment's bed register replaces M4's stub. Delete the `STUBS.md` row |
 | 2 | **Staff lookup replaces three stubs** | M2 → M1, M3, M4 | "Approved by Dr. Perera" renders from real data in all three |
 | 3 | **The pre-admission call** | M1 → M4 | A dispatch creates an `Admission` in `awaiting_bed`. Watch the urgency translation — `critical/high/medium/low` becomes `routine/urgent/emergency`, and a mismatch is a 400 |
-| 4 | **The full emergency workflow** | all five | `CareLanka_Component_Plan.md` §6, end to end: call in Flutter → dispatch → pre-admission → bed suggestion → staffing check → equipment check → one human approval → back to Flutter. **This is the assessed cross-platform workflow** (§9.1, §10). *Note 2026-09-16: M4's bed step now suggests without reserving, so a plan that stalls at approval leaves nothing half-allocated on the patient side — `integration_of_functions.md` §11.17* |
+| 4 | **The full emergency workflow** | all five | `CareLanka_Component_Plan.md` §6, end to end: call in Flutter → dispatch → pre-admission → manual bed assignment → staffing check → equipment check → one human approval → back to Flutter. **This is the assessed cross-platform workflow** (§9.1, §10). *Note 2026-09-22: M4's bed step is manual assignment only, so a plan that stalls before it leaves nothing half-allocated on the patient side — `integration_of_functions.md` §11.17* |
 
 ---
 
@@ -216,7 +216,7 @@ rather than discovering at the demo.
 | 4b | Audit interceptor + `AgentWorkflow` tables | Common | **Not built, and now blocking.** The audit interceptor still blocks nobody. The `AgentWorkflow` / `AgentProposedChange` pair is a different matter: **every agent in the project needs it, and M4's two are ready to be built behind it** (`build/patient.md` steps 11–16). `BedAssignment.WorkflowId` is already a column pointing at a table that does not exist. Re-swept 2026-09-16 — no entity, no configuration, no migration, no controller |
 | 5 | CI — `.github/` | Common | Not built. §13 grades it |
 | 6 | Auth integration + generated-contract test project | Common | **Done in PR #11** — `CareLanka.Api.Tests`, 15 tests against disposable PostgreSQL |
-| 7 | `web-ui/` scaffold | Common | Not built. Blocks all React work |
+| 7 | `web-ui/` scaffold | Common | **Done** — React 19/Vite, generated API client, shared shell and role-routed operational screens are live; see `web-ui/README.md` |
 | 8 | `flutter create .` | **whoever has the SDK** | Not run. No `android/`, no APK without it |
 | 9 | `swagger_parser` in `pubspec.yaml` | with #8 | Not added |
 | 10 | `*.g.dart` — committed or CI-built? | with #8 | Open. `.gitignore` currently ignores it |

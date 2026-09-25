@@ -8,6 +8,8 @@ abstract final class PatientFieldLimits {
   static const address = 300;
   static const contactName = 200;
   static const visitReason = 300;
+  static const careReportMin = 5;
+  static const careReportMax = 2000;
 }
 
 const _nicPattern = r'^(\d{9}[VvXx]|\d{12}|(?=.*[A-Za-z])[A-Za-z0-9]{6,15})$';
@@ -21,6 +23,39 @@ String? validateNic(String? value) {
         'or a passport number.';
   }
   return null;
+}
+
+final _oldNicPattern = RegExp(r'^(\d{2})\d{3}\d{3}\d[VvXx]$');
+final _newNicPattern = RegExp(r'^(\d{4})\d{3}\d{5}$');
+
+// A Sri Lankan NIC encodes the birth year in its leading digits: two digits (assumed 19xx —
+// the old format was retired before 2000) in the nine-digit form, four in the twelve-digit
+// form. A passport number carries no such encoding, so this returns null for one. Mirrors
+// nicBirthYear in web-ui/src/types/identifiers.ts.
+int? nicBirthYear(String nic) {
+  final text = nic.trim();
+
+  final oldMatch = _oldNicPattern.firstMatch(text);
+  if (oldMatch != null) {
+    return 1900 + int.parse(oldMatch.group(1)!);
+  }
+
+  final newMatch = _newNicPattern.firstMatch(text);
+  if (newMatch != null) {
+    return int.parse(newMatch.group(1)!);
+  }
+
+  return null;
+}
+
+String? validateDateOfBirthAgainstNic(DateTime? dateOfBirth, String nic) {
+  if (dateOfBirth == null) return null;
+
+  final expected = nicBirthYear(nic);
+  if (expected == null || expected == dateOfBirth.year) return null;
+
+  return "Doesn't match the NIC — its first digits say $expected, not "
+      '${dateOfBirth.year}.';
 }
 
 String? validateFullName(String? value) {
@@ -38,6 +73,14 @@ String? validateContactName(String? value) =>
 
 String? validateVisitReason(String? value) =>
     _withinLimit(value, PatientFieldLimits.visitReason);
+
+String? validateCareReport(String? value) {
+  final text = value?.trim() ?? '';
+  if (text.length < PatientFieldLimits.careReportMin) {
+    return 'Say a bit more — at least ${PatientFieldLimits.careReportMin} characters.';
+  }
+  return _withinLimit(value, PatientFieldLimits.careReportMax);
+}
 
 String? _withinLimit(String? value, int limit) =>
     (value != null && value.length > limit) ? 'Use $limit characters or fewer' : null;

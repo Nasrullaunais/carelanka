@@ -76,7 +76,12 @@ class _AwaitingList extends StatelessWidget {
         return RefreshIndicator(
           onRefresh: controller.reload,
           child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(AppTheme.gutter, 12, AppTheme.gutter, 32),
+            padding: const EdgeInsets.fromLTRB(
+              AppTheme.gutter,
+              12,
+              AppTheme.gutter,
+              32,
+            ),
             itemCount: items.length,
             separatorBuilder: (_, __) => const SizedBox(height: 10),
             itemBuilder: (_, index) => _AwaitingItemCard(item: items[index]),
@@ -94,18 +99,42 @@ class _AwaitingItemCard extends StatelessWidget {
 
   Future<void> _confirm(BuildContext context) async {
     final controller = context.read<EquipmentConfirmationController>();
-    final messenger = ScaffoldMessenger.of(context);
+    final sure = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Confirm ${item.name}?'),
+        content: Text(
+          '${item.assetTag} will enter the equipment register and become visible to the team.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Review again'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Confirm equipment'),
+          ),
+        ],
+      ),
+    );
+    if (sure != true || !context.mounted) return;
 
     final refused = await controller.confirm(item);
+    if (!context.mounted) return;
 
-    messenger.showSnackBar(SnackBar(
-      content: Text(refused?.message ?? '${item.name} confirmed. It now shows on the web dashboard.'),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          refused?.message ??
+              '${item.name} confirmed. It now shows on the web dashboard.',
+        ),
+      ),
+    );
   }
 
   Future<void> _reject(BuildContext context) async {
     final controller = context.read<EquipmentConfirmationController>();
-    final messenger = ScaffoldMessenger.of(context);
 
     final sure = await showDialog<bool>(
       context: context,
@@ -127,13 +156,14 @@ class _AwaitingItemCard extends StatelessWidget {
         ],
       ),
     );
-    if (sure != true) return;
+    if (sure != true || !context.mounted) return;
 
     final refused = await controller.reject(item);
+    if (!context.mounted) return;
 
-    messenger.showSnackBar(SnackBar(
-      content: Text(refused?.message ?? '${item.name} rejected.'),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(refused?.message ?? '${item.name} rejected.')),
+    );
   }
 
   @override
@@ -153,21 +183,38 @@ class _AwaitingItemCard extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               '${item.assetTag} · ${item.categoryName}',
-              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 10),
-            ConfirmationDetail(label: 'Make', value: '${item.manufacturer} ${item.model}'),
-            if (serial != null) ConfirmationDetail(label: 'Serial', value: serial),
-            ConfirmationDetail(label: 'Location', value: item.wardName ?? 'Central store'),
-            ConfirmationDetail(label: 'Purchased', value: FriendlyDate.date(item.purchaseDate)),
-            ConfirmationDetail(label: 'Registered', value: FriendlyDate.full(item.createdAt)),
+            ConfirmationDetail(
+              label: 'Make',
+              value: '${item.manufacturer} ${item.model}',
+            ),
+            if (serial != null)
+              ConfirmationDetail(label: 'Serial', value: serial),
+            ConfirmationDetail(
+              label: 'Location',
+              value: item.wardName ?? 'Central store',
+            ),
+            ConfirmationDetail(
+              label: 'Purchased',
+              value: FriendlyDate.date(item.purchaseDate),
+            ),
+            ConfirmationDetail(
+              label: 'Registered',
+              value: FriendlyDate.full(item.createdAt),
+            ),
             const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
                     onPressed: busy ? null : () => _reject(context),
-                    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                    ),
                     child: const Text('Reject'),
                   ),
                 ),
@@ -175,7 +222,9 @@ class _AwaitingItemCard extends StatelessWidget {
                 Expanded(
                   child: FilledButton(
                     onPressed: busy ? null : () => _confirm(context),
-                    style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                    ),
                     child: busy
                         ? const SizedBox(
                             width: 18,

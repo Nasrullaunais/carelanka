@@ -190,15 +190,15 @@ public sealed class CapacityEndpointTests
         var ward = await NewWardAsync(client);
         var beds = await AddBedsAsync(ward, 4);
 
-        await OccupyAsync(beds[0], category: AdmissionCategory.Inpatient);
-        await OccupyAsync(beds[1], category: AdmissionCategory.Inpatient);
-        await OccupyAsync(beds[2], category: AdmissionCategory.Hdu);
+        await OccupyAsync(beds[0], category: AdmissionCategory.General);
+        await OccupyAsync(beds[1], category: AdmissionCategory.General);
+        await OccupyAsync(beds[2], category: AdmissionCategory.Surgical);
 
         using var body = await ReadJsonAsync(await client.GetAsync($"/api/wards/{ward.Id}/occupancy"));
         var mix = body.RootElement.GetProperty("patients_by_category");
 
-        Assert.Equal(2, mix.GetProperty("inpatient").GetInt32());
-        Assert.Equal(1, mix.GetProperty("hdu").GetInt32());
+        Assert.Equal(2, mix.GetProperty("general").GetInt32());
+        Assert.Equal(1, mix.GetProperty("surgical").GetInt32());
     }
 
     [Fact]
@@ -211,7 +211,7 @@ public sealed class CapacityEndpointTests
         var mix = body.RootElement.GetProperty("patients_by_category");
 
         Assert.Equal(
-            new[] { "day_case", "hdu", "icu", "inpatient", "outpatient" },
+            new[] { "emergency", "general", "icu", "maternity", "surgical" },
             mix.EnumerateObject().Select(property => property.Name).Order().ToArray());
         Assert.All(mix.EnumerateObject(), property => Assert.Equal(0, property.Value.GetInt32()));
     }
@@ -401,7 +401,7 @@ public sealed class CapacityEndpointTests
 
     private Task OccupyAsync(
         Guid bedId,
-        AdmissionCategory category = AdmissionCategory.Inpatient,
+        AdmissionCategory category = AdmissionCategory.General,
         string? patientName = null)
         => AssignAsync(bedId, AssignmentStatus.Occupied, null, AdmissionStatus.Admitted, category,
             expectedArrival: null, patientName: patientName);
@@ -410,7 +410,7 @@ public sealed class CapacityEndpointTests
         Guid bedId,
         TimeSpan expiresIn,
         TimeSpan? expectedArrival = null,
-        AdmissionCategory category = AdmissionCategory.Inpatient)
+        AdmissionCategory category = AdmissionCategory.General)
         => AssignAsync(bedId, AssignmentStatus.Reserved, DateTimeOffset.UtcNow + expiresIn,
             AdmissionStatus.BedReserved, category, expectedArrival);
 
@@ -419,7 +419,7 @@ public sealed class CapacityEndpointTests
         AssignmentStatus status,
         DateTimeOffset? reservedUntil,
         AdmissionStatus admissionStatus,
-        AdmissionCategory category = AdmissionCategory.Inpatient,
+        AdmissionCategory category = AdmissionCategory.General,
         TimeSpan? expectedArrival = null,
         string? patientName = null)
     {
@@ -442,8 +442,7 @@ public sealed class CapacityEndpointTests
             AdmissionId = admissionId,
             BedId = bedId,
             Status = status,
-            ReservedUntil = reservedUntil,
-            AssignedBy = AssignedBy.User
+            ReservedUntil = reservedUntil
         });
 
         await db.SaveChangesAsync();
@@ -486,10 +485,10 @@ public sealed class CapacityEndpointTests
     private static string Wire(AdmissionCategory category) => category switch
     {
         AdmissionCategory.Icu => "icu",
-        AdmissionCategory.Hdu => "hdu",
-        AdmissionCategory.Inpatient => "inpatient",
-        AdmissionCategory.DayCase => "day_case",
-        _ => "outpatient"
+        AdmissionCategory.Surgical => "surgical",
+        AdmissionCategory.Maternity => "maternity",
+        AdmissionCategory.Emergency => "emergency",
+        _ => "general"
     };
 
     private static async Task<JsonElement> CapacityRowAsync(HttpClient client, TestWard ward)

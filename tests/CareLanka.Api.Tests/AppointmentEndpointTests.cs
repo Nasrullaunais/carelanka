@@ -246,7 +246,7 @@ public sealed class AppointmentEndpointTests
         Assert.Equal("pre_registered", admission.RootElement.GetProperty("source").GetString());
 
         Assert.Equal("awaiting_bed", admission.RootElement.GetProperty("status").GetString());
-        Assert.Equal("inpatient", admission.RootElement.GetProperty("admission_category").GetString());
+        Assert.Equal("general", admission.RootElement.GetProperty("admission_category").GetString());
         Assert.Equal(
             patientId,
             admission.RootElement.GetProperty("patient").GetProperty("id").GetString());
@@ -294,7 +294,7 @@ public sealed class AppointmentEndpointTests
     }
 
     [Fact]
-    public async Task A_nurse_may_not_check_somebody_in_at_icu_or_hdu_but_the_duty_manager_may()
+    public async Task A_nurse_may_not_check_somebody_in_at_icu_but_the_duty_manager_may()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         using var manager = await ClientAsync(ApiApplication.ManagerEmail);
@@ -314,11 +314,11 @@ public sealed class AppointmentEndpointTests
     }
 
     [Fact]
-    public async Task A_nurse_may_still_check_somebody_in_at_the_three_levels_that_are_theirs()
+    public async Task A_nurse_may_still_check_somebody_in_at_the_four_levels_that_are_theirs()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
 
-        foreach (var category in new[] { "outpatient", "day_case", "inpatient" })
+        foreach (var category in new[] { "general", "surgical", "maternity", "emergency" })
         {
             var appointmentId = await ConfirmedIdAsync(
                 nurse, await NewPatientAsync(nurse, $"Nurse Checks In {category}"), SoonUtc());
@@ -652,7 +652,7 @@ public sealed class AppointmentEndpointTests
     private async Task<HttpResponseMessage> CheckInAsync(
         HttpClient client,
         string appointmentId,
-        string category = "inpatient",
+        string category = "general",
         string? staffId = null)
         => await client.PostAsJsonAsync($"/api/appointments/{appointmentId}/check-in", new
         {
@@ -683,7 +683,7 @@ public sealed class AppointmentEndpointTests
         {
             patient_id = patientId,
             source = "walk_in",
-            admission_category = "inpatient",
+            admission_category = "general",
             category_set_by_staff_id = await NurseIdAsync(),
             urgency = "routine",
             is_infectious = false

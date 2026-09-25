@@ -23,6 +23,11 @@ VALUES
      'Kasun', 'Fernando', '+94771000003', 'Ambulance', 'ambulance_crew',
      now(), now(), true, NULL),
 
+    (gen_random_uuid(), 'crew.perera@carelanka.lk',
+     'AQAAAAIAAYagAAAAEIrtiEHUuSr7fqusZOgi2yPIVGVwVUbsHY7SlUpm2YDocakGkIfanTXxqPpwD6F7Sw==',
+     'Mihiri', 'Perera', '+94771000009', 'Ambulance', 'ambulance_crew',
+     now(), now(), true, NULL),
+
     (gen_random_uuid(), 'staff.jayasuriya@carelanka.lk',
      'AQAAAAIAAYagAAAAEC4BX8IMVN3U85XIxj6Khfq9XWWSI+dk20yHVCyIImPMt2e+/wT9Brm+SAFQpywgNg==',
      'Ishara', 'Jayasuriya', '+94771000004', 'Front Desk', 'general_staff',
@@ -68,6 +73,17 @@ INSERT INTO patient_accounts
      created_at, updated_at, is_active, deleted_at)
 VALUES
     (gen_random_uuid(), 'chathura.w',
+     'AQAAAAIAAYagAAAAEKv/cB2nN3X3BWOfSYbIUEmA6rjHv/NYE0wyfZJSUoMnQX0GoPnDmcPY+RxdSU2NWQ==',
+     NULL,
+     now(), now(), true, NULL)
+
+ON CONFLICT (username) WHERE is_active DO NOTHING;
+
+INSERT INTO patient_accounts
+    (id, username, password_hash, last_login_at,
+     created_at, updated_at, is_active, deleted_at)
+VALUES
+    (gen_random_uuid(), 'demo.emergency',
      'AQAAAAIAAYagAAAAEKv/cB2nN3X3BWOfSYbIUEmA6rjHv/NYE0wyfZJSUoMnQX0GoPnDmcPY+RxdSU2NWQ==',
      NULL,
      now(), now(), true, NULL)

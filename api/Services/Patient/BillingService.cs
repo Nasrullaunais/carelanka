@@ -272,8 +272,6 @@ public sealed class BillingService : IBillingService
             _db.BillLineItems.Remove(line);
         }
 
-        var prices = await _rates.GetPriceListAsync(ct);
-
         Add(bill, new BillLineEntity
         {
             Id = Guid.NewGuid(),
@@ -281,7 +279,7 @@ public sealed class BillingService : IBillingService
             Source = BillLineSource.ConsultationFee,
             Description = "Consultation fee",
             Quantity = 1m,
-            UnitPrice = prices.AdmissionFee(AdmissionCategory.Outpatient)
+            UnitPrice = BillingRates.ConsultationFee
         });
     }
 
@@ -359,7 +357,7 @@ public sealed class BillingService : IBillingService
                 AdmissionId = admission.Id,
                 Patient = ToPatientSummary(admission.Patient),
                 Status = admission.Status,
-                AdmissionCategory = admission.Category,
+                AdmissionCategory = admission.Category!.Value,
                 WardName = label.WardName,
                 BedNumber = label.BedNumber,
                 AdmittedAt = admission.AdmittedAt,
@@ -478,9 +476,9 @@ public sealed class BillingService : IBillingService
                 Id = Guid.NewGuid(),
                 BillId = billId,
                 Source = BillLineSource.AdmissionFee,
-                Description = $"Admission fee ({EnumWire.ToWire(admission.Category)})",
+                Description = $"Admission fee ({EnumWire.ToWire(admission.Category!.Value)})",
                 Quantity = 1m,
-                UnitPrice = prices.AdmissionFee(admission.Category)
+                UnitPrice = prices.AdmissionFee(admission.Category!.Value)
             }
         };
 

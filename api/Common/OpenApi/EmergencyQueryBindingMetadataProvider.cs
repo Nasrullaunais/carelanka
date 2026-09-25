@@ -10,7 +10,8 @@ public sealed class EmergencyQueryBindingMetadataProvider : IBindingMetadataProv
     {
         var containerType = context.Key.ContainerType;
         if ((containerType != typeof(EmergencyCallListRequest)
-                && containerType != typeof(MyEmergencyCallListRequest))
+                && containerType != typeof(MyEmergencyCallListRequest)
+                && containerType != typeof(MyDispatchHistoryRequest))
             || context.Key.Name is null)
         {
             return;

@@ -1,6 +1,9 @@
-import { Fragment, useState } from 'react';
+import { PaginationControls } from '../components/ui/pagination-controls';
+import { Table } from '../components/Table';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   assignBedManuallyMutation,
@@ -12,21 +15,34 @@ import {
   listPatientWorklistOptions,
   listWardsOptions,
   markArrivedMutation,
+  updatePatientMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
 import type { PrincipalRole, WorklistRow } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
 import { MedicalProfilePanel } from '../components/MedicalProfilePanel';
+import { ActionDialog } from '../components/ui/action-dialog';
+import { ConfirmDialog } from '../components/ui/confirm-dialog';
+import { BedCandidateTable } from '../components/BedCandidateTable';
 import {
   canAssignBed,
   canCompleteVisit,
+  canEditPatient,
   canMarkArrived,
   canReadMedicalProfile,
   canReadPatientDetails,
 } from '../types/permissions';
+import {
+  PatientFields,
+  emptyPatientForm,
+  onSubmit,
+  patientFormBody,
+  patientFormFrom,
+  patientFormProblems,
+  usePatientForm,
+} from './intake-form';
 import { localDateTime } from '../types/datetime';
 import { placementFor } from '../types/beds';
 import type { Placement } from '../types/beds';
-import { genderPolicyLabels, wardTypeLabels } from '../types/wards';
 import {
   arrivalRouteLabel,
   worklistStatusDetail,
@@ -36,7 +52,6 @@ import {
 import {
   admissionCategoryLabels,
   admissionSourceLabels,
-  admissionUrgencyLabels,
   detailFieldLabel,
   genderLabels,
   patientIdentifier,
@@ -70,6 +85,44 @@ export function PatientsPage() {
     }),
     enabled: canRead,
   });
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pendingAssignId = searchParams.get('assignBed');
+
+  const pendingAdmission = useQuery({
+    ...getAdmissionOptions({ path: { id: pendingAssignId ?? '' } }),
+    enabled: canRead && pendingAssignId !== null,
+  });
+
+  // Coming straight from an emergency admission: search for that patient's row so it is on
+  // the current page, then fall through to the effect below that opens the assign panel.
+  useEffect(() => {
+    const code = pendingAdmission.data?.patient?.patient_code;
+
+    if (!pendingAssignId || !code) {
+      return;
+    }
+
+    setSearch(code);
+    setSubmitted(code);
+    setPage(1);
+  }, [pendingAssignId, pendingAdmission.data]);
+
+  useEffect(() => {
+    const row = (board.data?.items ?? []).find((item) => item.id === pendingAssignId);
+
+    if (!pendingAssignId || !row || !canAssignBed(role)) {
+      return;
+    }
+
+    setOpenId(null);
+    setBedMode('assign');
+    setAssigningId(row.id);
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('assignBed');
+    setSearchParams(next, { replace: true });
+  }, [pendingAssignId, board.data, role, searchParams, setSearchParams]);
 
   if (!canRead) {
     return (
@@ -168,7 +221,7 @@ export function PatientsPage() {
         </form>
       </div>
 
-      <div className="card">
+      <div className="table-section">
         <h2>
           {includeFinished ? 'All patients, including finished visits' : 'Current patients'}
         </h2>
@@ -189,7 +242,7 @@ export function PatientsPage() {
               : 'No patients are expected or admitted.'}
           </p>
         ) : (
-          <table>
+          <Table footer={<PaginationControls label="Patients" page={page} totalPages={board.data?.total_pages ?? 1} totalItems={board.data?.total_items} onPageChange={setPage} />}>
             <thead>
               <tr>
                 <th>Patient</th>
@@ -203,8 +256,8 @@ export function PatientsPage() {
             </thead>
             <tbody>
               {rows.map((row) => (
-                <Fragment key={row.id}>
                   <tr
+                    key={row.id}
                     className={openId === row.id || assigningId === row.id ? 'open' : undefined}
                   >
                     <td>
@@ -223,10 +276,12 @@ export function PatientsPage() {
                       {row.admission_category ? (
                         <>
                           {admissionCategoryLabels[row.admission_category]}
-                          <br />
-                          <span className="muted">
-                            {row.urgency ? admissionUrgencyLabels[row.urgency] : ''}
-                          </span>
+                          {row.is_infectious && (
+                            <>
+                              <br />
+                              <span className="badge severity-high">Needs isolation</span>
+                            </>
+                          )}
                         </>
                       ) : (
                         <span className="muted">Not recorded</span>
@@ -255,58 +310,17 @@ export function PatientsPage() {
                     </td>
                   </tr>
 
-                  {assigningId === row.id && (
-                    <tr className="drawer">
-                      <td colSpan={5}>
-                        <AssignBedPanel
-                          row={row}
-                          mode={bedMode}
-                          onDone={() => setAssigningId(null)}
-                        />
-                      </td>
-                    </tr>
-                  )}
-
-                  {openId === row.id && (
-                    <tr className="drawer">
-                      <td colSpan={5}>
-                        <DetailsPanel row={row} role={role} onClose={() => setOpenId(null)} />
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
               ))}
             </tbody>
-          </table>
-        )}
-
-        {board.data && board.data.total_items > 0 && (
-          <div className="row" style={{ marginTop: '0.9rem', alignItems: 'center' }}>
-            <p className="muted" style={{ flex: '2 1 14rem' }}>
-              {board.data.total_items} row{board.data.total_items === 1 ? '' : 's'}, page{' '}
-              {board.data.page} of {board.data.total_pages}
-            </p>
-            <button
-              type="button"
-              className="secondary"
-              style={{ flex: '0 0 auto' }}
-              disabled={page <= 1}
-              onClick={() => setPage((current) => current - 1)}
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              style={{ flex: '0 0 auto' }}
-              disabled={page >= board.data.total_pages}
-              onClick={() => setPage((current) => current + 1)}
-            >
-              Next
-            </button>
-          </div>
+          </Table>
         )}
       </div>
+      <ActionDialog title={`${bedMode === 'correct' ? 'Correct bed' : 'Assign bed'} · ${rows.find((row) => row.id === assigningId)?.patient.full_name ?? 'patient'}`} isOpen={assigningId != null} onClose={() => setAssigningId(null)}>
+        {rows.find((row) => row.id === assigningId) && <AssignBedPanel row={rows.find((row) => row.id === assigningId)!} mode={bedMode} onDone={() => setAssigningId(null)} />}
+      </ActionDialog>
+      <ActionDialog title={`Patient details · ${rows.find((row) => row.id === openId)?.patient.full_name ?? 'patient'}`} isOpen={openId != null} onClose={() => setOpenId(null)}>
+        {rows.find((row) => row.id === openId) && <DetailsPanel row={rows.find((row) => row.id === openId)!} role={role} onClose={() => setOpenId(null)} />}
+      </ActionDialog>
     </>
   );
 }
@@ -348,6 +362,7 @@ function RowActions({
   onDetails: () => void;
 }) {
   const invalidate = useBoardInvalidation();
+  const [confirmComplete, setConfirmComplete] = useState(false);
 
   const arrive = useMutation({
     ...markArrivedMutation(),
@@ -362,6 +377,7 @@ function RowActions({
     onSuccess: () => {
       toast.success(`${row.patient.full_name}'s visit is complete.`);
       invalidate();
+      setConfirmComplete(false);
     },
   });
 
@@ -398,7 +414,7 @@ function RowActions({
         <button
           type="button"
           disabled={pending}
-          onClick={() => complete.mutate({ path: { id: row.id } })}
+          onClick={() => setConfirmComplete(true)}
         >
           {complete.isPending ? 'Saving…' : 'Complete visit'}
         </button>
@@ -406,6 +422,15 @@ function RowActions({
       <button type="button" className="secondary" onClick={onDetails}>
         {open ? 'Hide' : 'Details'}
       </button>
+      <ConfirmDialog
+        isOpen={confirmComplete}
+        onOpenChange={(open) => setConfirmComplete(open)}
+        title={`Complete ${row.patient.full_name}'s visit?`}
+        description="The visit will move out of the active patient board. Check that care and documentation are finished."
+        confirmLabel={complete.isPending ? 'Completing…' : 'Complete visit'}
+        isPending={complete.isPending}
+        onConfirm={() => complete.mutate({ path: { id: row.id } })}
+      />
     </>
   );
 }
@@ -496,9 +521,6 @@ function AssignBedPanel({
       : ({ kind: 'refused', why: 'Loading…' } as Placement),
   }));
 
-  const usable = candidates.filter((candidate) => candidate.placement.kind !== 'refused');
-  const overrides = candidates.filter((candidate) => candidate.placement.kind === 'override');
-
   const missing = (beds.data?.total_items ?? 0) - (beds.data?.items?.length ?? 0);
   const loading = visit.isLoading || wards.isLoading || beds.isLoading;
   const failed = visit.isError || wards.isError || beds.isError;
@@ -554,101 +576,39 @@ function AssignBedPanel({
         </p>
       ) : (
         <>
-          <table>
-            <thead>
-              <tr>
-                <th>Bed</th>
-                <th>Ward</th>
-                <th>Accepts</th>
-                <th>Isolation</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {candidates.map(({ bed, ward, placement }) => (
-                <tr key={bed.id}>
-                  <td>
-                    <strong>{bed.bed_number}</strong>
-                  </td>
-                  <td>
-                    {bed.ward_name}
-                    <br />
-                    <span className="muted">
-                      {ward ? wardTypeLabels[ward.ward_type] : 'Unknown ward'}
-                    </span>
-                  </td>
-                  <td>{ward ? genderPolicyLabels[ward.gender_policy] : '—'}</td>
-                  <td>{bed.has_isolation ? 'Yes' : 'No'}</td>
-                  <td>
-                    {placement.kind === 'refused' ? (
-                      <span className="muted">{placement.why}</span>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          className={placement.kind === 'override' ? 'warn' : undefined}
-                          disabled={writing}
-                          onClick={() =>
-                            correcting
-                              ? correct.mutate({
-                                  path: { id: row.id },
-                                  body: {
-                                    bed_id: bed.id,
-                                    reason: reason.trim().length > 0 ? reason.trim() : undefined,
-                                  },
-                                })
-                              : assign.mutate({
-                                  path: { id: row.id },
-                                  body: {
-                                    bed_id: bed.id,
-                                    override_reason:
-                                      reason.trim().length > 0 ? reason.trim() : undefined,
-                                  },
-                                })
-                          }
-                        >
-                          {placement.kind === 'override'
-                            ? correcting
-                              ? 'Move anyway'
-                              : 'Assign anyway'
-                            : correcting
-                              ? 'Move here'
-                              : alreadyHere
-                                ? 'Assign and admit'
-                                : 'Assign'}
-                        </button>
-                        {placement.kind === 'override' && (
-                          <p className="hint" style={{ marginTop: '0.25rem' }}>
-                            {placement.why}
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {usable.length === 0 && (
-            <p className="empty">
-              Beds are free, but none of them accepts this patient. The reason is on each row.
-            </p>
-          )}
-
-          {missing > 0 && (
-            <p className="field-error" style={{ marginTop: '0.6rem' }}>
-              {missing} more free {missing === 1 ? 'bed is' : 'beds are'} not shown. This list
-              is incomplete — report it before assigning a bed from it.
-            </p>
-          )}
-
-          {overrides.length > 0 && (
-            <p className="hint" style={{ marginTop: '0.6rem' }}>
-              Amber buttons are beds outside the patient&rsquo;s care level. You may use one as
-              duty manager; it is recorded as your decision, so give a reason in the note.
-            </p>
-          )}
+          <BedCandidateTable
+            candidates={candidates}
+            writing={writing}
+            missing={missing}
+            actionLabel={(placement) =>
+              placement.kind === 'override'
+                ? correcting
+                  ? 'Move anyway'
+                  : 'Assign anyway'
+                : correcting
+                  ? 'Move here'
+                  : alreadyHere
+                    ? 'Assign and admit'
+                    : 'Assign'
+            }
+            onPick={(bed) =>
+              correcting
+                ? correct.mutate({
+                    path: { id: row.id },
+                    body: {
+                      bed_id: bed.id,
+                      reason: reason.trim().length > 0 ? reason.trim() : undefined,
+                    },
+                  })
+                : assign.mutate({
+                    path: { id: row.id },
+                    body: {
+                      bed_id: bed.id,
+                      override_reason: reason.trim().length > 0 ? reason.trim() : undefined,
+                    },
+                  })
+            }
+          />
 
           <div className="field" style={{ marginTop: '0.9rem' }}>
             <label htmlFor="override-reason">
@@ -692,6 +652,8 @@ function DetailsPanel({
 
   const visit = useQuery(getAdmissionOptions({ path: { id: row.id } }));
 
+  const [editing, setEditing] = useState(false);
+
   const liveBed = visit.data?.bed_assignments?.find(
     (assignment) => assignment.status !== 'released',
   );
@@ -700,31 +662,52 @@ function DetailsPanel({
     <div className="drawer-body">
       <h3>Patient details</h3>
       {patient.isLoading && <p className="empty">Loading…</p>}
-      {patient.data && (
-        <table>
-          <tbody>
-            <Field label={patient.data.nic ? 'NIC' : 'Reference'}>
-              {patientIdentifier(patient.data)}
-            </Field>
-            <Field label="Gender">{genderLabels[patient.data.gender]}</Field>
-            <Field label="Date of birth">{patient.data.date_of_birth}</Field>
-            <Field label="Phone">{patient.data.phone}</Field>
-            <Field label="Address">{patient.data.address}</Field>
-            <Field label="Emergency contact">
-              {patient.data.emergency_contact_name
-                ? `${patient.data.emergency_contact_name} · ${
-                    patient.data.emergency_contact_phone ?? 'no number'
-                  }`
-                : null}
-            </Field>
-            <Field label="Registered">
-              {patient.data.created_at ? localDateTime(patient.data.created_at) : null}
-            </Field>
-            <Field label="Mobile app account">
-              {patient.data.has_account ? 'Linked' : 'None'}
-            </Field>
-          </tbody>
-        </table>
+
+      {patient.data && editing && (
+        <EditPatientPanel
+          patientId={patient.data.id}
+          identified={patient.data.nic !== null}
+          onDone={() => setEditing(false)}
+        />
+      )}
+
+      {patient.data && !editing && (
+        <>
+          <Table>
+            <tbody>
+              <Field label={patient.data.nic ? 'NIC' : 'Reference'}>
+                {patientIdentifier(patient.data)}
+              </Field>
+              <Field label="Gender">{genderLabels[patient.data.gender]}</Field>
+              <Field label="Date of birth">{patient.data.date_of_birth}</Field>
+              <Field label="Phone">{patient.data.phone}</Field>
+              <Field label="Address">{patient.data.address}</Field>
+              <Field label="Emergency/guardian contact">
+                {patient.data.emergency_contact_name
+                  ? `${patient.data.emergency_contact_name} · ${
+                      patient.data.emergency_contact_phone ?? 'no number'
+                    }`
+                  : null}
+              </Field>
+              <Field label="Registered">
+                {patient.data.created_at ? localDateTime(patient.data.created_at) : null}
+              </Field>
+              <Field label="Mobile app account">
+                {patient.data.has_account ? 'Linked' : 'None'}
+              </Field>
+            </tbody>
+          </Table>
+
+          {canEditPatient(role) && (
+            <button
+              type="button"
+              style={{ marginTop: '0.6rem' }}
+              onClick={() => setEditing(true)}
+            >
+              Edit patient details
+            </button>
+          )}
+        </>
       )}
 
       <>
@@ -733,21 +716,16 @@ function DetailsPanel({
         </h4>
           {visit.isLoading && <p className="empty">Loading…</p>}
           {visit.data && (
-            <table>
+            <Table>
               <tbody>
                 <Field label="Arrived by">{admissionSourceLabels[visit.data.source]}</Field>
-                <Field label="Care level">
-                  {admissionCategoryLabels[visit.data.admission_category]}
-                </Field>
-                <Field label="Urgency">{admissionUrgencyLabels[visit.data.urgency]}</Field>
-                <Field label="Needs a bed">
-                  {visit.data.requires_bed ? 'Yes' : 'No — outpatient, no bed is held'}
+                <Field label="Care level" empty="Not yet classified">
+                  {visit.data.admission_category
+                    ? admissionCategoryLabels[visit.data.admission_category]
+                    : null}
                 </Field>
                 <Field label="Needs isolation">{visit.data.is_infectious ? 'Yes' : 'No'}</Field>
-                <Field
-                  label="Bed"
-                  empty={visit.data.requires_bed ? 'Not assigned yet' : 'None needed'}
-                >
+                <Field label="Bed" empty="Not assigned yet">
                   {visit.data.ward_name
                     ? `${visit.data.ward_name} · ${visit.data.bed_number}`
                     : null}
@@ -758,8 +736,10 @@ function DetailsPanel({
                 <Field label="Admitted by" empty="Not recorded">
                   {visit.data.category_set_by_staff_name}
                 </Field>
-                <Field label="Care level chosen">
-                  {localDateTime(visit.data.category_set_at)}
+                <Field label="Care level chosen" empty="Not yet classified">
+                  {visit.data.category_set_at
+                    ? localDateTime(visit.data.category_set_at)
+                    : null}
                 </Field>
                 <Field label="Bed assigned by" empty="No bed assigned">
                   {liveBed?.approved_by_staff_name ?? (liveBed ? 'Not recorded' : null)}
@@ -776,7 +756,7 @@ function DetailsPanel({
                   {visit.data.discharged_at ? localDateTime(visit.data.discharged_at) : null}
                 </Field>
               </tbody>
-            </table>
+            </Table>
           )}
 
           {visit.data && visit.data.missing_fields.length > 0 && (
@@ -815,6 +795,82 @@ function DetailsPanel({
         Close
       </button>
     </div>
+  );
+}
+
+function EditPatientPanel({
+  patientId,
+  identified,
+  onDone,
+}: {
+  patientId: string;
+  identified: boolean;
+  onDone: () => void;
+}) {
+  const queryClient = useQueryClient();
+
+  const existing = useQuery(getPatientOptions({ path: { id: patientId } }));
+
+  const form = usePatientForm(emptyPatientForm(false));
+  const problems = patientFormProblems(form.value, identified, existing.data?.nic ?? '');
+
+  const [loadedId, setLoadedId] = useState<string | null>(null);
+
+  if (existing.data && loadedId !== existing.data.id) {
+    setLoadedId(existing.data.id);
+    form.replace(patientFormFrom(existing.data));
+  }
+
+  const save = useMutation({
+    ...updatePatientMutation(),
+    onSuccess: (saved) => {
+      toast.success(`${saved.full_name} updated.`);
+
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const id = (query.queryKey[0] as { _id?: string } | undefined)?._id;
+
+          return id === 'listPatients' || id === 'getPatient' || id === 'listPatientWorklist';
+        },
+      });
+
+      onDone();
+    },
+  });
+
+  if (existing.isLoading || !existing.data) {
+    return <p className="empty">Loading…</p>;
+  }
+
+  const patient = existing.data;
+
+  return (
+    <form
+      onSubmit={onSubmit(() =>
+        save.mutate({
+          path: { id: patientId },
+          body: patientFormBody(form.value, patient.nic ?? null),
+        }),
+      )}
+    >
+      <PatientFields
+        value={form.value}
+        set={form.set}
+        idPrefix="board-edit"
+        identified={identified}
+        allowUnknownGender={!identified}
+        nic={patient.nic ?? ''}
+      />
+
+      <div className="row">
+        <button type="submit" disabled={save.isPending || problems.blocked}>
+          {save.isPending ? 'Saving...' : 'Save'}
+        </button>
+        <button type="button" className="secondary" onClick={onDone}>
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }
 

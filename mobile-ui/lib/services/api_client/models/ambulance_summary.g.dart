@@ -13,6 +13,7 @@ AmbulanceSummary _$AmbulanceSummaryFromJson(
   registrationNumber: json['registration_number'] as String,
   status: AmbulanceStatus.fromJson(json['status'] as String),
   isDivertible: json['is_divertible'] as bool,
+  isActive: json['is_active'] as bool?,
   currentLatitude: (json['current_latitude'] as num?)?.toDouble(),
   currentLongitude: (json['current_longitude'] as num?)?.toDouble(),
   locationUpdatedAt: json['location_updated_at'] == null
@@ -25,7 +26,14 @@ AmbulanceSummary _$AmbulanceSummaryFromJson(
       ?.map((e) => AmbulanceEligibilityBlockReason.fromJson(e as String))
       .toList(),
   activeDispatchId: json['active_dispatch_id'] as String?,
+  activeDispatch: json['active_dispatch'] == null
+      ? null
+      : DispatchSummary.fromJson(
+          json['active_dispatch'] as Map<String, dynamic>,
+        ),
   distanceKm: (json['distance_km'] as num?)?.toDouble(),
+  driveMinutes: (json['drive_minutes'] as num?)?.toInt(),
+  isStraightLineDistance: json['is_straight_line_distance'] as bool?,
 );
 
 Map<String, dynamic> _$AmbulanceSummaryToJson(AmbulanceSummary instance) =>
@@ -33,6 +41,7 @@ Map<String, dynamic> _$AmbulanceSummaryToJson(AmbulanceSummary instance) =>
       'id': instance.id,
       'registration_number': instance.registrationNumber,
       'status': instance.status,
+      'is_active': instance.isActive,
       'current_latitude': instance.currentLatitude,
       'current_longitude': instance.currentLongitude,
       'location_updated_at': instance.locationUpdatedAt?.toIso8601String(),
@@ -41,6 +50,9 @@ Map<String, dynamic> _$AmbulanceSummaryToJson(AmbulanceSummary instance) =>
       'is_eligible': instance.isEligible,
       'eligibility_block_reasons': instance.eligibilityBlockReasons,
       'active_dispatch_id': instance.activeDispatchId,
+      'active_dispatch': instance.activeDispatch,
       'is_divertible': instance.isDivertible,
       'distance_km': instance.distanceKm,
+      'drive_minutes': instance.driveMinutes,
+      'is_straight_line_distance': instance.isStraightLineDistance,
     };

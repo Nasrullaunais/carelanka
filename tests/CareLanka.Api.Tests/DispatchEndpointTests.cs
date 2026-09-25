@@ -7,6 +7,7 @@ using CareLanka.Api.Data.Entities.Common;
 using CareLanka.Api.Data.Entities.Emergency;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.Services.Common;
+using CareLanka.Api.Services.Emergency;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -220,6 +221,44 @@ public sealed class DispatchEndpointTests
     }
 
     [Fact]
+    public async Task History_lists_only_my_finished_runs_newest_first()
+    {
+        var first = await SeedRunAsync();
+        var second = await SeedRunAsync();
+        var firstDispatch = await DispatchAsync(first);
+        var secondDispatch = await DispatchAsync(second);
+        using var crew = await ClientAsync(first.CrewEmails[0]);
+        using var otherCrew = await ClientAsync(second.CrewEmails[0]);
+        Assert.Equal(0, (await crew.GetFromJsonAsync<JsonElement>("/api/me/dispatches/history")).GetProperty("total_items").GetInt32());
+
+        await crew.PostAsJsonAsync($"/api/me/dispatches/{firstDispatch}/decline", new { reason = "Flat tyre" });
+        await otherCrew.PostAsJsonAsync($"/api/me/dispatches/{secondDispatch}/decline", new { reason = "Sick" });
+
+        var mine = await crew.GetFromJsonAsync<JsonElement>("/api/me/dispatches/history");
+        Assert.Equal(1, mine.GetProperty("total_items").GetInt32());
+        Assert.Equal(firstDispatch, mine.GetProperty("items")[0].GetProperty("id").GetGuid());
+        Assert.Equal("declined", mine.GetProperty("items")[0].GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task History_filters_by_date_and_rejects_a_backwards_range()
+    {
+        var run = await SeedRunAsync();
+        var dispatchId = await DispatchAsync(run);
+        using var crew = await ClientAsync(run.CrewEmails[0]);
+        await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/decline", new { reason = "Flat tyre" });
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var inRange = await crew.GetFromJsonAsync<JsonElement>($"/api/me/dispatches/history?from={today:O}&to={today:O}");
+        var past = await crew.GetFromJsonAsync<JsonElement>($"/api/me/dispatches/history?to={today.AddDays(-2):O}");
+        var backwards = await crew.GetAsync($"/api/me/dispatches/history?from={today:O}&to={today.AddDays(-1):O}");
+
+        Assert.Equal(1, inRange.GetProperty("total_items").GetInt32());
+        Assert.Equal(0, past.GetProperty("total_items").GetInt32());
+        Assert.Equal(HttpStatusCode.BadRequest, backwards.StatusCode);
+    }
+
+    [Fact]
     public async Task Navigation_points_to_the_scene_then_the_hospital_and_only_for_the_assigned_crew()
     {
         var run = await SeedRunAsync();
@@ -317,6 +356,127 @@ public sealed class DispatchEndpointTests
         var response = await manager.PostAsJsonAsync($"/api/emergency-calls/{run.CallId}/dispatch", new { ambulance_id = run.AmbulanceId });
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         return (await ReadAsync(response)).GetProperty("id").GetGuid();
+    }
+
+    [Fact]
+    public async Task Dispatching_queues_a_route_plan_and_the_saved_route_is_readable_only_by_the_run()
+    {
+        var run = await SeedRunAsync();
+        var outsider = await SeedCrewAsync();
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+        var dispatchId = await DispatchAsync(run);
+
+        var job = QueuedJobs<RoutePlanJob>().Single(x => x.DispatchId == dispatchId);
+        Assert.Equal(6.927079m, job.OriginLatitude);
+        Assert.Equal(79.861244m, job.OriginLongitude);
+        Assert.Equal(HttpStatusCode.NotFound, (await manager.GetAsync($"/api/dispatches/{dispatchId}/route")).StatusCode);
+
+        using (var scope = _application.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+            db.RouteLogs.Add(new RouteLog
+            {
+                Id = Guid.NewGuid(), DispatchId = dispatchId, OriginLatitude = job.OriginLatitude, OriginLongitude = job.OriginLongitude,
+                DestinationLatitude = 6.9271m, DestinationLongitude = 79.8612m, PlannedDistanceKm = 4.24m, PlannedDurationMinutes = 11,
+                MapsApiReference = "osrm"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var managerView = await manager.GetAsync($"/api/dispatches/{dispatchId}/route");
+        Assert.Equal(HttpStatusCode.OK, managerView.StatusCode);
+        var body = await ReadAsync(managerView);
+        Assert.Equal(11, body.GetProperty("planned_duration_minutes").GetInt32());
+        Assert.Equal("osrm", body.GetProperty("maps_api_reference").GetString());
+
+        using var member = await ClientAsync(run.CrewEmails[0]);
+        Assert.Equal(HttpStatusCode.OK, (await member.GetAsync($"/api/dispatches/{dispatchId}/route")).StatusCode);
+        using var stranger = await ClientAsync(outsider.Email);
+        Assert.Equal(HttpStatusCode.Forbidden, (await stranger.GetAsync($"/api/dispatches/{dispatchId}/route")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Dispatching_saves_one_push_per_crew_member_with_no_incident_text()
+    {
+        var run = await SeedRunAsync();
+        var dispatchId = await DispatchAsync(run);
+
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        var pushes = await db.Notifications.Where(x => x.EntityId == dispatchId).ToListAsync();
+
+        Assert.Equal(2, pushes.Count);
+        Assert.All(pushes, push =>
+        {
+            Assert.Equal(NotificationStatus.Queued, push.Status);
+            Assert.Equal("dispatch", push.EntityType);
+            Assert.Equal("New ambulance assignment", push.Title);
+            Assert.Equal("Open CareLanka to see your run.", push.Body);
+        });
+        Assert.Equal(2, pushes.Select(x => x.RecipientStaffMemberId).Distinct().Count());
+    }
+
+    [Fact]
+    public async Task Dispatching_queues_one_pre_admission_and_reassigning_does_not_add_another()
+    {
+        var run = await SeedRunAsync();
+        var replacement = await SeedRunAsync();
+        var dispatchId = await DispatchAsync(run);
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+
+        var reassign = await manager.PostAsJsonAsync($"/api/dispatches/{dispatchId}/reassign", new
+        {
+            replacement_ambulance_id = replacement.AmbulanceId,
+            reason = "Closer ambulance became free"
+        });
+
+        Assert.Equal(HttpStatusCode.OK, reassign.StatusCode);
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        var notice = await db.PreAdmissionNotices.SingleAsync(x => x.EmergencyCallId == run.CallId);
+        Assert.Equal(dispatchId, notice.DispatchId);
+        Assert.Equal(PreAdmissionStatus.Queued, notice.Status);
+    }
+
+    [Fact]
+    public async Task A_failed_dispatch_saves_no_pre_admission()
+    {
+        var run = await SeedRunAsync(crewCount: 1);
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+
+        var response = await manager.PostAsJsonAsync($"/api/emergency-calls/{run.CallId}/dispatch", new { ambulance_id = run.AmbulanceId });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        Assert.False(await db.PreAdmissionNotices.AnyAsync(x => x.EmergencyCallId == run.CallId));
+    }
+
+    [Fact]
+    public async Task A_failed_dispatch_saves_no_push()
+    {
+        var run = await SeedRunAsync();
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+        var before = await CountPushesAsync();
+
+        var response = await manager.PostAsJsonAsync($"/api/emergency-calls/{Guid.NewGuid()}/dispatch", new { ambulance_id = run.AmbulanceId });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(before, await CountPushesAsync());
+    }
+
+    private async Task<int> CountPushesAsync()
+    {
+        using var scope = _application.Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<CareLankaDbContext>().Notifications.CountAsync();
+    }
+
+    private List<T> QueuedJobs<T>() where T : SceneLookupJob
+    {
+        var reader = _application.Services.GetRequiredService<SceneLookupQueue>().Reader;
+        var jobs = new List<SceneLookupJob>();
+        while (reader.TryRead(out var job)) jobs.Add(job);
+        return jobs.OfType<T>().ToList();
     }
 
     private async Task<Run> SeedRunAsync(int crewCount = 2)

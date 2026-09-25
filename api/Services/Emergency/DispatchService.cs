@@ -5,11 +5,13 @@ using CareLanka.Api.Data;
 using CareLanka.Api.Data.Configurations.Emergency;
 using CareLanka.Api.Data.Entities.Emergency;
 using CareLanka.Api.Data.Enums;
+using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Emergency;
 using CareLanka.Api.Services.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using RouteLogView = CareLanka.Api.DTOs.Emergency.RouteLog;
 
 namespace CareLanka.Api.Services.Emergency;
 
@@ -20,10 +22,13 @@ public sealed class DispatchService : IDispatchService
     private readonly ICurrentUser _currentUser;
     private readonly TimeProvider _clock;
     private readonly EmergencyOptions _options;
+    private readonly ISceneLookupQueue _sceneLookups;
+    private readonly IPushNotifications _push;
 
     public DispatchService(CareLankaDbContext db, IAmbulanceEligibilityService eligibility,
-        ICurrentUser currentUser, TimeProvider clock, IOptions<EmergencyOptions> options)
-        => (_db, _eligibility, _currentUser, _clock, _options) = (db, eligibility, currentUser, clock, options.Value);
+        ICurrentUser currentUser, TimeProvider clock, IOptions<EmergencyOptions> options, ISceneLookupQueue sceneLookups,
+        IPushNotifications push)
+        => (_db, _eligibility, _currentUser, _clock, _options, _sceneLookups, _push) = (db, eligibility, currentUser, clock, options.Value, sceneLookups, push);
 
     private static readonly Dictionary<DispatchStatus, AmbulanceStatus> ProgressProjection = new()
     {
@@ -38,7 +43,73 @@ public sealed class DispatchService : IDispatchService
         var dispatch = await CreateCoreAsync(callId, request.AmbulanceId!.Value, ct);
         await SaveAsync(ct);
         await transaction.CommitAsync(ct);
+        QueueRoutePlan(dispatch);
         return ToDetail(dispatch);
+    }
+
+    public async Task<DispatchDetail> DispatchFromProposalAsync(
+        Guid callId, Guid ambulanceId, Guid proposalId, CancellationToken ct = default)
+    {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        var dispatch = await CreateCoreAsync(callId, ambulanceId, ct);
+        dispatch.DispatchProposalId = proposalId;
+        await SaveAsync(ct);
+        await transaction.CommitAsync(ct);
+        QueueRoutePlan(dispatch);
+        return ToDetail(dispatch);
+    }
+
+    public async Task<DispatchDetail> ApplyDiversionAsync(
+        Guid sourceDispatchId, Guid newCallId, Guid replacementAmbulanceId, Guid proposalId, string? reason, CancellationToken ct = default)
+    {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        var source = await LoadAsync(sourceDispatchId, ct);
+        RequirePrePickup(source, DispatchStatus.Reassigned);
+        source.Status = DispatchStatus.Reassigned;
+        source.ReassignmentReason = string.IsNullOrWhiteSpace(reason)
+            ? "Diverted to a more urgent call" : reason.Trim();
+        source.CompletedAt = _clock.GetUtcNow();
+        source.Ambulance.Status = AmbulanceStatus.Available;
+        source.EmergencyCall.Status = CallStatus.Received;
+        await SaveAsync(ct);
+        var replacement = await CreateCoreAsync(newCallId, replacementAmbulanceId, ct);
+        replacement.DispatchProposalId = proposalId;
+        source.SupersededByDispatchId = replacement.Id;
+        await SaveAsync(ct);
+        await transaction.CommitAsync(ct);
+        QueueRoutePlan(replacement);
+        return ToDetail(replacement);
+    }
+
+    public async Task<RouteLogView> GetRouteAsync(Guid id, CancellationToken ct = default)
+    {
+        var dispatch = await _db.Dispatches.AsNoTracking()
+            .Include(x => x.Crew)
+            .Include(x => x.RouteLog)
+            .SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw new NotFoundException("Dispatch", id);
+        if (_currentUser.Role == PrincipalRole.AmbulanceCrew && !dispatch.Crew.Any(x => x.StaffMemberId == _currentUser.Id))
+            throw new ForbiddenException();
+
+        var route = dispatch.RouteLog ?? throw new NotFoundException("Route", id);
+        return new RouteLogView
+        {
+            DispatchId = route.DispatchId,
+            OriginLatitude = route.OriginLatitude,
+            OriginLongitude = route.OriginLongitude,
+            DestinationLatitude = route.DestinationLatitude,
+            DestinationLongitude = route.DestinationLongitude,
+            PlannedDistanceKm = (double)route.PlannedDistanceKm,
+            PlannedDurationMinutes = route.PlannedDurationMinutes,
+            DepartedAt = route.DepartedAt,
+            ArrivedAt = route.ArrivedAt,
+            MapsApiReference = route.MapsApiReference
+        };
+    }
+
+    private void QueueRoutePlan(Dispatch dispatch)
+    {
+        if (dispatch.Ambulance.CurrentLatitude is { } latitude && dispatch.Ambulance.CurrentLongitude is { } longitude)
+            _sceneLookups.Enqueue(new RoutePlanJob(dispatch.Id, latitude, longitude));
     }
 
     public async Task<DispatchDetail> GetMyActiveAsync(CancellationToken ct = default)
@@ -52,6 +123,43 @@ public sealed class DispatchService : IDispatchService
             .OrderByDescending(x => x.DispatchedAt)
             .FirstOrDefaultAsync(ct);
         return dispatch is null ? throw new NotFoundException("Live dispatch", _currentUser.Id) : ToDetail(dispatch);
+    }
+
+    public async Task<PagedResult<DispatchSummary>> ListMyHistoryAsync(MyDispatchHistoryRequest request, CancellationToken ct = default)
+    {
+        var query = _db.Dispatches.AsNoTracking()
+            .Where(x => !DispatchStatusExtensions.LiveStatuses.Contains(x.Status)
+                && x.Crew.Any(crew => crew.StaffMemberId == _currentUser.Id));
+
+        if (request.From is { } from)
+        {
+            var start = new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            query = query.Where(x => x.DispatchedAt >= start);
+        }
+
+        if (request.To is { } to)
+        {
+            var end = new DateTimeOffset(to.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            query = query.Where(x => x.DispatchedAt < end);
+        }
+
+        var totalItems = await query.CountAsync(ct);
+        var items = await query.OrderByDescending(x => x.DispatchedAt).ThenBy(x => x.Id)
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .Select(x => new DispatchSummary
+            {
+                Id = x.Id,
+                EmergencyCallId = x.EmergencyCallId,
+                AmbulanceRegistration = x.Ambulance.RegistrationNumber,
+                CallPriority = x.EmergencyCall.Priority,
+                Status = x.Status,
+                CrewCount = x.Crew.Count,
+                DispatchedAt = x.DispatchedAt,
+                CompletedAt = x.CompletedAt
+            })
+            .ToListAsync(ct);
+        return PagedResult<DispatchSummary>.From(items, request.Page, request.PageSize, totalItems);
     }
 
     public async Task<NavigationTarget> GetMyNavigationTargetAsync(Guid id, CancellationToken ct = default)
@@ -72,7 +180,7 @@ public sealed class DispatchService : IDispatchService
             DestinationLongitude = longitude,
             DestinationLabel = label,
             GoogleMapsUrl = FormattableString.Invariant(
-                $"https://www.google.com/maps/dir/?api=1&destination={latitude},{longitude}&travelmode=driving")
+                $"https://www.google.com/maps/dir/?api=1&destination={latitude},{longitude}&travelmode=driving&dir_action=navigate")
         };
     }
 
@@ -105,6 +213,13 @@ public sealed class DispatchService : IDispatchService
         if (!ProgressProjection.TryGetValue(target, out var ambulanceStatus))
             throw new IllegalTransitionException("Dispatch", dispatch.Status.ToString(), target.ToString());
         Move(dispatch, target);
+        if (dispatch.RouteLog is not null)
+        {
+            if (target == DispatchStatus.EnRouteToScene)
+                dispatch.RouteLog.DepartedAt ??= _clock.GetUtcNow();
+            if (target == DispatchStatus.AtScene)
+                dispatch.RouteLog.ArrivedAt ??= _clock.GetUtcNow();
+        }
         dispatch.Ambulance.Status = ambulanceStatus;
         dispatch.EmergencyCall.Status = CallStatus.EnRoute;
         if (request.Latitude.HasValue)
@@ -165,6 +280,7 @@ public sealed class DispatchService : IDispatchService
         old.SupersededByDispatchId = replacement.Id;
         await SaveAsync(ct);
         await transaction.CommitAsync(ct);
+        QueueRoutePlan(replacement);
         return ToDetail(replacement);
     }
 
@@ -196,6 +312,17 @@ public sealed class DispatchService : IDispatchService
         call.Status = CallStatus.Dispatched;
         ambulance.Status = AmbulanceStatus.Dispatched;
         _db.Dispatches.Add(dispatch);
+        if (!await _db.PreAdmissionNotices.AnyAsync(x => x.EmergencyCallId == callId, ct))
+        {
+            _db.PreAdmissionNotices.Add(new PreAdmissionNotice
+            {
+                Id = Guid.NewGuid(), EmergencyCallId = callId, DispatchId = dispatch.Id,
+                Status = PreAdmissionStatus.Queued, NextAttemptAt = dispatch.DispatchedAt
+            });
+        }
+
+        _push.Stage(dispatch.Crew.Select(x => x.StaffMemberId), "New ambulance assignment",
+            "Open CareLanka to see your run.", "dispatch", dispatch.Id, "dispatch-assigned");
         return dispatch;
     }
 
@@ -229,7 +356,7 @@ public sealed class DispatchService : IDispatchService
     }
 
     private async Task<Dispatch> LoadAsync(Guid id, CancellationToken ct) => await _db.Dispatches
-        .Include(x => x.Crew).Include(x => x.Ambulance).Include(x => x.EmergencyCall)
+        .Include(x => x.Crew).Include(x => x.Ambulance).Include(x => x.EmergencyCall).Include(x => x.RouteLog)
         .SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw new NotFoundException("Dispatch", id);
 
     private static void RequirePrePickup(Dispatch dispatch, DispatchStatus target)
@@ -269,7 +396,8 @@ public sealed class DispatchService : IDispatchService
         AcknowledgedAt = dispatch.AcknowledgedAt, AcknowledgedByStaffId = dispatch.AcknowledgedByStaffId,
         DeclinedReason = dispatch.DeclinedReason, CancellationReason = dispatch.CancellationReason,
         ReassignmentReason = dispatch.ReassignmentReason, HandoverNotes = dispatch.HandoverNotes,
-        PatientCondition = dispatch.PatientCondition, CrewCount = dispatch.Crew.Count,
+        PatientCondition = dispatch.PatientCondition, SceneAddressLabel = dispatch.EmergencyCall.AddressLabel,
+        CrewCount = dispatch.Crew.Count,
         AcknowledgementOverdue = dispatch.IsAcknowledgementOverdue(_clock.GetUtcNow(), _options.AcknowledgementTimeoutSeconds),
         CrewStaffIds = dispatch.Crew.Select(x => x.StaffMemberId).ToList()
     };

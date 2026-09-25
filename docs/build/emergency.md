@@ -2,7 +2,7 @@
 
 **Owner:** Nasrulla Unais (Member 1)
 
-**Status:** Phases 0–4 and 6 complete; Phase 3 hardened 2026-09-19; Phase 5 (crew Flutter app) built except run history
+**Status:** Phases 0–10 complete; the Phase 11 report slice, Duty Manager UI and Emergency demo fixtures are complete. History, reconciliation, audit and broader resilience work remain.
 
 **Contract:** `specs/emergency-spec.yaml`
 
@@ -355,7 +355,7 @@ handling; a `409` caused by another dispatcher refreshes the affected call and f
 
 **Exit criteria:** the Duty Manager can crew an ambulance and dispatch it from React.
 
-### Phase 5 — Crew Flutter vertical slice — **BUILT 2026-09-19, history still open**
+### Phase 5 — Crew Flutter vertical slice — **COMPLETE 2026-09-19**
 
 **Goal:** let the assigned crew complete a run from their phone.
 
@@ -369,7 +369,7 @@ Screens and behaviour:
 - “Open in Google Maps” launches scene coordinates while travelling outward and the
   configured CareLanka Hospital emergency entrance while transporting.
 - Handover captures concise notes and condition on arrival (both optional; identity details are out of scope).
-- History shows the immutable responding crew snapshot. **Not built:** `getMyDispatchHistory` is in the spec but has no endpoint yet, so there is no history screen.
+- History shows the immutable responding crew snapshot. Built: `GET /me/dispatches/history` (finished runs, newest first, paged) and a "Past runs" screen. The list shows the run summary and crew count; the crew identities stay on the dispatch detail.
 - Settled: the navigation endpoint (`GET /me/dispatches/{id}/navigation`) is built; the hospital entrance comes from `Emergency:HospitalEntrance` in settings, which must hold a real place or the API refuses to start. The current value is a placeholder near the National Hospital in Colombo.
 
 **Exit criteria:** a crew member can acknowledge, navigate, progress and hand over; a
@@ -394,16 +394,22 @@ Work:
 **Exit criteria:** the caller sees the correct ambulance and status, and tracking closes
 cleanly after handover.
 
-### Phase 7 — Real Maps integration and graceful fallback
+### Phase 7 — Real Maps integration and graceful fallback — **COMPLETE 2026-09-20**
 
 **Goal:** rank by road travel time without making dispatch depend on Google.
 
 Work:
 
 - Keep `IAmbulanceDistanceService` as the provider seam and replace the current
-  straight-line stub with the configured Google routing provider.
-- Reverse-geocode the scene for a readable address when possible.
-- Store planned distance, duration and provider reference in `RouteLog`.
+  straight-line stub with a routing provider. **Built with OSRM** (free, no key, `Emergency:Routing`
+  in settings) instead of Google. The public OSRM server is for light use, so a hospital in
+  production would host its own. Ranking, the straight-line fallback and the label on the
+  dispatcher screen are done.
+- Reverse-geocode the scene for a readable address when possible. **Built with Nominatim**
+  (free). A background worker fills `address_label` a few seconds after a call is logged or moved,
+  one lookup per second, so a call for help never waits on it.
+- Store planned distance, duration and provider reference in `RouteLog`. **Built** by the same worker
+  after dispatch; read with `GET /dispatches/{id}/route`. `departed_at` and `arrived_at` are not filled yet.
 - Return a Google Maps launch URL or destination coordinates to Flutter; do not attempt
   to recreate Google's driver navigation UI.
 - On provider failure, rank by straight-line distance, label the fallback in the UI and
@@ -415,7 +421,7 @@ fallback ordering.
 
 **Exit criteria:** normal ranking uses driving ETA; provider failure remains dispatchable.
 
-### Phase 8 — Push notification reliability
+### Phase 8 — Push notification reliability — **BUILT 2026-09-20, not yet tried on a phone**
 
 **Goal:** deliver assignments while the crew app is backgrounded or closed.
 
@@ -432,7 +438,22 @@ Work:
 **Exit criteria:** a backgrounded assigned device receives the alert, and a missed push
 is recovered through polling.
 
-### Phase 9 — Hospital preparation and handover integration
+**What was built.** The Common tables (`device_tokens`, `notifications`, migration
+`Common_AddDeviceTokensAndNotifications`) plus `PUT /device-tokens` and
+`DELETE /device-tokens/{id}`. Dispatch and reassign save one `Queued` push per crew member
+inside the dispatch transaction, so a push never exists for a dispatch that rolled back.
+`PushDeliveryWorker` sends what is due through `IPushSender` (Firebase when
+`Push:CredentialsPath` is set, otherwise a log-only sender), retries with growing gaps, gives
+up after five tries, and revokes a token the provider rejects. The text is fixed
+("New ambulance assignment") and the data carries only the dispatch id. On the phone,
+`core/push` registers the token after a staff sign-in, unregisters on sign-out, and a tapped
+alert opens My run for the crew only. My run still polls every 10 seconds and refreshes when
+the app comes back to the front, which is the recovery for a missed push.
+
+**Not done.** A push is not withdrawn if the dispatch is cancelled before it is sent. The
+worker assumes one API instance. Android only; iPhone needs an Apple account.
+
+### Phase 9 — Hospital preparation and handover integration — **BUILT; REAL PATIENT INTEGRATION VERIFIED 2026-09-23**
 
 **Goal:** prepare CareLanka Hospital without making the ambulance wait on bed selection.
 
@@ -448,6 +469,27 @@ Work:
 
 **Exit criteria:** one pre-admission is created per dispatch and handover remains possible
 when Patient Management is temporarily unavailable.
+
+**What was built.** Dispatch saves a `PreAdmissionNotice` (`pre_admission_notices`, migration
+`Emergency_AddPreAdmissionNotices`) in the same transaction, so nothing is sent for a dispatch
+that rolled back. `PreAdmissionWorker` sends it through `IPreAdmissionGateway` after commit.
+Priority becomes urgency by the fixed table (critical to emergency, high to urgent,
+medium and low to routine). Failures retry with growing gaps and stop after eight tries; a
+refused request or a cancelled call is not retried. No ward or bed is sent. The expected
+arrival is the dispatch time plus `Emergency:PreAdmission:ArrivalAllowanceMinutes` (30), an
+estimate, because the route only covers the trip to the scene.
+
+**Decided here.** One notice per call, not per dispatch: a reassign makes a new dispatch for
+the same patient, and a second pre-admission would open a second admission for them. Patient
+Management is given the first dispatch's id.
+
+`PreAdmissionGateway` now calls Patient Management's real `IAdmissionService.PreAdmitAsync`
+operation in-process, and `Program.cs` registers that implementation. Dispatch-id uniqueness
+makes duplicate delivery idempotent; other admission conflicts are rejected rather than
+misreported as successful duplicates. `caller_user_id` and `patient_id` are sent, but
+`provisional_name` and `provisional_gender` are not, because the call does not record the
+patient’s name. Nothing shows the dispatcher that a pre-admission failed except the row and
+the log.
 
 ### Phase 10 — Dispatch & Routing AI agent
 
@@ -583,7 +625,7 @@ Already present:
 - Fleet eligibility decisions with configured crew minimum and explicit block reasons.
 - Repository-wide FluentValidation MVC integration; Emergency ambulance requests and query
   validation use separate validators.
-- A straight-line `IAmbulanceDistanceService` stub.
+- Real OSRM road-distance ranking with a straight-line fallback when routing is unavailable.
 - A documented `IStaffLookupService` stub until Staff Management publishes its implementation.
 - Emergency OpenAPI and ambulance endpoint tests.
 - Emergency-call create, caller-scoped list, Duty Manager board/detail/update endpoints,
@@ -591,13 +633,20 @@ Already present:
 
 - Manual dispatch, acknowledge, decline, progress, handover, cancel and reassign, with a
   version check and stored reasons; caller tracking and crew location reporting.
-- One React page (`EmergencyPage.tsx`): call board, detail, priority, dispatch, fleet list and
-  crew assignment, polling the selected call every 5 seconds.
-- Flutter: only the location reporter and a placeholder `my_run_screen.dart`.
+- Routed Duty Manager screens for live calls, proposal and diversion review, fleet board/map,
+  ambulance registration and crew assignment, cancellation review, and reports.
+- Flutter crew run screens: acknowledge, decline, status buttons, Google Maps launch, handover
+  and run history.
+- Real road-distance ranking (`OsrmAmbulanceDistanceService`, straight-line fallback), reverse
+  geocoding, and stored route summaries.
+- Firebase push delivery (`PushDeliveryWorker`/`IPushSender`) to the assigned crew, with polling
+  as the recovery path.
+- Pre-admission notice to Patient Management after a dispatch, retryable and non-blocking.
+- The Dispatch & Routing Agent (`api/Agents/Emergency/`): proposes a free ambulance or a
+  pre-pickup diversion, ranked by real driving ETA; deterministic validation re-run at
+  confirm/approve time; `pending_confirmation` / `pending_approval` human gates; `DutyManager`
+  confirm, approve, reject endpoints on `/dispatch-proposals`.
 
-Not yet present:
-
-- The crew's Flutter run screens (acknowledge, decline, status buttons, handover, history).
-- Real Maps, Firebase delivery, pre-admission, the AI agent, reports.
-
-Phase 5 (the crew's phone app) is next.
+Still outstanding from Phase 11: dispatch and crew histories, retry reconciliation, expanded
+audit coverage, patient-call rate limits, resilience/accessibility verification, and complete
+demo fixtures. The report slice is implemented.

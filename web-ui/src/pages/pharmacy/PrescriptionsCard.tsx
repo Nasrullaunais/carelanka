@@ -1,3 +1,4 @@
+import { Table } from '../../components/Table';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -11,12 +12,14 @@ import {
 import { downloadPrescription } from '../../services/api/generated';
 import type { Prescription, PrescriptionStatus } from '../../services/api/generated';
 import { Dialog } from '../EquipmentPage';
+import { ConfirmDialog } from '../../components/ui/confirm-dialog';
 import { prescriptionStatusLabels, prescriptionStatuses } from '../../types/pharmacy';
 
 export function PrescriptionsCard() {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<PrescriptionStatus>('submitted');
   const [rejecting, setRejecting] = useState<Prescription | null>(null);
+  const [confirming, setConfirming] = useState<{ kind: 'ready' | 'delivered'; prescription: Prescription } | null>(null);
 
   const prescriptions = useQuery(listPrescriptionsOptions({ query: { status } }));
   const rows = prescriptions.data ?? [];
@@ -35,6 +38,7 @@ export function PrescriptionsCard() {
         `Token ${prescription.token_number} issued to ${prescription.patient_name}. They can see it in the app.`,
       );
       refresh();
+      setConfirming(null);
     },
   });
 
@@ -43,6 +47,7 @@ export function PrescriptionsCard() {
     onSuccess: (prescription) => {
       toast.success(`Token ${prescription.token_number} delivered to ${prescription.patient_name}.`);
       refresh();
+      setConfirming(null);
     },
   });
 
@@ -86,7 +91,7 @@ export function PrescriptionsCard() {
       )}
 
       {rows.length > 0 && (
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Received</th>
@@ -124,7 +129,7 @@ export function PrescriptionsCard() {
                     <button
                       type="button"
                       disabled={busy}
-                      onClick={() => ready.mutate({ path: { id: prescription.id } })}
+                      onClick={() => setConfirming({ kind: 'ready', prescription })}
                     >
                       Ready — issue token
                     </button>{' '}
@@ -142,7 +147,7 @@ export function PrescriptionsCard() {
                     <button
                       type="button"
                       disabled={busy}
-                      onClick={() => deliver.mutate({ path: { id: prescription.id } })}
+                      onClick={() => setConfirming({ kind: 'delivered', prescription })}
                     >
                       Mark delivered
                     </button>{' '}
@@ -158,7 +163,7 @@ export function PrescriptionsCard() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
 
       {rejecting && (
@@ -171,6 +176,22 @@ export function PrescriptionsCard() {
           }}
         />
       )}
+      <ConfirmDialog
+        isOpen={confirming != null}
+        onOpenChange={(open) => { if (!open) setConfirming(null); }}
+        title={`${confirming?.kind === 'ready' ? 'Issue a collection token' : 'Mark prescription delivered'} for ${confirming?.prescription.patient_name ?? 'patient'}?`}
+        description={confirming?.kind === 'ready'
+          ? 'Confirm the medicine is ready. The patient will see their collection token in the app.'
+          : 'Confirm the medicine was handed to the patient. This closes the collection task.'}
+        confirmLabel={busy ? 'Saving…' : confirming?.kind === 'ready' ? 'Issue token' : 'Mark delivered'}
+        isPending={busy}
+        tone="accent"
+        onConfirm={() => {
+          if (!confirming) return;
+          if (confirming.kind === 'ready') ready.mutate({ path: { id: confirming.prescription.id } });
+          else deliver.mutate({ path: { id: confirming.prescription.id } });
+        }}
+      />
     </div>
   );
 }

@@ -12,6 +12,7 @@ public class Dispatch : AuditedEntity
     public DispatchStatus Status { get; set; }
     public Guid? SupersededByDispatchId { get; set; }
     public Dispatch? SupersededByDispatch { get; set; }
+    public Guid? DispatchProposalId { get; set; }
     public DateTimeOffset DispatchedAt { get; set; }
     public DateTimeOffset? AcknowledgedAt { get; set; }
     public Guid? AcknowledgedByStaffId { get; set; }

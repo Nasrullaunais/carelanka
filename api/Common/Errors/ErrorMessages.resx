@@ -200,6 +200,10 @@
     <value>{0} still has {1} item(s) on the register. Remove those items first, then the category.</value>
     <comment>Removing a category in use would leave machines with no category.</comment>
   </data>
+  <data name="cl_equ_031" xml:space="preserve">
+    <value>A reorder suggestion for {0} is already running. Wait for it to finish before starting another.</value>
+    <comment>Stops a second click from queueing a second run for the same medicine.</comment>
+  </data>
   <data name="cl_equ_013" xml:space="preserve">
     <value>{0} is with the maintenance unit. It comes back into service when they complete the repair, not by editing its status.</value>
     <comment>Says where the item is and who releases it, because the caller's next move is to go and look at the repair queue.</comment>
@@ -229,6 +233,15 @@
   </data>
   <data name="cl_emg_006" xml:space="preserve">
     <value>This emergency call is not waiting for an ambulance.</value>
+  </data>
+  <data name="cl_emg_007" xml:space="preserve">
+    <value>This call already has an open proposal or a live dispatch.</value>
+  </data>
+  <data name="cl_emg_008" xml:space="preserve">
+    <value>This proposal cannot be confirmed: {0}.</value>
+  </data>
+  <data name="cl_emg_009" xml:space="preserve">
+    <value>This diversion cannot be approved: {0}.</value>
   </data>
   <data name="cl_pat_002" xml:space="preserve">
     <value>A patient with NIC {0} is already registered, as record {1}.</value>
@@ -367,5 +380,25 @@
   <data name="cl_pat_037" xml:space="preserve">
     <value>That patient code and NIC do not match. Check the slip the hospital gave you, or call the desk.</value>
     <comment>Patient self-service. Deliberately one message for every failure - no such code, wrong NIC, no NIC on file, already claimed. Saying which would confirm to a stranger holding a slip that the code is real, which is the thing the NIC is there to stop.</comment>
+  </data>
+  <data name="cl_pat_038" xml:space="preserve">
+    <value>You have no current stay, so there is nobody to route this to. If this is urgent, use the emergency call screen.</value>
+    <comment>The care advisory agent's entry point. POST /me/care-queries refuses anybody without an open admission - nothing runs, no workflow row is created, no model is called.</comment>
+  </data>
+  <data name="cl_pat_040" xml:space="preserve">
+    <value>This care recommendation has already been reviewed.</value>
+    <comment>Approve or reject on a recommendation that is not pending_review - either it was already actioned, or a second reviewer opened the same one a moment later.</comment>
+  </data>
+  <data name="cl_pat_041" xml:space="preserve">
+    <value>A pre-admission already exists for dispatch {0}.</value>
+    <comment>POST /admissions/pre-admit is retried by Emergency on failure; a second call for the same dispatch_id after the first succeeded is a 409, not a duplicate admission.</comment>
+  </data>
+  <data name="cl_pat_042" xml:space="preserve">
+    <value>Admission {0} already has a care category.</value>
+    <comment>POST /admissions/{{id}}/classify only ever sets admission_category once; a clinician cannot silently overwrite another clinician's classification.</comment>
+  </data>
+  <data name="cl_pat_043" xml:space="preserve">
+    <value>Admission {0} needs a care category before a bed can be assigned.</value>
+    <comment>A pre-admission from Emergency has no admission_category until a clinician classifies it via POST /admissions/{{id}}/classify - bed assignment cannot run before that.</comment>
   </data>
 </root>

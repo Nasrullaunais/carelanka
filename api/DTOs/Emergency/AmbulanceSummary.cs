@@ -11,6 +11,7 @@ public sealed class AmbulanceSummary
     public string RegistrationNumber { get; set; } = string.Empty;
     [Required]
     public AmbulanceStatus Status { get; set; }
+    public bool IsActive { get; set; }
     public decimal? CurrentLatitude { get; set; }
     public decimal? CurrentLongitude { get; set; }
     public DateTimeOffset? LocationUpdatedAt { get; set; }
@@ -19,7 +20,10 @@ public sealed class AmbulanceSummary
     public bool IsEligible { get; set; }
     public IReadOnlyList<AmbulanceEligibilityBlockReason> EligibilityBlockReasons { get; set; } = [];
     public Guid? ActiveDispatchId { get; set; }
+    public DispatchSummary? ActiveDispatch { get; set; }
     [Required]
     public bool IsDivertible { get; set; }
     public double? DistanceKm { get; set; }
+    public int? DriveMinutes { get; set; }
+    public bool? IsStraightLineDistance { get; set; }
 }

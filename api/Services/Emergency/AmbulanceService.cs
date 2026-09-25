@@ -7,6 +7,7 @@ using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Emergency;
 using CareLanka.Api.Services.Common;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Npgsql;
 using AmbulanceEntity = CareLanka.Api.Data.Entities.Emergency.Ambulance;
 using AmbulanceResponse = CareLanka.Api.DTOs.Emergency.Ambulance;
@@ -21,6 +22,7 @@ public sealed class AmbulanceService : IAmbulanceService
     private readonly IAmbulanceEligibilityService _eligibility;
     private readonly IAmbulanceCrewService _crew;
     private readonly TimeProvider _timeProvider;
+    private readonly EmergencyOptions _options;
 
     public AmbulanceService(
         CareLankaDbContext db,
@@ -28,7 +30,8 @@ public sealed class AmbulanceService : IAmbulanceService
         IAmbulanceDistanceService distances,
         IAmbulanceEligibilityService eligibility,
         IAmbulanceCrewService crew,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IOptions<EmergencyOptions> options)
     {
         _db = db;
         _currentUser = currentUser;
@@ -36,6 +39,7 @@ public sealed class AmbulanceService : IAmbulanceService
         _eligibility = eligibility;
         _crew = crew;
         _timeProvider = timeProvider;
+        _options = options.Value;
     }
 
     public async Task<PagedResult<AmbulanceSummary>> ListAsync(
@@ -61,7 +65,7 @@ public sealed class AmbulanceService : IAmbulanceService
         }
 
         var rows = await query.ToListAsync(cancellationToken);
-        var measuredDistances = request.NearToLatitude is not null && request.NearToLongitude is not null
+        var measurement = request.NearToLatitude is not null && request.NearToLongitude is not null
             ? await _distances.MeasureAsync(
                 rows.Select(ambulance => new AmbulanceLocation(
                     ambulance.Id,
@@ -70,12 +74,39 @@ public sealed class AmbulanceService : IAmbulanceService
                 request.NearToLatitude.Value,
                 request.NearToLongitude.Value,
                 cancellationToken)
-            : new Dictionary<Guid, double?>();
-        var activeDispatches = await _db.Dispatches
+            : null;
+        var activeDispatchRows = await _db.Dispatches
             .AsNoTracking()
             .Where(dispatch => DispatchStatusExtensions.LiveStatuses.Contains(dispatch.Status))
-            .Select(dispatch => new { dispatch.AmbulanceId, dispatch.Id })
-            .ToDictionaryAsync(dispatch => dispatch.AmbulanceId, dispatch => dispatch.Id, cancellationToken);
+            .Select(dispatch => new
+            {
+                dispatch.AmbulanceId,
+                dispatch.Id,
+                dispatch.EmergencyCallId,
+                dispatch.Ambulance.RegistrationNumber,
+                dispatch.EmergencyCall.Priority,
+                dispatch.Status,
+                CrewCount = dispatch.Crew.Count,
+                dispatch.DispatchedAt,
+                dispatch.CompletedAt
+            })
+            .ToListAsync(cancellationToken);
+        var now = _timeProvider.GetUtcNow();
+        var activeDispatches = activeDispatchRows.ToDictionary(
+            dispatch => dispatch.AmbulanceId,
+            dispatch => new DispatchSummary
+            {
+                Id = dispatch.Id,
+                EmergencyCallId = dispatch.EmergencyCallId,
+                AmbulanceRegistration = dispatch.RegistrationNumber,
+                CallPriority = dispatch.Priority,
+                Status = dispatch.Status,
+                CrewCount = dispatch.CrewCount,
+                AcknowledgementOverdue = dispatch.Status == DispatchStatus.Assigned
+                    && now - dispatch.DispatchedAt > TimeSpan.FromSeconds(_options.AcknowledgementTimeoutSeconds),
+                DispatchedAt = dispatch.DispatchedAt,
+                CompletedAt = dispatch.CompletedAt
+            });
         var crewCounts = await _db.AmbulanceCrewAssignments
             .AsNoTracking()
             .Where(assignment => assignment.UnassignedAt == null)
@@ -85,10 +116,11 @@ public sealed class AmbulanceService : IAmbulanceService
 
         var summaries = rows.Select(ambulance =>
         {
-            Guid? activeDispatchId = activeDispatches.TryGetValue(ambulance.Id, out var dispatchId)
-                ? dispatchId
-                : null;
+            activeDispatches.TryGetValue(ambulance.Id, out var activeDispatch);
+            Guid? activeDispatchId = activeDispatch?.Id;
             var crewCount = crewCounts.GetValueOrDefault(ambulance.Id);
+            AmbulanceTravel? travel = null;
+            measurement?.ByAmbulance.TryGetValue(ambulance.Id, out travel);
             var decision = _eligibility.Decide(new AmbulanceEligibilityFacts(
                 ambulance.IsActive,
                 ambulance.Status,
@@ -101,6 +133,7 @@ public sealed class AmbulanceService : IAmbulanceService
                 Id = ambulance.Id,
                 RegistrationNumber = ambulance.RegistrationNumber,
                 Status = ambulance.Status,
+                IsActive = ambulance.IsActive,
                 CurrentLatitude = ambulance.CurrentLatitude,
                 CurrentLongitude = ambulance.CurrentLongitude,
                 LocationUpdatedAt = ambulance.LocationUpdatedAt,
@@ -109,8 +142,11 @@ public sealed class AmbulanceService : IAmbulanceService
                 IsEligible = decision.IsEligible,
                 EligibilityBlockReasons = decision.BlockReasons,
                 ActiveDispatchId = activeDispatchId,
+                ActiveDispatch = activeDispatch,
                 IsDivertible = activeDispatchId is null || IsDivertible(ambulance.Status),
-                DistanceKm = measuredDistances.GetValueOrDefault(ambulance.Id)
+                DistanceKm = travel?.DistanceKm,
+                DriveMinutes = travel?.DriveSeconds is { } seconds ? (int)Math.Ceiling(seconds / 60.0) : null,
+                IsStraightLineDistance = measurement?.IsStraightLine
             };
         });
 
@@ -125,8 +161,8 @@ public sealed class AmbulanceService : IAmbulanceService
         {
             (AmbulanceSortField.Status, true) => summaries.OrderBy(ambulance => ambulance.Status).ThenBy(ambulance => ambulance.Id),
             (AmbulanceSortField.Status, false) => summaries.OrderByDescending(ambulance => ambulance.Status).ThenBy(ambulance => ambulance.Id),
-            (AmbulanceSortField.Distance, true) => summaries.OrderBy(ambulance => ambulance.DistanceKm).ThenBy(ambulance => ambulance.Id),
-            (AmbulanceSortField.Distance, false) => summaries.OrderByDescending(ambulance => ambulance.DistanceKm).ThenBy(ambulance => ambulance.Id),
+            (AmbulanceSortField.Distance, true) => summaries.OrderBy(ambulance => ambulance.DistanceKm is null).ThenBy(ambulance => ambulance.DriveMinutes).ThenBy(ambulance => ambulance.DistanceKm).ThenBy(ambulance => ambulance.Id),
+            (AmbulanceSortField.Distance, false) => summaries.OrderBy(ambulance => ambulance.DistanceKm is null).ThenByDescending(ambulance => ambulance.DriveMinutes).ThenByDescending(ambulance => ambulance.DistanceKm).ThenBy(ambulance => ambulance.Id),
             (AmbulanceSortField.RegistrationNumber, true) => summaries.OrderBy(ambulance => ambulance.RegistrationNumber).ThenBy(ambulance => ambulance.Id),
             _ => summaries.OrderByDescending(ambulance => ambulance.RegistrationNumber).ThenBy(ambulance => ambulance.Id)
         };
@@ -268,6 +304,21 @@ public sealed class AmbulanceService : IAmbulanceService
         return ToResponse(ambulance);
     }
 
+    public async Task<AmbulanceResponse> GetMyAssignmentAsync(CancellationToken cancellationToken = default)
+    {
+        var liveAmbulanceId = await _db.DispatchCrew
+            .Where(crew => crew.StaffMemberId == _currentUser.Id
+                && DispatchStatusExtensions.LiveStatuses.Contains(crew.Dispatch.Status))
+            .Select(crew => (Guid?)crew.Dispatch.AmbulanceId)
+            .SingleOrDefaultAsync(cancellationToken);
+        var ambulanceId = liveAmbulanceId ?? await _db.AmbulanceCrewAssignments
+            .Where(assignment => assignment.StaffMemberId == _currentUser.Id && assignment.UnassignedAt == null)
+            .Select(assignment => (Guid?)assignment.AmbulanceId)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (ambulanceId is null) throw new NotFoundException("Assigned ambulance", _currentUser.Id);
+        return ToResponse(await GetEntityAsync(ambulanceId.Value, cancellationToken));
+    }
+
     public async Task ReportLocationAsync(Guid id, ReportAmbulanceLocationRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -275,7 +326,16 @@ public sealed class AmbulanceService : IAmbulanceService
         var ownsLiveRun = await _db.DispatchCrew.AnyAsync(crew =>
             crew.StaffMemberId == _currentUser.Id && crew.Dispatch.AmbulanceId == id
             && DispatchStatusExtensions.LiveStatuses.Contains(crew.Dispatch.Status), cancellationToken);
-        if (!ownsLiveRun) throw new ForbiddenException(MessageCode.Forbidden);
+        if (!ownsLiveRun)
+        {
+            var hasLiveRun = await _db.Dispatches.AnyAsync(dispatch => dispatch.AmbulanceId == id
+                && DispatchStatusExtensions.LiveStatuses.Contains(dispatch.Status), cancellationToken);
+            var assigned = await _db.AmbulanceCrewAssignments.AnyAsync(assignment =>
+                assignment.AmbulanceId == id && assignment.StaffMemberId == _currentUser.Id
+                && assignment.UnassignedAt == null, cancellationToken);
+            if (hasLiveRun || !assigned || !ambulance.IsActive)
+                throw new ForbiddenException(MessageCode.Forbidden);
+        }
         ambulance.CurrentLatitude = request.Latitude!.Value;
         ambulance.CurrentLongitude = request.Longitude!.Value;
         ambulance.LocationUpdatedAt = _timeProvider.GetUtcNow();

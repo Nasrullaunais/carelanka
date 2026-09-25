@@ -124,7 +124,7 @@ The second version keeps working when hold expiry, out-of-service beds or a new 
 | **`BillingRate`, `AdmissionFeeRate`** — what the hospital charges | **Patient (M4)** — *added 2026-09-11, see §11.13* | Nobody yet | Read: any staff. Write: administrator only |
 | **`BedAssignment`** — who is in a bed, holds, approvals | **Patient (M4)** | Equipment (before servicing a bed) | Patient only |
 | `Ward` — name, type, gender policy | **Patient (M4)** — *see §11.1* | All | Patient only |
-| `AgentWorkflow`, `AgentProposedChange` | **Common (group-owned)** — *DECIDED §11.2, **and still not built anywhere** as of 2026-09-16* | All five agents | All five agents, by `workflow_id` |
+| `AgentWorkflow`, `AgentProposedChange` | **Common (group-owned)** — *DECIDED §11.2, **built 2026-09-20** by the group in PR #80 (`Common_AddAgentWorkflows`)* | The four agents currently running | All four, by `workflow_id` — down from five agents / all five when this row was first written; the bed agent that used a fifth was removed 2026-09-22, see §11.17 |
 | `StaffMember`, `PatientAccount`, `RefreshToken`, login, JWT issuing | **Common (group-owned)** — `specs/common-spec.yaml` | All | Common only |
 | `AuditLog`, `Notification`, `DeviceToken` | **Common (group-owned)** | All | Written by the audit interceptor, never by hand |
 
@@ -327,18 +327,17 @@ occupied              free
    │ M3 waits            │ M3 sets Bed.condition = out_of_service   [M3 write]
    │ for discharge       │
    │                     ▼
-   │            Patient Management's Bed Agent
-   │            now has one fewer candidate bed
+   │            Patient Management now has one fewer
+   │            candidate bed on the manual assignment list
    │                     │
    │                     ▼
-   │            If that tips the ward to full, the agent
-   │            suggests a downgrade — which always needs
-   │            a Duty Manager to commit it
+   │            If that tips the ward to full, a Duty Manager
+   │            picks and commits a downgrade by hand
 ```
 
 **The hard rule: maintenance never evicts a patient.** If the bed is occupied or under a live hold, Equipment waits. M4 exposes the check; M3 respects the answer.
 
-One equipment warning ends with a human approving a different bed for a patient. **Two components, two agents, one visible consequence** — a far better demo than either agent running alone, and exactly what the rubric means by orchestration.
+One equipment warning ends with a human approving a different bed for a patient. **Two components, one agent and one manual decision, one visible consequence** — a far better demo than the agent running alone, and exactly what the rubric means by orchestration. *(Was "two agents" while the bed agent existed; bed placement is the Duty Manager's own call now, per the diagram above.)*
 
 **Reverse direction:** when servicing finishes, M3 returns the bed to `usable` and it re-enters M4's candidate pool automatically. No call needed — M4 reads the current condition every time.
 
@@ -370,7 +369,7 @@ Every patient now carries a second identifier, and the two do different jobs:
 
 > **No component, and no AI agent, decides a patient's care category.**
 
-`admission_category` (`icu` / `hdu` / `inpatient` / `day_case` / `outpatient`) is set by clinical staff and recorded with `category_set_by_staff_id`. It is an **input** to Patient Management's agent, never an output.
+`admission_category` (`icu` / `general` / `surgical` / `maternity` / `emergency`) is set by clinical staff and recorded with `category_set_by_staff_id`. It is an **input** to Patient Management's agent, never an output.
 
 This is not caution — it is written into the group plan:
 
@@ -400,14 +399,16 @@ Pre-admission created, status = awaiting_bed                    [M4]
   clinical staff set admission_category                       (human)
         │
         ▼
-Bed & Patient Details Agent                                   [M4]
+Bed placement — manual, since the agent's removal 2026-09-22             [M4]
   reads Equipment's bed register  ────────read──────────────►   [M3]
-  filters on hard rules H0-H6, ranks on soft rules
-  suggests a best bed plus every other bed that passed
-  deterministic validator re-checks every hard rule
-  WRITES NOTHING and holds no bed — changed 2026-09-16.
-  The 30-minute hold is written when a human commits, by
-  POST /admissions/{id}/assign-bed, under a row lock.
+  a nurse, manager or reception filters on hard rules H0-H6 by eye,
+  and picks a bed from the candidate list
+  server re-checks every hard rule regardless of who picked
+  The 30-minute hold is written when the human commits, by
+  POST /admissions/{id}/assign-bed, under a row lock — same endpoint,
+  same lock, as when a Bed & Patient Details Agent step fed it here
+  through 2026-09-22 (deterministic H0-H6 filter, soft-rule ranking,
+  best bed plus every other bed that passed, no write tool of its own).
         │
         ▼
 Staff Allocation Agent                                          [M2]
@@ -427,7 +428,8 @@ APPROVE   REJECT / REVISE
    │           └──► back to the relevant agent; admission stays awaiting_bed
    ▼
 Bed approval re-checked under a row lock, then committed        [M4]
-Ambulance crew + ward nurse get their tasks in Flutter        [M1/M4]
+Ambulance crew gets its task in Flutter; ward nurse gets hers
+in React — reversed from Flutter 2026-09-21                  [M1/M4]
    │
    ▼
 Patient arrives, marked admitted, assignment becomes occupied   [M4]
@@ -448,7 +450,7 @@ Injected as interfaces inside the API, and exposed as REST endpoints so the AI a
 | `ICapacityService.GetWardOccupancyAsync(wardId)` | `GET /api/wards/{id}/occupancy` | M2 | Occupied counts, care mix, incoming next 2h | **Live 2026-09-11** |
 | `IWardService.ListAsync()` | `GET /api/wards` | M3 | Ward id, name, type | Live 2026-09-09 |
 | `IBedOccupancyService.GetStatusAsync(bedId)` | `GET /api/beds/{id}/occupancy` | M3 | Whether a bed is occupied or held — **check this before servicing it** | **Live 2026-09-11** |
-| `IBedAssignmentService.ListAvailabilityAsync(…)` | `GET /api/bed-availability` | M4, and the bed agent | Equipment's register joined with our assignments, hold expiry applied | **Live 2026-09-11** |
+| `IBedAssignmentService.ListAvailabilityAsync(…)` | `GET /api/bed-availability` | M4 | Equipment's register joined with our assignments, hold expiry applied | **Live 2026-09-11** |
 | `CreatePreAdmissionAsync(dispatch)` | `POST /api/admissions/pre-admit` | M1 | Creates an admission from a dispatch | Not built |
 
 **Every response carrying a patient now carries `patient_code` as well** — eight characters,
@@ -496,7 +498,7 @@ servicing**, and an unknown bed id is a 404 rather than a confident "free".
 | **M1** | `caller_user_id` and `patient_is_caller` on the dispatch notification | §4.2 — without these we cannot tell whose medical record this is |
 | **M2** | Look up a staff member's name and role by ID | Displaying "Approved by …" without copying their data |
 | **M2** | `Doctor` as a role on the JWT | Gating `clinical_clearance` |
-| **M3** | A readable bed register: bed id, ward, number, condition, isolation capability | Our agent's candidate list. **This is our hardest dependency** — without it the bed agent has nothing to reason over. |
+| **M3** | A readable bed register: bed id, ward, number, condition, isolation capability | Our candidate list for manual bed assignment. **This is our hardest dependency** — without it there is nothing to assign from. |
 | **M3** | Notification (or just a condition change we can read) when a bed goes in or out of service | §6.2 |
 | **Group** | Shared agent-workflow tables | §11.2 |
 
@@ -505,7 +507,7 @@ servicing**, and an unknown bed id is a 404 rather than a confident "free".
 ## 11. Open items
 
 **11.1 — Does `Ward` sit with Patient Management or Equipment?**
-Beds are settled (§6.1). Wards are not. Argument for M4: a ward's `gender_policy` and `ward_type` are admission-policy facts that drive the bed agent's hard rules — Equipment does not care whether a ward is male or female, only about frames and servicing. Written as M4's for now; M3 and the group to confirm.
+Beds are settled (§6.1). Wards are not. Argument for M4: a ward's `gender_policy` and `ward_type` are admission-policy facts that drive bed placement's hard rules — Equipment does not care whether a ward is male or female, only about frames and servicing. Written as M4's for now; M3 and the group to confirm.
 
 **11.2 (DECIDED 2026-09-07) — The agent-workflow tables are common.**
 `AgentWorkflow` and `AgentProposedChange` are one group-owned pair, built once as part of
@@ -954,6 +956,11 @@ every attempt is attributable to an account, but nothing stops a login trying re
 **11.17 (OPEN — announced by M4 on 2026-09-16) — both Patient Management agents were redesigned,
 and one of the three changes affects everybody.**
 
+*Update 2026-09-22: the bed agent this item is mostly about was removed entirely — bed
+placement is the manual `assign-bed` path only now. Left here as-is because the argument in
+point 1 is a lesson for the other three agents' own designs, independent of whether this one
+still exists.*
+
 Full reasoning is `patient-management-plan.md` §8, rewritten the same day. Three changes; the
 first is the only one anybody else needs to read.
 
@@ -992,6 +999,31 @@ only runs for admitted patients, and the person who will actually walk over and 
 the nurse on shift. `clinical_clearance` on the discharge checklist did **not** move and is still
 Doctor-only. **M2, this is a note not a request** — `Doctor` and `WardNurse` are both already in
 `StaffRole` and M4 only reads the claim.
+
+**11.20 (ANNOUNCED by M4 on 2026-09-20) — the first agent is built, and it reserves four schema
+names nobody else may reuse.** The Bed and Patient Details Agent runs in `api/Agents/Patient/`
+behind `POST /api/bed-suggestions` and `GET /api/bed-workflows/{workflowId}`, both already in
+`patient-spec.yaml` and already in the uniqueness sweep.
+
+**M4 built two common things, and the group should take them over rather than write them again.**
+`api/Agents/ILanguageModel.cs`, `LanguageModelOptions.cs`, `GeminiLanguageModel.cs` and
+`NoLanguageModel.cs` are the provider seam ADR 2 specifies, and `api/Agents/AgentRunQueue.cs` is
+the 202-and-poll hand-off every agent needs. They are written to be provider- and
+component-agnostic: an agent hands over a fixed instruction and a JSON payload of facts, and gets
+JSON back. **Nothing in them is Patient Management's**, and nobody should add a second one - see
+"Common vs. yours" in `CLAUDE.md`. The key is configuration only (`LanguageModel:ApiKey`), absent
+from the repository, and with no key set the API starts normally and every agent still answers.
+
+Three more things the group needs to know:
+
+- **`bed_assignments.workflow_id` briefly was a real foreign key** to `agent_workflows.id`
+  (`Patient_LinkBedAssignmentWorkflow`, `ON DELETE RESTRICT`), linking a bed assignment back to
+  the bed-suggestion agent run that proposed it. Removed with the agent itself
+  (`Patient_RemoveBedAgentWorkflowLink`, 2026-09-22) — every bed assignment is a human one now.
+- **The common `/api/workflows` endpoints are still unbuilt.** The care advisory agent does not
+  need them either: `patient-spec.yaml` publishes its own poll route
+  (`GET /care-workflows/{workflowId}`). Whoever builds the common surface should know an agent
+  has already shipped without it.
 
 **11.18 (OPEN — announced by M3 on 2026-09-16) — a new equipment item waits for the hospital
 administrator to confirm it.**
@@ -1124,11 +1156,11 @@ Mirrors §9's format, from the Equipment side. All JWT-protected; role restricti
 
 | Endpoint | For | Returns |
 | :--- | :--- | :--- |
-| `GET /api/beds` | Patient Management's bed agent | The full bed register — id, ward, number, condition, isolation, distance. This is what §10 calls Patient's "hardest dependency." |
+| `GET /api/beds` | Patient Management's manual bed assignment | The full bed register — id, ward, number, condition, isolation, distance. This is what §10 calls Patient's "hardest dependency." |
 | `GET /api/wards/{wardId}/equipment-readiness` | The group orchestrator, as a step in the shared admission workflow | `ready` / `not_ready` for a ward against a list of required equipment categories (§8.7 "readiness check") |
 | `GET /api/equipment-items?wardId=` | Any staff, including other components' agents | Equipment currently in a given ward |
 | `GET /api/pharmacy-items?search=&availableOnly=` | Any authenticated staff | Stock search and availability — the literal "search and check availability" requirement (equipment-management-plan.md §5.2) |
-| A readable condition change on `Bed` (or a notification) when a bed goes in or out of service | Patient Management | So Patient's bed agent's candidate pool stays current — the item Patient asks for in §10 |
+| A readable condition change on `Bed` (or a notification) when a bed goes in or out of service | Patient Management | So Patient's bed-availability candidate pool stays current — the item Patient asks for in §10 |
 
 ## 16. What Equipment Management needs from others
 
@@ -1183,7 +1215,7 @@ Mirrors §9's and §15's format, from Staff's side. All JWT-protected; role rest
 | Endpoint | For | Returns |
 | :--- | :--- | :--- |
 | `POST /staff/lookup` | Patient, Equipment, Emergency — any component displaying "who did this" without copying staff data | Batch of `{ staff_id, found, full_name, role, is_active }`, in request order |
-| `GET /coverage/wards` | Patient's bed agent as an optional soft ranking rule (§5.4, not in the first build); the Equipment agent when deciding where to move equipment | Per-ward `{ on_duty_count, minimum_headcount, headcount_needed, status, by_role }` — counts only, no staff identities |
+| `GET /coverage/wards` | The Equipment agent when deciding where to move equipment. *(Was also an optional soft ranking input for Patient's bed-suggestion agent, §5.4 — moot since that agent was removed 2026-09-22.)* | Per-ward `{ on_duty_count, minimum_headcount, headcount_needed, status, by_role }` — counts only, no staff identities |
 | `GET /wards/{wardId}/staffing-rules` | Any component that needs to know a ward's staffing policy | The minimum-headcount rules for that ward, by role and skill |
 
 ## 21. What Staff Management needs from others

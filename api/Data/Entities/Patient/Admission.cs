@@ -10,7 +10,7 @@ public class Admission : AuditedEntity
 
     public AdmissionSource Source { get; set; }
 
-    public AdmissionCategory Category { get; set; }
+    public AdmissionCategory? Category { get; set; }
 
     public AdmissionUrgency Urgency { get; set; }
 
@@ -18,9 +18,9 @@ public class Admission : AuditedEntity
 
     public bool IsInfectious { get; set; }
 
-    public Guid CategorySetByStaffMemberId { get; set; }
+    public Guid? CategorySetByStaffMemberId { get; set; }
 
-    public DateTimeOffset CategorySetAt { get; set; }
+    public DateTimeOffset? CategorySetAt { get; set; }
 
     public string? DispatchId { get; set; }
 

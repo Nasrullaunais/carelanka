@@ -10,7 +10,7 @@ namespace CareLanka.Api.Tests;
 public sealed class AdmissionStatusMachineTests
 {
     private const string Workflow = """
-        awaiting_bed        -> awaiting_approval, cancelled
+        awaiting_bed        -> awaiting_approval, admitted, cancelled
         awaiting_approval   -> bed_reserved, awaiting_bed, cancelled
         bed_reserved        -> admitted, awaiting_bed, cancelled
         admitted            -> ready_for_discharge

@@ -16,10 +16,10 @@ export const bedAvailabilityLabels: Record<BedAvailability, string> = {
 
 const categoryRung: Record<AdmissionCategory, number> = {
   icu: 0,
-  hdu: 1,
-  inpatient: 2,
-  day_case: 2,
-  outpatient: 2,
+  general: 2,
+  surgical: 2,
+  maternity: 2,
+  emergency: 2,
 };
 
 const wardRung: Record<WardType, number> = {
@@ -78,11 +78,15 @@ export type Placement =
 export function placementFor(
   bed: { has_isolation: boolean },
   ward: { ward_type: WardType; gender_policy: GenderPolicy } | undefined,
-  admission: { admission_category: AdmissionCategory; is_infectious: boolean },
+  admission: { admission_category?: AdmissionCategory; is_infectious: boolean },
   patient: { gender: Gender | undefined; date_of_birth?: string | null },
   role: PrincipalRole | undefined,
 ): Placement {
   if (!ward) return { kind: 'refused', why: 'Ward not found' };
+
+  if (!admission.admission_category) {
+    return { kind: 'refused', why: 'Admission not yet classified' };
+  }
 
   if (patient.gender && !acceptsGender(ward.gender_policy, patient.gender)) {
     return {

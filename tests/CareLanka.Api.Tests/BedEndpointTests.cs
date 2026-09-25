@@ -290,7 +290,7 @@ public sealed class BedEndpointTests
             Id = Guid.NewGuid(),
             PatientId = patient.Id,
             Source = AdmissionSource.WalkIn,
-            Category = AdmissionCategory.Inpatient,
+            Category = AdmissionCategory.General,
             Urgency = AdmissionUrgency.Routine,
             Status = AdmissionStatus.Admitted,
             CategorySetByStaffMemberId = await SomeStaffIdAsync(db),
@@ -305,8 +305,7 @@ public sealed class BedEndpointTests
             Id = Guid.NewGuid(),
             AdmissionId = admission.Id,
             BedId = bedId,
-            Status = AssignmentStatus.Occupied,
-            AssignedBy = AssignedBy.User
+            Status = AssignmentStatus.Occupied
         });
 
         await db.SaveChangesAsync();

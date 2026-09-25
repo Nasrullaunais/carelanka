@@ -172,6 +172,9 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                         maxLength: PatientFieldLimits.nic,
                         serverErrors: errors['nic'],
                         validator: validateNic,
+                        // Re-validates the date of birth field against the new NIC as it's typed,
+                        // once the form has been submitted once.
+                        onChanged: _submitted ? (_) => setState(() {}) : null,
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<Gender>(
@@ -197,6 +200,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                       const SizedBox(height: 12),
                       _DateOfBirthField(
                         value: _dateOfBirth,
+                        nic: _nic.text,
                         enabled: !controller.saving,
                         serverError: _firstError(errors['date_of_birth']),
                         pick: _pickDateOfBirth,
@@ -234,7 +238,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                 ),
                 const SizedBox(height: 16),
                 SectionCard(
-                  title: 'Emergency contact',
+                  title: 'Emergency/guardian contact',
                   icon: Icons.emergency_outlined,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -338,6 +342,7 @@ void openMyDetails(BuildContext context, ProfileController controller) {
 class _DateOfBirthField extends StatelessWidget {
   const _DateOfBirthField({
     required this.value,
+    required this.nic,
     required this.enabled,
     required this.pick,
     required this.onChanged,
@@ -345,6 +350,7 @@ class _DateOfBirthField extends StatelessWidget {
   });
 
   final DateTime? value;
+  final String nic;
   final bool enabled;
   final Future<DateTime?> Function() pick;
   final ValueChanged<DateTime> onChanged;
@@ -354,7 +360,8 @@ class _DateOfBirthField extends StatelessWidget {
   Widget build(BuildContext context) {
     return FormField<DateTime>(
       initialValue: value,
-      validator: (v) => v == null ? 'Enter your date of birth' : null,
+      validator: (v) =>
+          v == null ? 'Enter your date of birth' : validateDateOfBirthAgainstNic(v, nic),
       builder: (field) => InkWell(
         onTap: enabled
             ? () async {
@@ -390,6 +397,7 @@ class _Field extends StatelessWidget {
     this.keyboardType,
     this.maxLength,
     this.serverErrors,
+    this.onChanged,
   });
 
   final TextEditingController controller;
@@ -399,6 +407,7 @@ class _Field extends StatelessWidget {
   final TextInputType? keyboardType;
   final int? maxLength;
   final List<String>? serverErrors;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -415,6 +424,7 @@ class _Field extends StatelessWidget {
           errorText: _firstError(serverErrors),
         ),
         validator: validator,
+        onChanged: onChanged,
       ),
     );
   }

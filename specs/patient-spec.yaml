@@ -8,10 +8,10 @@ info:
     Manages a patient's stay from arrival to discharge: who they are, whether they are
     currently in the hospital, which bed they are in, and whether they can go home.
 
-    **The line this component does not cross.** `admission_category` (icu / hdu / inpatient /
-    day_case / outpatient) is a clinical decision, set by a human and recorded with
-    `category_set_by_staff_id`. It is an INPUT to the bed agent, never an output. No endpoint
-    here lets an AI set or change it.
+    **The line this component does not cross.** `admission_category` (icu / general /
+    surgical / maternity / emergency) is a clinical decision, set by a human and recorded
+    with `category_set_by_staff_id`. It is an INPUT to bed placement, never an output. No
+    endpoint here lets an AI set or change it.
 
     **Design rationale** is in `patient-management-plan.md`.
     **Cross-component boundaries** are in `integration_of_functions.md`.
@@ -46,9 +46,8 @@ tags:
       Management; endpoints here read their register and join it with our assignments.
   - name: Bed Assignment
     description: >-
-      Agent suggestions and the one endpoint that actually places a patient in a bed. The
-      agent writes nothing; a human pressing "Use this bed" runs the same manual endpoint,
-      with the same hard rules and the same row lock, that has always been there.
+      The endpoints that place a patient in a bed and correct a mistaken placement, with the
+      same hard rules and the same row lock every time.
   - name: Discharge
     description: Discharge checklist and confirmation.
   - name: Billing
@@ -57,14 +56,14 @@ tags:
       2026-09-11 - see integration_of_functions.md section 11.10.
   - name: Care Recommendations
     description: |
-      The second agent. An ADMITTED patient describes how they are feeling; the agent reads
+      The care advisory agent. An ADMITTED patient describes how they are feeling; the agent reads
       their medical profile and the administrative shape of their past visits and drafts a
       decision-support note; a Doctor or a Ward Nurse must approve, edit or reject it before
       the patient ever sees it. Never a diagnosis - see patient-management-plan.md 8.10.
   - name: Patient Self-Service
     description: What a logged-in patient may see about themselves. Deliberately narrow.
   - name: Reports
-    description: Occupancy, length of stay, and agent performance.
+    description: Occupancy and length of stay.
   - name: Integration
     description: Read-only surfaces other components depend on.
 
@@ -612,16 +611,19 @@ paths:
       tags: [Admissions, Integration]
       summary: Create a pre-admission from an ambulance dispatch
       description: |
-        Roles: AmbulanceCrew, DutyManager, and the Emergency Service component.
+        Roles: GeneralStaff, WardNurse, DutyManager (`Policies.PatientRegistrar`).
 
-        **OPEN.** AmbulanceCrew was removed from the patient-registration policy on 2026-09-11,
-        so this line and `Policies.PatientRegistrar` now disagree about that role. This endpoint
-        is not built yet, so nothing is broken today - but it has to be settled before it is.
-        `integration_of_functions.md` §11.9, addressed to M1.
+        Called by Emergency Service directly, in-process, once a dispatch commits, so a bed
+        can be found BEFORE the patient arrives instead of after. Since Patient and Emergency
+        share one ASP.NET process and one `Data.Enums` assembly, the real call is a same-process
+        call through `IAdmissionService`, not an HTTP round trip - `PreAdmissionGateway` bridges
+        the two components' request shapes. This endpoint stays published on the OpenAPI
+        contract regardless, so the same route is testable directly and so Swagger documents
+        the full picture.
 
-        Called by Emergency Service (Member 1) when an ambulance is dispatched to this hospital,
-        so a bed can be found BEFORE the patient arrives. That head start is the whole reason
-        the bed agent is worth having.
+        The admission is created with `admission_category` unset - nobody has classified this
+        patient yet. **No component and no AI agent ever sets `admission_category`** (see the
+        top of this file); a clinician does, afterward, via `POST /admissions/{id}/classify`.
 
         `patient_is_caller` decides whose medical record this becomes. When true, `patient_id` is
         supplied and the admission links to that existing record - identity and history already
@@ -633,8 +635,9 @@ paths:
         to answer it than anyone reconstructing it afterwards. Filing one person's emergency
         under another person's record is the failure this prevents.
 
-        `destination_ward_type_hint` is a routing hint only. It never becomes
-        `admission_category` on its own - a human still sets that.
+        `destination_ward_type_hint` is a routing hint only. It is not persisted - it never
+        becomes `admission_category` on its own, and a human still sets that, later, via
+        `POST /admissions/{id}/classify`.
       operationId: preAdmitFromDispatch
       requestBody:
         required: true
@@ -652,6 +655,44 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
           description: A pre-admission already exists for this `dispatch_id`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /admissions/{id}/classify:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Admissions]
+      summary: Set the care category on a pre-admission
+      description: |
+        Roles: WardNurse, DutyManager (`Policies.AdmissionEditor`).
+
+        The other half of `POST /admissions/pre-admit`: a pre-admission from Emergency has no
+        `admission_category` until a clinician sets one here, by hand, having actually looked at
+        the patient. Can only be called once per admission - a second call is a 409, since
+        overwriting a clinician's classification silently is not a thing this endpoint does.
+
+        If the category turns out to be `outpatient`, the visit needs no bed after all and is
+        admitted immediately, the same as a walk-in outpatient at `POST /admissions`.
+      operationId: classifyAdmission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClassifyAdmissionRequest' }
+      responses:
+        '200':
+          description: Category set
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Admission' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This admission already has a care category.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -688,10 +729,10 @@ paths:
       description: |
         Roles: HospitalAdministrator.
 
-        `gender_policy` is a property of the ward, not a rule the agent bends under pressure.
-        ICU and pediatric wards are `mixed` because real intensive care units are open bays;
-        general wards are usually `male` or `female`. Keeping this in data means the agent
-        applies one rule to every ward and never carries a special case for emergencies.
+        `gender_policy` is a property of the ward, not a rule bent under pressure. ICU and
+        pediatric wards are `mixed` because real intensive care units are open bays; general
+        wards are usually `male` or `female`. Keeping this in data means the placement rules
+        apply one rule to every ward and never carry a special case for emergencies.
       operationId: createWard
       requestBody:
         required: true
@@ -723,9 +764,9 @@ paths:
         Roles: any authenticated staff. Consumed by Staff Management (Member 2) to work out
         staffing demand.
 
-        `patients_by_category` is the useful part: fifteen routine inpatients and two
-        high-dependency patients need very different staffing, even though both are
-        "seventeen patients".
+        `patients_by_category` is the useful part: fifteen general-ward patients and two
+        ICU patients need very different staffing, even though both are "seventeen
+        patients".
 
         `incoming_next_2h` lets the Staff Allocation Agent staff AHEAD of a rush instead of
         reacting to one.
@@ -771,7 +812,7 @@ paths:
         Roles: any authenticated staff.
 
         Reads Equipment Management's bed register and joins it with our assignments, applying
-        hold expiry. This is the candidate list the bed agent works from.
+        hold expiry. This is the candidate list staff pick a bed from.
 
         Deliberately NOT `/api/beds` - that route belongs to Equipment Management, which owns
         the bed register itself (`equipment-spec.yaml`). Theirs lists the beds that exist;
@@ -858,118 +899,15 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
 
   # ------------------------------------------------------------------
-  # Bed assignment and the agent
+  # Bed assignment
   # ------------------------------------------------------------------
 
-  /bed-suggestions:
-    post:
-      tags: [Bed Assignment]
-      summary: Ask the Bed and Patient Details Agent who this is and where they go
-      description: |
-        Roles: WardNurse, DutyManager, Reception.
-
-        Agent entry point. Starts the workflow and returns immediately with a `workflow_id`;
-        poll `/bed-workflows/{workflowId}` for progress.
-
-        Replaced `POST /admissions/{id}/bed-suggestion` on 2026-09-16. That route could only be
-        reached from a record somebody had already found, which is not the situation at a desk.
-        The body now takes EITHER an `admission_id` - from a row on the patients board - OR a
-        `patient_identifier`, which is an NIC or a patient code off the hospital slip. The agent
-        is not told which kind it was given; `PatientIdentifierFormats` already tells them apart.
-
-        What the agent does, in order: resolves the patient, reads the admission's requirements,
-        lists candidate beds, discards every bed failing a hard rule H0-H6, ranks the survivors
-        on soft rules, and returns a best bed plus every other bed that passed, each one
-        selectable.
-
-        THE AGENT WRITES NOTHING. Changed 2026-09-16: it used to place a 30 minute hold on its
-        chosen bed before a human saw anything. All four of its tools are now read-only, so a
-        run nobody acts on leaves the database exactly as it found it and takes no bed out of
-        circulation. The workflow pauses at `awaiting_approval`; the admission stays at
-        `awaiting_bed` and the bed stays free for anybody.
-
-        Committing a suggestion is `POST /admissions/{id}/assign-bed` with the `workflow_id` -
-        the same endpoint, the same row lock and the same hard rules a manual pick has always
-        run through. There is no agent-only write path, and no separate approve endpoint.
-
-        When it cannot suggest a bed it says which wall it hit rather than returning a bare
-        "none available": every blocked outcome carries a `blocker` with a machine code and one
-        plain sentence built in C# from the rule that actually stopped it, never written by the
-        model.
-      operationId: requestBedSuggestion
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/BedSuggestionRequest' }
-      responses:
-        '202':
-          description: Workflow started
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/BedWorkflowAccepted' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409':
-          description: This admission is not in a status that can receive a bed suggestion.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ProblemDetails' }
-        '503':
-          description: The agent service is unavailable. Use the manual assignment path instead.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ProblemDetails' }
-
-  /bed-workflows/{workflowId}:
-    parameters:
-      - name: workflowId
-        in: path
-        required: true
-        schema: { type: string, format: uuid }
-    get:
-      tags: [Bed Assignment]
-      summary: Agent execution summary
-      description: |
-        Roles: WardNurse, DutyManager, Reception.
-
-        Plan, completed steps, tool calls with timings, validation results, errors, retries,
-        approval status and final outcome - plus the answer itself: who the patient is, the
-        suggested bed, every selectable alternative, and the blocker when there is one.
-
-        `rationale` is a short human-readable summary shown on screen. The model's raw internal
-        reasoning is NOT stored - the assignment requires persisting only the workflow state the
-        design needs, not hidden reasoning.
-      operationId: getBedWorkflow
-      responses:
-        '200':
-          description: Execution summary
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/BedWorkflowSummary' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-
-  # WITHDRAWN 2026-09-16, never built: /bed-assignments/{id}/approve and
-  # /bed-assignments/{id}/reject.
-  #
-  # Both existed to approve or release a bed hold the agent had already written. The agent no
-  # longer writes one - see /bed-suggestions above - so there is nothing to approve after the
-  # fact and nothing to release. Pressing "Use this bed" IS the approval, and it runs
-  # /admissions/{id}/assign-bed with every check that endpoint has always had: H0-H6, the role
-  # gate, and a row lock. Rejecting a suggestion is closing the panel.
-  #
-  # Recorded here rather than deleted silently, because patient-management-plan.md 5.2 and the
-  # React screens both referred to them by name for two weeks.
   /admissions/{id}/assign-bed:
     parameters:
       - $ref: '#/components/parameters/PathId'
     post:
       tags: [Bed Assignment]
-      summary: Assign a bed manually, bypassing the agent
+      summary: Assign a bed to an admission
       description: |
         Roles: GeneralStaff, WardNurse and DutyManager for any bed MATCHING the patient's
         care level - intensive care included, because an ICU bed for an ICU patient is simply
@@ -977,16 +915,8 @@ paths:
         acute than the patient needs. Which bed depends on the request body rather than the
         route, so a caller choosing one they may not is a 403 from the service.
 
-        The manual path must always work. If the only way to admit a patient were through the
-        AI, the hospital would stop the moment the AI stopped. It is also what makes the human
-        genuinely in control rather than merely able to say yes or no.
-
-        The same hard rules and the same row-locked re-check apply. A human may overrule the
-        agent's ranking; nobody may put an ICU patient in a general bed without it being recorded
-        as a downgrade.
-
-        Records `assigned_by: user` and an `override_reason` when this follows a rejected
-        proposal, which is what the agent-performance report measures.
+        The row-locked re-check and the hard rules apply every time: nobody may put an ICU
+        patient in a general bed without it being recorded as a downgrade.
       operationId: assignBedManually
       requestBody:
         required: true
@@ -2353,8 +2283,8 @@ paths:
       tags: [Admissions]
       summary: Check in an expected patient
       description: |
-        Roles: WardNurse and GeneralStaff for outpatient, day_case and inpatient. DutyManager
-        for ICU and HDU.
+        Roles: WardNurse and GeneralStaff for general, surgical, maternity and emergency.
+        DutyManager for ICU.
 
         **Business op.** Turns an `Appointment` into an `Admission` with
         `source = pre_registered`, in one transaction: the appointment moves to `completed`
@@ -2368,8 +2298,8 @@ paths:
         and `category_set_by_staff_id` records who chose it.
 
         **The role split depends on the body, not the route.** A WardNurse or GeneralStaff may
-        check somebody in as `outpatient`, `day_case` or `inpatient`; `icu` and `hdu` are the
-        DutyManager's alone, and anyone else asking for either is a 403 carrying `cl_pat_011`.
+        check somebody in as `general`, `surgical`, `maternity` or `emergency`; `icu` is the
+        DutyManager's alone, and anyone else asking for it is a 403 carrying `cl_pat_011`.
 
         Returns the **admission**, not the appointment - the admission is what the desk works
         from next, and the booking is finished with. From here the patient is on
@@ -2457,39 +2387,6 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/LengthOfStayRow' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-
-  /reports/patient/agent-performance:
-    get:
-      tags: [Reports]
-      summary: How well the bed agent is doing
-      description: |
-        Roles: DutyManager.
-
-        Proposals approved, rejected and overridden, average time to approval, downgrade rate,
-        and safe-failure count.
-
-        This is the agent's own observability, which the assignment asks for by name. It is also
-        the honest answer to "how do you know your agent is any good?" - a rejection rate is
-        evidence; a demo that went well is not.
-      operationId: getPatientAgentPerformanceReport
-      parameters:
-        - name: from
-          in: query
-          required: true
-          schema: { type: string, format: date }
-        - name: to
-          in: query
-          required: true
-          schema: { type: string, format: date }
-      responses:
-        '200':
-          description: Agent performance
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/PatientAgentPerformanceReport' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -2709,6 +2606,43 @@ paths:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /care-recommendations/{id}/redraft:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [Care Recommendations]
+      summary: Run the agent again for a report still awaiting review
+      description: |
+        Roles: Doctor OR WardNurse. Same reviewers as approve and reject.
+
+        The usual reason a draft is the fixed backup sentence rather than a note about this
+        patient is a model that was busy, which clears on its own - so the reviewer's answer
+        to a useless draft is another run, not approving it anyway. Check draft_source on
+        CareWorkflowSummary to see which one you are reading.
+
+        Adds a second workflow rather than resetting the first: the original run happened and
+        overwriting it would erase the record of why a redraft was needed. The recommendation's
+        existing draft is cleared while the new run works.
+      operationId: redraftCareRecommendation
+      responses:
+        '202':
+          description: The run was queued. Poll the workflow for progress.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CareWorkflowAccepted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Only a Doctor or a WardNurse may redraft a care recommendation.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This recommendation is not pending review.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
   /me/care-recommendations:
     get:
       tags: [Patient Self-Service]
@@ -2795,12 +2729,14 @@ components:
     IllegalTransition:
       description: |
         Not a legal status change. The allowed moves are:
-        awaiting_bed -> awaiting_approval, cancelled;
+        awaiting_bed -> awaiting_approval, admitted, cancelled;
         awaiting_approval -> bed_reserved, awaiting_bed, cancelled;
         bed_reserved -> admitted, awaiting_bed, cancelled;
         admitted -> ready_for_discharge;
         ready_for_discharge -> discharged, admitted.
-        Anything else is rejected here rather than silently allowed.
+        Anything else is rejected here rather than silently allowed. (awaiting_bed straight to
+        admitted is POST /admissions/{id}/classify discovering the visit is outpatient after
+        all - the same jump a walk-in outpatient takes at creation, just discovered later.)
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -2825,9 +2761,14 @@ components:
     AdmissionCategory:
       type: string
       description: |
-        The care level. Set by clinical staff, never by an AI agent. Ordered most to least
-        intensive; the downgrade ladder walks icu -> hdu -> inpatient.
-      enum: [icu, hdu, inpatient, day_case, outpatient]
+        The care level. Set by clinical staff, never by an AI agent. Every value now
+        requires a bed - the only ladder left is icu (rung 0) against everything else
+        (rung 2); general/surgical/maternity/emergency carry equal acuity for bed
+        placement and differ only in which ward they belong in. emergency is a process
+        decision (skip full registration, admit now), not a physical ward type - it
+        places against general-typed wards via the rung system, same as any other rung-2
+        category.
+      enum: [icu, general, surgical, maternity, emergency]
 
     AppointmentStatus:
       type: string
@@ -2872,9 +2813,7 @@ components:
             reason:
               type: string
               nullable: true
-              description: |
-                Free text, written by whoever booked. Displayed to staff and never read by
-                the bed agent - free text stays data, never instructions.
+              description: Free text, written by whoever booked. Displayed to staff only.
             booked_by_staff_id:
               type: string
               format: uuid
@@ -2984,7 +2923,7 @@ components:
         reason:
           type: string
           nullable: true
-          description: Optional free text, for the desk to read. Never read by the agent.
+          description: Optional free text, for the desk to read.
 
     CreateAppointmentRequest:
       type: object
@@ -3003,7 +2942,7 @@ components:
           nullable: true
           maxLength: 300
           description: |
-            Optional free text, for the desk to read. Never read by the agent.
+            Optional free text, for the desk to read.
 
             There is no `booked_by_staff_id` on this body on purpose: who took the booking
             comes off the token. A field a client fills in is a field a client can fill in
@@ -3086,7 +3025,7 @@ components:
         status: { $ref: '#/components/schemas/WorklistStatus' }
         requires_bed:
           type: boolean
-          description: False for an outpatient, who is seen and goes home.
+          description: Always true - every `admission_category` value now reserves a bed.
         source:
           allOf:
             - $ref: '#/components/schemas/AdmissionSource'
@@ -3166,105 +3105,6 @@ components:
         twice.
       enum: [discharged, hold_expired, cancelled, transferred, rejected, corrected]
 
-    BedAgentOutcome:
-      type: string
-      description: |
-        What the bed agent decided. Called BedAgentOutcome rather than AgentOutcome
-        because staff-spec.yaml has its own AgentOutcome for what the staffing agent
-        decided. Different thing, same word, one shared app - so the names have to differ.
-        Extended 2026-09-16. `needs_duty_manager` is an upgrade-only ward, which the agent
-        refuses to rank as its best pick even though a duty manager may place one by hand.
-        `visit_needs_no_bed` is an outpatient, which is a different answer from "the hospital
-        is full" and must not render as an empty list. `patient_not_found` is a lookup by NIC
-        or patient code that matched nothing - an answer, not an error.
-      enum:
-        - proposed
-        - proposed_with_downgrade
-        - needs_duty_manager
-        - no_bed_available
-        - visit_needs_no_bed
-        - patient_not_found
-        - failed
-
-    BedSuggestionBlockerCode:
-      type: string
-      description: |
-        Which wall the agent hit. Paired with one plain sentence in `BedSuggestionBlocker`,
-        built in C# from the filter result - never written by the model, because a model asked
-        to explain its own failure writes something plausible rather than something true.
-      enum:
-        - downgrade_needed
-        - upgrade_only
-        - ward_full
-        - gender_policy
-        - needs_isolation
-        - pediatric_only
-        - no_bed_required
-        - no_such_patient
-        - no_open_admission
-        - agent_failed
-
-    BedSuggestionBlocker:
-      type: object
-      required: [code, message]
-      description: Null when nothing is in the way.
-      properties:
-        code: { $ref: '#/components/schemas/BedSuggestionBlockerCode' }
-        message:
-          type: string
-          example: No ICU beds are free. The nearest option is HDU-02, one level down, and a Duty Manager has to approve a downgrade.
-
-    SuggestedBed:
-      type: object
-      required: [bed_id, ward_name, bed_number, is_downgrade, requires_duty_manager]
-      description: |
-        One selectable bed. The best pick and every alternative use this same shape, on purpose:
-        alternatives used to be `{ bed_id, reason_not_chosen }`, which a nurse could read and
-        could not act on. Every entry here is committed the same way, with the same one button.
-      properties:
-        bed_id: { type: string, format: uuid }
-        ward_name: { type: string, example: ICU }
-        bed_number: { type: string, example: ICU-04 }
-        is_downgrade: { type: boolean }
-        requires_duty_manager:
-          type: boolean
-          description: True for ICU, HDU or any downgrade. The button is hidden for a ward nurse.
-        rules_satisfied:
-          type: array
-          items: { type: string }
-          example: [requires_bed, category_match, gender_policy, isolation, age_policy]
-        rationale:
-          type: string
-          nullable: true
-          description: Short human-readable summary. Not the model's raw reasoning.
-
-    BedSuggestionPatient:
-      type: object
-      required: [patient_id, patient_code, full_name]
-      description: |
-        Who the suggestion is for. Part of the answer rather than a second lookup - a bed
-        suggestion with no name on it is how the right bed gets given to the wrong person.
-      properties:
-        patient_id: { type: string, format: uuid }
-        patient_code: { type: string, example: PT-7K4M2Q }
-        full_name: { type: string, example: Lochana Dahanayake }
-        age: { type: integer, nullable: true }
-        gender: { $ref: '#/components/schemas/Gender' }
-        admission_id: { type: string, format: uuid, nullable: true }
-        admission_category:
-          allOf:
-            - $ref: '#/components/schemas/AdmissionCategory'
-          nullable: true
-        urgency:
-          allOf:
-            - $ref: '#/components/schemas/AdmissionUrgency'
-          nullable: true
-        is_infectious: { type: boolean }
-        status:
-          allOf:
-            - $ref: '#/components/schemas/AdmissionStatus'
-          nullable: true
-
     PatientMedicalProfile:
       type: object
       required: [patient_id]
@@ -3305,30 +3145,6 @@ components:
         allergies: { type: string, maxLength: 1000, nullable: true }
         current_symptoms: { type: string, maxLength: 2000, nullable: true }
         recent_situation: { type: string, maxLength: 2000, nullable: true }
-
-    BedSuggestionRequest:
-      type: object
-      description: |
-        Exactly one of `admission_id` or `patient_identifier`. Supplying both, or neither, is a
-        400 - "either of these" is a rule a validator can state and a caller can read, where a
-        silent precedence rule is one neither can.
-
-        Note what is NOT here: `admission_category`. A caller who could supply the care level
-        could lie about it, and that is the one field this agent must never influence. It is
-        read from the database through a read-only tool.
-      properties:
-        admission_id:
-          type: string
-          format: uuid
-          nullable: true
-          description: From a row already on the patients board.
-        patient_identifier:
-          type: string
-          maxLength: 32
-          nullable: true
-          description: >-
-            An NIC or a patient code, off the hospital slip. The caller does not say which and
-            the agent does not need to be told.
 
     # ---------- common ----------
 
@@ -3543,6 +3359,12 @@ components:
             - $ref: '#/components/schemas/Gender'
           nullable: true
 
+    ClassifyAdmissionRequest:
+      type: object
+      required: [admission_category]
+      properties:
+        admission_category: { $ref: '#/components/schemas/AdmissionCategory' }
+
     CompleteDetailsRequest:
       type: object
       description: Any subset of the fields that were missing. Completeness is recalculated server-side.
@@ -3595,44 +3417,40 @@ components:
         It was inline while nothing implemented it.
       properties:
         bed_id: { type: string, format: uuid }
-        workflow_id:
-          type: string
-          format: uuid
-          nullable: true
-          description: >-
-            Added 2026-09-16. Present when the nurse pressed "Use this bed" on an agent
-            suggestion; absent when they picked the bed themselves. It is what stamps the
-            resulting BedAssignment `assigned_by = agent` and links it back to the run, and it
-            is the ONLY thing that differs between the two paths - there is no agent-only
-            endpoint. A workflow_id that does not exist, or that suggested a different bed, is
-            recorded as a manual assignment rather than trusted.
         override_reason:
           type: string
           maxLength: 500
           nullable: true
           description: >-
-            Why a human chose a bed the agent did not suggest, or an off-path bed a duty
-            manager is overruling H2 to take. Never required: this endpoint is also the
-            ordinary path when nobody asked the agent at all.
+            Why an off-path bed a duty manager is overruling H2 to take, when the choice is not
+            self-explanatory.
 
     AdmissionSummary:
       type: object
-      required: [id, source, admission_category, urgency, status, details_complete, requires_bed]
+      required: [id, source, urgency, status, details_complete, requires_bed]
       properties:
         id: { type: string, format: uuid }
         patient: { $ref: '#/components/schemas/PatientSummary' }
         source: { $ref: '#/components/schemas/AdmissionSource' }
-        admission_category: { $ref: '#/components/schemas/AdmissionCategory' }
+        admission_category:
+          allOf:
+            - $ref: '#/components/schemas/AdmissionCategory'
+          nullable: true
+          description: >-
+            Null on a pre-admission from Emergency until a clinician classifies it via
+            POST /admissions/{id}/classify. Always set on every other admission source.
         urgency: { $ref: '#/components/schemas/AdmissionUrgency' }
         status: { $ref: '#/components/schemas/AdmissionStatus' }
         details_complete: { type: boolean }
         requires_bed:
           type: boolean
           description: |
-            **Hard rule H0.** Whether this visit needs a bed at all. False for an
-            `outpatient` - a scan, a blood test, a dressing change - who is seen and sent
-            home. True for every other care level, `day_case` included: a day case is on a
-            real bed for hours and it is a bed nobody else can have.
+            **Hard rule H0.** Whether this visit needs a bed at all. Always true - every
+            `admission_category` value reserves a bed, including while `admission_category`
+            is still null on an unclassified pre-admission (the safe default). A visit that
+            needs no bed at all (a scan, a blood test, a dressing change) is never an
+            `Admission` in the first place; it is billed straight off the appointment instead
+            (`POST /appointments/{id}/bill`).
 
             Derived from `admission_category` and never stored, so the two cannot disagree.
             Published rather than left to the client, because a screen that works it out for
@@ -3651,10 +3469,14 @@ components:
         - $ref: '#/components/schemas/AdmissionSummary'
         - $ref: '#/components/schemas/AuditFields'
         - type: object
-          required: [category_set_by_staff_id, category_set_at, is_infectious, missing_fields]
+          required: [is_infectious, missing_fields]
           properties:
             dispatch_id: { type: string, nullable: true }
-            category_set_by_staff_id: { type: string, format: uuid }
+            category_set_by_staff_id:
+              type: string
+              format: uuid
+              nullable: true
+              description: Null until a clinician classifies the admission via POST /admissions/{id}/classify.
             category_set_by_staff_name:
               type: string
               nullable: true
@@ -3662,8 +3484,9 @@ components:
                 Who admitted this patient and chose their care level. For a walk-in that is
                 whoever was on the desk, and it is the closest thing this component stores to
                 "who did the intake" - there are no created_by columns anywhere, by group
-                convention. Absent when no staff member matches the id.
-            category_set_at: { type: string, format: date-time }
+                convention. Absent when no staff member matches the id, or when the admission
+                is not yet classified.
+            category_set_at: { type: string, format: date-time, nullable: true }
             is_infectious: { type: boolean }
             reported_by_user_id:
               type: string
@@ -3700,13 +3523,6 @@ components:
               type: array
               description: Every assignment ever made for this admission, including rejected and expired ones.
               items: { $ref: '#/components/schemas/BedAssignment' }
-            workflows:
-              type: array
-              description: >-
-                Every agent run for this admission. NOT SERVED YET - the API omits this key
-                rather than returning an empty array, because AgentWorkflow is common and
-                unbuilt (ADR 3). Arrives with step 11 of docs/build/patient.md.
-              items: { $ref: '#/components/schemas/BedWorkflowSummary' }
             discharge:
               allOf:
                 - $ref: '#/components/schemas/Discharge'
@@ -3823,7 +3639,8 @@ components:
         patients_by_category:
           type: object
           description: |
-            Care mix. Fifteen inpatients and two HDU patients need different staffing.
+            Care mix. Fifteen general-ward patients and two ICU patients need different
+            staffing.
 
             Keyed by `AdmissionCategory` wire value. **Every category is present, zeros
             included** - a category that vanished when it dropped to zero would disappear
@@ -3871,7 +3688,7 @@ components:
           type: integer
           description: Usable, unoccupied, and not under a live reservation.
 
-    # ---------- bed assignment and agent ----------
+    # ---------- bed assignment ----------
 
     BedAssignment:
       allOf:
@@ -3884,7 +3701,6 @@ components:
             - ward_name
             - bed_number
             - status
-            - assigned_by
             - is_downgrade
           properties:
             id: { type: string, format: uuid }
@@ -3898,8 +3714,6 @@ components:
               format: date-time
               nullable: true
               description: The expiring hold. Past this instant the bed is free again, with no human action.
-            assigned_by: { $ref: '#/components/schemas/AssignedBy' }
-            workflow_id: { type: string, format: uuid, nullable: true }
             is_downgrade:
               type: boolean
               description: True when the bed is below the requested category. Always needs DutyManager approval.
@@ -3912,88 +3726,6 @@ components:
               allOf:
                 - $ref: '#/components/schemas/ReleaseReason'
               nullable: true
-
-    BedWorkflowAccepted:
-      type: object
-      properties:
-        workflow_id: { type: string, format: uuid }
-        admission_id:
-          type: string
-          format: uuid
-          nullable: true
-          description: >-
-            Null when the run was started from an NIC or patient code and the agent has not
-            resolved the patient yet. Populated once it has.
-        status: { type: string, example: running }
-        poll_url: { type: string, example: /api/bed-workflows/3fa85f64-5717-4562-b3fc-2c963f66afa6 }
-
-    BedWorkflowSummary:
-      type: object
-      description: |
-        Persisted agent execution state: id, objective, plan, completed steps, tool calls,
-        validation results, errors, approval status and outcome. Raw model reasoning is not
-        stored.
-      properties:
-        workflow_id: { type: string, format: uuid }
-        admission_id: { type: string, format: uuid, nullable: true }
-        objective: { type: string, example: suggest_bed }
-        status:
-          type: string
-          enum: [running, awaiting_approval, completed, failed]
-        outcome:
-          allOf:
-            - $ref: '#/components/schemas/BedAgentOutcome'
-          nullable: true
-        plan:
-          type: array
-          items: { type: string }
-        steps:
-          type: array
-          items:
-            type: object
-            properties:
-              step: { type: string }
-              tool: { type: string, nullable: true }
-              started_at: { type: string, format: date-time }
-              duration_ms: { type: integer }
-              ok: { type: boolean }
-              error: { type: string, nullable: true }
-        patient:
-          allOf:
-            - $ref: '#/components/schemas/BedSuggestionPatient'
-          nullable: true
-          description: Null only when the identifier matched nobody.
-        best:
-          allOf:
-            - $ref: '#/components/schemas/SuggestedBed'
-          nullable: true
-          description: The agent's top pick. Null on every blocked outcome.
-        alternatives:
-          type: array
-          description: >-
-            Every other bed that passed all seven hard rules, ranked below `best` and each one
-            selectable with the same button. Empty when there was only one, or none.
-          items: { $ref: '#/components/schemas/SuggestedBed' }
-        blocker:
-          allOf:
-            - $ref: '#/components/schemas/BedSuggestionBlocker'
-          nullable: true
-        validation:
-          type: object
-          description: >-
-            Result of the deterministic C# validator, run over `best` and every alternative
-            before any of them reach a human. Anything failing here is removed from the answer.
-            It runs a second time, under a row lock, at /admissions/{id}/assign-bed.
-          properties:
-            passed: { type: boolean }
-            failed_rules:
-              type: array
-              items: { type: string }
-        requires_approval_by:
-          type: string
-          enum: [ward_nurse, duty_manager]
-          nullable: true
-        retries: { type: integer }
 
     # ---------- discharge ----------
 
@@ -4063,7 +3795,7 @@ components:
         patient: { $ref: '#/components/schemas/PatientSummary' }
         ward_name:
           type: string
-          description: Empty when the patient holds no bed, e.g. an outpatient.
+          description: Empty when the patient has not yet been assigned a bed.
         bed_number: { type: string }
         admission_category: { $ref: '#/components/schemas/AdmissionCategory' }
         admitted_at: { type: string, format: date-time, nullable: true }
@@ -4572,22 +4304,7 @@ components:
         average_days: { type: number, format: float }
         median_days: { type: number, format: float }
 
-    PatientAgentPerformanceReport:
-      type: object
-      properties:
-        from: { type: string, format: date }
-        to: { type: string, format: date }
-        proposals_total: { type: integer }
-        approved: { type: integer }
-        rejected: { type: integer }
-        overridden_manually: { type: integer }
-        downgrades_proposed: { type: integer }
-        no_bed_available: { type: integer }
-        failed: { type: integer }
-        average_seconds_to_approval: { type: number, format: float }
-        average_agent_latency_ms: { type: number, format: float }
-
-    # ---------- care recommendations (second agent) ----------
+    # ---------- care recommendations ----------
 
     CareUrgency:
       type: string
@@ -4596,6 +4313,14 @@ components:
     CareRecommendationStatus:
       type: string
       enum: [pending_review, approved, rejected]
+
+    CareReviewerRole:
+      type: string
+      description: |
+        Who signed off a care reply. Deliberately narrower than the group-owned `StaffRole`:
+        the CareRecommendationReviewer policy admits a Doctor or a Ward Nurse and nobody else,
+        so those are the only two a patient can ever be shown.
+      enum: [doctor, ward_nurse]
 
     CareQueryRequest:
       type: object
@@ -4618,8 +4343,9 @@ components:
     CareWorkflowSummary:
       type: object
       description: |
-        Persisted agent execution state for the care advisory agent. Same shape and same
-        purpose as BedWorkflowSummary - see that schema's description.
+        Persisted agent execution state for the care advisory agent: id, objective, plan,
+        completed steps, tool calls, validation results, errors, approval status and outcome.
+        Raw model reasoning is not stored.
       properties:
         workflow_id: { type: string, format: uuid }
         recommendation_id: { type: string, format: uuid }
@@ -4656,7 +4382,22 @@ components:
             failed_rules:
               type: array
               items: { type: string }
+        draft_source: { $ref: '#/components/schemas/CareDraftSource' }
+        draft_note:
+          type: string
+          nullable: true
+          description: >-
+            Plain-language reason the fixed backup note was used instead of a model draft.
+            Null when draft_source is model.
         retries: { type: integer }
+
+    CareDraftSource:
+      type: string
+      description: >-
+        Where the draft on a care recommendation came from. Only model is a note written about
+        this patient; the other two are the same fixed backup sentence, and a reviewer has to be
+        told which one they are reading.
+      enum: [model, model_unavailable, model_rejected]
 
     CareRecommendationSummary:
       type: object
@@ -4691,9 +4432,11 @@ components:
           type: string
           nullable: true
           description: >-
-            The agent's draft. Staff-facing only - a patient never receives this field on any
-            route, which is enforced by MyCareRecommendation being a different shape rather
-            than by filtering this one.
+            The agent's draft of the reply, already addressed to the patient. Unapproved, so a
+            patient never receives this field on any route - what they read is doctor_message,
+            which the reviewer either approves from this draft or rewrites. The separation is
+            enforced by MyCareRecommendation being a different shape rather than by filtering
+            this one.
         status: { $ref: '#/components/schemas/CareRecommendationStatus' }
         workflow_id: { type: string, format: uuid, nullable: true }
         reviewed_by_staff_id: { type: string, format: uuid, nullable: true }
@@ -4733,5 +4476,22 @@ components:
         status: { $ref: '#/components/schemas/CareRecommendationStatus' }
         doctor_message:
           type: string
+          nullable: true
+          description: Set only once status is approved.
+        reviewed_by_name:
+          type: string
+          nullable: true
+          description: |
+            Who signed off the reply. Set alongside doctor_message, so a patient never learns
+            that a report they cannot read was reviewed, or by whom. Null on an approved row
+            means the reviewer's account has since been deactivated.
+        reviewed_by_role:
+          allOf:
+            - $ref: '#/components/schemas/CareReviewerRole'
+          nullable: true
+          description: The reviewer's role, so the reply can be attributed to a doctor or a nurse.
+        reviewed_at:
+          type: string
+          format: date-time
           nullable: true
           description: Set only once status is approved.

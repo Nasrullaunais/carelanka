@@ -594,6 +594,22 @@ paths:
             application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
+  /ambulances/mine:
+    get:
+      tags: [Ambulances]
+      summary: My assigned ambulance
+      description: 'Roles: AmbulanceCrew. Returns the live response vehicle, otherwise the current fleet assignment, scoped to the authenticated crew member.'
+      operationId: getMyAmbulanceAssignment
+      responses:
+        '200':
+          description: Assigned ambulance
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ambulance' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /ambulances/{id}/location:
     parameters:
       - $ref: '#/components/parameters/PathId'
@@ -603,7 +619,9 @@ paths:
       description: |
         Roles: AmbulanceCrew, their assigned vehicle only.
 
-        Posted from the crew's phone GPS while a run is active. Current position
+        Posted from the assigned crew's phone GPS while the crew app is open,
+        including before dispatch. During a live run only its responding crew may
+        report the position. Current position
         only, no history kept (`docs/entity_diagram.md`, Decision 9) — this
         overwrites `current_latitude`/`current_longitude` rather than appending a row,
         which is why the fleet map shows where everyone *is* and not where they have
@@ -1206,6 +1224,9 @@ paths:
         line on the React map view reads from here, so the map shows the route that
         was actually planned rather than re-querying and getting a different answer
         later.
+
+        The route is saved a few seconds after dispatch, so this returns 404 until then and
+        when the routing service was unavailable. Crew can read only their own run.
       operationId: getDispatchRoute
       responses:
         '200':
@@ -1293,6 +1314,7 @@ paths:
                       items:
                         type: array
                         items: { $ref: '#/components/schemas/DispatchSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /me/dispatches/{id}/acknowledge:
@@ -1498,23 +1520,22 @@ paths:
       - $ref: '#/components/parameters/PathId'
     get:
       tags: [My Calls]
-      summary: Track the ambulance coming to my call
+      summary: Track the status of my emergency call and its active ambulance
       description: |
         Roles: Patient, the caller of this call only.
 
-        **"Where is it, and how long?"** — the single question somebody waiting on a
-        pavement actually has. Returns the ambulance's current position and live ETA
-        while the run is active, and nothing else.
+        Returns the call status before dispatch, during the response, and after
+        completion or cancellation. Ambulance position is included only while a
+        dispatch is active.
 
         **A deliberately narrow shape, not a filtered staff response.** No crew
         names, no call notes, no other patients, no dispatch reasoning — the same
         rule Patient Management applies to its own patient-facing endpoints
-        (`patient-management-plan.md` §2). Returns `404` once the run is complete,
-        because there is nothing left to track.
+        (`patient-management-plan.md` §2). Unknown calls return `404`.
       operationId: trackMyEmergencyCall
       responses:
         '200':
-          description: Live tracking
+          description: Caller-scoped call status and active ambulance tracking
           content:
             application/json:
               schema: { $ref: '#/components/schemas/MyCallTracking' }
@@ -1971,7 +1992,7 @@ components:
         address_label:
           type: string
           nullable: true
-          description: Human-readable address from the maps API's reverse geocode, for the crew.
+          description: Address looked up from the coordinates a few seconds after the call is logged, so it can be empty at first or when the lookup service is down.
         details: { type: string, nullable: true }
         priority: { $ref: '#/components/schemas/CallPriority' }
         status: { $ref: '#/components/schemas/CallStatus' }
@@ -2085,6 +2106,7 @@ components:
         id: { type: string, format: uuid }
         registration_number: { type: string }
         status: { $ref: '#/components/schemas/AmbulanceStatus' }
+        is_active: { type: boolean }
         current_latitude: { type: number, format: double, nullable: true }
         current_longitude: { type: number, format: double, nullable: true }
         location_updated_at: { type: string, format: date-time, nullable: true }
@@ -2097,6 +2119,10 @@ components:
           type: array
           items: { $ref: '#/components/schemas/AmbulanceEligibilityBlockReason' }
         active_dispatch_id: { type: string, format: uuid, nullable: true }
+        active_dispatch:
+          allOf:
+            - $ref: '#/components/schemas/DispatchSummary'
+          nullable: true
         is_divertible:
           type: boolean
           description: |
@@ -2105,7 +2131,15 @@ components:
         distance_km:
           type: number
           nullable: true
-          description: Only present when the query supplied `nearToLatitude`/`nearToLongitude`.
+          description: Only present when the query supplied `nearToLatitude`/`nearToLongitude`. Road distance, or straight-line when `is_straight_line_distance` is true.
+        drive_minutes:
+          type: integer
+          nullable: true
+          description: Estimated driving time. Absent when the routing service was unavailable and the ranking fell back to straight-line distance.
+        is_straight_line_distance:
+          type: boolean
+          nullable: true
+          description: True when the routing service failed and `distance_km` is a straight line, so the UI can say so. Absent when no position was supplied.
 
     AmbulanceDetail:
       allOf:
@@ -2192,6 +2226,8 @@ components:
           properties:
             objective: { type: string }
             proposed_ambulance_id: { type: string, format: uuid, nullable: true }
+            proposed_ambulance_current_crew_count: { type: integer, nullable: true }
+            proposed_ambulance_required_crew_count: { type: integer, nullable: true }
             rationale:
               type: string
               nullable: true
@@ -2260,7 +2296,8 @@ components:
         source_call_waiting_minutes_so_far: { type: integer }
         source_call_additional_wait_minutes:
           type: integer
-          description: How much longer the other patient waits if this is approved. The number that decides it.
+          nullable: true
+          description: Estimated extra wait for the displaced call; null when no reliable estimate is available.
         replacement_ambulance_id:
           type: string
           format: uuid
@@ -2272,7 +2309,8 @@ components:
         replacement_ambulance_registration: { type: string, nullable: true }
         minutes_saved_for_this_call:
           type: integer
-          description: The benefit side — how much sooner the critical call is reached.
+          nullable: true
+          description: Estimated response time saved; null when no reliable comparison is available.
 
     DispatchPlanStep:
       type: object
@@ -2377,6 +2415,10 @@ components:
               type: array
               items: { $ref: '#/components/schemas/DispatchCrewMember' }
             call: { $ref: '#/components/schemas/EmergencyCallSummary' }
+            scene_address_label:
+              type: string
+              nullable: true
+              description: Reverse-geocoded scene address shown to the assigned crew.
             handover_notes: { type: string, nullable: true }
             patient_condition: { type: string, nullable: true }
 
@@ -2410,7 +2452,7 @@ components:
         maps_api_reference:
           type: string
           nullable: true
-          description: The maps provider's own request id, so a disputed ETA can be traced back.
+          description: Which routing provider produced the estimate (`osrm`), so a disputed ETA can be traced back. The provider gives no request ids.
 
     NavigationTarget:
       type: object
@@ -2488,6 +2530,12 @@ components:
         changes the dispatch; only Duty Manager approval can apply cancellation.
       properties:
         emergency_call_id: { type: string, format: uuid }
+        call_priority: { $ref: '#/components/schemas/CallPriority' }
+        call_status: { $ref: '#/components/schemas/CallStatus' }
+        caller_name: { type: string, nullable: true }
+        address_label: { type: string, nullable: true }
+        call_created_at: { type: string, format: date-time }
+        active_ambulance_registration: { type: string, nullable: true }
         status: { $ref: '#/components/schemas/CancellationRequestStatus' }
         reason: { type: string }
         requested_at: { type: string, format: date-time }

@@ -10,7 +10,10 @@ import '../models/run_step.dart';
 import '../services/crew_run_service.dart';
 
 class MyRunController extends ChangeNotifier {
-  MyRunController(this._service, {this.pollInterval = const Duration(seconds: 10)});
+  MyRunController(
+    this._service, {
+    this.pollInterval = const Duration(seconds: 10),
+  });
 
   final CrewRunService _service;
   final Duration pollInterval;
@@ -41,22 +44,30 @@ class MyRunController extends ChangeNotifier {
     try {
       _show(await _service.activeRun());
     } on ApiException catch (error) {
-      if (showLoading || _state is! AsyncReady<DispatchDetail?>) _state = AsyncData.failed(error);
+      if (showLoading || _state is! AsyncReady<DispatchDetail?>) {
+        _state = AsyncData.failed(error);
+      }
     }
     _notify();
   }
 
   Future<bool> acknowledge() => _act((run) => _service.acknowledge(run.id!));
 
-  Future<bool> decline(String reason) => _act((run) => _service.decline(run.id!, reason));
+  Future<bool> decline(String reason) =>
+      _act((run) => _service.decline(run.id!, reason));
 
   Future<bool> advance() => _act((run) {
-        final next = run.status?.nextStep?.nextStatus;
-        return next == null ? Future.value(run) : _service.advance(run.id!, next);
-      });
+    final next = run.status?.nextStep?.nextStatus;
+    return next == null ? Future.value(run) : _service.advance(run.id!, next);
+  });
 
-  Future<bool> handOver({String? notes, String? patientCondition}) =>
-      _act((run) => _service.handOver(run.id!, notes: notes, patientCondition: patientCondition));
+  Future<bool> handOver({String? notes, String? patientCondition}) => _act(
+    (run) => _service.handOver(
+      run.id!,
+      notes: notes,
+      patientCondition: patientCondition,
+    ),
+  );
 
   Future<NavigationTarget?> navigationTarget() async {
     final run = _state.valueOrNull;
@@ -75,7 +86,9 @@ class MyRunController extends ChangeNotifier {
     _notify();
   }
 
-  Future<bool> _act(Future<DispatchDetail> Function(DispatchDetail run) action) async {
+  Future<bool> _act(
+    Future<DispatchDetail> Function(DispatchDetail run) action,
+  ) async {
     final run = _state.valueOrNull;
     if (run == null || _busy) return false;
     _busy = true;

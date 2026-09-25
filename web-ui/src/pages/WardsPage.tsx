@@ -1,3 +1,4 @@
+import { Table } from '../components/Table';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,6 +10,7 @@ import {
 import type { GenderPolicy, Ward, WardType } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
 import { canCreateWard } from '../types/permissions';
+import { ActionDialog } from '../components/ui/action-dialog';
 import {
   genderPolicies,
   genderPolicyLabels,
@@ -16,6 +18,7 @@ import {
   wardTypeLabels,
   wardTypes,
 } from '../types/wards';
+import { AppSelect } from '../components/ui/app-select';
 
 export function WardsPage() {
   const session = useSession();
@@ -23,6 +26,7 @@ export function WardsPage() {
 
   const [wardType, setWardType] = useState<WardType | ''>('');
   const [isActive, setIsActive] = useState(true);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const wards = useQuery(
     listWardsOptions({ query: { ...(wardType ? { wardType } : {}), isActive } }),
@@ -51,42 +55,45 @@ export function WardsPage() {
         <h2>Filter</h2>
         <div className="row">
           <div>
-            <label htmlFor="filter-type">Ward type</label>
-            <select
+            <AppSelect
               id="filter-type"
+              label="Ward type"
               value={wardType}
-              onChange={(event) => setWardType(event.target.value as WardType | '')}
-            >
-              <option value="">All types</option>
-              {wardTypes.map((type) => (
-                <option key={type} value={type}>
-                  {wardTypeLabels[type]}
-                </option>
-              ))}
-            </select>
+              onValueChange={(value) => setWardType(value as WardType | '')}
+              options={[
+                { value: '', label: 'All types' },
+                ...wardTypes.map((type) => ({ value: type, label: wardTypeLabels[type] })),
+              ]}
+            />
           </div>
           <div>
-            <label htmlFor="filter-active">Status</label>
-            <select
+            <AppSelect
               id="filter-active"
+              label="Status"
               value={isActive ? 'active' : 'retired'}
-              onChange={(event) => setIsActive(event.target.value === 'active')}
-            >
-              <option value="active">Active</option>
-              <option value="retired">Retired</option>
-            </select>
+              onValueChange={(value) => setIsActive(value === 'active')}
+              options={[
+                { value: 'active', label: 'Active' },
+                { value: 'retired', label: 'Retired' },
+              ]}
+            />
           </div>
         </div>
       </div>
 
       {canCreateWard(session?.principal.role) && (
-        <CreateWardCard
-          isPending={create.isPending}
-          onCreate={(body, done) => create.mutate({ body }, { onSuccess: done })}
-        />
+        <>
+          <button type="button" onClick={() => setCreateOpen(true)}>Add ward</button>
+          <ActionDialog title="Add ward" isOpen={createOpen} onClose={() => setCreateOpen(false)}>
+            {createOpen && <CreateWardCard
+              isPending={create.isPending}
+              onCreate={(body, done) => create.mutate({ body }, { onSuccess: () => { done(); setCreateOpen(false); } })}
+            />}
+          </ActionDialog>
+        </>
       )}
 
-      <div className="card">
+      <div className="table-section">
         <h2>{isActive ? 'Active wards' : 'Retired wards'}</h2>
         <WardTable
           isLoading={wards.isLoading}
@@ -152,33 +159,23 @@ function CreateWardCard({
             />
           </div>
           <div className="field">
-            <label htmlFor="new-type">Ward type</label>
-            <select
+            <AppSelect
               id="new-type"
+              label="Ward type"
               value={wardType}
-              onChange={(event) => setWardType(event.target.value as WardType)}
-            >
-              {wardTypes.map((type) => (
-                <option key={type} value={type}>
-                  {wardTypeLabels[type]}
-                </option>
-              ))}
-            </select>
+              onValueChange={(value) => setWardType(value as WardType)}
+              options={wardTypes.map((type) => ({ value: type, label: wardTypeLabels[type] }))}
+            />
             <p className="hint">{wardTypeHints[wardType]}</p>
           </div>
           <div className="field">
-            <label htmlFor="new-policy">Gender policy</label>
-            <select
+            <AppSelect
               id="new-policy"
+              label="Gender policy"
               value={genderPolicy}
-              onChange={(event) => setGenderPolicy(event.target.value as GenderPolicy)}
-            >
-              {genderPolicies.map((policy) => (
-                <option key={policy} value={policy}>
-                  {genderPolicyLabels[policy]}
-                </option>
-              ))}
-            </select>
+              onValueChange={(value) => setGenderPolicy(value as GenderPolicy)}
+              options={genderPolicies.map((policy) => ({ value: policy, label: genderPolicyLabels[policy] }))}
+            />
           </div>
         </div>
 
@@ -221,7 +218,7 @@ function WardTable({
   }
 
   return (
-    <table>
+    <Table>
       <thead>
         <tr>
           <th>Name</th>
@@ -248,6 +245,6 @@ function WardTable({
           </tr>
         ))}
       </tbody>
-    </table>
+    </Table>
   );
 }

@@ -97,6 +97,7 @@ public sealed class WorklistService : IWorklistService
             Source = admission.Source,
             AdmissionCategory = admission.Category,
             Urgency = admission.Urgency,
+            IsInfectious = admission.IsInfectious,
             WardName = label?.WardName,
             BedNumber = label?.BedNumber,
             When = admission.AdmittedAt ?? admission.CreatedAt

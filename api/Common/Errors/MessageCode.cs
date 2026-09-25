@@ -74,6 +74,8 @@ public enum MessageCode
 
     EquipmentCategoryInUse,
 
+    ReorderSuggestionAlreadyRunning,
+
     PharmacyCategoryNameTaken,
 
     PharmacyItemNameTaken,
@@ -154,6 +156,12 @@ public enum MessageCode
 
     CallNotAwaitingDispatch,
 
+    DispatchProposalConflict,
+
+    DispatchProposalNotConfirmable,
+
+    DispatchProposalNotApprovable,
+
     NicLinkedToAnotherAccount,
 
     NicDoesNotMatchYourRecord,
@@ -166,5 +174,15 @@ public enum MessageCode
 
     NoBillRaised,
 
-    PatientCodeNotClaimable
+    PatientCodeNotClaimable,
+
+    NotCurrentlyAdmittedForCareQuery,
+
+    CareRecommendationNotPendingReview,
+
+    PreAdmissionAlreadyExists,
+
+    AdmissionAlreadyClassified,
+
+    AdmissionNotYetClassified
 }

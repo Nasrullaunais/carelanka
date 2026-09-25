@@ -1,5 +1,7 @@
 # web-ui — the React app
 
+For the current Docker API, web UI, and USB phone setup, see [LOCAL_SETUP.md](../LOCAL_SETUP.md).
+
 Plain React + Vite. Server state in TanStack Query. **The API client is generated,
 never hand-written.**
 
@@ -16,12 +18,12 @@ You need three things up, in this order.
 2. The API, on port 5231
        dotnet run --project api --launch-profile http
 
-3. This app, on port 5173
+3. This app, on port 5174
        npm install
        npm run dev
 ```
 
-Then open http://localhost:5173 and sign in with an account from `TEST_ACCOUNTS.md`.
+Then open http://localhost:5174 and sign in with an account from `TEST_ACCOUNTS.md`.
 
 **Start the API before this app.** Vite proxies `/api` to `localhost:5231`; without it
 every request toasts "Could not reach the server".
@@ -37,21 +39,23 @@ what is installed on the machine this was built on.
 
 `CareLanka_Component_Plan.md` §2.1: **React decides, Flutter does.** Anything that reviews
 a decision and says yes or no is React; anything done while walking a ward, sitting in an
-ambulance or lying in a bed is Flutter. §3 puts both **Patient** and **Ward Nurse** on
-Flutter, so neither belongs in this app.
+ambulance or lying in a bed is Flutter. §3 puts **Patient** on Flutter only. **Ward Nurse
+used to be on Flutter too, and is not any more** — reversed to React on 2026-09-21, because
+Patient Management ended up with no staff-facing mobile screen at all: reception, the ward
+nurse, the duty manager and the administrator all work through this app, full stop.
 
 For Patient Management that splits the screens like this:
 
 | | Screens |
 | :--- | :--- |
-| **React (here)** | Admissions dashboard, the patients board, intake, appointments, capacity, the bed suggestion panel, discharge confirmation, billing and billing rates, the medical profile editor, the care draft review queue, occupancy report |
-| **Flutter (`mobile-ui/`)** | Nurse: place a patient in a normal-ward bed, update status, complete details, maintain the medical profile, review care drafts, request discharge. Patient: my stay, my bill, past visits, book a visit, claim my record, discharge instructions, and — **while admitted only** — tell us how you are feeling and read the approved reply |
+| **React (here)** | Admissions dashboard, the patients board, intake, appointments, capacity, discharge confirmation, billing and billing rates, the medical profile editor, the care draft review queue, occupancy report — plus everything a ward nurse does: place a patient in a normal-ward bed, update status, complete details, maintain the medical profile, review care drafts, request discharge |
+| **Flutter (`mobile-ui/`)** | Patient only: my stay, my bill, past visits, book a visit, claim my record, discharge instructions, and — **while admitted only** — tell us how you are feeling and read the approved reply |
 
-*(Screen list refreshed 2026-09-16. The React side used to say "ICU/downgrade bed approval",
-which no longer exists as a screen: the bed agent writes nothing, so there is no proposal
-waiting to be approved after the fact — pressing "Use this bed" on a suggestion is the
-approval, and it calls the same `assign-bed` endpoint a manual pick has always used. See
-`specs/patient-management-plan.md` §8.6b.)*
+*(Screen list refreshed 2026-09-22. Two changes since it was last written: the ward nurse's
+screens moved here from Flutter on 2026-09-21 (above), and the bed suggestion panel this list
+used to include was removed on 2026-09-22 along with the agent behind it — bed placement is
+`assign-bed`, the same manual endpoint it always was, with no agent-suggested path any more.
+See `patient-management-plan.md` §8 and `CLAUDE.md`'s Patient row.)*
 
 `POST /auth/patient/login` exists in the API and is generated into the client here. That is
 fine — the generated client mirrors the whole API. It is simply never called from this app.

@@ -197,11 +197,11 @@ BEGIN
          admitted_at, discharged_at, missing_fields, details_completed_at,
          created_at, updated_at)
     VALUES
-        (v_ad1, v_p1, 'walk_in', 'inpatient', 'routine', 'awaiting_bed', false,
+        (v_ad1, v_p1, 'walk_in', 'general', 'routine', 'awaiting_bed', false,
          v_nurse, now() - interval '3 hours',
          NULL, NULL, '{}'::text[], now() - interval '3 hours',
          now() - interval '3 hours', now() - interval '3 hours'),
-        (v_ad2, v_p2, 'walk_in', 'inpatient', 'urgent', 'awaiting_bed', false,
+        (v_ad2, v_p2, 'walk_in', 'general', 'urgent', 'awaiting_bed', false,
          v_nurse, now() - interval '90 minutes',
          NULL, NULL, '{}'::text[], now() - interval '90 minutes',
          now() - interval '90 minutes', now() - interval '90 minutes');
@@ -228,21 +228,21 @@ BEGIN
          admitted_at, discharged_at, missing_fields, details_completed_at,
          created_at, updated_at)
     VALUES
-        (v_ad3, v_p3, 'walk_in', 'inpatient', 'routine', 'admitted', false,
+        (v_ad3, v_p3, 'walk_in', 'general', 'routine', 'admitted', false,
          v_nurse, now() - interval '1 day',
          v_admitted_3, NULL, '{}'::text[], now() - interval '1 day',
          now() - interval '1 day', v_admitted_3),
-        (v_ad4, v_p4, 'walk_in', 'inpatient', 'urgent', 'admitted', false,
+        (v_ad4, v_p4, 'walk_in', 'general', 'urgent', 'admitted', false,
          v_nurse, now() - interval '2 days',
          v_admitted_4, NULL, '{}'::text[], now() - interval '2 days',
          now() - interval '2 days', v_admitted_4);
 
     INSERT INTO bed_assignments
-        (id, admission_id, bed_id, status, assigned_by, occupied_at, is_downgrade,
+        (id, admission_id, bed_id, status, occupied_at, is_downgrade,
          created_at, updated_at)
     VALUES
-        (v_ba3, v_ad3, v_bed_s2_1, 'occupied', 'user', v_admitted_3, false, v_admitted_3, v_admitted_3),
-        (v_ba4, v_ad4, v_bed_s2_2, 'occupied', 'user', v_admitted_4, false, v_admitted_4, v_admitted_4);
+        (v_ba3, v_ad3, v_bed_s2_1, 'occupied', v_admitted_3, false, v_admitted_3, v_admitted_3),
+        (v_ba4, v_ad4, v_bed_s2_2, 'occupied', v_admitted_4, false, v_admitted_4, v_admitted_4);
 
     -- Ishara's bill is raised but NOT settled, on an admission that is still open. This is the
     -- only record here that makes `MyBill.is_final = false`, which is what the Flutter screen
@@ -343,22 +343,22 @@ BEGIN
          admitted_at, discharged_at, missing_fields, details_completed_at,
          created_at, updated_at)
     VALUES
-        (v_ad9, v_p9, 'walk_in', 'inpatient', 'routine', 'discharged', false,
+        (v_ad9, v_p9, 'walk_in', 'general', 'routine', 'discharged', false,
          v_doctor, v_admitted_9 - interval '1 day',
          v_admitted_9, v_discharged_9, '{}'::text[], v_admitted_9 - interval '1 day',
          v_admitted_9 - interval '1 day', v_discharged_9),
-        (v_ad10, v_p10, 'walk_in', 'inpatient', 'urgent', 'discharged', false,
+        (v_ad10, v_p10, 'walk_in', 'general', 'urgent', 'discharged', false,
          v_doctor, v_admitted_10 - interval '1 day',
          v_admitted_10, v_discharged_10, '{}'::text[], v_admitted_10 - interval '1 day',
          v_admitted_10 - interval '1 day', v_discharged_10);
 
     INSERT INTO bed_assignments
-        (id, admission_id, bed_id, status, assigned_by, occupied_at, released_at,
+        (id, admission_id, bed_id, status, occupied_at, released_at,
          release_reason, is_downgrade, created_at, updated_at)
     VALUES
-        (v_ba9, v_ad9, v_bed_s5_1, 'released', 'user', v_admitted_9, v_discharged_9,
+        (v_ba9, v_ad9, v_bed_s5_1, 'released', v_admitted_9, v_discharged_9,
          'discharged', false, v_admitted_9, v_discharged_9),
-        (v_ba10, v_ad10, v_bed_s5_2, 'released', 'user', v_admitted_10, v_discharged_10,
+        (v_ba10, v_ad10, v_bed_s5_2, 'released', v_admitted_10, v_discharged_10,
          'discharged', false, v_admitted_10, v_discharged_10);
 
     INSERT INTO discharges

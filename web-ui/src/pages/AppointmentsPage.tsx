@@ -1,4 +1,6 @@
-import { Fragment, useState } from 'react';
+import { PaginationControls } from '../components/ui/pagination-controls';
+import { Table } from '../components/Table';
+import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -16,13 +18,15 @@ import {
 import type {
   Admission,
   AdmissionCategory,
-  AdmissionUrgency,
   Appointment,
   AppointmentStatus,
   PatientSummary,
 } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
 import { BillPanel } from '../components/BillPanel';
+import { ActionDialog } from '../components/ui/action-dialog';
+import { ConfirmDialog } from '../components/ui/confirm-dialog';
+import { AppSelect } from '../components/ui/app-select';
 import {
   canBillAppointment,
   canOpenAppointmentBoard,
@@ -41,8 +45,6 @@ import { hasPassed, localDateTime, localInputValue, localTime, utcDay } from '..
 import {
   admissionCategoryHints,
   admissionCategoryLabels,
-  admissionUrgencies,
-  admissionUrgencyLabels,
   detailFieldLabel,
   patientIdentifier,
 } from '../types/patients';
@@ -59,6 +61,8 @@ export function AppointmentsPage() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState<{ appointment: Appointment; action: DeskAction } | null>(null);
   const [admitted, setAdmitted] = useState<Admission | null>(null);
+  const [noShowCandidate, setNoShowCandidate] = useState<Appointment | null>(null);
+  const [bookingOpen, setBookingOpen] = useState(false);
 
   // Two different questions: who may see the list, and who may act on a
   // booking. The administrator can bill a finished visit but cannot check
@@ -118,6 +122,7 @@ export function AppointmentsPage() {
       toast.success(`${updated.patient.full_name} marked as not attended.`);
       void refreshBookings();
       setOpen(null);
+      setNoShowCandidate(null);
     },
   });
 
@@ -144,7 +149,7 @@ export function AppointmentsPage() {
   }
 
   function markNotAttended(appointment: Appointment) {
-    noShow.mutate({ path: { id: appointment.id } });
+    setNoShowCandidate(appointment);
   }
 
   return (
@@ -168,21 +173,18 @@ export function AppointmentsPage() {
             />
           </div>
           <div>
-            <label htmlFor="filter-status">Status</label>
-            <select
+            <AppSelect
               id="filter-status"
+              label="Status"
               value={status}
-              onChange={(event) =>
-                resetTo(() => setStatus(event.target.value as AppointmentStatus | ''))
+              onValueChange={(value) =>
+                resetTo(() => setStatus(value as AppointmentStatus | ''))
               }
-            >
-              <option value="">Any status</option>
-              {appointmentStatuses.map((value) => (
-                <option key={value} value={value}>
-                  {appointmentStatusLabels[value]}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: 'Any status' },
+                ...appointmentStatuses.map((value) => ({ value, label: appointmentStatusLabels[value] })),
+              ]}
+            />
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-end' }}>
             <button
@@ -205,22 +207,27 @@ export function AppointmentsPage() {
         )}
       </div>
 
-      {isDesk && <BookVisitCard />}
+      {isDesk && <button type="button" onClick={() => setBookingOpen(true)}>Book a visit</button>}
+      <ActionDialog title="Book a visit" isOpen={bookingOpen} onClose={() => setBookingOpen(false)}>
+        {bookingOpen && <BookVisitCard onBooked={() => setBookingOpen(false)} />}
+      </ActionDialog>
 
       {admitted && <CheckedInCard admission={admitted} onDismiss={() => setAdmitted(null)} />}
 
-      <div className="card">
+      <div className="table-section">
         <h2>
           {status ? appointmentStatusLabels[status] : 'All bookings'}
           {date ? '' : ' — every day'}
         </h2>
 
         <AppointmentTable
+          footer={<PaginationControls label="Appointments" page={page} totalPages={appointments.data?.total_pages ?? 1} totalItems={appointments.data?.total_items} onPageChange={setPage} />}
           appointments={appointments.data?.items ?? []}
           isLoading={appointments.isLoading}
           isError={appointments.isError}
           onRetry={() => void appointments.refetch()}
           onAction={toggle}
+          onCloseAction={() => setOpen(null)}
           onSeenAndBill={seenAndBill}
           onNotAttended={markNotAttended}
           canAct={isDesk}
@@ -228,6 +235,7 @@ export function AppointmentsPage() {
           showDate={date === ''}
           openId={open?.appointment.id ?? null}
           openAction={open?.action ?? null}
+          activeAppointment={open?.appointment ?? null}
           renderDrawer={(appointment) => {
             if (open?.action === 'confirm') {
               return (
@@ -263,34 +271,17 @@ export function AppointmentsPage() {
             );
           }}
         />
+        <ConfirmDialog
+          isOpen={noShowCandidate != null}
+          onOpenChange={(open) => { if (!open) setNoShowCandidate(null); }}
+          title={`Mark ${noShowCandidate?.patient.full_name ?? 'patient'} as not attended?`}
+          description="This closes the booking as a missed visit. Check that the booked time has passed and the patient did not arrive."
+          confirmLabel={noShow.isPending ? 'Saving…' : 'Mark not attended'}
+          isPending={noShow.isPending}
+          onConfirm={() => { if (noShowCandidate) noShow.mutate({ path: { id: noShowCandidate.id } }); }}
+        />
 
-        {appointments.data && appointments.data.total_items > 0 && (
-          <div className="row" style={{ marginTop: '0.9rem', alignItems: 'center' }}>
-            <p className="muted" style={{ flex: '2 1 14rem' }}>
-              {appointments.data.total_items} booking
-              {appointments.data.total_items === 1 ? '' : 's'}, page {appointments.data.page} of{' '}
-              {appointments.data.total_pages}
-            </p>
-            <button
-              type="button"
-              className="secondary"
-              style={{ flex: '0 0 auto' }}
-              disabled={page <= 1}
-              onClick={() => setPage((current) => current - 1)}
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              style={{ flex: '0 0 auto' }}
-              disabled={page >= appointments.data.total_pages}
-              onClick={() => setPage((current) => current + 1)}
-            >
-              Next
-            </button>
-          </div>
-        )}
+
       </div>
     </>
   );
@@ -299,11 +290,13 @@ export function AppointmentsPage() {
 type DeskAction = 'confirm' | 'check-in' | 'cancel' | 'bill';
 
 function AppointmentTable({
+  footer,
   appointments,
   isLoading,
   isError,
   onRetry,
   onAction,
+  onCloseAction,
   onSeenAndBill,
   onNotAttended,
   canAct,
@@ -311,13 +304,16 @@ function AppointmentTable({
   showDate,
   openId,
   openAction,
+  activeAppointment,
   renderDrawer,
 }: {
+  footer?: React.ReactNode;
   appointments: Appointment[];
   isLoading: boolean;
   isError: boolean;
   onRetry: () => void;
   onAction: (appointment: Appointment, action: DeskAction) => void;
+  onCloseAction: () => void;
   onSeenAndBill: (appointment: Appointment) => void;
   onNotAttended: (appointment: Appointment) => void;
   canAct: boolean;
@@ -325,6 +321,7 @@ function AppointmentTable({
   showDate: boolean;
   openId: string | null;
   openAction: DeskAction | null;
+  activeAppointment: Appointment | null;
   renderDrawer: (appointment: Appointment) => ReactNode;
 }) {
   if (isLoading) {
@@ -347,7 +344,8 @@ function AppointmentTable({
   }
 
   return (
-    <table>
+    <>
+    <Table footer={footer}>
       <thead>
         <tr>
           <th>{showDate ? 'When' : 'Time'}</th>
@@ -360,8 +358,7 @@ function AppointmentTable({
       </thead>
       <tbody>
         {appointments.map((appointment) => (
-          <Fragment key={appointment.id}>
-            <tr className={openId === appointment.id ? 'open' : undefined}>
+            <tr key={appointment.id} className={openId === appointment.id ? 'open' : undefined}>
               <td>
                 <strong>
                   {showDate
@@ -484,15 +481,17 @@ function AppointmentTable({
               </td>
             </tr>
 
-            {openId === appointment.id && (
-              <tr className="drawer">
-                <td colSpan={6}>{renderDrawer(appointment)}</td>
-              </tr>
-            )}
-          </Fragment>
         ))}
       </tbody>
-    </table>
+    </Table>
+    <ActionDialog
+      title={`${openAction === 'check-in' ? 'Admit' : openAction === 'confirm' ? 'Confirm' : openAction === 'cancel' ? 'Cancel' : 'Bill'} · ${activeAppointment?.patient.full_name ?? 'appointment'}`}
+      isOpen={openId != null}
+      onClose={onCloseAction}
+    >
+      {activeAppointment && renderDrawer(activeAppointment)}
+    </ActionDialog>
+    </>
   );
 }
 
@@ -618,7 +617,7 @@ function CancelPanel({
   );
 }
 
-function BookVisitCard() {
+function BookVisitCard({ onBooked }: { onBooked: () => void }) {
   const queryClient = useQueryClient();
 
   const [search, setSearch] = useState('');
@@ -651,6 +650,7 @@ function BookVisitCard() {
       setSubmitted('');
       setWhen('');
       setReason('');
+      onBooked();
     },
   });
 
@@ -670,7 +670,7 @@ function BookVisitCard() {
   }
 
   return (
-    <div className="card">
+    <div className="table-section">
       <h2>Book a visit</h2>
       <p className="muted" style={{ marginBottom: '0.9rem' }}>
         For a patient on the phone or at the counter. A patient booking in the app uses the same
@@ -714,7 +714,7 @@ function BookVisitCard() {
           )}
 
           {!patients.isFetching && (patients.data?.items.length ?? 0) > 0 && (
-            <table>
+            <Table>
               <tbody>
                 {patients.data?.items.map((found) => (
                   <tr key={found.id}>
@@ -740,7 +740,7 @@ function BookVisitCard() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
           )}
         </>
       ) : (
@@ -818,8 +818,7 @@ function CheckInPanel({
 
   const levels = canSetHighCare ? dutyManagerCareLevels : deskCareLevels;
 
-  const [category, setCategory] = useState<AdmissionCategory>('outpatient');
-  const [urgency, setUrgency] = useState<AdmissionUrgency>('routine');
+  const [category, setCategory] = useState<AdmissionCategory>('general');
   const [isInfectious, setIsInfectious] = useState(false);
 
   const checkIn = useMutation({
@@ -849,7 +848,7 @@ function CheckInPanel({
       body: {
         admission_category: category,
         category_set_by_staff_id: staffId,
-        urgency,
+        urgency: 'routine',
         is_infectious: isInfectious,
       },
     });
@@ -870,46 +869,24 @@ function CheckInPanel({
       </p>
 
       <form onSubmit={submit}>
-        <div className="row">
-          <div className="field">
-            <label htmlFor="checkin-category">Care level</label>
-            <select
-              id="checkin-category"
-              value={category}
-              onChange={(event) => setCategory(event.target.value as AdmissionCategory)}
-            >
-              {levels.map((value) => (
-                <option key={value} value={value}>
-                  {admissionCategoryLabels[value]}
-                </option>
-              ))}
-            </select>
+        <div className="field">
+          <AppSelect
+            id="checkin-category"
+            label="Care level"
+            value={category}
+            onValueChange={(value) => setCategory(value as AdmissionCategory)}
+            options={levels.map((value) => ({ value, label: admissionCategoryLabels[value] }))}
+          />
+          <p className="hint">
+            {admissionCategoryHints[category]} This is your decision and is recorded against
+            your name.
+          </p>
+          {!canSetHighCare && (
             <p className="hint">
-              {admissionCategoryHints[category]} This is your decision and is recorded against
-              your name.
+              Intensive care is the duty manager&rsquo;s decision, so it is not on this list.
+              If the patient needs it, ask the duty manager to check them in.
             </p>
-            {!canSetHighCare && (
-              <p className="hint">
-                Intensive care and high dependency are the duty manager&rsquo;s decision, so
-                they are not on this list. If the patient needs either, ask the duty manager to
-                check them in.
-              </p>
-            )}
-          </div>
-          <div className="field">
-            <label htmlFor="checkin-urgency">Urgency</label>
-            <select
-              id="checkin-urgency"
-              value={urgency}
-              onChange={(event) => setUrgency(event.target.value as AdmissionUrgency)}
-            >
-              {admissionUrgencies.map((value) => (
-                <option key={value} value={value}>
-                  {admissionUrgencyLabels[value]}
-                </option>
-              ))}
-            </select>
-          </div>
+          )}
         </div>
 
         <div className="field">
@@ -922,7 +899,7 @@ function CheckInPanel({
             />{' '}
             Needs isolation
           </label>
-          <p className="hint">Forces an isolation-capable bed when the bed agent runs.</p>
+          <p className="hint">Forces an isolation-capable bed when a bed is assigned.</p>
         </div>
 
         <div className="row">
@@ -950,7 +927,13 @@ function CheckedInCard({
       <h2>Admitted</h2>
       <p className="muted">
         {admission.patient?.full_name ?? 'The patient'} is admitted and awaiting a bed. Care
-        level: <strong>{admissionCategoryLabels[admission.admission_category]}</strong>.
+        level:{' '}
+        <strong>
+          {admission.admission_category
+            ? admissionCategoryLabels[admission.admission_category]
+            : 'Not yet classified'}
+        </strong>
+        .
       </p>
 
       {admission.missing_fields.length > 0 && (

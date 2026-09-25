@@ -5,6 +5,7 @@ using System.Text.Json;
 using CareLanka.Api.Data;
 using CareLanka.Api.Data.Entities.Common;
 using CareLanka.Api.Data.Enums;
+using CareLanka.Api.Services.Emergency;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -17,6 +18,66 @@ public sealed class EmergencyCallEndpointTests
     private readonly ApiApplication _application;
 
     public EmergencyCallEndpointTests(ApiApplication application) => _application = application;
+
+    [Fact]
+    public async Task Assigned_crew_can_refresh_their_ambulance_before_dispatch_but_not_another_vehicle()
+    {
+        using var manager = await StaffClientAsync(ApiApplication.ManagerEmail);
+        var own = await CreateReadyAmbulanceAsync(manager);
+        var other = await CreateReadyAmbulanceAsync(manager);
+        using var crew = await StaffClientAsync(own.FirstCrewEmail);
+        using var assignment = await crew.GetAsync("/api/ambulances/mine");
+        Assert.Equal(HttpStatusCode.OK, assignment.StatusCode);
+        using var body = JsonDocument.Parse(await assignment.Content.ReadAsStringAsync());
+        Assert.Equal(own.AmbulanceId, body.RootElement.GetProperty("id").GetGuid());
+        using var updated = await crew.PostAsJsonAsync($"/api/ambulances/{own.AmbulanceId}/location",
+            new { latitude = 6.91, longitude = 79.87 });
+        Assert.Equal(HttpStatusCode.NoContent, updated.StatusCode);
+        using var forbidden = await crew.PostAsJsonAsync($"/api/ambulances/{other.AmbulanceId}/location",
+            new { latitude = 6.91, longitude = 79.87 });
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        using var scope = _application.Services.CreateScope();
+        var ambulance = await scope.ServiceProvider.GetRequiredService<CareLankaDbContext>()
+            .Ambulances.SingleAsync(x => x.Id == own.AmbulanceId);
+        Assert.Equal(6.91m, ambulance.CurrentLatitude);
+        Assert.True(ambulance.LocationUpdatedAt > DateTimeOffset.UtcNow.AddMinutes(-1));
+    }
+
+    [Fact]
+    public async Task A_self_report_resolves_the_patient_from_the_authenticated_account()
+    {
+        using var client = _application.CreateClient();
+        using var registration = await client.PostAsJsonAsync("/api/auth/patient/register", new
+        {
+            username = $"emergency-{Guid.NewGuid():N}", password = ApiApplication.Password
+        });
+        Assert.Equal(HttpStatusCode.Created, registration.StatusCode);
+        using var accountBody = JsonDocument.Parse(await registration.Content.ReadAsStringAsync());
+        var accountId = accountBody.RootElement.GetProperty("principal").GetProperty("id").GetGuid();
+        await AuthorizeFromAsync(client, registration);
+        var patientId = Guid.NewGuid();
+        using (var scope = _application.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+            db.Patients.Add(new CareLanka.Api.Data.Entities.Patient.Patient
+            {
+                Id = patientId, PatientCode = $"P{Guid.NewGuid():N}"[..8].ToUpperInvariant(),
+                FullName = "Self Reporting Patient", Gender = Gender.Female,
+                Phone = $"07{Random.Shared.NextInt64(10000000, 99999999)}", UserAccountId = accountId
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using var response = await client.PostAsJsonAsync("/api/emergency-calls", new
+        {
+            patient_is_caller = true, latitude = 6.927079, longitude = 79.861244,
+            location_accuracy_metres = 12.5, location_captured_at = DateTimeOffset.UtcNow,
+            idempotency_key = Guid.NewGuid()
+        });
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal(patientId, body.RootElement.GetProperty("patient_id").GetGuid());
+    }
 
     [Fact]
     public async Task Patient_submission_is_stored_once_and_appears_on_the_duty_manager_call_board()
@@ -54,6 +115,26 @@ public sealed class EmergencyCallEndpointTests
     }
 
     [Fact]
+    public async Task A_new_call_and_a_moved_call_both_queue_an_address_lookup()
+    {
+        using var patient = await PatientClientAsync();
+        using var manager = await StaffClientAsync(ApiApplication.ManagerEmail);
+        var queue = _application.Services.GetRequiredService<SceneLookupQueue>().Reader;
+        while (queue.TryRead(out _)) { }
+
+        using var created = await patient.PostAsJsonAsync("/api/emergency-calls", Request(Guid.NewGuid(), true));
+        using var body = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+        var callId = body.RootElement.GetProperty("id").GetGuid();
+        Assert.True(queue.TryRead(out var first));
+        Assert.Equal(new AddressLookupJob(callId), first);
+
+        using var moved = await manager.PatchAsJsonAsync($"/api/emergency-calls/{callId}", new { latitude = 6.93, longitude = 79.86 });
+        Assert.Equal(HttpStatusCode.OK, moved.StatusCode);
+        Assert.True(queue.TryRead(out var second));
+        Assert.Equal(new AddressLookupJob(callId), second);
+    }
+
+    [Fact]
     public async Task A_patient_call_can_be_manually_dispatched_and_handed_over_without_AI()
     {
         using var patient = await PatientClientAsync();
@@ -64,6 +145,12 @@ public sealed class EmergencyCallEndpointTests
         var ready = await CreateReadyAmbulanceAsync(manager);
         using var crew = await StaffClientAsync(ready.FirstCrewEmail);
         var ambulanceId = ready.AmbulanceId;
+
+        using var receivedTracking = await patient.GetAsync($"/api/me/emergency-calls/{callId}/tracking");
+        Assert.Equal(HttpStatusCode.OK, receivedTracking.StatusCode);
+        using var receivedTrackingBody = JsonDocument.Parse(await receivedTracking.Content.ReadAsStringAsync());
+        Assert.Equal("received", receivedTrackingBody.RootElement.GetProperty("call_status").GetString());
+        Assert.False(receivedTrackingBody.RootElement.GetProperty("ambulance_is_on_the_way").GetBoolean());
 
         using var dispatched = await manager.PostAsJsonAsync($"/api/emergency-calls/{callId}/dispatch", new { ambulance_id = ambulanceId });
         Assert.Equal(HttpStatusCode.Created, dispatched.StatusCode);
@@ -80,6 +167,10 @@ public sealed class EmergencyCallEndpointTests
         Assert.Equal(HttpStatusCode.OK, handover.StatusCode);
         using var handoverBody = JsonDocument.Parse(await handover.Content.ReadAsStringAsync());
         Assert.Equal("handed_over", handoverBody.RootElement.GetProperty("status").GetString());
+        using var completedTracking = await patient.GetAsync($"/api/me/emergency-calls/{callId}/tracking");
+        Assert.Equal(HttpStatusCode.OK, completedTracking.StatusCode);
+        using var completedTrackingBody = JsonDocument.Parse(await completedTracking.Content.ReadAsStringAsync());
+        Assert.Equal("completed", completedTrackingBody.RootElement.GetProperty("call_status").GetString());
     }
 
     [Fact]
@@ -173,6 +264,10 @@ public sealed class EmergencyCallEndpointTests
         Assert.Equal(HttpStatusCode.OK, cancelled.StatusCode);
         using var body = JsonDocument.Parse(await cancelled.Content.ReadAsStringAsync());
         Assert.Equal("cancelled", body.RootElement.GetProperty("status").GetString());
+        using var tracking = await patient.GetAsync($"/api/me/emergency-calls/{callId}/tracking");
+        Assert.Equal(HttpStatusCode.OK, tracking.StatusCode);
+        using var trackingBody = JsonDocument.Parse(await tracking.Content.ReadAsStringAsync());
+        Assert.Equal("cancelled", trackingBody.RootElement.GetProperty("call_status").GetString());
     }
 
     [Fact]
@@ -199,7 +294,9 @@ public sealed class EmergencyCallEndpointTests
         Assert.Equal("Caller confirmed", body.RootElement.GetProperty("review_notes").GetString());
 
         using var tracking = await patient.GetAsync($"/api/me/emergency-calls/{callId}/tracking");
-        Assert.Equal(HttpStatusCode.NotFound, tracking.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, tracking.StatusCode);
+        using var trackingBody = JsonDocument.Parse(await tracking.Content.ReadAsStringAsync());
+        Assert.Equal("cancelled", trackingBody.RootElement.GetProperty("call_status").GetString());
     }
 
     [Fact]

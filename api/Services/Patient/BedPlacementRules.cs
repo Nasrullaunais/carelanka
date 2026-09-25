@@ -8,17 +8,17 @@ namespace CareLanka.Api.Services.Patient;
 
 public static class BedPlacementRules
 {
-    public static bool RequiresBed(AdmissionCategory category)
-        => category != AdmissionCategory.Outpatient;
+    public static bool RequiresBed(AdmissionCategory category) => true;
 
-    private static int Rung(AdmissionCategory category) => category switch
+    public static bool RequiresBed(AdmissionCategory? category) => true;
+
+    public static int Rung(AdmissionCategory category) => category switch
     {
         AdmissionCategory.Icu => 0,
-        AdmissionCategory.Hdu => 1,
         _ => 2
     };
 
-    private static int Rung(WardType wardType) => wardType switch
+    public static int Rung(WardType wardType) => wardType switch
     {
         WardType.Icu => 0,
         WardType.Hdu => 1,
@@ -36,11 +36,11 @@ public static class BedPlacementRules
 
     public const int PediatricAgeLimit = 18;
 
-    public static bool IsChild(DateOnly? dateOfBirth, DateOnly asOf)
+    public static int? AgeOn(DateOnly? dateOfBirth, DateOnly asOf)
     {
         if (dateOfBirth is not { } born)
         {
-            return false;
+            return null;
         }
 
         var age = asOf.Year - born.Year;
@@ -50,8 +50,11 @@ public static class BedPlacementRules
             age--;
         }
 
-        return age < PediatricAgeLimit;
+        return age;
     }
+
+    public static bool IsChild(DateOnly? dateOfBirth, DateOnly asOf)
+        => AgeOn(dateOfBirth, asOf) is { } age && age < PediatricAgeLimit;
 
     public static bool EnsurePlaceable(
         AdmissionCategory category,

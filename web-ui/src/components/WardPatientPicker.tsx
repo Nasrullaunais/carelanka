@@ -1,3 +1,4 @@
+import { Table } from './Table';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -5,6 +6,7 @@ import {
   listWardsOptions,
 } from '../services/api/generated/@tanstack/react-query.gen';
 import type { WardPatient } from '../services/api/generated';
+import { AppSelect } from './ui/app-select';
 
 const PAGE_SIZE = 10;
 
@@ -47,22 +49,19 @@ export function WardPatientPicker({
   return (
     <>
       <div className="field">
-        <label htmlFor="ward-patient-ward">Ward</label>
-        <select
+        <AppSelect
           id="ward-patient-ward"
+          label="Ward"
           value={wardName}
-          onChange={(event) => {
-            setWardName(event.target.value);
+          onValueChange={(value) => {
+            setWardName(value);
             setPage(1);
           }}
-        >
-          <option value="">Every ward</option>
-          {(wards.data ?? []).map((ward) => (
-            <option key={ward.id} value={ward.name}>
-              {ward.name}
-            </option>
-          ))}
-        </select>
+          options={[
+            { value: '', label: 'Every ward' },
+            ...(wards.data ?? []).map((ward) => ({ value: ward.name, label: ward.name })),
+          ]}
+        />
       </div>
 
       {patients.isPending && <p className="muted">Loading patients…</p>}
@@ -86,7 +85,7 @@ export function WardPatientPicker({
       )}
 
       {rows.length > 0 && (
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Ward</th>
@@ -113,7 +112,7 @@ export function WardPatientPicker({
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
 
       {totalPages > 1 && (

@@ -389,7 +389,7 @@ public sealed class AdmissionEndpointTests
         var created = await nurse.PostAsJsonAsync("/api/admissions", new
         {
             patient_id = patientId,
-            admission_category = "inpatient",
+            admission_category = "general",
             category_set_by_staff_id = await NurseIdAsync(),
             urgency = "routine",
             is_infectious = false
@@ -408,7 +408,7 @@ public sealed class AdmissionEndpointTests
         {
             patient_id = patientId,
             source = "walk_in",
-            admission_category = "inpatient",
+            admission_category = "general",
             category_set_by_staff_id = await NurseIdAsync(),
             is_infectious = false
         });
@@ -788,7 +788,7 @@ public sealed class AdmissionEndpointTests
         string source = "walk_in",
         string? dispatchId = null,
         string urgency = "routine",
-        string category = "inpatient")
+        string category = "general")
         => client.PostAsJsonAsync("/api/admissions", new
         {
             patient_id = patientId,

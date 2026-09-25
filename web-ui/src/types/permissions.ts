@@ -179,6 +179,19 @@ export function canSetBillingRates(role: PrincipalRole | undefined): boolean {
   return role === 'hospital_administrator';
 }
 
+/// The care advisory agent's review queue: what a patient reported and the agent's draft. The
+/// duty manager can see the queue exists without being able to act on it - same split as
+/// canReadMedicalProfile, which is exactly who may see what the agent read.
+export function canReadCareQueue(role: PrincipalRole | undefined): boolean {
+  return canReadMedicalProfile(role);
+}
+
+/// Approving, editing or rejecting a draft - the Doctor or the Ward Nurse on shift, the person
+/// who will actually walk over and look at the patient. Narrower than canReadCareQueue.
+export function canReviewCareRecommendation(role: PrincipalRole | undefined): boolean {
+  return role === 'ward_nurse' || role === 'doctor';
+}
+
 export const roleLabels: Record<PrincipalRole, string> = {
   ward_nurse: 'Ward nurse',
   doctor: 'Doctor',

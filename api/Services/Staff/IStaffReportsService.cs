@@ -7,4 +7,8 @@ public interface IStaffReportsService
     Task<CoverageReport> GetCoverageReportAsync(
         CoverageReportParameters parameters,
         CancellationToken cancellationToken = default);
+
+    Task<LeaveReport> GetLeaveReportAsync(
+        LeaveReportParameters parameters,
+        CancellationToken cancellationToken = default);
 }

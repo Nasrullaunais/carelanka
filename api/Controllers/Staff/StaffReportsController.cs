@@ -1,3 +1,4 @@
+using CareLanka.Api.Common.Auth;
 using CareLanka.Api.DTOs.Staff;
 using CareLanka.Api.Services.Staff;
 using Microsoft.AspNetCore.Authorization;
@@ -28,6 +29,20 @@ public sealed class StaffReportsController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var result = await _reportsService.GetCoverageReportAsync(parameters, cancellationToken);
+        return Ok(result);
+    }
+
+    [Authorize(Policy = Policies.HospitalAdministrator)]
+    [HttpGet("leave", Name = "getLeaveReport")]
+    [ProducesResponseType(typeof(LeaveReport), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    public async Task<ActionResult<LeaveReport>> GetLeaveReport(
+        [FromQuery] LeaveReportParameters parameters,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _reportsService.GetLeaveReportAsync(parameters, cancellationToken);
         return Ok(result);
     }
 }

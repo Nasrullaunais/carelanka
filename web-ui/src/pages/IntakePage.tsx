@@ -16,6 +16,7 @@ import type {
   AdmissionCategory,
   Patient,
   PatientSummary,
+  PrincipalRole,
 } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
 import { fieldLimits, nicProblem } from '../types/identifiers';
@@ -29,7 +30,11 @@ import {
   patientFormProblems,
   usePatientForm,
 } from './intake-form';
-import { canEditPatient, canRegisterPatient } from '../types/permissions';
+import {
+  canChangePatientIdentity,
+  canEditPatient,
+  canRegisterPatient,
+} from '../types/permissions';
 import {
   admissionCategories,
   admissionCategoriesFor,
@@ -162,6 +167,7 @@ export function IntakePage() {
       {step === 'edit' && patient && (
         <EditStep
           patientId={patient.id}
+          role={role}
           onBack={leaveEdit}
           onSaved={(saved) => {
             setPatient(saved);
@@ -394,7 +400,9 @@ function LevelStep({
           >
             <strong>{admissionCategoryLabels[value]}</strong>
             <br />
-            <span className="hint">{admissionCategoryHints[value]}</span>
+            <span className={value === 'emergency' ? 'hint hint-on-primary' : 'hint'}>
+              {admissionCategoryHints[value]}
+            </span>
           </button>
         ))}
       </div>
@@ -607,10 +615,12 @@ function RegisterStep({
 
 function EditStep({
   patientId,
+  role,
   onBack,
   onSaved,
 }: {
   patientId: string;
+  role: PrincipalRole | undefined;
   onBack: () => void;
   onSaved: (patient: Patient) => void;
 }) {
@@ -621,13 +631,15 @@ function EditStep({
   const form = usePatientForm(emptyPatientForm(false));
 
   const identified = (existing.data?.nic ?? null) !== null;
-  const problems = patientFormProblems(form.value, identified, existing.data?.nic ?? '');
+  const [nicInput, setNicInput] = useState('');
+  const problems = patientFormProblems(form.value, identified, nicInput);
 
   const [loadedId, setLoadedId] = useState<string | null>(null);
 
   if (existing.data && loadedId !== existing.data.id) {
     setLoadedId(existing.data.id);
     form.replace(patientFormFrom(existing.data));
+    setNicInput(existing.data.nic ?? '');
   }
 
   const save = useMutation({
@@ -669,6 +681,8 @@ function EditStep({
   }
 
   const patient = existing.data;
+  const canChangeIdentity = canChangePatientIdentity(role, !!patient.nic);
+  const currentNicProblem = nicProblem(nicInput);
 
   return (
     <div className="card">
@@ -688,31 +702,54 @@ function EditStep({
         )}
       </p>
 
-      <p className="hint" style={{ marginBottom: '0.9rem' }}>
-        The NIC cannot be changed here. Changing which person a record identifies is how one
-        patient&rsquo;s history ends up on another patient&rsquo;s record.
-      </p>
+      {!canChangeIdentity && (
+        <p className="hint" style={{ marginBottom: '0.9rem' }}>
+          The NIC cannot be changed here. Changing which person a record identifies is how one
+          patient&rsquo;s history ends up on another patient&rsquo;s record.
+        </p>
+      )}
 
       <form
         onSubmit={onSubmit(() =>
           save.mutate({
             path: { id: patientId },
 
-            body: patientFormBody(form.value, patient.nic ?? null),
+            body: patientFormBody(
+              form.value,
+              canChangeIdentity ? nicInput.trim() || null : patient.nic ?? null,
+            ),
           }),
         )}
       >
+        {canChangeIdentity && (
+          <div className="field">
+            <label htmlFor="edit-nic">NIC</label>
+            <input
+              id="edit-nic"
+              value={nicInput}
+              maxLength={20}
+              aria-invalid={currentNicProblem !== null}
+              onChange={(event) => setNicInput(event.target.value)}
+              placeholder="199534501V"
+            />
+            {currentNicProblem && <p className="field-error">{currentNicProblem}</p>}
+          </div>
+        )}
         <PatientFields
           value={form.value}
           set={form.set}
           idPrefix="edit"
           identified={identified}
           allowUnknownGender={!identified}
-          nic={patient.nic ?? ''}
+          identityLocked={!canChangeIdentity}
+          nic={nicInput}
         />
 
         <div className="row">
-          <button type="submit" disabled={save.isPending || problems.blocked}>
+          <button
+            type="submit"
+            disabled={save.isPending || problems.blocked || currentNicProblem !== null}
+          >
             {save.isPending ? 'Saving...' : 'Save and go back'}
           </button>
           <button type="button" className="secondary" onClick={onBack}>

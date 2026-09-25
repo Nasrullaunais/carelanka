@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using CareLanka.Api.Data;
 using CareLanka.Api.Data.Enums;
+using CareLanka.Api.Data.Entities.Patient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -443,6 +444,51 @@ public sealed class DischargeBillingEndpointTests
             await nurse.GetAsync($"/api/beds/{visit.BedId}/occupancy"));
 
         Assert.False(occupancy.RootElement.GetProperty("occupied").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Confirming_a_discharge_closes_unanswered_care_recommendations()
+    {
+        var visit = await ReadyToGoAsync();
+
+        using (var scope = _application.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+            var admissionId = Guid.Parse(visit.AdmissionId);
+            var patientId = await db.Admissions
+                .Where(row => row.Id == admissionId)
+                .Select(row => row.PatientId)
+                .SingleAsync();
+
+            db.CareRecommendations.Add(new CareRecommendation
+            {
+                Id = Guid.NewGuid(),
+                PatientId = patientId,
+                AdmissionId = admissionId,
+                ReportedText = "I need help.",
+                ReportedAt = DateTimeOffset.UtcNow,
+                AgentMessage = "A nurse will come soon.",
+                Status = CareRecommendationStatus.PendingReview,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var confirmed = await nurse.PostAsJsonAsync($"/api/discharges/{visit.AdmissionId}/confirm", new { });
+        Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
+
+        using var verificationScope = _application.Services.CreateScope();
+        var verificationDb = verificationScope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        var recommendation = await verificationDb.CareRecommendations
+            .AsNoTracking()
+            .SingleAsync(row => row.AdmissionId == Guid.Parse(visit.AdmissionId));
+
+        Assert.Equal(CareRecommendationStatus.Rejected, recommendation.Status);
+        Assert.Equal(
+            "Closed automatically: the patient was discharged before this was answered.",
+            recommendation.RejectionReason);
     }
 
     [Fact]

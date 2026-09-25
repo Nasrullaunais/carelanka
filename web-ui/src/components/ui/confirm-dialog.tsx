@@ -11,7 +11,7 @@ import {
   Button,
 } from '@heroui/react';
 
-export function ConfirmDialog({ isOpen, onOpenChange, title, description, confirmLabel = 'Confirm', cancelLabel = 'Cancel', tone = 'danger', isPending, onConfirm }: {
+export function ConfirmDialog({ isOpen, onOpenChange, title, description, confirmLabel = 'Confirm', cancelLabel = 'Cancel', tone = 'danger', isPending, confirmDisabled = false, onConfirm }: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
@@ -20,6 +20,7 @@ export function ConfirmDialog({ isOpen, onOpenChange, title, description, confir
   cancelLabel?: string;
   tone?: 'danger' | 'accent';
   isPending?: boolean;
+  confirmDisabled?: boolean;
   onConfirm: () => void;
 }) {
   return (
@@ -37,7 +38,7 @@ export function ConfirmDialog({ isOpen, onOpenChange, title, description, confir
               </Button>
               <Button
                 variant={tone === 'danger' ? 'danger' : 'primary'}
-                isDisabled={isPending}
+                isDisabled={isPending || confirmDisabled}
                 onPress={onConfirm}
               >
                 {confirmLabel}

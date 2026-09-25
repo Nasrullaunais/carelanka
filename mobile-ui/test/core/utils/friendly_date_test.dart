@@ -35,6 +35,13 @@ void main() {
       expect(FriendlyDate.countdown(DateTime(2026, 9, 14, 11), now: now), 'In 1 hour');
     });
 
+    test('days are calendar days, not 24-hour blocks', () {
+      expect(
+        FriendlyDate.countdown(DateTime(2026, 9, 27, 11), now: DateTime(2026, 9, 25, 20)),
+        'In 2 days',
+      );
+    });
+
     test('the past counts backwards', () {
       expect(FriendlyDate.countdown(DateTime(2026, 9, 11, 10), now: now), '3 days ago');
       expect(FriendlyDate.countdown(DateTime(2026, 9, 14, 8), now: now), '2 hours ago');

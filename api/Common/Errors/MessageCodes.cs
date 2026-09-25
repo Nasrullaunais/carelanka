@@ -106,7 +106,8 @@ public static class MessageCodes
             [MessageCode.MaternityNeedsFemalePatient] = "cl_pat_048",
             [MessageCode.CareAgentStillDrafting] = "cl_pat_049",
             [MessageCode.TooManyCareQueries] = "cl_pat_050",
-            [MessageCode.NicHasHospitalRecord] = "cl_pat_051"
+            [MessageCode.NicHasHospitalRecord] = "cl_pat_051",
+            [MessageCode.PatientIdentityLocked] = "cl_pat_052"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

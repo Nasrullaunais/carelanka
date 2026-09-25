@@ -75,6 +75,18 @@ public sealed class CareRecommendationValidatorTests
         Assert.Contains("CR5", result.FailedRules);
     }
 
+    [Fact]
+    public void Saying_cannot_advise_a_medicine_passes_CR5()
+    {
+        var result = CareRecommendationValidator.Validate(
+            new CareDraftCandidate(CareUrgency.Medium, "We cannot advise you to take paracetamol."),
+            redFlagMatched: false,
+            allergiesText: null,
+            reportedText: "can I take paracetamol");
+
+        Assert.True(result.Passed, string.Join(", ", result.FailedRules));
+    }
+
     /// <summary>
     /// One warning cannot license a recommendation further down, which is why the rule is applied
     /// sentence by sentence rather than to the message as a whole.

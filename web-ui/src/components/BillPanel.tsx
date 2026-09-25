@@ -1,5 +1,6 @@
 import { Table } from './Table';
 import { AppSelect } from './ui/app-select';
+import { ConfirmDialog } from './ui/confirm-dialog';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -57,6 +58,7 @@ export function BillPanel({
   const [chargeQuantity, setChargeQuantity] = useState('1');
   const [unitPrice, setUnitPrice] = useState(String(templates[0].unitPrice ?? ''));
   const [settlementNote, setSettlementNote] = useState('');
+  const [confirmingSettle, setConfirmingSettle] = useState(false);
 
   const template = chargeTemplate(templateKey, forAppointment);
 
@@ -119,6 +121,7 @@ export function BillPanel({
   };
 
   const onSettled = (result: Bill) => {
+    setConfirmingSettle(false);
     toast.success(
       forAppointment
         ? `Bill ${result.bill_number} settled.`
@@ -364,14 +367,23 @@ export function BillPanel({
               <button
                 type="button"
                 disabled={settle.isPending}
-                onClick={() =>
-                  runSettle({ settlement_note: settlementNote.trim() || null })
-                }
+                onClick={() => setConfirmingSettle(true)}
               >
                 {settle.isPending ? 'Settling…' : `Settle ${money(data.total, data.currency)}`}
               </button>
             </div>
           </div>
+
+          <ConfirmDialog
+            isOpen={confirmingSettle}
+            onOpenChange={setConfirmingSettle}
+            title={`Settle ${money(data.total, data.currency)}?`}
+            description="A settled bill is final and cannot be changed afterwards."
+            confirmLabel={settle.isPending ? 'Settling…' : 'Settle'}
+            tone="accent"
+            isPending={settle.isPending}
+            onConfirm={() => runSettle({ settlement_note: settlementNote.trim() || null })}
+          />
 
           <p className="hint">
             {forAppointment ? (

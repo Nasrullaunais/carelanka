@@ -78,7 +78,14 @@ export function canRegisterPatient(role: PrincipalRole | undefined): boolean {
 }
 
 export function canEditPatient(role: PrincipalRole | undefined): boolean {
-  return canRegisterPatient(role);
+  return canRegisterPatient(role) || role === 'hospital_administrator';
+}
+
+export function canChangePatientIdentity(
+  role: PrincipalRole | undefined,
+  hasNic: boolean,
+): boolean {
+  return !hasNic || role === 'hospital_administrator';
 }
 
 export function canReadPatientDetails(role: PrincipalRole | undefined): boolean {

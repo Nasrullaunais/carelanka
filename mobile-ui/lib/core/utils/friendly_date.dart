@@ -38,7 +38,7 @@ class FriendlyDate {
     final amount = switch (gap) {
       _ when gap.inDays >= 365 => _plural(gap.inDays ~/ 365, 'year'),
       _ when gap.inDays >= 30 => _plural(gap.inDays ~/ 30, 'month'),
-      _ when gap.inDays >= 1 => _plural(gap.inDays, 'day'),
+      _ when gap.inDays >= 1 => _plural(_calendarDaysFromNow(value, now).abs(), 'day'),
       _ when gap.inHours >= 1 => _plural(gap.inHours, 'hour'),
       _ => _plural(gap.inMinutes, 'minute'),
     };

@@ -16,7 +16,7 @@ import { AppSelect } from '../components/ui/app-select';
 
 export type PatientFormValue = {
   fullName: string;
-  gender: Gender;
+  gender: Gender | '';
   phone: string;
   address: string;
   contactName: string;
@@ -30,7 +30,7 @@ export type PatientFormValue = {
 export function emptyPatientForm(unidentified: boolean, forcedGender?: Gender): PatientFormValue {
   return {
     fullName: unidentified ? 'Unidentified patient' : '',
-    gender: forcedGender ?? (unidentified ? 'unknown' : 'male'),
+    gender: forcedGender ?? (unidentified ? 'unknown' : ''),
     phone: '',
     address: '',
     contactName: '',
@@ -70,6 +70,7 @@ export function patientFormProblems(value: PatientFormValue, identified = false,
     dateOfBirth === '';
 
   const missing = {
+    gender: value.gender === '',
     phone: identified && value.phone.trim().length === 0,
     address: identified && value.address.trim().length === 0,
     dateOfBirth: identified && dateOfBirth === '' && !dateIncomplete,
@@ -77,6 +78,7 @@ export function patientFormProblems(value: PatientFormValue, identified = false,
 
   const blocked =
     value.fullName.trim().length === 0 ||
+    value.gender === '' ||
     phone !== null ||
     contactPhone !== null ||
     dateOfBirthError !== null ||
@@ -104,7 +106,7 @@ export function patientFormBody(value: PatientFormValue, nic: string | null) {
   return {
     full_name: value.fullName.trim(),
     nic,
-    gender: value.gender,
+    gender: value.gender as Gender,
     date_of_birth: orNull(toIsoDate(value.birthYear, value.birthMonth, value.birthDay)),
     phone: orNull(value.phone),
     address: orNull(value.address),
@@ -143,6 +145,7 @@ export function PatientFields({
   idPrefix,
   identified = false,
   lockGenderTo,
+  identityLocked = false,
   allowUnknownGender = false,
   nic = '',
 }: {
@@ -153,6 +156,7 @@ export function PatientFields({
 
   identified?: boolean;
   lockGenderTo?: Gender;
+  identityLocked?: boolean;
   /// For an unidentified arrival only — hard rule H3 (patient-management-plan.md §9) sends
   /// `unknown` to a mixed ward by rule rather than guessing a single-sex ward from appearance.
   allowUnknownGender?: boolean;
@@ -166,9 +170,16 @@ export function PatientFields({
     ? [...selectableGenders, 'unknown']
     : selectableGenders;
 
-  const genderOptions = baseGenderOptions.includes(value.gender)
-    ? baseGenderOptions
-    : [...baseGenderOptions, value.gender];
+  const current = value.gender;
+  const known: Gender[] =
+    current === '' || baseGenderOptions.includes(current)
+      ? baseGenderOptions
+      : [...baseGenderOptions, current];
+
+  const genderOptions = [
+    ...(current === '' ? [{ value: '', label: 'Choose' }] : []),
+    ...known.map((option) => ({ value: option, label: genderLabels[option] })),
+  ];
 
   return (
     <>
@@ -179,6 +190,7 @@ export function PatientFields({
             id={`${idPrefix}-name`}
             value={value.fullName}
             maxLength={fieldLimits.fullName}
+            disabled={identityLocked}
             onChange={(event) => set('fullName', event.target.value)}
             required
           />
@@ -189,10 +201,16 @@ export function PatientFields({
             id={`${idPrefix}-gender`}
             label="Gender"
             value={value.gender}
-            isDisabled={lockGenderTo !== undefined}
+            isDisabled={lockGenderTo !== undefined || identityLocked}
             onValueChange={(nextValue) => set('gender', nextValue as Gender)}
-            options={genderOptions.map((option) => ({ value: option, label: genderLabels[option] }))}
+            options={genderOptions}
           />
+          {problems.missing.gender && <p className="field-error">Choose male or female.</p>}
+          {identityLocked && (
+            <p className="hint">
+              Only an administrator can change the name or gender once a NIC is recorded.
+            </p>
+          )}
           {lockGenderTo && (
             <p className="hint">Locked to {genderLabels[lockGenderTo]} for this care level.</p>
           )}

@@ -140,7 +140,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Use my patient code'),
+            child: const Text('I have a patient code'),
           ),
         ],
       ),

@@ -975,6 +975,38 @@ public sealed class BedAssignmentEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, assigned.StatusCode);
     }
 
+    [Fact]
+    public async Task An_administrator_cannot_change_gender_against_the_current_wards_policy()
+    {
+        var ward = await NewWardAsync(genderPolicy: "female");
+        var beds = await AddBedsAsync(ward, 1);
+
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var admissionId = await NewAdmissionAsync(nurse, gender: "female");
+        var assigned = await nurse.PostAsJsonAsync(
+            $"/api/admissions/{admissionId}/assign-bed", new { bed_id = beds[0] });
+        Assert.Equal(HttpStatusCode.OK, assigned.StatusCode);
+
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
+        using var admission = await ReadJsonAsync(
+            await administrator.GetAsync($"/api/admissions/{admissionId}"));
+        var patientId = admission.RootElement.GetProperty("patient").GetProperty("id").GetString();
+        using var patient = await ReadJsonAsync(
+            await administrator.GetAsync($"/api/patients/{patientId}"));
+
+        var response = await administrator.PutAsJsonAsync(
+            $"/api/patients/{patientId}", new
+            {
+                full_name = patient.RootElement.GetProperty("full_name").GetString(),
+                gender = "male",
+                nic = patient.RootElement.GetProperty("nic").GetString()
+            });
+
+        using var body = await ReadJsonAsync(response);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("cl_pat_017", body.RootElement.GetProperty("code").GetString());
+    }
+
     private sealed record TestWard(Guid Id, string Name);
 
     private async Task<TestWard> NewWardAsync(

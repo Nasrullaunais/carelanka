@@ -17,7 +17,7 @@ namespace CareLanka.Api.Services.Patient;
 
 public sealed class AppointmentService : IAppointmentService
 {
-    private static readonly AppointmentStatus[] OpenStatuses =
+    internal static readonly AppointmentStatus[] OpenStatuses =
     [
         AppointmentStatus.Scheduled,
         AppointmentStatus.Confirmed

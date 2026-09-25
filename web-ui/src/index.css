@@ -486,6 +486,11 @@ button.secondary {
   line-height: 1.5;
 }
 
+.hint.hint-on-primary {
+  color: inherit;
+  opacity: 0.85;
+}
+
 .hint code {
   background: var(--canvas);
   padding: 0.05rem 0.3rem;

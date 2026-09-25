@@ -26,6 +26,7 @@ import type {
   Gender,
   Patient,
   PatientSummary,
+  PrincipalRole,
 } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
 import { BillPanel } from '../components/BillPanel';
@@ -34,6 +35,7 @@ import { ConfirmDialog } from '../components/ui/confirm-dialog';
 import { AppSelect } from '../components/ui/app-select';
 import {
   canBillAppointment,
+  canChangePatientIdentity,
   canOpenAppointmentBoard,
   canWorkAppointmentDesk,
 } from '../types/permissions';
@@ -314,6 +316,7 @@ export function AppointmentsPage() {
             return (
               <CheckInPanel
                 appointment={appointment}
+                role={role}
                 noBedPending={complete.isPending}
                 onCancel={() => setOpen(null)}
                 onNoBed={() => complete.mutate({ path: { id: appointment.id } })}
@@ -490,12 +493,6 @@ function AppointmentTable({
                     <button
                       type="button"
                       className="secondary"
-                      disabled={hasPassed(appointment.scheduled_at)}
-                      title={
-                        hasPassed(appointment.scheduled_at)
-                          ? 'The booked time has passed — use Did not come or Check in instead.'
-                          : undefined
-                      }
                       onClick={() => onAction(appointment, 'cancel')}
                     >
                       {openId === appointment.id && openAction === 'cancel'
@@ -529,7 +526,7 @@ function AppointmentTable({
       </tbody>
     </Table>
     <ActionDialog
-      title={`${openAction === 'check-in' ? 'Admit' : openAction === 'confirm' ? 'Confirm' : openAction === 'cancel' ? 'Cancel' : 'Bill'} · ${activeAppointment?.patient.full_name ?? 'appointment'}`}
+      title={`${openAction === 'check-in' ? 'Check in' : openAction === 'confirm' ? 'Confirm' : openAction === 'cancel' ? 'Cancel' : 'Bill'} · ${activeAppointment?.patient.full_name ?? 'appointment'}`}
       isOpen={openId != null}
       onClose={onCloseAction}
     >
@@ -850,7 +847,12 @@ function BookVisitCard({ onBooked }: { onBooked: () => void }) {
             <button
               type="button"
               className="secondary"
-              onClick={() => setPatient(null)}
+              onClick={() => {
+                setPatient(null);
+                setSearch('');
+                setSubmitted('');
+                setReason('');
+              }}
               style={{ marginLeft: '0.4rem' }}
             >
               Someone else
@@ -1083,12 +1085,14 @@ function lacksIntakeDetails(patient: Patient): boolean {
 
 function CheckInPanel({
   appointment,
+  role,
   noBedPending,
   onCancel,
   onNoBed,
   onCheckedIn,
 }: {
   appointment: Appointment;
+  role: PrincipalRole | undefined;
   noBedPending: boolean;
   onCancel: () => void;
   onNoBed: () => void;
@@ -1107,6 +1111,7 @@ function CheckInPanel({
   });
 
   const form = usePatientForm(emptyPatientForm(false));
+  const [nicInput, setNicInput] = useState('');
   const [loadedId, setLoadedId] = useState<string | null>(null);
 
   if (details.data && loadedId !== details.data.id) {
@@ -1115,6 +1120,7 @@ function CheckInPanel({
       ...patientFormFrom(details.data),
       ...(choice === 'maternity' ? { gender: 'female' as const } : {}),
     });
+    setNicInput(details.data.nic ?? '');
   }
 
   // Walk-in intake lets an emergency skip the full form, so check-in does too.
@@ -1123,8 +1129,9 @@ function CheckInPanel({
     choice !== 'emergency' &&
     details.data !== undefined &&
     lacksIntakeDetails(details.data);
-  const nic = details.data?.nic ?? '';
-  const problems = patientFormProblems(form.value, true, nic);
+  const problems = patientFormProblems(form.value, true, nicInput);
+  const canChangeIdentity = canChangePatientIdentity(role, !!details.data?.nic);
+  const currentNicProblem = nicProblem(nicInput);
 
   const saveDetails = useMutation({
     ...updatePatientMutation(),
@@ -1192,12 +1199,15 @@ function CheckInPanel({
       return;
     }
 
-    if (problems.blocked) return;
+    if (problems.blocked || currentNicProblem !== null) return;
 
     saveDetails.mutate(
       {
         path: { id: appointment.patient.id },
-        body: patientFormBody(form.value, details.data?.nic ?? null),
+        body: patientFormBody(
+          form.value,
+          canChangeIdentity ? nicInput.trim() || null : details.data?.nic ?? null,
+        ),
       },
       { onSuccess: () => admit(choice) },
     );
@@ -1255,13 +1265,28 @@ function CheckInPanel({
               registered with only a name, phone and gender. A ward admission needs the same
               details as walk-in intake.
             </p>
+            {canChangeIdentity && (
+              <div className="field">
+                <label htmlFor="checkin-nic">NIC</label>
+                <input
+                  id="checkin-nic"
+                  value={nicInput}
+                  maxLength={20}
+                  aria-invalid={currentNicProblem !== null}
+                  onChange={(event) => setNicInput(event.target.value)}
+                  placeholder="199534501V"
+                />
+                {currentNicProblem && <p className="field-error">{currentNicProblem}</p>}
+              </div>
+            )}
             <PatientFields
               value={form.value}
               set={form.set}
               idPrefix="checkin"
               identified
               lockGenderTo={choice === 'maternity' ? 'female' : undefined}
-              nic={nic}
+              identityLocked={!canChangeIdentity}
+              nic={nicInput}
             />
           </>
         )}

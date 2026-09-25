@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -6,14 +8,11 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/friendly_date.dart';
 import '../../../services/api_client/models/care_recommendation_status.dart';
 import '../../../services/api_client/models/care_reviewer_role.dart';
+import '../../../services/api_client/models/my_admission.dart';
 import '../../../services/api_client/models/my_care_recommendation.dart';
 import '../services/patient_service.dart';
 import '../validation/patient_fields.dart';
 import 'panels.dart';
-
-/// How many past reports the card shows. Older ones stay on the server; a patient scrolling
-/// a stay's worth of messages inside one card on a home screen is worse than a short tail.
-const _visibleHistory = 5;
 
 /// A card inside My Stay, and nowhere else - it only exists while the patient is admitted, so
 /// the 409 the server can return is a backstop rather than something ordinary use can reach.
@@ -25,7 +24,9 @@ const _visibleHistory = 5;
 /// on the left, oldest first, with the box to write in underneath. Everything the ward sends
 /// back carries the name of the doctor or nurse who signed it off.
 class CareQueryCard extends StatefulWidget {
-  const CareQueryCard({super.key});
+  const CareQueryCard({super.key, required this.admission});
+
+  final MyAdmission admission;
 
   @override
   State<CareQueryCard> createState() => _CareQueryCardState();
@@ -36,6 +37,8 @@ class _CareQueryCardState extends State<CareQueryCard> {
   final _text = TextEditingController();
 
   bool _submitting = false;
+  DateTime? _blockedUntil;
+  Timer? _ticker;
   Future<List<MyCareRecommendation>>? _history;
 
   // Read once, from the same PatientService instance every other patient screen shares -
@@ -49,14 +52,39 @@ class _CareQueryCardState extends State<CareQueryCard> {
   }
 
   @override
+  void didUpdateWidget(CareQueryCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.admission, widget.admission)) _loadHistory();
+  }
+
+  @override
   void dispose() {
+    _ticker?.cancel();
     _text.dispose();
     super.dispose();
   }
 
+  void _blockFor(Duration duration) {
+    _ticker?.cancel();
+    setState(() => _blockedUntil = DateTime.now().add(duration));
+    _ticker = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return timer.cancel();
+      if (DateTime.now().isAfter(_blockedUntil!)) {
+        timer.cancel();
+        setState(() => _blockedUntil = null);
+      } else {
+        setState(() {});
+      }
+    });
+  }
+
+  bool get _blocked => _blockedUntil != null;
+
   void _loadHistory() {
     setState(() {
-      _history = _service.loadMyCareRecommendations().then((page) => page.items);
+      _history = _service
+          .loadMyCareRecommendations(pageSize: 50)
+          .then((page) => page.items);
     });
   }
 
@@ -102,11 +130,19 @@ class _CareQueryCardState extends State<CareQueryCard> {
     } on ApiException catch (error) {
       if (!mounted) return;
 
-      final message = error.code == PatientService.notCurrentlyAdmittedForCareQueryCode
+      if (error.code == PatientService.tooManyCareQueriesCode) {
+        _blockFor(const Duration(minutes: 2));
+        return;
+      }
+
+      final message =
+          error.code == PatientService.notCurrentlyAdmittedForCareQueryCode
           ? 'This only works while you are admitted.'
           : error.message;
 
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -115,6 +151,12 @@ class _CareQueryCardState extends State<CareQueryCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final remainingSeconds = _blocked
+        ? (_blockedUntil!.difference(DateTime.now()).inMilliseconds / 1000)
+              .ceil()
+        : 0;
+    final minutes = remainingSeconds ~/ 60;
+    final seconds = (remainingSeconds % 60).toString().padLeft(2, '0');
 
     return SectionCard(
       title: 'How are you feeling?',
@@ -125,7 +167,9 @@ class _CareQueryCardState extends State<CareQueryCard> {
           Text(
             'A nurse or doctor reads every message. Nothing here is answered automatically, '
             'and it is not for an emergency.',
-            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
           _Conversation(future: _history, onRetry: _loadHistory),
           const SizedBox(height: 18),
@@ -150,7 +194,7 @@ class _CareQueryCardState extends State<CareQueryCard> {
           Align(
             alignment: Alignment.centerRight,
             child: FilledButton.icon(
-              onPressed: _submitting ? null : _submit,
+              onPressed: _submitting || _blocked ? null : _submit,
               style: FilledButton.styleFrom(
                 minimumSize: const Size(0, 44),
                 padding: const EdgeInsets.symmetric(horizontal: 22),
@@ -165,6 +209,17 @@ class _CareQueryCardState extends State<CareQueryCard> {
               label: Text(_submitting ? 'Sending…' : 'Send'),
             ),
           ),
+          if (_blocked)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'You have already sent 3 messages in the last minute. You can send another in '
+                '$minutes:$seconds. If you need help now, press your call bell or tell a nurse.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -203,15 +258,14 @@ class _Conversation extends StatelessWidget {
         final all = snapshot.data ?? const <MyCareRecommendation>[];
         if (all.isEmpty) return const SizedBox.shrink();
 
-        final shown = all.take(_visibleHistory).toList().reversed.toList();
+        final shown = all.reversed.toList();
 
         return Column(
           children: [
             const SizedBox(height: 20),
-            if (all.length > shown.length)
-              _ThreadNote(child: Text('Showing your last ${shown.length} messages')),
             for (var i = 0; i < shown.length; i++) ...[
-              if (_startsNewDay(shown, i)) _DaySeparator(date: shown[i].reportedAt!),
+              if (_startsNewDay(shown, i))
+                _DaySeparator(date: shown[i].reportedAt!),
               _Exchange(item: shown[i]),
             ],
           ],
@@ -245,7 +299,9 @@ class _Exchange extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final reply = item.status == CareRecommendationStatus.approved ? item.doctorMessage : null;
+    final reply = item.status == CareRecommendationStatus.approved
+        ? item.doctorMessage
+        : null;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -255,7 +311,9 @@ class _Exchange extends StatelessWidget {
           _Bubble(
             text: item.reportedText ?? '',
             fromMe: true,
-            footer: item.reportedAt == null ? null : FriendlyDate.time(item.reportedAt!),
+            footer: item.reportedAt == null
+                ? null
+                : FriendlyDate.time(item.reportedAt!),
           ),
           const SizedBox(height: 8),
           if (reply != null)
@@ -281,8 +339,10 @@ class _Exchange extends StatelessWidget {
     final named = name != null && name.isNotEmpty;
 
     return switch (item.reviewedByRole) {
-      CareReviewerRole.doctor => named ? 'Approved by Dr. $name' : 'Approved by a doctor',
-      CareReviewerRole.wardNurse => named ? 'Approved by Nurse $name' : 'Approved by a ward nurse',
+      CareReviewerRole.doctor =>
+        named ? 'Approved by Dr. $name' : 'Approved by a doctor',
+      CareReviewerRole.wardNurse =>
+        named ? 'Approved by Nurse $name' : 'Approved by a ward nurse',
       _ => named ? 'Approved by $name' : 'Approved by the ward',
     };
   }
@@ -309,12 +369,16 @@ class _Bubble extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(left: fromMe ? 36 : 0, right: fromMe ? 0 : 36),
       child: Column(
-        crossAxisAlignment: fromMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: fromMe
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
             decoration: BoxDecoration(
-              color: fromMe ? scheme.primaryContainer : scheme.surfaceContainerHighest,
+              color: fromMe
+                  ? scheme.primaryContainer
+                  : scheme.surfaceContainerHighest,
               border: fromMe ? null : Border.all(color: scheme.outlineVariant),
               borderRadius: BorderRadius.only(
                 topLeft: corner,
@@ -337,7 +401,9 @@ class _Bubble extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Text(
                 footer!,
-                style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
               ),
             ),
           ],
@@ -386,7 +452,9 @@ class _ThreadNote extends StatelessWidget {
       child: Center(
         child: DefaultTextStyle.merge(
           textAlign: TextAlign.center,
-          style: theme.textTheme.labelSmall!.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          style: theme.textTheme.labelSmall!.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
           child: child,
         ),
       ),
@@ -425,7 +493,9 @@ class _PendingNote extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
             ),
           ),
         ],

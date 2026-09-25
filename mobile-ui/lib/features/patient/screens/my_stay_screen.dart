@@ -155,7 +155,7 @@ class _Admission extends StatelessWidget {
             ),
           if (journey.reached == JourneyStep.inHospital) ...[
             const SizedBox(height: 16),
-            const CareQueryCard(),
+            CareQueryCard(admission: admission),
           ],
           if (hasPlaceOrTime) ...[
             const SizedBox(height: 16),

@@ -455,11 +455,11 @@ BEGIN
         (id, bill_id, source, description, quantity, unit_price, bed_assignment_id,
          created_at, updated_at)
     VALUES
-        (gen_random_uuid(), v_bl11, 'consultation_fee', 'Outpatient consultation fee', 1, 2000.00,
+        (gen_random_uuid(), v_bl11, 'consultation_fee', 'Outpatient consultation fee', 1, 1500.00,
          NULL, v_visit_11, v_visit_11),
         (gen_random_uuid(), v_bl11, 'manual', 'Complete blood count (CBC) test', 1, 1500.00,
          NULL, v_visit_11, v_visit_11),
-        (gen_random_uuid(), v_bl12, 'consultation_fee', 'Outpatient consultation fee', 1, 2000.00,
+        (gen_random_uuid(), v_bl12, 'consultation_fee', 'Outpatient consultation fee', 1, 1500.00,
          NULL, v_visit_12, v_visit_12),
         (gen_random_uuid(), v_bl12, 'manual', 'Chest X-ray', 1, 3000.00,
          NULL, v_visit_12, v_visit_12);

@@ -13,7 +13,6 @@ class PatientMedicalProfile {
     this.knownConditions,
     this.allergies,
     this.currentSymptoms,
-    this.recentSituation,
     this.updatedByStaffId,
     this.updatedByStaffName,
     this.updatedAt,
@@ -28,8 +27,6 @@ class PatientMedicalProfile {
   final String? allergies;
   @JsonKey(name: 'current_symptoms')
   final String? currentSymptoms;
-  @JsonKey(name: 'recent_situation')
-  final String? recentSituation;
   @JsonKey(name: 'updated_by_staff_id')
   final String? updatedByStaffId;
   @JsonKey(name: 'updated_by_staff_name')

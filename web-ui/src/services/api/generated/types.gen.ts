@@ -1398,7 +1398,6 @@ export type PatientMedicalProfile = {
     known_conditions?: string | null;
     allergies?: string | null;
     current_symptoms?: string | null;
-    recent_situation?: string | null;
     updated_by_staff_id?: string | null;
     updated_by_staff_name?: string | null;
     updated_at?: string | null;
@@ -1759,7 +1758,6 @@ export type UpdateMedicalProfileRequest = {
     known_conditions?: string | null;
     allergies?: string | null;
     current_symptoms?: string | null;
-    recent_situation?: string | null;
 };
 
 export type UpdateMyDispatchStatusRequest = {

@@ -27,8 +27,7 @@ public sealed class DeterministicCareAdvisor : ICareAdvisor
         var hasHistory = context.MedicalProfile is { } profile && (
             !string.IsNullOrWhiteSpace(profile.KnownConditions) ||
             !string.IsNullOrWhiteSpace(profile.Allergies) ||
-            !string.IsNullOrWhiteSpace(profile.CurrentSymptoms) ||
-            !string.IsNullOrWhiteSpace(profile.RecentSituation));
+            !string.IsNullOrWhiteSpace(profile.CurrentSymptoms));
 
         var urgency = context.RedFlagMatched
             ? CareUrgency.High

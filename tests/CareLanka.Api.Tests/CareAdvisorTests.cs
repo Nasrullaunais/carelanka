@@ -64,7 +64,7 @@ public sealed class CareAdvisorTests
         var context = new CareAdviceContext(
             "I took 500mg paracetamol for my penicillin allergy reaction",
             RedFlagMatched: false,
-            new CareMedicalProfileFacts("Diabetes", "Penicillin", "Fever", null),
+            new CareMedicalProfileFacts("Diabetes", "Penicillin", "Fever"),
             null,
             new CarePatientHistoryFacts(40, Gender.Male, [], []));
 
@@ -87,7 +87,7 @@ public sealed class CareAdvisorTests
         => new(
             "My headache is worse today and it hurts more when I lie flat.",
             RedFlagMatched: false,
-            new CareMedicalProfileFacts("Type 2 diabetes", "Penicillin", "Headache since admission", null),
+            new CareMedicalProfileFacts("Type 2 diabetes", "Penicillin", "Headache since admission"),
             new CareCurrentAdmissionFacts(AdmissionCategory.General, AdmissionUrgency.Routine, false, "General B", DateTimeOffset.UtcNow),
             new CarePatientHistoryFacts(34, Gender.Female, [], []));
 

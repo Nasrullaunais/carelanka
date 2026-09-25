@@ -12,7 +12,6 @@ UpdateMedicalProfileRequest _$UpdateMedicalProfileRequestFromJson(
   knownConditions: json['known_conditions'] as String?,
   allergies: json['allergies'] as String?,
   currentSymptoms: json['current_symptoms'] as String?,
-  recentSituation: json['recent_situation'] as String?,
 );
 
 Map<String, dynamic> _$UpdateMedicalProfileRequestToJson(
@@ -21,5 +20,4 @@ Map<String, dynamic> _$UpdateMedicalProfileRequestToJson(
   'known_conditions': instance.knownConditions,
   'allergies': instance.allergies,
   'current_symptoms': instance.currentSymptoms,
-  'recent_situation': instance.recentSituation,
 };

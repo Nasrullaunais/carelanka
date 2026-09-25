@@ -86,7 +86,6 @@ public sealed class MedicalProfileService : IMedicalProfileService
         profile.KnownConditions = Clean(request.KnownConditions);
         profile.Allergies = Clean(request.Allergies);
         profile.CurrentSymptoms = Clean(request.CurrentSymptoms);
-        profile.RecentSituation = Clean(request.RecentSituation);
         profile.UpdatedByStaffMemberId = _currentUser.Id;
     }
 
@@ -101,7 +100,6 @@ public sealed class MedicalProfileService : IMedicalProfileService
             KnownConditions = profile.KnownConditions,
             Allergies = profile.Allergies,
             CurrentSymptoms = profile.CurrentSymptoms,
-            RecentSituation = profile.RecentSituation,
             UpdatedByStaffId = profile.UpdatedByStaffMemberId,
             UpdatedByStaffName = StaffNames.Lookup(names, profile.UpdatedByStaffMemberId),
             UpdatedAt = profile.UpdatedAt

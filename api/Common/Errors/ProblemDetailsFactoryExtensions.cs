@@ -42,6 +42,36 @@ public static class ProblemDetailsFactoryExtensions
 
             problem.Extensions["failed_checks"] = dispatchRejected.FailedChecks;
         }
+        else if (exception is StaffEmailConflictException emailConflict)
+        {
+            if (emailConflict.ExistingId.HasValue)
+            {
+                problem.Extensions["existing_id"] = emailConflict.ExistingId.Value;
+            }
+
+            if (!string.IsNullOrWhiteSpace(emailConflict.CustomMessage))
+            {
+                problem.Detail = emailConflict.CustomMessage;
+            }
+        }
+        else if (exception is StaffDeactivationConflictException deactivationConflict)
+        {
+            problem.Extensions["affected_allocations"] = deactivationConflict.AffectedAllocations;
+
+            if (!string.IsNullOrWhiteSpace(deactivationConflict.CustomMessage))
+            {
+                problem.Detail = deactivationConflict.CustomMessage;
+            }
+        }
+        else if (exception is InvalidSkillsBadRequestException invalidSkills)
+        {
+            problem.Extensions["invalid_skill_ids"] = invalidSkills.InvalidSkillIds;
+
+            if (!string.IsNullOrWhiteSpace(invalidSkills.CustomMessage))
+            {
+                problem.Detail = invalidSkills.CustomMessage;
+            }
+        }
 
         return problem.WithCareLankaExtensions(context, exception.Code);
     }

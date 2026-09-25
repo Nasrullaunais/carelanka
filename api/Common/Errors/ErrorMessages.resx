@@ -193,7 +193,7 @@
     <comment>Only an open warning can be acknowledged; a closed one stays as it was.</comment>
   </data>
   <data name="cl_equ_029" xml:space="preserve">
-    <value>This warning is {0}, not resolved. Only a resolved warning can be marked done.</value>
+    <value>This warning is {0}. Only a resolved or dismissed warning can be marked done.</value>
     <comment>Done takes a fixed problem off the list; an open one must be fixed first.</comment>
   </data>
   <data name="cl_equ_030" xml:space="preserve">

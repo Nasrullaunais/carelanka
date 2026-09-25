@@ -35,20 +35,17 @@ public sealed class WarningService : IWarningService
     private readonly ICurrentUser _currentUser;
     private readonly TimeProvider _clock;
     private readonly EquipmentOptions _options;
-    private readonly IEquipmentConfirmationCode _confirmationCode;
 
     public WarningService(
         CareLankaDbContext db,
         ICurrentUser currentUser,
         TimeProvider clock,
-        IOptions<EquipmentOptions> options,
-        IEquipmentConfirmationCode confirmationCode)
+        IOptions<EquipmentOptions> options)
     {
         _db = db;
         _currentUser = currentUser;
         _clock = clock;
         _options = options.Value;
-        _confirmationCode = confirmationCode;
     }
 
     public async Task<PagedResult<Warning>> ListAsync(
@@ -117,16 +114,13 @@ public sealed class WarningService : IWarningService
         return ToDto(warning, labels);
     }
 
-    public async Task ClearAsync(
-        Guid id, string? confirmationCode, CancellationToken cancellationToken = default)
+    public async Task ClearAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        _confirmationCode.Ensure(confirmationCode);
-
         var warning = await _db.Warnings
             .FirstOrDefaultAsync(w => w.Id == id && w.ClearedAt == null, cancellationToken)
             ?? throw new NotFoundException("Warning", id);
 
-        if (warning.Status != WarningStatus.ActionTaken)
+        if (warning.Status is not (WarningStatus.ActionTaken or WarningStatus.Dismissed))
         {
             throw new ConflictException(MessageCode.WarningNotResolved, EnumWire.ToWire(warning.Status));
         }

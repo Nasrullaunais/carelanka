@@ -49,21 +49,15 @@ public class WarningsController : ControllerBase
     public async Task<ActionResult<Warning>> AcknowledgeWarning(Guid id, CancellationToken ct)
         => Ok(await _warnings.AcknowledgeAsync(id, ct));
 
-    // Taking a resolved warning off the list is the hospital administrator's, with the
-    // confirmation code, the same as confirming and retiring equipment.
-    [Authorize(Policy = Policies.EquipmentConfirmer)]
     [HttpPost("{id:guid}/clear", Name = "clearWarning")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
-    public async Task<IActionResult> ClearWarning(
-        Guid id,
-        [FromHeader(Name = EquipmentOptions.ConfirmationCodeHeader)] string? confirmationCode,
-        CancellationToken ct)
+    public async Task<IActionResult> ClearWarning(Guid id, CancellationToken ct)
     {
-        await _warnings.ClearAsync(id, confirmationCode, ct);
+        await _warnings.ClearAsync(id, ct);
 
         return NoContent();
     }

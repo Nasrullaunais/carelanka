@@ -13,3 +13,16 @@ Future<void> callNumber(BuildContext context, String number) async {
     );
   }
 }
+
+// Opens the mail app with the address filled in.
+Future<void> emailAddress(BuildContext context, String address) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final uri = Uri(scheme: 'mailto', path: address);
+
+  final launched = await launchUrl(uri).catchError((_) => false);
+  if (!launched) {
+    messenger.showSnackBar(
+      SnackBar(content: Text('No mail app is set up. The address is $address.')),
+    );
+  }
+}

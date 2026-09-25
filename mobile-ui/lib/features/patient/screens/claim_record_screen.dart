@@ -296,11 +296,23 @@ class _DeskHelp extends StatelessWidget {
       accent: scheme.warning,
       title: title,
       body: body,
-      action: OutlinedButton.icon(
-        onPressed: () => callNumber(context, HospitalContact.reception),
-        icon: const Icon(Icons.call_outlined, size: 18),
-        label: const Text(HospitalContact.reception),
-        style: OutlinedButton.styleFrom(minimumSize: const Size(0, 42)),
+      action: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          OutlinedButton.icon(
+            onPressed: () => callNumber(context, HospitalContact.reception),
+            icon: const Icon(Icons.call_outlined, size: 18),
+            label: const Text(HospitalContact.reception),
+            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 42)),
+          ),
+          OutlinedButton.icon(
+            onPressed: () => emailAddress(context, HospitalContact.email),
+            icon: const Icon(Icons.mail_outline, size: 18),
+            label: const Text(HospitalContact.email),
+            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 42)),
+          ),
+        ],
       ),
     );
   }

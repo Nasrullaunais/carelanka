@@ -606,7 +606,7 @@ function AssignBedPanel({
             <p className="hint">
               {correcting
                 ? 'Kept on the record. Not required.'
-                : 'Kept on the record. Once the bed agent is running, this is where you record why its suggestion was not followed.'}
+                : 'Kept on the record. Not required.'}
             </p>
           </div>
         </>

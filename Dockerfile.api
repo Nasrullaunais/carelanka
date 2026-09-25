@@ -1,0 +1,17 @@
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+COPY api/CareLanka.Api.csproj api/
+RUN dotnet restore api/CareLanka.Api.csproj
+COPY api/ api/
+RUN dotnet publish api/CareLanka.Api.csproj -c Release -o /out --no-restore
+
+FROM build AS migrate
+RUN dotnet tool install --global dotnet-ef --version '8.*'
+ENV PATH="/root/.dotnet/tools:${PATH}"
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+WORKDIR /app
+COPY --from=build /out .
+ENV ASPNETCORE_URLS=http://0.0.0.0:5231
+EXPOSE 5231
+ENTRYPOINT ["dotnet", "CareLanka.Api.dll"]

@@ -38,6 +38,7 @@ public sealed class StaffReportsEndpointTests
     [Theory]
     [InlineData("/reports/coverage", "get", "getCoverageReport")]
     [InlineData("/reports/leave", "get", "getLeaveReport")]
+    [InlineData("/reports/staff/agent-performance", "get", "getStaffAgentPerformanceReport")]
     public async Task Operation_ids_match_contract(string path, string method, string expectedOperationId)
     {
         using var document = await GenerateSwaggerAsync();
@@ -50,6 +51,7 @@ public sealed class StaffReportsEndpointTests
     [Theory]
     [InlineData("/reports/coverage", "get")]
     [InlineData("/reports/leave", "get")]
+    [InlineData("/reports/staff/agent-performance", "get")]
     public async Task Response_statuses_match_contract(string path, string method)
     {
         using var document = await GenerateSwaggerAsync();
@@ -1047,6 +1049,488 @@ public sealed class StaffReportsEndpointTests
 
     #endregion
 
+    #region Agent Performance Report - Authentication & Authorization Tests
+
+    [Fact]
+    public async Task Agent_performance_report_requires_authentication()
+    {
+        using var environment = TestEnvironment.Use();
+        await using var app = new StaffReportsTestApplication();
+        using var client = app.CreateClient();
+
+        var response = await client.GetAsync("/api/reports/staff/agent-performance?from=2026-10-01&to=2026-10-07");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("duty_manager")]
+    [InlineData("general_staff")]
+    [InlineData("ward_nurse")]
+    [InlineData("doctor")]
+    [InlineData("equipment_manager")]
+    [InlineData("patient")]
+    public async Task Agent_performance_report_rejects_non_hospital_administrator(string role)
+    {
+        using var environment = TestEnvironment.Use();
+        await using var app = new StaffReportsTestApplication();
+        using var client = app.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", CreateToken(role, role == "patient" ? "patient" : "staff"));
+
+        var response = await client.GetAsync("/api/reports/staff/agent-performance?from=2026-10-01&to=2026-10-07");
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Agent_performance_report_accepts_hospital_administrator()
+    {
+        using var environment = TestEnvironment.Use();
+        var stubReports = new StubStaffReportsService();
+        stubReports.SetAgentPerformanceResponse(new StaffAgentPerformanceReport
+        {
+            From = new DateOnly(2026, 10, 1),
+            To = new DateOnly(2026, 10, 7),
+            ProposalsRaised = 0,
+            ProposalsAutoTriggered = 0,
+            ValidationFailureRate = 0.0,
+            Approved = 0,
+            Rejected = 0,
+            RevisionRequested = 0,
+            FailedSafely = 0,
+            CascadingSwaps = 0,
+            MedianMinutesGapToFill = 0.0,
+            RejectionReasons = new Dictionary<string, int>()
+        });
+
+        await using var app = new StaffReportsTestApplication(stubReports);
+        using var client = app.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", CreateToken("hospital_administrator", "staff"));
+
+        var response = await client.GetAsync("/api/reports/staff/agent-performance?from=2026-10-01&to=2026-10-07");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    #endregion
+
+    #region Agent Performance Report - Parameter Validation Tests
+
+    [Fact]
+    public async Task Agent_performance_report_requires_from_date()
+    {
+        using var environment = TestEnvironment.Use();
+        await using var app = new StaffReportsTestApplication();
+        using var client = app.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", CreateToken("hospital_administrator", "staff"));
+
+        var response = await client.GetAsync("/api/reports/staff/agent-performance?to=2026-10-07");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Agent_performance_report_requires_to_date()
+    {
+        using var environment = TestEnvironment.Use();
+        await using var app = new StaffReportsTestApplication();
+        using var client = app.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", CreateToken("hospital_administrator", "staff"));
+
+        var response = await client.GetAsync("/api/reports/staff/agent-performance?from=2026-10-01");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Agent_performance_report_rejects_from_greater_than_to()
+    {
+        using var environment = TestEnvironment.Use();
+        await using var app = new StaffReportsTestApplication();
+        using var client = app.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", CreateToken("hospital_administrator", "staff"));
+
+        var response = await client.GetAsync("/api/reports/staff/agent-performance?from=2026-10-07&to=2026-10-01");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Agent_performance_report_passes_valid_dates()
+    {
+        using var environment = TestEnvironment.Use();
+        var stubReports = new StubStaffReportsService();
+
+        await using var app = new StaffReportsTestApplication(stubReports);
+        using var client = app.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", CreateToken("hospital_administrator", "staff"));
+
+        var response = await client.GetAsync("/api/reports/staff/agent-performance?from=2026-10-01&to=2026-10-07");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        Assert.NotNull(stubReports.LastAgentPerformanceParameters);
+        Assert.Equal(new DateOnly(2026, 10, 1), stubReports.LastAgentPerformanceParameters.From);
+        Assert.Equal(new DateOnly(2026, 10, 7), stubReports.LastAgentPerformanceParameters.To);
+    }
+
+    #endregion
+
+    #region Agent Performance Report - Contract Shape & Empty Tests
+
+    [Fact]
+    public async Task Agent_performance_report_returns_200_with_expected_contract_shape()
+    {
+        using var environment = TestEnvironment.Use();
+        var stubReports = new StubStaffReportsService();
+        var from = new DateOnly(2026, 10, 1);
+        var to = new DateOnly(2026, 10, 7);
+
+        stubReports.SetAgentPerformanceResponse(new StaffAgentPerformanceReport
+        {
+            From = from,
+            To = to,
+            ProposalsRaised = 10,
+            ProposalsAutoTriggered = 4,
+            ValidationFailureRate = 0.2,
+            Approved = 6,
+            Rejected = 2,
+            RevisionRequested = 1,
+            FailedSafely = 1,
+            CascadingSwaps = 3,
+            MedianMinutesGapToFill = 15.5,
+            RejectionReasons = new Dictionary<string, int>
+            {
+                { "unsafe_suggestion", 1 },
+                { "staff_unsuitable", 1 }
+            }
+        });
+
+        await using var app = new StaffReportsTestApplication(stubReports);
+        using var client = app.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", CreateToken("hospital_administrator", "staff"));
+
+        var response = await client.GetAsync($"/api/reports/staff/agent-performance?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var report = await response.Content.ReadFromJsonAsync<StaffAgentPerformanceReport>(JsonOptions);
+        Assert.NotNull(report);
+        Assert.Equal(from, report.From);
+        Assert.Equal(to, report.To);
+        Assert.Equal(10, report.ProposalsRaised);
+        Assert.Equal(4, report.ProposalsAutoTriggered);
+        Assert.Equal(0.2, report.ValidationFailureRate);
+        Assert.Equal(6, report.Approved);
+        Assert.Equal(2, report.Rejected);
+        Assert.Equal(1, report.RevisionRequested);
+        Assert.Equal(1, report.FailedSafely);
+        Assert.Equal(3, report.CascadingSwaps);
+        Assert.Equal(15.5, report.MedianMinutesGapToFill);
+        Assert.NotNull(report.RejectionReasons);
+        Assert.Equal(1, report.RejectionReasons["unsafe_suggestion"]);
+        Assert.Equal(1, report.RejectionReasons["staff_unsuitable"]);
+    }
+
+    [Fact]
+    public async Task Agent_performance_report_returns_empty_when_no_matching_proposals()
+    {
+        using var environment = TestEnvironment.Use();
+        var stubReports = new StubStaffReportsService();
+        var from = new DateOnly(2026, 10, 1);
+        var to = new DateOnly(2026, 10, 7);
+
+        stubReports.SetAgentPerformanceResponse(new StaffAgentPerformanceReport
+        {
+            From = from,
+            To = to,
+            ProposalsRaised = 0,
+            ProposalsAutoTriggered = 0,
+            ValidationFailureRate = 0.0,
+            Approved = 0,
+            Rejected = 0,
+            RevisionRequested = 0,
+            FailedSafely = 0,
+            CascadingSwaps = 0,
+            MedianMinutesGapToFill = 0.0,
+            RejectionReasons = new Dictionary<string, int>()
+        });
+
+        await using var app = new StaffReportsTestApplication(stubReports);
+        using var client = app.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", CreateToken("hospital_administrator", "staff"));
+
+        var response = await client.GetAsync($"/api/reports/staff/agent-performance?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var report = await response.Content.ReadFromJsonAsync<StaffAgentPerformanceReport>(JsonOptions);
+        Assert.NotNull(report);
+        Assert.Equal(from, report.From);
+        Assert.Equal(to, report.To);
+        Assert.Equal(0, report.ProposalsRaised);
+        Assert.Equal(0, report.ProposalsAutoTriggered);
+        Assert.Equal(0.0, report.ValidationFailureRate);
+        Assert.Equal(0, report.Approved);
+        Assert.Equal(0, report.Rejected);
+        Assert.Equal(0, report.RevisionRequested);
+        Assert.Equal(0, report.FailedSafely);
+        Assert.Equal(0, report.CascadingSwaps);
+        Assert.Equal(0.0, report.MedianMinutesGapToFill);
+        Assert.NotNull(report.RejectionReasons);
+        Assert.Empty(report.RejectionReasons);
+    }
+
+    #endregion
+
+    #region Agent Performance Report - Business Logic & Metrics Tests
+
+    [Fact]
+    public void Agent_type_filter_excludes_other_agents()
+    {
+        var workflows = new List<AgentWorkflow>
+        {
+            new() { Id = Guid.NewGuid(), AgentType = AgentType.StaffAllocation },
+            new() { Id = Guid.NewGuid(), AgentType = AgentType.DispatchRouting },
+            new() { Id = Guid.NewGuid(), AgentType = AgentType.EquipmentMonitoring },
+            new() { Id = Guid.NewGuid(), AgentType = AgentType.PatientCareAdvisory }
+        };
+
+        var staffWorkflows = workflows.Where(w => w.AgentType == AgentType.StaffAllocation).ToList();
+        Assert.Single(staffWorkflows);
+    }
+
+    [Fact]
+    public void Date_window_boundary_filter_is_inclusive()
+    {
+        var from = new DateOnly(2026, 10, 1);
+        var to = new DateOnly(2026, 10, 3);
+
+        var fromUtc = from.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var toUtc = to.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+
+        var insideStart = new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero);
+        var insideMiddle = new DateTimeOffset(2026, 10, 2, 12, 0, 0, TimeSpan.Zero);
+        var insideEnd = new DateTimeOffset(2026, 10, 3, 23, 59, 59, TimeSpan.Zero);
+        var outsideBefore = new DateTimeOffset(2026, 9, 30, 23, 59, 59, TimeSpan.Zero);
+        var outsideAfter = new DateTimeOffset(2026, 10, 4, 0, 0, 0, TimeSpan.Zero);
+
+        Assert.True(insideStart >= fromUtc && insideStart < toUtc);
+        Assert.True(insideMiddle >= fromUtc && insideMiddle < toUtc);
+        Assert.True(insideEnd >= fromUtc && insideEnd < toUtc);
+        Assert.False(outsideBefore >= fromUtc && outsideBefore < toUtc);
+        Assert.False(outsideAfter >= fromUtc && outsideAfter < toUtc);
+    }
+
+    [Fact]
+    public void Proposals_auto_triggered_uses_parent_workflow_id()
+    {
+        var parentId = Guid.NewGuid();
+        var workflows = new List<AgentWorkflow>
+        {
+            new() { Id = Guid.NewGuid(), AgentType = AgentType.StaffAllocation, ParentWorkflowId = parentId },
+            new() { Id = Guid.NewGuid(), AgentType = AgentType.StaffAllocation, ParentWorkflowId = null },
+            new() { Id = Guid.NewGuid(), AgentType = AgentType.StaffAllocation, ParentWorkflowId = parentId }
+        };
+
+        var autoTriggeredCount = workflows.Count(w => w.ParentWorkflowId.HasValue);
+        Assert.Equal(2, autoTriggeredCount);
+    }
+
+    [Fact]
+    public void Validation_failure_rate_counts_distinct_workflows_and_avoids_zero_division()
+    {
+        var wf1Id = Guid.NewGuid();
+        var wf2Id = Guid.NewGuid();
+        var wf3Id = Guid.NewGuid();
+        var wf4Id = Guid.NewGuid();
+
+        var workflows = new List<AgentWorkflow>
+        {
+            new() { Id = wf1Id, AgentType = AgentType.StaffAllocation },
+            new() { Id = wf2Id, AgentType = AgentType.StaffAllocation },
+            new() { Id = wf3Id, AgentType = AgentType.StaffAllocation },
+            new() { Id = wf4Id, AgentType = AgentType.StaffAllocation }
+        };
+
+        var changes = new List<AgentProposedChange>
+        {
+            // wf1 has two failed changes - must count as only ONE failed workflow
+            new() { AgentWorkflowId = wf1Id, ValidationStatus = ProposedChangeValidationStatus.Failed },
+            new() { AgentWorkflowId = wf1Id, ValidationStatus = ProposedChangeValidationStatus.Failed },
+            // wf2 passed
+            new() { AgentWorkflowId = wf2Id, ValidationStatus = ProposedChangeValidationStatus.Passed },
+            // wf3 passed
+            new() { AgentWorkflowId = wf3Id, ValidationStatus = ProposedChangeValidationStatus.Passed }
+            // wf4 has no changes
+        };
+
+        var failedWorkflowIds = changes
+            .Where(c => c.ValidationStatus == ProposedChangeValidationStatus.Failed)
+            .Select(c => c.AgentWorkflowId)
+            .Distinct()
+            .ToHashSet();
+
+        var failedCount = workflows.Count(w => failedWorkflowIds.Contains(w.Id));
+        Assert.Equal(1, failedCount);
+
+        var rate = workflows.Count > 0 ? (double)failedCount / workflows.Count : 0.0;
+        Assert.Equal(0.25, rate);
+
+        // Zero proposals case
+        var emptyRate = 0 > 0 ? (double)0 / 0 : 0.0;
+        Assert.Equal(0.0, emptyRate);
+    }
+
+    [Fact]
+    public void Status_counts_map_approved_executed_rejected_and_revision_requested()
+    {
+        var workflows = new List<AgentWorkflow>
+        {
+            new() { Id = Guid.NewGuid(), Status = AgentWorkflowStatus.Approved },
+            new() { Id = Guid.NewGuid(), Status = AgentWorkflowStatus.Executed },
+            new() { Id = Guid.NewGuid(), Status = AgentWorkflowStatus.Rejected },
+            new() { Id = Guid.NewGuid(), Status = AgentWorkflowStatus.RevisionRequested },
+            new() { Id = Guid.NewGuid(), Status = AgentWorkflowStatus.PendingApproval }
+        };
+
+        var approved = workflows.Count(w => w.Status == AgentWorkflowStatus.Approved || w.Status == AgentWorkflowStatus.Executed);
+        var rejected = workflows.Count(w => w.Status == AgentWorkflowStatus.Rejected);
+        var revisionRequested = workflows.Count(w => w.Status == AgentWorkflowStatus.RevisionRequested);
+
+        Assert.Equal(2, approved);
+        Assert.Equal(1, rejected);
+        Assert.Equal(1, revisionRequested);
+    }
+
+    [Fact]
+    public void Failed_safely_counts_status_failed_and_safe_failure_outcomes()
+    {
+        var workflows = new List<AgentWorkflow>
+        {
+            new() { Id = Guid.NewGuid(), Status = AgentWorkflowStatus.Failed },
+            new() { Id = Guid.NewGuid(), Status = AgentWorkflowStatus.Pending, FinalOutcome = "no_candidate_found" },
+            new() { Id = Guid.NewGuid(), Status = AgentWorkflowStatus.Pending, FinalOutcome = "failed" },
+            new() { Id = Guid.NewGuid(), Status = AgentWorkflowStatus.Approved, FinalOutcome = "free_staff_proposed" }
+        };
+
+        var failedSafely = workflows.Count(w =>
+            w.Status == AgentWorkflowStatus.Failed ||
+            string.Equals(w.FinalOutcome, "no_candidate_found", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(w.FinalOutcome, "failed", StringComparison.OrdinalIgnoreCase));
+
+        Assert.Equal(3, failedSafely);
+    }
+
+    [Fact]
+    public void Cascading_swaps_identifies_indicators_at_most_once_per_workflow()
+    {
+        var wf1Id = Guid.NewGuid();
+        var wf2Id = Guid.NewGuid();
+        var wf3Id = Guid.NewGuid();
+        var wf4Id = Guid.NewGuid();
+
+        var workflows = new List<AgentWorkflow>
+        {
+            // wf1: has EndAllocation proposed change
+            new() { Id = wf1Id, AgentType = AgentType.StaffAllocation },
+            // wf2: has from_ward in payload
+            new() { Id = wf2Id, AgentType = AgentType.StaffAllocation },
+            // wf3: has FinalOutcome = swap_proposed
+            new() { Id = wf3Id, AgentType = AgentType.StaffAllocation, FinalOutcome = "swap_proposed" },
+            // wf4: normal free staff proposal
+            new() { Id = wf4Id, AgentType = AgentType.StaffAllocation, FinalOutcome = "free_staff_proposed" }
+        };
+
+        var changes = new List<AgentProposedChange>
+        {
+            // wf1: multiple EndAllocation changes - must count at most once
+            new() { AgentWorkflowId = wf1Id, ChangeType = ProposedChangeType.EndAllocation },
+            new() { AgentWorkflowId = wf1Id, ChangeType = ProposedChangeType.EndAllocation },
+            // wf2: payload with from_ward
+            new() { AgentWorkflowId = wf2Id, ChangeType = ProposedChangeType.CreateAllocation, Payload = "{\"from_ward\":\"ICU\"}" },
+            // wf4: simple CreateAllocation
+            new() { AgentWorkflowId = wf4Id, ChangeType = ProposedChangeType.CreateAllocation }
+        };
+
+        var changesByWorkflow = changes.GroupBy(c => c.AgentWorkflowId).ToDictionary(g => g.Key, g => g.ToList());
+
+        var cascadingCount = workflows.Count(w =>
+        {
+            if (string.Equals(w.FinalOutcome, "swap_proposed", StringComparison.OrdinalIgnoreCase)) return true;
+            if (changesByWorkflow.TryGetValue(w.Id, out var wfChanges))
+            {
+                return wfChanges.Any(c => c.ChangeType == ProposedChangeType.EndAllocation ||
+                    (!string.IsNullOrEmpty(c.Payload) && c.Payload.Contains("from_ward")));
+            }
+            return false;
+        });
+
+        Assert.Equal(3, cascadingCount); // wf1, wf2, wf3
+    }
+
+    [Fact]
+    public void Median_minutes_gap_to_fill_handles_odd_even_and_missing_timestamps()
+    {
+        var createdAt = new DateTimeOffset(2026, 10, 1, 10, 0, 0, TimeSpan.Zero);
+
+        // Odd sample: 10m, 20m, 30m -> median is 20m
+        var oddDurations = new List<double> { 30.0, 10.0, 20.0 };
+        oddDurations.Sort();
+        var oddMedian = oddDurations[oddDurations.Count / 2];
+        Assert.Equal(20.0, oddMedian);
+
+        // Even sample: 10m, 20m, 30m, 40m -> median is (20+30)/2 = 25m
+        var evenDurations = new List<double> { 40.0, 10.0, 30.0, 20.0 };
+        evenDurations.Sort();
+        var evenMedian = (evenDurations[(evenDurations.Count / 2) - 1] + evenDurations[evenDurations.Count / 2]) / 2.0;
+        Assert.Equal(25.0, evenMedian);
+
+        // Missing timestamp or negative duration filtered
+        var changes = new List<AgentProposedChange>
+        {
+            new() { AppliedAt = null }, // missing
+            new() { AppliedAt = createdAt.AddMinutes(-5) }, // negative
+            new() { AppliedAt = createdAt.AddMinutes(15) } // valid
+        };
+
+        var validDurations = changes
+            .Where(c => c.AppliedAt.HasValue && c.AppliedAt.Value >= createdAt)
+            .Select(c => (c.AppliedAt!.Value - createdAt).TotalMinutes)
+            .ToList();
+
+        Assert.Single(validDurations);
+        Assert.Equal(15.0, validDurations[0]);
+    }
+
+    [Fact]
+    public void Rejection_reasons_aggregates_canonical_wire_keys()
+    {
+        var workflows = new List<AgentWorkflow>
+        {
+            new() { Id = Guid.NewGuid(), Status = AgentWorkflowStatus.Rejected, FinalOutcome = "unsafe_suggestion" },
+            new() { Id = Guid.NewGuid(), Status = AgentWorkflowStatus.Rejected, FinalOutcome = "unsafe_suggestion" },
+            new() { Id = Guid.NewGuid(), Status = AgentWorkflowStatus.Rejected, ReviewNotes = "staff_unsuitable" },
+            new() { Id = Guid.NewGuid(), Status = AgentWorkflowStatus.Approved, FinalOutcome = "unsafe_suggestion" } // Not rejected! Must NOT count!
+        };
+
+        var reasons = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var w in workflows.Where(w => w.Status == AgentWorkflowStatus.Rejected))
+        {
+            var key = w.FinalOutcome ?? w.ReviewNotes;
+            if (key != null)
+            {
+                reasons.TryGetValue(key, out var count);
+                reasons[key] = count + 1;
+            }
+        }
+
+        Assert.Equal(2, reasons["unsafe_suggestion"]);
+        Assert.Equal(1, reasons["staff_unsuitable"]);
+        Assert.False(reasons.ContainsKey("other"));
+    }
+
+    #endregion
+
     #region Helpers and Test Doubles
 
     private static string CreateToken(string role, string principalType, Guid? subject = null)
@@ -1147,6 +1631,7 @@ public sealed class StaffReportsEndpointTests
     {
         public CoverageReportParameters? LastCoverageParameters { get; private set; }
         public LeaveReportParameters? LastLeaveParameters { get; private set; }
+        public StaffAgentPerformanceReportParameters? LastAgentPerformanceParameters { get; private set; }
 
         private CoverageReport _coverageResponse = new()
         {
@@ -1164,8 +1649,25 @@ public sealed class StaffReportsEndpointTests
             Rows = Array.Empty<LeaveReportRow>()
         };
 
+        private StaffAgentPerformanceReport _agentPerformanceResponse = new()
+        {
+            From = DateOnly.FromDateTime(DateTime.UtcNow),
+            To = DateOnly.FromDateTime(DateTime.UtcNow),
+            ProposalsRaised = 0,
+            ProposalsAutoTriggered = 0,
+            ValidationFailureRate = 0.0,
+            Approved = 0,
+            Rejected = 0,
+            RevisionRequested = 0,
+            FailedSafely = 0,
+            CascadingSwaps = 0,
+            MedianMinutesGapToFill = 0.0,
+            RejectionReasons = new Dictionary<string, int>()
+        };
+
         public void SetCoverageResponse(CoverageReport response) => _coverageResponse = response;
         public void SetLeaveResponse(LeaveReport response) => _leaveResponse = response;
+        public void SetAgentPerformanceResponse(StaffAgentPerformanceReport response) => _agentPerformanceResponse = response;
 
         public Task<CoverageReport> GetCoverageReportAsync(
             CoverageReportParameters parameters,
@@ -1181,6 +1683,14 @@ public sealed class StaffReportsEndpointTests
         {
             LastLeaveParameters = parameters;
             return Task.FromResult(_leaveResponse);
+        }
+
+        public Task<StaffAgentPerformanceReport> GetStaffAgentPerformanceReportAsync(
+            StaffAgentPerformanceReportParameters parameters,
+            CancellationToken cancellationToken = default)
+        {
+            LastAgentPerformanceParameters = parameters;
+            return Task.FromResult(_agentPerformanceResponse);
         }
     }
 

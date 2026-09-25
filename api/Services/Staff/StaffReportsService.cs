@@ -486,4 +486,234 @@ public sealed class StaffReportsService : IStaffReportsService
         // Overnight shift crosses midnight and ends on Date + 1 day
         return (shift.EndTime.ToTimeSpan() + TimeSpan.FromHours(24) - shift.StartTime.ToTimeSpan()).TotalHours;
     }
+
+    public async Task<StaffAgentPerformanceReport> GetStaffAgentPerformanceReportAsync(
+        StaffAgentPerformanceReportParameters parameters,
+        CancellationToken cancellationToken = default)
+    {
+        if (!parameters.From.HasValue || !parameters.To.HasValue)
+        {
+            throw new BadRequestException(MessageCode.ValidationFailed, "From and To dates are required.");
+        }
+
+        if (parameters.To.Value < parameters.From.Value)
+        {
+            throw new BadRequestException(MessageCode.ValidationFailed, "To date must be greater than or equal to From date.");
+        }
+
+        var from = parameters.From.Value;
+        var to = parameters.To.Value;
+
+        var fromUtc = from.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var toUtc = to.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+
+        var workflows = await _db.AgentWorkflows
+            .AsNoTracking()
+            .Where(w => w.AgentType == AgentType.StaffAllocation
+                && w.CreatedAt >= fromUtc
+                && w.CreatedAt < toUtc)
+            .ToListAsync(cancellationToken);
+
+        int proposalsRaised = workflows.Count;
+
+        if (proposalsRaised == 0)
+        {
+            return new StaffAgentPerformanceReport
+            {
+                From = from,
+                To = to,
+                ProposalsRaised = 0,
+                ProposalsAutoTriggered = 0,
+                ValidationFailureRate = 0.0,
+                Approved = 0,
+                Rejected = 0,
+                RevisionRequested = 0,
+                FailedSafely = 0,
+                CascadingSwaps = 0,
+                MedianMinutesGapToFill = 0.0,
+                RejectionReasons = new Dictionary<string, int>()
+            };
+        }
+
+        var workflowIds = workflows.Select(w => w.Id).ToList();
+
+        var changes = await _db.AgentProposedChanges
+            .AsNoTracking()
+            .Where(c => workflowIds.Contains(c.AgentWorkflowId))
+            .ToListAsync(cancellationToken);
+
+        var changesByWorkflow = changes
+            .GroupBy(c => c.AgentWorkflowId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        int proposalsAutoTriggered = workflows.Count(w => w.ParentWorkflowId.HasValue);
+
+        var failedValidationWorkflowIds = changes
+            .Where(c => c.ValidationStatus == ProposedChangeValidationStatus.Failed)
+            .Select(c => c.AgentWorkflowId)
+            .Distinct()
+            .ToHashSet();
+
+        int failedValidationCount = workflows.Count(w => failedValidationWorkflowIds.Contains(w.Id));
+        double validationFailureRate = Math.Round((double)failedValidationCount / proposalsRaised, 4);
+
+        int approved = workflows.Count(w => w.Status == AgentWorkflowStatus.Approved || w.Status == AgentWorkflowStatus.Executed);
+        int rejected = workflows.Count(w => w.Status == AgentWorkflowStatus.Rejected);
+        int revisionRequested = workflows.Count(w => w.Status == AgentWorkflowStatus.RevisionRequested);
+        int failedSafely = workflows.Count(IsFailedSafely);
+
+        int cascadingSwaps = workflows.Count(w =>
+        {
+            changesByWorkflow.TryGetValue(w.Id, out var wfChanges);
+            return IsCascadingSwap(w, wfChanges ?? new List<AgentProposedChange>());
+        });
+
+        var durations = new List<double>();
+        foreach (var workflow in workflows.Where(w => w.Status == AgentWorkflowStatus.Approved || w.Status == AgentWorkflowStatus.Executed))
+        {
+            if (changesByWorkflow.TryGetValue(workflow.Id, out var wfChanges))
+            {
+                var appliedChanges = wfChanges.Where(c => c.AppliedAt.HasValue).ToList();
+                if (appliedChanges.Count > 0)
+                {
+                    var appliedAt = appliedChanges.Min(c => c.AppliedAt!.Value);
+                    var duration = (appliedAt - workflow.CreatedAt).TotalMinutes;
+                    if (duration >= 0)
+                    {
+                        durations.Add(duration);
+                    }
+                }
+            }
+        }
+
+        durations.Sort();
+        double medianMinutesGapToFill = 0.0;
+        if (durations.Count > 0)
+        {
+            int n = durations.Count;
+            if (n % 2 == 1)
+            {
+                medianMinutesGapToFill = durations[n / 2];
+            }
+            else
+            {
+                medianMinutesGapToFill = (durations[(n / 2) - 1] + durations[n / 2]) / 2.0;
+            }
+        }
+        medianMinutesGapToFill = Math.Round(medianMinutesGapToFill, 2);
+
+        var rejectionReasons = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var rejectedWorkflow in workflows.Where(w => w.Status == AgentWorkflowStatus.Rejected))
+        {
+            var reasonWire = ExtractRejectionReasonWire(rejectedWorkflow);
+            if (!string.IsNullOrWhiteSpace(reasonWire))
+            {
+                rejectionReasons.TryGetValue(reasonWire, out var count);
+                rejectionReasons[reasonWire] = count + 1;
+            }
+        }
+
+        var sortedRejectionReasons = rejectionReasons
+            .OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
+        return new StaffAgentPerformanceReport
+        {
+            From = from,
+            To = to,
+            ProposalsRaised = proposalsRaised,
+            ProposalsAutoTriggered = proposalsAutoTriggered,
+            ValidationFailureRate = validationFailureRate,
+            Approved = approved,
+            Rejected = rejected,
+            RevisionRequested = revisionRequested,
+            FailedSafely = failedSafely,
+            CascadingSwaps = cascadingSwaps,
+            MedianMinutesGapToFill = medianMinutesGapToFill,
+            RejectionReasons = sortedRejectionReasons
+        };
+    }
+
+    private static string? ExtractRejectionReasonWire(AgentWorkflow workflow)
+    {
+        if (!string.IsNullOrWhiteSpace(workflow.FinalOutcome))
+        {
+            var match = MatchRejectionReasonWire(workflow.FinalOutcome);
+            if (match != null) return match;
+        }
+
+        if (!string.IsNullOrWhiteSpace(workflow.ReviewNotes))
+        {
+            var match = MatchRejectionReasonWire(workflow.ReviewNotes);
+            if (match != null) return match;
+        }
+
+        return null;
+    }
+
+    private static string? MatchRejectionReasonWire(string value)
+    {
+        var trimmed = value.Trim();
+        foreach (var r in Enum.GetValues<RejectionReason>())
+        {
+            var wire = EnumWire.ToWire(r);
+            if (string.Equals(trimmed, wire, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(trimmed, r.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                return wire;
+            }
+        }
+        return null;
+    }
+
+    private static bool IsFailedSafely(AgentWorkflow workflow)
+    {
+        if (workflow.Status == AgentWorkflowStatus.Failed)
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(workflow.FinalOutcome))
+        {
+            var outcome = workflow.FinalOutcome.Trim();
+            if (string.Equals(outcome, EnumWire.ToWire(AgentOutcome.NoCandidateFound), StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(outcome, nameof(AgentOutcome.NoCandidateFound), StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(outcome, EnumWire.ToWire(AgentOutcome.Failed), StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(outcome, nameof(AgentOutcome.Failed), StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsCascadingSwap(AgentWorkflow workflow, List<AgentProposedChange> changes)
+    {
+        if (string.Equals(workflow.FinalOutcome, EnumWire.ToWire(AgentOutcome.SwapProposed), StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(workflow.FinalOutcome, nameof(AgentOutcome.SwapProposed), StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        foreach (var change in changes)
+        {
+            if (change.ChangeType == ProposedChangeType.EndAllocation)
+            {
+                return true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(change.Payload))
+            {
+                if (change.Payload.Contains("\"from_ward\"", StringComparison.OrdinalIgnoreCase) ||
+                    change.Payload.Contains("\"is_cascading_swap\":true", StringComparison.OrdinalIgnoreCase) ||
+                    change.Payload.Contains("\"is_cascading_swap\": true", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
 }

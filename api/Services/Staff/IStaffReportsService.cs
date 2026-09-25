@@ -11,4 +11,8 @@ public interface IStaffReportsService
     Task<LeaveReport> GetLeaveReportAsync(
         LeaveReportParameters parameters,
         CancellationToken cancellationToken = default);
+
+    Task<StaffAgentPerformanceReport> GetStaffAgentPerformanceReportAsync(
+        StaffAgentPerformanceReportParameters parameters,
+        CancellationToken cancellationToken = default);
 }

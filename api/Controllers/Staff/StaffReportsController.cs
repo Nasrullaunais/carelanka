@@ -45,4 +45,18 @@ public sealed class StaffReportsController : ControllerBase
         var result = await _reportsService.GetLeaveReportAsync(parameters, cancellationToken);
         return Ok(result);
     }
+
+    [Authorize(Policy = Policies.HospitalAdministrator)]
+    [HttpGet("staff/agent-performance", Name = "getStaffAgentPerformanceReport")]
+    [ProducesResponseType(typeof(StaffAgentPerformanceReport), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    public async Task<ActionResult<StaffAgentPerformanceReport>> GetStaffAgentPerformanceReport(
+        [FromQuery] StaffAgentPerformanceReportParameters parameters,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _reportsService.GetStaffAgentPerformanceReportAsync(parameters, cancellationToken);
+        return Ok(result);
+    }
 }

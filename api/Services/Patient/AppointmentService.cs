@@ -91,6 +91,41 @@ public sealed class AppointmentService : IAppointmentService
         return ToResponse(appointment);
     }
 
+    /// <summary>
+    /// Someone at the counter now, for a test, scan or check-up, with no booking. Recorded as
+    /// a visit starting now and already confirmed - the person confirming it is the one looking
+    /// at them - so the day-of actions are open straight away.
+    /// </summary>
+    public async Task<AppointmentResponse> CreateWalkInAsync(
+        CreateWalkInAppointmentRequest request, CancellationToken ct = default)
+    {
+        var patient = await _db.Patients.FirstOrDefaultAsync(p => p.Id == request.PatientId, ct)
+            ?? throw new NotFoundException("Patient", request.PatientId);
+
+        await EnsureNothingOpenForAsync(patient, ct);
+
+        var now = DateTimeOffset.UtcNow;
+
+        var appointment = new AppointmentEntity
+        {
+            Id = Guid.NewGuid(),
+            PatientId = patient.Id,
+            ScheduledAt = now,
+            Status = AppointmentStatus.Confirmed,
+            Reason = Clean(request.Reason),
+            BookedByStaffMemberId = _currentUser.Id,
+            ConfirmedAt = now,
+            ConfirmedByStaffMemberId = _currentUser.Id
+        };
+
+        _db.Appointments.Add(appointment);
+        await _db.SaveChangesAsync(ct);
+
+        appointment.Patient = patient;
+
+        return ToResponse(appointment);
+    }
+
     public async Task<AppointmentEntity> BookForPatientAsync(
         Guid patientId, BookAppointmentRequest request, CancellationToken ct = default)
     {

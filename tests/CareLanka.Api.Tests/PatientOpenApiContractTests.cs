@@ -55,6 +55,7 @@ public sealed class PatientOpenApiContractTests
     [InlineData("WardCapacity")]
     [InlineData("Appointment")]
     [InlineData("CreateAppointmentRequest")]
+    [InlineData("CreateWalkInAppointmentRequest")]
     [InlineData("CheckInRequest")]
     [InlineData("AdmissionBed")]
     [InlineData("BedAssignment")]

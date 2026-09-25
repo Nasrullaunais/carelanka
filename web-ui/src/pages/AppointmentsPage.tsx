@@ -11,14 +11,20 @@ import {
   completeAppointmentMutation,
   confirmAppointmentMutation,
   createAppointmentMutation,
+  createPatientMutation,
+  createWalkInAppointmentMutation,
+  getPatientOptions,
   listAppointmentsOptions,
   listPatientsOptions,
   markAppointmentNoShowMutation,
+  updatePatientMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
 import type {
   Admission,
   Appointment,
   AppointmentStatus,
+  Gender,
+  Patient,
   PatientSummary,
 } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
@@ -45,8 +51,19 @@ import {
   admissionCategoryHints,
   admissionCategoryLabels,
   detailFieldLabel,
+  genderLabels,
   patientIdentifier,
+  selectableGenders,
 } from '../types/patients';
+import { fieldLimits, nicProblem, phoneProblem } from '../types/identifiers';
+import {
+  PatientFields,
+  emptyPatientForm,
+  patientFormBody,
+  patientFormFrom,
+  patientFormProblems,
+  usePatientForm,
+} from './intake-form';
 
 const PAGE_SIZE = 20;
 
@@ -85,7 +102,7 @@ export function AppointmentsPage() {
   if (!canSee) {
     return (
       <>
-        <h1>Expected visits</h1>
+        <h1>Appointments</h1>
         <p className="empty">
           Your role cannot open the bookings list. Reception, ward nurses, the duty manager
           and the administrator can.
@@ -141,10 +158,10 @@ export function AppointmentsPage() {
 
   return (
     <>
-      <h1>Expected visits</h1>
+      <h1>Appointments</h1>
       <p className="muted">
-        Patients booked to come in, so the desk knows before they arrive. Confirm a booking
-        when you read it; the actions for the day itself open up once it is confirmed.
+        Patients booked to come in, and walk-ins recorded at the desk. Confirm a booking when
+        you read it; the actions for the day itself open up once it is confirmed.
       </p>
 
       <div className="card">
@@ -586,12 +603,18 @@ function CancelPanel({
   );
 }
 
+type BookingPatient = Pick<PatientSummary, 'id' | 'full_name' | 'nic' | 'temp_reference'>;
+
+type Arrival = 'later' | 'now';
+
 function BookVisitCard({ onBooked }: { onBooked: () => void }) {
   const queryClient = useQueryClient();
 
   const [search, setSearch] = useState('');
   const [submitted, setSubmitted] = useState('');
-  const [patient, setPatient] = useState<PatientSummary | null>(null);
+  const [registering, setRegistering] = useState(false);
+  const [patient, setPatient] = useState<BookingPatient | null>(null);
+  const [arrival, setArrival] = useState<Arrival>('later');
   const [when, setWhen] = useState('');
   const [reason, setReason] = useState('');
 
@@ -600,43 +623,85 @@ function BookVisitCard({ onBooked }: { onBooked: () => void }) {
     enabled: submitted.length > 0,
   });
 
+  function finish() {
+    queryClient.invalidateQueries({
+      predicate: (query) => {
+        const id = (query.queryKey[0] as { _id?: string } | undefined)?._id;
+        return id === 'listAppointments' || id === 'listPatientWorklist';
+      },
+    });
+
+    setPatient(null);
+    setSearch('');
+    setSubmitted('');
+    setArrival('later');
+    setWhen('');
+    setReason('');
+    onBooked();
+  }
+
   const book = useMutation({
     ...createAppointmentMutation(),
     onSuccess: (appointment) => {
       toast.success(
         `${appointment.patient.full_name} booked for ${localDateTime(appointment.scheduled_at)}.`,
       );
-
-      queryClient.invalidateQueries({
-        predicate: (query) => {
-          const id = (query.queryKey[0] as { _id?: string } | undefined)?._id;
-          return id === 'listAppointments' || id === 'listPatientWorklist';
-        },
-      });
-
-      setPatient(null);
-      setSearch('');
-      setSubmitted('');
-      setWhen('');
-      setReason('');
-      onBooked();
+      finish();
     },
   });
 
+  const walkIn = useMutation({
+    ...createWalkInAppointmentMutation(),
+    onSuccess: (appointment) => {
+      toast.success(
+        `${appointment.patient.full_name} is recorded as here now. Check them in from today's list.`,
+      );
+      finish();
+    },
+  });
+
+  function choose(chosen: BookingPatient) {
+    setPatient(chosen);
+    setRegistering(false);
+    setWhen(localInputValue(new Date(Date.now() + 60 * 60 * 1000)));
+  }
+
   const isFuture = when !== '' && new Date(when).getTime() > Date.now();
+  const cleanReason = reason.trim().length > 0 ? reason.trim() : null;
+  const pending = book.isPending || walkIn.isPending;
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!patient || !isFuture) return;
+    if (!patient) return;
+
+    if (arrival === 'now') {
+      walkIn.mutate({ body: { patient_id: patient.id, reason: cleanReason } });
+      return;
+    }
+
+    if (!isFuture) return;
 
     book.mutate({
       body: {
         patient_id: patient.id,
         scheduled_at: new Date(when).toISOString(),
-        reason: reason.trim().length > 0 ? reason.trim() : null,
+        reason: cleanReason,
       },
     });
   }
+
+  if (registering) {
+    return (
+      <RegisterForBooking
+        search={submitted}
+        onRegistered={choose}
+        onBack={() => setRegistering(false)}
+      />
+    );
+  }
+
+  const searched = submitted !== '' && !patients.isFetching && patients.data !== undefined;
+  const matches = patients.data?.items ?? [];
 
   return (
     <div className="table-section">
@@ -675,17 +740,17 @@ function BookVisitCard({ onBooked }: { onBooked: () => void }) {
 
           {patients.isFetching && <p className="empty">Searching…</p>}
 
-          {submitted !== '' && !patients.isFetching && patients.data?.items.length === 0 && (
+          {searched && matches.length === 0 && (
             <p className="empty">
-              No patient matches “{submitted}”. A patient must be registered before a visit can
-              be booked — register them on the intake screen first.
+              No patient matches &ldquo;{submitted}&rdquo;. If this is their first visit, register
+              them below.
             </p>
           )}
 
-          {!patients.isFetching && (patients.data?.items.length ?? 0) > 0 && (
+          {searched && matches.length > 0 && (
             <Table>
               <tbody>
-                {patients.data?.items.map((found) => (
+                {matches.map((found) => (
                   <tr key={found.id}>
                     <td>
                       <strong>{found.full_name}</strong>
@@ -695,14 +760,7 @@ function BookVisitCard({ onBooked }: { onBooked: () => void }) {
                       </span>
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      <button
-                        type="button"
-                        className="secondary"
-                        onClick={() => {
-                          setPatient(found);
-                          setWhen(localInputValue(new Date(Date.now() + 60 * 60 * 1000)));
-                        }}
-                      >
+                      <button type="button" className="secondary" onClick={() => choose(found)}>
                         Book a visit
                       </button>
                     </td>
@@ -710,6 +768,20 @@ function BookVisitCard({ onBooked }: { onBooked: () => void }) {
                 ))}
               </tbody>
             </Table>
+          )}
+
+          {searched && (
+            <p style={{ marginTop: '0.9rem' }}>
+              <button
+                type="button"
+                className={matches.length === 0 ? undefined : 'secondary'}
+                onClick={() => setRegistering(true)}
+              >
+                {matches.length === 0
+                  ? 'Register a new patient'
+                  : 'None of these - register a new patient'}
+              </button>
+            </p>
           )}
         </>
       ) : (
@@ -727,47 +799,228 @@ function BookVisitCard({ onBooked }: { onBooked: () => void }) {
             </button>
           </p>
 
+          <div className="field">
+            <AppSelect
+              id="book-arrival"
+              label="When are they coming?"
+              value={arrival}
+              onValueChange={(value) => setArrival(value as Arrival)}
+              options={[
+                { value: 'later', label: 'Book a date and time' },
+                { value: 'now', label: 'They are here now (walk-in)' },
+              ]}
+            />
+            {arrival === 'now' && (
+              <p className="hint">
+                Recorded for right now and already confirmed, so you can check them in straight
+                away from today&rsquo;s list.
+              </p>
+            )}
+          </div>
+
           <div className="row">
-            <div className="field">
-              <label htmlFor="book-when">Date and time</label>
-              <input
-                id="book-when"
-                type="datetime-local"
-                value={when}
-                min={localInputValue(new Date())}
-                onChange={(event) => setWhen(event.target.value)}
-                required
-              />
-              {when !== '' && !isFuture && (
-                <p className="hint">
-                  That time has already passed. A patient who is here now is admitted, not
-                  booked — use the intake screen instead.
-                </p>
-              )}
-            </div>
+            {arrival === 'later' && (
+              <div className="field">
+                <label htmlFor="book-when">Date and time</label>
+                <input
+                  id="book-when"
+                  type="datetime-local"
+                  value={when}
+                  min={localInputValue(new Date())}
+                  onChange={(event) => setWhen(event.target.value)}
+                  required
+                />
+                {when !== '' && !isFuture && (
+                  <p className="hint">
+                    That time has already passed. For someone at the counter now, choose
+                    &ldquo;They are here now&rdquo; above.
+                  </p>
+                )}
+              </div>
+            )}
             <div className="field">
               <label htmlFor="book-reason">Reason (optional)</label>
               <input
                 id="book-reason"
                 value={reason}
-                maxLength={500}
+                maxLength={300}
                 onChange={(event) => setReason(event.target.value)}
-                placeholder="Follow-up, cardiology"
+                placeholder="Blood test, chest X-ray, follow-up"
               />
-              <p className="hint">
-                For staff to read. The bed agent never reads it — free text stays data, never
-                instructions.
-              </p>
             </div>
           </div>
 
-          <button type="submit" disabled={book.isPending || !isFuture}>
-            {book.isPending ? 'Booking…' : 'Book the visit'}
+          <button type="submit" disabled={pending || (arrival === 'later' && !isFuture)}>
+            {pending ? 'Saving…' : arrival === 'now' ? 'Record the walk-in' : 'Book the visit'}
           </button>
         </form>
       )}
     </div>
   );
+}
+
+function prefillFromSearch(search: string) {
+  const text = search.trim();
+
+  if (text.length > 0 && phoneProblem(text) === null) {
+    return { fullName: '', phone: text, nic: '' };
+  }
+
+  if (/\d/.test(text) && nicProblem(text) === null) {
+    return { fullName: '', phone: '', nic: text };
+  }
+
+  return { fullName: text, phone: '', nic: '' };
+}
+
+/// A short record on purpose: the patient is often on the phone, and a test or scan needs no
+/// more. The full intake details are taken at check-in, only if they are admitted to a ward.
+function RegisterForBooking({
+  search,
+  onRegistered,
+  onBack,
+}: {
+  search: string;
+  onRegistered: (patient: Patient) => void;
+  onBack: () => void;
+}) {
+  const queryClient = useQueryClient();
+
+  const [initial] = useState(() => prefillFromSearch(search));
+  const [fullName, setFullName] = useState(initial.fullName);
+  const [phone, setPhone] = useState(initial.phone);
+  const [gender, setGender] = useState<Gender | ''>('');
+  const [nic, setNic] = useState(initial.nic);
+
+  const phoneError = phoneProblem(phone);
+  const nicError = nicProblem(nic);
+
+  const blocked =
+    fullName.trim().length === 0 ||
+    phone.trim().length === 0 ||
+    phoneError !== null ||
+    gender === '' ||
+    nicError !== null;
+
+  const register = useMutation({
+    ...createPatientMutation(),
+    onSuccess: (created) => {
+      toast.success(`${created.full_name} registered. Patient ID ${created.patient_code}.`);
+
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          (query.queryKey[0] as { _id?: string } | undefined)?._id === 'listPatients',
+      });
+
+      onRegistered(created);
+    },
+  });
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (gender === '' || blocked) return;
+
+    register.mutate({
+      body: {
+        full_name: fullName.trim(),
+        nic: nic.trim().length > 0 ? nic.trim() : null,
+        gender,
+        date_of_birth: null,
+        phone: phone.trim(),
+        address: null,
+        emergency_contact_name: null,
+        emergency_contact_phone: null,
+      },
+    });
+  }
+
+  return (
+    <div className="table-section">
+      <h2>Register a new patient</h2>
+      <p className="muted" style={{ marginBottom: '0.9rem' }}>
+        Only what is needed to book the visit. If they are admitted to a ward when they arrive,
+        the rest of their details are taken at check-in.
+      </p>
+
+      <form onSubmit={submit}>
+        <div className="row">
+          <div className="field">
+            <label htmlFor="new-name">Full name</label>
+            <input
+              id="new-name"
+              value={fullName}
+              maxLength={fieldLimits.fullName}
+              onChange={(event) => setFullName(event.target.value)}
+              required
+              autoFocus
+            />
+          </div>
+          <div className="field">
+            <AppSelect
+              id="new-gender"
+              label="Gender"
+              value={gender}
+              onValueChange={(value) => setGender(value as Gender | '')}
+              options={[
+                { value: '', label: 'Choose' },
+                ...selectableGenders.map((value) => ({ value, label: genderLabels[value] })),
+              ]}
+            />
+          </div>
+        </div>
+
+        <div className="row">
+          <div className="field">
+            <label htmlFor="new-phone">Mobile number</label>
+            <input
+              id="new-phone"
+              value={phone}
+              inputMode="tel"
+              maxLength={20}
+              placeholder="0771234567"
+              aria-invalid={phoneError !== null}
+              onChange={(event) => setPhone(event.target.value)}
+              required
+            />
+            {phoneError && <p className="field-error">{phoneError}</p>}
+          </div>
+          <div className="field">
+            <label htmlFor="new-nic">
+              NIC <span className="muted">(optional)</span>
+            </label>
+            <input
+              id="new-nic"
+              value={nic}
+              maxLength={20}
+              placeholder="199534501V"
+              aria-invalid={nicError !== null}
+              onChange={(event) => setNic(event.target.value)}
+            />
+            {nicError && <p className="field-error">{nicError}</p>}
+            <p className="hint">
+              The NIC lets the patient connect this record to the CareLanka app, where they can
+              see their visits and bills. It also stops the same person being registered twice.
+            </p>
+          </div>
+        </div>
+
+        <div className="row">
+          <button type="submit" disabled={register.isPending || blocked}>
+            {register.isPending ? 'Registering…' : 'Register and continue'}
+          </button>
+          <button type="button" className="secondary" onClick={onBack}>
+            Back to search
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+/// A patient registered while booking has only a name, phone and gender. Walk-in intake takes
+/// these three from anyone who can answer, so an admission asks for them before it goes ahead.
+function lacksIntakeDetails(patient: Patient): boolean {
+  return !patient.date_of_birth || !patient.address || !patient.phone;
 }
 
 function CheckInPanel({
@@ -787,6 +1040,45 @@ function CheckInPanel({
 
   const [choice, setChoice] = useState<CheckInChoice>('general');
   const [isInfectious, setIsInfectious] = useState(false);
+
+  const admitting = choice !== 'no_bed';
+
+  const details = useQuery({
+    ...getPatientOptions({ path: { id: appointment.patient.id } }),
+    enabled: admitting,
+  });
+
+  const form = usePatientForm(emptyPatientForm(false));
+  const [loadedId, setLoadedId] = useState<string | null>(null);
+
+  if (details.data && loadedId !== details.data.id) {
+    setLoadedId(details.data.id);
+    form.replace({
+      ...patientFormFrom(details.data),
+      ...(choice === 'maternity' ? { gender: 'female' as const } : {}),
+    });
+  }
+
+  // Walk-in intake lets an emergency skip the full form, so check-in does too.
+  const needsDetails =
+    admitting &&
+    choice !== 'emergency' &&
+    details.data !== undefined &&
+    lacksIntakeDetails(details.data);
+  const nic = details.data?.nic ?? '';
+  const problems = patientFormProblems(form.value, true, nic);
+
+  const saveDetails = useMutation({
+    ...updatePatientMutation(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const id = (query.queryKey[0] as { _id?: string } | undefined)?._id;
+          return id === 'listPatients' || id === 'getPatient';
+        },
+      });
+    },
+  });
 
   const checkIn = useMutation({
     ...checkInAppointmentMutation(),
@@ -808,6 +1100,27 @@ function CheckInPanel({
     },
   });
 
+  function chooseLevel(next: CheckInChoice) {
+    setChoice(next);
+
+    if (next === 'maternity') {
+      form.set('gender', 'female');
+    } else if (details.data) {
+      form.set('gender', details.data.gender);
+    }
+  }
+
+  function admit(category: Exclude<CheckInChoice, 'no_bed'>) {
+    checkIn.mutate({
+      path: { id: appointment.id },
+      body: {
+        admission_category: category,
+        urgency: 'routine',
+        is_infectious: isInfectious,
+      },
+    });
+  }
+
   function submit(event: FormEvent) {
     event.preventDefault();
 
@@ -816,17 +1129,24 @@ function CheckInPanel({
       return;
     }
 
-    checkIn.mutate({
-      path: { id: appointment.id },
-      body: {
-        admission_category: choice,
-        urgency: 'routine',
-        is_infectious: isInfectious,
+    if (!needsDetails) {
+      admit(choice);
+      return;
+    }
+
+    if (problems.blocked) return;
+
+    saveDetails.mutate(
+      {
+        path: { id: appointment.patient.id },
+        body: patientFormBody(form.value, details.data?.nic ?? null),
       },
-    });
+      { onSuccess: () => admit(choice) },
+    );
   }
 
-  const pending = checkIn.isPending || noBedPending;
+  const pending = checkIn.isPending || saveDetails.isPending || noBedPending;
+  const waitingForDetails = admitting && (details.isLoading || details.isError);
 
   return (
     <div className="drawer-body">
@@ -843,7 +1163,7 @@ function CheckInPanel({
             id="checkin-category"
             label="What do they need?"
             value={choice}
-            onValueChange={(value) => setChoice(value as CheckInChoice)}
+            onValueChange={(value) => chooseLevel(value as CheckInChoice)}
             options={[
               ...admissionCategoriesFor(appointment.patient.gender).map((value) => ({
                 value,
@@ -859,7 +1179,36 @@ function CheckInPanel({
           </p>
         </div>
 
-        {choice !== 'no_bed' && (
+        {admitting && details.isLoading && <p className="empty">Loading patient details…</p>}
+
+        {admitting && details.isError && (
+          <div className="empty">
+            <p>Could not load the patient&rsquo;s details.</p>
+            <button type="button" className="secondary" onClick={() => void details.refetch()}>
+              Try again
+            </button>
+          </div>
+        )}
+
+        {needsDetails && (
+          <>
+            <p className="stub-note" style={{ marginBottom: '0.9rem' }}>
+              <strong>Complete their details before admitting.</strong> This patient was
+              registered with only a name, phone and gender. A ward admission needs the same
+              details as walk-in intake.
+            </p>
+            <PatientFields
+              value={form.value}
+              set={form.set}
+              idPrefix="checkin"
+              identified
+              lockGenderTo={choice === 'maternity' ? 'female' : undefined}
+              nic={nic}
+            />
+          </>
+        )}
+
+        {admitting && (
           <div className="field">
             <label htmlFor="checkin-infectious">
               <input
@@ -875,12 +1224,17 @@ function CheckInPanel({
         )}
 
         <div className="row">
-          <button type="submit" disabled={pending}>
+          <button
+            type="submit"
+            disabled={pending || waitingForDetails || (needsDetails && problems.blocked)}
+          >
             {pending
               ? 'Saving…'
               : choice === 'no_bed'
                 ? 'Record the visit and bill'
-                : 'Admit to a ward'}
+                : needsDetails
+                  ? 'Save details and admit'
+                  : 'Admit to a ward'}
           </button>
           <button type="button" className="secondary" onClick={onCancel}>
             Cancel

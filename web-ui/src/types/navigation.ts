@@ -48,8 +48,8 @@ export const destinations: Destination[] = [
     to: '/appointments',
     icon: CalendarDays,
     group: 'Patient care',
-    label: 'Expected visits',
-    description: 'Who has booked to come in, and when they are expected.',
+    label: 'Appointments',
+    description: 'Who has booked to come in, and walk-ins for a test, scan or check-up.',
     canAccess: canOpenAppointmentBoard,
   },
   {

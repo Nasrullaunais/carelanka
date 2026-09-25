@@ -19,6 +19,9 @@ public interface IAppointmentService
     Task<AppointmentResponse> CreateAsync(
         CreateAppointmentRequest request, CancellationToken cancellationToken = default);
 
+    Task<AppointmentResponse> CreateWalkInAsync(
+        CreateWalkInAppointmentRequest request, CancellationToken cancellationToken = default);
+
     Task<AdmissionResponse> CheckInAsync(
         Guid id, CheckInRequest request, CancellationToken cancellationToken = default);
 

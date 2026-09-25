@@ -1862,7 +1862,7 @@ up, the desk opens one panel and answers "What do they need?" from one list:
 | Choice | What happens | Where it is billed |
 | :--- | :--- | :--- |
 | `icu`, `general`, `surgical`, `maternity`, `emergency` — the same list as walk-in intake, `maternity` hidden for a male patient | `POST /appointments/{id}/check-in`. An ordinary admission: the patient moves to the Patients page, gets a bed, is marked arrived, cleared by a doctor and discharged — exactly the walk-in flow | On the admission, at discharge |
-| **No bed needed** — a check-up, scan or test | `POST /appointments/{id}/complete`. No admission is created | On the booking, from the same Expected visits page |
+| **No bed needed** — a check-up, scan or test | `POST /appointments/{id}/complete`. No admission is created | On the booking, from the same Appointments page |
 
 It replaced two buttons ("Seen and bill" and "Needs a ward — admit") that asked the same
 question in two places. **The duty-manager-only rule for `icu` at check-in is gone**
@@ -1872,9 +1872,30 @@ protects a bed: placing a patient in a bed off their care level, or outside the 
 it (H2, H7).
 
 An appointment bill needs a `completed` booking with no admission behind it (`cl_pat_045`,
-`cl_pat_035`), so a cancelled or missed booking cannot be charged. The Expected visits list
+`cl_pat_035`), so a cancelled or missed booking cannot be charged. The Appointments list
 reads its day in Sri Lanka time; it used to be the UTC day, which put an early-morning booking
 under the day before.
+
+**First-time patients and walk-ins** *(added 2026-09-25)*. The page was renamed from "Expected
+visits" to **Appointments**. Two gaps closed:
+
+- **A patient the hospital has never seen could not be booked.** The only screen that
+  registered a patient was walk-in intake, and it always ends in an admission. The Book a visit
+  dialog now offers **Register a new patient** after a search, with a short record: name,
+  mobile number and gender, NIC optional. `POST /patients` already accepted that; nothing new on
+  the server. The NIC is asked for because the app claims a record by patient code + NIC
+  (`POST /me/claim`), and because without it a later app pre-register makes a second record.
+- **Somebody at the counter now for a test or scan had no route.** `POST /appointments` refuses
+  a past time (`cl_pat_010`) and the old hint sent them to intake, which admits.
+  `POST /appointments/walk-in` records the visit at the current time, already `confirmed` and
+  stamped with the signed-in user as booker and confirmer, so Check in opens at once. Same
+  one-open-booking and not-admitted rules. Staff only; the app still books ahead.
+
+**The full intake form moved to check-in, not booking.** Whether they need a bed is decided when
+they arrive, so it is asked once, there. Choosing a care level for a patient whose record lacks
+a date of birth, address or phone shows walk-in intake's form first (same fields, same rules —
+`maternity` locks gender to female) and saves it before admitting. `emergency` skips it, as it
+does in intake. **No bed needed** asks for nothing more.
 
 ### The patients board is everyone who is here
 

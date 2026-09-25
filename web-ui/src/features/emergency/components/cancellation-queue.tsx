@@ -43,8 +43,9 @@ function elapsedMinutes(iso?: string | null): string {
 
 export function CancellationQueue() {
   const [page, setPage] = useState(1);
+  const [showReviewed, setShowReviewed] = useState(false);
   const query = useQuery({
-    ...listEmergencyCancellationRequestsOptions({ query: { Page: page, PageSize: 25 } }),
+    ...listEmergencyCancellationRequestsOptions({ query: { ...(showReviewed ? {} : { Status: 'pending' as const }), Page: page, PageSize: 25 } }),
     refetchInterval: 5_000,
   });
 
@@ -68,18 +69,19 @@ export function CancellationQueue() {
         </div>
         {query.data && <div className="cancellation-count" aria-label={`${pendingOnPage} awaiting review on this page`}><strong>{pendingOnPage}</strong><span>awaiting review<br />on this page</span></div>}
       </div>
+      <div className="flex gap-2"><Button variant={showReviewed ? 'outline' : 'primary'} aria-pressed={!showReviewed} onPress={() => { setShowReviewed(false); setPage(1); }}>Awaiting review</Button><Button variant={showReviewed ? 'primary' : 'outline'} aria-pressed={showReviewed} onPress={() => { setShowReviewed(true); setPage(1); }}>All requests</Button></div>
       <div className="cancellation-guidance" role="note">
         <span className="cancellation-guidance-icon" aria-hidden="true">i</span>
         <p><strong>Before you decide:</strong> approving cancels the emergency call and recalls any assigned ambulance. Rejecting keeps the response active and requires an explanation.</p>
       </div>
       <QueryState
         query={query}
-        isEmpty={(data) => data.items.length === 0}
         emptyMessage="No cancellation requests to review. New requests will appear here automatically."
         errorContext="Could not load cancellation requests."
         skeletonRows={4}
       >
         {(data) => <div className="cancellation-list">
+          {requests.length === 0 && <p className="empty">No cancellation requests on this page.</p>}
           {requests.map((request) => <CancellationCard key={request.emergency_call_id} request={request} />)}
           <PaginationControls label="Cancellation requests" page={page} totalPages={data.total_pages} onPageChange={setPage} />
         </div>}

@@ -1,3 +1,7 @@
+using CareLanka.Api.Data;
+using CareLanka.Api.Data.Enums;
+using Microsoft.EntityFrameworkCore;
+
 namespace CareLanka.Api.Agents.Emergency;
 
 /// <summary>
@@ -17,7 +21,38 @@ public sealed class DispatchProposalWorker : BackgroundService
         _log = log;
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+        => Task.WhenAll(ConsumeAsync(stoppingToken), RecoverAsync(stoppingToken));
+
+    // The channel is a wake-up mechanism; persisted pending proposals survive restarts
+    // and transient processing failures. Execution checks status, so duplicates are harmless.
+    private async Task RecoverAsync(CancellationToken stoppingToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+        do
+        {
+            try
+            {
+                await using var scope = _scopes.CreateAsyncScope();
+                var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+                var pending = await db.DispatchProposals.AsNoTracking()
+                    .Where(proposal => proposal.Status == DispatchProposalStatus.Pending)
+                    .OrderBy(proposal => proposal.CreatedAt)
+                    .Select(proposal => proposal.Id).Take(100).ToListAsync(stoppingToken);
+                foreach (var id in pending) _queue.Enqueue(id);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception exception)
+            {
+                _log.LogError(exception, "Pending dispatch proposals could not be recovered; retrying shortly.");
+            }
+        } while (await timer.WaitForNextTickAsync(stoppingToken));
+    }
+
+    private async Task ConsumeAsync(CancellationToken stoppingToken)
     {
         await foreach (var proposalId in _queue.ReadAllAsync(stoppingToken))
         {

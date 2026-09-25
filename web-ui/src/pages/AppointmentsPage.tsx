@@ -1,3 +1,4 @@
+import { PaginationControls } from '../components/ui/pagination-controls';
 import { Table } from '../components/Table';
 import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
@@ -213,13 +214,14 @@ export function AppointmentsPage() {
 
       {admitted && <CheckedInCard admission={admitted} onDismiss={() => setAdmitted(null)} />}
 
-      <div className="card">
+      <div className="table-section">
         <h2>
           {status ? appointmentStatusLabels[status] : 'All bookings'}
           {date ? '' : ' — every day'}
         </h2>
 
         <AppointmentTable
+          footer={<PaginationControls label="Appointments" page={page} totalPages={appointments.data?.total_pages ?? 1} totalItems={appointments.data?.total_items} onPageChange={setPage} />}
           appointments={appointments.data?.items ?? []}
           isLoading={appointments.isLoading}
           isError={appointments.isError}
@@ -279,33 +281,7 @@ export function AppointmentsPage() {
           onConfirm={() => { if (noShowCandidate) noShow.mutate({ path: { id: noShowCandidate.id } }); }}
         />
 
-        {appointments.data && appointments.data.total_items > 0 && (
-          <div className="row" style={{ marginTop: '0.9rem', alignItems: 'center' }}>
-            <p className="muted" style={{ flex: '2 1 14rem' }}>
-              {appointments.data.total_items} booking
-              {appointments.data.total_items === 1 ? '' : 's'}, page {appointments.data.page} of{' '}
-              {appointments.data.total_pages}
-            </p>
-            <button
-              type="button"
-              className="secondary"
-              style={{ flex: '0 0 auto' }}
-              disabled={page <= 1}
-              onClick={() => setPage((current) => current - 1)}
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              style={{ flex: '0 0 auto' }}
-              disabled={page >= appointments.data.total_pages}
-              onClick={() => setPage((current) => current + 1)}
-            >
-              Next
-            </button>
-          </div>
-        )}
+
       </div>
     </>
   );
@@ -314,6 +290,7 @@ export function AppointmentsPage() {
 type DeskAction = 'confirm' | 'check-in' | 'cancel' | 'bill';
 
 function AppointmentTable({
+  footer,
   appointments,
   isLoading,
   isError,
@@ -330,6 +307,7 @@ function AppointmentTable({
   activeAppointment,
   renderDrawer,
 }: {
+  footer?: React.ReactNode;
   appointments: Appointment[];
   isLoading: boolean;
   isError: boolean;
@@ -367,7 +345,7 @@ function AppointmentTable({
 
   return (
     <>
-    <Table>
+    <Table footer={footer}>
       <thead>
         <tr>
           <th>{showDate ? 'When' : 'Time'}</th>
@@ -692,7 +670,7 @@ function BookVisitCard({ onBooked }: { onBooked: () => void }) {
   }
 
   return (
-    <div className="card">
+    <div className="table-section">
       <h2>Book a visit</h2>
       <p className="muted" style={{ marginBottom: '0.9rem' }}>
         For a patient on the phone or at the counter. A patient booking in the app uses the same

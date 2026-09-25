@@ -873,10 +873,10 @@ export type DiversionImpact = {
     source_call_address_label?: string | null;
     source_dispatch_status?: DispatchStatus;
     source_call_waiting_minutes_so_far?: number;
-    source_call_additional_wait_minutes?: number;
+    source_call_additional_wait_minutes?: number | null;
     replacement_ambulance_id?: string | null;
     replacement_ambulance_registration?: string | null;
-    minutes_saved_for_this_call?: number;
+    minutes_saved_for_this_call?: number | null;
 };
 
 export type EmergencyAgentPerformanceReport = {

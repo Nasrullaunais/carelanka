@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Card, CardContent, CardTitle } from '@heroui/react';
+import { Button } from '@heroui/react';
 import type { AmbulanceSummary } from '../../../services/api/generated';
 import { listAmbulancesOptions, listEmergencyCallsOptions } from '../../../services/api/generated/@tanstack/react-query.gen';
 import { DataTable, type DataTableColumn } from '../../../components/ui/data-table';
@@ -33,8 +33,8 @@ export function FleetBoard() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Card><CardContent className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3"><CardTitle>Fleet board</CardTitle><div className="flex gap-2"><Button size="sm" variant={view === 'board' ? 'primary' : 'outline'} onPress={() => setView('board')}>Board</Button><Button size="sm" variant={view === 'map' ? 'primary' : 'outline'} onPress={() => setView('map')}>Map</Button></div></div>
+      <section className="flex flex-col gap-3" aria-labelledby="fleet-board-heading">
+        <div className="flex items-center justify-between gap-3"><h2 id="fleet-board-heading" className="m-0">Fleet board</h2><div className="flex gap-2"><Button size="sm" variant={view === 'board' ? 'primary' : 'outline'} onPress={() => setView('board')}>Board</Button><Button size="sm" variant={view === 'map' ? 'primary' : 'outline'} onPress={() => setView('map')}>Map</Button></div></div>
         <QueryState query={fleet} errorContext="Could not load the ambulance fleet." isEmpty={(data) => data.items.length === 0} emptyMessage="No ambulances are registered.">
           {(fleetData) => view === 'board' ? (
             <DataTable ariaLabel="Ambulance fleet" rows={fleetData.items} columns={columns} rowKey={(row) => row.id} rowText={(row) => row.registration_number} pagination={{ page, totalPages: fleetData.total_pages, onPageChange: setPage }} />
@@ -49,7 +49,7 @@ export function FleetBoard() {
             </QueryState>
           )}
         </QueryState>
-      </CardContent></Card>
+      </section>
       <ActionDialog title={`Manage crew · ${selected?.registration_number ?? ''}`} isOpen={selected != null} onClose={() => setSelected(undefined)}>
         {selected && <CrewManagement ambulanceId={selected.id} registrationNumber={selected.registration_number} />}
       </ActionDialog>

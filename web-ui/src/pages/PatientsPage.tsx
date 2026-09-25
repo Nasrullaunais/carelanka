@@ -1,3 +1,4 @@
+import { PaginationControls } from '../components/ui/pagination-controls';
 import { Table } from '../components/Table';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -220,7 +221,7 @@ export function PatientsPage() {
         </form>
       </div>
 
-      <div className="card">
+      <div className="table-section">
         <h2>
           {includeFinished ? 'All patients, including finished visits' : 'Current patients'}
         </h2>
@@ -241,7 +242,7 @@ export function PatientsPage() {
               : 'No patients are expected or admitted.'}
           </p>
         ) : (
-          <Table>
+          <Table footer={<PaginationControls label="Patients" page={page} totalPages={board.data?.total_pages ?? 1} totalItems={board.data?.total_items} onPageChange={setPage} />}>
             <thead>
               <tr>
                 <th>Patient</th>
@@ -312,33 +313,6 @@ export function PatientsPage() {
               ))}
             </tbody>
           </Table>
-        )}
-
-        {board.data && board.data.total_items > 0 && (
-          <div className="row" style={{ marginTop: '0.9rem', alignItems: 'center' }}>
-            <p className="muted" style={{ flex: '2 1 14rem' }}>
-              {board.data.total_items} row{board.data.total_items === 1 ? '' : 's'}, page{' '}
-              {board.data.page} of {board.data.total_pages}
-            </p>
-            <button
-              type="button"
-              className="secondary"
-              style={{ flex: '0 0 auto' }}
-              disabled={page <= 1}
-              onClick={() => setPage((current) => current - 1)}
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              style={{ flex: '0 0 auto' }}
-              disabled={page >= board.data.total_pages}
-              onClick={() => setPage((current) => current + 1)}
-            >
-              Next
-            </button>
-          </div>
         )}
       </div>
       <ActionDialog title={`${bedMode === 'correct' ? 'Correct bed' : 'Assign bed'} · ${rows.find((row) => row.id === assigningId)?.patient.full_name ?? 'patient'}`} isOpen={assigningId != null} onClose={() => setAssigningId(null)}>

@@ -1,3 +1,4 @@
+import { PaginationControls } from '../components/ui/pagination-controls';
 import { Table } from '../components/Table';
 import { useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
@@ -89,7 +90,7 @@ function PatientSearch({
   });
 
   return (
-    <div className="card">
+    <div className="table-section">
       <h2>Or search by code, name or NIC</h2>
       <p className="muted">
         For somebody who is not on a ward list — an outpatient in for a blood test, or a visit
@@ -174,7 +175,7 @@ function ReportList({ patient }: { patient: Chosen }) {
   const totalPages = reports.data?.total_pages ?? 1;
 
   return (
-    <div className="card">
+    <div className="table-section">
       <h2>
         Results for {patient.fullName} ({patient.patientCode})
       </h2>
@@ -196,7 +197,7 @@ function ReportList({ patient }: { patient: Chosen }) {
       )}
 
       {rows.length > 0 && (
-        <Table>
+        <Table footer={<PaginationControls label="Lab results" page={page} totalPages={totalPages} totalItems={reports.data?.total_items} onPageChange={setPage} />}>
           <thead>
             <tr>
               <th>Test</th>
@@ -222,30 +223,6 @@ function ReportList({ patient }: { patient: Chosen }) {
             ))}
           </tbody>
         </Table>
-      )}
-
-      {totalPages > 1 && (
-        <div className="pager">
-          <button
-            type="button"
-            className="secondary"
-            disabled={page <= 1}
-            onClick={() => setPage((current) => current - 1)}
-          >
-            Previous
-          </button>
-          <span className="muted">
-            Page {page} of {totalPages}
-          </span>
-          <button
-            type="button"
-            className="secondary"
-            disabled={page >= totalPages}
-            onClick={() => setPage((current) => current + 1)}
-          >
-            Next
-          </button>
-        </div>
       )}
     </div>
   );

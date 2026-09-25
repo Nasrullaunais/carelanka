@@ -92,6 +92,10 @@ public sealed class DispatchProposalExecutor
                 };
             }
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception failure)
         {
             _log.LogError(failure, "Dispatch proposal {ProposalId} failed.", proposalId);

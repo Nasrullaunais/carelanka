@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, CardContent, CardTitle } from '@heroui/react';
+import { Button } from '@heroui/react';
 import { toast } from 'sonner';
 import type { AmbulanceDetail, AmbulanceStatus, AmbulanceSummary } from '../../../services/api/generated';
 import {
@@ -71,8 +71,8 @@ export function AmbulanceRegister() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Card><CardContent className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3"><CardTitle>Ambulance register</CardTitle><Button onPress={() => setDialog({ kind: 'create' })}>Add ambulance</Button></div>
+      <section className="flex flex-col gap-3" aria-labelledby="ambulance-register-heading">
+        <div className="flex flex-wrap items-center justify-between gap-3"><h2 id="ambulance-register-heading" className="m-0">Ambulance register</h2><Button onPress={() => setDialog({ kind: 'create' })}>Add ambulance</Button></div>
         <AppSelect
           className="max-w-xs"
           label="Status filter"
@@ -86,7 +86,7 @@ export function AmbulanceRegister() {
         <QueryState query={list} errorContext="Could not load the ambulance register." isEmpty={(data) => data.items.length === 0} emptyMessage="No ambulances are registered.">
           {(data) => <DataTable ariaLabel="Ambulance register" rows={data.items} columns={columns} rowKey={(row) => row.id} rowText={(row) => row.registration_number} pagination={{ page, totalPages: data.total_pages, onPageChange: setPage }} />}
         </QueryState>
-      </CardContent></Card>
+      </section>
       <ActionDialog title={`Manage crew · ${crewAmbulance?.registration_number ?? ''}`} isOpen={crewAmbulance != null} onClose={() => setCrewAmbulance(undefined)}>
         {crewAmbulance && <CrewManagement ambulanceId={crewAmbulance.id} registrationNumber={crewAmbulance.registration_number} />}
       </ActionDialog>

@@ -1,3 +1,4 @@
+import { Brand } from '../components/Brand';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';
@@ -16,7 +17,7 @@ export function LoginPage() {
     onSuccess: (tokens) => {
       setSession(tokens);
       toast.success(`Signed in as ${tokens.principal.display_name}`);
-      navigate('/wards');
+      navigate('/', { replace: true });
     },
   });
 
@@ -28,8 +29,9 @@ export function LoginPage() {
   return (
     <main className="login-page">
       <div className="card">
-        <h1>CareLanka</h1>
-        <p className="muted">Staff sign-in.</p>
+        <Brand />
+        <h1 className="auth-title">Welcome back</h1>
+        <p className="muted">Sign in to your CareLanka staff workspace.</p>
 
         <form onSubmit={submit} style={{ marginTop: '1.25rem' }}>
           <div className="field">
@@ -62,9 +64,7 @@ export function LoginPage() {
         </form>
 
         <p className="hint">
-          Patients use the CareLanka mobile app, not this one. Seeded staff accounts are in{' '}
-          <code>TEST_ACCOUNTS.md</code>; creating a ward needs{' '}
-          <code>admin.wickrama@carelanka.lk</code>.
+          Patients can sign in or register using the CareLanka mobile app.
         </p>
       </div>
     </main>

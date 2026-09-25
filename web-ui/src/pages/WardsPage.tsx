@@ -93,7 +93,7 @@ export function WardsPage() {
         </>
       )}
 
-      <div className="card">
+      <div className="table-section">
         <h2>{isActive ? 'Active wards' : 'Retired wards'}</h2>
         <WardTable
           isLoading={wards.isLoading}

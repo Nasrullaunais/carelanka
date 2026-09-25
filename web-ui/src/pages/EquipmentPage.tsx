@@ -1,3 +1,4 @@
+import { PaginationControls } from '../components/ui/pagination-controls';
 import { Table } from '../components/Table';
 import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
@@ -192,7 +193,7 @@ export function EquipmentPage() {
         </>
       )}
 
-      <div className="card">
+      <div className="table-section">
         <h2>Item register</h2>
         {awaitingConfirmation.data && awaitingConfirmation.data.count > 0 && (
           <p className="info-note">
@@ -207,6 +208,7 @@ export function EquipmentPage() {
           </p>
         )}
         <ItemTable
+          footer={<PaginationControls label="Equipment" page={page} totalPages={totalPages} totalItems={paged?.total_items} onPageChange={setPage} />}
           isLoading={items.isLoading}
           isError={items.isError}
           onRetry={() => void items.refetch()}
@@ -217,29 +219,7 @@ export function EquipmentPage() {
           onChanged={refreshItems}
         />
 
-        {paged && paged.total_items > 0 && (
-          <div className="pager">
-            <button
-              type="button"
-              className="secondary"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              Previous
-            </button>
-            <span className="muted">
-              Page {paged.page} of {totalPages} · {paged.total_items} items
-            </span>
-            <button
-              type="button"
-              className="secondary"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            >
-              Next
-            </button>
-          </div>
-        )}
+
       </div>
 
       <ActionDialog title="Equipment details" isOpen={selected != null} onClose={() => setSelected(null)}>
@@ -250,6 +230,7 @@ export function EquipmentPage() {
 }
 
 function ItemTable({
+  footer,
   items,
   isLoading,
   isError,
@@ -259,6 +240,7 @@ function ItemTable({
   role,
   onChanged,
 }: {
+  footer?: React.ReactNode;
   items: EquipmentItemSummary[];
   isLoading: boolean;
   isError: boolean;
@@ -288,7 +270,7 @@ function ItemTable({
   }
 
   return (
-    <Table>
+    <Table footer={footer}>
       <thead>
         <tr>
           <th>Item</th>

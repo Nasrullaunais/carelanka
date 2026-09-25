@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../../test/api-mocks';
 import { EmergencyDesk } from './emergency-desk';
 
-const mocks = vi.hoisted(() => ({ dispatch: vi.fn(), createCall: vi.fn(), toastError: vi.fn() }));
+const mocks = vi.hoisted(() => ({ dispatch: vi.fn(), createCall: vi.fn(), toastError: vi.fn(), callStatus: 'received' }));
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: mocks.toastError } }));
 vi.mock('./location-picker', () => ({
@@ -16,14 +16,14 @@ vi.mock('../../../services/api/generated/@tanstack/react-query.gen', () => ({
   listEmergencyCallsOptions: () => ({
     queryKey: ['calls'],
     queryFn: () => Promise.resolve({
-      items: [{ id: 'call-1', priority: 'high', status: 'received', caller_name: 'A. Perera', address_label: 'Colombo Fort', waiting_minutes: 4 }],
+      items: [{ id: 'call-1', priority: 'high', status: mocks.callStatus, caller_name: 'A. Perera', address_label: 'Colombo Fort', waiting_minutes: 4 }],
       page: 1, page_size: 100, total_items: 1, total_pages: 1,
     }),
   }),
   getEmergencyCallOptions: () => ({
     queryKey: ['call', 'call-1'],
     queryFn: () => Promise.resolve({
-      id: 'call-1', priority: 'high', status: 'received', caller_name: 'A. Perera', caller_phone: '0712345678',
+      id: 'call-1', priority: 'high', status: mocks.callStatus, caller_name: 'A. Perera', caller_phone: '0712345678',
       details: 'Severe chest pain', address_label: 'Colombo Fort', latitude: 6.927, longitude: 79.861, dispatches: [],
     }),
   }),
@@ -44,6 +44,17 @@ describe('EmergencyDesk', () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    mocks.callStatus = 'received';
+  });
+
+  it.each(['dispatched', 'en_route', 'at_scene', 'transporting', 'completed', 'cancelled'])('hides dispatch and agent actions for %s calls', async (status) => {
+    mocks.callStatus = status;
+    renderWithProviders(<EmergencyDesk />);
+    await userEvent.click(screen.getByRole('button', { name: 'All calls' }));
+    fireEvent.click((await screen.findByText('A. Perera')).closest('tr')!);
+    await screen.findByText('Severe chest pain');
+    expect(screen.queryByRole('button', { name: 'Ask the agent' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Dispatch$/ })).not.toBeInTheDocument();
   });
 
   it('selects a call and dispatches an eligible ambulance', async () => {

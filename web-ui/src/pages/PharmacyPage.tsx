@@ -1,3 +1,4 @@
+import { PaginationControls } from '../components/ui/pagination-controls';
 import { Table } from '../components/Table';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
@@ -159,9 +160,10 @@ export function PharmacyPage() {
         </>
       )}
 
-      <div className="card">
+      <div className="table-section">
         <h2>Catalog</h2>
         <ItemTable
+          footer={<PaginationControls label="Pharmacy" page={page} totalPages={totalPages} totalItems={paged?.total_items} onPageChange={setPage} />}
           isLoading={items.isLoading}
           isError={items.isError}
           onRetry={() => void items.refetch()}
@@ -174,29 +176,7 @@ export function PharmacyPage() {
           onChanged={refresh}
         />
 
-        {paged && paged.total_items > 0 && (
-          <div className="pager">
-            <button
-              type="button"
-              className="secondary"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              Previous
-            </button>
-            <span className="muted">
-              Page {paged.page} of {totalPages} · {paged.total_items} items
-            </span>
-            <button
-              type="button"
-              className="secondary"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            >
-              Next
-            </button>
-          </div>
-        )}
+
       </div>
 
       <ActionDialog title="Medicine details" isOpen={selected != null} onClose={() => setSelected(null)}>
@@ -213,6 +193,7 @@ export function PharmacyPage() {
 }
 
 function ItemTable({
+  footer,
   items,
   isLoading,
   isError,
@@ -224,6 +205,7 @@ function ItemTable({
   role,
   onChanged,
 }: {
+  footer?: React.ReactNode;
   items: PharmacyItem[];
   isLoading: boolean;
   isError: boolean;
@@ -255,7 +237,7 @@ function ItemTable({
   }
 
   return (
-    <Table>
+    <Table footer={footer}>
       <thead>
         <tr>
           <th>Item</th>

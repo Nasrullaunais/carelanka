@@ -91,7 +91,7 @@ export function CapacityPage() {
             </button>
           </div>
 
-          <div className="card">
+          <div className="table-section">
             <h2>Ward by ward</h2>
 
             {capacity.isLoading ? (

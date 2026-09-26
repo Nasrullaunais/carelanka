@@ -18,21 +18,47 @@ BEGIN;
 -- 1. Clear the visit data
 -- ---------------------------------------------------------------------------
 --
--- Children before parents. `bed_assignments` and `beds` have no declared foreign key between
--- them (they belong to two different components), so the order here is about the rows that DO
--- point at each other: a bill line points at a bill, a bill at an admission, an admission at a
--- patient.
+-- **This used to be `TRUNCATE ... RESTART IDENTITY CASCADE` and that was wrong** — the same
+-- mistake `004_patient_demo_data.sql` documents and fixes for itself. CASCADE means "also empty
+-- every table with a foreign key onto these", not "respect ON DELETE RESTRICT", so it silently
+-- wiped `emergency_calls`, then `dispatches` through `fk_dispatches_emergency_calls_...`, then
+-- `route_logs` after that — three tables of Emergency's, gone, with nothing printed.
+--
+-- Detach the nullable cross-component links, then DELETE children before parents. `bed_assignments`
+-- and `beds` have no declared foreign key between them (they belong to two different components),
+-- so the order here is about the rows that DO point at each other: a bill line points at a bill, a
+-- bill at an admission, an admission at a patient.
 
-TRUNCATE TABLE
-    bill_line_items,
-    bills,
-    discharge_checklist_items,
-    discharges,
-    bed_assignments,
-    appointments,
-    admissions,
-    patients
-RESTART IDENTITY CASCADE;
+UPDATE emergency_calls SET patient_id = NULL WHERE patient_id IS NOT NULL;
+UPDATE equipment_items
+SET assigned_to_admission_id = NULL
+WHERE assigned_to_admission_id IS NOT NULL;
+
+DELETE FROM bill_line_items;
+DELETE FROM bills;
+DELETE FROM discharge_checklist_items;
+DELETE FROM discharges;
+DELETE FROM care_recommendations;
+DELETE FROM patient_medical_profiles;
+DELETE FROM bed_assignments;
+DELETE FROM appointments;
+DELETE FROM admissions;
+DELETE FROM patients;
+
+-- `lab_reports.patient_id` is Equipment's, carries no foreign key, and is NOT NULL, so it can be
+-- neither detached nor left honest. Say so out loud rather than orphaning in silence.
+DO $$
+DECLARE v_orphans int;
+BEGIN
+    SELECT count(*) INTO v_orphans FROM lab_reports;
+
+    IF v_orphans > 0 THEN
+        RAISE WARNING
+            '% lab_reports row(s) now point at patients that no longer exist. That table is '
+            'Equipment Management''s and this script does not delete it. Re-run Equipment''s '
+            'lab seed, or clear it, before demoing the laboratory screens.', v_orphans;
+    END IF;
+END $$;
 
 -- ---------------------------------------------------------------------------
 -- 2. Clear the ward board
@@ -40,9 +66,18 @@ RESTART IDENTITY CASCADE;
 --
 -- `beds` is **Equipment Management's** table. Emptying it is a demo reset, not a schema
 -- decision — the bed model is still theirs. Equipment's own catalogues are left alone.
+--
+-- Same CASCADE trap as above: `agent_proposed_changes` (common's AI-agent table) holds nullable
+-- `proposed_bed_id` / `proposed_ward_id`, and `dispatches` (Emergency's) holds a nullable
+-- `destination_ward_id`. Detach those first, then DELETE plainly — plain TRUNCATE still refuses
+-- to run while either foreign key exists at all, row count aside.
 
-TRUNCATE TABLE beds RESTART IDENTITY CASCADE;
-TRUNCATE TABLE wards RESTART IDENTITY CASCADE;
+UPDATE agent_proposed_changes SET proposed_bed_id = NULL WHERE proposed_bed_id IS NOT NULL;
+UPDATE agent_proposed_changes SET proposed_ward_id = NULL WHERE proposed_ward_id IS NOT NULL;
+UPDATE dispatches SET destination_ward_id = NULL WHERE destination_ward_id IS NOT NULL;
+
+DELETE FROM beds;
+DELETE FROM wards;
 
 -- ---------------------------------------------------------------------------
 -- 3. The eight wards

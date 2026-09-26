@@ -62,6 +62,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__CareLanka: Host=db;Port=5432;Database=carelanka;Username=carelanka;Password=carelanka_dev
       Jwt__SigningKey: ${CARELANKA_JWT_SIGNING_KEY:?Set CARELANKA_JWT_SIGNING_KEY in .env}
+      LanguageModel__ApiKey: ${CARELANKA_GEMINI_API_KEY:-}
     ports:
       - "127.0.0.1:5231:5231"
     depends_on:

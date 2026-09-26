@@ -45,6 +45,21 @@ sign-up. `GET /api/auth/me` returns `patient_id: null` and every `/api/me/*` rou
 Registration is open — `POST /api/auth/patient/register` with a username and a password
 makes a new one and signs you straight in.
 
+`docs/seed/007_emergency_demo_fleet.sql` adds four more ambulances around Colombo, each
+with its own crew. Every crew login uses `CareLanka#2026`:
+
+| Ambulance | Parked near | Crew |
+| :--- | :--- | :--- |
+| `WP-CAL-101` | Borella | `crew.fernando`, `crew.perera` |
+| `WP-CAL-102` | Rajagiriya | `crew.wickramasinghe`, `crew.herath`, `crew.bandara` |
+| `WP-CAL-103` | Dehiwala | `crew.jayawardena`, `crew.dissanayake` |
+| `WP-CAL-104` | Nugegoda | `crew.gunawardena`, `crew.ekanayake` |
+| `WP-CAL-105` | Kelaniya | `crew.kumara`, `crew.ratnayake` |
+
+All addresses end in `@carelanka.lk`. Nobody needs to carry a phone for them: the API
+reports each one near its parking spot every 3 minutes. Log in as a crew member and open
+My run, and that phone's real position takes over for its ambulance.
+
 `demo.emergency` is linked to a demo patient by `docs/seed/006_emergency_demo_data.sql`.
 Use it for the complete ambulance-to-pre-admission demonstration while keeping
 `chathura.w` available for the unlinked-account scenario.

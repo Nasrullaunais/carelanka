@@ -189,7 +189,7 @@ ambulance.
 
 ### 3.4 Seed data
 
-- 6–8 ambulances, mixed `available` / `en_route` / `out_of_service`, with current crew assignments
+- 5 ambulances spread around Colombo (`006` and `007_emergency_demo_fleet.sql`), each with current crew assignments; `WP-CAL-102` has three crew so the agent has a real crew-size trade-off to weigh
 - 10–15 `EmergencyCall` rows across every `CallStatus`, a mix of `patient_is_caller = true/false`, and at least one still unidentified so the link-patient operation has something to demo
 - Completed `Dispatch` + `RouteLog` pairs so the response-time and fleet reports render immediately
 - One `reassigned` dispatch with its replacement, so the diversion chain is visible
@@ -299,7 +299,7 @@ Follows the same gather → filter → rank → propose → validate → human g
 
 | Tool | Reads |
 | :--- | :--- |
-| `list_eligible_ambulances` | Our deterministic eligibility service: active, serviceable, enough current crew, no live dispatch, recent location |
+| `list_eligible_ambulances` | Our deterministic eligibility service: active, serviceable, enough current crew, no live dispatch, a location reported in the last 30 minutes (`Emergency:LocationMaxAgeMinutes`) |
 | `get_active_dispatches` | Our `Dispatch` table — needed to spot divertible pre-pickup runs |
 | `get_route` | The maps API — real distance and duration to the scene |
 
@@ -478,6 +478,14 @@ the time on.
 4. **The record** — `RouteLog` stores what the API returned, with `maps_api_reference` so an ETA can be traced back to the request that produced it
 
 This is the assignment's one required third-party integration (§11) for the **whole system** — no other component needs one. The GPS/map device feature (§8) is covered by the same work.
+
+**The demo fleet.** A demo has five ambulances and nobody carrying their crew phones, so their
+locations would go stale and the agent would find nothing eligible. `DemoFleetLocationWorker`
+stands in for those phones. Every 3 minutes it reports each ambulance listed under
+`Emergency:DemoFleet` at a spot within about 90 m of its parking place. It leaves an ambulance
+alone when it is on a live run, or when a real phone reported it in the last minute, so a crew
+member who opens My run takes over with real GPS. It is on in `appsettings.json` because the
+hosted demo needs it, and should be turned off for a real deployment.
 
 **Degradation matters:** the navigation target needs no live route request. If backend
 route/ETA calculation fails, Emergency uses straight-line ordering, labels the fallback,

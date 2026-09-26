@@ -8,6 +8,7 @@ using CareLanka.Api.Data.Enums;
 using CareLanka.Api.Services.Emergency;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace CareLanka.Api.Tests;
@@ -245,7 +246,8 @@ public sealed class EmergencyCallEndpointTests
         {
             var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
             var ambulance = await db.Ambulances.SingleAsync(item => item.Id == ready.AmbulanceId);
-            ambulance.LocationUpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-6);
+            var maxAge = scope.ServiceProvider.GetRequiredService<IOptions<EmergencyOptions>>().Value.LocationMaxAgeMinutes;
+            ambulance.LocationUpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-maxAge - 1);
             await db.SaveChangesAsync();
         }
 

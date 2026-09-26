@@ -7,6 +7,7 @@ using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Staff;
 using CareLanka.Api.Services.Common;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace CareLanka.Api.Services.Staff;
 
@@ -14,11 +15,19 @@ public sealed class AllocationService : IAllocationService
 {
     private readonly CareLankaDbContext _db;
     private readonly ICurrentUser _currentUser;
+    private readonly IRosterProposalService? _rosterProposalService;
+    private readonly ILogger<AllocationService>? _logger;
 
-    public AllocationService(CareLankaDbContext db, ICurrentUser currentUser)
+    public AllocationService(
+        CareLankaDbContext db,
+        ICurrentUser currentUser,
+        IRosterProposalService? rosterProposalService = null,
+        ILogger<AllocationService>? logger = null)
     {
         _db = db;
         _currentUser = currentUser;
+        _rosterProposalService = rosterProposalService;
+        _logger = logger;
     }
 
     public async Task<PagedResult<AllocationDto>> ListAllocationsAsync(
@@ -275,11 +284,24 @@ public sealed class AllocationService : IAllocationService
 
         var coverage = ComputeCoverage(allocation.Shift);
 
+        Guid? rosterProposalId = null;
+        if (!request.SuppressAgent && _rosterProposalService != null && coverage.ShortfallToMinimum > 0)
+        {
+            try
+            {
+                rosterProposalId = await _rosterProposalService.TriggerProposalIfUnderstaffedAsync(allocation.ShiftId, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to automatically trigger roster proposal for understaffed shift {ShiftId} after allocation {AllocationId} ended.", allocation.ShiftId, allocation.Id);
+            }
+        }
+
         return new EndAllocationResponse
         {
             Allocation = MapToDto(allocation, staffName),
             ShiftCoverage = coverage,
-            RosterProposalId = null
+            RosterProposalId = rosterProposalId
         };
     }
 

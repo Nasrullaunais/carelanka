@@ -136,6 +136,13 @@ export function StaffManagementPage() {
           >
             Leave requests
           </Link>
+          <Link
+            to="/staff/roster-proposals"
+            className="secondary button"
+            style={{ textDecoration: 'none' }}
+          >
+            Roster proposals
+          </Link>
           <button
             type="button"
             className="secondary"

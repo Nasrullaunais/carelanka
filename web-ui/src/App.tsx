@@ -17,6 +17,7 @@ import { PatientsPage } from './pages/PatientsPage';
 import { PharmacyPage } from './pages/PharmacyPage';
 import { StaffLeaveApprovalPage } from './pages/StaffLeaveApprovalPage';
 import { StaffManagementPage } from './pages/StaffManagementPage';
+import { StaffRosterProposalsPage } from './pages/staff/StaffRosterProposalsPage';
 import { WardCoveragePage } from './pages/WardCoveragePage';
 import { WardsPage } from './pages/WardsPage';
 import { clearSession } from './services/auth/session';
@@ -74,6 +75,7 @@ export function App() {
         <Route path="/staff" element={<StaffManagementPage />} />
         <Route path="/staff/coverage" element={<WardCoveragePage />} />
         <Route path="/staff/leave-approval" element={<StaffLeaveApprovalPage />} />
+        <Route path="/staff/roster-proposals" element={<StaffRosterProposalsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

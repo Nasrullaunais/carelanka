@@ -37,6 +37,7 @@ export function AppShell() {
               </NavLink>
               <NavLink to="/staff/coverage">Coverage</NavLink>
               <NavLink to="/staff/leave-approval">Leave</NavLink>
+              <NavLink to="/staff/roster-proposals">Proposals</NavLink>
             </>
           )}
           {canManageEmergency(session?.principal.role) && <NavLink to="/emergency">Emergency</NavLink>}

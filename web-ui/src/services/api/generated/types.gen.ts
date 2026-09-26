@@ -143,6 +143,8 @@ export type AffectedShiftDto = {
     coverage_if_approved: ShiftCoverageDto;
 };
 
+export type AgentOutcome = 'swap_proposed' | 'free_staff_proposed' | 'no_candidate_found' | 'failed';
+
 export type AllocationDto = {
     id: string;
     shift_id: string;
@@ -293,6 +295,10 @@ export type ApproveCareRecommendationRequest = {
 };
 
 export type ApproveDispatchProposalRequest = {
+    notes?: string | null;
+};
+
+export type ApproveRosterProposalRequest = {
     notes?: string | null;
 };
 
@@ -748,6 +754,12 @@ export type CreatePharmacyTransactionRequest = {
     type: PharmacyTransactionType;
     quantity: number;
     note?: string | null;
+};
+
+export type CreateRosterProposalRequest = {
+    shift_id: string;
+    objective?: string | null;
+    allow_cascading_swap?: boolean;
 };
 
 export type CreateShiftRequest = {
@@ -1684,6 +1696,16 @@ export type PharmacyTransactionPagedResult = {
 
 export type PharmacyTransactionType = 'received' | 'dispensed' | 'adjusted' | 'expired_removed';
 
+export type PlanStepDto = {
+    sequence?: number;
+    step?: number;
+    agent_role?: string | null;
+    description?: string | null;
+    status?: string | null;
+    started_at?: string | null;
+    completed_at?: string | null;
+};
+
 export type PreAdmitRequest = {
     dispatch_id?: string | null;
     patient_is_caller?: boolean;
@@ -1741,6 +1763,8 @@ export type ProblemDetails = {
     [key: string]: unknown;
 };
 
+export type ProposedChangeValidationStatus = 'pending' | 'passed' | 'failed';
+
 export type RaisedBy = 'agent' | 'user' | 'system';
 
 export type ReassignDispatchRequest = {
@@ -1775,6 +1799,13 @@ export type RejectPrescriptionRequest = {
     reason: string | null;
 };
 
+export type RejectRosterProposalRequest = {
+    reason: RejectionReason;
+    notes?: string | null;
+};
+
+export type RejectionReason = 'unsafe_suggestion' | 'source_ward_cannot_spare' | 'staff_unsuitable' | 'gap_filled_another_way' | 'no_longer_needed' | 'other';
+
 export type RelatedEntityType = 'pharmacy_item' | 'equipment_item' | 'bed';
 
 export type ReleaseReason = 'discharged' | 'hold_expired' | 'cancelled' | 'transferred' | 'rejected' | 'corrected';
@@ -1797,6 +1828,13 @@ export type RequestCancellationRequest = {
     reason?: string | null;
 };
 
+export type RequestRosterProposalRevisionRequest = {
+    guidance: string;
+    notes?: string | null;
+    exclude_staff_ids?: Array<string> | null;
+    exclude_ward_ids?: Array<string> | null;
+};
+
 export type RetireAmbulanceRequest = {
     reason: string | null;
 };
@@ -1807,6 +1845,94 @@ export type ReviewCancellationRequest = {
 
 export type RevokeStaffSkillResponse = {
     affected_allocations: Array<AllocationSummaryDto>;
+};
+
+export type RosterProposalDetail = {
+    id?: string;
+    workflow_id?: string;
+    shift_id?: string;
+    ward_name?: string | null;
+    shift_date?: string;
+    objective?: string | null;
+    status?: RosterProposalStatus;
+    outcome?: AgentOutcome;
+    is_cascading_swap?: boolean;
+    change_count?: number;
+    created_at?: string;
+    plan?: Array<PlanStepDto> | null;
+    proposed_changes?: Array<RosterProposedChangeDto> | null;
+    validation?: Array<RosterValidationResult> | null;
+    tool_calls?: Array<ToolCallDto> | null;
+    errors?: Array<RosterProposalErrorDto> | null;
+    attempt_count?: number;
+    started_at?: string | null;
+    completed_at?: string | null;
+    reviewed_by_staff_id?: string | null;
+    reviewed_by_staff_member_id?: string | null;
+    reviewed_at?: string | null;
+    review_notes?: string | null;
+    rejection_reason?: RejectionReason;
+    final_outcome?: string | null;
+};
+
+export type RosterProposalErrorDto = {
+    step?: string | null;
+    message?: string | null;
+    occurred_at?: string;
+};
+
+export type RosterProposalStatus = 'pending' | 'pending_approval' | 'approved' | 'executed' | 'rejected' | 'revision_requested' | 'failed';
+
+export type RosterProposalSummary = {
+    id?: string;
+    workflow_id?: string;
+    shift_id?: string;
+    ward_name?: string | null;
+    shift_date?: string;
+    objective?: string | null;
+    status?: RosterProposalStatus;
+    outcome?: AgentOutcome;
+    is_cascading_swap?: boolean;
+    change_count?: number;
+    created_at?: string;
+};
+
+export type RosterProposalSummaryPagedResult = {
+    items: Array<RosterProposalSummary>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
+export type RosterProposedChangeDto = {
+    id?: string;
+    sequence?: number;
+    change_type?: RosterProposedChangeType;
+    target_allocation_id?: string | null;
+    proposed_staff_member_id?: string | null;
+    staff_member_id?: string | null;
+    proposed_staff_name?: string | null;
+    staff_name?: string | null;
+    proposed_shift_id?: string | null;
+    to_shift_id?: string | null;
+    from_shift_id?: string | null;
+    from_ward_name?: string | null;
+    to_ward_name?: string | null;
+    rationale?: string | null;
+    validation_status?: ProposedChangeValidationStatus;
+    validation_message?: string | null;
+    applied_at?: string | null;
+    applied_entity_id?: string | null;
+};
+
+export type RosterProposedChangeType = 'end_allocation' | 'create_allocation';
+
+export type RosterValidationResult = {
+    check: string;
+    passed: boolean;
+    detail: string;
+    checked_at: string;
 };
 
 export type RouteLog = {
@@ -1995,6 +2121,19 @@ export type StaffSummaryDtoPagedResult = {
     page_size: number;
     total_items: number;
     total_pages: number;
+};
+
+export type ToolCallDto = {
+    tool_name?: string | null;
+    tool?: string | null;
+    arguments?: {
+        [key: string]: unknown;
+    } | null;
+    succeeded?: boolean;
+    duration_ms?: number;
+    error?: string | null;
+    summary?: string | null;
+    called_at?: string;
 };
 
 export type UpdateAmbulanceRequest = {
@@ -9082,6 +9221,242 @@ export type GetStaffAgentPerformanceReportResponses = {
 };
 
 export type GetStaffAgentPerformanceReportResponse = GetStaffAgentPerformanceReportResponses[keyof GetStaffAgentPerformanceReportResponses];
+
+export type ListRosterProposalsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: RosterProposalStatus;
+        wardId?: string;
+        shiftId?: string;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/roster-proposals';
+};
+
+export type ListRosterProposalsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListRosterProposalsError = ListRosterProposalsErrors[keyof ListRosterProposalsErrors];
+
+export type ListRosterProposalsResponses = {
+    /**
+     * OK
+     */
+    200: RosterProposalSummaryPagedResult;
+};
+
+export type ListRosterProposalsResponse = ListRosterProposalsResponses[keyof ListRosterProposalsResponses];
+
+export type CreateRosterProposalData = {
+    body?: CreateRosterProposalRequest;
+    path?: never;
+    query?: never;
+    url: '/roster-proposals';
+};
+
+export type CreateRosterProposalErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CreateRosterProposalError = CreateRosterProposalErrors[keyof CreateRosterProposalErrors];
+
+export type CreateRosterProposalResponses = {
+    /**
+     * Accepted
+     */
+    202: RosterProposalSummary;
+};
+
+export type CreateRosterProposalResponse = CreateRosterProposalResponses[keyof CreateRosterProposalResponses];
+
+export type GetRosterProposalData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/roster-proposals/{id}';
+};
+
+export type GetRosterProposalErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetRosterProposalError = GetRosterProposalErrors[keyof GetRosterProposalErrors];
+
+export type GetRosterProposalResponses = {
+    /**
+     * OK
+     */
+    200: RosterProposalDetail;
+};
+
+export type GetRosterProposalResponse = GetRosterProposalResponses[keyof GetRosterProposalResponses];
+
+export type ApproveRosterProposalData = {
+    body?: ApproveRosterProposalRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/roster-proposals/{id}/approve';
+};
+
+export type ApproveRosterProposalErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ApproveRosterProposalError = ApproveRosterProposalErrors[keyof ApproveRosterProposalErrors];
+
+export type ApproveRosterProposalResponses = {
+    /**
+     * OK
+     */
+    200: RosterProposalDetail;
+};
+
+export type ApproveRosterProposalResponse = ApproveRosterProposalResponses[keyof ApproveRosterProposalResponses];
+
+export type RejectRosterProposalData = {
+    body?: RejectRosterProposalRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/roster-proposals/{id}/reject';
+};
+
+export type RejectRosterProposalErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RejectRosterProposalError = RejectRosterProposalErrors[keyof RejectRosterProposalErrors];
+
+export type RejectRosterProposalResponses = {
+    /**
+     * OK
+     */
+    200: RosterProposalDetail;
+};
+
+export type RejectRosterProposalResponse = RejectRosterProposalResponses[keyof RejectRosterProposalResponses];
+
+export type ReviseRosterProposalData = {
+    body?: RequestRosterProposalRevisionRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/roster-proposals/{id}/request-revision';
+};
+
+export type ReviseRosterProposalErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ReviseRosterProposalError = ReviseRosterProposalErrors[keyof ReviseRosterProposalErrors];
+
+export type ReviseRosterProposalResponses = {
+    /**
+     * Accepted
+     */
+    202: RosterProposalSummary;
+};
+
+export type ReviseRosterProposalResponse = ReviseRosterProposalResponses[keyof ReviseRosterProposalResponses];
 
 export type ListShiftsData = {
     body?: never;

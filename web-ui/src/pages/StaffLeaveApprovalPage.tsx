@@ -119,6 +119,9 @@ export function StaffLeaveApprovalPage() {
           <Link to="/staff/coverage" className="secondary button" style={{ textDecoration: 'none' }}>
             Ward coverage
           </Link>
+          <Link to="/staff/roster-proposals" className="secondary button" style={{ textDecoration: 'none' }}>
+            Roster proposals
+          </Link>
           <button
             type="button"
             className="secondary"

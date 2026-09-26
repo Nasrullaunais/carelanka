@@ -7,6 +7,7 @@ using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Staff;
 using CareLanka.Api.Services.Common;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace CareLanka.Api.Services.Staff;
 
@@ -15,15 +16,21 @@ public class LeaveRequestService : ILeaveRequestService
     private readonly CareLankaDbContext _db;
     private readonly ICurrentUser _currentUser;
     private readonly TimeProvider _clock;
+    private readonly IRosterProposalService? _rosterProposalService;
+    private readonly ILogger<LeaveRequestService>? _logger;
 
     public LeaveRequestService(
         CareLankaDbContext db,
         ICurrentUser currentUser,
-        TimeProvider? clock = null)
+        TimeProvider? clock = null,
+        IRosterProposalService? rosterProposalService = null,
+        ILogger<LeaveRequestService>? logger = null)
     {
         _db = db;
         _currentUser = currentUser;
         _clock = clock ?? TimeProvider.System;
+        _rosterProposalService = rosterProposalService;
+        _logger = logger;
     }
 
     public async Task<LeaveRequestDetailDto> CreateLeaveRequestAsync(
@@ -352,6 +359,7 @@ public class LeaveRequestService : ILeaveRequestService
         leave.UpdatedAt = now;
 
         var releasedSummaries = new List<AllocationSummaryDto>();
+        var affectedShiftIds = new List<Guid>();
 
         if (isReject)
         {
@@ -437,9 +445,31 @@ public class LeaveRequestService : ILeaveRequestService
                     var wardName = wardMap.TryGetValue(allocation.Shift.WardId, out var wName) ? wName : string.Empty;
                     releasedSummaries.Add(ToAllocationSummary(allocation, wardName, staffName));
                 }
+
+                affectedShiftIds = overlappingAllocations.Select(a => a.ShiftId).Distinct().ToList();
             }
 
             await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        var rosterProposalIds = new List<Guid>();
+        if (!isReject && _rosterProposalService != null && affectedShiftIds.Count > 0)
+        {
+            foreach (var shiftId in affectedShiftIds)
+            {
+                try
+                {
+                    var proposalId = await _rosterProposalService.TriggerProposalIfUnderstaffedAsync(shiftId, cancellationToken);
+                    if (proposalId.HasValue)
+                    {
+                        rosterProposalIds.Add(proposalId.Value);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Failed to automatically trigger roster proposal for shift {ShiftId} after leave request {LeaveRequestId} was approved.", shiftId, leave.Id);
+                }
+            }
         }
 
         var requester = await _db.StaffMembers.AsNoTracking()
@@ -449,7 +479,7 @@ public class LeaveRequestService : ILeaveRequestService
         {
             LeaveRequest = MapToDto(leave, requester?.FullName ?? string.Empty, _clock),
             ReleasedAllocations = releasedSummaries,
-            RosterProposalIds = Array.Empty<Guid>()
+            RosterProposalIds = rosterProposalIds
         };
     }
 

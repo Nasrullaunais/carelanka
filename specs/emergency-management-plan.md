@@ -308,10 +308,11 @@ Follows the same gather → filter → rank → propose → validate → human g
 1. Read the call: location, priority, and whether the patient is already known.
 2. Ask deterministic code for eligible ambulances and explicit block reasons.
 3. Rank them by **real driving ETA through the maps API**, not straight-line distance — the nearest vehicle by map is regularly not the nearest by road, and this is the single place the third-party integration earns its keep.
-4. **If something is free** → propose it, `pending_confirmation`. One tap sends it (§5.1).
-5. **If nothing is free** → look at active dispatches for a pre-pickup run on a lower-priority call, work out the cost to that patient, and propose a diversion with a populated `DiversionImpact`, `pending_approval` (§5.2).
-6. **If neither** → stop. Outcome `no_ambulance_available`, workflow `failed`, recorded honestly. No retry loop.
-7. Once the Duty Manager confirms and a `Dispatch` exists, call Patient Management's
+4. **Gemini picks from the ranked shortlist and writes the reason** (`draft_recommendation`, below).
+5. **If something is free** → propose it, `pending_confirmation`. One tap sends it (§5.1).
+6. **If nothing is free** → look at active dispatches for a pre-pickup run on a lower-priority call, work out the cost to that patient, and propose a diversion with a populated `DiversionImpact`, `pending_approval` (§5.2). Which run to divert is a hard rule, so Gemini only writes the explanation for the run the rules chose.
+7. **If neither** → stop. Outcome `no_ambulance_available`, workflow `failed`, recorded honestly. No retry loop.
+8. Once the Duty Manager confirms and a `Dispatch` exists, call Patient Management's
    `POST /admissions/pre-admit` so its ward/bed workflow can start before arrival. This
    integration is not part of the dispatch transaction and failure never stops the run.
 
@@ -328,6 +329,25 @@ Deliberately lossy in one direction — `medium` and `low` both mean "no rush" o
 question is which bed. **The agent never chooses this value**; it is a fixed lookup. The
 same table is written in `emergency-spec.yaml`'s `DispatchNotification`,
 `integration_of_functions.md` §22, and `patient-spec.yaml`'s `PreAdmitRequest`.
+
+**Where Gemini comes in (ADR 2).** The agent sends Gemini the call's priority, the caller's
+own words (marked as data, never instructions), whether the patient is known, and up to 5
+eligible ambulances with road minutes, crew count and location age. Gemini returns
+`{"ambulance_id", "rationale"}`. It may pick an ambulance other than the fastest only when
+it is **at most 3 minutes slower** — for example a fuller crew on a critical call. Plain C#
+then checks the pick before anyone sees it:
+
+| Check | Catches |
+| :--- | :--- |
+| `on_shortlist` | An id Gemini made up, or one that was never eligible |
+| `within_time_margin` | A pick more than 3 minutes slower than the fastest; with no road estimates, anything but the first |
+| `reason_names_choice` | A reason that does not name the chosen registration, or runs past 600 characters |
+
+A failed check replaces Gemini's pick with the fastest ambulance. No key, a spent quota, a
+timeout or an unreadable answer does the same. Either way the proposal records where its
+pick came from in `recommendation_source` — `model`, `model_unavailable` or `model_rejected`
+— with a plain-words `recommendation_note`, and the React queue shows it next to the reason.
+So the Duty Manager can always tell a Gemini pick from the backup rule.
 
 **Deterministic validation — ordinary C#, never the model checking itself.** Run before a proposal reaches a human, and **re-run immediately before applying**, because the road situation moves while a proposal sits on screen:
 
@@ -468,7 +488,7 @@ the Google Maps launch target.
 
 ## 12. Testing
 
-- **Unit:** eligibility and configured crew minimum; ETA ranking; the diversion cost calculation; every legal and illegal `DispatchStatus` move; the safe-failure path when nothing is available
+- **Unit:** eligibility and configured crew minimum; ETA ranking; Gemini's pick against recorded answers (never the live API), each of the three pick checks, and the fallback for no key, a spent quota and an unreadable answer; the diversion cost calculation; every legal and illegal `DispatchStatus` move; the safe-failure path when nothing is available
 - **Integration:** the partial unique index actually rejects a second confirm against the same ambulance under concurrent requests; a diversion approved after the crew reached the scene is refused; approving a diversion re-queues the original call in the same transaction; the pre-admission call fires once per dispatch, not once per retry
 - **Contract:** `openapi-spec-validator` against `emergency-spec.yaml`, plus the cross-spec route/operationId/schema uniqueness check CI runs for all four
 

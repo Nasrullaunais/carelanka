@@ -9,7 +9,9 @@ public sealed record DispatchAgentRequest(
     decimal Latitude,
     decimal Longitude,
     bool AllowDiversion,
-    IReadOnlyList<Guid> ExcludeAmbulanceIds);
+    IReadOnlyList<Guid> ExcludeAmbulanceIds,
+    string? CallDetails = null,
+    bool PatientKnown = false);
 
 public sealed record DispatchAgentRun(
     IReadOnlyList<DispatchPlanStep> Plan,
@@ -23,7 +25,9 @@ public sealed record DispatchAgentRun(
     string? Rationale,
     DiversionImpact? DiversionImpact,
     Guid? SourceDispatchId,
-    IReadOnlyList<string> Errors);
+    IReadOnlyList<string> Errors,
+    DispatchRecommendationSource? RecommendationSource = null,
+    string? RecommendationNote = null);
 
 public interface IDispatchAgent
 {

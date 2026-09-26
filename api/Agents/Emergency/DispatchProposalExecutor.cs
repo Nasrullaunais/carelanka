@@ -44,7 +44,8 @@ public sealed class DispatchProposalExecutor
                 new DispatchAgentRequest(
                     proposal.EmergencyCallId, proposal.CallPriority,
                     proposal.EmergencyCall.Latitude, proposal.EmergencyCall.Longitude,
-                    proposal.AllowDiversion, excludeAmbulanceIds),
+                    proposal.AllowDiversion, excludeAmbulanceIds,
+                    proposal.EmergencyCall.Details, proposal.EmergencyCall.PatientId is not null),
                 ct);
 
             proposal.Outcome = run.Outcome;
@@ -52,6 +53,8 @@ public sealed class DispatchProposalExecutor
             proposal.ProposedAmbulanceId = run.ProposedAmbulanceId;
             proposal.EstimatedMinutesToScene = run.EstimatedMinutesToScene;
             proposal.Rationale = run.Rationale;
+            proposal.RecommendationSource = run.RecommendationSource;
+            proposal.RecommendationNote = run.RecommendationNote;
 
             if (run.DiversionImpact is { } impact)
             {

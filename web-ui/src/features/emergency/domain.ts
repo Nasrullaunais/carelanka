@@ -8,6 +8,7 @@ import type {
   CancelReason,
   DispatchOutcome,
   DispatchProposalStatus,
+  DispatchRecommendationSource,
   DispatchRejectionReason,
   DispatchStatus,
 } from '../../services/api/generated';
@@ -111,6 +112,18 @@ export const proposalOutcomeLabels: Record<DispatchOutcome, string> = {
   diversion_proposed: 'Diversion proposed',
   no_ambulance_available: 'No ambulance available',
   failed: 'Failed',
+};
+
+export const recommendationSourceLabels: Record<DispatchRecommendationSource, string> = {
+  model: 'Chosen by Gemini',
+  model_unavailable: 'Fastest-first rule (Gemini unavailable)',
+  model_rejected: 'Fastest-first rule (Gemini pick rejected)',
+};
+
+export const recommendationSourceTones: Record<DispatchRecommendationSource, StatusTone> = {
+  model: 'accent',
+  model_unavailable: 'warning',
+  model_rejected: 'warning',
 };
 
 export const rejectionReasonLabels: Record<DispatchRejectionReason, string> = {

@@ -796,6 +796,8 @@ export type DispatchProposalDetail = {
     proposed_ambulance_current_crew_count?: number | null;
     proposed_ambulance_required_crew_count?: number | null;
     rationale?: string | null;
+    recommendation_source?: DispatchRecommendationSource;
+    recommendation_note?: string | null;
     diversion_impact?: DiversionImpact;
     plan?: Array<DispatchPlanStep> | null;
     validation?: Array<DispatchValidationResult> | null;
@@ -839,6 +841,8 @@ export type DispatchProposalSummaryPagedResult = {
     total_items: number;
     total_pages: number;
 };
+
+export type DispatchRecommendationSource = 'model' | 'model_unavailable' | 'model_rejected';
 
 export type DispatchRejectionReason = 'unsafe_diversion' | 'source_call_too_urgent_to_divert' | 'ambulance_unsuitable' | 'handled_another_way' | 'no_longer_needed' | 'other';
 

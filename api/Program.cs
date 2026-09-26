@@ -441,6 +441,7 @@ builder.Services.AddHostedService<PreAdmissionWorker>();
 // exists once a Duty Manager confirms or approves through the proposal API. Its own queue and
 // worker, separate from the bed and care agents' for the same single-reader-channel reason.
 builder.Services.AddScoped<IDispatchAgentTools, DispatchAgentTools>();
+builder.Services.AddScoped<IDispatchAdvisor, GeminiDispatchAdvisor>();
 builder.Services.AddScoped<IDispatchAgent, DispatchAgent>();
 builder.Services.AddScoped<IDispatchProposalService, DispatchProposalService>();
 builder.Services.AddScoped<DispatchProposalExecutor>();

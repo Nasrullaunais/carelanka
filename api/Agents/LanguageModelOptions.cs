@@ -41,8 +41,12 @@ public sealed class LanguageModelOptions
     /// Support for <see cref="ThinkingBudget"/> varies by model - <c>gemini-3.5-flash-lite</c>
     /// rejects it outright with a 400 - so re-check both together when changing this.
     /// </para>
+    /// <para>
+    /// Switched to <c>gemini-3.5-flash-lite</c> on 2026-09-26, with <see cref="ThinkingBudget"/>
+    /// left null for the reason above. Not yet re-measured against the live API.
+    /// </para>
     /// </summary>
-    public string Model { get; set; } = "gemini-3.5-flash";
+    public string Model { get; set; } = "gemini-3.5-flash-lite";
 
     public string BaseUrl { get; set; } = "https://generativelanguage.googleapis.com/v1beta";
 

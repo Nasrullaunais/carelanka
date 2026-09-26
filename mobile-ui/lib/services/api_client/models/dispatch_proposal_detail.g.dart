@@ -36,6 +36,12 @@ DispatchProposalDetail _$DispatchProposalDetailFromJson(
   proposedAmbulanceRequiredCrewCount:
       (json['proposed_ambulance_required_crew_count'] as num?)?.toInt(),
   rationale: json['rationale'] as String?,
+  recommendationSource: json['recommendation_source'] == null
+      ? null
+      : DispatchRecommendationSource.fromJson(
+          json['recommendation_source'] as String,
+        ),
+  recommendationNote: json['recommendation_note'] as String?,
   diversionImpact: json['diversion_impact'] == null
       ? null
       : DiversionImpact.fromJson(
@@ -91,6 +97,8 @@ Map<String, dynamic> _$DispatchProposalDetailToJson(
   'proposed_ambulance_required_crew_count':
       instance.proposedAmbulanceRequiredCrewCount,
   'rationale': instance.rationale,
+  'recommendation_source': instance.recommendationSource,
+  'recommendation_note': instance.recommendationNote,
   'diversion_impact': instance.diversionImpact,
   'plan': instance.plan,
   'validation': instance.validation,

@@ -34,3 +34,6 @@ graft/
 
 # Firebase phone-app config, kept out of git
 mobile-ui/android/app/google-services.json
+
+# Office lock files, created while a document is open
+~$*

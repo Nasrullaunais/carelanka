@@ -147,6 +147,12 @@ final class FakeLocationGateway implements CrewLocationGateway {
 
   @override
   Future<CrewPosition> currentPosition() async => position;
+
+  @override
+  Future<bool> openAppSettings() async => true;
+
+  @override
+  Future<bool> openLocationSettings() async => true;
 }
 
 final class PendingLocationGateway implements CrewLocationGateway {
@@ -162,4 +168,10 @@ final class PendingLocationGateway implements CrewLocationGateway {
     requested.complete();
     return position.future;
   }
+
+  @override
+  Future<bool> openAppSettings() async => true;
+
+  @override
+  Future<bool> openLocationSettings() async => true;
 }

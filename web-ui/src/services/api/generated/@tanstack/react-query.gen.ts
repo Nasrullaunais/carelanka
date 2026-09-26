@@ -3,8 +3,8 @@
 import { type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { acknowledgeMyDispatch, acknowledgeWarning, addAppointmentBillCharge, addBillCharge, addPharmacyBatch, approveCareRecommendation, approveDispatchProposal, approveEmergencyCancellationRequest, assignBedManually, assignCurrentAmbulanceCrew, assignEquipmentItem, bookMyAppointment, cancelAdmission, cancelAppointmentAtTheDesk, cancelDispatch, cancelMyAppointment, cancelMyEmergencyCall, checkInAppointment, claimMyRecord, classifyAdmission, clearWarning, completeAdmissionDetails, completeAppointment, completeVisit, confirmAppointment, confirmDischarge, confirmDispatchProposal, confirmEquipmentItem, confirmMaintenanceSchedule, correctBed, countEquipmentItemsAwaitingConfirmation, countMaintenanceSchedulesAwaitingConfirmation, createAdmission, createAmbulance, createAppointment, createBed, createDispatchProposal, createEmergencyCall, createEquipmentCategory, createEquipmentItem, createMaintenanceSchedule, createPatient, createPharmacyCategory, createPharmacyItem, createWard, declineMyDispatch, dispatchEmergencyCall, downloadLabReport, downloadMyLabReport, downloadPrescription, getAdmission, getAdmissionBill, getAmbulance, getAppointmentBill, getBedOccupancy, getBillingRates, getCareRecommendation, getCareWorkflow, getCurrentAmbulanceCrew, getCurrentUser, getDispatchProposal, getDispatchRoute, getEmergencyCall, getEquipmentItem, getEquipmentItemByTag, getHealth, getMyActiveDispatch, getMyAdmission, getMyAppointmentBill, getMyBill, getMyCareRecommendations, getMyDispatchHistory, getMyDispatchNavigationTarget, getMyEmergencyCalls, getMyHistory, getMyLabReports, getMyProfile, getPatient, getPatientMedicalProfile, getPharmacyItem, getWardCapacity, getWardOccupancy, linkPatientAccount, listAdmissions, listAmbulances, listAppointments, listBedAvailability, listBeds, listCareRecommendations, listDischargeCandidates, listDispatchProposals, listEmergencyCalls, listEmergencyCancellationRequests, listEquipmentCategories, listEquipmentCategoriesForRemoval, listEquipmentItems, listEquipmentItemsAwaitingConfirmation, listLabReports, listMaintenanceSchedules, listMaintenanceSchedulesAwaitingConfirmation, listMyAppointments, listMyPrescriptions, listOutstandingBills, listPatients, listPatientWorklist, listPharmacyBatches, listPharmacyCategories, listPharmacyItems, listPharmacyTransactions, listPrescriptions, listWardPatients, listWards, listWarnings, login, loginPatient, logout, lookupPatient, markAppointmentNoShow, markArrived, markPrescriptionDelivered, markPrescriptionReady, type Options, preAdmitFromDispatch, prepareAdmissionBill, prepareAppointmentBill, preRegisterSelf, previewMyClaim, reassignDispatch, recordHandover, recordPharmacyBatchTransaction, recordPharmacyTransaction, redraftCareRecommendation, refreshToken, registerDevice, registerPatientAccount, reinstateAmbulance, rejectCareRecommendation, rejectDispatchProposal, rejectEmergencyCancellationRequest, rejectEquipmentItem, rejectPrescription, releaseEquipmentItem, removeAppointmentBillCharge, removeBillCharge, removeEquipmentCategory, removeEquipmentItem, removePharmacyItem, replacePatientMedicalProfile, reportAmbulanceLocation, reportEquipmentFault, requestMyEmergencyCallCancellation, retireAmbulance, retireBed, retireEquipmentItem, runWarningSweep, settleAppointmentBill, settleBill, submitCareQuery, trackMyEmergencyCall, unassignCurrentAmbulanceCrew, unregisterDevice, updateAmbulance, updateBed, updateBillingRates, updateDischargeChecklist, updateEmergencyCall, updateEquipmentItem, updateMyDispatchStatus, updatePatient, uploadLabReport, uploadMyPrescription } from '../sdk.gen';
-import type { AcknowledgeMyDispatchData, AcknowledgeMyDispatchError, AcknowledgeMyDispatchResponse, AcknowledgeWarningData, AcknowledgeWarningError, AcknowledgeWarningResponse, AddAppointmentBillChargeData, AddAppointmentBillChargeError, AddAppointmentBillChargeResponse, AddBillChargeData, AddBillChargeError, AddBillChargeResponse, AddPharmacyBatchData, AddPharmacyBatchError, AddPharmacyBatchResponse, ApproveCareRecommendationData, ApproveCareRecommendationError, ApproveCareRecommendationResponse, ApproveDispatchProposalData, ApproveDispatchProposalError, ApproveDispatchProposalResponse, ApproveEmergencyCancellationRequestData, ApproveEmergencyCancellationRequestError, ApproveEmergencyCancellationRequestResponse, AssignBedManuallyData, AssignBedManuallyError, AssignBedManuallyResponse, AssignCurrentAmbulanceCrewData, AssignCurrentAmbulanceCrewError, AssignCurrentAmbulanceCrewResponse, AssignEquipmentItemData, AssignEquipmentItemError, AssignEquipmentItemResponse, BookMyAppointmentData, BookMyAppointmentError, BookMyAppointmentResponse, CancelAdmissionData, CancelAdmissionError, CancelAdmissionResponse, CancelAppointmentAtTheDeskData, CancelAppointmentAtTheDeskError, CancelAppointmentAtTheDeskResponse, CancelDispatchData, CancelDispatchError, CancelDispatchResponse, CancelMyAppointmentData, CancelMyAppointmentError, CancelMyAppointmentResponse, CancelMyEmergencyCallData, CancelMyEmergencyCallError, CancelMyEmergencyCallResponse, CheckInAppointmentData, CheckInAppointmentError, CheckInAppointmentResponse, ClaimMyRecordData, ClaimMyRecordError, ClaimMyRecordResponse, ClassifyAdmissionData, ClassifyAdmissionError, ClassifyAdmissionResponse, ClearWarningData, ClearWarningError, ClearWarningResponse, CompleteAdmissionDetailsData, CompleteAdmissionDetailsError, CompleteAdmissionDetailsResponse, CompleteAppointmentData, CompleteAppointmentError, CompleteAppointmentResponse, CompleteVisitData, CompleteVisitError, CompleteVisitResponse, ConfirmAppointmentData, ConfirmAppointmentError, ConfirmAppointmentResponse, ConfirmDischargeData, ConfirmDischargeError, ConfirmDischargeResponse, ConfirmDispatchProposalData, ConfirmDispatchProposalError, ConfirmDispatchProposalResponse, ConfirmEquipmentItemData, ConfirmEquipmentItemError, ConfirmEquipmentItemResponse, ConfirmMaintenanceScheduleData, ConfirmMaintenanceScheduleError, ConfirmMaintenanceScheduleResponse, CorrectBedData, CorrectBedError, CorrectBedResponse, CountEquipmentItemsAwaitingConfirmationData, CountEquipmentItemsAwaitingConfirmationError, CountEquipmentItemsAwaitingConfirmationResponse, CountMaintenanceSchedulesAwaitingConfirmationData, CountMaintenanceSchedulesAwaitingConfirmationError, CountMaintenanceSchedulesAwaitingConfirmationResponse, CreateAdmissionData, CreateAdmissionError, CreateAdmissionResponse, CreateAmbulanceData, CreateAmbulanceError, CreateAmbulanceResponse, CreateAppointmentData, CreateAppointmentError, CreateAppointmentResponse, CreateBedData, CreateBedError, CreateBedResponse, CreateDispatchProposalData, CreateDispatchProposalError, CreateDispatchProposalResponse, CreateEmergencyCallData, CreateEmergencyCallError, CreateEmergencyCallResponse, CreateEquipmentCategoryData, CreateEquipmentCategoryError, CreateEquipmentCategoryResponse, CreateEquipmentItemData, CreateEquipmentItemError, CreateEquipmentItemResponse, CreateMaintenanceScheduleData, CreateMaintenanceScheduleError, CreateMaintenanceScheduleResponse, CreatePatientData, CreatePatientError, CreatePatientResponse, CreatePharmacyCategoryData, CreatePharmacyCategoryError, CreatePharmacyCategoryResponse, CreatePharmacyItemData, CreatePharmacyItemError, CreatePharmacyItemResponse, CreateWardData, CreateWardError, CreateWardResponse, DeclineMyDispatchData, DeclineMyDispatchError, DeclineMyDispatchResponse, DispatchEmergencyCallData, DispatchEmergencyCallError, DispatchEmergencyCallResponse, DownloadLabReportData, DownloadLabReportError, DownloadLabReportResponse, DownloadMyLabReportData, DownloadMyLabReportError, DownloadMyLabReportResponse, DownloadPrescriptionData, DownloadPrescriptionError, DownloadPrescriptionResponse, GetAdmissionBillData, GetAdmissionBillError, GetAdmissionBillResponse, GetAdmissionData, GetAdmissionError, GetAdmissionResponse, GetAmbulanceData, GetAmbulanceError, GetAmbulanceResponse, GetAppointmentBillData, GetAppointmentBillError, GetAppointmentBillResponse, GetBedOccupancyData, GetBedOccupancyError, GetBedOccupancyResponse, GetBillingRatesData, GetBillingRatesError, GetBillingRatesResponse, GetCareRecommendationData, GetCareRecommendationError, GetCareRecommendationResponse, GetCareWorkflowData, GetCareWorkflowError, GetCareWorkflowResponse, GetCurrentAmbulanceCrewData, GetCurrentAmbulanceCrewError, GetCurrentAmbulanceCrewResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetDispatchProposalData, GetDispatchProposalError, GetDispatchProposalResponse, GetDispatchRouteData, GetDispatchRouteError, GetDispatchRouteResponse, GetEmergencyCallData, GetEmergencyCallError, GetEmergencyCallResponse, GetEquipmentItemByTagData, GetEquipmentItemByTagError, GetEquipmentItemByTagResponse, GetEquipmentItemData, GetEquipmentItemError, GetEquipmentItemResponse, GetHealthData, GetHealthError, GetHealthResponse, GetMyActiveDispatchData, GetMyActiveDispatchError, GetMyActiveDispatchResponse, GetMyAdmissionData, GetMyAdmissionError, GetMyAdmissionResponse, GetMyAppointmentBillData, GetMyAppointmentBillError, GetMyAppointmentBillResponse, GetMyBillData, GetMyBillError, GetMyBillResponse, GetMyCareRecommendationsData, GetMyCareRecommendationsError, GetMyCareRecommendationsResponse, GetMyDispatchHistoryData, GetMyDispatchHistoryError, GetMyDispatchHistoryResponse, GetMyDispatchNavigationTargetData, GetMyDispatchNavigationTargetError, GetMyDispatchNavigationTargetResponse, GetMyEmergencyCallsData, GetMyEmergencyCallsError, GetMyEmergencyCallsResponse, GetMyHistoryData, GetMyHistoryError, GetMyHistoryResponse, GetMyLabReportsData, GetMyLabReportsError, GetMyLabReportsResponse, GetMyProfileData, GetMyProfileError, GetMyProfileResponse, GetPatientData, GetPatientError, GetPatientMedicalProfileData, GetPatientMedicalProfileError, GetPatientMedicalProfileResponse, GetPatientResponse, GetPharmacyItemData, GetPharmacyItemError, GetPharmacyItemResponse, GetWardCapacityData, GetWardCapacityError, GetWardCapacityResponse, GetWardOccupancyData, GetWardOccupancyError, GetWardOccupancyResponse, LinkPatientAccountData, LinkPatientAccountError, LinkPatientAccountResponse, ListAdmissionsData, ListAdmissionsError, ListAdmissionsResponse, ListAmbulancesData, ListAmbulancesError, ListAmbulancesResponse, ListAppointmentsData, ListAppointmentsError, ListAppointmentsResponse, ListBedAvailabilityData, ListBedAvailabilityError, ListBedAvailabilityResponse, ListBedsData, ListBedsError, ListBedsResponse, ListCareRecommendationsData, ListCareRecommendationsError, ListCareRecommendationsResponse, ListDischargeCandidatesData, ListDischargeCandidatesError, ListDischargeCandidatesResponse, ListDispatchProposalsData, ListDispatchProposalsError, ListDispatchProposalsResponse, ListEmergencyCallsData, ListEmergencyCallsError, ListEmergencyCallsResponse, ListEmergencyCancellationRequestsData, ListEmergencyCancellationRequestsError, ListEmergencyCancellationRequestsResponse, ListEquipmentCategoriesData, ListEquipmentCategoriesError, ListEquipmentCategoriesForRemovalData, ListEquipmentCategoriesForRemovalError, ListEquipmentCategoriesForRemovalResponse, ListEquipmentCategoriesResponse, ListEquipmentItemsAwaitingConfirmationData, ListEquipmentItemsAwaitingConfirmationError, ListEquipmentItemsAwaitingConfirmationResponse, ListEquipmentItemsData, ListEquipmentItemsError, ListEquipmentItemsResponse, ListLabReportsData, ListLabReportsError, ListLabReportsResponse, ListMaintenanceSchedulesAwaitingConfirmationData, ListMaintenanceSchedulesAwaitingConfirmationError, ListMaintenanceSchedulesAwaitingConfirmationResponse, ListMaintenanceSchedulesData, ListMaintenanceSchedulesError, ListMaintenanceSchedulesResponse, ListMyAppointmentsData, ListMyAppointmentsError, ListMyAppointmentsResponse, ListMyPrescriptionsData, ListMyPrescriptionsError, ListMyPrescriptionsResponse, ListOutstandingBillsData, ListOutstandingBillsError, ListOutstandingBillsResponse, ListPatientsData, ListPatientsError, ListPatientsResponse, ListPatientWorklistData, ListPatientWorklistError, ListPatientWorklistResponse, ListPharmacyBatchesData, ListPharmacyBatchesError, ListPharmacyBatchesResponse, ListPharmacyCategoriesData, ListPharmacyCategoriesError, ListPharmacyCategoriesResponse, ListPharmacyItemsData, ListPharmacyItemsError, ListPharmacyItemsResponse, ListPharmacyTransactionsData, ListPharmacyTransactionsError, ListPharmacyTransactionsResponse, ListPrescriptionsData, ListPrescriptionsError, ListPrescriptionsResponse, ListWardPatientsData, ListWardPatientsError, ListWardPatientsResponse, ListWardsData, ListWardsError, ListWardsResponse, ListWarningsData, ListWarningsError, ListWarningsResponse, LoginData, LoginError, LoginPatientData, LoginPatientError, LoginPatientResponse, LoginResponse, LogoutData, LogoutError, LogoutResponse, LookupPatientData, LookupPatientError, LookupPatientResponse, MarkAppointmentNoShowData, MarkAppointmentNoShowError, MarkAppointmentNoShowResponse, MarkArrivedData, MarkArrivedError, MarkArrivedResponse, MarkPrescriptionDeliveredData, MarkPrescriptionDeliveredError, MarkPrescriptionDeliveredResponse, MarkPrescriptionReadyData, MarkPrescriptionReadyError, MarkPrescriptionReadyResponse, PreAdmitFromDispatchData, PreAdmitFromDispatchError, PreAdmitFromDispatchResponse, PrepareAdmissionBillData, PrepareAdmissionBillError, PrepareAdmissionBillResponse, PrepareAppointmentBillData, PrepareAppointmentBillError, PrepareAppointmentBillResponse, PreRegisterSelfData, PreRegisterSelfError, PreRegisterSelfResponse, PreviewMyClaimData, PreviewMyClaimError, PreviewMyClaimResponse, ReassignDispatchData, ReassignDispatchError, ReassignDispatchResponse, RecordHandoverData, RecordHandoverError, RecordHandoverResponse, RecordPharmacyBatchTransactionData, RecordPharmacyBatchTransactionError, RecordPharmacyBatchTransactionResponse, RecordPharmacyTransactionData, RecordPharmacyTransactionError, RecordPharmacyTransactionResponse, RedraftCareRecommendationData, RedraftCareRecommendationError, RedraftCareRecommendationResponse, RefreshTokenData, RefreshTokenError, RefreshTokenResponse, RegisterDeviceData, RegisterDeviceError, RegisterDeviceResponse, RegisterPatientAccountData, RegisterPatientAccountError, RegisterPatientAccountResponse, ReinstateAmbulanceData, ReinstateAmbulanceError, ReinstateAmbulanceResponse, RejectCareRecommendationData, RejectCareRecommendationError, RejectCareRecommendationResponse, RejectDispatchProposalData, RejectDispatchProposalError, RejectDispatchProposalResponse, RejectEmergencyCancellationRequestData, RejectEmergencyCancellationRequestError, RejectEmergencyCancellationRequestResponse, RejectEquipmentItemData, RejectEquipmentItemError, RejectEquipmentItemResponse, RejectPrescriptionData, RejectPrescriptionError, RejectPrescriptionResponse, ReleaseEquipmentItemData, ReleaseEquipmentItemError, ReleaseEquipmentItemResponse, RemoveAppointmentBillChargeData, RemoveAppointmentBillChargeError, RemoveAppointmentBillChargeResponse, RemoveBillChargeData, RemoveBillChargeError, RemoveBillChargeResponse, RemoveEquipmentCategoryData, RemoveEquipmentCategoryError, RemoveEquipmentCategoryResponse, RemoveEquipmentItemData, RemoveEquipmentItemError, RemoveEquipmentItemResponse, RemovePharmacyItemData, RemovePharmacyItemError, RemovePharmacyItemResponse, ReplacePatientMedicalProfileData, ReplacePatientMedicalProfileError, ReplacePatientMedicalProfileResponse, ReportAmbulanceLocationData, ReportAmbulanceLocationError, ReportAmbulanceLocationResponse, ReportEquipmentFaultData, ReportEquipmentFaultError, ReportEquipmentFaultResponse, RequestMyEmergencyCallCancellationData, RequestMyEmergencyCallCancellationError, RequestMyEmergencyCallCancellationResponse, RetireAmbulanceData, RetireAmbulanceError, RetireAmbulanceResponse, RetireBedData, RetireBedError, RetireBedResponse, RetireEquipmentItemData, RetireEquipmentItemError, RetireEquipmentItemResponse, RunWarningSweepData, RunWarningSweepError, RunWarningSweepResponse, SettleAppointmentBillData, SettleAppointmentBillError, SettleAppointmentBillResponse, SettleBillData, SettleBillError, SettleBillResponse, SubmitCareQueryData, SubmitCareQueryError, SubmitCareQueryResponse, TrackMyEmergencyCallData, TrackMyEmergencyCallError, TrackMyEmergencyCallResponse, UnassignCurrentAmbulanceCrewData, UnassignCurrentAmbulanceCrewError, UnassignCurrentAmbulanceCrewResponse, UnregisterDeviceData, UnregisterDeviceError, UnregisterDeviceResponse, UpdateAmbulanceData, UpdateAmbulanceError, UpdateAmbulanceResponse, UpdateBedData, UpdateBedError, UpdateBedResponse, UpdateBillingRatesData, UpdateBillingRatesError, UpdateBillingRatesResponse, UpdateDischargeChecklistData, UpdateDischargeChecklistError, UpdateDischargeChecklistResponse, UpdateEmergencyCallData, UpdateEmergencyCallError, UpdateEmergencyCallResponse, UpdateEquipmentItemData, UpdateEquipmentItemError, UpdateEquipmentItemResponse, UpdateMyDispatchStatusData, UpdateMyDispatchStatusError, UpdateMyDispatchStatusResponse, UpdatePatientData, UpdatePatientError, UpdatePatientResponse, UploadLabReportData, UploadLabReportError, UploadLabReportResponse, UploadMyPrescriptionData, UploadMyPrescriptionError, UploadMyPrescriptionResponse } from '../types.gen';
+import { acknowledgeMyDispatch, acknowledgeWarning, addAppointmentBillCharge, addBillCharge, addPharmacyBatch, approveCareRecommendation, approveDispatchProposal, approveEmergencyCancellationRequest, assignBedManually, assignCurrentAmbulanceCrew, assignEquipmentItem, bookMyAppointment, cancelAdmission, cancelAppointmentAtTheDesk, cancelDispatch, cancelMyAppointment, cancelMyEmergencyCall, cancelShift, checkInAppointment, claimMyRecord, classifyAdmission, clearWarning, clockIn, clockOut, completeAdmissionDetails, completeAppointment, completeVisit, confirmAppointment, confirmDischarge, confirmDispatchProposal, confirmEquipmentItem, confirmMaintenanceSchedule, correctBed, countEquipmentItemsAwaitingConfirmation, countMaintenanceSchedulesAwaitingConfirmation, createAdmission, createAllocation, createAmbulance, createAppointment, createBed, createDispatchProposal, createEmergencyCall, createEquipmentCategory, createEquipmentItem, createMaintenanceSchedule, createMyLeaveRequest, createPatient, createPharmacyCategory, createPharmacyItem, createShift, createShiftsBulk, createSkill, createStaffMember, createWard, deactivateStaffMember, decideLeaveRequest, declineMyDispatch, dispatchEmergencyCall, downloadLabReport, downloadMyLabReport, downloadPrescription, endAllocation, getAdmission, getAdmissionBill, getAmbulance, getAppointmentBill, getBedOccupancy, getBillingRates, getCareRecommendation, getCareWorkflow, getCoverageReport, getCurrentAmbulanceCrew, getCurrentUser, getDispatchProposal, getDispatchRoute, getEmergencyCall, getEquipmentItem, getEquipmentItemByTag, getHealth, getLeaveReport, getLeaveRequest, getMyActiveDispatch, getMyAdmission, getMyAppointmentBill, getMyBill, getMyCareRecommendations, getMyDispatchHistory, getMyDispatchNavigationTarget, getMyEmergencyCalls, getMyHistory, getMyLabReports, getMyLeaveRequests, getMyProfile, getMyShifts, getPatient, getPatientMedicalProfile, getPharmacyItem, getShift, getStaffAgentPerformanceReport, getStaffMember, getWardCapacity, getWardCoverage, getWardOccupancy, getWardStaffingRules, grantStaffSkill, linkPatientAccount, listAdmissions, listAllocations, listAmbulances, listAppointments, listBedAvailability, listBeds, listCareRecommendations, listDischargeCandidates, listDispatchProposals, listEmergencyCalls, listEmergencyCancellationRequests, listEquipmentCategories, listEquipmentCategoriesForRemoval, listEquipmentItems, listEquipmentItemsAwaitingConfirmation, listLabReports, listLeaveRequests, listMaintenanceSchedules, listMaintenanceSchedulesAwaitingConfirmation, listMyAppointments, listMyPrescriptions, listOutstandingBills, listPatients, listPatientWorklist, listPharmacyBatches, listPharmacyCategories, listPharmacyItems, listPharmacyTransactions, listPrescriptions, listShifts, listSkills, listStaff, listStaffSkills, listWardPatients, listWards, listWarnings, login, loginPatient, logout, lookupPatient, lookupStaff, markAppointmentNoShow, markArrived, markPrescriptionDelivered, markPrescriptionReady, type Options, preAdmitFromDispatch, prepareAdmissionBill, prepareAppointmentBill, preRegisterSelf, previewMyClaim, reactivateStaffMember, reassignDispatch, recordHandover, recordPharmacyBatchTransaction, recordPharmacyTransaction, redraftCareRecommendation, refreshToken, registerDevice, registerPatientAccount, reinstateAmbulance, rejectCareRecommendation, rejectDispatchProposal, rejectEmergencyCancellationRequest, rejectEquipmentItem, rejectPrescription, releaseEquipmentItem, removeAppointmentBillCharge, removeBillCharge, removeEquipmentCategory, removeEquipmentItem, removePharmacyItem, replacePatientMedicalProfile, reportAmbulanceLocation, reportEquipmentFault, requestMyEmergencyCallCancellation, retireAmbulance, retireBed, retireEquipmentItem, retireSkill, revokeStaffSkill, runWarningSweep, settleAppointmentBill, settleBill, setWardStaffingRules, submitCareQuery, trackMyEmergencyCall, unassignCurrentAmbulanceCrew, unregisterDevice, updateAmbulance, updateBed, updateBillingRates, updateDischargeChecklist, updateEmergencyCall, updateEquipmentItem, updateMyDispatchStatus, updatePatient, updateShift, updateSkill, updateStaffMember, uploadLabReport, uploadMyPrescription, withdrawMyLeaveRequest } from '../sdk.gen';
+import type { AcknowledgeMyDispatchData, AcknowledgeMyDispatchError, AcknowledgeMyDispatchResponse, AcknowledgeWarningData, AcknowledgeWarningError, AcknowledgeWarningResponse, AddAppointmentBillChargeData, AddAppointmentBillChargeError, AddAppointmentBillChargeResponse, AddBillChargeData, AddBillChargeError, AddBillChargeResponse, AddPharmacyBatchData, AddPharmacyBatchError, AddPharmacyBatchResponse, ApproveCareRecommendationData, ApproveCareRecommendationError, ApproveCareRecommendationResponse, ApproveDispatchProposalData, ApproveDispatchProposalError, ApproveDispatchProposalResponse, ApproveEmergencyCancellationRequestData, ApproveEmergencyCancellationRequestError, ApproveEmergencyCancellationRequestResponse, AssignBedManuallyData, AssignBedManuallyError, AssignBedManuallyResponse, AssignCurrentAmbulanceCrewData, AssignCurrentAmbulanceCrewError, AssignCurrentAmbulanceCrewResponse, AssignEquipmentItemData, AssignEquipmentItemError, AssignEquipmentItemResponse, BookMyAppointmentData, BookMyAppointmentError, BookMyAppointmentResponse, CancelAdmissionData, CancelAdmissionError, CancelAdmissionResponse, CancelAppointmentAtTheDeskData, CancelAppointmentAtTheDeskError, CancelAppointmentAtTheDeskResponse, CancelDispatchData, CancelDispatchError, CancelDispatchResponse, CancelMyAppointmentData, CancelMyAppointmentError, CancelMyAppointmentResponse, CancelMyEmergencyCallData, CancelMyEmergencyCallError, CancelMyEmergencyCallResponse, CancelShiftData, CancelShiftError, CancelShiftResponse, CheckInAppointmentData, CheckInAppointmentError, CheckInAppointmentResponse, ClaimMyRecordData, ClaimMyRecordError, ClaimMyRecordResponse, ClassifyAdmissionData, ClassifyAdmissionError, ClassifyAdmissionResponse, ClearWarningData, ClearWarningError, ClearWarningResponse, ClockInData, ClockInError, ClockInResponse, ClockOutData, ClockOutError, ClockOutResponse, CompleteAdmissionDetailsData, CompleteAdmissionDetailsError, CompleteAdmissionDetailsResponse, CompleteAppointmentData, CompleteAppointmentError, CompleteAppointmentResponse, CompleteVisitData, CompleteVisitError, CompleteVisitResponse, ConfirmAppointmentData, ConfirmAppointmentError, ConfirmAppointmentResponse, ConfirmDischargeData, ConfirmDischargeError, ConfirmDischargeResponse, ConfirmDispatchProposalData, ConfirmDispatchProposalError, ConfirmDispatchProposalResponse, ConfirmEquipmentItemData, ConfirmEquipmentItemError, ConfirmEquipmentItemResponse, ConfirmMaintenanceScheduleData, ConfirmMaintenanceScheduleError, ConfirmMaintenanceScheduleResponse, CorrectBedData, CorrectBedError, CorrectBedResponse, CountEquipmentItemsAwaitingConfirmationData, CountEquipmentItemsAwaitingConfirmationError, CountEquipmentItemsAwaitingConfirmationResponse, CountMaintenanceSchedulesAwaitingConfirmationData, CountMaintenanceSchedulesAwaitingConfirmationError, CountMaintenanceSchedulesAwaitingConfirmationResponse, CreateAdmissionData, CreateAdmissionError, CreateAdmissionResponse, CreateAllocationData, CreateAllocationError, CreateAllocationResponse, CreateAmbulanceData, CreateAmbulanceError, CreateAmbulanceResponse, CreateAppointmentData, CreateAppointmentError, CreateAppointmentResponse, CreateBedData, CreateBedError, CreateBedResponse, CreateDispatchProposalData, CreateDispatchProposalError, CreateDispatchProposalResponse, CreateEmergencyCallData, CreateEmergencyCallError, CreateEmergencyCallResponse, CreateEquipmentCategoryData, CreateEquipmentCategoryError, CreateEquipmentCategoryResponse, CreateEquipmentItemData, CreateEquipmentItemError, CreateEquipmentItemResponse, CreateMaintenanceScheduleData, CreateMaintenanceScheduleError, CreateMaintenanceScheduleResponse, CreateMyLeaveRequestData, CreateMyLeaveRequestError, CreateMyLeaveRequestResponse, CreatePatientData, CreatePatientError, CreatePatientResponse, CreatePharmacyCategoryData, CreatePharmacyCategoryError, CreatePharmacyCategoryResponse, CreatePharmacyItemData, CreatePharmacyItemError, CreatePharmacyItemResponse, CreateShiftData, CreateShiftError, CreateShiftResponse, CreateShiftsBulkData, CreateShiftsBulkError, CreateShiftsBulkResponse, CreateSkillData, CreateSkillError, CreateSkillResponse, CreateStaffMemberData, CreateStaffMemberError, CreateStaffMemberResponse, CreateWardData, CreateWardError, CreateWardResponse, DeactivateStaffMemberData, DeactivateStaffMemberError, DeactivateStaffMemberResponse, DecideLeaveRequestData, DecideLeaveRequestError, DecideLeaveRequestResponse, DeclineMyDispatchData, DeclineMyDispatchError, DeclineMyDispatchResponse, DispatchEmergencyCallData, DispatchEmergencyCallError, DispatchEmergencyCallResponse, DownloadLabReportData, DownloadLabReportError, DownloadLabReportResponse, DownloadMyLabReportData, DownloadMyLabReportError, DownloadMyLabReportResponse, DownloadPrescriptionData, DownloadPrescriptionError, DownloadPrescriptionResponse, EndAllocationData, EndAllocationError, EndAllocationResponse2, GetAdmissionBillData, GetAdmissionBillError, GetAdmissionBillResponse, GetAdmissionData, GetAdmissionError, GetAdmissionResponse, GetAmbulanceData, GetAmbulanceError, GetAmbulanceResponse, GetAppointmentBillData, GetAppointmentBillError, GetAppointmentBillResponse, GetBedOccupancyData, GetBedOccupancyError, GetBedOccupancyResponse, GetBillingRatesData, GetBillingRatesError, GetBillingRatesResponse, GetCareRecommendationData, GetCareRecommendationError, GetCareRecommendationResponse, GetCareWorkflowData, GetCareWorkflowError, GetCareWorkflowResponse, GetCoverageReportData, GetCoverageReportError, GetCoverageReportResponse, GetCurrentAmbulanceCrewData, GetCurrentAmbulanceCrewError, GetCurrentAmbulanceCrewResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetDispatchProposalData, GetDispatchProposalError, GetDispatchProposalResponse, GetDispatchRouteData, GetDispatchRouteError, GetDispatchRouteResponse, GetEmergencyCallData, GetEmergencyCallError, GetEmergencyCallResponse, GetEquipmentItemByTagData, GetEquipmentItemByTagError, GetEquipmentItemByTagResponse, GetEquipmentItemData, GetEquipmentItemError, GetEquipmentItemResponse, GetHealthData, GetHealthError, GetHealthResponse, GetLeaveReportData, GetLeaveReportError, GetLeaveReportResponse, GetLeaveRequestData, GetLeaveRequestError, GetLeaveRequestResponse, GetMyActiveDispatchData, GetMyActiveDispatchError, GetMyActiveDispatchResponse, GetMyAdmissionData, GetMyAdmissionError, GetMyAdmissionResponse, GetMyAppointmentBillData, GetMyAppointmentBillError, GetMyAppointmentBillResponse, GetMyBillData, GetMyBillError, GetMyBillResponse, GetMyCareRecommendationsData, GetMyCareRecommendationsError, GetMyCareRecommendationsResponse, GetMyDispatchHistoryData, GetMyDispatchHistoryError, GetMyDispatchHistoryResponse, GetMyDispatchNavigationTargetData, GetMyDispatchNavigationTargetError, GetMyDispatchNavigationTargetResponse, GetMyEmergencyCallsData, GetMyEmergencyCallsError, GetMyEmergencyCallsResponse, GetMyHistoryData, GetMyHistoryError, GetMyHistoryResponse, GetMyLabReportsData, GetMyLabReportsError, GetMyLabReportsResponse, GetMyLeaveRequestsData, GetMyLeaveRequestsError, GetMyLeaveRequestsResponse, GetMyProfileData, GetMyProfileError, GetMyProfileResponse, GetMyShiftsData, GetMyShiftsError, GetMyShiftsResponse, GetPatientData, GetPatientError, GetPatientMedicalProfileData, GetPatientMedicalProfileError, GetPatientMedicalProfileResponse, GetPatientResponse, GetPharmacyItemData, GetPharmacyItemError, GetPharmacyItemResponse, GetShiftData, GetShiftError, GetShiftResponse, GetStaffAgentPerformanceReportData, GetStaffAgentPerformanceReportError, GetStaffAgentPerformanceReportResponse, GetStaffMemberData, GetStaffMemberError, GetStaffMemberResponse, GetWardCapacityData, GetWardCapacityError, GetWardCapacityResponse, GetWardCoverageData, GetWardCoverageError, GetWardCoverageResponse, GetWardOccupancyData, GetWardOccupancyError, GetWardOccupancyResponse, GetWardStaffingRulesData, GetWardStaffingRulesError, GetWardStaffingRulesResponse, GrantStaffSkillData, GrantStaffSkillError, GrantStaffSkillResponse, LinkPatientAccountData, LinkPatientAccountError, LinkPatientAccountResponse, ListAdmissionsData, ListAdmissionsError, ListAdmissionsResponse, ListAllocationsData, ListAllocationsError, ListAllocationsResponse, ListAmbulancesData, ListAmbulancesError, ListAmbulancesResponse, ListAppointmentsData, ListAppointmentsError, ListAppointmentsResponse, ListBedAvailabilityData, ListBedAvailabilityError, ListBedAvailabilityResponse, ListBedsData, ListBedsError, ListBedsResponse, ListCareRecommendationsData, ListCareRecommendationsError, ListCareRecommendationsResponse, ListDischargeCandidatesData, ListDischargeCandidatesError, ListDischargeCandidatesResponse, ListDispatchProposalsData, ListDispatchProposalsError, ListDispatchProposalsResponse, ListEmergencyCallsData, ListEmergencyCallsError, ListEmergencyCallsResponse, ListEmergencyCancellationRequestsData, ListEmergencyCancellationRequestsError, ListEmergencyCancellationRequestsResponse, ListEquipmentCategoriesData, ListEquipmentCategoriesError, ListEquipmentCategoriesForRemovalData, ListEquipmentCategoriesForRemovalError, ListEquipmentCategoriesForRemovalResponse, ListEquipmentCategoriesResponse, ListEquipmentItemsAwaitingConfirmationData, ListEquipmentItemsAwaitingConfirmationError, ListEquipmentItemsAwaitingConfirmationResponse, ListEquipmentItemsData, ListEquipmentItemsError, ListEquipmentItemsResponse, ListLabReportsData, ListLabReportsError, ListLabReportsResponse, ListLeaveRequestsData, ListLeaveRequestsError, ListLeaveRequestsResponse, ListMaintenanceSchedulesAwaitingConfirmationData, ListMaintenanceSchedulesAwaitingConfirmationError, ListMaintenanceSchedulesAwaitingConfirmationResponse, ListMaintenanceSchedulesData, ListMaintenanceSchedulesError, ListMaintenanceSchedulesResponse, ListMyAppointmentsData, ListMyAppointmentsError, ListMyAppointmentsResponse, ListMyPrescriptionsData, ListMyPrescriptionsError, ListMyPrescriptionsResponse, ListOutstandingBillsData, ListOutstandingBillsError, ListOutstandingBillsResponse, ListPatientsData, ListPatientsError, ListPatientsResponse, ListPatientWorklistData, ListPatientWorklistError, ListPatientWorklistResponse, ListPharmacyBatchesData, ListPharmacyBatchesError, ListPharmacyBatchesResponse, ListPharmacyCategoriesData, ListPharmacyCategoriesError, ListPharmacyCategoriesResponse, ListPharmacyItemsData, ListPharmacyItemsError, ListPharmacyItemsResponse, ListPharmacyTransactionsData, ListPharmacyTransactionsError, ListPharmacyTransactionsResponse, ListPrescriptionsData, ListPrescriptionsError, ListPrescriptionsResponse, ListShiftsData, ListShiftsError, ListShiftsResponse, ListSkillsData, ListSkillsError, ListSkillsResponse, ListStaffData, ListStaffError, ListStaffResponse, ListStaffSkillsData, ListStaffSkillsError, ListStaffSkillsResponse, ListWardPatientsData, ListWardPatientsError, ListWardPatientsResponse, ListWardsData, ListWardsError, ListWardsResponse, ListWarningsData, ListWarningsError, ListWarningsResponse, LoginData, LoginError, LoginPatientData, LoginPatientError, LoginPatientResponse, LoginResponse, LogoutData, LogoutError, LogoutResponse, LookupPatientData, LookupPatientError, LookupPatientResponse, LookupStaffData, LookupStaffError, LookupStaffResponse, MarkAppointmentNoShowData, MarkAppointmentNoShowError, MarkAppointmentNoShowResponse, MarkArrivedData, MarkArrivedError, MarkArrivedResponse, MarkPrescriptionDeliveredData, MarkPrescriptionDeliveredError, MarkPrescriptionDeliveredResponse, MarkPrescriptionReadyData, MarkPrescriptionReadyError, MarkPrescriptionReadyResponse, PreAdmitFromDispatchData, PreAdmitFromDispatchError, PreAdmitFromDispatchResponse, PrepareAdmissionBillData, PrepareAdmissionBillError, PrepareAdmissionBillResponse, PrepareAppointmentBillData, PrepareAppointmentBillError, PrepareAppointmentBillResponse, PreRegisterSelfData, PreRegisterSelfError, PreRegisterSelfResponse, PreviewMyClaimData, PreviewMyClaimError, PreviewMyClaimResponse, ReactivateStaffMemberData, ReactivateStaffMemberError, ReactivateStaffMemberResponse, ReassignDispatchData, ReassignDispatchError, ReassignDispatchResponse, RecordHandoverData, RecordHandoverError, RecordHandoverResponse, RecordPharmacyBatchTransactionData, RecordPharmacyBatchTransactionError, RecordPharmacyBatchTransactionResponse, RecordPharmacyTransactionData, RecordPharmacyTransactionError, RecordPharmacyTransactionResponse, RedraftCareRecommendationData, RedraftCareRecommendationError, RedraftCareRecommendationResponse, RefreshTokenData, RefreshTokenError, RefreshTokenResponse, RegisterDeviceData, RegisterDeviceError, RegisterDeviceResponse, RegisterPatientAccountData, RegisterPatientAccountError, RegisterPatientAccountResponse, ReinstateAmbulanceData, ReinstateAmbulanceError, ReinstateAmbulanceResponse, RejectCareRecommendationData, RejectCareRecommendationError, RejectCareRecommendationResponse, RejectDispatchProposalData, RejectDispatchProposalError, RejectDispatchProposalResponse, RejectEmergencyCancellationRequestData, RejectEmergencyCancellationRequestError, RejectEmergencyCancellationRequestResponse, RejectEquipmentItemData, RejectEquipmentItemError, RejectEquipmentItemResponse, RejectPrescriptionData, RejectPrescriptionError, RejectPrescriptionResponse, ReleaseEquipmentItemData, ReleaseEquipmentItemError, ReleaseEquipmentItemResponse, RemoveAppointmentBillChargeData, RemoveAppointmentBillChargeError, RemoveAppointmentBillChargeResponse, RemoveBillChargeData, RemoveBillChargeError, RemoveBillChargeResponse, RemoveEquipmentCategoryData, RemoveEquipmentCategoryError, RemoveEquipmentCategoryResponse, RemoveEquipmentItemData, RemoveEquipmentItemError, RemoveEquipmentItemResponse, RemovePharmacyItemData, RemovePharmacyItemError, RemovePharmacyItemResponse, ReplacePatientMedicalProfileData, ReplacePatientMedicalProfileError, ReplacePatientMedicalProfileResponse, ReportAmbulanceLocationData, ReportAmbulanceLocationError, ReportAmbulanceLocationResponse, ReportEquipmentFaultData, ReportEquipmentFaultError, ReportEquipmentFaultResponse, RequestMyEmergencyCallCancellationData, RequestMyEmergencyCallCancellationError, RequestMyEmergencyCallCancellationResponse, RetireAmbulanceData, RetireAmbulanceError, RetireAmbulanceResponse, RetireBedData, RetireBedError, RetireBedResponse, RetireEquipmentItemData, RetireEquipmentItemError, RetireEquipmentItemResponse, RetireSkillData, RetireSkillError, RetireSkillResponse, RevokeStaffSkillData, RevokeStaffSkillError, RevokeStaffSkillResponse2, RunWarningSweepData, RunWarningSweepError, RunWarningSweepResponse, SettleAppointmentBillData, SettleAppointmentBillError, SettleAppointmentBillResponse, SettleBillData, SettleBillError, SettleBillResponse, SetWardStaffingRulesData, SetWardStaffingRulesError, SetWardStaffingRulesResponse, SubmitCareQueryData, SubmitCareQueryError, SubmitCareQueryResponse, TrackMyEmergencyCallData, TrackMyEmergencyCallError, TrackMyEmergencyCallResponse, UnassignCurrentAmbulanceCrewData, UnassignCurrentAmbulanceCrewError, UnassignCurrentAmbulanceCrewResponse, UnregisterDeviceData, UnregisterDeviceError, UnregisterDeviceResponse, UpdateAmbulanceData, UpdateAmbulanceError, UpdateAmbulanceResponse, UpdateBedData, UpdateBedError, UpdateBedResponse, UpdateBillingRatesData, UpdateBillingRatesError, UpdateBillingRatesResponse, UpdateDischargeChecklistData, UpdateDischargeChecklistError, UpdateDischargeChecklistResponse, UpdateEmergencyCallData, UpdateEmergencyCallError, UpdateEmergencyCallResponse, UpdateEquipmentItemData, UpdateEquipmentItemError, UpdateEquipmentItemResponse, UpdateMyDispatchStatusData, UpdateMyDispatchStatusError, UpdateMyDispatchStatusResponse, UpdatePatientData, UpdatePatientError, UpdatePatientResponse, UpdateShiftData, UpdateShiftError, UpdateShiftResponse, UpdateSkillData, UpdateSkillError, UpdateSkillResponse, UpdateStaffMemberData, UpdateStaffMemberError, UpdateStaffMemberResponse2, UploadLabReportData, UploadLabReportError, UploadLabReportResponse, UploadMyPrescriptionData, UploadMyPrescriptionError, UploadMyPrescriptionResponse, WithdrawMyLeaveRequestData, WithdrawMyLeaveRequestError, WithdrawMyLeaveRequestResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -417,6 +417,76 @@ export const listPatientWorklistInfiniteOptions = (options?: Options<ListPatient
         queryKey: listPatientWorklistInfiniteQueryKey(options)
     });
     return opts as Omit<typeof opts, 'initialData'>;
+};
+
+export const listAllocationsQueryKey = (options?: Options<ListAllocationsData>) => createQueryKey('listAllocations', options);
+
+export const listAllocationsOptions = (options?: Options<ListAllocationsData>) => queryOptions<ListAllocationsResponse, ListAllocationsError, ListAllocationsResponse, ReturnType<typeof listAllocationsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listAllocations({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listAllocationsQueryKey(options)
+});
+
+export const listAllocationsInfiniteQueryKey = (options?: Options<ListAllocationsData>): QueryKey<Options<ListAllocationsData>> => createQueryKey('listAllocations', options, true);
+
+export const listAllocationsInfiniteOptions = (options?: Options<ListAllocationsData>) => {
+    const opts = infiniteQueryOptions<ListAllocationsResponse, ListAllocationsError, InfiniteData<ListAllocationsResponse>, QueryKey<Options<ListAllocationsData>>, number | Pick<QueryKey<Options<ListAllocationsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListAllocationsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listAllocations({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listAllocationsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+export const createAllocationMutation = (options?: Partial<Options<CreateAllocationData>>): UseMutationOptions<CreateAllocationResponse, CreateAllocationError, Options<CreateAllocationData>> => {
+    const mutationOptions: UseMutationOptions<CreateAllocationResponse, CreateAllocationError, Options<CreateAllocationData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createAllocation({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const endAllocationMutation = (options?: Partial<Options<EndAllocationData>>): UseMutationOptions<EndAllocationResponse2, EndAllocationError, Options<EndAllocationData>> => {
+    const mutationOptions: UseMutationOptions<EndAllocationResponse2, EndAllocationError, Options<EndAllocationData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await endAllocation({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
 };
 
 export const getCurrentAmbulanceCrewQueryKey = (options: Options<GetCurrentAmbulanceCrewData>) => createQueryKey('getCurrentAmbulanceCrew', options);
@@ -1755,6 +1825,35 @@ export const getHealthOptions = (options?: Options<GetHealthData>) => queryOptio
     queryKey: getHealthQueryKey(options)
 });
 
+export const lookupStaffMutation = (options?: Partial<Options<LookupStaffData>>): UseMutationOptions<LookupStaffResponse, LookupStaffError, Options<LookupStaffData>> => {
+    const mutationOptions: UseMutationOptions<LookupStaffResponse, LookupStaffError, Options<LookupStaffData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await lookupStaff({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getWardCoverageQueryKey = (options?: Options<GetWardCoverageData>) => createQueryKey('getWardCoverage', options);
+
+export const getWardCoverageOptions = (options?: Options<GetWardCoverageData>) => queryOptions<GetWardCoverageResponse, GetWardCoverageError, GetWardCoverageResponse, ReturnType<typeof getWardCoverageQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getWardCoverage({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getWardCoverageQueryKey(options)
+});
+
 export const getWardCapacityQueryKey = (options?: Options<GetWardCapacityData>) => createQueryKey('getWardCapacity', options);
 
 export const getWardCapacityOptions = (options?: Options<GetWardCapacityData>) => queryOptions<GetWardCapacityResponse, GetWardCapacityError, GetWardCapacityResponse, ReturnType<typeof getWardCapacityQueryKey>>({
@@ -1881,6 +1980,77 @@ export const listWardPatientsInfiniteOptions = (options?: Options<ListWardPatien
         queryKey: listWardPatientsInfiniteQueryKey(options)
     });
     return opts as Omit<typeof opts, 'initialData'>;
+};
+
+export const listLeaveRequestsQueryKey = (options?: Options<ListLeaveRequestsData>) => createQueryKey('listLeaveRequests', options);
+
+export const listLeaveRequestsOptions = (options?: Options<ListLeaveRequestsData>) => queryOptions<ListLeaveRequestsResponse, ListLeaveRequestsError, ListLeaveRequestsResponse, ReturnType<typeof listLeaveRequestsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listLeaveRequests({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listLeaveRequestsQueryKey(options)
+});
+
+export const listLeaveRequestsInfiniteQueryKey = (options?: Options<ListLeaveRequestsData>): QueryKey<Options<ListLeaveRequestsData>> => createQueryKey('listLeaveRequests', options, true);
+
+export const listLeaveRequestsInfiniteOptions = (options?: Options<ListLeaveRequestsData>) => {
+    const opts = infiniteQueryOptions<ListLeaveRequestsResponse, ListLeaveRequestsError, InfiniteData<ListLeaveRequestsResponse>, QueryKey<Options<ListLeaveRequestsData>>, number | Pick<QueryKey<Options<ListLeaveRequestsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListLeaveRequestsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listLeaveRequests({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listLeaveRequestsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+export const getLeaveRequestQueryKey = (options: Options<GetLeaveRequestData>) => createQueryKey('getLeaveRequest', options);
+
+export const getLeaveRequestOptions = (options: Options<GetLeaveRequestData>) => queryOptions<GetLeaveRequestResponse, GetLeaveRequestError, GetLeaveRequestResponse, ReturnType<typeof getLeaveRequestQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getLeaveRequest({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getLeaveRequestQueryKey(options)
+});
+
+export const decideLeaveRequestMutation = (options?: Partial<Options<DecideLeaveRequestData>>): UseMutationOptions<DecideLeaveRequestResponse, DecideLeaveRequestError, Options<DecideLeaveRequestData>> => {
+    const mutationOptions: UseMutationOptions<DecideLeaveRequestResponse, DecideLeaveRequestError, Options<DecideLeaveRequestData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await decideLeaveRequest({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
 };
 
 export const listMaintenanceSchedulesQueryKey = (options?: Options<ListMaintenanceSchedulesData>) => createQueryKey('listMaintenanceSchedules', options);
@@ -2151,6 +2321,92 @@ export const requestMyEmergencyCallCancellationMutation = (options?: Partial<Opt
     };
     return mutationOptions;
 };
+
+export const clockInMutation = (options?: Partial<Options<ClockInData>>): UseMutationOptions<ClockInResponse, ClockInError, Options<ClockInData>> => {
+    const mutationOptions: UseMutationOptions<ClockInResponse, ClockInError, Options<ClockInData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await clockIn({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const clockOutMutation = (options?: Partial<Options<ClockOutData>>): UseMutationOptions<ClockOutResponse, ClockOutError, Options<ClockOutData>> => {
+    const mutationOptions: UseMutationOptions<ClockOutResponse, ClockOutError, Options<ClockOutData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await clockOut({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getMyLeaveRequestsQueryKey = (options?: Options<GetMyLeaveRequestsData>) => createQueryKey('getMyLeaveRequests', options);
+
+export const getMyLeaveRequestsOptions = (options?: Options<GetMyLeaveRequestsData>) => queryOptions<GetMyLeaveRequestsResponse, GetMyLeaveRequestsError, GetMyLeaveRequestsResponse, ReturnType<typeof getMyLeaveRequestsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getMyLeaveRequests({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getMyLeaveRequestsQueryKey(options)
+});
+
+export const createMyLeaveRequestMutation = (options?: Partial<Options<CreateMyLeaveRequestData>>): UseMutationOptions<CreateMyLeaveRequestResponse, CreateMyLeaveRequestError, Options<CreateMyLeaveRequestData>> => {
+    const mutationOptions: UseMutationOptions<CreateMyLeaveRequestResponse, CreateMyLeaveRequestError, Options<CreateMyLeaveRequestData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createMyLeaveRequest({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const withdrawMyLeaveRequestMutation = (options?: Partial<Options<WithdrawMyLeaveRequestData>>): UseMutationOptions<WithdrawMyLeaveRequestResponse, WithdrawMyLeaveRequestError, Options<WithdrawMyLeaveRequestData>> => {
+    const mutationOptions: UseMutationOptions<WithdrawMyLeaveRequestResponse, WithdrawMyLeaveRequestError, Options<WithdrawMyLeaveRequestData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await withdrawMyLeaveRequest({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getMyShiftsQueryKey = (options?: Options<GetMyShiftsData>) => createQueryKey('getMyShifts', options);
+
+export const getMyShiftsOptions = (options?: Options<GetMyShiftsData>) => queryOptions<GetMyShiftsResponse, GetMyShiftsError, GetMyShiftsResponse, ReturnType<typeof getMyShiftsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getMyShifts({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getMyShiftsQueryKey(options)
+});
 
 export const getMyActiveDispatchQueryKey = (options?: Options<GetMyActiveDispatchData>) => createQueryKey('getMyActiveDispatch', options);
 
@@ -3053,6 +3309,406 @@ export const rejectPrescriptionMutation = (options?: Partial<Options<RejectPresc
     const mutationOptions: UseMutationOptions<RejectPrescriptionResponse, RejectPrescriptionError, Options<RejectPrescriptionData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await rejectPrescription({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getCoverageReportQueryKey = (options?: Options<GetCoverageReportData>) => createQueryKey('getCoverageReport', options);
+
+export const getCoverageReportOptions = (options?: Options<GetCoverageReportData>) => queryOptions<GetCoverageReportResponse, GetCoverageReportError, GetCoverageReportResponse, ReturnType<typeof getCoverageReportQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getCoverageReport({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getCoverageReportQueryKey(options)
+});
+
+export const getLeaveReportQueryKey = (options?: Options<GetLeaveReportData>) => createQueryKey('getLeaveReport', options);
+
+export const getLeaveReportOptions = (options?: Options<GetLeaveReportData>) => queryOptions<GetLeaveReportResponse, GetLeaveReportError, GetLeaveReportResponse, ReturnType<typeof getLeaveReportQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getLeaveReport({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getLeaveReportQueryKey(options)
+});
+
+export const getStaffAgentPerformanceReportQueryKey = (options?: Options<GetStaffAgentPerformanceReportData>) => createQueryKey('getStaffAgentPerformanceReport', options);
+
+export const getStaffAgentPerformanceReportOptions = (options?: Options<GetStaffAgentPerformanceReportData>) => queryOptions<GetStaffAgentPerformanceReportResponse, GetStaffAgentPerformanceReportError, GetStaffAgentPerformanceReportResponse, ReturnType<typeof getStaffAgentPerformanceReportQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getStaffAgentPerformanceReport({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getStaffAgentPerformanceReportQueryKey(options)
+});
+
+export const listShiftsQueryKey = (options?: Options<ListShiftsData>) => createQueryKey('listShifts', options);
+
+export const listShiftsOptions = (options?: Options<ListShiftsData>) => queryOptions<ListShiftsResponse, ListShiftsError, ListShiftsResponse, ReturnType<typeof listShiftsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listShifts({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listShiftsQueryKey(options)
+});
+
+export const listShiftsInfiniteQueryKey = (options?: Options<ListShiftsData>): QueryKey<Options<ListShiftsData>> => createQueryKey('listShifts', options, true);
+
+export const listShiftsInfiniteOptions = (options?: Options<ListShiftsData>) => {
+    const opts = infiniteQueryOptions<ListShiftsResponse, ListShiftsError, InfiniteData<ListShiftsResponse>, QueryKey<Options<ListShiftsData>>, number | Pick<QueryKey<Options<ListShiftsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListShiftsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listShifts({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listShiftsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+export const createShiftMutation = (options?: Partial<Options<CreateShiftData>>): UseMutationOptions<CreateShiftResponse, CreateShiftError, Options<CreateShiftData>> => {
+    const mutationOptions: UseMutationOptions<CreateShiftResponse, CreateShiftError, Options<CreateShiftData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createShift({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const createShiftsBulkMutation = (options?: Partial<Options<CreateShiftsBulkData>>): UseMutationOptions<CreateShiftsBulkResponse, CreateShiftsBulkError, Options<CreateShiftsBulkData>> => {
+    const mutationOptions: UseMutationOptions<CreateShiftsBulkResponse, CreateShiftsBulkError, Options<CreateShiftsBulkData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createShiftsBulk({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const cancelShiftMutation = (options?: Partial<Options<CancelShiftData>>): UseMutationOptions<CancelShiftResponse, CancelShiftError, Options<CancelShiftData>> => {
+    const mutationOptions: UseMutationOptions<CancelShiftResponse, CancelShiftError, Options<CancelShiftData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await cancelShift({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getShiftQueryKey = (options: Options<GetShiftData>) => createQueryKey('getShift', options);
+
+export const getShiftOptions = (options: Options<GetShiftData>) => queryOptions<GetShiftResponse, GetShiftError, GetShiftResponse, ReturnType<typeof getShiftQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getShift({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getShiftQueryKey(options)
+});
+
+export const updateShiftMutation = (options?: Partial<Options<UpdateShiftData>>): UseMutationOptions<UpdateShiftResponse, UpdateShiftError, Options<UpdateShiftData>> => {
+    const mutationOptions: UseMutationOptions<UpdateShiftResponse, UpdateShiftError, Options<UpdateShiftData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await updateShift({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getWardStaffingRulesQueryKey = (options: Options<GetWardStaffingRulesData>) => createQueryKey('getWardStaffingRules', options);
+
+export const getWardStaffingRulesOptions = (options: Options<GetWardStaffingRulesData>) => queryOptions<GetWardStaffingRulesResponse, GetWardStaffingRulesError, GetWardStaffingRulesResponse, ReturnType<typeof getWardStaffingRulesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getWardStaffingRules({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getWardStaffingRulesQueryKey(options)
+});
+
+export const setWardStaffingRulesMutation = (options?: Partial<Options<SetWardStaffingRulesData>>): UseMutationOptions<SetWardStaffingRulesResponse, SetWardStaffingRulesError, Options<SetWardStaffingRulesData>> => {
+    const mutationOptions: UseMutationOptions<SetWardStaffingRulesResponse, SetWardStaffingRulesError, Options<SetWardStaffingRulesData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await setWardStaffingRules({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listSkillsQueryKey = (options?: Options<ListSkillsData>) => createQueryKey('listSkills', options);
+
+export const listSkillsOptions = (options?: Options<ListSkillsData>) => queryOptions<ListSkillsResponse, ListSkillsError, ListSkillsResponse, ReturnType<typeof listSkillsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listSkills({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listSkillsQueryKey(options)
+});
+
+export const createSkillMutation = (options?: Partial<Options<CreateSkillData>>): UseMutationOptions<CreateSkillResponse, CreateSkillError, Options<CreateSkillData>> => {
+    const mutationOptions: UseMutationOptions<CreateSkillResponse, CreateSkillError, Options<CreateSkillData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createSkill({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const retireSkillMutation = (options?: Partial<Options<RetireSkillData>>): UseMutationOptions<RetireSkillResponse, RetireSkillError, Options<RetireSkillData>> => {
+    const mutationOptions: UseMutationOptions<RetireSkillResponse, RetireSkillError, Options<RetireSkillData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await retireSkill({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const updateSkillMutation = (options?: Partial<Options<UpdateSkillData>>): UseMutationOptions<UpdateSkillResponse, UpdateSkillError, Options<UpdateSkillData>> => {
+    const mutationOptions: UseMutationOptions<UpdateSkillResponse, UpdateSkillError, Options<UpdateSkillData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await updateSkill({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listStaffSkillsQueryKey = (options: Options<ListStaffSkillsData>) => createQueryKey('listStaffSkills', options);
+
+export const listStaffSkillsOptions = (options: Options<ListStaffSkillsData>) => queryOptions<ListStaffSkillsResponse, ListStaffSkillsError, ListStaffSkillsResponse, ReturnType<typeof listStaffSkillsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listStaffSkills({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listStaffSkillsQueryKey(options)
+});
+
+export const grantStaffSkillMutation = (options?: Partial<Options<GrantStaffSkillData>>): UseMutationOptions<GrantStaffSkillResponse, GrantStaffSkillError, Options<GrantStaffSkillData>> => {
+    const mutationOptions: UseMutationOptions<GrantStaffSkillResponse, GrantStaffSkillError, Options<GrantStaffSkillData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await grantStaffSkill({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const revokeStaffSkillMutation = (options?: Partial<Options<RevokeStaffSkillData>>): UseMutationOptions<RevokeStaffSkillResponse2, RevokeStaffSkillError, Options<RevokeStaffSkillData>> => {
+    const mutationOptions: UseMutationOptions<RevokeStaffSkillResponse2, RevokeStaffSkillError, Options<RevokeStaffSkillData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await revokeStaffSkill({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listStaffQueryKey = (options?: Options<ListStaffData>) => createQueryKey('listStaff', options);
+
+export const listStaffOptions = (options?: Options<ListStaffData>) => queryOptions<ListStaffResponse, ListStaffError, ListStaffResponse, ReturnType<typeof listStaffQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listStaff({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listStaffQueryKey(options)
+});
+
+export const listStaffInfiniteQueryKey = (options?: Options<ListStaffData>): QueryKey<Options<ListStaffData>> => createQueryKey('listStaff', options, true);
+
+export const listStaffInfiniteOptions = (options?: Options<ListStaffData>) => {
+    const opts = infiniteQueryOptions<ListStaffResponse, ListStaffError, InfiniteData<ListStaffResponse>, QueryKey<Options<ListStaffData>>, number | Pick<QueryKey<Options<ListStaffData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListStaffData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listStaff({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listStaffInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+export const createStaffMemberMutation = (options?: Partial<Options<CreateStaffMemberData>>): UseMutationOptions<CreateStaffMemberResponse, CreateStaffMemberError, Options<CreateStaffMemberData>> => {
+    const mutationOptions: UseMutationOptions<CreateStaffMemberResponse, CreateStaffMemberError, Options<CreateStaffMemberData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createStaffMember({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getStaffMemberQueryKey = (options: Options<GetStaffMemberData>) => createQueryKey('getStaffMember', options);
+
+export const getStaffMemberOptions = (options: Options<GetStaffMemberData>) => queryOptions<GetStaffMemberResponse, GetStaffMemberError, GetStaffMemberResponse, ReturnType<typeof getStaffMemberQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getStaffMember({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getStaffMemberQueryKey(options)
+});
+
+export const updateStaffMemberMutation = (options?: Partial<Options<UpdateStaffMemberData>>): UseMutationOptions<UpdateStaffMemberResponse2, UpdateStaffMemberError, Options<UpdateStaffMemberData>> => {
+    const mutationOptions: UseMutationOptions<UpdateStaffMemberResponse2, UpdateStaffMemberError, Options<UpdateStaffMemberData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await updateStaffMember({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const deactivateStaffMemberMutation = (options?: Partial<Options<DeactivateStaffMemberData>>): UseMutationOptions<DeactivateStaffMemberResponse, DeactivateStaffMemberError, Options<DeactivateStaffMemberData>> => {
+    const mutationOptions: UseMutationOptions<DeactivateStaffMemberResponse, DeactivateStaffMemberError, Options<DeactivateStaffMemberData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await deactivateStaffMember({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const reactivateStaffMemberMutation = (options?: Partial<Options<ReactivateStaffMemberData>>): UseMutationOptions<ReactivateStaffMemberResponse, ReactivateStaffMemberError, Options<ReactivateStaffMemberData>> => {
+    const mutationOptions: UseMutationOptions<ReactivateStaffMemberResponse, ReactivateStaffMemberError, Options<ReactivateStaffMemberData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await reactivateStaffMember({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

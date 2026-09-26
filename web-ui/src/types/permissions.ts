@@ -192,6 +192,18 @@ export function canReviewCareRecommendation(role: PrincipalRole | undefined): bo
   return role === 'ward_nurse' || role === 'doctor';
 }
 
+export function canViewStaff(role: PrincipalRole | undefined): boolean {
+  return role === 'hospital_administrator' || role === 'duty_manager';
+}
+
+export function canManageStaff(role: PrincipalRole | undefined): boolean {
+  return role === 'hospital_administrator';
+}
+
+export function canManageLeave(role: PrincipalRole | undefined): boolean {
+  return role === 'hospital_administrator' || role === 'duty_manager';
+}
+
 export const roleLabels: Record<PrincipalRole, string> = {
   ward_nurse: 'Ward nurse',
   doctor: 'Doctor',

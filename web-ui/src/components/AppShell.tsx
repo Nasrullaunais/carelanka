@@ -3,8 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { logoutMutation } from '../services/api/generated/@tanstack/react-query.gen';
 import { clearSession, getSession } from '../services/auth/session';
 import { useSession } from '../services/auth/useSession';
-import { roleLabels } from '../types/permissions';
-import { canManageEmergency } from '../types/permissions';
+import { canManageEmergency, canViewStaff, roleLabels } from '../types/permissions';
 
 export function AppShell() {
   const session = useSession();
@@ -31,6 +30,15 @@ export function AppShell() {
           <NavLink to="/" end>
             Dashboard
           </NavLink>
+          {canViewStaff(session?.principal.role) && (
+            <>
+              <NavLink to="/staff" end>
+                Staff
+              </NavLink>
+              <NavLink to="/staff/coverage">Coverage</NavLink>
+              <NavLink to="/staff/leave-approval">Leave</NavLink>
+            </>
+          )}
           {canManageEmergency(session?.principal.role) && <NavLink to="/emergency">Emergency</NavLink>}
         </nav>
 

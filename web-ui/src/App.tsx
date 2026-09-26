@@ -15,6 +15,9 @@ import { MaintenanceUnitPage } from './pages/MaintenanceUnitPage';
 import { WarningsPage } from './pages/WarningsPage';
 import { PatientsPage } from './pages/PatientsPage';
 import { PharmacyPage } from './pages/PharmacyPage';
+import { StaffLeaveApprovalPage } from './pages/StaffLeaveApprovalPage';
+import { StaffManagementPage } from './pages/StaffManagementPage';
+import { WardCoveragePage } from './pages/WardCoveragePage';
 import { WardsPage } from './pages/WardsPage';
 import { clearSession } from './services/auth/session';
 import { useSession } from './services/auth/useSession';
@@ -68,6 +71,9 @@ export function App() {
         <Route path="/warnings" element={<WarningsPage />} />
         <Route path="/laboratory" element={<LaboratoryPage />} />
         <Route path="/pharmacy" element={<PharmacyPage />} />
+        <Route path="/staff" element={<StaffManagementPage />} />
+        <Route path="/staff/coverage" element={<WardCoveragePage />} />
+        <Route path="/staff/leave-approval" element={<StaffLeaveApprovalPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

@@ -138,6 +138,54 @@ export type AdmissionSummaryPagedResult = {
 
 export type AdmissionUrgency = 'routine' | 'urgent' | 'emergency';
 
+export type AffectedShiftDto = {
+    shift: ShiftSummaryDto;
+    coverage_if_approved: ShiftCoverageDto;
+};
+
+export type AllocationDto = {
+    id: string;
+    shift_id: string;
+    staff_member_id: string;
+    staff_name: string;
+    status: AllocationStatus;
+    source: AllocationSource;
+    ended_at?: string | null;
+    ended_reason?: AllocationEndReason;
+    replaced_by_allocation_id?: string | null;
+    clocked_in_at?: string | null;
+    clocked_out_at?: string | null;
+    created_by_staff_id?: string | null;
+    roster_proposal_id?: string | null;
+    created_at: string;
+};
+
+export type AllocationDtoPagedResult = {
+    items: Array<AllocationDto>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
+export type AllocationEndReason = 'leave_approved' | 'swapped_out' | 'shift_cancelled' | 'staff_deactivated' | 'manual';
+
+export type AllocationSource = 'manual' | 'agent_proposal' | 'swap_request';
+
+export type AllocationStatus = 'proposed' | 'confirmed' | 'released' | 'cancelled';
+
+export type AllocationSummaryDto = {
+    allocation_id: string;
+    shift_id: string;
+    ward_name: string;
+    date: string;
+    start_time: string;
+    end_time: string;
+    staff_member_id: string;
+    staff_name: string;
+    status: AllocationStatus;
+};
+
 export type Ambulance = {
     id: string;
     registration_number: string;
@@ -371,6 +419,29 @@ export type BookAppointmentRequest = {
     reason?: string | null;
 };
 
+export type BulkShiftPatternItem = {
+    start_time: string;
+    end_time: string;
+    required_role: StaffRole;
+    required_skill_id?: string | null;
+    headcount_needed: number;
+    minimum_headcount?: number | null;
+};
+
+export type BulkShiftRequest = {
+    ward_id: string;
+    from: string;
+    to: string;
+    weekdays?: Array<string> | null;
+    patterns: Array<BulkShiftPatternItem>;
+};
+
+export type BulkShiftResponse = {
+    created: number;
+    skipped: number;
+    shifts: Array<ShiftSummaryDto>;
+};
+
 export type CallPriority = 'critical' | 'high' | 'medium' | 'low';
 
 export type CallStatus = 'received' | 'dispatched' | 'en_route' | 'completed' | 'cancelled';
@@ -528,6 +599,32 @@ export type CorrectBedRequest = {
     reason?: string | null;
 };
 
+export type CoverageReport = {
+    from?: string;
+    to?: string;
+    rows?: Array<CoverageReportRow> | null;
+    totals?: CoverageReportTotals;
+};
+
+export type CoverageReportRow = {
+    ward_id?: string;
+    ward_name?: string | null;
+    date?: string;
+    shifts_total?: number;
+    shifts_understaffed?: number;
+    hours_below_minimum?: number;
+    fill_rate?: number;
+};
+
+export type CoverageReportTotals = {
+    shifts_total?: number;
+    shifts_understaffed?: number;
+    hours_below_minimum?: number;
+    fill_rate?: number;
+};
+
+export type CoverageStatus = 'adequate' | 'at_minimum' | 'understaffed' | 'critical';
+
 export type CreateAdmissionRequest = {
     patient_id: string;
     source: AdmissionSource;
@@ -537,6 +634,13 @@ export type CreateAdmissionRequest = {
     urgency: AdmissionUrgency;
     is_infectious?: boolean;
     expected_arrival?: string | null;
+};
+
+export type CreateAllocationRequest = {
+    shift_id: string;
+    staff_member_id: string;
+    override?: boolean;
+    override_reason?: string | null;
 };
 
 export type CreateAmbulanceRequest = {
@@ -595,6 +699,15 @@ export type CreateEquipmentItemRequest = {
     next_maintenance_due?: string | null;
 };
 
+export type CreateLeaveRequest = {
+    type: LeaveType;
+    start_date?: string | null;
+    end_date?: string | null;
+    reason?: string | null;
+    swap_shift_id?: string | null;
+    swap_with_staff_member_id?: string | null;
+};
+
 export type CreateMaintenanceScheduleRequest = {
     asset_type: AssetType;
     asset_id: string;
@@ -637,6 +750,33 @@ export type CreatePharmacyTransactionRequest = {
     note?: string | null;
 };
 
+export type CreateShiftRequest = {
+    ward_id: string;
+    date: string;
+    start_time: string;
+    end_time: string;
+    required_role: StaffRole;
+    required_skill_id?: string | null;
+    headcount_needed: number;
+    minimum_headcount?: number | null;
+};
+
+export type CreateSkillRequest = {
+    name: string;
+    description?: string | null;
+};
+
+export type CreateStaffMemberRequest = {
+    first_name: string;
+    last_name: string;
+    email: string;
+    temporary_password: string;
+    phone_number?: string | null;
+    role: StaffRole;
+    department?: string | null;
+    skill_ids?: Array<string> | null;
+};
+
 export type CreateWardRequest = {
     name: string;
     ward_type: WardType;
@@ -652,6 +792,22 @@ export type CurrentPrincipal = {
     email?: string | null;
     phone_number?: string | null;
     patient_id?: string | null;
+};
+
+export type DeactivateStaffMemberRequest = {
+    reason: string;
+    effective_date?: string | null;
+};
+
+export type DecideLeaveRequest = {
+    decision: string;
+    notes?: string | null;
+};
+
+export type DecideLeaveResponse = {
+    leave_request: LeaveRequestDto;
+    released_allocations: Array<AllocationSummaryDto>;
+    roster_proposal_ids: Array<string>;
 };
 
 export type DeclineDispatchRequest = {
@@ -917,6 +1073,18 @@ export type EmergencyCancellationRequestPagedResult = {
     total_pages: number;
 };
 
+export type EndAllocationRequest = {
+    reason: AllocationEndReason;
+    notes?: string | null;
+    suppress_agent?: boolean;
+};
+
+export type EndAllocationResponse = {
+    allocation: AllocationDto;
+    shift_coverage: ShiftCoverageDto;
+    roster_proposal_id?: string | null;
+};
+
 export type EquipmentCategory = {
     id: string;
     name: string;
@@ -1009,6 +1177,12 @@ export type Gender = 'male' | 'female' | 'other' | 'unknown';
 
 export type GenderPolicy = 'male' | 'female' | 'mixed';
 
+export type GrantStaffSkillRequest = {
+    skill_id: string;
+    valid_from?: string | null;
+    expires_at?: string | null;
+};
+
 export type HealthStatus = {
     status?: string | null;
     database?: string | null;
@@ -1036,8 +1210,76 @@ export type LabReportPagedResult = {
     total_pages: number;
 };
 
+export type LeaveReport = {
+    from?: string;
+    to?: string;
+    group_by?: string | null;
+    rows?: Array<LeaveReportRow> | null;
+};
+
+export type LeaveReportRow = {
+    key?: string | null;
+    approved_days?: number;
+    pending_days?: number;
+    rejected_count?: number;
+    sick_days?: number;
+};
+
+export type LeaveRequestDetailDto = {
+    id: string;
+    staff_member_id: string;
+    staff_name: string;
+    type: LeaveType;
+    is_urgent: boolean;
+    start_date: string;
+    end_date: string;
+    reason?: string | null;
+    status: LeaveStatus;
+    reviewed_by_staff_id?: string | null;
+    reviewed_at?: string | null;
+    review_notes?: string | null;
+    swap_with_staff_member_id?: string | null;
+    swap_shift_id?: string | null;
+    created_at: string;
+    affected_shifts: Array<AffectedShiftDto>;
+};
+
+export type LeaveRequestDto = {
+    id: string;
+    staff_member_id: string;
+    staff_name: string;
+    type: LeaveType;
+    is_urgent: boolean;
+    start_date: string;
+    end_date: string;
+    reason?: string | null;
+    status: LeaveStatus;
+    reviewed_by_staff_id?: string | null;
+    reviewed_at?: string | null;
+    review_notes?: string | null;
+    swap_with_staff_member_id?: string | null;
+    swap_shift_id?: string | null;
+    created_at: string;
+};
+
+export type LeaveRequestDtoPagedResult = {
+    items: Array<LeaveRequestDto>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
+export type LeaveStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn';
+
+export type LeaveType = 'annual' | 'sick' | 'emergency' | 'shift_swap';
+
 export type LinkPatientAccountRequest = {
     user_account_id: string;
+};
+
+export type LookupStaffRequest = {
+    staff_ids: Array<string>;
 };
 
 export type MaintenanceSchedule = {
@@ -1227,6 +1469,21 @@ export type MyProfile = {
     emergency_contact_phone?: string | null;
     details_complete: boolean;
     missing_fields: Array<string>;
+};
+
+export type MyShiftDto = {
+    allocation_id: string;
+    shift_id: string;
+    ward_name: string;
+    date: string;
+    start_time: string;
+    end_time: string;
+    crosses_midnight: boolean;
+    status: AllocationStatus;
+    clocked_in_at?: string | null;
+    clocked_out_at?: string | null;
+    can_clock_in: boolean;
+    was_reassigned: boolean;
 };
 
 export type NavigationTarget = {
@@ -1522,6 +1779,11 @@ export type RelatedEntityType = 'pharmacy_item' | 'equipment_item' | 'bed';
 
 export type ReleaseReason = 'discharged' | 'hold_expired' | 'cancelled' | 'transferred' | 'rejected' | 'corrected';
 
+export type ReplaceWardStaffingRulesResponse = {
+    rules: Array<WardStaffingRuleDto>;
+    shifts_now_disagreeing: Array<ShiftSummaryDto>;
+};
+
 export type ReportAmbulanceLocationRequest = {
     latitude?: number | null;
     longitude?: number | null;
@@ -1543,6 +1805,10 @@ export type ReviewCancellationRequest = {
     notes?: string | null;
 };
 
+export type RevokeStaffSkillResponse = {
+    affected_allocations: Array<AllocationSummaryDto>;
+};
+
 export type RouteLog = {
     dispatch_id?: string;
     origin_latitude?: number;
@@ -1560,11 +1826,175 @@ export type SettleBillRequest = {
     settlement_note?: string | null;
 };
 
+export type ShiftCoverageDto = {
+    confirmed_count: number;
+    headcount_needed: number;
+    minimum_headcount: number;
+    status: CoverageStatus;
+    shortfall_to_minimum: number;
+};
+
+export type ShiftDetailDto = {
+    id: string;
+    ward_id: string;
+    ward_name: string;
+    date: string;
+    start_time: string;
+    end_time: string;
+    crosses_midnight: boolean;
+    required_role: StaffRole;
+    required_skill_id?: string | null;
+    required_skill_name?: string | null;
+    headcount_needed: number;
+    minimum_headcount: number;
+    created_at: string;
+    updated_at: string;
+    coverage: ShiftCoverageDto;
+    allocations: Array<AllocationDto>;
+    open_proposal_id?: string | null;
+};
+
+export type ShiftDto = {
+    id: string;
+    ward_id: string;
+    ward_name: string;
+    date: string;
+    start_time: string;
+    end_time: string;
+    crosses_midnight: boolean;
+    required_role: StaffRole;
+    required_skill_id?: string | null;
+    required_skill_name?: string | null;
+    headcount_needed: number;
+    minimum_headcount: number;
+    created_at: string;
+    updated_at: string;
+};
+
+export type ShiftSummaryDto = {
+    id: string;
+    ward_id: string;
+    ward_name: string;
+    date: string;
+    start_time: string;
+    end_time: string;
+    crosses_midnight: boolean;
+    required_role: StaffRole;
+    required_skill_id?: string | null;
+    required_skill_name?: string | null;
+    headcount_needed: number;
+    minimum_headcount: number;
+    created_at: string;
+    updated_at: string;
+    coverage: ShiftCoverageDto;
+};
+
+export type ShiftSummaryDtoPagedResult = {
+    items: Array<ShiftSummaryDto>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
+export type SkillDto = {
+    id: string;
+    name: string;
+    description?: string | null;
+    staff_count: number;
+};
+
 export type SortDirection = 'asc' | 'desc';
+
+export type StaffAgentPerformanceReport = {
+    from?: string;
+    to?: string;
+    proposals_raised?: number;
+    proposals_auto_triggered?: number;
+    validation_failure_rate?: number;
+    approved?: number;
+    rejected?: number;
+    revision_requested?: number;
+    failed_safely?: number;
+    cascading_swaps?: number;
+    median_minutes_gap_to_fill?: number;
+    rejection_reasons?: {
+        [key: string]: number;
+    } | null;
+};
 
 export type StaffLoginRequest = {
     email: string;
     password: string;
+};
+
+export type StaffLookupResult = {
+    staff_id: string;
+    found: boolean;
+    full_name?: string | null;
+    role?: StaffRole;
+    is_active?: boolean | null;
+};
+
+export type StaffMemberDetailDto = {
+    id: string;
+    employee_number: string;
+    first_name: string;
+    last_name: string;
+    full_name: string;
+    email: string;
+    phone_number?: string | null;
+    role: StaffRole;
+    department?: string | null;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+    skills: Array<StaffSkillDto>;
+    upcoming_allocations: Array<AllocationSummaryDto>;
+    leave_balance_days?: number | null;
+};
+
+export type StaffMemberDto = {
+    id: string;
+    employee_number: string;
+    first_name: string;
+    last_name: string;
+    full_name: string;
+    email: string;
+    phone_number?: string | null;
+    role: StaffRole;
+    department?: string | null;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
+export type StaffRole = 'ward_nurse' | 'doctor' | 'ambulance_crew' | 'general_staff' | 'duty_manager' | 'hospital_administrator' | 'equipment_manager';
+
+export type StaffSkillDto = {
+    skill_id: string;
+    skill_name: string;
+    valid_from?: string | null;
+    expires_at?: string | null;
+    is_valid: boolean;
+    granted_at: string;
+};
+
+export type StaffSummaryDto = {
+    id: string;
+    full_name: string;
+    role: StaffRole;
+    department?: string | null;
+    is_active: boolean;
+    skill_count: number;
+};
+
+export type StaffSummaryDtoPagedResult = {
+    items: Array<StaffSummaryDto>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
 };
 
 export type UpdateAmbulanceRequest = {
@@ -1627,6 +2057,24 @@ export type UpdatePatientRequest = {
     emergency_contact_phone?: string | null;
 };
 
+export type UpdateSkillRequest = {
+    name: string;
+    description?: string | null;
+};
+
+export type UpdateStaffMemberRequest = {
+    first_name?: string | null;
+    last_name?: string | null;
+    phone_number?: string | null;
+    role?: StaffRole;
+    department?: string | null;
+};
+
+export type UpdateStaffMemberResponse = {
+    staff_member: StaffMemberDto;
+    affected_allocations: Array<AllocationSummaryDto>;
+};
+
 export type ValidationProblemDetails = {
     type?: string | null;
     title?: string | null;
@@ -1662,6 +2110,24 @@ export type WardCapacity = {
 export type WardCapacitySummary = {
     generated_at: string;
     wards: Array<WardCapacity>;
+};
+
+export type WardCoverageDto = {
+    ward_id: string;
+    ward_name: string;
+    current_shift_id?: string | null;
+    on_duty_count: number;
+    minimum_headcount: number;
+    headcount_needed: number;
+    status: CoverageStatus;
+    by_role: {
+        [key: string]: number;
+    };
+};
+
+export type WardCoverageOverviewResponse = {
+    generated_at: string;
+    wards: Array<WardCoverageDto>;
 };
 
 export type WardExpenseRateUpdate = {
@@ -1705,6 +2171,21 @@ export type WardPatientPagedResult = {
 export type WardRates = {
     ward_type: WardType;
     expenses: Array<ExpenseRate>;
+};
+
+export type WardStaffingRuleDto = {
+    id: string;
+    ward_id: string;
+    required_role: StaffRole;
+    required_skill_id?: string | null;
+    required_skill_name?: string | null;
+    minimum_headcount: number;
+};
+
+export type WardStaffingRuleInput = {
+    required_role: StaffRole;
+    required_skill_id?: string | null;
+    minimum_headcount: number;
 };
 
 export type WardType = 'icu' | 'hdu' | 'general' | 'maternity' | 'pediatric' | 'isolation' | 'surgical' | 'emergency' | 'mental_health';
@@ -2546,6 +3027,124 @@ export type ListPatientWorklistResponses = {
 };
 
 export type ListPatientWorklistResponse = ListPatientWorklistResponses[keyof ListPatientWorklistResponses];
+
+export type ListAllocationsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        shiftId?: string;
+        staffMemberId?: string;
+        wardId?: string;
+        status?: AllocationStatus;
+        from?: string;
+        to?: string;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/allocations';
+};
+
+export type ListAllocationsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListAllocationsError = ListAllocationsErrors[keyof ListAllocationsErrors];
+
+export type ListAllocationsResponses = {
+    /**
+     * OK
+     */
+    200: AllocationDtoPagedResult;
+};
+
+export type ListAllocationsResponse = ListAllocationsResponses[keyof ListAllocationsResponses];
+
+export type CreateAllocationData = {
+    body?: CreateAllocationRequest;
+    path?: never;
+    query?: never;
+    url: '/allocations';
+};
+
+export type CreateAllocationErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CreateAllocationError = CreateAllocationErrors[keyof CreateAllocationErrors];
+
+export type CreateAllocationResponses = {
+    /**
+     * Created
+     */
+    201: AllocationDto;
+};
+
+export type CreateAllocationResponse = CreateAllocationResponses[keyof CreateAllocationResponses];
+
+export type EndAllocationData = {
+    body?: EndAllocationRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/allocations/{id}/end';
+};
+
+export type EndAllocationErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type EndAllocationError = EndAllocationErrors[keyof EndAllocationErrors];
+
+export type EndAllocationResponses = {
+    /**
+     * OK
+     */
+    200: EndAllocationResponse;
+};
+
+export type EndAllocationResponse2 = EndAllocationResponses[keyof EndAllocationResponses];
 
 export type GetCurrentAmbulanceCrewData = {
     body?: never;
@@ -5566,6 +6165,62 @@ export type GetHealthResponses = {
 
 export type GetHealthResponse = GetHealthResponses[keyof GetHealthResponses];
 
+export type LookupStaffData = {
+    body?: LookupStaffRequest;
+    path?: never;
+    query?: never;
+    url: '/staff/lookup';
+};
+
+export type LookupStaffErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+};
+
+export type LookupStaffError = LookupStaffErrors[keyof LookupStaffErrors];
+
+export type LookupStaffResponses = {
+    /**
+     * OK
+     */
+    200: Array<StaffLookupResult>;
+};
+
+export type LookupStaffResponse = LookupStaffResponses[keyof LookupStaffResponses];
+
+export type GetWardCoverageData = {
+    body?: never;
+    path?: never;
+    query?: {
+        at?: string;
+    };
+    url: '/coverage/wards';
+};
+
+export type GetWardCoverageErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+};
+
+export type GetWardCoverageError = GetWardCoverageErrors[keyof GetWardCoverageErrors];
+
+export type GetWardCoverageResponses = {
+    /**
+     * OK
+     */
+    200: WardCoverageOverviewResponse;
+};
+
+export type GetWardCoverageResponse = GetWardCoverageResponses[keyof GetWardCoverageResponses];
+
 export type GetWardCapacityData = {
     body?: never;
     path?: never;
@@ -5741,6 +6396,121 @@ export type ListWardPatientsResponses = {
 };
 
 export type ListWardPatientsResponse = ListWardPatientsResponses[keyof ListWardPatientsResponses];
+
+export type ListLeaveRequestsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        staffMemberId?: string;
+        status?: LeaveStatus;
+        type?: LeaveType;
+        from?: string;
+        to?: string;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/leave-requests';
+};
+
+export type ListLeaveRequestsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListLeaveRequestsError = ListLeaveRequestsErrors[keyof ListLeaveRequestsErrors];
+
+export type ListLeaveRequestsResponses = {
+    /**
+     * OK
+     */
+    200: LeaveRequestDtoPagedResult;
+};
+
+export type ListLeaveRequestsResponse = ListLeaveRequestsResponses[keyof ListLeaveRequestsResponses];
+
+export type GetLeaveRequestData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/leave-requests/{id}';
+};
+
+export type GetLeaveRequestErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetLeaveRequestError = GetLeaveRequestErrors[keyof GetLeaveRequestErrors];
+
+export type GetLeaveRequestResponses = {
+    /**
+     * OK
+     */
+    200: LeaveRequestDetailDto;
+};
+
+export type GetLeaveRequestResponse = GetLeaveRequestResponses[keyof GetLeaveRequestResponses];
+
+export type DecideLeaveRequestData = {
+    body?: DecideLeaveRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/leave-requests/{id}/decision';
+};
+
+export type DecideLeaveRequestErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type DecideLeaveRequestError = DecideLeaveRequestErrors[keyof DecideLeaveRequestErrors];
+
+export type DecideLeaveRequestResponses = {
+    /**
+     * OK
+     */
+    200: DecideLeaveResponse;
+};
+
+export type DecideLeaveRequestResponse = DecideLeaveRequestResponses[keyof DecideLeaveRequestResponses];
 
 export type ListMaintenanceSchedulesData = {
     body?: never;
@@ -6203,6 +6973,212 @@ export type RequestMyEmergencyCallCancellationResponses = {
 };
 
 export type RequestMyEmergencyCallCancellationResponse = RequestMyEmergencyCallCancellationResponses[keyof RequestMyEmergencyCallCancellationResponses];
+
+export type ClockInData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/allocations/{id}/clock-in';
+};
+
+export type ClockInErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ClockInError = ClockInErrors[keyof ClockInErrors];
+
+export type ClockInResponses = {
+    /**
+     * OK
+     */
+    200: AllocationDto;
+};
+
+export type ClockInResponse = ClockInResponses[keyof ClockInResponses];
+
+export type ClockOutData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/allocations/{id}/clock-out';
+};
+
+export type ClockOutErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ClockOutError = ClockOutErrors[keyof ClockOutErrors];
+
+export type ClockOutResponses = {
+    /**
+     * OK
+     */
+    200: AllocationDto;
+};
+
+export type ClockOutResponse = ClockOutResponses[keyof ClockOutResponses];
+
+export type GetMyLeaveRequestsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: LeaveStatus;
+    };
+    url: '/me/leave-requests';
+};
+
+export type GetMyLeaveRequestsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+};
+
+export type GetMyLeaveRequestsError = GetMyLeaveRequestsErrors[keyof GetMyLeaveRequestsErrors];
+
+export type GetMyLeaveRequestsResponses = {
+    /**
+     * OK
+     */
+    200: Array<LeaveRequestDto>;
+};
+
+export type GetMyLeaveRequestsResponse = GetMyLeaveRequestsResponses[keyof GetMyLeaveRequestsResponses];
+
+export type CreateMyLeaveRequestData = {
+    body?: CreateLeaveRequest;
+    path?: never;
+    query?: never;
+    url: '/me/leave-requests';
+};
+
+export type CreateMyLeaveRequestErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CreateMyLeaveRequestError = CreateMyLeaveRequestErrors[keyof CreateMyLeaveRequestErrors];
+
+export type CreateMyLeaveRequestResponses = {
+    /**
+     * Created
+     */
+    201: LeaveRequestDetailDto;
+};
+
+export type CreateMyLeaveRequestResponse = CreateMyLeaveRequestResponses[keyof CreateMyLeaveRequestResponses];
+
+export type WithdrawMyLeaveRequestData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/leave-requests/{id}';
+};
+
+export type WithdrawMyLeaveRequestErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type WithdrawMyLeaveRequestError = WithdrawMyLeaveRequestErrors[keyof WithdrawMyLeaveRequestErrors];
+
+export type WithdrawMyLeaveRequestResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type WithdrawMyLeaveRequestResponse = WithdrawMyLeaveRequestResponses[keyof WithdrawMyLeaveRequestResponses];
+
+export type GetMyShiftsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        from?: string;
+        to?: string;
+        includePast?: boolean;
+    };
+    url: '/me/shifts';
+};
+
+export type GetMyShiftsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+};
+
+export type GetMyShiftsError = GetMyShiftsErrors[keyof GetMyShiftsErrors];
+
+export type GetMyShiftsResponses = {
+    /**
+     * OK
+     */
+    200: Array<MyShiftDto>;
+};
+
+export type GetMyShiftsResponse = GetMyShiftsResponses[keyof GetMyShiftsResponses];
 
 export type GetMyActiveDispatchData = {
     body?: never;
@@ -7996,6 +8972,892 @@ export type RejectPrescriptionResponses = {
 };
 
 export type RejectPrescriptionResponse = RejectPrescriptionResponses[keyof RejectPrescriptionResponses];
+
+export type GetCoverageReportData = {
+    body?: never;
+    path?: never;
+    query?: {
+        from?: string;
+        to?: string;
+        wardId?: string;
+    };
+    url: '/reports/coverage';
+};
+
+export type GetCoverageReportErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type GetCoverageReportError = GetCoverageReportErrors[keyof GetCoverageReportErrors];
+
+export type GetCoverageReportResponses = {
+    /**
+     * OK
+     */
+    200: CoverageReport;
+};
+
+export type GetCoverageReportResponse = GetCoverageReportResponses[keyof GetCoverageReportResponses];
+
+export type GetLeaveReportData = {
+    body?: never;
+    path?: never;
+    query?: {
+        from?: string;
+        to?: string;
+        groupBy?: string;
+    };
+    url: '/reports/leave';
+};
+
+export type GetLeaveReportErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type GetLeaveReportError = GetLeaveReportErrors[keyof GetLeaveReportErrors];
+
+export type GetLeaveReportResponses = {
+    /**
+     * OK
+     */
+    200: LeaveReport;
+};
+
+export type GetLeaveReportResponse = GetLeaveReportResponses[keyof GetLeaveReportResponses];
+
+export type GetStaffAgentPerformanceReportData = {
+    body?: never;
+    path?: never;
+    query?: {
+        from?: string;
+        to?: string;
+    };
+    url: '/reports/staff/agent-performance';
+};
+
+export type GetStaffAgentPerformanceReportErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type GetStaffAgentPerformanceReportError = GetStaffAgentPerformanceReportErrors[keyof GetStaffAgentPerformanceReportErrors];
+
+export type GetStaffAgentPerformanceReportResponses = {
+    /**
+     * OK
+     */
+    200: StaffAgentPerformanceReport;
+};
+
+export type GetStaffAgentPerformanceReportResponse = GetStaffAgentPerformanceReportResponses[keyof GetStaffAgentPerformanceReportResponses];
+
+export type ListShiftsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        wardId?: string;
+        from?: string;
+        to?: string;
+        role?: StaffRole;
+        coverageStatus?: CoverageStatus;
+        page?: number;
+        pageSize?: number;
+        sortBy?: string;
+        sortDir?: string;
+    };
+    url: '/shifts';
+};
+
+export type ListShiftsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListShiftsError = ListShiftsErrors[keyof ListShiftsErrors];
+
+export type ListShiftsResponses = {
+    /**
+     * OK
+     */
+    200: ShiftSummaryDtoPagedResult;
+};
+
+export type ListShiftsResponse = ListShiftsResponses[keyof ListShiftsResponses];
+
+export type CreateShiftData = {
+    body?: CreateShiftRequest;
+    path?: never;
+    query?: never;
+    url: '/shifts';
+};
+
+export type CreateShiftErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type CreateShiftError = CreateShiftErrors[keyof CreateShiftErrors];
+
+export type CreateShiftResponses = {
+    /**
+     * Created
+     */
+    201: ShiftDto;
+};
+
+export type CreateShiftResponse = CreateShiftResponses[keyof CreateShiftResponses];
+
+export type CreateShiftsBulkData = {
+    body?: BulkShiftRequest;
+    path?: never;
+    query?: never;
+    url: '/shifts/bulk';
+};
+
+export type CreateShiftsBulkErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type CreateShiftsBulkError = CreateShiftsBulkErrors[keyof CreateShiftsBulkErrors];
+
+export type CreateShiftsBulkResponses = {
+    /**
+     * Created
+     */
+    201: BulkShiftResponse;
+};
+
+export type CreateShiftsBulkResponse = CreateShiftsBulkResponses[keyof CreateShiftsBulkResponses];
+
+export type CancelShiftData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/shifts/{id}';
+};
+
+export type CancelShiftErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CancelShiftError = CancelShiftErrors[keyof CancelShiftErrors];
+
+export type CancelShiftResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type CancelShiftResponse = CancelShiftResponses[keyof CancelShiftResponses];
+
+export type GetShiftData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/shifts/{id}';
+};
+
+export type GetShiftErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetShiftError = GetShiftErrors[keyof GetShiftErrors];
+
+export type GetShiftResponses = {
+    /**
+     * OK
+     */
+    200: ShiftDetailDto;
+};
+
+export type GetShiftResponse = GetShiftResponses[keyof GetShiftResponses];
+
+export type UpdateShiftData = {
+    body?: CreateShiftRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/shifts/{id}';
+};
+
+export type UpdateShiftErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type UpdateShiftError = UpdateShiftErrors[keyof UpdateShiftErrors];
+
+export type UpdateShiftResponses = {
+    /**
+     * OK
+     */
+    200: ShiftDto;
+};
+
+export type UpdateShiftResponse = UpdateShiftResponses[keyof UpdateShiftResponses];
+
+export type GetWardStaffingRulesData = {
+    body?: never;
+    path: {
+        wardId: string;
+    };
+    query?: never;
+    url: '/wards/{wardId}/staffing-rules';
+};
+
+export type GetWardStaffingRulesErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetWardStaffingRulesError = GetWardStaffingRulesErrors[keyof GetWardStaffingRulesErrors];
+
+export type GetWardStaffingRulesResponses = {
+    /**
+     * OK
+     */
+    200: Array<WardStaffingRuleDto>;
+};
+
+export type GetWardStaffingRulesResponse = GetWardStaffingRulesResponses[keyof GetWardStaffingRulesResponses];
+
+export type SetWardStaffingRulesData = {
+    body?: Array<WardStaffingRuleInput>;
+    path: {
+        wardId: string;
+    };
+    query?: never;
+    url: '/wards/{wardId}/staffing-rules';
+};
+
+export type SetWardStaffingRulesErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type SetWardStaffingRulesError = SetWardStaffingRulesErrors[keyof SetWardStaffingRulesErrors];
+
+export type SetWardStaffingRulesResponses = {
+    /**
+     * OK
+     */
+    200: ReplaceWardStaffingRulesResponse;
+};
+
+export type SetWardStaffingRulesResponse = SetWardStaffingRulesResponses[keyof SetWardStaffingRulesResponses];
+
+export type ListSkillsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        search?: string;
+    };
+    url: '/skills';
+};
+
+export type ListSkillsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+};
+
+export type ListSkillsError = ListSkillsErrors[keyof ListSkillsErrors];
+
+export type ListSkillsResponses = {
+    /**
+     * OK
+     */
+    200: Array<SkillDto>;
+};
+
+export type ListSkillsResponse = ListSkillsResponses[keyof ListSkillsResponses];
+
+export type CreateSkillData = {
+    body?: CreateSkillRequest;
+    path?: never;
+    query?: never;
+    url: '/skills';
+};
+
+export type CreateSkillErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CreateSkillError = CreateSkillErrors[keyof CreateSkillErrors];
+
+export type CreateSkillResponses = {
+    /**
+     * Created
+     */
+    201: SkillDto;
+};
+
+export type CreateSkillResponse = CreateSkillResponses[keyof CreateSkillResponses];
+
+export type RetireSkillData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/skills/{id}';
+};
+
+export type RetireSkillErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RetireSkillError = RetireSkillErrors[keyof RetireSkillErrors];
+
+export type RetireSkillResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type RetireSkillResponse = RetireSkillResponses[keyof RetireSkillResponses];
+
+export type UpdateSkillData = {
+    body?: UpdateSkillRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/skills/{id}';
+};
+
+export type UpdateSkillErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type UpdateSkillError = UpdateSkillErrors[keyof UpdateSkillErrors];
+
+export type UpdateSkillResponses = {
+    /**
+     * OK
+     */
+    200: SkillDto;
+};
+
+export type UpdateSkillResponse = UpdateSkillResponses[keyof UpdateSkillResponses];
+
+export type ListStaffSkillsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/staff/{id}/skills';
+};
+
+export type ListStaffSkillsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type ListStaffSkillsError = ListStaffSkillsErrors[keyof ListStaffSkillsErrors];
+
+export type ListStaffSkillsResponses = {
+    /**
+     * OK
+     */
+    200: Array<StaffSkillDto>;
+};
+
+export type ListStaffSkillsResponse = ListStaffSkillsResponses[keyof ListStaffSkillsResponses];
+
+export type GrantStaffSkillData = {
+    body?: GrantStaffSkillRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/staff/{id}/skills';
+};
+
+export type GrantStaffSkillErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type GrantStaffSkillError = GrantStaffSkillErrors[keyof GrantStaffSkillErrors];
+
+export type GrantStaffSkillResponses = {
+    /**
+     * Created
+     */
+    201: StaffSkillDto;
+};
+
+export type GrantStaffSkillResponse = GrantStaffSkillResponses[keyof GrantStaffSkillResponses];
+
+export type RevokeStaffSkillData = {
+    body?: never;
+    path: {
+        staffId: string;
+        skillId: string;
+    };
+    query?: never;
+    url: '/staff/{staffId}/skills/{skillId}';
+};
+
+export type RevokeStaffSkillErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type RevokeStaffSkillError = RevokeStaffSkillErrors[keyof RevokeStaffSkillErrors];
+
+export type RevokeStaffSkillResponses = {
+    /**
+     * OK
+     */
+    200: RevokeStaffSkillResponse;
+};
+
+export type RevokeStaffSkillResponse2 = RevokeStaffSkillResponses[keyof RevokeStaffSkillResponses];
+
+export type ListStaffData = {
+    body?: never;
+    path?: never;
+    query?: {
+        search?: string;
+        role?: StaffRole;
+        skill?: string;
+        department?: string;
+        includeInactive?: boolean;
+        page?: number;
+        pageSize?: number;
+        sortBy?: string;
+        sortDir?: string;
+    };
+    url: '/staff';
+};
+
+export type ListStaffErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListStaffError = ListStaffErrors[keyof ListStaffErrors];
+
+export type ListStaffResponses = {
+    /**
+     * OK
+     */
+    200: StaffSummaryDtoPagedResult;
+};
+
+export type ListStaffResponse = ListStaffResponses[keyof ListStaffResponses];
+
+export type CreateStaffMemberData = {
+    body?: CreateStaffMemberRequest;
+    path?: never;
+    query?: never;
+    url: '/staff';
+};
+
+export type CreateStaffMemberErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CreateStaffMemberError = CreateStaffMemberErrors[keyof CreateStaffMemberErrors];
+
+export type CreateStaffMemberResponses = {
+    /**
+     * Created
+     */
+    201: StaffMemberDto;
+};
+
+export type CreateStaffMemberResponse = CreateStaffMemberResponses[keyof CreateStaffMemberResponses];
+
+export type GetStaffMemberData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/staff/{id}';
+};
+
+export type GetStaffMemberErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetStaffMemberError = GetStaffMemberErrors[keyof GetStaffMemberErrors];
+
+export type GetStaffMemberResponses = {
+    /**
+     * OK
+     */
+    200: StaffMemberDetailDto;
+};
+
+export type GetStaffMemberResponse = GetStaffMemberResponses[keyof GetStaffMemberResponses];
+
+export type UpdateStaffMemberData = {
+    body?: UpdateStaffMemberRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/staff/{id}';
+};
+
+export type UpdateStaffMemberErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type UpdateStaffMemberError = UpdateStaffMemberErrors[keyof UpdateStaffMemberErrors];
+
+export type UpdateStaffMemberResponses = {
+    /**
+     * OK
+     */
+    200: UpdateStaffMemberResponse;
+};
+
+export type UpdateStaffMemberResponse2 = UpdateStaffMemberResponses[keyof UpdateStaffMemberResponses];
+
+export type DeactivateStaffMemberData = {
+    body?: DeactivateStaffMemberRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/staff/{id}/deactivate';
+};
+
+export type DeactivateStaffMemberErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type DeactivateStaffMemberError = DeactivateStaffMemberErrors[keyof DeactivateStaffMemberErrors];
+
+export type DeactivateStaffMemberResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeactivateStaffMemberResponse = DeactivateStaffMemberResponses[keyof DeactivateStaffMemberResponses];
+
+export type ReactivateStaffMemberData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/staff/{id}/reactivate';
+};
+
+export type ReactivateStaffMemberErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ReactivateStaffMemberError = ReactivateStaffMemberErrors[keyof ReactivateStaffMemberErrors];
+
+export type ReactivateStaffMemberResponses = {
+    /**
+     * OK
+     */
+    200: StaffMemberDto;
+};
+
+export type ReactivateStaffMemberResponse = ReactivateStaffMemberResponses[keyof ReactivateStaffMemberResponses];
 
 export type ListBedAvailabilityData = {
     body?: never;

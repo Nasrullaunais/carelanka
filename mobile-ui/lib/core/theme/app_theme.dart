@@ -425,7 +425,7 @@ class BrandSurfaces extends ThemeExtension<BrandSurfaces> {
   final Color? heroGlow;
   final Color? pageWash;
 
-  // (background, foreground) pairs for shortcut tiles, in a fixed order: teal, violet, amber, rose.
+  // (background, foreground) pairs for shortcut tiles. Light: teal, violet, amber, rose.
   final List<(Color, Color)> accents;
 
   static const light = BrandSurfaces(
@@ -444,19 +444,20 @@ class BrandSurfaces extends ThemeExtension<BrandSurfaces> {
     ],
   );
 
+  // Dark stays muted on purpose: a saturated gradient and four neon tiles read as a consumer
+  // app on a dark background, so every tile shares one quiet teal.
   static const dark = BrandSurfaces(
-    heroFrom: Color(0xFF0FA697),
-    heroTo: Color(0xFF2F6FE0),
-    onHero: Color(0xFFFFFFFF),
-    onHeroMuted: Color(0xFFD6ECF5),
-    heroTrack: Color(0x40FFFFFF),
-    heroChip: Color(0x33FFFFFF),
-    heroGlow: Color(0x552F6FE0),
+    heroFrom: Color(0xFF15343A),
+    heroTo: Color(0xFF16263A),
+    onHero: Color(0xFFF1F4FA),
+    onHeroMuted: Color(0xFFA9BAC8),
+    heroTrack: Color(0x2EFFFFFF),
+    heroChip: Color(0x1FFFFFFF),
     accents: [
-      (Color(0xFF0E3A3A), Color(0xFF3FE0C8)),
-      (Color(0xFF221F4A), Color(0xFF9B8CFF)),
-      (Color(0xFF3A2A12), Color(0xFFFFB45C)),
-      (Color(0xFF3A1622), Color(0xFFFF6B8B)),
+      (Color(0xFF172234), Color(0xFF7CCFC2)),
+      (Color(0xFF172234), Color(0xFF7CCFC2)),
+      (Color(0xFF172234), Color(0xFF7CCFC2)),
+      (Color(0xFF172234), Color(0xFF7CCFC2)),
     ],
   );
 

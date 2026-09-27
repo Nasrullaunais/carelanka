@@ -8,6 +8,7 @@ import 'package:retrofit/retrofit.dart';
 import '../models/lookup_staff_request.dart';
 import '../models/staff_lookup_result.dart';
 import '../models/ward_capacity_summary.dart';
+import '../models/ward_coverage_overview_response.dart';
 
 part 'integration_api.g.dart';
 
@@ -18,6 +19,11 @@ abstract class IntegrationApi {
   @POST('/staff/lookup')
   Future<List<StaffLookupResult>> lookupStaff({
     @Body() LookupStaffRequest? body,
+  });
+
+  @GET('/coverage/wards')
+  Future<WardCoverageOverviewResponse> getWardCoverage({
+    @Query('at') DateTime? at,
   });
 
   @GET('/capacity/wards')

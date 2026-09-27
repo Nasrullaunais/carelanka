@@ -20,6 +20,7 @@ using CareLanka.Api.Agents.Equipment;
 using CareLanka.Api.Agents.Patient;
 using CareLanka.Api.Services.Patient;
 using CareLanka.Api.Services.Staff;
+using CareLanka.Api.Agents.Staff;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -479,6 +480,15 @@ builder.Services.AddScoped<IBillingRateService, BillingRateService>();
 builder.Services.AddScoped<IMeService, MeService>();
 builder.Services.AddScoped<ISkillService, SkillService>();
 builder.Services.AddScoped<IStaffMemberService, StaffMemberService>();
+builder.Services.AddScoped<IAllocationService, AllocationService>();
+builder.Services.AddScoped<ILeaveRequestService, LeaveRequestService>();
+builder.Services.AddScoped<IMyRosterService, MyRosterService>();
+builder.Services.AddScoped<IWardCoverageService, WardCoverageService>();
+builder.Services.AddScoped<IStaffReportsService, StaffReportsService>();
+builder.Services.AddScoped<IStaffAllocationAgentTools, StaffAllocationAgentTools>();
+builder.Services.AddScoped<RosterProposalValidator>();
+builder.Services.AddScoped<IStaffAllocationAgent, StaffAllocationAgent>();
+builder.Services.AddScoped<IRosterProposalService, RosterProposalService>();
 
 builder.Services.AddScoped<IBedRegistryService, BedRegistryService>();
 

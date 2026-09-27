@@ -6,15 +6,38 @@ import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
 import '../models/call_priority.dart';
+import '../models/coverage_report.dart';
 import '../models/emergency_agent_performance_report.dart';
 import '../models/fleet_utilisation_report.dart';
+import '../models/leave_report.dart';
 import '../models/response_time_report.dart';
+import '../models/staff_agent_performance_report.dart';
 
 part 'reports_api.g.dart';
 
 @RestApi()
 abstract class ReportsApi {
   factory ReportsApi(Dio dio, {String? baseUrl}) = _ReportsApi;
+
+  @GET('/reports/coverage')
+  Future<CoverageReport> getCoverageReport({
+    @Query('from') DateTime? from,
+    @Query('to') DateTime? to,
+    @Query('wardId') String? wardId,
+  });
+
+  @GET('/reports/leave')
+  Future<LeaveReport> getLeaveReport({
+    @Query('from') DateTime? from,
+    @Query('to') DateTime? to,
+    @Query('groupBy') String? groupBy,
+  });
+
+  @GET('/reports/staff/agent-performance')
+  Future<StaffAgentPerformanceReport> getStaffAgentPerformanceReport({
+    @Query('from') DateTime? from,
+    @Query('to') DateTime? to,
+  });
 
   @GET('/reports/emergency/response-times')
   Future<ResponseTimeReport> getEmergencyResponseTimeReport({

@@ -14,6 +14,8 @@ import {
   canOpenDischargeBoard,
   canSetBillingRates,
   canReadCareQueue,
+  canViewStaff,
+  canManageLeave,
 } from './permissions';
 
 export type Destination = {
@@ -133,6 +135,24 @@ export const destinations: Destination[] = [
     label: 'Pharmacy',
     description: 'Search medicines and supplies, see what is on the shelf, record what moves.',
     canAccess: canReadEquipment,
+  },
+  {
+    to: '/staff',
+    label: 'Staff management',
+    description: 'Staff directory, account creation, role assignments, and active status.',
+    canAccess: canViewStaff,
+  },
+  {
+    to: '/staff/coverage',
+    label: 'Ward staffing coverage',
+    description: 'Real-time ward staffing levels, headcount requirements, and coverage status.',
+    canAccess: canViewStaff,
+  },
+  {
+    to: '/staff/leave-approval',
+    label: 'Staff leave approval',
+    description: 'Review and decide staff leave requests, evaluate coverage impacts, and trigger roster proposals.',
+    canAccess: canManageLeave,
   },
 ];
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Popover, PopoverContent, PopoverDialog } from '@heroui/react';
-import { ChevronLeft, ChevronRight, LayoutDashboard, LogOut, UserRound } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LayoutDashboard, LogOut, UserRound, Users } from 'lucide-react';
 import { logoutMutation } from '../services/api/generated/@tanstack/react-query.gen';
 import { clearSession, getSession } from '../services/auth/session';
 import { useSession } from '../services/auth/useSession';
@@ -53,10 +53,18 @@ export function AppShell() {
       <nav id="workspace-navigation" className="sidebar-nav" aria-label="Main navigation">
         <NavLink to="/" end className="sidebar-link" onClick={closeMobileNavigation} title="Dashboard" aria-label="Dashboard"><LayoutDashboard size={19} aria-hidden="true" /><span>Dashboard</span></NavLink>
         {groups.map((group) => {
-          const links = destinations.filter((destination) => destination.group === group);
+          const links = destinations.filter((destination) => (destination.group ?? 'Administration') === group);
           return links.length > 0 && <div className="sidebar-group" key={group}>
             <p className="sidebar-group-label">{group}</p>
-            {links.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} className="sidebar-link" onClick={closeMobileNavigation} title={label} aria-label={label}><Icon size={19} aria-hidden="true" /><span>{label}</span></NavLink>)}
+            {links.map(({ to, label, icon }) => {
+              const Icon = icon ?? Users;
+              return (
+                <NavLink key={to} to={to} className="sidebar-link" onClick={closeMobileNavigation} title={label} aria-label={label}>
+                  <Icon size={19} aria-hidden="true" />
+                  <span>{label}</span>
+                </NavLink>
+              );
+            })}
           </div>;
         })}
       </nav>

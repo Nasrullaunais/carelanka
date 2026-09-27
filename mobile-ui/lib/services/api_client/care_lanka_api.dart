@@ -5,6 +5,7 @@
 import 'package:dio/dio.dart';
 
 import 'clients/admissions_api.dart';
+import 'clients/allocations_api.dart';
 import 'clients/ambulances_api.dart';
 import 'clients/auth_api.dart';
 import 'clients/beds_api.dart';
@@ -20,14 +21,18 @@ import 'clients/equipment_api.dart';
 import 'clients/health_api.dart';
 import 'clients/integration_api.dart';
 import 'clients/laboratory_api.dart';
+import 'clients/leave_api.dart';
 import 'clients/maintenance_api.dart';
 import 'clients/monitoring_api.dart';
 import 'clients/my_calls_api.dart';
+import 'clients/my_roster_api.dart';
 import 'clients/my_run_api.dart';
 import 'clients/patient_self_service_api.dart';
 import 'clients/patients_api.dart';
 import 'clients/pharmacy_api.dart';
 import 'clients/reports_api.dart';
+import 'clients/roster_agent_api.dart';
+import 'clients/shifts_api.dart';
 import 'clients/skills_api.dart';
 import 'clients/staff_api.dart';
 import 'clients/wards_and_beds_api.dart';
@@ -46,6 +51,7 @@ class CareLankaApi {
   static String get version => 'v1';
 
   AdmissionsApi? _admissions;
+  AllocationsApi? _allocations;
   AmbulancesApi? _ambulances;
   AuthApi? _auth;
   BedsApi? _beds;
@@ -61,19 +67,25 @@ class CareLankaApi {
   HealthApi? _health;
   IntegrationApi? _integration;
   LaboratoryApi? _laboratory;
+  LeaveApi? _leave;
   MaintenanceApi? _maintenance;
   MonitoringApi? _monitoring;
   MyCallsApi? _myCalls;
+  MyRosterApi? _myRoster;
   MyRunApi? _myRun;
   PatientSelfServiceApi? _patientSelfService;
   PatientsApi? _patients;
   PharmacyApi? _pharmacy;
   ReportsApi? _reports;
+  RosterAgentApi? _rosterAgent;
+  ShiftsApi? _shifts;
   SkillsApi? _skills;
   StaffApi? _staff;
   WardsAndBedsApi? _wardsAndBeds;
 
   AdmissionsApi get admissions => _admissions ??= AdmissionsApi(_dio, baseUrl: _baseUrl);
+
+  AllocationsApi get allocations => _allocations ??= AllocationsApi(_dio, baseUrl: _baseUrl);
 
   AmbulancesApi get ambulances => _ambulances ??= AmbulancesApi(_dio, baseUrl: _baseUrl);
 
@@ -105,11 +117,15 @@ class CareLankaApi {
 
   LaboratoryApi get laboratory => _laboratory ??= LaboratoryApi(_dio, baseUrl: _baseUrl);
 
+  LeaveApi get leave => _leave ??= LeaveApi(_dio, baseUrl: _baseUrl);
+
   MaintenanceApi get maintenance => _maintenance ??= MaintenanceApi(_dio, baseUrl: _baseUrl);
 
   MonitoringApi get monitoring => _monitoring ??= MonitoringApi(_dio, baseUrl: _baseUrl);
 
   MyCallsApi get myCalls => _myCalls ??= MyCallsApi(_dio, baseUrl: _baseUrl);
+
+  MyRosterApi get myRoster => _myRoster ??= MyRosterApi(_dio, baseUrl: _baseUrl);
 
   MyRunApi get myRun => _myRun ??= MyRunApi(_dio, baseUrl: _baseUrl);
 
@@ -120,6 +136,10 @@ class CareLankaApi {
   PharmacyApi get pharmacy => _pharmacy ??= PharmacyApi(_dio, baseUrl: _baseUrl);
 
   ReportsApi get reports => _reports ??= ReportsApi(_dio, baseUrl: _baseUrl);
+
+  RosterAgentApi get rosterAgent => _rosterAgent ??= RosterAgentApi(_dio, baseUrl: _baseUrl);
+
+  ShiftsApi get shifts => _shifts ??= ShiftsApi(_dio, baseUrl: _baseUrl);
 
   SkillsApi get skills => _skills ??= SkillsApi(_dio, baseUrl: _baseUrl);
 

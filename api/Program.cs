@@ -91,7 +91,7 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
     };
 });
 
-var connectionString = builder.Configuration.GetConnectionString("CareLanka")
+var connectionString = builder.Configuration.GetConnectionString(CareLankaDatabase.ConnectionStringName)
     ?? throw new InvalidOperationException(
         "ConnectionStrings:CareLanka is not configured. See api/README.md for local setup.");
 
@@ -99,8 +99,7 @@ builder.Services.AddSingleton<TimestampInterceptor>();
 builder.Services.AddSingleton<AmbulanceStatusHistoryInterceptor>();
 
 builder.Services.AddDbContext<CareLankaDbContext>((provider, options) => options
-    .UseNpgsql(connectionString)
-    .UseSnakeCaseNamingConvention()
+    .UseCareLankaDatabase(connectionString)
     .AddInterceptors(
         provider.GetRequiredService<AmbulanceStatusHistoryInterceptor>(),
         provider.GetRequiredService<TimestampInterceptor>()));

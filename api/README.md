@@ -10,10 +10,10 @@ Four people need this to start on four machines. Three commands, then it runs.
 
 - **.NET 8 SDK**
 - **PostgreSQL 14 or newer**, running locally
-- **`dotnet-ef`**, once per machine:
+- **`dotnet-ef`**, pinned in `.config/dotnet-tools.json`. Once per clone, from the repo root:
 
   ```
-  dotnet tool install --global dotnet-ef --version 8.*
+  dotnet tool restore
   ```
 
 To run the integration tests, Docker must also be running. `dotnet test` starts a

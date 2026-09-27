@@ -62,8 +62,8 @@ skeleton")*. `android/` and `ios/` exist, the generated `api_client` is wired up
 `lib/features/patient/` is a built and tested feature. The other three feature folders are
 still empty.
 
-Still not built anywhere: the audit interceptor, `AgentWorkflow` / `AgentProposedChange`, any
-AI agent, and CI (there is no `.github/`).
+Still not built anywhere: the audit interceptor, `AgentWorkflow` / `AgentProposedChange`, and
+any AI agent.
 
 **`AgentWorkflow` is now the thing in front of the most work.** It is common, group-owned and
 settled by ADR 3, and every agent in the project needs it — Patient Management's two are
@@ -497,13 +497,15 @@ component and add yours at the end of your group.
 
 # CI
 
-**Not built yet — there is no `.github/`.** Until it exists, nothing checks a PR
-automatically and the gates below are things you run by hand. `BUILD_PLAN.md` §7
-row 5 tracks it; assignment §13 grades it.
+`.github/workflows/ci.yml` runs on every push and PR to `main`. Four check jobs:
+`dotnet build` + `dotnet test`; web `typecheck` + `test` + `build`; `flutter analyze` +
+`flutter test`; and the contract job — spec checks, a migration for every model change,
+and both generated clients regenerated against the running API with zero drift.
 
-What it should run on every PR into `main`: `dotnet build` + `dotnet test`;
-`bun install --frozen-lockfile` → `check:codegen` → `typecheck`;
-`flutter analyze` + `flutter test`; spec validation and uniqueness checks.
+Only when all four pass: four images to `ghcr.io`, then (on `main` only) deploy to the
+Azure server over SSH and check `/api/health`. `deploy/README.md` is the server setup.
+
+**A red check blocks the deploy.** Fix the cause; don't loosen the check.
 
 # Strict Rules
 - DO NOT INCLUDE COMMENTS UNLESS NECESSARY, COMMENT ONLY IF A FUTURE DEV WOULD BE CONFUSED OR MISLED.

@@ -231,6 +231,9 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.PatientOnly,
         policy => policy.RequireRole(EnumWire.ToWire(PrincipalRole.Patient)));
 
+    options.AddPolicy(Policies.AnyPrincipal,
+        policy => policy.RequireRole([.. allStaffRoles, EnumWire.ToWire(PrincipalRole.Patient)]));
+
     options.AddPolicy(Policies.EmergencyResponder, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.DutyManager),
         EnumWire.ToWire(StaffRole.AmbulanceCrew)));
@@ -425,6 +428,7 @@ builder.Services.AddScoped<IEmergencyReportService, EmergencyReportService>();
 builder.Services.AddScoped<IDeviceTokenService, DeviceTokenService>();
 builder.Services.AddScoped<IRecipientResolver, RecipientResolver>();
 builder.Services.AddScoped<INotifier, Notifier>();
+builder.Services.AddScoped<IInboxService, InboxService>();
 builder.Services.AddScoped<PushDeliveryProcessor>();
 builder.Services.AddSingleton<IPushSender>(services =>
     string.IsNullOrWhiteSpace(services.GetRequiredService<IOptions<PushOptions>>().Value.CredentialsPath)

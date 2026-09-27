@@ -70,6 +70,11 @@ tags:
     description: |
       The group-owned agent workflow record. Read the trace, approve or reject the one
       high-impact gate. Domain agents write here; nothing here writes domain data.
+  - name: Notifications
+    description: |
+      The caller's own inbox, staff or patient alike. Every route here acts on whoever
+      the bearer token belongs to - there is no way to read anyone else's notifications
+      through this surface, a mismatched id is a 404 rather than a 403.
 
 paths:
 
@@ -324,6 +329,98 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  # ============================================================
+  # Notifications - the caller's own inbox
+  # ============================================================
+
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: List my notifications
+      description: |
+        Roles: any staff or patient, for their own inbox only.
+      operationId: listMyNotifications
+      parameters:
+        - name: unreadOnly
+          in: query
+          schema: { type: boolean, default: false }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+      responses:
+        '200':
+          description: A page of the caller's own notifications
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/InboxNotification' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /notifications/unread-count:
+    get:
+      tags: [Notifications]
+      summary: How many of my notifications are unread
+      description: |
+        Roles: any staff or patient, for their own inbox only. What the inbox bell badge
+        polls, and what a reconnect after a dropped live connection falls back to.
+      operationId: getMyUnreadNotificationCount
+      responses:
+        '200':
+          description: The caller's own unread count
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UnreadNotificationCount' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /notifications/{id}/read:
+    post:
+      tags: [Notifications]
+      summary: Mark one of my notifications read
+      description: |
+        Roles: any staff or patient, for their own inbox only. Someone else's
+        notification id is a 404, so ids cannot be probed. Already read is not an
+        error - calling it twice just returns the same row.
+      operationId: markNotificationRead
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The notification, now read
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InboxNotification' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /notifications/read-all:
+    post:
+      tags: [Notifications]
+      summary: Mark my whole inbox read
+      description: |
+        Roles: any staff or patient, for their own inbox only. Returns the caller's
+        unread count, which is always zero right after this call.
+      operationId: markAllNotificationsRead
+      responses:
+        '200':
+          description: The caller's own unread count, now zero
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UnreadNotificationCount' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   # ============================================================
   # Workflows - the group-owned agent surface
@@ -816,6 +913,42 @@ components:
             for a patient who has an account but has never been treated here. A patient
             client must handle null - it is the ordinary state for a new sign-up, not an
             error.
+
+    # ---------- notifications ----------
+
+    NotificationType:
+      type: string
+      description: |
+        One value per row in the event catalogue (`docs/build/notifications.md` §5).
+        Only `dispatch_assigned` exists today; the rest of the catalogue is later phases.
+      enum:
+        - dispatch_assigned
+
+    InboxNotification:
+      type: object
+      description: |
+        Not `Notification` - that name is too generic to stay unique across specs, and
+        this shape is deliberately the inbox's own view: no recipient id, no dedupe key,
+        nothing that would let one caller learn about another's delivery.
+      required: [id, type, title, body, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        type: { $ref: '#/components/schemas/NotificationType' }
+        title: { type: string }
+        body: { type: string }
+        entity_type:
+          type: string
+          nullable: true
+          description: What the notification is about, e.g. `dispatch`. Opaque to the client.
+        entity_id: { type: string, format: uuid, nullable: true }
+        read_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    UnreadNotificationCount:
+      type: object
+      required: [count]
+      properties:
+        count: { type: integer }
 
     # ---------- workflows ----------
 

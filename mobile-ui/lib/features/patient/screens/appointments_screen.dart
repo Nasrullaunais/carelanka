@@ -57,7 +57,11 @@ class AppointmentsScreenState extends State<AppointmentsScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 44),
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+            ),
             child: const Text('Cancel visit'),
           ),
         ],

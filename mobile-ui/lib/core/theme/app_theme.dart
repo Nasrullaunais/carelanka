@@ -314,10 +314,31 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         headerBackgroundColor: brand.heroFrom,
         headerForegroundColor: brand.onHero,
+        headerHeadlineStyle: text.headlineSmall,
+        weekdayStyle: text.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
+        dayStyle: text.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusXL)),
       ),
       timePickerTheme: TimePickerThemeData(
         backgroundColor: scheme.surface,
+        dialBackgroundColor: scheme.surfaceContainerHigh,
+        hourMinuteColor: WidgetStateColor.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? scheme.primaryContainer
+              : scheme.surfaceContainerHigh,
+        ),
+        hourMinuteTextColor: WidgetStateColor.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? scheme.onPrimaryContainer
+              : scheme.onSurface,
+        ),
+        dayPeriodColor: scheme.primaryContainer,
+        dayPeriodTextColor: WidgetStateColor.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? scheme.onPrimaryContainer
+              : scheme.onSurfaceVariant,
+        ),
+        dayPeriodBorderSide: BorderSide(color: fieldBorder),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusXL)),
       ),
       popupMenuTheme: PopupMenuThemeData(

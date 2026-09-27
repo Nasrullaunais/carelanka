@@ -1,3 +1,4 @@
+using CareLanka.Api.Common.Persistence;
 using CareLanka.Api.Data;
 using CareLanka.Api.Data.Entities.Common;
 using CareLanka.Api.Data.Enums;
@@ -53,8 +54,11 @@ public sealed class PushDeliveryProcessor(
         }
 
         var message = new PushMessage(notification.Title, notification.Body, notification.DedupeKey,
+            notification.Type.AndroidChannel(),
             new Dictionary<string, string>
             {
+                ["id"] = notification.Id.ToString(),
+                ["type"] = EnumWire.ToWire(notification.Type),
                 ["entity_type"] = notification.EntityType ?? string.Empty,
                 ["entity_id"] = notification.EntityId?.ToString() ?? string.Empty
             });

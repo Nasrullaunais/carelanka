@@ -72,6 +72,43 @@ public sealed class DeviceTokenEndpointTests
     }
 
     [Fact]
+    public async Task A_patient_can_register_and_unregister_their_own_phone()
+    {
+        using var patient = await PatientClientAsync();
+        var token = NewToken();
+
+        var id = (await ReadAsync(await Register(patient, token))).GetProperty("id").GetGuid();
+
+        using (var scope = _application.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+            var device = await db.DeviceTokens.SingleAsync(d => d.Token == token);
+            Assert.Null(device.StaffMemberId);
+            Assert.NotNull(device.PatientAccountId);
+        }
+
+        Assert.Equal(HttpStatusCode.NoContent, (await patient.DeleteAsync($"/api/device-tokens/{id}")).StatusCode);
+        Assert.NotNull(await RevokedAtAsync(token));
+    }
+
+    [Fact]
+    public async Task A_phone_moving_from_staff_to_a_patient_stops_belonging_to_the_staff_member()
+    {
+        using var crew = await ClientAsync(ApiApplication.AmbulanceEmail);
+        using var patient = await PatientClientAsync();
+        var token = NewToken();
+
+        await Register(crew, token);
+        await Register(patient, token);
+
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        var device = await db.DeviceTokens.SingleAsync(d => d.Token == token);
+        Assert.Null(device.StaffMemberId);
+        Assert.NotNull(device.PatientAccountId);
+    }
+
+    [Fact]
     public async Task An_empty_token_or_unknown_platform_is_rejected_and_anonymous_callers_are_kept_out()
     {
         using var crew = await ClientAsync(ApiApplication.AmbulanceEmail);
@@ -105,6 +142,19 @@ public sealed class DeviceTokenEndpointTests
         using var login = await client.PostAsJsonAsync("/api/auth/login", new { email, password = ApiApplication.Password });
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
             "Bearer", (await ReadAsync(login)).GetProperty("access_token").GetString());
+        return client;
+    }
+
+    private async Task<HttpClient> PatientClientAsync()
+    {
+        var client = _application.CreateClient();
+        using var registered = await client.PostAsJsonAsync("/api/auth/patient/register", new
+        {
+            username = $"device.patient.{Guid.NewGuid():N}",
+            password = ApiApplication.Password
+        });
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", (await ReadAsync(registered)).GetProperty("access_token").GetString());
         return client;
     }
 

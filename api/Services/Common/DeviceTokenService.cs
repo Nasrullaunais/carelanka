@@ -1,6 +1,7 @@
 using CareLanka.Api.Common.Exceptions;
 using CareLanka.Api.Data;
 using CareLanka.Api.Data.Entities.Common;
+using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Common;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -26,13 +27,22 @@ public sealed class DeviceTokenService(CareLankaDbContext db, ICurrentUser curre
 
     public async Task UnregisterAsync(Guid id, CancellationToken ct = default)
     {
-        var device = await db.DeviceTokens.SingleOrDefaultAsync(d => d.Id == id && d.StaffMemberId == currentUser.Id, ct)
+        var query = currentUser.PrincipalType switch
+        {
+            PrincipalType.Staff => db.DeviceTokens.Where(d => d.StaffMemberId == currentUser.Id),
+            PrincipalType.Patient => db.DeviceTokens.Where(d => d.PatientAccountId == currentUser.Id),
+            _ => db.DeviceTokens.Where(_ => false)
+        };
+
+        var device = await query.SingleOrDefaultAsync(d => d.Id == id, ct)
             ?? throw new NotFoundException("Device", id);
         if (device.RevokedAt is not null) return;
         device.RevokedAt = clock.GetUtcNow();
         await db.SaveChangesAsync(ct);
     }
 
+    // A shared ward phone must never show the last user's alerts, so signing in as someone
+    // else moves the token to them - the previous owner column is cleared, not just left stale.
     private async Task<DeviceRegistration> UpsertAsync(string token, RegisterDeviceRequest request, CancellationToken ct)
     {
         var now = clock.GetUtcNow();
@@ -43,7 +53,8 @@ public sealed class DeviceTokenService(CareLankaDbContext db, ICurrentUser curre
             db.DeviceTokens.Add(device);
         }
 
-        device.StaffMemberId = currentUser.Id;
+        device.StaffMemberId = currentUser.PrincipalType == PrincipalType.Staff ? currentUser.Id : null;
+        device.PatientAccountId = currentUser.PrincipalType == PrincipalType.Patient ? currentUser.Id : null;
         device.Platform = request.Platform;
         device.LastSeenAt = now;
         device.RevokedAt = null;

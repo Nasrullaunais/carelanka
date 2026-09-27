@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/notifications/notification_bell.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/friendly_date.dart';
 import '../../../core/widgets/async_data.dart';
@@ -164,6 +165,7 @@ class _Greeting extends StatelessWidget {
             ],
           ),
         ),
+        const NotificationBell(),
         CircleAvatar(
           radius: 22,
           backgroundColor: theme.colorScheme.primaryContainer,

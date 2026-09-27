@@ -23,6 +23,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
+import '../../fake_inbox.dart';
 import '../equipment/fake_prescriptions.dart';
 import 'fake_patient_service.dart';
 
@@ -128,6 +129,7 @@ void main() {
           ChangeNotifierProvider.value(value: appointmentsController),
           ChangeNotifierProvider.value(value: auth),
           Provider<PrescriptionService>.value(value: FakePrescriptionService()),
+          fakeInboxProvider(),
         ],
         child: MaterialApp(theme: theme, home: screen),
       ),

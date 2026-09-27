@@ -65,7 +65,7 @@ public sealed class PushDeliveryTests
         var message = SentTo(sender, staffId).Single().Message;
         Assert.Equal(saved.Title, message.Title);
         Assert.Equal(saved.Body, message.Body);
-        Assert.Equal(["entity_id", "entity_type"], message.Data.Keys.Order());
+        Assert.Equal(["entity_id", "entity_type", "id", "type"], message.Data.Keys.Order());
         Assert.Equal(saved.EntityId.ToString(), message.Data["entity_id"]);
     }
 

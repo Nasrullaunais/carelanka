@@ -446,7 +446,8 @@ class BrandSurfaces extends ThemeExtension<BrandSurfaces> {
   final Color? heroGlow;
   final Color? pageWash;
 
-  // (background, foreground) pairs for shortcut tiles. Light: teal, violet, amber, rose.
+  // (background, foreground) pairs for shortcut tiles. Kept to one cool family so red stays
+  // reserved for the ambulance card.
   final List<(Color, Color)> accents;
 
   static const light = BrandSurfaces(
@@ -458,10 +459,10 @@ class BrandSurfaces extends ThemeExtension<BrandSurfaces> {
     heroChip: Color(0xB3FFFFFF),
     pageWash: Color(0xFFE3F6F1),
     accents: [
-      (Color(0xFFDDF5EE), Color(0xFF0F7C70)),
-      (Color(0xFFE9E6FD), Color(0xFF5B4FD6)),
-      (Color(0xFFFFEEDD), Color(0xFFB85A08)),
-      (Color(0xFFFFE6EA), Color(0xFFC9304F)),
+      (Color(0xFFDDF3EE), Color(0xFF0F7C70)),
+      (Color(0xFFE2ECF6), Color(0xFF2D5F8B)),
+      (Color(0xFFDCEFF2), Color(0xFF1C6C7A)),
+      (Color(0xFFE6ECF0), Color(0xFF46606E)),
     ],
   );
 

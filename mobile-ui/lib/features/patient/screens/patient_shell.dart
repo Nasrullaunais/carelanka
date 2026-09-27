@@ -39,7 +39,7 @@ class _PatientShellState extends State<PatientShell> {
       tab: PatientTab.appointments,
       icon: Icons.event_outlined,
       on: Icons.event,
-      label: 'Appointments'
+      label: 'My visits'
     ),
     (
       tab: PatientTab.myStay,
@@ -136,7 +136,7 @@ class _PatientShellState extends State<PatientShell> {
               child: IndexedStack(
                 index: _tab.index,
                 children: [
-                  HomeScreen(onOpenTab: _openTab),
+                  HomeScreen(onOpenTab: _openTab, onBookVisit: _bookVisit),
                   AppointmentsScreen(key: _appointmentsKey),
                   MyStayScreen(onBookVisit: _bookVisit),
                   MyPrescriptionsTab(key: _prescriptionsKey),
@@ -144,20 +144,134 @@ class _PatientShellState extends State<PatientShell> {
                 ],
               ),
             ),
-            bottomNavigationBar: NavigationBar(
-              selectedIndex: _tab.index,
-              onDestinationSelected: (index) => _openTab(PatientTab.values[index]),
-              destinations: [
-                for (final item in _bar)
-                  NavigationDestination(
-                    icon: Icon(item.icon),
-                    selectedIcon: Icon(item.on),
-                    label: item.label,
-                  ),
-              ],
+            bottomNavigationBar: _PatientNavBar(
+              selected: _tab,
+              onSelect: _openTab,
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+// A hand-built bar rather than NavigationBar: that one gives every tab a fixed fifth of the width
+// and wraps a long name ("Prescriptions") onto a second line. Here the open tab's name shrinks to
+// fit instead, and the others show only their icon, named by a long-press tooltip.
+class _PatientNavBar extends StatelessWidget {
+  const _PatientNavBar({required this.selected, required this.onSelect});
+
+  final PatientTab selected;
+  final void Function(PatientTab tab) onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.navigationBarTheme.backgroundColor,
+        border: Border(top: BorderSide(color: theme.dividerColor)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 76,
+          child: Row(
+            children: [
+              for (final item in _PatientShellState._bar)
+                Expanded(
+                  child: _NavItem(
+                    icon: item.icon,
+                    selectedIcon: item.on,
+                    label: item.label,
+                    selected: item.tab == selected,
+                    onTap: () => onSelect(item.tab),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  const _NavItem({
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  static const _duration = Duration(milliseconds: 220);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      excludeSemantics: true,
+      child: Tooltip(
+        message: label,
+        child: InkResponse(
+          onTap: onTap,
+          radius: 36,
+          highlightShape: BoxShape.rectangle,
+          containedInkWell: true,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedContainer(
+                duration: _duration,
+                curve: Curves.easeOutCubic,
+                width: 60,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: selected ? scheme.primaryContainer : Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  selected ? selectedIcon : icon,
+                  size: 24,
+                  color: selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
+                ),
+              ),
+              AnimatedSize(
+                duration: _duration,
+                curve: Curves.easeOutCubic,
+                child: selected
+                    ? Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            label,
+                            maxLines: 1,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: scheme.onSurface,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      )
+                    : const SizedBox(width: double.infinity),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

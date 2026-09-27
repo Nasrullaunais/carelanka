@@ -44,7 +44,7 @@ services:
         if [ "$$(psql -Atc "SELECT to_regclass('public.local_seed_complete') IS NOT NULL")" = t ]; then
           echo 'Demo data already seeded'; exit 0
         fi
-        for file in /seed/001_identity.sql /seed/002_patient_wards.sql /seed/002_pharmacy_categories.sql /seed/003_equipment_beds.sql /seed/004_patient_demo_data.sql /seed/005_patient_medical_profiles.sql /seed/006_emergency_demo_data.sql; do
+        for file in /seed/001_identity.sql /seed/002_patient_wards.sql /seed/002_pharmacy_categories.sql /seed/003_equipment_beds.sql /seed/004_patient_demo_data.sql /seed/005_patient_medical_profiles.sql /seed/006_emergency_demo_data.sql /seed/007_emergency_demo_fleet.sql; do
           psql -v ON_ERROR_STOP=1 -f "$$file"
         done
         psql -v ON_ERROR_STOP=1 -c 'CREATE TABLE local_seed_complete (seeded_at timestamptz NOT NULL DEFAULT now())'
@@ -62,6 +62,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__CareLanka: Host=db;Port=5432;Database=carelanka;Username=carelanka;Password=carelanka_dev
       Jwt__SigningKey: ${CARELANKA_JWT_SIGNING_KEY:?Set CARELANKA_JWT_SIGNING_KEY in .env}
+      LanguageModel__ApiKey: ${CARELANKA_GEMINI_API_KEY:-}
     ports:
       - "127.0.0.1:5231:5231"
     depends_on:

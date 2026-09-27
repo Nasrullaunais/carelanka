@@ -9,6 +9,8 @@ public sealed class DispatchProposalDetail : DispatchProposalSummary
     public int? ProposedAmbulanceCurrentCrewCount { get; set; }
     public int? ProposedAmbulanceRequiredCrewCount { get; set; }
     public string? Rationale { get; set; }
+    public DispatchRecommendationSource? RecommendationSource { get; set; }
+    public string? RecommendationNote { get; set; }
     public DiversionImpact? DiversionImpact { get; set; }
     public IReadOnlyList<DispatchPlanStep> Plan { get; set; } = [];
     public IReadOnlyList<DispatchValidationResult> Validation { get; set; } = [];

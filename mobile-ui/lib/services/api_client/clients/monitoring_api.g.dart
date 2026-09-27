@@ -115,16 +115,10 @@ class _MonitoringApi implements MonitoringApi {
   }
 
   @override
-  Future<void> clearWarning({
-    required String id,
-    required String xConfirmationCode,
-  }) async {
+  Future<void> clearWarning({required String id}) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
-    final _headers = <String, dynamic>{
-      r'X-Confirmation-Code': xConfirmationCode,
-    };
-    _headers.removeWhere((k, v) => v == null);
+    final _headers = <String, dynamic>{};
     const Map<String, dynamic>? _data = null;
     final _options = _setStreamType<void>(
       Options(method: 'POST', headers: _headers, extra: _extra)

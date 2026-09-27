@@ -118,6 +118,9 @@ builder.Services
         "Emergency:MinimumReadyCrew must be greater than zero.")
     .Validate(options => options.LocationMaxAgeMinutes > 0,
         "Emergency:LocationMaxAgeMinutes must be greater than zero.")
+    .Validate(options => !options.DemoFleet.Enabled
+            || (options.DemoFleet.IntervalMinutes > 0 && options.DemoFleet.IntervalMinutes < options.LocationMaxAgeMinutes),
+        "Emergency:DemoFleet:IntervalMinutes must be above zero and below LocationMaxAgeMinutes.")
     .Validate(options => options.HospitalEntrance.Latitude is >= -90 and <= 90
             && options.HospitalEntrance.Longitude is >= -180 and <= 180
             && (options.HospitalEntrance.Latitude != 0 || options.HospitalEntrance.Longitude != 0),
@@ -437,11 +440,14 @@ builder.Services.AddHostedService<SceneLookupWorker>();
 builder.Services.AddScoped<IPreAdmissionGateway, PreAdmissionGateway>();
 builder.Services.AddScoped<PreAdmissionProcessor>();
 builder.Services.AddHostedService<PreAdmissionWorker>();
+builder.Services.AddScoped<DemoFleetLocationProcessor>();
+builder.Services.AddHostedService<DemoFleetLocationWorker>();
 
 // The Dispatch & Routing Agent. Three read-only tools, no write tool at all - a dispatch only
 // exists once a Duty Manager confirms or approves through the proposal API. Its own queue and
 // worker, separate from the bed and care agents' for the same single-reader-channel reason.
 builder.Services.AddScoped<IDispatchAgentTools, DispatchAgentTools>();
+builder.Services.AddScoped<IDispatchAdvisor, GeminiDispatchAdvisor>();
 builder.Services.AddScoped<IDispatchAgent, DispatchAgent>();
 builder.Services.AddScoped<IDispatchProposalService, DispatchProposalService>();
 builder.Services.AddScoped<DispatchProposalExecutor>();
@@ -561,12 +567,13 @@ var app = builder.Build();
 
 app.UseExceptionHandler();
 
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Swagger:Enabled"))
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-else
+
+if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
 }

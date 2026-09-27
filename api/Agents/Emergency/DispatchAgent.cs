@@ -19,16 +19,21 @@ public sealed class DispatchAgent : IDispatchAgent
     private const string ReadCall = "read_call";
     private const string ListCandidates = "list_eligible_ambulances";
     private const string RankByEta = "rank_by_eta";
+    private const string DraftRecommendation = "draft_recommendation";
+    private const string RecommendationWithinRules = "recommendation_within_rules";
+    private const int ShortlistSize = 5;
     private const string Decide = "decide_free_or_diversion";
     private const string Validate = "validate_deterministically";
     private const string Pause = "pause_for_approval";
 
     private readonly IDispatchAgentTools _tools;
+    private readonly IDispatchAdvisor _advisor;
     private readonly TimeProvider _clock;
 
-    public DispatchAgent(IDispatchAgentTools tools, TimeProvider clock)
+    public DispatchAgent(IDispatchAgentTools tools, IDispatchAdvisor advisor, TimeProvider clock)
     {
         _tools = tools;
+        _advisor = advisor;
         _clock = clock;
     }
 
@@ -52,30 +57,45 @@ public sealed class DispatchAgent : IDispatchAgent
                 () => _tools.GetRouteMinutesAsync(eligible, request.Latitude, request.Longitude, ct));
             Step(plan, RankByEta);
 
-            var ranked = eligible
-                .Select(candidate => (candidate, minutes: routeMinutes.GetValueOrDefault(candidate.Id)))
-                .OrderBy(row => row.minutes ?? int.MaxValue)
+            var now = _clock.GetUtcNow();
+            var call = new DispatchCallFacts(request.CallPriority, request.CallDetails, request.PatientKnown);
+            var shortlist = eligible
+                .Select(candidate => new RankedAmbulance(
+                    candidate.Id,
+                    candidate.RegistrationNumber,
+                    routeMinutes.GetValueOrDefault(candidate.Id),
+                    candidate.CrewCount,
+                    Math.Max(0, (int)(now - candidate.LocationUpdatedAt).TotalSeconds)))
+                .OrderBy(candidate => candidate.RouteMinutes ?? int.MaxValue)
+                .Take(ShortlistSize)
                 .ToList();
 
-            if (ranked.Count > 0)
+            if (shortlist.Count > 0)
             {
-                var (best, minutes) = ranked[0];
+                var context = new DispatchChoiceContext(call, shortlist);
+                var drafted = await DraftAsync(
+                    toolCalls, new { shortlist = shortlist.Count }, () => _advisor.ChooseAsync(context, ct));
+                Step(plan, DraftRecommendation);
                 Step(plan, Decide);
+
+                var (advice, adviceCheck) = await CheckAsync(
+                    drafted, DispatchAdviceValidator.ValidateChoice(drafted, context),
+                    () => new DeterministicDispatchAdvisor().ChooseAsync(context, ct), now);
+                var chosen = shortlist.Single(candidate => candidate.Id == advice.AmbulanceId);
 
                 var validation = new List<DispatchValidationResult>
                 {
-                    DispatchProposalValidator.AmbulanceEligible(true, _clock.GetUtcNow())
+                    adviceCheck,
+                    DispatchProposalValidator.AmbulanceEligible(true, now)
                 };
                 Step(plan, Validate);
                 Step(plan, Pause);
 
                 return new DispatchAgentRun(
                     plan, toolCalls, validation, DispatchOutcome.FreeAmbulanceProposed,
-                    IsDiversion: false, best.Id, best.RegistrationNumber, minutes,
-                    Rationale(minutes is { } m
-                        ? $"{best.RegistrationNumber} has the shortest available road estimate among eligible ambulances, about {m} minute(s)."
-                        : $"{best.RegistrationNumber} is eligible, but road estimates are unavailable. Compare locations before confirming."),
-                    DiversionImpact: null, SourceDispatchId: null, errors);
+                    IsDiversion: false, chosen.Id, chosen.RegistrationNumber, chosen.RouteMinutes,
+                    advice.Rationale, DiversionImpact: null, SourceDispatchId: null, errors,
+                    advice.Source, advice.SourceNote);
             }
 
             if (!request.AllowDiversion)
@@ -112,11 +132,21 @@ public sealed class DispatchAgent : IDispatchAgent
                     null, null, errors);
             }
 
-            var now = _clock.GetUtcNow();
             var waitingMinutes = Math.Max(0, (int)(now - divertible.DispatchedAt).TotalMinutes);
+
+            var diversion = new DiversionContext(call, divertible, waitingMinutes);
+            var explained = await DraftAsync(
+                toolCalls, new { diverted = divertible.AmbulanceRegistration },
+                () => _advisor.ExplainDiversionAsync(diversion, ct));
+            Step(plan, DraftRecommendation);
+
+            var (diversionAdvice, diversionCheck) = await CheckAsync(
+                explained, DispatchAdviceValidator.ValidateDiversion(explained, diversion),
+                () => new DeterministicDispatchAdvisor().ExplainDiversionAsync(diversion, ct), now);
 
             var diversionValidation = new List<DispatchValidationResult>
             {
+                diversionCheck,
                 DispatchProposalValidator.SourcePrePickup(divertible.Status, now),
                 DispatchProposalValidator.ReplacementAvailable(false, now)
             };
@@ -140,9 +170,8 @@ public sealed class DispatchAgent : IDispatchAgent
             return new DispatchAgentRun(
                 plan, toolCalls, diversionValidation, DispatchOutcome.DiversionProposed,
                 IsDiversion: true, divertible.AmbulanceId, divertible.AmbulanceRegistration, null,
-                Rationale($"Every ambulance is committed. {divertible.AmbulanceRegistration} is pre-pickup on a " +
-                    $"lower-priority call and can be turned around; that call returns to the queue."),
-                impact, divertible.DispatchId, errors);
+                diversionAdvice.Rationale, impact, divertible.DispatchId, errors,
+                diversionAdvice.Source, diversionAdvice.SourceNote);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -157,7 +186,44 @@ public sealed class DispatchAgent : IDispatchAgent
         }
     }
 
-    private static string Rationale(string text) => text;
+    private static async Task<DispatchAdvice> DraftAsync(
+        List<DispatchToolCall> calls, object arguments, Func<Task<DispatchAdvice>> draft)
+    {
+        var startedAt = DateTimeOffset.UtcNow;
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var advice = await draft();
+
+        calls.Add(new DispatchToolCall
+        {
+            ToolName = DraftRecommendation, Arguments = ToArgs(arguments),
+            Succeeded = advice.Source == DispatchRecommendationSource.Model,
+            DurationMs = (int)stopwatch.ElapsedMilliseconds, Error = advice.SourceNote, CalledAt = startedAt
+        });
+
+        return advice;
+    }
+
+    private static async Task<(DispatchAdvice Advice, DispatchValidationResult Check)> CheckAsync(
+        DispatchAdvice drafted, DispatchAdviceVerdict verdict, Func<Task<DispatchAdvice>> fallback,
+        DateTimeOffset now)
+    {
+        if (verdict.Passed)
+        {
+            return (drafted, RecommendationCheck(verdict.Detail, now));
+        }
+
+        var note = $"{verdict.Detail} The fastest-first rule was used instead.";
+        var replacement = (await fallback()) with
+        {
+            Source = DispatchRecommendationSource.ModelRejected,
+            SourceNote = note
+        };
+
+        return (replacement, RecommendationCheck(note, now));
+    }
+
+    private static DispatchValidationResult RecommendationCheck(string detail, DateTimeOffset now)
+        => new() { Check = RecommendationWithinRules, Passed = true, Detail = detail, CheckedAt = now };
 
     private static void Step(List<DispatchPlanStep> plan, string description)
         => plan.Add(new DispatchPlanStep

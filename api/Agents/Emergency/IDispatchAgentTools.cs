@@ -1,7 +1,12 @@
 namespace CareLanka.Api.Agents.Emergency;
 
 public sealed record EligibleAmbulanceCandidate(
-    Guid Id, string RegistrationNumber, decimal Latitude, decimal Longitude);
+    Guid Id,
+    string RegistrationNumber,
+    decimal Latitude,
+    decimal Longitude,
+    int CrewCount,
+    DateTimeOffset LocationUpdatedAt);
 
 public sealed record DivertibleDispatchCandidate(
     Guid DispatchId,

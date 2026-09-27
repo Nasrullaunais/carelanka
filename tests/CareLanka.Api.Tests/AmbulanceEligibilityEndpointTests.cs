@@ -7,7 +7,9 @@ using CareLanka.Api.Data.Entities.Common;
 using CareLanka.Api.Data.Entities.Emergency;
 using CareLanka.Api.Data.Enums;
 using Microsoft.EntityFrameworkCore;
+using CareLanka.Api.Services.Emergency;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace CareLanka.Api.Tests;
@@ -62,9 +64,10 @@ public sealed class AmbulanceEligibilityEndpointTests
             .Select(staff => staff.Id)
             .SingleAsync();
         var now = DateTimeOffset.UtcNow;
+        var maxAge = scope.ServiceProvider.GetRequiredService<IOptions<EmergencyOptions>>().Value.LocationMaxAgeMinutes;
         var eligible = Vehicle($"{prefix}-A", true, AmbulanceStatus.Dispatched, now);
         var blocked = Vehicle($"{prefix}-B", false, AmbulanceStatus.OutOfService, null);
-        var stale = Vehicle($"{prefix}-C", true, AmbulanceStatus.Available, now.AddMinutes(-10));
+        var stale = Vehicle($"{prefix}-C", true, AmbulanceStatus.Available, now.AddMinutes(-maxAge - 1));
         db.Ambulances.AddRange(eligible, blocked, stale);
 
         var crew = Enumerable.Range(0, 5).Select(index => new StaffMember

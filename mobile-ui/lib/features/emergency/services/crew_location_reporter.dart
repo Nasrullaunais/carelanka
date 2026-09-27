@@ -1,18 +1,25 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:geolocator/geolocator.dart';
 
 import '../../../core/network/api.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../services/api_client/care_lanka_api.dart';
 import '../../../services/api_client/models/report_ambulance_location_request.dart';
+import 'device_location.dart';
 
-enum CrewLocationPermission { granted, denied, permanentlyDenied, unavailable }
+enum CrewLocationPermission {
+  granted,
+  approximateOnly,
+  denied,
+  permanentlyDenied,
+  unavailable,
+}
 
 enum CrewLocationReportingState {
   stopped,
   reporting,
+  approximateOnly,
   permissionDenied,
   permissionPermanentlyDenied,
   unavailable,
@@ -38,6 +45,8 @@ final class CrewPosition {
 abstract interface class CrewLocationGateway {
   Future<CrewLocationPermission> requestPermission();
   Future<CrewPosition> currentPosition();
+  Future<bool> openAppSettings();
+  Future<bool> openLocationSettings();
 }
 
 abstract interface class CrewDispatchGateway {
@@ -72,6 +81,8 @@ final class CrewLocationReporter extends ChangeNotifier {
       if (generation != _generation) return;
       if (permission != CrewLocationPermission.granted) {
         _setState(switch (permission) {
+          CrewLocationPermission.approximateOnly =>
+            CrewLocationReportingState.approximateOnly,
           CrewLocationPermission.denied =>
             CrewLocationReportingState.permissionDenied,
           CrewLocationPermission.permanentlyDenied =>
@@ -89,6 +100,22 @@ final class CrewLocationReporter extends ChangeNotifier {
       if (generation == _generation) {
         _setState(CrewLocationReportingState.failed);
       }
+    }
+  }
+
+  Future<void> fixAccess() async {
+    switch (_state) {
+      case CrewLocationReportingState.permissionDenied:
+        await resume();
+      case CrewLocationReportingState.approximateOnly ||
+          CrewLocationReportingState.permissionPermanentlyDenied:
+        await _location.openAppSettings();
+      case CrewLocationReportingState.unavailable:
+        await _location.openLocationSettings();
+      case CrewLocationReportingState.stopped ||
+          CrewLocationReportingState.reporting ||
+          CrewLocationReportingState.failed:
+        return;
     }
   }
 
@@ -145,29 +172,34 @@ final class CrewLocationReporter extends ChangeNotifier {
 }
 
 final class GeolocatorCrewLocationGateway implements CrewLocationGateway {
+  const GeolocatorCrewLocationGateway(this._location);
+
+  static const _fixTimeLimit = Duration(seconds: 10);
+
+  final DeviceLocation _location;
+
   @override
-  Future<CrewLocationPermission> requestPermission() async {
-    if (!await Geolocator.isLocationServiceEnabled()) {
-      return CrewLocationPermission.unavailable;
-    }
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-    return switch (permission) {
-      LocationPermission.always ||
-      LocationPermission.whileInUse => CrewLocationPermission.granted,
-      LocationPermission.deniedForever =>
-        CrewLocationPermission.permanentlyDenied,
-      _ => CrewLocationPermission.denied,
-    };
-  }
+  Future<CrewLocationPermission> requestPermission() async =>
+      switch (await _location.requestAccess()) {
+        LocationAccess.precise => CrewLocationPermission.granted,
+        LocationAccess.approximate => CrewLocationPermission.approximateOnly,
+        LocationAccess.denied => CrewLocationPermission.denied,
+        LocationAccess.deniedForever =>
+          CrewLocationPermission.permanentlyDenied,
+        LocationAccess.serviceOff => CrewLocationPermission.unavailable,
+      };
 
   @override
   Future<CrewPosition> currentPosition() async {
-    final position = await Geolocator.getCurrentPosition();
-    return CrewPosition(position.latitude, position.longitude);
+    final fix = await _location.currentFix(_fixTimeLimit);
+    return CrewPosition(fix.latitude, fix.longitude);
   }
+
+  @override
+  Future<bool> openAppSettings() => _location.openAppSettings();
+
+  @override
+  Future<bool> openLocationSettings() => _location.openLocationSettings();
 }
 
 final class GeneratedCrewDispatchGateway implements CrewDispatchGateway {

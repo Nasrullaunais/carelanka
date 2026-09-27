@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../emergency_routes.dart';
+import '../state/caller_location_controller.dart';
 import '../state/patient_emergency_controller.dart';
+import '../widgets/caller_location_card.dart';
 
 class ReportEmergencyScreen extends StatefulWidget {
   const ReportEmergencyScreen({super.key});
@@ -14,77 +15,52 @@ class ReportEmergencyScreen extends StatefulWidget {
   State<ReportEmergencyScreen> createState() => _ReportEmergencyScreenState();
 }
 
-class _ReportEmergencyScreenState extends State<ReportEmergencyScreen> {
+class _ReportEmergencyScreenState extends State<ReportEmergencyScreen>
+    with WidgetsBindingObserver {
   final _details = TextEditingController();
   bool _forMe = true;
-  Position? _position;
-  String? _locationError;
-  bool _locating = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<PatientEmergencyController>().load();
+      if (!mounted) return;
+      context.read<PatientEmergencyController>().load();
+      context.read<CallerLocationController>().start();
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final location = context.read<CallerLocationController>();
+    switch (state) {
+      case AppLifecycleState.resumed:
+        location.resume();
+      case AppLifecycleState.hidden || AppLifecycleState.paused:
+        location.pause();
+      case AppLifecycleState.inactive || AppLifecycleState.detached:
+        return;
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _details.dispose();
     super.dispose();
   }
 
-  Future<void> _locate() async {
-    setState(() {
-      _locating = true;
-      _locationError = null;
-    });
-    try {
-      if (!await Geolocator.isLocationServiceEnabled()) {
-        throw const LocationServiceDisabledException();
-      }
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        throw const PermissionDeniedException(
-          'Location permission is required to send help.',
-        );
-      }
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-        ),
-      );
-      if (mounted) setState(() => _position = position);
-    } catch (_) {
-      if (mounted) {
-        setState(
-          () => _locationError =
-              'We could not get your location. Enable precise location access, then try again.',
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _locating = false);
-    }
-  }
-
   Future<void> _submit() async {
-    final position = _position;
-    if (position == null) {
-      await _locate();
-      return;
-    }
+    final fix = context.read<CallerLocationController>().fix;
+    if (fix == null) return;
     final controller = context.read<PatientEmergencyController>();
     final id = await controller.report(
       patientIsCaller: _forMe,
-      latitude: position.latitude,
-      longitude: position.longitude,
-      accuracy: position.accuracy,
-      capturedAt: position.timestamp,
+      latitude: fix.latitude,
+      longitude: fix.longitude,
+      accuracy: fix.accuracyMetres,
+      capturedAt: fix.capturedAt,
       details: _details.text,
     );
     if (mounted && id != null) {
@@ -95,6 +71,7 @@ class _ReportEmergencyScreenState extends State<ReportEmergencyScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<PatientEmergencyController>();
+    final location = context.watch<CallerLocationController>();
     return Scaffold(
       appBar: AppBar(title: const Text('Request an ambulance')),
       body: ListView(
@@ -113,6 +90,14 @@ class _ReportEmergencyScreenState extends State<ReportEmergencyScreen> {
             selected: {_forMe},
             onSelectionChanged: (value) => setState(() => _forMe = value.first),
           ),
+          if (!_forMe) ...[
+            const SizedBox(height: 8),
+            Text(
+              'We send where this phone is. If you are not with the person, '
+              'write their address below.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
           const SizedBox(height: 20),
           TextField(
             controller: _details,
@@ -125,27 +110,7 @@ class _ReportEmergencyScreenState extends State<ReportEmergencyScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          if (_position != null)
-            const ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.location_on_outlined),
-              title: Text('Precise location captured'),
-            )
-          else
-            OutlinedButton.icon(
-              onPressed: _locating ? null : _locate,
-              icon: const Icon(Icons.my_location),
-              label: Text(
-                _locating ? 'Finding location…' : 'Use my current location',
-              ),
-            ),
-          if (_locationError != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              _locationError!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          ],
+          const CallerLocationCard(),
           if (controller.error != null) ...[
             const SizedBox(height: 8),
             Text(
@@ -183,9 +148,13 @@ class _ReportEmergencyScreenState extends State<ReportEmergencyScreen> {
           ],
           const SizedBox(height: 20),
           FilledButton.icon(
-            onPressed: controller.acting ? null : _submit,
+            onPressed: controller.acting || !location.canSend ? null : _submit,
             icon: const Icon(Icons.emergency_outlined),
-            label: Text(controller.acting ? 'Sending…' : 'Request ambulance'),
+            label: Text(switch ((controller.acting, location.canSend)) {
+              (true, _) => 'Sending…',
+              (false, false) => 'Waiting for your location…',
+              (false, true) => 'Request ambulance',
+            }),
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(56),
             ),

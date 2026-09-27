@@ -16,6 +16,9 @@ public sealed class DispatchProposalConfiguration : IEntityTypeConfiguration<Dis
                 "ck_dispatch_proposals_status", EnumWire.CheckConstraint<DispatchProposalStatus>("status"));
             table.HasCheckConstraint(
                 "ck_dispatch_proposals_priority", EnumWire.CheckConstraint<CallPriority>("call_priority"));
+            table.HasCheckConstraint(
+                "ck_dispatch_proposals_recommendation_source",
+                EnumWire.CheckConstraint<DispatchRecommendationSource>("recommendation_source"));
         });
 
         builder.HasKey(proposal => proposal.Id);
@@ -39,7 +42,11 @@ public sealed class DispatchProposalConfiguration : IEntityTypeConfiguration<Dis
         builder.Property(proposal => proposal.RejectionReason)
             .HasConversion(new SnakeCaseEnumConverter<DispatchRejectionReason>())
             .HasMaxLength(40);
+        builder.Property(proposal => proposal.RecommendationSource)
+            .HasConversion(new SnakeCaseEnumConverter<DispatchRecommendationSource>())
+            .HasMaxLength(30);
         builder.Property(proposal => proposal.Rationale).HasMaxLength(1000);
+        builder.Property(proposal => proposal.RecommendationNote).HasMaxLength(500);
         builder.Property(proposal => proposal.SourceCallAddressLabel).HasMaxLength(300);
         builder.Property(proposal => proposal.ReviewNotes).HasMaxLength(500);
 

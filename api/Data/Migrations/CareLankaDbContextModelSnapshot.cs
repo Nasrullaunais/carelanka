@@ -999,6 +999,16 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("rationale");
 
+                    b.Property<string>("RecommendationNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("recommendation_note");
+
+                    b.Property<string>("RecommendationSource")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("recommendation_source");
+
                     b.Property<string>("RejectionReason")
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
@@ -1088,6 +1098,8 @@ namespace CareLanka.Api.Data.Migrations
                     b.ToTable("dispatch_proposals", null, t =>
                         {
                             t.HasCheckConstraint("ck_dispatch_proposals_priority", "call_priority IN ('critical', 'high', 'medium', 'low')");
+
+                            t.HasCheckConstraint("ck_dispatch_proposals_recommendation_source", "recommendation_source IN ('model', 'model_unavailable', 'model_rejected')");
 
                             t.HasCheckConstraint("ck_dispatch_proposals_status", "status IN ('pending', 'pending_confirmation', 'pending_approval', 'approved', 'executed', 'rejected', 'failed')");
                         });
@@ -3655,15 +3667,21 @@ namespace CareLanka.Api.Data.Migrations
                     b.HasIndex("WardId")
                         .HasDatabaseName("ix_ward_staffing_rules_ward_id");
 
+                    b.HasIndex("WardId", "RequiredRole")
+                        .IsUnique()
+                        .HasDatabaseName("ux_ward_staffing_rules_ward_role_no_skill")
+                        .HasFilter("required_skill_id IS NULL");
+
                     b.HasIndex("WardId", "RequiredRole", "RequiredSkillId")
                         .IsUnique()
-                        .HasDatabaseName("ux_ward_staffing_rules_ward_role_skill");
+                        .HasDatabaseName("ux_ward_staffing_rules_ward_role_skill")
+                        .HasFilter("required_skill_id IS NOT NULL");
 
                     b.ToTable("ward_staffing_rules", null, t =>
                         {
-                            t.HasCheckConstraint("ck_ward_staffing_rules_required_role", "required_role IN ('ward_nurse', 'doctor', 'ambulance_crew', 'general_staff', 'duty_manager', 'hospital_administrator', 'equipment_manager')");
+                            t.HasCheckConstraint("ck_ward_staffing_rules_min", "minimum_headcount > 0");
 
-                            t.HasCheckConstraint("ck_wsr_min", "minimum_headcount > 0");
+                            t.HasCheckConstraint("ck_ward_staffing_rules_required_role", "required_role IN ('ward_nurse', 'doctor', 'ambulance_crew', 'general_staff', 'duty_manager', 'hospital_administrator', 'equipment_manager')");
                         });
                 });
 

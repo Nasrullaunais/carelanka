@@ -9,6 +9,8 @@ import 'screens/emergency_tracking_screen.dart';
 import 'screens/run_history_screen.dart';
 import 'services/crew_location_reporter.dart';
 import 'services/crew_run_service.dart';
+import 'services/device_location.dart';
+import 'state/caller_location_controller.dart';
 import 'state/my_run_controller.dart';
 import 'state/run_history_controller.dart';
 import 'services/patient_emergency_service.dart';
@@ -26,10 +28,18 @@ class EmergencyPaths {
 final List<RouteBase> emergencyRoutes = [
   GoRoute(
     path: EmergencyPaths.patientReport,
-    builder: (context, _) => ChangeNotifierProvider(
-      create: (context) => PatientEmergencyController(
-        GeneratedPatientEmergencyService(context.read<CareLankaApi>()),
-      ),
+    builder: (context, _) => MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (context) => PatientEmergencyController(
+            GeneratedPatientEmergencyService(context.read<CareLankaApi>()),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              CallerLocationController(const GeolocatorDeviceLocation()),
+        ),
+      ],
       child: const ReportEmergencyScreen(),
     ),
   ),
@@ -60,7 +70,9 @@ final List<RouteBase> emergencyRoutes = [
             dispatches: GeneratedCrewDispatchGateway(
               context.read<CareLankaApi>(),
             ),
-            location: GeolocatorCrewLocationGateway(),
+            location: const GeolocatorCrewLocationGateway(
+              GeolocatorDeviceLocation(),
+            ),
           ),
         ),
         ChangeNotifierProvider(

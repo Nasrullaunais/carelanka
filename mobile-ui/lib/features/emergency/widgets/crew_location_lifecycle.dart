@@ -29,6 +29,9 @@ final class _CrewLocationLifecycleState extends State<CrewLocationLifecycle>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // A system permission popup makes the app `inactive`; pausing then would
+    // cancel the request the popup is answering.
+    if (state == AppLifecycleState.inactive) return;
     if (state == AppLifecycleState.resumed) {
       widget.reporter.resume();
       return;

@@ -1,7 +1,8 @@
 {$SITE_ADDRESS} {
 	encode gzip
 
-	handle /api/* {
+	@api path /api/* /swagger /swagger/*
+	handle @api {
 		reverse_proxy api:5231
 	}
 

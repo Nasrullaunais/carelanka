@@ -1574,9 +1574,11 @@ nothing else — nobody on staff has a reason to open it.)*
 
 | Screen | Contents |
 | :--- | :--- |
+| Home | *(Rev 2026-09-28.)* Greeting, then one card for what is happening now: the current stay with a step progress bar built from `StayJourney`, else the next visit, else "No upcoming visits". Round shortcuts (Book a visit, My reports, Prescriptions, Past visits; while admitted, booking and past visits give way to Profile), the ambulance request, and the emergency contact with a call button. **No patient code here** — see Profile |
+| Profile | The patient's details and emergency contact, plus the **patient code** card ("Show this at reception", copy button). No QR code: nothing in the project scans one, reception types the code *(removed 2026-09-28)* |
 | My status | "You are in Ward 5B, Bed 12" — the narrow DTO from §7.6 |
 | Book a visit | Date/time picker, optional reason. `POST /me/appointments`. No calendars or slots — the patient says when they intend to come |
-| My visits | Upcoming and past bookings, cancel while still `scheduled` |
+| My visits | Upcoming and past bookings, cancel while still `scheduled`. A "Book a visit" button stays on the list once there are bookings, hidden while admitted *(fixed 2026-09-28: it used to exist only on the empty list, so a second visit could not be booked)* |
 | Pre-register | Details ahead of a planned visit |
 | Discharge info | Summary note and instructions |
 | **Call an ambulance** | Minimum details + location, posted to Emergency's endpoint. Because the caller is logged in, we already know who they are — the pre-admission starts complete. |

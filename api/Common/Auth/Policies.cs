@@ -23,6 +23,13 @@ public static class Policies
     public const string PatientEditor = nameof(PatientEditor);
 
     /// <summary>
+    /// Giving a patient a new app password after checking who they are - the desk, the duty
+    /// manager and the administrator. Not the ward nurse or the doctor: it is an identity check
+    /// at the counter or on the phone, not bedside work.
+    /// </summary>
+    public const string PatientPasswordReset = nameof(PatientPasswordReset);
+
+    /// <summary>
     /// Reading what the hospital knows about a patient's health. The duty manager is on it
     /// because they work the patients board; reception and the billing desk are not, and that is
     /// the whole point of it being a separate policy from <see cref="PatientDetails"/>.

@@ -19,6 +19,7 @@ class AuthInterceptor extends QueuedInterceptor {
   final Dio _refreshDio;
 
   static const _retriedKey = 'carelanka.retried_after_refresh';
+  static const _passwordChangeRequiredCode = 'cl_err_004';
 
   static const _unauthenticatedPaths = {
     '/auth/login',
@@ -41,6 +42,13 @@ class AuthInterceptor extends QueuedInterceptor {
   @override
   Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
     final request = err.requestOptions;
+
+    if (_isPasswordChangeRequired(err.response)) {
+      _sessionExpiry.requirePasswordChange();
+      handler.next(err);
+      return;
+    }
+
     final shouldRefresh = err.response?.statusCode == 401 &&
         !_unauthenticatedPaths.contains(request.path) &&
         request.extra[_retriedKey] != true;
@@ -67,6 +75,13 @@ class AuthInterceptor extends QueuedInterceptor {
     } on DioException catch (e) {
       handler.next(e);
     }
+  }
+
+  static bool _isPasswordChangeRequired(Response<dynamic>? response) {
+    final body = response?.data;
+    return response?.statusCode == 403 &&
+        body is Map &&
+        body['code'] == _passwordChangeRequiredCode;
   }
 
   Future<bool> _refresh() async {

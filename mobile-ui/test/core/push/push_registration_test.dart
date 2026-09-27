@@ -80,6 +80,7 @@ final class FakeAuth extends AuthController {
       principalType: type,
       role: type == PrincipalType.staff ? PrincipalRole.ambulanceCrew : PrincipalRole.patient,
       displayName: 'Test',
+      mustChangePassword: false,
     );
     notifyListeners();
   }

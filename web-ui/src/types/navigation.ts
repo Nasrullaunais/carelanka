@@ -1,4 +1,4 @@
-import { Ambulance, BedDouble, CalendarCheck, CalendarDays, ClipboardCheck, ClipboardList, FlaskConical, HeartPulse, Hospital, Package, Pill, Settings2, ShieldAlert, UserCog, UserPlus, Users, Wrench, type LucideIcon } from 'lucide-react';
+import { Ambulance, BedDouble, CalendarCheck, CalendarDays, ClipboardCheck, ClipboardList, FlaskConical, HeartPulse, Hospital, KeyRound, Package, Pill, Settings2, ShieldAlert, UserCog, UserPlus, Users, Wrench, type LucideIcon } from 'lucide-react';
 import type { PrincipalRole } from '../services/api/generated';
 import {
   canManageEmergency,
@@ -14,6 +14,7 @@ import {
   canOpenDischargeBoard,
   canSetBillingRates,
   canReadCareQueue,
+  canResetPatientPassword,
   canViewStaff,
   canManageLeave,
 } from './permissions';
@@ -71,6 +72,14 @@ export const destinations: Destination[] = [
     description:
       "What patients have reported about how they feel, and the agent's draft note for a nurse or doctor to check.",
     canAccess: canReadCareQueue,
+  },
+  {
+    to: '/patient-accounts',
+    icon: KeyRound,
+    group: 'Patient care',
+    label: 'Patient app accounts',
+    description: "Find a patient's app login and give them a new password when they have forgotten theirs.",
+    canAccess: canResetPatientPassword,
   },
   {
     to: '/billing-settings',

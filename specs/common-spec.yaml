@@ -40,6 +40,16 @@ info:
     own domain approval surface. Those are that member's individual work. This file owns
     only what crosses all four.
 
+    **3. A forced password change, enforced by the server.** When the hospital resets a
+    patient's forgotten app password (`POST /patient-accounts/{patientId}/reset-password`
+    in `patient-spec.yaml`), the account is flagged. While it is, `CurrentPrincipal`
+    carries `must_change_password: true` and the access token carries a `pwd_change`
+    claim. Every route then answers `403` with `cl_err_004` ("Choose a new password
+    before continuing."), except these four: `POST /auth/password`, `POST /auth/logout`,
+    `POST /auth/refresh` and `GET /auth/me`. A client that sees the flag, or a `403`
+    with `cl_err_004`, sends the user to its change-password screen. Changing the
+    password clears the flag and ends every session; the next sign-in has no claim.
+
     **Decisions recorded in `docs/ADR.md`.**
 
     **Wire format:** `snake_case` bodies, `camelCase` query parameters.
@@ -270,6 +280,10 @@ paths:
 
         On success every refresh token the caller holds is revoked, on every device, this
         one included. The client signs out and the user signs in again with the new password.
+
+        Also clears `must_change_password`. This is the one useful thing a patient holding a
+        temporary password from the hospital can do - see `cl_err_004` in the description
+        at the top of this file.
       operationId: changePassword
       requestBody:
         required: true
@@ -827,7 +841,7 @@ components:
 
     CurrentPrincipal:
       type: object
-      required: [id, principal_type, role, display_name]
+      required: [id, principal_type, role, display_name, must_change_password]
       properties:
         id:
           type: string
@@ -859,6 +873,12 @@ components:
             for a patient who has an account but has never been treated here. A patient
             client must handle null - it is the ordinary state for a new sign-up, not an
             error.
+        must_change_password:
+          type: boolean
+          description: |
+            True while a patient is signed in with a temporary password the hospital gave
+            them. Every route except the four listed under `cl_err_004` refuses them until
+            they call `POST /auth/password`. Always false for staff.
 
     # ---------- workflows ----------
 

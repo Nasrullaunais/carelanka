@@ -59,6 +59,20 @@ public sealed class OpenApiContractTests
         Assert.True(expectedRequired.SetEquals(generatedRequired));
     }
 
+    [Fact]
+    public async Task The_current_principal_always_says_whether_a_password_change_is_required()
+    {
+        using var document = await GeneratedOpenApi.ParseAsync();
+
+        var principal = document.RootElement.GetProperty("components").GetProperty("schemas")
+            .GetProperty("CurrentPrincipal");
+
+        Assert.Contains("must_change_password",
+            principal.GetProperty("required").EnumerateArray().Select(item => item.GetString()));
+        Assert.Equal("boolean",
+            principal.GetProperty("properties").GetProperty("must_change_password").GetProperty("type").GetString());
+    }
+
     private static void AssertRequiredMatchesContract(
         JsonElement generatedSchema, YamlMappingNode contract, string schemaName)
     {

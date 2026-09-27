@@ -23,6 +23,7 @@ public static class MessageCodes
             [MessageCode.RefreshTokenInvalid] = "cl_err_001",
             [MessageCode.UsernameAlreadyTaken] = "cl_err_002",
             [MessageCode.CurrentPasswordIncorrect] = "cl_err_003",
+            [MessageCode.PasswordChangeRequired] = "cl_err_004",
             [MessageCode.BedNumberTaken] = "cl_equ_001",
             [MessageCode.AssetTagTaken] = "cl_equ_002",
             [MessageCode.BedOccupied] = "cl_equ_003",
@@ -113,7 +114,8 @@ public static class MessageCodes
             [MessageCode.CareAgentStillDrafting] = "cl_pat_049",
             [MessageCode.TooManyCareQueries] = "cl_pat_050",
             [MessageCode.NicHasHospitalRecord] = "cl_pat_051",
-            [MessageCode.PatientIdentityLocked] = "cl_pat_052"
+            [MessageCode.PatientIdentityLocked] = "cl_pat_052",
+            [MessageCode.PatientHasNoAppAccount] = "cl_pat_053"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

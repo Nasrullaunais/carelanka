@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/auth/auth_controller.dart';
+import '../../../core/auth/change_password_screen.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/desk_help.dart';
 import '../../../core/widgets/phone_width.dart';
-import 'change_password_screen.dart';
 
 class ManageAccountScreen extends StatelessWidget {
   const ManageAccountScreen({super.key});
@@ -35,6 +36,14 @@ class ManageAccountScreen extends StatelessWidget {
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
                     ),
+                  ),
+                  const Divider(indent: 20, endIndent: 20),
+                  ListTile(
+                    leading: const Icon(Icons.lock_reset_outlined),
+                    title: const Text('Reset password'),
+                    subtitle: const Text('Forgot it? The hospital can give you a new one.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => showResetPasswordHelp(context),
                   ),
                 ],
               ),

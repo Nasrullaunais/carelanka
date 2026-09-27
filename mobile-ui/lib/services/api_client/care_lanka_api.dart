@@ -27,6 +27,7 @@ import 'clients/monitoring_api.dart';
 import 'clients/my_calls_api.dart';
 import 'clients/my_roster_api.dart';
 import 'clients/my_run_api.dart';
+import 'clients/patient_app_accounts_api.dart';
 import 'clients/patient_self_service_api.dart';
 import 'clients/patients_api.dart';
 import 'clients/pharmacy_api.dart';
@@ -73,6 +74,7 @@ class CareLankaApi {
   MyCallsApi? _myCalls;
   MyRosterApi? _myRoster;
   MyRunApi? _myRun;
+  PatientAppAccountsApi? _patientAppAccounts;
   PatientSelfServiceApi? _patientSelfService;
   PatientsApi? _patients;
   PharmacyApi? _pharmacy;
@@ -128,6 +130,8 @@ class CareLankaApi {
   MyRosterApi get myRoster => _myRoster ??= MyRosterApi(_dio, baseUrl: _baseUrl);
 
   MyRunApi get myRun => _myRun ??= MyRunApi(_dio, baseUrl: _baseUrl);
+
+  PatientAppAccountsApi get patientAppAccounts => _patientAppAccounts ??= PatientAppAccountsApi(_dio, baseUrl: _baseUrl);
 
   PatientSelfServiceApi get patientSelfService => _patientSelfService ??= PatientSelfServiceApi(_dio, baseUrl: _baseUrl);
 

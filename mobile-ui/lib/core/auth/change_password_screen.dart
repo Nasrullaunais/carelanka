@@ -2,15 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/auth/auth_controller.dart';
-import '../../../core/auth/auth_form.dart';
-import '../../../core/network/api_exception.dart';
-import '../../../core/routing/app_router.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/phone_width.dart';
+import '../network/api_exception.dart';
+import '../routing/app_router.dart';
+import '../theme/app_theme.dart';
+import '../widgets/phone_width.dart';
+import 'auth_controller.dart';
+import 'auth_form.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
-  const ChangePasswordScreen({super.key});
+  const ChangePasswordScreen({super.key, this.forced = false});
+
+  /// Signed in with a temporary password from the hospital: nothing else is reachable until a
+  /// new one is chosen, so there is no way back from here, only sign out.
+  final bool forced;
 
   @override
   State<ChangePasswordScreen> createState() => _ChangePasswordScreenState();
@@ -72,15 +76,28 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return PhoneWidth(
+    final screen = PhoneWidth(
       child: Scaffold(
-        appBar: AppBar(title: const Text('Change password')),
+        appBar: AppBar(
+          title: Text(widget.forced ? 'Choose a new password' : 'Change password'),
+          automaticallyImplyLeading: !widget.forced,
+          actions: [
+            if (widget.forced)
+              TextButton(
+                onPressed: _busy ? null : () => context.read<AuthController>().signOut(),
+                child: const Text('Sign out'),
+              ),
+          ],
+        ),
         body: ListView(
           padding: const EdgeInsets.fromLTRB(AppTheme.gutter, 12, AppTheme.gutter, 32),
           children: [
             Text(
-              'After changing it you will be signed out on every device, then sign in '
-              'again with the new password.',
+              widget.forced
+                  ? 'The hospital gave you a temporary password. Enter it as your current '
+                      'password, then choose your own.'
+                  : 'After changing it you will be signed out on every device, then sign in '
+                      'again with the new password.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -128,5 +145,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         ),
       ),
     );
+
+    return widget.forced ? PopScope(canPop: false, child: screen) : screen;
   }
 }

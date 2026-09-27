@@ -88,6 +88,10 @@ export function canChangePatientIdentity(
   return !hasNic || role === 'hospital_administrator';
 }
 
+export function canResetPatientPassword(role: PrincipalRole | undefined): boolean {
+  return role === 'general_staff' || role === 'duty_manager' || role === 'hospital_administrator';
+}
+
 export function canReadPatientDetails(role: PrincipalRole | undefined): boolean {
   return isStaff(role) && role !== 'ambulance_crew';
 }

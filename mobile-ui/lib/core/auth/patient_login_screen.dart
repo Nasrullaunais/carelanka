@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../routing/app_router.dart';
+import '../widgets/desk_help.dart';
 import 'auth_controller.dart';
 import 'auth_form.dart';
 
@@ -75,6 +76,13 @@ class _PatientLoginScreenState extends State<PatientLoginScreen> {
                 onSubmitted: (_) => _busy ? null : _submit(),
                 validator: (value) =>
                     (value == null || value.isEmpty) ? 'Enter your password' : null,
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _busy ? null : () => showResetPasswordHelp(context),
+                  child: const Text('Forgot password?'),
+                ),
               ),
               const SizedBox(height: 8),
               AuthSubmitButton(label: 'Sign in', busy: _busy, onPressed: _submit),

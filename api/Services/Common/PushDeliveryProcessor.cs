@@ -17,33 +17,38 @@ public sealed class PushDeliveryProcessor(
     public async Task<int> DeliverDueAsync(CancellationToken ct = default)
     {
         var now = clock.GetUtcNow();
-        var due = await db.Notifications
-            .Where(n => n.Channel == NotificationChannel.Push
-                && n.Status == NotificationStatus.Queued
-                && n.NextAttemptAt <= now)
-            .OrderBy(n => n.NextAttemptAt)
+        var due = await db.NotificationDeliveries
+            .Include(d => d.Notification)
+            .Where(d => d.Channel == NotificationChannel.Push
+                && d.Status == NotificationStatus.Queued
+                && d.NextAttemptAt <= now)
+            .OrderBy(d => d.NextAttemptAt)
             .Take(_options.BatchSize)
             .ToListAsync(ct);
 
-        foreach (var notification in due)
+        foreach (var delivery in due)
         {
-            await DeliverAsync(notification, ct);
+            await DeliverAsync(delivery, ct);
             await db.SaveChangesAsync(ct);
         }
 
         return due.Count;
     }
 
-    private async Task DeliverAsync(Notification notification, CancellationToken ct)
+    private async Task DeliverAsync(NotificationDelivery delivery, CancellationToken ct)
     {
+        var notification = delivery.Notification;
         var tokens = await db.DeviceTokens
-            .Where(t => t.StaffMemberId == notification.RecipientStaffMemberId && t.RevokedAt == null)
+            .Where(t => t.RevokedAt == null
+                && (notification.RecipientStaffMemberId != null
+                    ? t.StaffMemberId == notification.RecipientStaffMemberId
+                    : t.PatientAccountId == notification.RecipientPatientAccountId))
             .ToListAsync(ct);
 
         if (tokens.Count == 0)
         {
-            notification.Status = NotificationStatus.Failed;
-            notification.FailureReason = "no_device";
+            delivery.Status = NotificationStatus.Failed;
+            delivery.FailureReason = "no_device";
             return;
         }
 
@@ -72,26 +77,26 @@ public sealed class PushDeliveryProcessor(
             }
         }
 
-        notification.AttemptCount++;
+        delivery.AttemptCount++;
         if (delivered)
         {
-            notification.Status = NotificationStatus.Sent;
-            notification.SentAt = clock.GetUtcNow();
+            delivery.Status = NotificationStatus.Sent;
+            delivery.SentAt = clock.GetUtcNow();
         }
         else if (!retryable)
         {
-            notification.Status = NotificationStatus.Failed;
-            notification.FailureReason = "no_device";
+            delivery.Status = NotificationStatus.Failed;
+            delivery.FailureReason = "no_device";
         }
-        else if (notification.AttemptCount >= _options.MaxAttempts)
+        else if (delivery.AttemptCount >= _options.MaxAttempts)
         {
-            notification.Status = NotificationStatus.Failed;
-            notification.FailureReason = "gave_up";
+            delivery.Status = NotificationStatus.Failed;
+            delivery.FailureReason = "gave_up";
         }
         else
         {
-            var delay = TimeSpan.FromSeconds(_options.RetryBaseSeconds * Math.Pow(3, notification.AttemptCount - 1));
-            notification.NextAttemptAt = clock.GetUtcNow() + delay;
+            var delay = TimeSpan.FromSeconds(_options.RetryBaseSeconds * Math.Pow(3, delivery.AttemptCount - 1));
+            delivery.NextAttemptAt = clock.GetUtcNow() + delay;
         }
     }
 }

@@ -46,23 +46,23 @@ public sealed class PushDeliveryTests
         await DeliverAsync(sender, DateTimeOffset.UtcNow);
 
         Assert.Equal([$"phone-a-{staffId:N}", $"phone-b-{staffId:N}"], SentTo(sender, staffId).Select(x => x.Token).Order());
-        var saved = await NotificationAsync(notificationId);
+        var saved = await DeliveryAsync(notificationId);
         Assert.Equal(NotificationStatus.Sent, saved.Status);
         Assert.NotNull(saved.SentAt);
         Assert.Equal(1, saved.AttemptCount);
-        Assert.Equal(staffId, saved.RecipientStaffMemberId);
+        Assert.Equal(staffId, (await NotificationAsync(notificationId)).RecipientStaffMemberId);
     }
 
     [Fact]
     public async Task The_message_carries_only_the_generic_text_and_the_dispatch_id()
     {
-        var (_, notificationId) = await SeedAsync("phone-a");
+        var (staffId, notificationId) = await SeedAsync("phone-a");
         var sender = new RecordingPushSender();
 
         await DeliverAsync(sender, DateTimeOffset.UtcNow);
 
         var saved = await NotificationAsync(notificationId);
-        var message = SentTo(sender, saved.RecipientStaffMemberId).Single().Message;
+        var message = SentTo(sender, staffId).Single().Message;
         Assert.Equal(saved.Title, message.Title);
         Assert.Equal(saved.Body, message.Body);
         Assert.Equal(["entity_id", "entity_type"], message.Data.Keys.Order());
@@ -78,7 +78,7 @@ public sealed class PushDeliveryTests
         var now = DateTimeOffset.UtcNow;
 
         await DeliverAsync(sender, now);
-        var afterFirst = await NotificationAsync(notificationId);
+        var afterFirst = await DeliveryAsync(notificationId);
         Assert.Equal(NotificationStatus.Queued, afterFirst.Status);
         Assert.True(afterFirst.NextAttemptAt > now);
 
@@ -86,7 +86,7 @@ public sealed class PushDeliveryTests
         Assert.Single(SentTo(sender, staffId));
 
         await DeliverAsync(sender, afterFirst.NextAttemptAt.AddSeconds(1));
-        Assert.Equal(NotificationStatus.Sent, (await NotificationAsync(notificationId)).Status);
+        Assert.Equal(NotificationStatus.Sent, (await DeliveryAsync(notificationId)).Status);
         Assert.Equal(2, SentTo(sender, staffId).Count);
     }
 
@@ -100,10 +100,10 @@ public sealed class PushDeliveryTests
         for (var attempt = 0; attempt < 5; attempt++)
         {
             await DeliverAsync(sender, when);
-            when = (await NotificationAsync(notificationId)).NextAttemptAt.AddSeconds(1);
+            when = (await DeliveryAsync(notificationId)).NextAttemptAt.AddSeconds(1);
         }
 
-        var saved = await NotificationAsync(notificationId);
+        var saved = await DeliveryAsync(notificationId);
         Assert.Equal(NotificationStatus.Failed, saved.Status);
         Assert.Equal("gave_up", saved.FailureReason);
         Assert.Equal(5, saved.AttemptCount);
@@ -117,7 +117,7 @@ public sealed class PushDeliveryTests
 
         await DeliverAsync(sender, DateTimeOffset.UtcNow);
 
-        Assert.Equal(NotificationStatus.Failed, (await NotificationAsync(notificationId)).Status);
+        Assert.Equal(NotificationStatus.Failed, (await DeliveryAsync(notificationId)).Status);
         using var scope = _application.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
         Assert.NotNull((await db.DeviceTokens.SingleAsync(x => x.Token == $"stale-phone-{staffId:N}")).RevokedAt);
@@ -131,7 +131,7 @@ public sealed class PushDeliveryTests
 
         await DeliverAsync(sender, DateTimeOffset.UtcNow);
 
-        var saved = await NotificationAsync(notificationId);
+        var saved = await DeliveryAsync(notificationId);
         Assert.Equal(NotificationStatus.Failed, saved.Status);
         Assert.Equal("no_device", saved.FailureReason);
         Assert.Empty(SentTo(sender, staffId));
@@ -146,6 +146,54 @@ public sealed class PushDeliveryTests
         var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
         db.Notifications.Add(Copy(original, staffId));
 
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+    }
+
+    [Fact]
+    public async Task A_notification_cannot_have_both_a_staff_and_a_patient_recipient_or_neither()
+    {
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        db.Notifications.Add(NoRecipient());
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        db.ChangeTracker.Clear();
+
+        var staff = await db.StaffMembers.FirstAsync();
+        var patient = new Data.Entities.Common.PatientAccount
+        {
+            Id = Guid.NewGuid(), Username = $"patient-{Guid.NewGuid():N}", PasswordHash = "x"
+        };
+        db.PatientAccounts.Add(patient);
+        db.Notifications.Add(BothRecipients(staff.Id, patient.Id));
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+    }
+
+    [Fact]
+    public async Task A_device_token_cannot_belong_to_both_a_staff_member_and_a_patient_or_neither()
+    {
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        db.DeviceTokens.Add(new DeviceToken
+        {
+            Id = Guid.NewGuid(), Token = $"orphan-{Guid.NewGuid():N}",
+            Platform = DevicePlatform.Android, LastSeenAt = DateTimeOffset.UtcNow
+        });
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        db.ChangeTracker.Clear();
+
+        var staff = await db.StaffMembers.FirstAsync();
+        var patient = new Data.Entities.Common.PatientAccount
+        {
+            Id = Guid.NewGuid(), Username = $"patient-{Guid.NewGuid():N}", PasswordHash = "x"
+        };
+        db.PatientAccounts.Add(patient);
+        db.DeviceTokens.Add(new DeviceToken
+        {
+            Id = Guid.NewGuid(), StaffMemberId = staff.Id, PatientAccountId = patient.Id,
+            Token = $"both-{Guid.NewGuid():N}", Platform = DevicePlatform.Android, LastSeenAt = DateTimeOffset.UtcNow
+        });
         await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
     }
 
@@ -168,6 +216,13 @@ public sealed class PushDeliveryTests
         using var scope = _application.Services.CreateScope();
         return await scope.ServiceProvider.GetRequiredService<CareLankaDbContext>()
             .Notifications.AsNoTracking().SingleAsync(x => x.Id == id);
+    }
+
+    private async Task<NotificationDelivery> DeliveryAsync(Guid notificationId)
+    {
+        using var scope = _application.Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<CareLankaDbContext>()
+            .NotificationDeliveries.AsNoTracking().SingleAsync(x => x.NotificationId == notificationId);
     }
 
     private async Task<(Guid StaffId, Guid NotificationId)> SeedAsync(params string[] tokens)
@@ -199,9 +254,22 @@ public sealed class PushDeliveryTests
 
     private static Notification Copy(Notification source, Guid staffId) => new()
     {
-        Id = Guid.NewGuid(), RecipientStaffMemberId = staffId, Channel = source.Channel, Title = source.Title,
-        Body = source.Body, EntityType = source.EntityType, EntityId = source.EntityId, Status = source.Status,
-        DedupeKey = source.DedupeKey, NextAttemptAt = source.NextAttemptAt
+        Id = Guid.NewGuid(), RecipientStaffMemberId = staffId, Type = source.Type, Title = source.Title,
+        Body = source.Body, EntityType = source.EntityType, EntityId = source.EntityId,
+        DedupeKey = source.DedupeKey
+    };
+
+    private static Notification NoRecipient() => new()
+    {
+        Id = Guid.NewGuid(), Type = NotificationType.DispatchAssigned, Title = "t", Body = "b",
+        DedupeKey = $"no-recipient:{Guid.NewGuid()}"
+    };
+
+    private static Notification BothRecipients(Guid staffId, Guid patientId) => new()
+    {
+        Id = Guid.NewGuid(), RecipientStaffMemberId = staffId, RecipientPatientAccountId = patientId,
+        Type = NotificationType.DispatchAssigned, Title = "t", Body = "b",
+        DedupeKey = $"both-recipients:{Guid.NewGuid()}"
     };
 
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider

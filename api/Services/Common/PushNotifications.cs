@@ -16,17 +16,25 @@ public sealed class PushNotifications(CareLankaDbContext db, TimeProvider clock)
         var now = clock.GetUtcNow();
         foreach (var staffMemberId in staffMemberIds.Distinct())
         {
-            db.Notifications.Add(new Notification
+            var notification = new Notification
             {
                 Id = Guid.NewGuid(),
                 RecipientStaffMemberId = staffMemberId,
-                Channel = NotificationChannel.Push,
+                Type = NotificationType.DispatchAssigned,
                 Title = title,
                 Body = body,
                 EntityType = entityType,
                 EntityId = entityId,
+                DedupeKey = $"{reason}:{entityId}:{staffMemberId}"
+            };
+            db.Notifications.Add(notification);
+            db.NotificationDeliveries.Add(new NotificationDelivery
+            {
+                Id = Guid.NewGuid(),
+                NotificationId = notification.Id,
+                Notification = notification,
+                Channel = NotificationChannel.Push,
                 Status = NotificationStatus.Queued,
-                DedupeKey = $"{reason}:{entityId}:{staffMemberId}",
                 NextAttemptAt = now
             });
         }

@@ -983,7 +983,6 @@ public sealed class ShiftEndpointTests
             builder.UseEnvironment("Development");
             builder.ConfigureServices(services =>
             {
-                services.AddScoped<IShiftService, ShiftService>();
                 if (_stub != null)
                 {
                     services.RemoveAll<IShiftService>();

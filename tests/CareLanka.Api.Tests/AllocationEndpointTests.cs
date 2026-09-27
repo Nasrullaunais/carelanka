@@ -895,7 +895,6 @@ public sealed class AllocationEndpointTests
             builder.UseEnvironment("Development");
             builder.ConfigureServices(services =>
             {
-                services.AddScoped<IAllocationService, AllocationService>();
                 if (_stub != null)
                 {
                     services.RemoveAll<IAllocationService>();

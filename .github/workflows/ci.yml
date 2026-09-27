@@ -177,9 +177,32 @@ jobs:
       - if: failure()
         run: cat "$RUNNER_TEMP/api.log" || true
 
+  changes:
+    name: Does this change the images?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      images: ${{ steps.diff.outputs.images }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      # App code is already covered by the checks; only packaging changes need an image build on a PR.
+      - id: diff
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            echo "images=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only HEAD^1 HEAD | grep -qE '^(Dockerfile\.api|\.dockerignore|deploy/|\.config/|\.github/workflows/)'; then
+            echo "images=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "images=false" >> "$GITHUB_OUTPUT"
+          fi
+
   images:
     name: Image (${{ matrix.image }})
-    needs: [api, web, mobile, contract]
+    needs: [changes, api, web, mobile, contract]
+    if: needs.changes.outputs.images == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

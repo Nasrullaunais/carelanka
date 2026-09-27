@@ -35,7 +35,6 @@ dependencies:
   intl: ^0.20.3
 
   # The patient code as a scannable card, for the reception desk.
-  qr_flutter: ^4.1.0
 
   # `tel:` links — calling the hospital or your own emergency contact.
   url_launcher: ^6.3.2

@@ -118,91 +118,79 @@ class NoticeBanner extends StatelessWidget {
 
     return Container(
       width: double.infinity,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: scheme.surface,
+        color: Color.alphaBlend(accent.withValues(alpha: 0.07), scheme.surface),
         borderRadius: BorderRadius.circular(AppTheme.radiusL),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.6)),
+        border: Border.all(color: accent.withValues(alpha: 0.28)),
       ),
-      // IntrinsicHeight: stretch alone can't size the accent edge to match unbounded content in a list.
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              width: 4,
-              decoration: BoxDecoration(
-                color: accent,
-                borderRadius: const BorderRadius.horizontal(
-                  left: Radius.circular(AppTheme.radiusL),
-                ),
-              ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.14),
+              shape: BoxShape.circle,
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 16, 16, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(icon, size: 19, color: accent),
-                        const SizedBox(width: 10),
-                        Expanded(child: Text(title, style: theme.textTheme.titleSmall)),
-                      ],
+            child: Icon(icon, size: 19, color: accent),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 7),
+                  child: Text(title, style: theme.textTheme.titleSmall),
+                ),
+                if (body != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    body!,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
                     ),
-                    if (body != null) ...[
-                      const SizedBox(height: 6),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 29),
-                        child: Text(
-                          body!,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
+                  ),
+                ],
+                if (bullets.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final bullet in bullets)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: scheme.surface,
+                            borderRadius: BorderRadius.circular(
+                              AppTheme.radiusS,
+                            ),
+                            border: Border.all(color: scheme.outlineVariant),
+                          ),
+                          child: Text(
+                            bullet,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: scheme.onSurface,
+                            ),
                           ),
                         ),
-                      ),
                     ],
-                    if (bullets.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 29),
-                        child: Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: [
-                            for (final bullet in bullets)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: scheme.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(AppTheme.radiusS),
-                                ),
-                                child: Text(
-                                  bullet,
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: scheme.onSurfaceVariant,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    if (action != null) ...[
-                      const SizedBox(height: 12),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 29),
-                        child: Align(alignment: Alignment.centerLeft, child: action!),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+                  ),
+                ],
+                if (action != null) ...[
+                  const SizedBox(height: 14),
+                  Align(alignment: Alignment.centerLeft, child: action!),
+                ],
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

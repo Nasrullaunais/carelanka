@@ -8,6 +8,7 @@ import '../../../services/api_client/models/my_profile.dart';
 import '../state/profile_controller.dart';
 import '../widgets/dialer.dart';
 import '../widgets/panels.dart';
+import '../widgets/patient_id_card.dart';
 import 'claim_record_screen.dart';
 import 'my_details_screen.dart';
 import 'my_reports_screen.dart';
@@ -58,6 +59,8 @@ class ProfileScreen extends StatelessWidget {
           ] else ...[
             _Header(profile: profile),
             const SizedBox(height: 20),
+            PatientIdCard(patientCode: profile.patientCode),
+            const SizedBox(height: 16),
             if (!profile.detailsComplete) ...[
               NoticeBanner(
                 icon: Icons.info_outline,
@@ -211,21 +214,6 @@ class _Header extends StatelessWidget {
                 style: theme.textTheme.titleLarge,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  profile.patientCode,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                    letterSpacing: 1,
-                  ),
-                ),
               ),
             ],
           ),

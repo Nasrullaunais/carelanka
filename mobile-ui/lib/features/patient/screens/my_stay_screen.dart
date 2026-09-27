@@ -239,30 +239,26 @@ class _StatusHeadline extends StatelessWidget {
     final scheme = theme.colorScheme;
     final look = StatusLook.ofAdmission(admission.status, scheme);
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(AppTheme.radiusL),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.6)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: look.surface, shape: BoxShape.circle),
-            child: Icon(look.icon, size: 22, color: look.color),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(admission.statusText, style: theme.textTheme.titleLarge),
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: look.surface, shape: BoxShape.circle),
+              child: Icon(look.icon, size: 22, color: look.color),
             ),
-          ),
-        ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(admission.statusText, style: theme.textTheme.titleLarge),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

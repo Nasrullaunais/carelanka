@@ -51,8 +51,7 @@ public sealed class MedicalProfileEndpointTests
         {
             known_conditions = "Type 2 diabetes, diagnosed 2019.",
             allergies = "Penicillin",
-            current_symptoms = "Headache since admission.",
-            recent_situation = "Two days of dizziness at home."
+            current_symptoms = "Headache since admission. Two days of dizziness at home before it."
         });
 
         Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
@@ -63,6 +62,7 @@ public sealed class MedicalProfileEndpointTests
         Assert.Equal(
             "Type 2 diabetes, diagnosed 2019.",
             body.RootElement.GetProperty("known_conditions").GetString());
+        Assert.False(body.RootElement.TryGetProperty("recent_situation", out _));
         Assert.NotEqual(
             JsonValueKind.Null, body.RootElement.GetProperty("updated_by_staff_name").ValueKind);
         Assert.NotEqual(JsonValueKind.Null, body.RootElement.GetProperty("updated_at").ValueKind);

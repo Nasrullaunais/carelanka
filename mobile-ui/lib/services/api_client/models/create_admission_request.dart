@@ -16,7 +16,6 @@ class CreateAdmissionRequest {
     required this.patientId,
     required this.source,
     required this.admissionCategory,
-    required this.categorySetByStaffId,
     required this.urgency,
     this.isInfectious = false,
     this.dispatchId,
@@ -32,8 +31,6 @@ class CreateAdmissionRequest {
   final String? dispatchId;
   @JsonKey(name: 'admission_category')
   final AdmissionCategory admissionCategory;
-  @JsonKey(name: 'category_set_by_staff_id')
-  final String categorySetByStaffId;
   final AdmissionUrgency urgency;
   @JsonKey(name: 'is_infectious')
   final bool isInfectious;

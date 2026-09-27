@@ -36,8 +36,6 @@ public interface IAdmissionService
 
     Task<AdmissionResponse> MarkArrivedAsync(Guid id, CancellationToken cancellationToken = default);
 
-    Task<AdmissionResponse> CompleteAsync(Guid id, CancellationToken cancellationToken = default);
-
     Task<AdmissionResponse> CancelAsync(
         Guid id, CancelAdmissionRequest request, CancellationToken cancellationToken = default);
 

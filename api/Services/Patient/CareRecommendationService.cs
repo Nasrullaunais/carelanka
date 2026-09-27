@@ -23,6 +23,14 @@ public sealed class CareRecommendationService : ICareRecommendationService
 {
     public const string Objective = "draft_care_recommendation";
 
+    public const int QueriesPerMinute = 3;
+
+    /// <summary>
+    /// A run still open after this long is treated as dead - the queue lives in memory, so a
+    /// restart mid-run leaves the row open forever. Past this, reviewers may act on the report.
+    /// </summary>
+    public static readonly TimeSpan RunGivenUpAfter = TimeSpan.FromMinutes(10);
+
     /// <summary>
     /// The states in which a patient is physically on a ward with staff responsible for them
     /// right now. <c>awaiting_bed</c> and <c>bed_reserved</c> are not yet a stay to advise on;
@@ -57,13 +65,29 @@ public sealed class CareRecommendationService : ICareRecommendationService
             throw new ConflictException(MessageCode.NotCurrentlyAdmittedForCareQuery);
         }
 
+        var now = DateTimeOffset.UtcNow;
+        var oneMinuteAgo = now.AddMinutes(-1);
+
+        var sentLastMinute = await _db.CareRecommendations
+            .CountAsync(row => row.PatientId == patientId && row.ReportedAt > oneMinuteAgo, ct);
+
+        if (sentLastMinute >= QueriesPerMinute)
+        {
+            throw new TooManyRequestsException(MessageCode.TooManyCareQueries, sentLastMinute);
+        }
+
+        var reportedText = request.ReportedText.Trim();
+
+        // Screened now as well as inside the run, so the patient is told to get help straight
+        // away instead of waiting on the agent.
         var recommendation = new CareRecommendationEntity
         {
             Id = Guid.NewGuid(),
             PatientId = patientId,
             AdmissionId = admission.Id,
-            ReportedText = request.ReportedText.Trim(),
-            ReportedAt = DateTimeOffset.UtcNow,
+            ReportedText = reportedText,
+            ReportedAt = now,
+            RedFlag = CareRedFlagScreen.Matches(reportedText),
             Status = CareRecommendationStatus.PendingReview
         };
 
@@ -96,7 +120,8 @@ public sealed class CareRecommendationService : ICareRecommendationService
             WorkflowId = workflow.Id,
             RecommendationId = recommendation.Id,
             Status = "running",
-            PollUrl = $"/api/care-workflows/{workflow.Id}"
+            PollUrl = $"/api/care-workflows/{workflow.Id}",
+            RedFlag = recommendation.RedFlag
         };
     }
 
@@ -110,6 +135,8 @@ public sealed class CareRecommendationService : ICareRecommendationService
         {
             throw new ConflictException(MessageCode.CareRecommendationNotPendingReview);
         }
+
+        await EnsureAgentFinishedAsync(id, ct);
 
         // A fresh workflow rather than a reset of the old one: the first run is a real thing that
         // happened, and overwriting it would erase the record of why a redraft was needed.
@@ -142,7 +169,8 @@ public sealed class CareRecommendationService : ICareRecommendationService
             WorkflowId = workflow.Id,
             RecommendationId = recommendation.Id,
             Status = "running",
-            PollUrl = $"/api/care-workflows/{workflow.Id}"
+            PollUrl = $"/api/care-workflows/{workflow.Id}",
+            RedFlag = recommendation.RedFlag
         };
     }
 
@@ -333,7 +361,30 @@ public sealed class CareRecommendationService : ICareRecommendationService
             throw new ConflictException(MessageCode.CareRecommendationNotPendingReview);
         }
 
+        await EnsureAgentFinishedAsync(id, ct);
+
         return recommendation;
+    }
+
+    public static bool IsStillRunning(AgentWorkflow workflow, DateTimeOffset now)
+        => workflow.CompletedAt is null && workflow.StartedAt > now - RunGivenUpAfter;
+
+    private async Task EnsureAgentFinishedAsync(Guid recommendationId, CancellationToken ct)
+    {
+        var cutoff = DateTimeOffset.UtcNow - RunGivenUpAfter;
+
+        var running = await _db.AgentWorkflows.AnyAsync(
+            row => row.AgentType == AgentType.PatientCareAdvisory
+                && row.EntityType == CareAgentExecutor.WorkflowEntityType
+                && row.EntityId == recommendationId
+                && row.CompletedAt == null
+                && row.StartedAt > cutoff,
+            ct);
+
+        if (running)
+        {
+            throw new ConflictException(MessageCode.CareAgentStillDrafting);
+        }
     }
 
     private static CareWorkflowStatus Status(AgentWorkflow workflow, CareRecommendationEntity? recommendation)
@@ -345,7 +396,9 @@ public sealed class CareRecommendationService : ICareRecommendationService
 
         if (workflow.CompletedAt is null)
         {
-            return CareWorkflowStatus.Running;
+            return IsStillRunning(workflow, DateTimeOffset.UtcNow)
+                ? CareWorkflowStatus.Running
+                : CareWorkflowStatus.Failed;
         }
 
         return recommendation?.Status == CareRecommendationStatus.PendingReview

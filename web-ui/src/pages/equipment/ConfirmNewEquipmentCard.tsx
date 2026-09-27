@@ -1,3 +1,4 @@
+import { Table } from '../../components/Table';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -140,7 +141,7 @@ export function ConfirmNewEquipmentCard() {
       )}
 
       {rows.length > 0 && (
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Registered</th>
@@ -184,7 +185,7 @@ export function ConfirmNewEquipmentCard() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
 
       {rejecting && (

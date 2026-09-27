@@ -17,24 +17,55 @@ public static class CareRedFlagScreen
     public static readonly IReadOnlyList<string> Keywords =
     [
         "chest pain",
-        "can't breathe",
+        "heart attack",
+        "cant breathe",
         "cannot breathe",
         "can not breathe",
+        "not breathing",
+        "short of breath",
+        "shortness of breath",
+        "difficulty breathing",
+        "trouble breathing",
+        "choking",
         "severe bleeding",
         "heavy bleeding",
+        "coughing up blood",
+        "vomiting blood",
         "loss of consciousness",
         "unconscious",
         "unresponsive",
+        "passed out",
+        "fainted",
         "stroke",
         "suicidal",
         "suicide",
-        "can't move my",
+        "kill myself",
+        "cant move my",
         "cannot move my",
         "severe allergic reaction",
         "anaphylaxis",
         "seizure",
         "convulsion"
     ];
+
+    /// <summary>
+    /// Lower-cases, drops apostrophes of every kind and squeezes spaces, so a phone's curly
+    /// apostrophe, a typed "can't" and a hurried "cant" all read the same. The keywords above
+    /// are already stored in this form.
+    /// </summary>
+    public static string Normalise(string text)
+    {
+        var withoutApostrophes = text
+            .ToLowerInvariant()
+            .Replace("'", string.Empty)
+            .Replace("\u2019", string.Empty)
+            .Replace("\u2018", string.Empty)
+            .Replace("\u02BC", string.Empty)
+            .Replace("`", string.Empty);
+
+        return string.Join(' ', withoutApostrophes.Split(
+            (char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+    }
 
     public static bool Matches(string reportedText)
     {
@@ -43,7 +74,8 @@ public static class CareRedFlagScreen
             return false;
         }
 
-        return Keywords.Any(keyword =>
-            reportedText.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+        var text = Normalise(reportedText);
+
+        return Keywords.Any(keyword => text.Contains(keyword, StringComparison.Ordinal));
     }
 }

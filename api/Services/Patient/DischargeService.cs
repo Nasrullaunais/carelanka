@@ -113,6 +113,13 @@ public sealed class DischargeService : IDischargeService
         }
 
         var admission = await LoadForWriteAsync(admissionId, ct);
+
+        if (!OnTheWard.Contains(admission.Status))
+        {
+            throw new ConflictException(
+                MessageCode.DischargeChecklistNotOnWard, EnumWire.ToWire(admission.Status));
+        }
+
         var discharge = await EnsureDischargeAsync(admission, ct);
 
         foreach (var (item, ticked) in wanted)
@@ -166,6 +173,19 @@ public sealed class DischargeService : IDischargeService
             live.ReservedUntil = null;
             live.ReleasedAt = now;
             live.ReleaseReason = ReleaseReason.Discharged;
+        }
+
+        var unanswered = await _db.CareRecommendations
+            .Where(row => row.AdmissionId == admission.Id
+                && row.Status == CareRecommendationStatus.PendingReview)
+            .ToListAsync(ct);
+
+        foreach (var row in unanswered)
+        {
+            row.Status = CareRecommendationStatus.Rejected;
+            row.RejectionReason = "Closed automatically: the patient was discharged before this was answered.";
+            row.ReviewedByStaffMemberId = _currentUser.Id;
+            row.ReviewedAt = now;
         }
 
         await _db.SaveChangesAsync(ct);

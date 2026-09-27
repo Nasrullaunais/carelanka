@@ -52,6 +52,7 @@ public static class MessageCodes
             [MessageCode.WarningClosed] = "cl_equ_028",
             [MessageCode.WarningNotResolved] = "cl_equ_029",
             [MessageCode.EquipmentCategoryInUse] = "cl_equ_030",
+            [MessageCode.ReorderSuggestionAlreadyRunning] = "cl_equ_031",
             [MessageCode.WardNameTaken] = "cl_pat_001",
             [MessageCode.PatientNicTaken] = "cl_pat_002",
             [MessageCode.PatientAlreadyHasAccount] = "cl_pat_003",
@@ -59,10 +60,8 @@ public static class MessageCodes
             [MessageCode.TempReferenceExhausted] = "cl_pat_005",
             [MessageCode.PatientHasOpenAdmission] = "cl_pat_006",
             [MessageCode.DispatchIdRequired] = "cl_pat_007",
-            [MessageCode.CategoryStaffNotFound] = "cl_pat_008",
             [MessageCode.PatientHasOpenAppointment] = "cl_pat_009",
             [MessageCode.AppointmentInThePast] = "cl_pat_010",
-            [MessageCode.CareLevelNeedsDutyManager] = "cl_pat_011",
             [MessageCode.BedNeedsDutyManager] = "cl_pat_012",
             [MessageCode.BedDowngradeNeedsDutyManager] = "cl_pat_013",
             [MessageCode.BedAlreadyClaimed] = "cl_pat_014",
@@ -71,8 +70,6 @@ public static class MessageCodes
             [MessageCode.BedWardGenderPolicy] = "cl_pat_017",
             [MessageCode.BedNeedsIsolation] = "cl_pat_018",
             [MessageCode.BedWardNotInService] = "cl_pat_019",
-            [MessageCode.VisitNeedsDischargeNotComplete] = "cl_pat_020",
-            [MessageCode.VisitNeedsNoBed] = "cl_pat_021",
             [MessageCode.ChecklistItemWrongRole] = "cl_pat_022",
             [MessageCode.DischargeChecklistIncomplete] = "cl_pat_023",
             [MessageCode.BillingTickedBySettlingOnly] = "cl_pat_025",
@@ -101,7 +98,16 @@ public static class MessageCodes
             [MessageCode.CareRecommendationNotPendingReview] = "cl_pat_040",
             [MessageCode.PreAdmissionAlreadyExists] = "cl_pat_041",
             [MessageCode.AdmissionAlreadyClassified] = "cl_pat_042",
-            [MessageCode.AdmissionNotYetClassified] = "cl_pat_043"
+            [MessageCode.AdmissionNotYetClassified] = "cl_pat_043",
+            [MessageCode.BillNotOpenForStay] = "cl_pat_044",
+            [MessageCode.AppointmentNotBillable] = "cl_pat_045",
+            [MessageCode.DischargeChecklistNotOnWard] = "cl_pat_046",
+            [MessageCode.BedWardWrongKind] = "cl_pat_047",
+            [MessageCode.MaternityNeedsFemalePatient] = "cl_pat_048",
+            [MessageCode.CareAgentStillDrafting] = "cl_pat_049",
+            [MessageCode.TooManyCareQueries] = "cl_pat_050",
+            [MessageCode.NicHasHospitalRecord] = "cl_pat_051",
+            [MessageCode.PatientIdentityLocked] = "cl_pat_052"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

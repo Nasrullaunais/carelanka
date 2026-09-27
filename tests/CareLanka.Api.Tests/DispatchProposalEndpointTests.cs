@@ -1,3 +1,6 @@
+using CareLanka.Api.Agents.Emergency;
+using CareLanka.Api.Data.Entities.Common;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -135,6 +138,92 @@ public sealed class DispatchProposalEndpointTests
 
         Assert.Equal(HttpStatusCode.Conflict, create.StatusCode);
         Assert.Equal("cl_emg_007", (await ReadAsync(create)).GetProperty("code").GetString());
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("patient_reached")]
+    [InlineData("priority_changed")]
+    [InlineData("crew_unavailable")]
+    public async Task Diversion_rechecks_live_state_before_moving_an_ambulance(string? change)
+    {
+        var others = await OtherAmbulanceIdsAsync();
+        var ambulanceId = await SeedReadyAmbulanceAsync();
+        var sourceCallId = await SeedCallAsync(CallPriority.Low);
+        var urgentCallId = await SeedCallAsync(CallPriority.Critical);
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+        var assigned = await manager.PostAsJsonAsync($"/api/emergency-calls/{sourceCallId}/dispatch", new { ambulance_id = ambulanceId });
+        Assert.Equal(HttpStatusCode.Created, assigned.StatusCode);
+        var create = await manager.PostAsJsonAsync("/api/dispatch-proposals", new
+        {
+            emergency_call_id = urgentCallId, allow_diversion = true, exclude_ambulance_ids = others
+        });
+        Assert.Equal(HttpStatusCode.Accepted, create.StatusCode);
+        var proposal = await SettledAsync(manager, (await ReadAsync(create)).GetProperty("id").GetGuid());
+        Assert.Equal("pending_approval", proposal.GetProperty("status").GetString());
+        if (change is not null)
+        {
+            using var changes = _application.Services.CreateScope();
+            var state = changes.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+            if (change == "patient_reached") (await state.Dispatches.SingleAsync(x => x.EmergencyCallId == sourceCallId)).Status = DispatchStatus.AtScene;
+            if (change == "priority_changed") (await state.EmergencyCalls.FindAsync(urgentCallId))!.Priority = CallPriority.Low;
+            if (change == "crew_unavailable")
+                foreach (var assignment in await state.AmbulanceCrewAssignments.Where(x => x.AmbulanceId == ambulanceId).ToListAsync()) assignment.UnassignedAt = DateTimeOffset.UtcNow;
+            await state.SaveChangesAsync();
+        }
+        var approved = await manager.PostAsJsonAsync($"/api/dispatch-proposals/{proposal.GetProperty("id").GetGuid()}/approve", new { notes = "Urgent response required" });
+        if (change is not null)
+        {
+            Assert.Equal(HttpStatusCode.Conflict, approved.StatusCode);
+            using var check = _application.Services.CreateScope();
+            var unchanged = check.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+            Assert.Equal(CallStatus.Received, (await unchanged.EmergencyCalls.FindAsync(urgentCallId))!.Status);
+            Assert.False(await unchanged.Dispatches.AnyAsync(x => x.EmergencyCallId == urgentCallId));
+            return;
+        }
+        Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        Assert.Equal(CallStatus.Received, (await db.EmergencyCalls.FindAsync(sourceCallId))!.Status);
+        Assert.Equal(CallStatus.Dispatched, (await db.EmergencyCalls.FindAsync(urgentCallId))!.Status);
+        Assert.Equal(DispatchStatus.Reassigned, (await db.Dispatches.SingleAsync(x => x.EmergencyCallId == sourceCallId)).Status);
+        Assert.Equal(ambulanceId, (await db.Dispatches.SingleAsync(x => x.EmergencyCallId == urgentCallId)).AmbulanceId);
+    }
+
+    [Fact]
+    public async Task Pending_proposals_are_recovered_without_an_in_memory_queue_entry()
+    {
+        var callId = await SeedCallAsync(CallPriority.High);
+        var proposalId = Guid.NewGuid();
+        using (var scope = _application.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+            var workflow = new AgentWorkflow
+            {
+                Id = Guid.NewGuid(), AgentType = AgentType.DispatchRouting, EntityType = "EmergencyCall",
+                EntityId = callId, CorrelationId = Guid.NewGuid(), Objective = "Recovery test",
+                Status = AgentWorkflowStatus.Pending, StartedAt = DateTimeOffset.UtcNow, AttemptCount = 1
+            };
+            db.AgentWorkflows.Add(workflow);
+            db.DispatchProposals.Add(new DispatchProposal
+            {
+                Id = proposalId, WorkflowId = workflow.Id, EmergencyCallId = callId,
+                CallPriority = CallPriority.High, Status = DispatchProposalStatus.Pending
+            });
+            await db.SaveChangesAsync();
+        }
+        using var worker = new DispatchProposalWorker(new DispatchRunQueue(), _application.Services.GetRequiredService<IServiceScopeFactory>(), NullLogger<DispatchProposalWorker>.Instance);
+        await worker.StartAsync(CancellationToken.None);
+        try
+        {
+            using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+            var result = await SettledAsync(manager, proposalId);
+            Assert.NotEqual("pending", result.GetProperty("status").GetString());
+        }
+        finally
+        {
+            await worker.StopAsync(CancellationToken.None);
+        }
     }
 
     private async Task<Guid> StartAsync(HttpClient manager, Guid callId, IReadOnlyList<Guid>? excludeAmbulanceIds = null)

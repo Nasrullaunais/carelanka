@@ -6,9 +6,11 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/friendly_date.dart';
 import '../../../core/widgets/phone_width.dart';
 import '../../../services/api_client/models/gender.dart';
+import '../services/patient_service.dart';
 import '../state/profile_controller.dart';
 import '../validation/patient_fields.dart';
 import '../widgets/panels.dart';
+import 'claim_record_screen.dart';
 
 class MyDetailsScreen extends StatefulWidget {
   const MyDetailsScreen({super.key});
@@ -99,6 +101,11 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     if (!mounted) return;
 
     if (!saved) {
+      if (controller.saveError?.code == PatientService.nicHasHospitalRecordCode) {
+        await _offerPatientCode(controller);
+        return;
+      }
+
       // Field errors already render under their fields — only toast when there's no field to blame.
       if (controller.fieldErrors.isEmpty) {
         final message =
@@ -113,6 +120,41 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Your details have been saved.')),
+    );
+  }
+
+  Future<void> _offerPatientCode(ProfileController controller) async {
+    final usePatientCode = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('You already have a hospital record'),
+        content: Text(
+          controller.saveError?.message ??
+              'Use "I have a patient code" instead. Your code is on the slip the hospital '
+                  'gave you, or ask at the hospital desk.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('I have a patient code'),
+          ),
+        ],
+      ),
+    );
+
+    if (usePatientCode != true || !mounted) return;
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => ChangeNotifierProvider<ProfileController>.value(
+          value: controller,
+          child: const ClaimRecordScreen(),
+        ),
+      ),
     );
   }
 
@@ -172,6 +214,9 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                         maxLength: PatientFieldLimits.nic,
                         serverErrors: errors['nic'],
                         validator: validateNic,
+                        // Re-validates the date of birth field against the new NIC as it's typed,
+                        // once the form has been submitted once.
+                        onChanged: _submitted ? (_) => setState(() {}) : null,
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<Gender>(
@@ -197,6 +242,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                       const SizedBox(height: 12),
                       _DateOfBirthField(
                         value: _dateOfBirth,
+                        nic: _nic.text,
                         enabled: !controller.saving,
                         serverError: _firstError(errors['date_of_birth']),
                         pick: _pickDateOfBirth,
@@ -234,7 +280,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                 ),
                 const SizedBox(height: 16),
                 SectionCard(
-                  title: 'Emergency contact',
+                  title: 'Emergency/guardian contact',
                   icon: Icons.emergency_outlined,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -338,6 +384,7 @@ void openMyDetails(BuildContext context, ProfileController controller) {
 class _DateOfBirthField extends StatelessWidget {
   const _DateOfBirthField({
     required this.value,
+    required this.nic,
     required this.enabled,
     required this.pick,
     required this.onChanged,
@@ -345,6 +392,7 @@ class _DateOfBirthField extends StatelessWidget {
   });
 
   final DateTime? value;
+  final String nic;
   final bool enabled;
   final Future<DateTime?> Function() pick;
   final ValueChanged<DateTime> onChanged;
@@ -354,7 +402,8 @@ class _DateOfBirthField extends StatelessWidget {
   Widget build(BuildContext context) {
     return FormField<DateTime>(
       initialValue: value,
-      validator: (v) => v == null ? 'Enter your date of birth' : null,
+      validator: (v) =>
+          v == null ? 'Enter your date of birth' : validateDateOfBirthAgainstNic(v, nic),
       builder: (field) => InkWell(
         onTap: enabled
             ? () async {
@@ -390,6 +439,7 @@ class _Field extends StatelessWidget {
     this.keyboardType,
     this.maxLength,
     this.serverErrors,
+    this.onChanged,
   });
 
   final TextEditingController controller;
@@ -399,6 +449,7 @@ class _Field extends StatelessWidget {
   final TextInputType? keyboardType;
   final int? maxLength;
   final List<String>? serverErrors;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -415,6 +466,7 @@ class _Field extends StatelessWidget {
           errorText: _firstError(serverErrors),
         ),
         validator: validator,
+        onChanged: onChanged,
       ),
     );
   }

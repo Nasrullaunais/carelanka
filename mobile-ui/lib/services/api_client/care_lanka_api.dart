@@ -14,6 +14,7 @@ import 'clients/cancellation_review_api.dart';
 import 'clients/care_recommendations_api.dart';
 import 'clients/device_tokens_api.dart';
 import 'clients/discharge_api.dart';
+import 'clients/dispatch_agent_api.dart';
 import 'clients/dispatches_api.dart';
 import 'clients/equipment_api.dart';
 import 'clients/health_api.dart';
@@ -26,6 +27,9 @@ import 'clients/my_run_api.dart';
 import 'clients/patient_self_service_api.dart';
 import 'clients/patients_api.dart';
 import 'clients/pharmacy_api.dart';
+import 'clients/reports_api.dart';
+import 'clients/skills_api.dart';
+import 'clients/staff_api.dart';
 import 'clients/wards_and_beds_api.dart';
 
 /// CareLanka API `vv1`
@@ -51,6 +55,7 @@ class CareLankaApi {
   CareRecommendationsApi? _careRecommendations;
   DeviceTokensApi? _deviceTokens;
   DischargeApi? _discharge;
+  DispatchAgentApi? _dispatchAgent;
   DispatchesApi? _dispatches;
   EquipmentApi? _equipment;
   HealthApi? _health;
@@ -63,6 +68,9 @@ class CareLankaApi {
   PatientSelfServiceApi? _patientSelfService;
   PatientsApi? _patients;
   PharmacyApi? _pharmacy;
+  ReportsApi? _reports;
+  SkillsApi? _skills;
+  StaffApi? _staff;
   WardsAndBedsApi? _wardsAndBeds;
 
   AdmissionsApi get admissions => _admissions ??= AdmissionsApi(_dio, baseUrl: _baseUrl);
@@ -84,6 +92,8 @@ class CareLankaApi {
   DeviceTokensApi get deviceTokens => _deviceTokens ??= DeviceTokensApi(_dio, baseUrl: _baseUrl);
 
   DischargeApi get discharge => _discharge ??= DischargeApi(_dio, baseUrl: _baseUrl);
+
+  DispatchAgentApi get dispatchAgent => _dispatchAgent ??= DispatchAgentApi(_dio, baseUrl: _baseUrl);
 
   DispatchesApi get dispatches => _dispatches ??= DispatchesApi(_dio, baseUrl: _baseUrl);
 
@@ -108,6 +118,12 @@ class CareLankaApi {
   PatientsApi get patients => _patients ??= PatientsApi(_dio, baseUrl: _baseUrl);
 
   PharmacyApi get pharmacy => _pharmacy ??= PharmacyApi(_dio, baseUrl: _baseUrl);
+
+  ReportsApi get reports => _reports ??= ReportsApi(_dio, baseUrl: _baseUrl);
+
+  SkillsApi get skills => _skills ??= SkillsApi(_dio, baseUrl: _baseUrl);
+
+  StaffApi get staff => _staff ??= StaffApi(_dio, baseUrl: _baseUrl);
 
   WardsAndBedsApi get wardsAndBeds => _wardsAndBeds ??= WardsAndBedsApi(_dio, baseUrl: _baseUrl);
 }

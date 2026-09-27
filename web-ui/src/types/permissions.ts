@@ -78,7 +78,14 @@ export function canRegisterPatient(role: PrincipalRole | undefined): boolean {
 }
 
 export function canEditPatient(role: PrincipalRole | undefined): boolean {
-  return canRegisterPatient(role);
+  return canRegisterPatient(role) || role === 'hospital_administrator';
+}
+
+export function canChangePatientIdentity(
+  role: PrincipalRole | undefined,
+  hasNic: boolean,
+): boolean {
+  return !hasNic || role === 'hospital_administrator';
 }
 
 export function canReadPatientDetails(role: PrincipalRole | undefined): boolean {
@@ -114,10 +121,6 @@ export function canWorkAppointmentDesk(role: PrincipalRole | undefined): boolean
 /// check anyone in. Mirrors `canOpenDischargeBoard`.
 export function canOpenAppointmentBoard(role: PrincipalRole | undefined): boolean {
   return canWorkAppointmentDesk(role) || canWorkBillingDesk(role);
-}
-
-export function canSetHighCareLevel(role: PrincipalRole | undefined): boolean {
-  return role === 'duty_manager';
 }
 
 export function canManageEmergency(role: PrincipalRole | undefined): boolean {
@@ -161,10 +164,6 @@ export function canWorkBillingDesk(role: PrincipalRole | undefined): boolean {
 /// discharge checklist and stays reception's alone.
 export function canBillAppointment(role: PrincipalRole | undefined): boolean {
   return canWorkBillingDesk(role) || role === 'ward_nurse';
-}
-
-export function canCompleteVisit(role: PrincipalRole | undefined): boolean {
-  return role === 'ward_nurse' || role === 'duty_manager';
 }
 
 export function canMarkArrived(role: PrincipalRole | undefined): boolean {

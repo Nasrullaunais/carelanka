@@ -59,6 +59,9 @@ abstract class AmbulancesApi {
     @Body() CreateAmbulanceRequest? body,
   });
 
+  @GET('/ambulances/mine')
+  Future<Ambulance> getMyAmbulanceAssignment();
+
   @GET('/ambulances/{id}')
   Future<AmbulanceDetail> getAmbulance({
     @Path('id') required String id,

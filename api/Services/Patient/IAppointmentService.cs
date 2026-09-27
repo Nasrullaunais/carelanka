@@ -12,12 +12,17 @@ public interface IAppointmentService
     Task<PagedResult<AppointmentResponse>> ListAsync(
         DateOnly? date,
         AppointmentStatus? status,
+        string? search,
+        bool includeFinished,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default);
 
     Task<AppointmentResponse> CreateAsync(
         CreateAppointmentRequest request, CancellationToken cancellationToken = default);
+
+    Task<AppointmentResponse> CreateWalkInAsync(
+        CreateWalkInAppointmentRequest request, CancellationToken cancellationToken = default);
 
     Task<AdmissionResponse> CheckInAsync(
         Guid id, CheckInRequest request, CancellationToken cancellationToken = default);

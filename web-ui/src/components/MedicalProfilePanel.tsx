@@ -1,3 +1,4 @@
+import { Table } from './Table';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -14,24 +15,21 @@ import { localDateTime } from '../types/datetime';
 const KNOWN_CONDITIONS_MAX = 2000;
 const ALLERGIES_MAX = 1000;
 const CURRENT_SYMPTOMS_MAX = 2000;
-const RECENT_SITUATION_MAX = 2000;
 
 type Draft = {
   known_conditions: string;
   allergies: string;
   current_symptoms: string;
-  recent_situation: string;
 };
 
 const empty: Draft = {
   known_conditions: '',
   allergies: '',
   current_symptoms: '',
-  recent_situation: '',
 };
 
 /**
- * The four boxes the care advisory agent reads. Everything in them is typed by a clinician -
+ * The three boxes the care advisory agent reads. Everything in them is typed by a clinician -
  * there is no field here the system fills in, which is what keeps this a handover note rather
  * than a medical record.
  */
@@ -63,7 +61,6 @@ export function MedicalProfilePanel({
       known_conditions: profile.data?.known_conditions ?? '',
       allergies: profile.data?.allergies ?? '',
       current_symptoms: profile.data?.current_symptoms ?? '',
-      recent_situation: profile.data?.recent_situation ?? '',
     });
 
     setEditing(true);
@@ -90,7 +87,6 @@ export function MedicalProfilePanel({
         known_conditions: draft.known_conditions.trim() || null,
         allergies: draft.allergies.trim() || null,
         current_symptoms: draft.current_symptoms.trim() || null,
-        recent_situation: draft.recent_situation.trim() || null,
       },
     });
   }
@@ -109,8 +105,7 @@ export function MedicalProfilePanel({
     const blank =
       !profile.data?.known_conditions &&
       !profile.data?.allergies &&
-      !profile.data?.current_symptoms &&
-      !profile.data?.recent_situation;
+      !profile.data?.current_symptoms;
 
     return (
       <>
@@ -119,7 +114,7 @@ export function MedicalProfilePanel({
             Nobody has recorded anything about this patient's health yet.
           </p>
         ) : (
-          <table>
+          <Table>
             <tbody>
               <ProfileField label="Known conditions">
                 {profile.data?.known_conditions}
@@ -128,11 +123,8 @@ export function MedicalProfilePanel({
               <ProfileField label="Current symptoms">
                 {profile.data?.current_symptoms}
               </ProfileField>
-              <ProfileField label="Recent situation">
-                {profile.data?.recent_situation}
-              </ProfileField>
             </tbody>
-          </table>
+          </Table>
         )}
 
         {written && (
@@ -180,18 +172,10 @@ export function MedicalProfilePanel({
 
       <ProfileInput
         label="Current symptoms"
-        hint="What they are in with this time."
+        hint="What they are in with this time, and what led up to it: a fall last week, a course of antibiotics finished."
         maxLength={CURRENT_SYMPTOMS_MAX}
         value={draft.current_symptoms}
         onChange={(value) => setDraft({ ...draft, current_symptoms: value })}
-      />
-
-      <ProfileInput
-        label="Recent situation"
-        hint="Recent events worth knowing: a fall last week, a course of antibiotics finished."
-        maxLength={RECENT_SITUATION_MAX}
-        value={draft.recent_situation}
-        onChange={(value) => setDraft({ ...draft, recent_situation: value })}
       />
 
       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>

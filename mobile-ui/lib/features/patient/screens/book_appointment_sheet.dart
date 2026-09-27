@@ -11,7 +11,9 @@ class BookAppointmentRequestDraft {
   final String? reason;
 }
 
-Future<BookAppointmentRequestDraft?> showBookAppointmentSheet(BuildContext context) {
+Future<BookAppointmentRequestDraft?> showBookAppointmentSheet(
+  BuildContext context,
+) {
   return showModalBottomSheet<BookAppointmentRequestDraft>(
     context: context,
     isScrollControlled: true,
@@ -85,10 +87,12 @@ class _BookAppointmentSheetState extends State<_BookAppointmentSheet> {
       return;
     }
 
-    Navigator.of(context).pop(BookAppointmentRequestDraft(
-      scheduledAt: scheduledAt,
-      reason: _reason.text.trim().isEmpty ? null : _reason.text.trim(),
-    ));
+    Navigator.of(context).pop(
+      BookAppointmentRequestDraft(
+        scheduledAt: scheduledAt,
+        reason: _reason.text.trim().isEmpty ? null : _reason.text.trim(),
+      ),
+    );
   }
 
   @override
@@ -116,7 +120,9 @@ class _BookAppointmentSheetState extends State<_BookAppointmentSheet> {
               const SizedBox(height: 4),
               Text(
                 'Only one open booking is allowed at a time.',
-                style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 22),
               const _Label('Date'),
@@ -127,8 +133,13 @@ class _BookAppointmentSheetState extends State<_BookAppointmentSheet> {
                 children: [
                   for (var offset = 1; offset <= 3; offset++)
                     _ChoiceChip(
-                      label: FriendlyDate.relativeDay(today.add(Duration(days: offset))),
-                      selected: _isSameDay(_date, today.add(Duration(days: offset))),
+                      label: FriendlyDate.relativeDay(
+                        today.add(Duration(days: offset)),
+                      ),
+                      selected: _isSameDay(
+                        _date,
+                        today.add(Duration(days: offset)),
+                      ),
                       onTap: () => setState(
                         () => _date = today.add(Duration(days: offset)),
                       ),
@@ -191,8 +202,11 @@ class _BookAppointmentSheetState extends State<_BookAppointmentSheet> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.check_circle_outline,
-                          size: 18, color: scheme.onPrimaryContainer),
+                      Icon(
+                        Icons.check_circle_outline,
+                        size: 18,
+                        color: scheme.onPrimaryContainer,
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
@@ -222,9 +236,9 @@ class _BookAppointmentSheetState extends State<_BookAppointmentSheet> {
       a != null && a.year == b.year && a.month == b.month && a.day == b.day;
 
   static bool _isSuggestedDay(DateTime date, DateTime today) => List.generate(
-        3,
-        (index) => today.add(Duration(days: index + 1)),
-      ).any((day) => _isSameDay(date, day));
+    3,
+    (index) => today.add(Duration(days: index + 1)),
+  ).any((day) => _isSameDay(date, day));
 }
 
 class _Label extends StatelessWidget {
@@ -259,33 +273,46 @@ class _ChoiceChip extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    return Material(
-      color: selected ? scheme.primary : scheme.surface,
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        onTap: onTap,
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: Material(
+        color: selected ? scheme.primary : scheme.surface,
         borderRadius: BorderRadius.circular(999),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: selected ? scheme.primary : scheme.outlineVariant),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (icon != null) ...[
-                Icon(icon, size: 15, color: selected ? scheme.onPrimary : scheme.onSurfaceVariant),
-                const SizedBox(width: 7),
-              ],
-              Text(
-                label,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: selected ? scheme.onPrimary : scheme.onSurface,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: selected ? scheme.primary : scheme.outlineVariant,
               ),
-            ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  Icon(
+                    icon,
+                    size: 15,
+                    color: selected
+                        ? scheme.onPrimary
+                        : scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 7),
+                ],
+                Text(
+                  label,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: selected ? scheme.onPrimary : scheme.onSurface,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -1,3 +1,4 @@
+import { Table } from '../components/Table';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -168,7 +169,7 @@ export function BillingSettingsPage() {
               recorded, not by the ward — it is charged before the ward is known.
             </p>
 
-            <table>
+            <Table>
               <thead>
                 <tr>
                   <th>Care level</th>
@@ -195,14 +196,14 @@ export function BillingSettingsPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
           </div>
 
           {(rates.data?.wards ?? []).map((ward) => (
             <div className="card" key={ward.ward_type}>
               <h2>{wardTypeLabels[ward.ward_type]}</h2>
 
-              <table>
+              <Table>
                 <thead>
                   <tr>
                     <th>What for</th>
@@ -242,7 +243,7 @@ export function BillingSettingsPage() {
                     );
                   })}
                 </tbody>
-              </table>
+              </Table>
             </div>
           ))}
 

@@ -25,7 +25,6 @@ export type Admission = {
     urgency: AdmissionUrgency;
     status: AdmissionStatus;
     details_complete: boolean;
-    requires_bed: boolean;
     ward_name?: string | null;
     bed_number?: string | null;
     expected_arrival?: string | null;
@@ -65,7 +64,7 @@ export type AdmissionBedPagedResult = {
     total_pages: number;
 };
 
-export type AdmissionCategory = 'icu' | 'hdu' | 'inpatient' | 'day_case' | 'outpatient';
+export type AdmissionCategory = 'icu' | 'general' | 'surgical' | 'maternity' | 'emergency';
 
 export type AdmissionDetail = {
     id: string;
@@ -75,7 +74,6 @@ export type AdmissionDetail = {
     urgency: AdmissionUrgency;
     status: AdmissionStatus;
     details_complete: boolean;
-    requires_bed: boolean;
     ward_name?: string | null;
     bed_number?: string | null;
     expected_arrival?: string | null;
@@ -121,7 +119,6 @@ export type AdmissionSummary = {
     urgency: AdmissionUrgency;
     status: AdmissionStatus;
     details_complete: boolean;
-    requires_bed: boolean;
     ward_name?: string | null;
     bed_number?: string | null;
     expected_arrival?: string | null;
@@ -239,6 +236,7 @@ export type AmbulanceSummary = {
     id: string;
     registration_number: string;
     status: AmbulanceStatus;
+    is_active?: boolean;
     current_latitude?: number | null;
     current_longitude?: number | null;
     location_updated_at?: string | null;
@@ -247,6 +245,7 @@ export type AmbulanceSummary = {
     is_eligible?: boolean;
     eligibility_block_reasons?: Array<AmbulanceEligibilityBlockReason> | null;
     active_dispatch_id?: string | null;
+    active_dispatch?: DispatchSummary;
     is_divertible: boolean;
     distance_km?: number | null;
     drive_minutes?: number | null;
@@ -533,6 +532,7 @@ export type CareWorkflowAccepted = {
     recommendation_id?: string;
     status?: string | null;
     poll_url?: string | null;
+    red_flag?: boolean;
 };
 
 export type CareWorkflowStatus = 'running' | 'pending_review' | 'completed' | 'failed';
@@ -559,7 +559,6 @@ export type CareWorkflowValidation = {
 
 export type CheckInRequest = {
     admission_category: AdmissionCategory;
-    category_set_by_staff_id: string;
     urgency: AdmissionUrgency;
     is_infectious?: boolean;
 };
@@ -636,7 +635,6 @@ export type CreateAdmissionRequest = {
     source: AdmissionSource;
     dispatch_id?: string | null;
     admission_category: AdmissionCategory;
-    category_set_by_staff_id: string;
     urgency: AdmissionUrgency;
     is_infectious?: boolean;
     expected_arrival?: string | null;
@@ -789,11 +787,21 @@ export type CreateStaffMemberRequest = {
     skill_ids?: Array<string> | null;
 };
 
+export type CreateWalkInAppointmentRequest = {
+    patient_id: string;
+    reason?: string | null;
+};
+
 export type CreateWardRequest = {
     name: string;
     ward_type: WardType;
     gender_policy: GenderPolicy;
     is_active?: boolean;
+};
+
+export type CrewCandidate = {
+    staff_member_id: string;
+    full_name: string;
 };
 
 export type CurrentPrincipal = {
@@ -891,6 +899,7 @@ export type DispatchDetail = {
     reassignment_reason?: string | null;
     handover_notes?: string | null;
     patient_condition?: string | null;
+    scene_address_label?: string | null;
     crew_staff_ids?: Array<string> | null;
 };
 
@@ -917,6 +926,8 @@ export type DispatchProposalDetail = {
     created_at?: string;
     objective?: string | null;
     proposed_ambulance_id?: string | null;
+    proposed_ambulance_current_crew_count?: number | null;
+    proposed_ambulance_required_crew_count?: number | null;
     rationale?: string | null;
     diversion_impact?: DiversionImpact;
     plan?: Array<DispatchPlanStep> | null;
@@ -1012,10 +1023,28 @@ export type DiversionImpact = {
     source_call_address_label?: string | null;
     source_dispatch_status?: DispatchStatus;
     source_call_waiting_minutes_so_far?: number;
-    source_call_additional_wait_minutes?: number;
+    source_call_additional_wait_minutes?: number | null;
     replacement_ambulance_id?: string | null;
     replacement_ambulance_registration?: string | null;
-    minutes_saved_for_this_call?: number;
+    minutes_saved_for_this_call?: number | null;
+};
+
+export type EmergencyAgentPerformanceReport = {
+    from?: string;
+    to?: string;
+    proposals_raised?: number;
+    confirmed?: number;
+    confirmed_without_change_rate?: number;
+    diversions_proposed?: number;
+    diversions_approved?: number;
+    diversions_rejected?: number;
+    no_ambulance_available_count?: number;
+    validation_failure_rate?: number;
+    median_seconds_proposal_to_confirm?: number;
+    median_minutes_call_to_dispatch?: number;
+    rejection_reasons?: {
+        [key: string]: number;
+    } | null;
 };
 
 export type EmergencyCallDetail = {
@@ -1069,6 +1098,12 @@ export type EmergencyCallSummaryPagedResult = {
 
 export type EmergencyCancellationRequest = {
     emergency_call_id?: string;
+    call_priority?: CallPriority;
+    call_status?: CallStatus;
+    caller_name?: string | null;
+    address_label?: string | null;
+    call_created_at?: string;
+    active_ambulance_registration?: string | null;
     status?: CancellationRequestStatus;
     reason?: string | null;
     requested_at?: string;
@@ -1183,6 +1218,21 @@ export type EquipmentStatus = 'available' | 'assigned' | 'maintenance' | 'retire
 export type ExpenseRate = {
     expense_key: string;
     amount: number;
+};
+
+export type FleetUtilisationReport = {
+    from?: string;
+    to?: string;
+    rows?: Array<FleetUtilisationReportRow> | null;
+};
+
+export type FleetUtilisationReportRow = {
+    ambulance_id?: string;
+    registration_number?: string | null;
+    run_count?: number;
+    hours_committed?: number;
+    idle_share?: number;
+    out_of_service_hours?: number;
 };
 
 export type Gender = 'male' | 'female' | 'other' | 'unknown';
@@ -1593,7 +1643,6 @@ export type PatientMedicalProfile = {
     known_conditions?: string | null;
     allergies?: string | null;
     current_symptoms?: string | null;
-    recent_situation?: string | null;
     updated_by_staff_id?: string | null;
     updated_by_staff_name?: string | null;
     updated_at?: string | null;
@@ -1810,6 +1859,33 @@ export type RelatedEntityType = 'pharmacy_item' | 'equipment_item' | 'bed';
 
 export type ReleaseReason = 'discharged' | 'hold_expired' | 'cancelled' | 'transferred' | 'rejected' | 'corrected';
 
+export type ReorderSuggestionAccepted = {
+    workflow_id?: string;
+    suggestion_id?: string;
+    status?: string | null;
+    poll_url?: string | null;
+};
+
+export type ReorderSuggestionSource = 'model' | 'model_unavailable' | 'model_rejected';
+
+export type ReorderWorkflowStatus = 'running' | 'completed' | 'failed';
+
+export type ReorderWorkflowSummary = {
+    workflow_id?: string;
+    suggestion_id?: string;
+    pharmacy_item_id?: string;
+    objective?: string | null;
+    status?: ReorderWorkflowStatus;
+    plan?: Array<string> | null;
+    steps?: Array<CareAgentStep> | null;
+    current_threshold?: number;
+    current_quantity_on_hand?: number;
+    suggested_threshold?: number | null;
+    reasoning?: string | null;
+    source?: ReorderSuggestionSource;
+    retries?: number;
+};
+
 export type ReplaceWardStaffingRulesResponse = {
     rules: Array<WardStaffingRuleDto>;
     shifts_now_disagreeing: Array<ShiftSummaryDto>;
@@ -1833,6 +1909,27 @@ export type RequestRosterProposalRevisionRequest = {
     notes?: string | null;
     exclude_staff_ids?: Array<string> | null;
     exclude_ward_ids?: Array<string> | null;
+};
+
+export type ResponseTimeReport = {
+    from?: string;
+    to?: string;
+    rows?: Array<ResponseTimeReportRow> | null;
+    totals?: ResponseTimeReportTotals;
+};
+
+export type ResponseTimeReportRow = {
+    priority?: CallPriority;
+    call_count?: number;
+    median_minutes_to_dispatch?: number;
+    median_minutes_to_arrival?: number;
+    slowest_minutes_to_arrival?: number;
+};
+
+export type ResponseTimeReportTotals = {
+    call_count?: number;
+    median_minutes_to_dispatch?: number;
+    median_minutes_to_arrival?: number;
 };
 
 export type RetireAmbulanceRequest = {
@@ -2176,7 +2273,6 @@ export type UpdateMedicalProfileRequest = {
     known_conditions?: string | null;
     allergies?: string | null;
     current_symptoms?: string | null;
-    recent_situation?: string | null;
 };
 
 export type UpdateMyDispatchStatusRequest = {
@@ -2194,6 +2290,10 @@ export type UpdatePatientRequest = {
     address?: string | null;
     emergency_contact_name?: string | null;
     emergency_contact_phone?: string | null;
+};
+
+export type UpdateReorderThresholdRequest = {
+    reorder_threshold: number;
 };
 
 export type UpdateSkillRequest = {
@@ -2374,7 +2474,6 @@ export type WorklistRow = {
     id: string;
     patient: PatientSummary;
     status: WorklistStatus;
-    requires_bed: boolean;
     source?: AdmissionSource;
     admission_category?: AdmissionCategory;
     urgency?: AdmissionUrgency;
@@ -2679,45 +2778,6 @@ export type MarkArrivedResponses = {
 
 export type MarkArrivedResponse = MarkArrivedResponses[keyof MarkArrivedResponses];
 
-export type CompleteVisitData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/admissions/{id}/complete';
-};
-
-export type CompleteVisitErrors = {
-    /**
-     * Unauthorized
-     */
-    401: ProblemDetails;
-    /**
-     * Forbidden
-     */
-    403: ProblemDetails;
-    /**
-     * Not Found
-     */
-    404: ProblemDetails;
-    /**
-     * Conflict
-     */
-    409: ProblemDetails;
-};
-
-export type CompleteVisitError = CompleteVisitErrors[keyof CompleteVisitErrors];
-
-export type CompleteVisitResponses = {
-    /**
-     * OK
-     */
-    200: Admission;
-};
-
-export type CompleteVisitResponse = CompleteVisitResponses[keyof CompleteVisitResponses];
-
 export type CancelAdmissionData = {
     body?: CancelAdmissionRequest;
     path: {
@@ -2853,6 +2913,8 @@ export type ListAppointmentsData = {
     query?: {
         date?: string;
         status?: AppointmentStatus;
+        search?: string;
+        includeFinished?: boolean;
         page?: number;
         pageSize?: number;
     };
@@ -2925,6 +2987,47 @@ export type CreateAppointmentResponses = {
 };
 
 export type CreateAppointmentResponse = CreateAppointmentResponses[keyof CreateAppointmentResponses];
+
+export type CreateWalkInAppointmentData = {
+    body?: CreateWalkInAppointmentRequest;
+    path?: never;
+    query?: never;
+    url: '/appointments/walk-in';
+};
+
+export type CreateWalkInAppointmentErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CreateWalkInAppointmentError = CreateWalkInAppointmentErrors[keyof CreateWalkInAppointmentErrors];
+
+export type CreateWalkInAppointmentResponses = {
+    /**
+     * Created
+     */
+    201: Appointment;
+};
+
+export type CreateWalkInAppointmentResponse = CreateWalkInAppointmentResponses[keyof CreateWalkInAppointmentResponses];
 
 export type ConfirmAppointmentData = {
     body?: never;
@@ -3483,6 +3586,39 @@ export type CreateAmbulanceResponses = {
 };
 
 export type CreateAmbulanceResponse = CreateAmbulanceResponses[keyof CreateAmbulanceResponses];
+
+export type GetMyAmbulanceAssignmentData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/ambulances/mine';
+};
+
+export type GetMyAmbulanceAssignmentErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetMyAmbulanceAssignmentError = GetMyAmbulanceAssignmentErrors[keyof GetMyAmbulanceAssignmentErrors];
+
+export type GetMyAmbulanceAssignmentResponses = {
+    /**
+     * OK
+     */
+    200: Ambulance;
+};
+
+export type GetMyAmbulanceAssignmentResponse = GetMyAmbulanceAssignmentResponses[keyof GetMyAmbulanceAssignmentResponses];
 
 export type GetAmbulanceData = {
     body?: never;
@@ -5012,6 +5148,10 @@ export type RejectCareRecommendationErrors = {
      * Not Found
      */
     404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
 };
 
 export type RejectCareRecommendationError = RejectCareRecommendationErrors[keyof RejectCareRecommendationErrors];
@@ -6943,9 +7083,6 @@ export type AcknowledgeWarningResponse = AcknowledgeWarningResponses[keyof Ackno
 
 export type ClearWarningData = {
     body?: never;
-    headers: {
-        'X-Confirmation-Code': string;
-    };
     path: {
         id: string;
     };
@@ -8087,6 +8224,10 @@ export type SubmitCareQueryErrors = {
      * Conflict
      */
     409: ProblemDetails;
+    /**
+     * Too Many Requests
+     */
+    429: ProblemDetails;
 };
 
 export type SubmitCareQueryError = SubmitCareQueryErrors[keyof SubmitCareQueryErrors];
@@ -8921,6 +9062,119 @@ export type RecordPharmacyBatchTransactionResponses = {
 
 export type RecordPharmacyBatchTransactionResponse = RecordPharmacyBatchTransactionResponses[keyof RecordPharmacyBatchTransactionResponses];
 
+export type UpdateReorderThresholdData = {
+    body?: UpdateReorderThresholdRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/pharmacy-items/{id}/reorder-threshold';
+};
+
+export type UpdateReorderThresholdErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type UpdateReorderThresholdError = UpdateReorderThresholdErrors[keyof UpdateReorderThresholdErrors];
+
+export type UpdateReorderThresholdResponses = {
+    /**
+     * OK
+     */
+    200: PharmacyItem;
+};
+
+export type UpdateReorderThresholdResponse = UpdateReorderThresholdResponses[keyof UpdateReorderThresholdResponses];
+
+export type SubmitReorderSuggestionData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/pharmacy-items/{id}/reorder-suggestion';
+};
+
+export type SubmitReorderSuggestionErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type SubmitReorderSuggestionError = SubmitReorderSuggestionErrors[keyof SubmitReorderSuggestionErrors];
+
+export type SubmitReorderSuggestionResponses = {
+    /**
+     * Accepted
+     */
+    202: ReorderSuggestionAccepted;
+};
+
+export type SubmitReorderSuggestionResponse = SubmitReorderSuggestionResponses[keyof SubmitReorderSuggestionResponses];
+
+export type GetReorderSuggestionWorkflowData = {
+    body?: never;
+    path: {
+        workflowId: string;
+    };
+    query?: never;
+    url: '/pharmacy-items/reorder-suggestions/{workflowId}';
+};
+
+export type GetReorderSuggestionWorkflowErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetReorderSuggestionWorkflowError = GetReorderSuggestionWorkflowErrors[keyof GetReorderSuggestionWorkflowErrors];
+
+export type GetReorderSuggestionWorkflowResponses = {
+    /**
+     * OK
+     */
+    200: ReorderWorkflowSummary;
+};
+
+export type GetReorderSuggestionWorkflowResponse = GetReorderSuggestionWorkflowResponses[keyof GetReorderSuggestionWorkflowResponses];
+
 export type ListPrescriptionsData = {
     body?: never;
     path?: never;
@@ -9221,6 +9475,115 @@ export type GetStaffAgentPerformanceReportResponses = {
 };
 
 export type GetStaffAgentPerformanceReportResponse = GetStaffAgentPerformanceReportResponses[keyof GetStaffAgentPerformanceReportResponses];
+
+export type GetEmergencyResponseTimeReportData = {
+    body?: never;
+    path?: never;
+    query?: {
+        from?: string;
+        to?: string;
+        priority?: CallPriority;
+    };
+    url: '/reports/emergency/response-times';
+};
+
+export type GetEmergencyResponseTimeReportErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type GetEmergencyResponseTimeReportError = GetEmergencyResponseTimeReportErrors[keyof GetEmergencyResponseTimeReportErrors];
+
+export type GetEmergencyResponseTimeReportResponses = {
+    /**
+     * OK
+     */
+    200: ResponseTimeReport;
+};
+
+export type GetEmergencyResponseTimeReportResponse = GetEmergencyResponseTimeReportResponses[keyof GetEmergencyResponseTimeReportResponses];
+
+export type GetFleetUtilisationReportData = {
+    body?: never;
+    path?: never;
+    query?: {
+        from?: string;
+        to?: string;
+    };
+    url: '/reports/emergency/fleet-utilisation';
+};
+
+export type GetFleetUtilisationReportErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type GetFleetUtilisationReportError = GetFleetUtilisationReportErrors[keyof GetFleetUtilisationReportErrors];
+
+export type GetFleetUtilisationReportResponses = {
+    /**
+     * OK
+     */
+    200: FleetUtilisationReport;
+};
+
+export type GetFleetUtilisationReportResponse = GetFleetUtilisationReportResponses[keyof GetFleetUtilisationReportResponses];
+
+export type GetEmergencyAgentPerformanceReportData = {
+    body?: never;
+    path?: never;
+    query?: {
+        from?: string;
+        to?: string;
+    };
+    url: '/reports/emergency/agent-performance';
+};
+
+export type GetEmergencyAgentPerformanceReportErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type GetEmergencyAgentPerformanceReportError = GetEmergencyAgentPerformanceReportErrors[keyof GetEmergencyAgentPerformanceReportErrors];
+
+export type GetEmergencyAgentPerformanceReportResponses = {
+    /**
+     * OK
+     */
+    200: EmergencyAgentPerformanceReport;
+};
+
+export type GetEmergencyAgentPerformanceReportResponse = GetEmergencyAgentPerformanceReportResponses[keyof GetEmergencyAgentPerformanceReportResponses];
 
 export type ListRosterProposalsData = {
     body?: never;
@@ -10233,6 +10596,37 @@ export type ReactivateStaffMemberResponses = {
 };
 
 export type ReactivateStaffMemberResponse = ReactivateStaffMemberResponses[keyof ReactivateStaffMemberResponses];
+
+export type SearchAvailableCrewData = {
+    body?: never;
+    path?: never;
+    query?: {
+        search?: string;
+    };
+    url: '/staff/crew-candidates';
+};
+
+export type SearchAvailableCrewErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type SearchAvailableCrewError = SearchAvailableCrewErrors[keyof SearchAvailableCrewErrors];
+
+export type SearchAvailableCrewResponses = {
+    /**
+     * OK
+     */
+    200: Array<CrewCandidate>;
+};
+
+export type SearchAvailableCrewResponse = SearchAvailableCrewResponses[keyof SearchAvailableCrewResponses];
 
 export type ListBedAvailabilityData = {
     body?: never;

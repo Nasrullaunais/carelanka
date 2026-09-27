@@ -22,10 +22,10 @@ public sealed class WardPatientEndpointTests
         using var equipment = await ClientAsync(ApiApplication.EquipmentEmail);
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
 
-        // An outpatient in for a blood test: no bed, admitted the moment the record opens. The
-        // cheapest current visit to make, and exactly the case the ward filter must not hide.
+        // A patient admitted but not yet placed in a bed: no ward yet. The cheapest current
+        // visit to make, and exactly the case the ward filter must not hide.
         var patientId = await NewPatientAsync(nurse, "Lab Ward Listing");
-        var admissionId = await NewOutpatientVisitAsync(nurse, patientId);
+        var admissionId = await NewUnplacedAdmissionAsync(nurse, patientId);
 
         using var everyone = await ReadJsonAsync(
             await equipment.GetAsync("/api/ward-patients?pageSize=100"));
@@ -36,7 +36,7 @@ public sealed class WardPatientEndpointTests
         Assert.Equal("Lab Ward Listing", mine.GetProperty("full_name").GetString());
         Assert.Equal(admissionId, mine.GetProperty("admission_id").GetString());
         Assert.False(string.IsNullOrWhiteSpace(mine.GetProperty("patient_code").GetString()));
-        Assert.Equal("admitted", mine.GetProperty("admission_status").GetString());
+        Assert.Equal("awaiting_bed", mine.GetProperty("admission_status").GetString());
 
         // Null rather than absent. The column renders "No bed" instead of going blank.
         Assert.Equal(JsonValueKind.Null, mine.GetProperty("ward_name").ValueKind);
@@ -49,7 +49,7 @@ public sealed class WardPatientEndpointTests
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
 
         var patientId = await NewPatientAsync(nurse, "Lab Ward Filter");
-        await NewOutpatientVisitAsync(nurse, patientId);
+        await NewUnplacedAdmissionAsync(nurse, patientId);
 
         using var everyone = await ReadJsonAsync(
             await equipment.GetAsync("/api/ward-patients?pageSize=100"));
@@ -99,10 +99,10 @@ public sealed class WardPatientEndpointTests
     }
 
     /// <summary>
-    /// A visit that needs no bed, so it opens straight at `admitted` with no ward. The cheapest
-    /// current visit there is: no ward, no bed, no assignment.
+    /// A freshly created admission with no bed assigned yet: no ward. The cheapest current
+    /// visit there is: no ward, no bed, no assignment.
     /// </summary>
-    private static async Task<string> NewOutpatientVisitAsync(HttpClient nurse, string patientId)
+    private static async Task<string> NewUnplacedAdmissionAsync(HttpClient nurse, string patientId)
     {
         using var me = await ReadJsonAsync(await nurse.GetAsync("/api/auth/me"));
 
@@ -110,7 +110,7 @@ public sealed class WardPatientEndpointTests
         {
             patient_id = patientId,
             source = "walk_in",
-            admission_category = "outpatient",
+            admission_category = "general",
             category_set_by_staff_id = me.RootElement.GetProperty("id").GetString(),
             urgency = "routine",
             is_infectious = false

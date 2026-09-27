@@ -1,3 +1,5 @@
+import { PaginationControls } from '../components/ui/pagination-controls';
+import { Table } from '../components/Table';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -17,6 +19,7 @@ import {
 } from '../types/maintenance';
 import { ConfirmMaintenanceCard } from './equipment/ConfirmMaintenanceCard';
 import { RetireItemDialog } from './equipment/RetireItemDialog';
+import { AppSelect } from '../components/ui/app-select';
 
 const PAGE_SIZE = 10;
 
@@ -64,7 +67,7 @@ export function MaintenanceUnitPage() {
 
       <ScheduleMaintenanceCard />
 
-      <div className="card">
+      <div className="table-section">
         <h2>Open jobs</h2>
 
         {queue.isPending && <p className="empty">Loading the queue…</p>}
@@ -83,7 +86,7 @@ export function MaintenanceUnitPage() {
         )}
 
         {rows.length > 0 && (
-          <table>
+          <Table footer={<PaginationControls label="Maintenance" page={page} totalPages={totalPages} totalItems={queue.data?.total_items} onPageChange={setPage} />}>
             <thead>
               <tr>
                 <th>Item</th>
@@ -118,31 +121,7 @@ export function MaintenanceUnitPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
-        )}
-
-        {totalPages > 1 && (
-          <div className="pager">
-            <button
-              type="button"
-              className="secondary"
-              disabled={page <= 1}
-              onClick={() => setPage((current) => current - 1)}
-            >
-              Previous
-            </button>
-            <span className="muted">
-              Page {page} of {totalPages}
-            </span>
-            <button
-              type="button"
-              className="secondary"
-              disabled={page >= totalPages}
-              onClick={() => setPage((current) => current + 1)}
-            >
-              Next
-            </button>
-          </div>
+          </Table>
         )}
       </div>
 
@@ -230,37 +209,30 @@ function ScheduleMaintenanceCard() {
             />
           </div>
           <div className="field">
-            <label htmlFor="maintenance-item">Item</label>
-            <select
+            <AppSelect
               id="maintenance-item"
+              label="Item"
               value={assetId}
-              onChange={(event) => setAssetId(event.target.value)}
-              required
-            >
-              <option value="">{items.isPending ? 'Loading…' : 'Choose…'}</option>
-              {choices.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name} ({item.asset_tag})
-                </option>
-              ))}
-            </select>
+              onValueChange={setAssetId}
+              isRequired
+              isDisabled={items.isPending}
+              options={[
+                { value: '', label: items.isPending ? 'Loading…' : 'Choose…' },
+                ...choices.map((item) => ({ value: item.id, label: `${item.name} (${item.asset_tag})` })),
+              ]}
+            />
           </div>
         </div>
 
         <div className="row">
           <div className="field">
-            <label htmlFor="maintenance-type">Type</label>
-            <select
+            <AppSelect
               id="maintenance-type"
+              label="Type"
               value={scheduleType}
-              onChange={(event) => setScheduleType(event.target.value as MaintenanceType)}
-            >
-              {schedulableMaintenanceTypes.map((type) => (
-                <option key={type} value={type}>
-                  {maintenanceTypeLabels[type]}
-                </option>
-              ))}
-            </select>
+              onValueChange={(value) => setScheduleType(value as MaintenanceType)}
+              options={schedulableMaintenanceTypes.map((type) => ({ value: type, label: maintenanceTypeLabels[type] }))}
+            />
           </div>
           <div className="field">
             <label htmlFor="maintenance-date">Date</label>

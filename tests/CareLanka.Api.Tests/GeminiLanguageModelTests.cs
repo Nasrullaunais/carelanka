@@ -15,9 +15,9 @@ namespace CareLanka.Api.Tests;
 public sealed class GeminiLanguageModelTests
 {
     [Fact]
-    public async Task A_spent_allowance_is_not_retried()
+    public async Task A_spent_daily_allowance_is_not_retried()
     {
-        var (model, handler) = Build(HttpStatusCode.TooManyRequests);
+        var (model, handler) = Build(HttpStatusCode.TooManyRequests, body: QuotaRefusal("PerDay"));
 
         var result = await model.CompleteJsonAsync("instruction", "{}");
 
@@ -25,6 +25,28 @@ public sealed class GeminiLanguageModelTests
         Assert.Equal(LanguageModelFailure.QuotaExhausted, result.Reason);
         Assert.Equal(1, handler.Calls);
     }
+
+    /// <summary>
+    /// The per-minute limit clears by itself, so it is waited out like a busy provider rather than
+    /// reported to the reviewer as an allowance that needs a new key.
+    /// </summary>
+    [Fact]
+    public async Task The_per_minute_limit_is_retried_and_not_reported_as_a_spent_allowance()
+    {
+        var (model, handler) = Build(HttpStatusCode.TooManyRequests, body: QuotaRefusal("PerMinute"));
+
+        var result = await model.CompleteJsonAsync("instruction", "{}");
+
+        Assert.False(result.Ok);
+        Assert.Equal(LanguageModelFailure.ProviderOverloaded, result.Reason);
+        Assert.Equal(3, handler.Calls);
+    }
+
+    private static string QuotaRefusal(string window) => """
+        {"error":{"code":429,"message":"You exceeded your current quota.","status":"RESOURCE_EXHAUSTED",
+        "details":[{"@type":"type.googleapis.com/google.rpc.QuotaFailure",
+        "violations":[{"quotaId":"GenerateRequestsWINDOWPerProjectPerModel-FreeTier"}]}]}}
+        """.Replace("WINDOW", window);
 
     [Fact]
     public async Task A_busy_provider_is_retried_to_the_configured_budget()

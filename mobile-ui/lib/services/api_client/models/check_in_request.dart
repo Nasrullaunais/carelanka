@@ -13,7 +13,6 @@ part 'check_in_request.g.dart';
 class CheckInRequest {
   const CheckInRequest({
     required this.admissionCategory,
-    required this.categorySetByStaffId,
     required this.urgency,
     this.isInfectious = false,
   });
@@ -22,8 +21,6 @@ class CheckInRequest {
   
   @JsonKey(name: 'admission_category')
   final AdmissionCategory admissionCategory;
-  @JsonKey(name: 'category_set_by_staff_id')
-  final String categorySetByStaffId;
   final AdmissionUrgency urgency;
   @JsonKey(name: 'is_infectious')
   final bool isInfectious;

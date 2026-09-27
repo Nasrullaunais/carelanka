@@ -38,8 +38,7 @@ public sealed class CareAgentTools : ICareAgentTools
             : new CareMedicalProfileFacts(
                 profile.KnownConditions,
                 profile.Allergies,
-                profile.CurrentSymptoms,
-                profile.RecentSituation);
+                profile.CurrentSymptoms);
     }
 
     public async Task<CarePatientHistoryFacts> GetPatientHistoryAsync(

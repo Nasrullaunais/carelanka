@@ -12,6 +12,14 @@ public sealed class CareAgentJournal
 {
     private readonly List<CareAgentStep> _steps = [];
     private readonly List<string> _errors = [];
+    private readonly Func<IReadOnlyList<CareAgentStep>, Task>? _onProgress;
+
+    /// <param name="onProgress">
+    /// Called with the steps so far after each slow step - the tool calls and the draft - so a
+    /// reviewer watching the run sees where it is rather than step one until the very end.
+    /// </param>
+    public CareAgentJournal(Func<IReadOnlyList<CareAgentStep>, Task>? onProgress = null)
+        => _onProgress = onProgress;
 
     public CareWorkflowValidation Validation { get; } = new() { Passed = true };
 
@@ -41,18 +49,22 @@ public sealed class CareAgentJournal
         var startedAt = DateTimeOffset.UtcNow;
         var clock = Stopwatch.StartNew();
 
+        TResult result;
+
         try
         {
-            var result = await call();
+            result = await call();
             Record(step, tool, startedAt, clock, ok: true, error: null);
-
-            return result;
         }
         catch (Exception failure)
         {
             Record(step, tool, startedAt, clock, ok: false, failure.Message);
             throw;
         }
+
+        await ReportAsync();
+
+        return result;
     }
 
     public async Task<TResult> StepAsync<TResult>(string step, Func<Task<TResult>> work)
@@ -60,18 +72,22 @@ public sealed class CareAgentJournal
         var startedAt = DateTimeOffset.UtcNow;
         var clock = Stopwatch.StartNew();
 
+        TResult result;
+
         try
         {
-            var result = await work();
+            result = await work();
             Record(step, tool: null, startedAt, clock, ok: true, error: null);
-
-            return result;
         }
         catch (Exception failure)
         {
             Record(step, tool: null, startedAt, clock, ok: false, failure.Message);
             throw;
         }
+
+        await ReportAsync();
+
+        return result;
     }
 
     public void Fail(Exception failure) => _errors.Add(failure.Message);
@@ -85,6 +101,8 @@ public sealed class CareAgentJournal
     /// </summary>
     public CareAgentRun SafeFailure(int attempts)
         => new(CareAgent.Plan, _steps, CareAgentOutcome.Failed, null, RedFlag, Validation, _errors, attempts);
+
+    private Task ReportAsync() => _onProgress?.Invoke(_steps.ToArray()) ?? Task.CompletedTask;
 
     private void Record(
         string step, string? tool, DateTimeOffset startedAt, Stopwatch clock, bool ok, string? error)

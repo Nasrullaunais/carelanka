@@ -5,6 +5,8 @@ namespace CareLanka.Api.Services.Emergency;
 
 public interface IAmbulanceService
 {
+    Task<Ambulance> GetMyAssignmentAsync(CancellationToken cancellationToken = default);
+
     Task<PagedResult<AmbulanceSummary>> ListAsync(
         AmbulanceListRequest request,
         CancellationToken cancellationToken = default);

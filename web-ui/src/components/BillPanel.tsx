@@ -1,3 +1,6 @@
+import { Table } from './Table';
+import { AppSelect } from './ui/app-select';
+import { ConfirmDialog } from './ui/confirm-dialog';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -55,6 +58,7 @@ export function BillPanel({
   const [chargeQuantity, setChargeQuantity] = useState('1');
   const [unitPrice, setUnitPrice] = useState(String(templates[0].unitPrice ?? ''));
   const [settlementNote, setSettlementNote] = useState('');
+  const [confirmingSettle, setConfirmingSettle] = useState(false);
 
   const template = chargeTemplate(templateKey, forAppointment);
 
@@ -117,6 +121,7 @@ export function BillPanel({
   };
 
   const onSettled = (result: Bill) => {
+    setConfirmingSettle(false);
     toast.success(
       forAppointment
         ? `Bill ${result.bill_number} settled.`
@@ -265,18 +270,13 @@ export function BillPanel({
           >
             <div className="row">
               <div className="field">
-                <label htmlFor="charge-kind">Charge type</label>
-                <select
+                <AppSelect
                   id="charge-kind"
+                  label="Charge type"
                   value={templateKey}
-                  onChange={(event) => chooseTemplate(event.target.value)}
-                >
-                  {templates.map((option) => (
-                    <option key={option.key} value={option.key}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={chooseTemplate}
+                  options={templates.map((option) => ({ value: option.key, label: option.label }))}
+                />
               </div>
               <div className="field">
                 <label htmlFor="charge-description">Description on the bill</label>
@@ -367,14 +367,23 @@ export function BillPanel({
               <button
                 type="button"
                 disabled={settle.isPending}
-                onClick={() =>
-                  runSettle({ settlement_note: settlementNote.trim() || null })
-                }
+                onClick={() => setConfirmingSettle(true)}
               >
                 {settle.isPending ? 'Settling…' : `Settle ${money(data.total, data.currency)}`}
               </button>
             </div>
           </div>
+
+          <ConfirmDialog
+            isOpen={confirmingSettle}
+            onOpenChange={setConfirmingSettle}
+            title={`Settle ${money(data.total, data.currency)}?`}
+            description="A settled bill is final and cannot be changed afterwards."
+            confirmLabel={settle.isPending ? 'Settling…' : 'Settle'}
+            tone="accent"
+            isPending={settle.isPending}
+            onConfirm={() => runSettle({ settlement_note: settlementNote.trim() || null })}
+          />
 
           <p className="hint">
             {forAppointment ? (
@@ -503,7 +512,7 @@ export function BillPrintout({
         </div>
       </dl>
 
-      <table>
+      <Table>
         <thead>
           <tr>
             <th>Description</th>
@@ -533,7 +542,7 @@ export function BillPrintout({
             </td>
           </tr>
         </tbody>
-      </table>
+      </Table>
 
       <p className="print-only print-foot">
         {bill.settled

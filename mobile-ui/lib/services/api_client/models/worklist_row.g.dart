@@ -10,7 +10,6 @@ WorklistRow _$WorklistRowFromJson(Map<String, dynamic> json) => WorklistRow(
   id: json['id'] as String,
   patient: PatientSummary.fromJson(json['patient'] as Map<String, dynamic>),
   status: WorklistStatus.fromJson(json['status'] as String),
-  requiresBed: json['requires_bed'] as bool,
   whenValue: DateTime.parse(json['when'] as String),
   source: json['source'] == null
       ? null
@@ -31,7 +30,6 @@ Map<String, dynamic> _$WorklistRowToJson(WorklistRow instance) =>
       'id': instance.id,
       'patient': instance.patient,
       'status': instance.status,
-      'requires_bed': instance.requiresBed,
       'source': instance.source,
       'admission_category': instance.admissionCategory,
       'urgency': instance.urgency,

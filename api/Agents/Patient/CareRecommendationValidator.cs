@@ -61,7 +61,7 @@ public static partial class CareRecommendationValidator
     /// </remarks>
     private static readonly HashSet<string> NegativeMarkers = new(new[]
     {
-        "not", "never", "avoid", "dont", "wont", "cant", "shouldnt", "mustnt", "unsafe", "stop",
+        "not", "never", "avoid", "dont", "wont", "cant", "cannot", "shouldnt", "mustnt", "unsafe", "stop",
         "allergic", "allergy", "reaction"
     }.Select(Normalise));
 

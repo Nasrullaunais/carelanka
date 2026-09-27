@@ -1,3 +1,4 @@
+import { Table } from '../components/Table';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -18,6 +19,7 @@ import type {
 } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
 import { canReadCareQueue, canReviewCareRecommendation } from '../types/permissions';
+import { ActionDialog } from '../components/ui/action-dialog';
 
 const urgencyLabels: Record<CareUrgency, string> = {
   low: 'Low',
@@ -91,7 +93,7 @@ export function CareRecommendationsPage() {
         nurse or doctor to approve or correct before it reaches them.
       </p>
 
-      <div className="card">
+      <div className="table-section">
         <div className="filters">
           {statusFilters.map((filter) => (
             <button
@@ -117,7 +119,7 @@ export function CareRecommendationsPage() {
         ) : rows.length === 0 ? (
           <p className="empty">Nothing here right now.</p>
         ) : (
-          <table>
+          <Table>
             <thead>
               <tr>
                 <th>Patient</th>
@@ -168,18 +170,13 @@ export function CareRecommendationsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         )}
       </div>
 
-      {selectedId && (
-        <div className="card">
-          <RecommendationDetail
-            recommendationId={selectedId}
-            onDone={() => setSelectedId(null)}
-          />
-        </div>
-      )}
+      <ActionDialog title="Care recommendation" isOpen={selectedId != null} onClose={() => setSelectedId(null)}>
+        {selectedId && <RecommendationDetail recommendationId={selectedId} onDone={() => setSelectedId(null)} />}
+      </ActionDialog>
     </>
   );
 }
@@ -341,8 +338,7 @@ function RecommendationDetail({
       ) : !profile.data ||
         (!profile.data.known_conditions &&
           !profile.data.allergies &&
-          !profile.data.current_symptoms &&
-          !profile.data.recent_situation) ? (
+          !profile.data.current_symptoms) ? (
         <p className="muted">No medical profile is on record for this patient.</p>
       ) : (
         <dl className="detail-grid">
@@ -357,10 +353,6 @@ function RecommendationDetail({
           <div>
             <dt>Current symptoms</dt>
             <dd>{profile.data.current_symptoms || <span className="muted">Not recorded</span>}</dd>
-          </div>
-          <div>
-            <dt>Recent situation</dt>
-            <dd>{profile.data.recent_situation || <span className="muted">Not recorded</span>}</dd>
           </div>
         </dl>
       )}
@@ -436,19 +428,23 @@ function RecommendationDetail({
               rows={5}
               maxLength={2000}
               value={draftedMessage}
-              placeholder="No draft — write the reply yourself."
+              disabled={agentRunning}
+              placeholder={
+                agentRunning ? 'Waiting for the agent…' : 'No draft — write the reply yourself.'
+              }
               onChange={(event) => setDoctorMessage(event.target.value)}
             />
             <p className="hint">
-              This is the agent&apos;s draft. Approve it as it stands, or correct it first — the
-              patient reads exactly what is in this box.
+              {agentRunning
+                ? 'The agent is still writing its draft. Approve and Reject open up when it is here.'
+                : "This is the agent's draft. Approve it as it stands, or correct it first — the patient reads exactly what is in this box."}
             </p>
           </div>
 
           <div className="actions">
             <button
               type="button"
-              disabled={approve.isPending}
+              disabled={approve.isPending || agentRunning || draftedMessage.trim().length === 0}
               onClick={() =>
                 approve.mutate({
                   path: { id: recommendationId },
@@ -458,7 +454,15 @@ function RecommendationDetail({
             >
               {approve.isPending ? 'Approving…' : 'Approve'}
             </button>
-            <button type="button" className="secondary" onClick={() => setShowReject(true)}>
+            {draftedMessage.trim().length === 0 && !agentRunning && (
+              <p className="hint">Write a reply, or Reject.</p>
+            )}
+            <button
+              type="button"
+              className="secondary"
+              disabled={agentRunning}
+              onClick={() => setShowReject(true)}
+            >
               Reject
             </button>
           </div>

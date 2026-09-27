@@ -20,7 +20,6 @@ public class PatientMedicalProfileConfiguration : IEntityTypeConfiguration<Patie
         builder.Property(profile => profile.KnownConditions).HasMaxLength(LongFieldLength);
         builder.Property(profile => profile.Allergies).HasMaxLength(AllergiesLength);
         builder.Property(profile => profile.CurrentSymptoms).HasMaxLength(LongFieldLength);
-        builder.Property(profile => profile.RecentSituation).HasMaxLength(LongFieldLength);
 
         builder.HasOne(profile => profile.Patient)
             .WithOne()

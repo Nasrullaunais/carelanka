@@ -81,13 +81,14 @@ public sealed class PatientEndpointTests
     public async Task Editing_a_patient_never_moves_their_code_because_it_is_already_on_a_wristband()
     {
         using var client = await ClientAsync(ApiApplication.NurseEmail);
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
         var nic = NewNic();
 
         using var created = await ReadJsonAsync(await CreateAsync(client, "Before Rename", nic: nic));
         var id = created.RootElement.GetProperty("id").GetString();
         var code = created.RootElement.GetProperty("patient_code").GetString();
 
-        using var updated = await ReadJsonAsync(await client.PutAsJsonAsync(
+        using var updated = await ReadJsonAsync(await administrator.PutAsJsonAsync(
             $"/api/patients/{id}",
             new { full_name = "After Rename", gender = "female", nic, phone = NewPhone() }));
 
@@ -312,10 +313,11 @@ public sealed class PatientEndpointTests
     public async Task An_update_replaces_the_fields_that_were_missing_at_intake()
     {
         using var client = await ClientAsync(ApiApplication.NurseEmail);
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
         var nic = NewNic();
         var id = await CreateIdAsync(client, "Before Update", nic);
 
-        var response = await client.PutAsJsonAsync($"/api/patients/{id}", new
+        var response = await administrator.PutAsJsonAsync($"/api/patients/{id}", new
         {
             full_name = "After Update",
             gender = "female",
@@ -337,12 +339,72 @@ public sealed class PatientEndpointTests
     }
 
     [Fact]
+    public async Task A_nurse_cannot_change_identity_after_a_nic_is_recorded()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var nic = NewNic();
+        var id = await CreateIdAsync(nurse, "Locked Identity", nic);
+
+        using var refused = await nurse.PutAsJsonAsync(
+            $"/api/patients/{id}", new { full_name = "Changed Name", gender = "male", nic });
+        using var response = await ReadJsonAsync(refused);
+
+        Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
+        Assert.Equal("cl_pat_052", response.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task A_nurse_can_change_non_identity_details_after_a_nic_is_recorded()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var nic = NewNic();
+        var id = await CreateIdAsync(nurse, "Phone Update", nic);
+
+        var response = await nurse.PutAsJsonAsync(
+            $"/api/patients/{id}", new { full_name = "Phone Update", gender = "male", nic, phone = NewPhone() });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task An_administrator_can_change_identity_after_a_nic_is_recorded()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var nic = NewNic();
+        var id = await CreateIdAsync(nurse, "Admin Identity", nic);
+
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
+        var response = await administrator.PutAsJsonAsync(
+            $"/api/patients/{id}", new { full_name = "Admin Changed", gender = "female", nic });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Reception_can_add_a_nic_and_name_to_an_unidentified_patient()
+    {
+        using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
+        using var created = await ReadJsonAsync(await CreateAsync(reception, "Unidentified Arrival"));
+        var id = created.RootElement.GetProperty("id").GetString();
+        var nic = NewNic();
+
+        using var updated = await reception.PutAsJsonAsync(
+            $"/api/patients/{id}", new { full_name = "Now Identified", gender = "male", nic });
+        using var response = await ReadJsonAsync(updated);
+
+        Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
+        Assert.Equal(nic, response.RootElement.GetProperty("nic").GetString());
+        Assert.Equal("Now Identified", response.RootElement.GetProperty("full_name").GetString());
+    }
+
+    [Fact]
     public async Task Clearing_every_identifier_on_an_update_gets_a_temp_reference_not_a_500()
     {
         using var client = await ClientAsync(ApiApplication.NurseEmail);
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
         var id = await CreateIdAsync(client, "Loses Their Papers", NewNic());
 
-        var response = await client.PutAsJsonAsync(
+        var response = await administrator.PutAsJsonAsync(
             $"/api/patients/{id}", new { full_name = "Loses Their Papers", gender = "unknown" });
 
         using var body = await ReadJsonAsync(response);
@@ -357,12 +419,13 @@ public sealed class PatientEndpointTests
     public async Task Updating_one_patient_onto_another_patients_nic_is_a_409()
     {
         using var client = await ClientAsync(ApiApplication.NurseEmail);
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
         var taken = NewNic();
 
         await CreateAsync(client, "Owns The Nic", nic: taken);
         var id = await CreateIdAsync(client, "Wants The Nic", NewNic());
 
-        var response = await client.PutAsJsonAsync(
+        var response = await administrator.PutAsJsonAsync(
             $"/api/patients/{id}", new { full_name = "Wants The Nic", gender = "male", nic = taken });
 
         using var body = await ReadJsonAsync(response);
@@ -507,7 +570,7 @@ public sealed class PatientEndpointTests
     }
 
     [Fact]
-    public async Task An_administrator_may_read_the_register_but_may_not_edit_a_record()
+    public async Task An_administrator_may_read_and_edit_the_register()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         var id = await CreateIdAsync(nurse, "Read Only To Admin", NewNic());
@@ -518,7 +581,7 @@ public sealed class PatientEndpointTests
             $"/api/patients/{id}", new { full_name = "Renamed", gender = "male", nic = NewNic() });
 
         Assert.Equal(HttpStatusCode.OK, read.StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, edit.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, edit.StatusCode);
     }
 
     [Fact]

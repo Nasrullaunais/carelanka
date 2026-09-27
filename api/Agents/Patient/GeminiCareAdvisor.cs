@@ -30,7 +30,7 @@ public sealed class GeminiCareAdvisor : ICareAdvisor
         their care.
 
         You are given the patient's own words, their medical profile (typed by staff - known
-        conditions, allergies, current symptoms, recent situation), their current admission, and
+        conditions, allergies, current symptoms), their current admission, and
         the administrative shape of their past visits and past reports. Answer their question
         using what the hospital already knows about them.
 
@@ -135,8 +135,7 @@ public sealed class GeminiCareAdvisor : ICareAdvisor
                 {
                     known_conditions = profile.KnownConditions,
                     allergies = profile.Allergies,
-                    current_symptoms = profile.CurrentSymptoms,
-                    recent_situation = profile.RecentSituation
+                    current_symptoms = profile.CurrentSymptoms
                 }
                 : null,
             current_admission = context.CurrentAdmission is { } admission

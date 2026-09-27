@@ -14,8 +14,13 @@ namespace CareLanka.Api.Controllers.Equipment;
 public class PharmacyItemsController : ControllerBase
 {
     private readonly IPharmacyItemService _items;
+    private readonly IReorderSuggestionService _reorderSuggestions;
 
-    public PharmacyItemsController(IPharmacyItemService items) => _items = items;
+    public PharmacyItemsController(IPharmacyItemService items, IReorderSuggestionService reorderSuggestions)
+    {
+        _items = items;
+        _reorderSuggestions = reorderSuggestions;
+    }
 
     [Authorize(Policy = Policies.AnyStaff)]
     [HttpGet(Name = "listPharmacyItems")]
@@ -148,4 +153,40 @@ public class PharmacyItemsController : ControllerBase
         [FromQuery][Range(1, 100)] int pageSize = 20,
         CancellationToken ct = default)
         => Ok(await _items.ListTransactionsAsync(id, page, pageSize, ct));
+
+    [Authorize(Policy = Policies.EquipmentManager)]
+    [HttpPatch("{id:guid}/reorder-threshold", Name = "updateReorderThreshold")]
+    [ProducesResponseType(typeof(PharmacyItem), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<ActionResult<PharmacyItem>> UpdateReorderThreshold(
+        Guid id, [FromBody] UpdateReorderThresholdRequest request, CancellationToken ct)
+        => Ok(await _items.UpdateReorderThresholdAsync(id, request.ReorderThreshold, ct));
+
+    [Authorize(Policy = Policies.EquipmentManager)]
+    [HttpPost("{id:guid}/reorder-suggestion", Name = "submitReorderSuggestion")]
+    [ProducesResponseType(typeof(ReorderSuggestionAccepted), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<ReorderSuggestionAccepted>> SubmitReorderSuggestion(
+        Guid id, CancellationToken ct)
+    {
+        var accepted = await _reorderSuggestions.SubmitAsync(id, ct);
+
+        return Accepted(accepted.PollUrl, accepted);
+    }
+
+    [Authorize(Policy = Policies.EquipmentManager)]
+    [HttpGet("reorder-suggestions/{workflowId:guid}", Name = "getReorderSuggestionWorkflow")]
+    [ProducesResponseType(typeof(ReorderWorkflowSummary), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<ActionResult<ReorderWorkflowSummary>> GetReorderSuggestionWorkflow(
+        Guid workflowId, CancellationToken ct)
+        => Ok(await _reorderSuggestions.GetWorkflowAsync(workflowId, ct));
 }

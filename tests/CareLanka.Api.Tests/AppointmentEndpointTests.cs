@@ -103,6 +103,135 @@ public sealed class AppointmentEndpointTests
     }
 
     [Fact]
+    public async Task A_walk_in_starts_now_already_confirmed_so_the_desk_can_finish_it_at_once()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var patientId = await NewPatientAsync(nurse, "Walk In Blood Test");
+        var before = DateTimeOffset.UtcNow;
+
+        var created = await nurse.PostAsJsonAsync(
+            "/api/appointments/walk-in", new { patient_id = patientId, reason = "Blood test" });
+        using var body = await ReadJsonAsync(created);
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        Assert.Equal("confirmed", body.RootElement.GetProperty("status").GetString());
+        Assert.Equal("Blood test", body.RootElement.GetProperty("reason").GetString());
+        Assert.Equal(await NurseIdAsync(), body.RootElement.GetProperty("booked_by_staff_id").GetString());
+        Assert.Equal(await NurseIdAsync(), body.RootElement.GetProperty("confirmed_by_staff_id").GetString());
+        Assert.InRange(
+            body.RootElement.GetProperty("scheduled_at").GetDateTimeOffset(),
+            before.AddSeconds(-1),
+            DateTimeOffset.UtcNow.AddSeconds(1));
+
+        var id = body.RootElement.GetProperty("id").GetString();
+        var completed = await nurse.PostAsync($"/api/appointments/{id}/complete", content: null);
+
+        Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_walk_in_keeps_the_one_open_booking_rule()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var patientId = await NewPatientAsync(nurse, "Walk In Already Booked");
+        await BookAsync(nurse, patientId, SoonUtc());
+
+        var walkIn = await nurse.PostAsJsonAsync(
+            "/api/appointments/walk-in", new { patient_id = patientId });
+        using var body = await ReadJsonAsync(walkIn);
+
+        Assert.Equal(HttpStatusCode.Conflict, walkIn.StatusCode);
+        Assert.Equal("cl_pat_009", body.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Searching_matches_the_patients_name_code_nic_and_phone()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var patientId = await NewPatientAsync(nurse, "Kamala Perera Searchable");
+        await BookAsync(nurse, patientId, SoonUtc());
+
+        using var patientBody = await ReadJsonAsync(
+            await nurse.GetAsync($"/api/patients/{patientId}"));
+        var code = patientBody.RootElement.GetProperty("patient_code").GetString();
+
+        using var byName = await ReadJsonAsync(
+            await nurse.GetAsync("/api/appointments?search=Kamala+Perera+Searchable&pageSize=100"));
+        using var byCode = await ReadJsonAsync(
+            await nurse.GetAsync($"/api/appointments?search={code}&pageSize=100"));
+        using var noMatch = await ReadJsonAsync(
+            await nurse.GetAsync("/api/appointments?search=Nobody+Matches+This&pageSize=100"));
+
+        Assert.Contains(
+            byName.RootElement.GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("patient").GetProperty("id").GetString() == patientId);
+        Assert.Contains(
+            byCode.RootElement.GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("patient").GetProperty("id").GetString() == patientId);
+        Assert.DoesNotContain(
+            noMatch.RootElement.GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("patient").GetProperty("id").GetString() == patientId);
+    }
+
+    [Fact]
+    public async Task Finished_bookings_are_left_off_the_list_until_asked_for()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var patientId = await NewPatientAsync(nurse, "Finished Visit Hidden By Default");
+        var id = await ConfirmedIdAsync(nurse, patientId, SoonUtc());
+
+        Assert.Equal(
+            HttpStatusCode.OK, (await nurse.PostAsync($"/api/appointments/{id}/complete", content: null)).StatusCode);
+
+        using var byDefault = await ReadJsonAsync(
+            await nurse.GetAsync("/api/appointments?pageSize=100"));
+        using var withFinished = await ReadJsonAsync(
+            await nurse.GetAsync("/api/appointments?includeFinished=true&pageSize=100"));
+        using var byStatus = await ReadJsonAsync(
+            await nurse.GetAsync("/api/appointments?status=completed&pageSize=100"));
+
+        Assert.DoesNotContain(Ids(byDefault), item => item == id);
+        Assert.Contains(Ids(withFinished), item => item == id);
+        Assert.Contains(Ids(byStatus), item => item == id);
+    }
+
+    [Fact]
+    public async Task A_walk_in_with_no_patient_is_refused_before_anything_is_looked_up()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+
+        var missing = await nurse.PostAsJsonAsync("/api/appointments/walk-in", new { reason = "Scan" });
+        var empty = await nurse.PostAsJsonAsync(
+            "/api/appointments/walk-in", new { patient_id = Guid.Empty });
+        using var emptyBody = await ReadJsonAsync(empty);
+
+        Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, empty.StatusCode);
+        Assert.Equal("cl_err_400", emptyBody.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Only_the_desk_records_a_walk_in()
+    {
+        using var doctor = await ClientAsync(ApiApplication.DoctorEmail);
+        using var administrator = await ClientAsync(ApiApplication.AdministratorEmail);
+        using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
+
+        var body = new { patient_id = Guid.NewGuid() };
+
+        foreach (var refused in new[] { doctor, administrator })
+        {
+            Assert.Equal(
+                HttpStatusCode.Forbidden,
+                (await refused.PostAsJsonAsync("/api/appointments/walk-in", body)).StatusCode);
+        }
+
+        Assert.Equal(
+            HttpStatusCode.NotFound,
+            (await reception.PostAsJsonAsync("/api/appointments/walk-in", body)).StatusCode);
+    }
+
+    [Fact]
     public async Task A_patient_who_is_already_in_the_building_cannot_be_booked_a_visit()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
@@ -246,7 +375,7 @@ public sealed class AppointmentEndpointTests
         Assert.Equal("pre_registered", admission.RootElement.GetProperty("source").GetString());
 
         Assert.Equal("awaiting_bed", admission.RootElement.GetProperty("status").GetString());
-        Assert.Equal("inpatient", admission.RootElement.GetProperty("admission_category").GetString());
+        Assert.Equal("general", admission.RootElement.GetProperty("admission_category").GetString());
         Assert.Equal(
             patientId,
             admission.RootElement.GetProperty("patient").GetProperty("id").GetString());
@@ -294,31 +423,11 @@ public sealed class AppointmentEndpointTests
     }
 
     [Fact]
-    public async Task A_nurse_may_not_check_somebody_in_at_icu_or_hdu_but_the_duty_manager_may()
-    {
-        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
-        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
-
-        var refusedFor = await ConfirmedIdAsync(
-            nurse, await NewPatientAsync(nurse, "Nurse Tries ICU"), SoonUtc());
-        var allowedFor = await ConfirmedIdAsync(
-            nurse, await NewPatientAsync(nurse, "Manager Does ICU"), SoonUtc());
-
-        var refused = await CheckInAsync(nurse, refusedFor, category: "icu");
-        using var body = await ReadJsonAsync(refused);
-        var allowed = await CheckInAsync(manager, allowedFor, category: "icu");
-
-        Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
-        Assert.Equal("cl_pat_011", body.RootElement.GetProperty("code").GetString());
-        Assert.Equal(HttpStatusCode.Created, allowed.StatusCode);
-    }
-
-    [Fact]
-    public async Task A_nurse_may_still_check_somebody_in_at_the_three_levels_that_are_theirs()
+    public async Task A_nurse_may_check_somebody_in_at_every_level_walk_in_intake_offers()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
 
-        foreach (var category in new[] { "outpatient", "day_case", "inpatient" })
+        foreach (var category in new[] { "icu", "general", "surgical", "emergency" })
         {
             var appointmentId = await ConfirmedIdAsync(
                 nurse, await NewPatientAsync(nurse, $"Nurse Checks In {category}"), SoonUtc());
@@ -345,17 +454,19 @@ public sealed class AppointmentEndpointTests
     }
 
     [Fact]
-    public async Task A_check_in_naming_a_clinician_who_does_not_exist_is_refused()
+    public async Task A_check_in_records_whoever_is_signed_in_as_choosing_the_care_level()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         var appointmentId = await ConfirmedIdAsync(
-            nurse, await NewPatientAsync(nurse, "Check In With Unknown Staff"), SoonUtc());
+            nurse, await NewPatientAsync(nurse, "Check In Claimed Staff"), SoonUtc());
 
         var response = await CheckInAsync(nurse, appointmentId, staffId: Guid.NewGuid().ToString());
         using var body = await ReadJsonAsync(response);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Equal("cl_pat_008", body.RootElement.GetProperty("code").GetString());
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(
+            await NurseIdAsync(),
+            body.RootElement.GetProperty("category_set_by_staff_id").GetString());
     }
 
     [Fact]
@@ -652,7 +763,7 @@ public sealed class AppointmentEndpointTests
     private async Task<HttpResponseMessage> CheckInAsync(
         HttpClient client,
         string appointmentId,
-        string category = "inpatient",
+        string category = "general",
         string? staffId = null)
         => await client.PostAsJsonAsync($"/api/appointments/{appointmentId}/check-in", new
         {
@@ -662,12 +773,32 @@ public sealed class AppointmentEndpointTests
             is_infectious = false
         });
 
-    private static async Task<string> NewPatientAsync(HttpClient nurse, string fullName)
+    [Fact]
+    public async Task Maternity_is_refused_for_a_male_patient_and_allowed_for_a_female_one()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+
+        var forHim = await ConfirmedIdAsync(
+            nurse, await NewPatientAsync(nurse, "Maternity Him"), SoonUtc());
+        var forHer = await ConfirmedIdAsync(
+            nurse, await NewPatientAsync(nurse, "Maternity Her", gender: "female"), SoonUtc());
+
+        var refused = await CheckInAsync(nurse, forHim, category: "maternity");
+        using var body = await ReadJsonAsync(refused);
+        var allowed = await CheckInAsync(nurse, forHer, category: "maternity");
+
+        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+        Assert.Equal("cl_pat_048", body.RootElement.GetProperty("code").GetString());
+        Assert.Equal(HttpStatusCode.Created, allowed.StatusCode);
+    }
+
+    private static async Task<string> NewPatientAsync(
+        HttpClient nurse, string fullName, string gender = "male")
     {
         var created = await nurse.PostAsJsonAsync("/api/patients", new
         {
             full_name = fullName,
-            gender = "male",
+            gender,
             nic = $"P{Guid.NewGuid():N}"[..12]
         });
 
@@ -683,7 +814,7 @@ public sealed class AppointmentEndpointTests
         {
             patient_id = patientId,
             source = "walk_in",
-            admission_category = "inpatient",
+            admission_category = "general",
             category_set_by_staff_id = await NurseIdAsync(),
             urgency = "routine",
             is_infectious = false

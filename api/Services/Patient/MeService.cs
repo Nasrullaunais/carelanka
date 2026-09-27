@@ -80,9 +80,16 @@ public sealed class MeService : IMeService
 
         var existing = await _db.Patients.FirstOrDefaultAsync(p => p.Nic == nic, ct);
 
-        return existing is not null
-            ? await LinkExistingRecordAsync(existing, accountId, request, ct)
-            : await CreateAndLinkRecordAsync(accountId, nic, request, ct);
+        // A NIC alone is not proof of who someone is - it is printed on too many forms. A record
+        // the hospital made is joined only through the patient code the desk hands over in person.
+        if (existing is not null)
+        {
+            throw new ConflictException(existing.UserAccountId is null
+                ? MessageCode.NicHasHospitalRecord
+                : MessageCode.NicLinkedToAnotherAccount);
+        }
+
+        return await CreateAndLinkRecordAsync(accountId, nic, request, ct);
     }
 
     public async Task<PatientClaimPreview> PreviewClaimAsync(
@@ -305,25 +312,6 @@ public sealed class MeService : IMeService
         return ToProfile(mine);
     }
 
-    private async Task<MyProfile> LinkExistingRecordAsync(
-        PatientEntity existing, Guid accountId, PreRegisterRequest request, CancellationToken ct)
-    {
-        if (existing.UserAccountId is not null)
-        {
-            throw new ConflictException(MessageCode.NicLinkedToAnotherAccount);
-        }
-
-        existing.DateOfBirth ??= request.DateOfBirth;
-        existing.Phone ??= Clean(request.Phone);
-        existing.Address ??= Clean(request.Address);
-        existing.EmergencyContactName ??= Clean(request.EmergencyContactName);
-        existing.EmergencyContactPhone ??= Clean(request.EmergencyContactPhone);
-
-        await _patients.LinkAccountAsync(existing.Id, accountId, ct);
-
-        return ToProfile(existing);
-    }
-
     private async Task<MyProfile> CreateAndLinkRecordAsync(
         Guid accountId, string nic, PreRegisterRequest request, CancellationToken ct)
     {
@@ -476,7 +464,7 @@ public sealed class MeService : IMeService
                 appointment.Status, appointment.CancelledByStaffMemberId is not null),
             Reason = appointment.Reason,
 
-            CanCancel = appointment.Status == AppointmentStatus.Scheduled,
+            CanCancel = AppointmentService.OpenStatuses.Contains(appointment.Status),
             CancellationReason = appointment.CancellationReason,
             CancelledByHospital = appointment.CancelledByStaffMemberId is not null
         };

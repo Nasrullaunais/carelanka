@@ -290,7 +290,7 @@ public sealed class BedEndpointTests
             Id = Guid.NewGuid(),
             PatientId = patient.Id,
             Source = AdmissionSource.WalkIn,
-            Category = AdmissionCategory.Inpatient,
+            Category = AdmissionCategory.General,
             Urgency = AdmissionUrgency.Routine,
             Status = AdmissionStatus.Admitted,
             CategorySetByStaffMemberId = await SomeStaffIdAsync(db),

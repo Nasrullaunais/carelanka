@@ -6,6 +6,7 @@ using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Patient;
 using CareLanka.Api.Services.Common;
+using CareLanka.Api.Services.Equipment;
 using Microsoft.EntityFrameworkCore;
 using AdmissionResponse = CareLanka.Api.DTOs.Patient.Admission;
 using AppointmentEntity = CareLanka.Api.Data.Entities.Patient.Appointment;
@@ -16,7 +17,7 @@ namespace CareLanka.Api.Services.Patient;
 
 public sealed class AppointmentService : IAppointmentService
 {
-    private static readonly AppointmentStatus[] OpenStatuses =
+    internal static readonly AppointmentStatus[] OpenStatuses =
     [
         AppointmentStatus.Scheduled,
         AppointmentStatus.Confirmed
@@ -26,12 +27,6 @@ public sealed class AppointmentService : IAppointmentService
     [
         AdmissionStatus.Discharged,
         AdmissionStatus.Cancelled
-    ];
-
-    private static readonly AdmissionCategory[] DutyManagerOnly =
-    [
-        AdmissionCategory.Icu,
-        AdmissionCategory.Hdu
     ];
 
     private readonly CareLankaDbContext _db;
@@ -49,6 +44,8 @@ public sealed class AppointmentService : IAppointmentService
     public async Task<PagedResult<AppointmentResponse>> ListAsync(
         DateOnly? date,
         AppointmentStatus? status,
+        string? search,
+        bool includeFinished,
         int page,
         int pageSize,
         CancellationToken ct = default)
@@ -57,7 +54,10 @@ public sealed class AppointmentService : IAppointmentService
 
         if (date is { } day)
         {
-            var from = new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            // The hospital's calendar day, so an early-morning booking is not listed under yesterday.
+            var midnight = day.ToDateTime(TimeOnly.MinValue);
+            var from = new DateTimeOffset(midnight, HospitalTime.Zone.GetUtcOffset(midnight))
+                .ToUniversalTime();
             var to = from.AddDays(1);
 
             query = query.Where(a => a.ScheduledAt >= from && a.ScheduledAt < to);
@@ -66,6 +66,24 @@ public sealed class AppointmentService : IAppointmentService
         if (status is { } wanted)
         {
             query = query.Where(a => a.Status == wanted);
+        }
+        else if (!includeFinished)
+        {
+            // The default view is what still needs the desk's attention. A booking that is
+            // over - seen, cancelled or missed - is left out until asked for, so the list does
+            // not fill up with visits nobody needs to act on any more.
+            query = query.Where(a => OpenStatuses.Contains(a.Status));
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var pattern = $"%{search.Trim()}%";
+
+            query = query.Where(a =>
+                EF.Functions.ILike(a.Patient.FullName, pattern)
+                || EF.Functions.ILike(a.Patient.PatientCode, pattern)
+                || (a.Patient.Nic != null && EF.Functions.ILike(a.Patient.Nic, pattern))
+                || (a.Patient.Phone != null && EF.Functions.ILike(a.Patient.Phone, pattern)));
         }
 
         var totalItems = await query.CountAsync(ct);
@@ -89,6 +107,41 @@ public sealed class AppointmentService : IAppointmentService
 
         var appointment = await BookAsync(
             patient, request.ScheduledAt, request.Reason, _currentUser.Id, ct);
+
+        return ToResponse(appointment);
+    }
+
+    /// <summary>
+    /// Someone at the counter now, for a test, scan or check-up, with no booking. Recorded as
+    /// a visit starting now and already confirmed - the person confirming it is the one looking
+    /// at them - so the day-of actions are open straight away.
+    /// </summary>
+    public async Task<AppointmentResponse> CreateWalkInAsync(
+        CreateWalkInAppointmentRequest request, CancellationToken ct = default)
+    {
+        var patient = await _db.Patients.FirstOrDefaultAsync(p => p.Id == request.PatientId, ct)
+            ?? throw new NotFoundException("Patient", request.PatientId);
+
+        await EnsureNothingOpenForAsync(patient, ct);
+
+        var now = DateTimeOffset.UtcNow;
+
+        var appointment = new AppointmentEntity
+        {
+            Id = Guid.NewGuid(),
+            PatientId = patient.Id,
+            ScheduledAt = now,
+            Status = AppointmentStatus.Confirmed,
+            Reason = Clean(request.Reason),
+            BookedByStaffMemberId = _currentUser.Id,
+            ConfirmedAt = now,
+            ConfirmedByStaffMemberId = _currentUser.Id
+        };
+
+        _db.Appointments.Add(appointment);
+        await _db.SaveChangesAsync(ct);
+
+        appointment.Patient = patient;
 
         return ToResponse(appointment);
     }
@@ -267,12 +320,6 @@ public sealed class AppointmentService : IAppointmentService
     {
         var category = request.AdmissionCategory!.Value;
 
-        if (DutyManagerOnly.Contains(category) && _currentUser.Role != PrincipalRole.DutyManager)
-        {
-            throw new ForbiddenException(
-                MessageCode.CareLevelNeedsDutyManager, EnumWire.ToWire(category));
-        }
-
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
 
         await _db.Database.ExecuteSqlAsync(
@@ -292,7 +339,6 @@ public sealed class AppointmentService : IAppointmentService
             Source = AdmissionSource.PreRegistered,
 
             AdmissionCategory = category,
-            CategorySetByStaffId = request.CategorySetByStaffId,
             Urgency = request.Urgency!.Value,
             IsInfectious = request.IsInfectious,
 

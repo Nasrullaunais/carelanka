@@ -81,6 +81,9 @@ public sealed class FluentValidationIntegrationTests
 
     private sealed class TrackingAmbulanceService : IAmbulanceService
     {
+        public Task<Ambulance> GetMyAssignmentAsync(CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
         public bool CreateWasCalled { get; private set; }
 
         public bool ListWasCalled { get; private set; }

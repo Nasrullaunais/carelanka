@@ -24,6 +24,7 @@ public class CareLankaDbContext : DbContext
 
     public DbSet<EmergencyCall> EmergencyCalls => Set<EmergencyCall>();
     public DbSet<Ambulance> Ambulances => Set<Ambulance>();
+    public DbSet<AmbulanceStatusHistory> AmbulanceStatusHistory => Set<AmbulanceStatusHistory>();
     public DbSet<AmbulanceCrewAssignment> AmbulanceCrewAssignments => Set<AmbulanceCrewAssignment>();
     public DbSet<Dispatch> Dispatches => Set<Dispatch>();
     public DbSet<DispatchCrew> DispatchCrew => Set<DispatchCrew>();
@@ -48,6 +49,7 @@ public class CareLankaDbContext : DbContext
 
     public DbSet<PharmacyBatch> PharmacyBatches => Set<PharmacyBatch>();
     public DbSet<PharmacyTransaction> PharmacyTransactions => Set<PharmacyTransaction>();
+    public DbSet<ReorderSuggestion> ReorderSuggestions => Set<ReorderSuggestion>();
     public DbSet<LabReport> LabReports => Set<LabReport>();
 
     public DbSet<Prescription> Prescriptions => Set<Prescription>();

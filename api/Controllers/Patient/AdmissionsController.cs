@@ -123,16 +123,6 @@ public class AdmissionsController : ControllerBase
     public async Task<ActionResult<AdmissionResponse>> MarkArrived(Guid id, CancellationToken ct)
         => Ok(await _admissions.MarkArrivedAsync(id, ct));
 
-    [Authorize(Policy = Policies.AdmissionEditor)]
-    [HttpPost("{id:guid}/complete", Name = "completeVisit")]
-    [ProducesResponseType(typeof(AdmissionResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
-    public async Task<ActionResult<AdmissionResponse>> CompleteVisit(Guid id, CancellationToken ct)
-        => Ok(await _admissions.CompleteAsync(id, ct));
-
     [Authorize(Policy = Policies.DutyManager)]
     [HttpPost("{id:guid}/cancel", Name = "cancelAdmission")]
     [ProducesResponseType(typeof(AdmissionResponse), StatusCodes.Status200OK)]

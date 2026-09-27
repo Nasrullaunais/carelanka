@@ -18,7 +18,6 @@ class WorklistRow {
     required this.id,
     required this.patient,
     required this.status,
-    required this.requiresBed,
     required this.whenValue,
     this.source,
     this.admissionCategory,
@@ -33,8 +32,6 @@ class WorklistRow {
   final String id;
   final PatientSummary patient;
   final WorklistStatus status;
-  @JsonKey(name: 'requires_bed')
-  final bool requiresBed;
   final AdmissionSource? source;
   @JsonKey(name: 'admission_category')
   final AdmissionCategory? admissionCategory;

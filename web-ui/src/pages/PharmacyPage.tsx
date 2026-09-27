@@ -1,3 +1,5 @@
+import { PaginationControls } from '../components/ui/pagination-controls';
+import { Table } from '../components/Table';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -12,11 +14,14 @@ import type { PharmacyItem, PrincipalRole } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
 import { canManageEquipment } from '../types/permissions';
 import { Dialog } from './EquipmentPage';
+import { ActionDialog } from '../components/ui/action-dialog';
 import { StockDialog } from './pharmacy/StockDialog';
 import { ItemHistoryCard } from './pharmacy/ItemHistoryCard';
 import { AddBatchDialog, BatchList } from './pharmacy/BatchList';
 import { RemoveMedicineDialog } from './pharmacy/RemoveMedicineDialog';
 import { PrescriptionsCard } from './pharmacy/PrescriptionsCard';
+import { ReorderSuggestionPanel } from './pharmacy/ReorderSuggestionPanel';
+import { AppSelect } from '../components/ui/app-select';
 
 const PAGE_SIZE = 10;
 
@@ -30,6 +35,9 @@ export function PharmacyPage() {
   const [availableOnly, setAvailableOnly] = useState(false);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<string | null>(null);
+  const [batchesItem, setBatchesItem] = useState<PharmacyItem | null>(null);
+  const [suggestingItem, setSuggestingItem] = useState<PharmacyItem | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
 
   const categories = useQuery(listPharmacyCategoriesOptions());
 
@@ -93,36 +101,34 @@ export function PharmacyPage() {
             />
           </div>
           <div>
-            <label htmlFor="ph-category">Category</label>
-            <select
+            <AppSelect
               id="ph-category"
+              label="Category"
               value={categoryId}
-              onChange={(event) => {
-                setCategoryId(event.target.value);
+              onValueChange={(value) => {
+                setCategoryId(value);
                 page1();
               }}
-            >
-              <option value="">All categories</option>
-              {(categories.data ?? []).map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: 'All categories' },
+                ...(categories.data ?? []).map((category) => ({ value: category.id, label: category.name })),
+              ]}
+            />
           </div>
           <div>
-            <label htmlFor="ph-available">Availability</label>
-            <select
+            <AppSelect
               id="ph-available"
+              label="Availability"
               value={availableOnly ? 'in-stock' : 'all'}
-              onChange={(event) => {
-                setAvailableOnly(event.target.value === 'in-stock');
+              onValueChange={(value) => {
+                setAvailableOnly(value === 'in-stock');
                 page1();
               }}
-            >
-              <option value="all">Everything in the catalog</option>
-              <option value="in-stock">On the shelf now</option>
-            </select>
+              options={[
+                { value: 'all', label: 'Everything in the catalog' },
+                { value: 'in-stock', label: 'On the shelf now' },
+              ]}
+            />
           </div>
         </div>
         <p className="hint">
@@ -132,11 +138,15 @@ export function PharmacyPage() {
       </div>
 
       {canManageEquipment(role) && (
-        <AddItemCard
+        <>
+        <button type="button" onClick={() => setAddOpen(true)}>Add medicine</button>
+        <ActionDialog title="Add medicine" isOpen={addOpen} onClose={() => setAddOpen(false)}>
+        {addOpen && <AddItemCard
           categories={(categories.data ?? []).map((c) => ({ id: c.id, name: c.name }))}
           onDone={() => {
             refresh();
             page1();
+            setAddOpen(false);
           }}
           onCategoryAdded={() =>
             queryClient.invalidateQueries({
@@ -145,68 +155,65 @@ export function PharmacyPage() {
                 'listPharmacyCategories',
             })
           }
-        />
+        />}
+        </ActionDialog>
+        </>
       )}
 
-      <div className="card">
+      <div className="table-section">
         <h2>Catalog</h2>
         <ItemTable
+          footer={<PaginationControls label="Pharmacy" page={page} totalPages={totalPages} totalItems={paged?.total_items} onPageChange={setPage} />}
           isLoading={items.isLoading}
           isError={items.isError}
           onRetry={() => void items.refetch()}
           items={paged?.items ?? []}
           selectedId={selected}
           onSelect={(id) => setSelected((current) => (current === id ? null : id))}
+          onOpenBatches={setBatchesItem}
+          onSuggest={setSuggestingItem}
           role={role}
           onChanged={refresh}
         />
 
-        {paged && paged.total_items > 0 && (
-          <div className="pager">
-            <button
-              type="button"
-              className="secondary"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              Previous
-            </button>
-            <span className="muted">
-              Page {paged.page} of {totalPages} · {paged.total_items} items
-            </span>
-            <button
-              type="button"
-              className="secondary"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            >
-              Next
-            </button>
-          </div>
-        )}
+
       </div>
 
-      {selected && <ItemHistoryCard id={selected} onClose={() => setSelected(null)} />}
+      <ActionDialog title="Medicine details" isOpen={selected != null} onClose={() => setSelected(null)}>
+        {selected && <ItemHistoryCard id={selected} onClose={() => setSelected(null)} />}
+      </ActionDialog>
+      <ActionDialog title={`Batches · ${batchesItem?.name ?? 'medicine'}`} isOpen={batchesItem != null} onClose={() => setBatchesItem(null)}>
+        {batchesItem && <BatchList item={batchesItem} manage={canManageEquipment(role)} onChanged={refresh} />}
+      </ActionDialog>
+      <ActionDialog title={`Suggest threshold · ${suggestingItem?.name ?? 'medicine'}`} isOpen={suggestingItem != null} onClose={() => setSuggestingItem(null)}>
+        {suggestingItem && <ReorderSuggestionPanel item={suggestingItem} onClose={() => setSuggestingItem(null)} onChanged={refresh} />}
+      </ActionDialog>
     </>
   );
 }
 
 function ItemTable({
+  footer,
   items,
   isLoading,
   isError,
   onRetry,
   selectedId,
   onSelect,
+  onOpenBatches,
+  onSuggest,
   role,
   onChanged,
 }: {
+  footer?: React.ReactNode;
   items: PharmacyItem[];
   isLoading: boolean;
   isError: boolean;
   onRetry: () => void;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onOpenBatches: (item: PharmacyItem) => void;
+  onSuggest: (item: PharmacyItem) => void;
   role: PrincipalRole | undefined;
   onChanged: () => void;
 }) {
@@ -230,7 +237,7 @@ function ItemTable({
   }
 
   return (
-    <table>
+    <Table footer={footer}>
       <thead>
         <tr>
           <th>Item</th>
@@ -248,12 +255,14 @@ function ItemTable({
             item={item}
             selectedId={selectedId}
             onSelect={onSelect}
+            onOpenBatches={onOpenBatches}
+            onSuggest={onSuggest}
             role={role}
             onChanged={onChanged}
           />
         ))}
       </tbody>
-    </table>
+    </Table>
   );
 }
 
@@ -262,20 +271,22 @@ function ItemRows({
   item,
   selectedId,
   onSelect,
+  onOpenBatches,
+  onSuggest,
   role,
   onChanged,
 }: {
   item: PharmacyItem;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onOpenBatches: (item: PharmacyItem) => void;
+  onSuggest: (item: PharmacyItem) => void;
   role: PrincipalRole | undefined;
   onChanged: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   const manage = canManageEquipment(role);
 
   return (
-    <>
       <tr className={selectedId === item.id ? 'selected' : undefined}>
         <td>
           <button type="button" className="linklike" onClick={() => onSelect(item.id)}>
@@ -286,10 +297,9 @@ function ItemRows({
             <button
               type="button"
               className="linklike small"
-              aria-expanded={open}
-              onClick={() => setOpen((current) => !current)}
+              onClick={() => onOpenBatches(item)}
             >
-              {open ? '▾' : '▸'} {item.batch_count} {item.batch_count === 1 ? 'batch' : 'batches'}
+              View {item.batch_count} {item.batch_count === 1 ? 'batch' : 'batches'}
             </button>
           )}
         </td>
@@ -306,19 +316,13 @@ function ItemRows({
         </td>
         {manage && (
           <td>
-            <MoveStockButton item={item} onChanged={onChanged} />
+            <MoveStockButton item={item} onChanged={onChanged} />{' '}
+            <button type="button" className="secondary" onClick={() => onSuggest(item)}>
+              Suggest threshold
+            </button>
           </td>
         )}
       </tr>
-
-      {open && (
-        <tr>
-          <td colSpan={manage ? 6 : 5}>
-            <BatchList item={item} manage={manage} onChanged={onChanged} />
-          </td>
-        </tr>
-      )}
-    </>
   );
 }
 
@@ -415,7 +419,6 @@ function AddItemCard({
   const [expiryDate, setExpiryDate] = useState('');
   const [unit, setUnit] = useState('box');
   const [quantity, setQuantity] = useState('0');
-  const [threshold, setThreshold] = useState('10');
   const [unitPrice, setUnitPrice] = useState('');
 
   const [newCategory, setNewCategory] = useState('');
@@ -455,7 +458,6 @@ function AddItemCard({
         expiry_date: expiryDate || null,
         unit: unit.trim(),
         quantity_on_hand: Number(quantity),
-        reorder_threshold: Number(threshold),
         unit_price: unitPrice ? Number(unitPrice) : null,
       },
     });
@@ -472,7 +474,9 @@ function AddItemCard({
 
       <p className="muted" style={{ marginBottom: '0.9rem' }}>
         The quantity here is opening stock. After this, it only ever changes through a
-        recorded movement, so the shelf and the history can never disagree.
+        recorded movement, so the shelf and the history can never disagree. The reorder
+        threshold starts at 10 — there is no dispensing history yet for Suggest threshold to
+        reason from, so set it once the medicine has some.
       </p>
 
       {categories.length === 0 && (
@@ -495,20 +499,17 @@ function AddItemCard({
             />
           </div>
           <div className="field">
-            <label htmlFor="ph-new-category">Category</label>
-            <select
+            <AppSelect
               id="ph-new-category"
+              label="Category"
               value={categoryId}
-              onChange={(event) => setCategoryId(event.target.value)}
-              required
-            >
-              <option value="">Choose…</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+              onValueChange={setCategoryId}
+              isRequired
+              options={[
+                { value: '', label: 'Choose…' },
+                ...categories.map((category) => ({ value: category.id, label: category.name })),
+              ]}
+            />
           </div>
           <div className="field">
             <label htmlFor="ph-unit">Unit</label>
@@ -568,17 +569,6 @@ function AddItemCard({
             />
           </div>
           <div className="field">
-            <label htmlFor="ph-threshold">Reorder threshold</label>
-            <input
-              id="ph-threshold"
-              type="number"
-              min={0}
-              value={threshold}
-              onChange={(event) => setThreshold(event.target.value)}
-              required
-            />
-          </div>
-          <div className="field">
             <label htmlFor="ph-price">Unit price</label>
             <input
               id="ph-price"
@@ -619,15 +609,16 @@ function AddItemCard({
             />
           </div>
           <div className="field">
-            <label htmlFor="ph-cat-rx">Prescription</label>
-            <select
+            <AppSelect
               id="ph-cat-rx"
+              label="Prescription"
               value={prescription ? 'yes' : 'no'}
-              onChange={(event) => setPrescription(event.target.value === 'yes')}
-            >
-              <option value="no">Not required</option>
-              <option value="yes">Required</option>
-            </select>
+              onValueChange={(value) => setPrescription(value === 'yes')}
+              options={[
+                { value: 'no', label: 'Not required' },
+                { value: 'yes', label: 'Required' },
+              ]}
+            />
           </div>
           <div className="actions">
             <button

@@ -10,5 +10,6 @@ public sealed class DispatchDetail : DispatchSummary
     public string? ReassignmentReason { get; set; }
     public string? HandoverNotes { get; set; }
     public string? PatientCondition { get; set; }
+    public string? SceneAddressLabel { get; set; }
     public IReadOnlyList<Guid> CrewStaffIds { get; set; } = [];
 }

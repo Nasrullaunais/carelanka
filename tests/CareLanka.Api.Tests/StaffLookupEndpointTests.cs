@@ -215,6 +215,11 @@ public sealed class StaffLookupValidationTests
             IReadOnlyList<Guid> staffIds,
             CancellationToken ct = default)
             => Task.FromResult(_results);
+
+        public Task<IReadOnlyList<CrewCandidate>> SearchAvailableCrewAsync(
+            string? search,
+            CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<CrewCandidate>>([]);
     }
 }
 
@@ -243,7 +248,7 @@ public sealed class StaffLookupEndpointTests
         });
         Assert.Equal(HttpStatusCode.OK, nurseLogin.StatusCode);
         using var nurseBody = JsonDocument.Parse(await nurseLogin.Content.ReadAsStringAsync());
-        var nurseId = nurseBody.RootElement.GetProperty("staff_member").GetProperty("id").GetGuid();
+        var nurseId = nurseBody.RootElement.GetProperty("principal").GetProperty("id").GetGuid();
 
         var unknownId = Guid.NewGuid();
 

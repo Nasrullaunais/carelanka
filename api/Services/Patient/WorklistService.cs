@@ -93,7 +93,6 @@ public sealed class WorklistService : IWorklistService
                 DateOfBirth = admission.Patient.DateOfBirth
             },
             Status = StatusOf(admission.Status),
-            RequiresBed = BedPlacementRules.RequiresBed(admission.Category),
             Source = admission.Source,
             AdmissionCategory = admission.Category,
             Urgency = admission.Urgency,

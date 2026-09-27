@@ -30,10 +30,12 @@ public class AppointmentsController : ControllerBase
     public async Task<ActionResult<PagedResult<AppointmentResponse>>> ListAppointments(
         [FromQuery] DateOnly? date,
         [FromQuery] AppointmentStatus? status,
+        [FromQuery] string? search,
+        [FromQuery] bool includeFinished = false,
         [FromQuery][Range(1, int.MaxValue)] int page = 1,
         [FromQuery][Range(1, 100)] int pageSize = 20,
         CancellationToken ct = default)
-        => Ok(await _appointments.ListAsync(date, status, page, pageSize, ct));
+        => Ok(await _appointments.ListAsync(date, status, search, includeFinished, page, pageSize, ct));
 
     [Authorize(Policy = Policies.AppointmentDesk)]
     [HttpPost(Name = "createAppointment")]
@@ -50,6 +52,18 @@ public class AppointmentsController : ControllerBase
 
         return Created((string?)null, appointment);
     }
+
+    [Authorize(Policy = Policies.AppointmentDesk)]
+    [HttpPost("walk-in", Name = "createWalkInAppointment")]
+    [ProducesResponseType(typeof(AppointmentResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<AppointmentResponse>> CreateWalkInAppointment(
+        [FromBody] CreateWalkInAppointmentRequest request, CancellationToken ct)
+        => Created((string?)null, await _appointments.CreateWalkInAsync(request, ct));
 
     [Authorize(Policy = Policies.AppointmentDesk)]
     [HttpPost("{id:guid}/confirm", Name = "confirmAppointment")]

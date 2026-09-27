@@ -10,8 +10,8 @@ public interface IWarningService
 
     Task<Warning> AcknowledgeAsync(Guid id, CancellationToken cancellationToken = default);
 
-    /// <summary>Marks a resolved warning done, which takes it off the list for good.</summary>
-    Task ClearAsync(Guid id, string? confirmationCode, CancellationToken cancellationToken = default);
+    /// <summary>Marks a resolved or dismissed warning done, which takes it off the list for good.</summary>
+    Task ClearAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>Checks stock, expiry and maintenance against fixed rules, raises a warning for
     /// each problem found and closes the ones whose problem has gone.</summary>

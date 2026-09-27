@@ -36,6 +36,7 @@ DispatchDetail _$DispatchDetailFromJson(Map<String, dynamic> json) =>
       reassignmentReason: json['reassignment_reason'] as String?,
       handoverNotes: json['handover_notes'] as String?,
       patientCondition: json['patient_condition'] as String?,
+      sceneAddressLabel: json['scene_address_label'] as String?,
       crewStaffIds: (json['crew_staff_ids'] as List<dynamic>?)
           ?.map((e) => e as String)
           .toList(),
@@ -61,5 +62,6 @@ Map<String, dynamic> _$DispatchDetailToJson(DispatchDetail instance) =>
       'reassignment_reason': instance.reassignmentReason,
       'handover_notes': instance.handoverNotes,
       'patient_condition': instance.patientCondition,
+      'scene_address_label': instance.sceneAddressLabel,
       'crew_staff_ids': instance.crewStaffIds,
     };

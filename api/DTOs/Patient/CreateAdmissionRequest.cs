@@ -21,9 +21,6 @@ public class CreateAdmissionRequest
     public AdmissionCategory? AdmissionCategory { get; set; }
 
     [Required]
-    public Guid CategorySetByStaffId { get; set; }
-
-    [Required]
     [EnumDataType(typeof(AdmissionUrgency))]
     public AdmissionUrgency? Urgency { get; set; }
 

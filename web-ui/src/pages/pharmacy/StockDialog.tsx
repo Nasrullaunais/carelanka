@@ -11,6 +11,7 @@ import {
   takesStock,
   transactionTypeLabels,
 } from '../../types/pharmacy';
+import { AppSelect } from '../../components/ui/app-select';
 
 export function StockDialog({
   item,
@@ -66,18 +67,13 @@ export function StockDialog({
       <form onSubmit={submit}>
         <div className="row">
           <div className="field">
-            <label htmlFor="mv-type">What happened</label>
-            <select
+            <AppSelect
               id="mv-type"
+              label="What happened"
               value={type}
-              onChange={(event) => setType(event.target.value as PharmacyTransactionType)}
-            >
-              {movementTypes.map((value) => (
-                <option key={value} value={value}>
-                  {transactionTypeLabels[value]}
-                </option>
-              ))}
-            </select>
+              onValueChange={(value) => setType(value as PharmacyTransactionType)}
+              options={movementTypes.map((value) => ({ value, label: transactionTypeLabels[value] }))}
+            />
           </div>
           <div className="field">
             <label htmlFor="mv-qty">How many {item.unit}</label>

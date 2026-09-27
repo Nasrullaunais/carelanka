@@ -118,7 +118,7 @@ The second version keeps working when hold expiry, out-of-service beds or a new 
 | **`Bed`** — exists, number, condition, repairs | **Equipment (M3)** | Patient (to find candidates) | Equipment only |
 | **`LabReport`** — a finished laboratory result and the file itself | **Equipment (M3)** — *claimed 2026-09-13, see §11.15* | Doctor, ward nurse, duty manager | Equipment only (the laboratory) |
 | `Patient`, `Admission`, `Appointment`, `Discharge`, `DischargeChecklistItem` | **Patient (M4)** | Emergency, Staff (aggregates only) | Patient only |
-| **`PatientMedicalProfile`** — conditions, allergies, current symptoms, recent situation | **Patient (M4)** — *added 2026-09-16, see §11.17* | Nobody else. Not published cross-component and not patient-readable | Patient only — ward nurse or doctor |
+| **`PatientMedicalProfile`** — conditions, allergies, current symptoms | **Patient (M4)** — *added 2026-09-16, see §11.17* | Nobody else. Not published cross-component and not patient-readable | Patient only — ward nurse or doctor |
 | **`CareRecommendation`** — a patient's own report and the drafted reply | **Patient (M4)** | Nobody else | Patient only |
 | **`Bill`, `BillLineItem`** — what a visit costs and whether it is paid | **Patient (M4)** — *claimed 2026-09-11, see §11.10* | Nobody yet | Patient only |
 | **`BillingRate`, `AdmissionFeeRate`** — what the hospital charges | **Patient (M4)** — *added 2026-09-11, see §11.13* | Nobody yet | Read: any staff. Write: administrator only |
@@ -369,7 +369,7 @@ Every patient now carries a second identifier, and the two do different jobs:
 
 > **No component, and no AI agent, decides a patient's care category.**
 
-`admission_category` (`icu` / `hdu` / `inpatient` / `day_case` / `outpatient`) is set by clinical staff and recorded with `category_set_by_staff_id`. It is an **input** to Patient Management's agent, never an output.
+`admission_category` (`icu` / `general` / `surgical` / `maternity` / `emergency`) is set by clinical staff and recorded with `category_set_by_staff_id`. It is an **input** to Patient Management's agent, never an output.
 
 This is not caution — it is written into the group plan:
 
@@ -465,10 +465,10 @@ derived from the two stored statuses rather than being a third one. Other compon
 keep reading `GET /api/capacity/wards` and `GET /api/wards/{id}/occupancy` for counts — this
 one carries patient identities and is the desk's view, not an aggregate.
 
-**`POST /api/admissions/{id}/complete` finishes a visit that never needed a bed** — an
-`outpatient` scan or blood test. Not the discharge workflow: a visit holding a bed is refused
-with `cl_pat_020`, because discharge releases a bed and Equipment's register has to see that
-happen. Nothing outside Patient calls it.
+~~**`POST /api/admissions/{id}/complete`**~~ **was removed on 2026-09-25** (§11.21). Every care
+level needs a bed since the `outpatient` category went, so it could only ever answer 409. A
+check-up, scan or test is an appointment completed and billed on the booking. Nothing outside
+Patient called it.
 
 All JWT-protected and role-restricted. Aggregate endpoints return **counts, never patient identities** — `CapacityEndpointTests` asserts a patient's name appears in neither response body.
 
@@ -764,6 +764,15 @@ has to be chased through a ward nurse.
 **Scope.** `PUT /patients/{id}` only. `AdmissionEditor` is untouched and is still ward nurse and
 duty manager — chasing a visit's paperwork is a different job from fixing a name.
 
+**Narrowed 2026-09-26 (M4, own component).** Correcting a typo is still the desk's job, but
+changing *who a record identifies* no longer is. Once a patient has a NIC, only
+`HospitalAdministrator` may change their full name, gender or NIC — `403 cl_pat_052`, enforced in
+`PatientIdentityRules` on both `PUT /patients/{id}` and `PATCH /admissions/{id}/details`. A record
+with no NIC yet (an unidentified arrival) stays fully editable by reception, the ward nurse and the
+duty manager, which is how it gets identified. `HospitalAdministrator` joined `PatientEditor` for
+this. Phone, address, date of birth and emergency contact are unaffected. No other component
+calls these routes.
+
 **11.13 (OPEN — announced by M4 on 2026-09-11) — prices are a table now, and the administrator
 owns them.**
 
@@ -922,6 +931,8 @@ record the desk created, using the patient code.**
 Here because it sits next to common auth without being part of it, and everybody should be able
 to see where the line was drawn.
 
+> *Update 2026-09-25 (§11.21): pre-register no longer links by NIC at all; the patient code is the only way in to a desk-made record.*
+
 **The problem.** `POST /me/pre-register` links a login to an existing record by matching on NIC,
 and `CreatePatientRequest.Nic` is optional — a walk-in or an emergency arrival is often
 registered without one, which is what `temp_reference` is for. That patient installs the app
@@ -985,8 +996,8 @@ an `admission_id` or an NIC / patient code. `AdmissionStatus.AwaitingApproval` i
 removing a value from a shared enum is a cross-component change for no gain. **M3: nothing
 breaks, but no admission will ever appear in that state again.**
 
-**2. A new table, `PatientMedicalProfile`.** One row per patient, four free-text fields a nurse
-types: conditions, allergies, current symptoms, recent situation. It exists because the care
+**2. A new table, `PatientMedicalProfile`.** One row per patient, three free-text fields a nurse
+types: conditions, allergies, current symptoms (a fourth, recent situation, was folded into current symptoms on 2026-09-25, §11.21). It exists because the care
 advisory agent was reading demographics and the administrative shape of past visits, which is
 nothing to reason over. **Not published cross-component, not patient-readable, and not an EHR** —
 no vitals, no lab results, no coded diagnosis. Announced rather than asked, on the same footing
@@ -1102,6 +1113,55 @@ are ours — the same split as `LabReport`, except that here Equipment also serv
 
 **No data crosses the other way.** The prescription stores the patient id only; the pharmacy shows
 code and name read through `IPatientService` at display time.
+
+**11.21 (FYI — announced by M4 on 2026-09-25) — Patient Management review fixes. Nothing here
+changes anything another component calls, but three things left the contract.**
+
+**Removed from `patient-spec.yaml`:** `POST /admissions/{id}/complete` (`completeVisit`); the
+`requires_bed` field on `AdmissionSummary`, `Admission` and `WorklistRow` (it was always `true`);
+and the `awaiting_bed -> admitted` status move. Swept before removing: no Equipment, Emergency or
+Staff code reads any of them — `WardPatientService` and `PreAdmissionGateway` go through
+`IAdmissionService` methods that did not change. Both generated clients were regenerated.
+
+**New rules, Patient's own:** ward fit on bed assignment (`cl_pat_047`, duty manager may overrule),
+`maternity` refused for a patient recorded as male (`cl_pat_048`), bills and the discharge checklist
+only while the patient is on the ward (`cl_pat_044`–`046`), three care reports a minute per patient
+(`cl_pat_050`), and approving a care draft refused while the agent is still writing it
+(`cl_pat_049`). `cl_pat_011`, `cl_pat_008`, `cl_pat_020` and `cl_pat_021` are retired and will not be reused.
+
+**Two identity changes.** `POST /me/pre-register` no longer links a login to a record the desk
+made just because the NIC matches — that is 409 `cl_pat_051`, and the patient uses their patient
+code (`POST /me/claim`) instead. And `category_set_by_staff_id` is no longer in
+`CreateAdmissionRequest` or `CheckInRequest`: the server records whoever is signed in. An old
+caller still sending it is not broken - the field is ignored.
+
+**For Emergency, specifically:** a pre-admission classified as `maternity` for a male patient is now
+409 at `POST /admissions/{id}/classify`. `PreAdmitAsync` itself is untouched.
+
+**The medical profile is three fields, not four.** `recent_situation` is gone from `PatientMedicalProfile`,
+`UpdateMedicalProfileRequest` and the table; the migration (`Patient_RemoveMedicalProfileRecentSituation`)
+appends any text it held to `current_symptoms` first. Staff-facing and Patient-only — no other component
+reads it.
+
+---
+
+**11.22 (FYI — announced by M4 on 2026-09-25) — first-time patients and walk-ins on
+Appointments. Additive only.**
+
+**New:** `POST /appointments/walk-in` (`createWalkInAppointment`, schema
+`CreateWalkInAppointmentRequest`) — a visit recorded at the current time and already confirmed,
+for a test, scan or check-up with no booking. Desk roles only. No existing route, schema or rule
+changed.
+
+**For the laboratory (M3), nothing to do.** The desk can now register a patient with only a
+name, mobile number and gender, for a visit that never becomes an admission. Such a patient is in
+no ward, so `GET /ward-patients` does not list them — by design, it lists who is in a bed. They
+are found through the lab page's existing search by code, name or NIC (`GET /patients`), and
+`POST /lab-reports` already accepts any patient id.
+
+**The web client was regenerated**, and that also brought in the Staff routes
+(`listStaff`, `createStaffMember`, …) that were in the API but missing from the committed client.
+Generated output only; no Staff code changed.
 
 ---
 

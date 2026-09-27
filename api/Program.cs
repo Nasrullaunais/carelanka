@@ -16,6 +16,7 @@ using CareLanka.Api.Services.Emergency;
 using CareLanka.Api.Services.Emergency.Stubs;
 using CareLanka.Api.Agents;
 using CareLanka.Api.Agents.Emergency;
+using CareLanka.Api.Agents.Equipment;
 using CareLanka.Api.Agents.Patient;
 using CareLanka.Api.Services.Patient;
 using CareLanka.Api.Services.Staff;
@@ -95,11 +96,14 @@ var connectionString = builder.Configuration.GetConnectionString("CareLanka")
         "ConnectionStrings:CareLanka is not configured. See api/README.md for local setup.");
 
 builder.Services.AddSingleton<TimestampInterceptor>();
+builder.Services.AddSingleton<AmbulanceStatusHistoryInterceptor>();
 
 builder.Services.AddDbContext<CareLankaDbContext>((provider, options) => options
     .UseNpgsql(connectionString)
     .UseSnakeCaseNamingConvention()
-    .AddInterceptors(provider.GetRequiredService<TimestampInterceptor>()));
+    .AddInterceptors(
+        provider.GetRequiredService<AmbulanceStatusHistoryInterceptor>(),
+        provider.GetRequiredService<TimestampInterceptor>()));
 
 builder.Services
     .AddOptions<JwtOptions>()
@@ -254,7 +258,8 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.PatientEditor, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.GeneralStaff),
         EnumWire.ToWire(StaffRole.WardNurse),
-        EnumWire.ToWire(StaffRole.DutyManager)));
+        EnumWire.ToWire(StaffRole.DutyManager),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
 
     options.AddPolicy(Policies.MedicalProfileReader, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.WardNurse),
@@ -413,6 +418,7 @@ builder.Services.AddScoped<IAmbulanceService, AmbulanceService>();
 builder.Services.AddScoped<IAmbulanceCrewService, AmbulanceCrewService>();
 builder.Services.AddScoped<IEmergencyCallService, EmergencyCallService>();
 builder.Services.AddScoped<IDispatchService, DispatchService>();
+builder.Services.AddScoped<IEmergencyReportService, EmergencyReportService>();
 builder.Services.AddScoped<IDeviceTokenService, DeviceTokenService>();
 builder.Services.AddScoped<IPushNotifications, PushNotifications>();
 builder.Services.AddScoped<PushDeliveryProcessor>();
@@ -492,6 +498,17 @@ builder.Services.AddScoped<ICareRecommendationService, CareRecommendationService
 builder.Services.AddScoped<CareAgentExecutor>();
 builder.Services.AddSingleton<ICareRunQueue, CareRunQueue>();
 builder.Services.AddHostedService<CareAgentWorker>();
+
+// The reorder-threshold advisor. One read tool, no write tool at all - applying a suggestion is
+// a plain PharmacyItemService edit a human makes separately, never something this agent does.
+// Its own queue and worker, same reasoning as the care agent's: agents do not share a channel.
+builder.Services.AddScoped<IReorderAgentTools, ReorderAgentTools>();
+builder.Services.AddScoped<IReorderAdvisor, GeminiReorderAdvisor>();
+builder.Services.AddScoped<IReorderAgent, ReorderAgent>();
+builder.Services.AddScoped<IReorderSuggestionService, ReorderSuggestionService>();
+builder.Services.AddScoped<ReorderAgentExecutor>();
+builder.Services.AddSingleton<IReorderRunQueue, ReorderRunQueue>();
+builder.Services.AddHostedService<ReorderAgentWorker>();
 
 // ADR 2: the provider is one registration and nothing in an agent knows which model answered.
 // With no key the API still starts and every agent still answers - see NoLanguageModel.

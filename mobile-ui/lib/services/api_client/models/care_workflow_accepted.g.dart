@@ -13,6 +13,7 @@ CareWorkflowAccepted _$CareWorkflowAcceptedFromJson(
   recommendationId: json['recommendation_id'] as String?,
   status: json['status'] as String?,
   pollUrl: json['poll_url'] as String?,
+  redFlag: json['red_flag'] as bool?,
 );
 
 Map<String, dynamic> _$CareWorkflowAcceptedToJson(
@@ -22,4 +23,5 @@ Map<String, dynamic> _$CareWorkflowAcceptedToJson(
   'recommendation_id': instance.recommendationId,
   'status': instance.status,
   'poll_url': instance.pollUrl,
+  'red_flag': instance.redFlag,
 };

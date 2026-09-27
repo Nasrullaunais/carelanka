@@ -1,4 +1,5 @@
 using CareLanka.Api.Data.Enums;
+using CareLanka.Api.Services.Emergency;
 using CareLanka.Api.DTOs.Emergency;
 
 namespace CareLanka.Api.Agents.Emergency;
@@ -71,8 +72,9 @@ public sealed class DispatchAgent : IDispatchAgent
                 return new DispatchAgentRun(
                     plan, toolCalls, validation, DispatchOutcome.FreeAmbulanceProposed,
                     IsDiversion: false, best.Id, best.RegistrationNumber, minutes,
-                    Rationale($"{best.RegistrationNumber} is the nearest eligible ambulance" +
-                        (minutes is { } m ? $", about {m} minute(s) away by road." : ".")),
+                    Rationale(minutes is { } m
+                        ? $"{best.RegistrationNumber} has the shortest available road estimate among eligible ambulances, about {m} minute(s)."
+                        : $"{best.RegistrationNumber} is eligible, but road estimates are unavailable. Compare locations before confirming."),
                     DiversionImpact: null, SourceDispatchId: null, errors);
             }
 
@@ -91,7 +93,9 @@ public sealed class DispatchAgent : IDispatchAgent
                 toolCalls, "get_active_dispatches", new { }, () => _tools.GetActiveDispatchesAsync(ct));
 
             var divertible = active
-                .Where(dispatch => dispatch.CallPriority > request.CallPriority)
+                .Where(dispatch => dispatch.CallPriority > request.CallPriority
+                    && !request.ExcludeAmbulanceIds.Contains(dispatch.AmbulanceId)
+                    && dispatch.Status.IsPrePickup())
                 .OrderByDescending(dispatch => dispatch.CallPriority)
                 .ThenBy(dispatch => dispatch.DispatchedAt)
                 .FirstOrDefault();
@@ -114,7 +118,7 @@ public sealed class DispatchAgent : IDispatchAgent
             var diversionValidation = new List<DispatchValidationResult>
             {
                 DispatchProposalValidator.SourcePrePickup(divertible.Status, now),
-                DispatchProposalValidator.ReplacementAvailable(true, now)
+                DispatchProposalValidator.ReplacementAvailable(false, now)
             };
             Step(plan, Validate);
             Step(plan, Pause);
@@ -127,10 +131,10 @@ public sealed class DispatchAgent : IDispatchAgent
                 SourceCallAddressLabel = divertible.CallAddressLabel,
                 SourceDispatchStatus = divertible.Status,
                 SourceCallWaitingMinutesSoFar = waitingMinutes,
-                SourceCallAdditionalWaitMinutes = 15,
+                SourceCallAdditionalWaitMinutes = null,
                 ReplacementAmbulanceId = null,
                 ReplacementAmbulanceRegistration = null,
-                MinutesSavedForThisCall = 0
+                MinutesSavedForThisCall = null
             };
 
             return new DispatchAgentRun(
@@ -139,6 +143,10 @@ public sealed class DispatchAgent : IDispatchAgent
                 Rationale($"Every ambulance is committed. {divertible.AmbulanceRegistration} is pre-pickup on a " +
                     $"lower-priority call and can be turned around; that call returns to the queue."),
                 impact, divertible.DispatchId, errors);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception failure)
         {

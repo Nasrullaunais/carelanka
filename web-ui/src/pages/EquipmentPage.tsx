@@ -1,3 +1,5 @@
+import { PaginationControls } from '../components/ui/pagination-controls';
+import { Table } from '../components/Table';
 import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -20,6 +22,8 @@ import type {
   WardPatient,
 } from '../services/api/generated';
 import { WardPatientPicker } from '../components/WardPatientPicker';
+import { ActionDialog } from '../components/ui/action-dialog';
+import { AppSelect } from '../components/ui/app-select';
 import { useSession } from '../services/auth/useSession';
 import {
   canConfirmEquipment,
@@ -46,6 +50,7 @@ export function EquipmentPage() {
   const [wardId, setWardId] = useState('');
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<string | null>(null);
+  const [registerOpen, setRegisterOpen] = useState(false);
 
   const categories = useQuery(listEquipmentCategoriesOptions());
   const awaitingConfirmation = useQuery({
@@ -113,58 +118,49 @@ export function EquipmentPage() {
             />
           </div>
           <div>
-            <label htmlFor="filter-category">Category</label>
-            <select
+            <AppSelect
               id="filter-category"
+              label="Category"
               value={categoryId}
-              onChange={(event) => {
-                setCategoryId(event.target.value);
+              onValueChange={(value) => {
+                setCategoryId(value);
                 page1();
               }}
-            >
-              <option value="">All categories</option>
-              {(categories.data ?? []).map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: 'All categories' },
+                ...(categories.data ?? []).map((category) => ({ value: category.id, label: category.name })),
+              ]}
+            />
           </div>
           <div>
-            <label htmlFor="filter-status">Status</label>
-            <select
+            <AppSelect
               id="filter-status"
+              label="Status"
               value={status}
-              onChange={(event) => {
-                setStatus(event.target.value as EquipmentStatus | '');
+              onValueChange={(value) => {
+                setStatus(value as EquipmentStatus | '');
                 page1();
               }}
-            >
-              <option value="">Any status</option>
-              {equipmentStatuses.map((value) => (
-                <option key={value} value={value}>
-                  {equipmentStatusLabels[value]}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: 'Any status' },
+                ...equipmentStatuses.map((value) => ({ value, label: equipmentStatusLabels[value] })),
+              ]}
+            />
           </div>
           <div>
-            <label htmlFor="filter-ward">Ward</label>
-            <select
+            <AppSelect
               id="filter-ward"
+              label="Ward"
               value={wardId}
-              onChange={(event) => {
-                setWardId(event.target.value);
+              onValueChange={(value) => {
+                setWardId(value);
                 page1();
               }}
-            >
-              <option value="">Anywhere</option>
-              {(wards.data ?? []).map((ward) => (
-                <option key={ward.id} value={ward.id}>
-                  {ward.name}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: 'Anywhere' },
+                ...(wards.data ?? []).map((ward) => ({ value: ward.id, label: ward.name })),
+              ]}
+            />
           </div>
         </div>
       </div>
@@ -174,12 +170,16 @@ export function EquipmentPage() {
       {canConfirmEquipment(role) && <RemoveCategoriesCard />}
 
       {canManageEquipment(role) && (
-        <RegisterItemCard
+        <>
+        <button type="button" onClick={() => setRegisterOpen(true)}>Register equipment</button>
+        <ActionDialog title="Register equipment" isOpen={registerOpen} onClose={() => setRegisterOpen(false)}>
+        {registerOpen && <RegisterItemCard
           categories={(categories.data ?? []).map((c) => ({ id: c.id, name: c.name }))}
           wards={(wards.data ?? []).map((w) => ({ id: w.id, name: w.name }))}
           onDone={() => {
             refreshItems();
             page1();
+            setRegisterOpen(false);
           }}
           onCategoryCreated={() => {
             queryClient.invalidateQueries({
@@ -188,10 +188,12 @@ export function EquipmentPage() {
                 'listEquipmentCategories',
             });
           }}
-        />
+        />}
+        </ActionDialog>
+        </>
       )}
 
-      <div className="card">
+      <div className="table-section">
         <h2>Item register</h2>
         {awaitingConfirmation.data && awaitingConfirmation.data.count > 0 && (
           <p className="info-note">
@@ -206,6 +208,7 @@ export function EquipmentPage() {
           </p>
         )}
         <ItemTable
+          footer={<PaginationControls label="Equipment" page={page} totalPages={totalPages} totalItems={paged?.total_items} onPageChange={setPage} />}
           isLoading={items.isLoading}
           isError={items.isError}
           onRetry={() => void items.refetch()}
@@ -216,37 +219,18 @@ export function EquipmentPage() {
           onChanged={refreshItems}
         />
 
-        {paged && paged.total_items > 0 && (
-          <div className="pager">
-            <button
-              type="button"
-              className="secondary"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              Previous
-            </button>
-            <span className="muted">
-              Page {paged.page} of {totalPages} · {paged.total_items} items
-            </span>
-            <button
-              type="button"
-              className="secondary"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            >
-              Next
-            </button>
-          </div>
-        )}
+
       </div>
 
-      {selected && <ItemDetailCard id={selected} onClose={() => setSelected(null)} />}
+      <ActionDialog title="Equipment details" isOpen={selected != null} onClose={() => setSelected(null)}>
+        {selected && <ItemDetailCard id={selected} onClose={() => setSelected(null)} />}
+      </ActionDialog>
     </>
   );
 }
 
 function ItemTable({
+  footer,
   items,
   isLoading,
   isError,
@@ -256,6 +240,7 @@ function ItemTable({
   role,
   onChanged,
 }: {
+  footer?: React.ReactNode;
   items: EquipmentItemSummary[];
   isLoading: boolean;
   isError: boolean;
@@ -285,7 +270,7 @@ function ItemTable({
   }
 
   return (
-    <table>
+    <Table footer={footer}>
       <thead>
         <tr>
           <th>Item</th>
@@ -321,7 +306,7 @@ function ItemTable({
           </tr>
         ))}
       </tbody>
-    </table>
+    </Table>
   );
 }
 
@@ -582,17 +567,9 @@ export function Dialog({
   children: ReactNode;
 }) {
   return (
-    <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-label={title}>
-      <div className="dialog card">
-        <div className="dialog-head">
-          <h2>{title}</h2>
-          <button type="button" className="secondary" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
+    <ActionDialog title={title} isOpen onClose={onClose} size="compact">
+      {children}
+    </ActionDialog>
   );
 }
 
@@ -709,20 +686,17 @@ function RegisterItemCard({
             />
           </div>
           <div className="field">
-            <label htmlFor="item-category">Category</label>
-            <select
+            <AppSelect
               id="item-category"
+              label="Category"
               value={categoryId}
-              onChange={(event) => setCategoryId(event.target.value)}
-              required
-            >
-              <option value="">Choose…</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+              onValueChange={setCategoryId}
+              isRequired
+              options={[
+                { value: '', label: 'Choose…' },
+                ...categories.map((category) => ({ value: category.id, label: category.name })),
+              ]}
+            />
           </div>
           <div className="field">
             <label htmlFor="item-tag">Asset tag</label>
@@ -783,19 +757,16 @@ function RegisterItemCard({
             />
           </div>
           <div className="field">
-            <label htmlFor="item-ward">Ward</label>
-            <select
+            <AppSelect
               id="item-ward"
+              label="Ward"
               value={wardId}
-              onChange={(event) => setWardId(event.target.value)}
-            >
-              <option value="">Central store</option>
-              {wards.map((ward) => (
-                <option key={ward.id} value={ward.id}>
-                  {ward.name}
-                </option>
-              ))}
-            </select>
+              onValueChange={setWardId}
+              options={[
+                { value: '', label: 'Central store' },
+                ...wards.map((ward) => ({ value: ward.id, label: ward.name })),
+              ]}
+            />
           </div>
         </div>
 

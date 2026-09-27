@@ -17,12 +17,11 @@ class AdmissionSummary {
   const AdmissionSummary({
     required this.id,
     required this.source,
-    required this.admissionCategory,
     required this.urgency,
     required this.status,
     required this.detailsComplete,
-    required this.requiresBed,
     this.patient,
+    this.admissionCategory,
     this.wardName,
     this.bedNumber,
     this.expectedArrival,
@@ -35,13 +34,11 @@ class AdmissionSummary {
   final PatientSummary? patient;
   final AdmissionSource source;
   @JsonKey(name: 'admission_category')
-  final AdmissionCategory admissionCategory;
+  final AdmissionCategory? admissionCategory;
   final AdmissionUrgency urgency;
   final AdmissionStatus status;
   @JsonKey(name: 'details_complete')
   final bool detailsComplete;
-  @JsonKey(name: 'requires_bed')
-  final bool requiresBed;
   @JsonKey(name: 'ward_name')
   final String? wardName;
   @JsonKey(name: 'bed_number')

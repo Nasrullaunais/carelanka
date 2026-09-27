@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -8,6 +9,7 @@ import '../../../core/widgets/async_view.dart';
 import '../../../services/api_client/models/my_admission.dart';
 import '../../../services/api_client/models/my_appointment.dart';
 import '../../../services/api_client/models/my_profile.dart';
+import '../../emergency/emergency_routes.dart';
 import '../state/appointments_controller.dart';
 import '../state/my_stay_controller.dart';
 import '../state/profile_controller.dart';
@@ -73,7 +75,11 @@ class HomeScreen extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   const SizedBox(height: 12),
-                  _QuickActions(profile: profile, onOpenTab: onOpenTab),
+                  _QuickActions(
+                    profile: profile,
+                    onOpenTab: onOpenTab,
+                    admitted: stay.state.valueOrNull is MyStayCurrent,
+                  ),
                 ],
         ),
       ),
@@ -488,10 +494,18 @@ class _CompleteDetailsBanner extends StatelessWidget {
 }
 
 class _QuickActions extends StatelessWidget {
-  const _QuickActions({required this.profile, required this.onOpenTab});
+  const _QuickActions({
+    required this.profile,
+    required this.onOpenTab,
+    required this.admitted,
+  });
 
   final MyProfile profile;
   final void Function(PatientTab tab) onOpenTab;
+
+  // While admitted, My stay already shows the current stay, not past ones — the tile here
+  // would be redundant. Past visits stays reachable from Profile regardless.
+  final bool admitted;
 
   @override
   Widget build(BuildContext context) {
@@ -506,6 +520,13 @@ class _QuickActions extends StatelessWidget {
       childAspectRatio: 1.55,
       children: [
         _ActionTile(
+          icon: Icons.emergency_outlined,
+          label: 'Request ambulance',
+          caption: 'Share your location',
+          tone: _ActionTone.urgent,
+          onTap: () => context.push(EmergencyPaths.patientReport),
+        ),
+        _ActionTile(
           icon: Icons.add_circle_outline,
           label: 'Book a visit',
           caption: 'Choose a date and time',
@@ -517,14 +538,13 @@ class _QuickActions extends StatelessWidget {
           caption: 'Current admission',
           onTap: () => onOpenTab(PatientTab.myStay),
         ),
-        _ActionTile(
-          icon: Icons.history,
-          label: 'Past visits',
-          caption: 'Completed stays',
-          onTap: () => Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (_) => const PastVisitsScreen())),
-        ),
+        if (!admitted)
+          _ActionTile(
+            icon: Icons.history,
+            label: 'Past visits',
+            caption: 'Completed stays',
+            onTap: () => openPastVisits(context),
+          ),
         _ActionTile(
           icon: Icons.description_outlined,
           label: 'My reports',
@@ -544,7 +564,7 @@ class _QuickActions extends StatelessWidget {
         else
           _ActionTile(
             icon: Icons.contact_phone_outlined,
-            label: 'Emergency contact',
+            label: 'Emergency/guardian contact',
             caption: 'Not added yet',
             onTap: () =>
                 openMyDetails(context, context.read<ProfileController>()),

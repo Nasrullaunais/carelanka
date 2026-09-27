@@ -8,14 +8,14 @@ import 'package:json_annotation/json_annotation.dart';
 enum AdmissionCategory {
   @JsonValue('icu')
   icu('icu'),
-  @JsonValue('hdu')
-  hdu('hdu'),
-  @JsonValue('inpatient')
-  inpatient('inpatient'),
-  @JsonValue('day_case')
-  dayCase('day_case'),
-  @JsonValue('outpatient')
-  outpatient('outpatient'),
+  @JsonValue('general')
+  general('general'),
+  @JsonValue('surgical')
+  surgical('surgical'),
+  @JsonValue('maternity')
+  maternity('maternity'),
+  @JsonValue('emergency')
+  emergency('emergency'),
   /// Default value for all unparsed values, allows backward compatibility when adding new values on the backend.
   $unknown(null);
 

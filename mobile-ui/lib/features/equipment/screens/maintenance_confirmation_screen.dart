@@ -35,7 +35,8 @@ class MaintenanceConfirmationScreen extends StatelessWidget {
             ? const _AwaitingJobs()
             : ConfirmationCodeGate(
                 controller: controller,
-                explanation: 'An item only goes back into service after you confirm its '
+                explanation:
+                    'An item only goes back into service after you confirm its '
                     'maintenance is done.',
               ),
       ),
@@ -78,7 +79,12 @@ class _AwaitingJobs extends StatelessWidget {
         return RefreshIndicator(
           onRefresh: controller.reload,
           child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(AppTheme.gutter, 12, AppTheme.gutter, 32),
+            padding: const EdgeInsets.fromLTRB(
+              AppTheme.gutter,
+              12,
+              AppTheme.gutter,
+              32,
+            ),
             itemCount: jobs.length,
             separatorBuilder: (_, __) => const SizedBox(height: 10),
             itemBuilder: (_, index) => _AwaitingJobCard(job: jobs[index]),
@@ -95,15 +101,14 @@ class _AwaitingJobCard extends StatelessWidget {
   final MaintenanceSchedule job;
 
   static String typeLabel(MaintenanceType type) => switch (type) {
-        MaintenanceType.routineService => 'Routine service',
-        MaintenanceType.calibration => 'Calibration',
-        MaintenanceType.repair => 'Repair',
-        _ => 'Maintenance',
-      };
+    MaintenanceType.routineService => 'Routine service',
+    MaintenanceType.calibration => 'Calibration',
+    MaintenanceType.repair => 'Repair',
+    _ => 'Maintenance',
+  };
 
   Future<void> _confirm(BuildContext context) async {
     final controller = context.read<MaintenanceConfirmationController>();
-    final messenger = ScaffoldMessenger.of(context);
 
     final sure = await showDialog<bool>(
       context: context,
@@ -124,13 +129,19 @@ class _AwaitingJobCard extends StatelessWidget {
         ],
       ),
     );
-    if (sure != true) return;
+    if (sure != true || !context.mounted) return;
 
     final refused = await controller.confirm(job);
+    if (!context.mounted) return;
 
-    messenger.showSnackBar(SnackBar(
-      content: Text(refused?.message ?? '${job.assetLabel} is confirmed and back in service.'),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          refused?.message ??
+              '${job.assetLabel} is confirmed and back in service.',
+        ),
+      ),
+    );
   }
 
   @override
@@ -150,7 +161,9 @@ class _AwaitingJobCard extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               typeLabel(job.scheduleType),
-              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 10),
             ConfirmationDetail(
@@ -159,11 +172,16 @@ class _AwaitingJobCard extends StatelessWidget {
                   ? '${FriendlyDate.date(job.scheduledDate)} · overdue'
                   : FriendlyDate.date(job.scheduledDate),
             ),
-            ConfirmationDetail(label: 'Notes', value: notes ?? 'No notes given.'),
+            ConfirmationDetail(
+              label: 'Notes',
+              value: notes ?? 'No notes given.',
+            ),
             const SizedBox(height: 12),
             FilledButton(
               onPressed: busy ? null : () => _confirm(context),
-              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
               child: busy
                   ? const SizedBox(
                       width: 18,

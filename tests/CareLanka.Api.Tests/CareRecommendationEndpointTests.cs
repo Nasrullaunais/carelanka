@@ -41,7 +41,7 @@ public sealed class CareRecommendationEndpointTests
     {
         var (patient, patientId) = await NewAdmittablePatientAsync();
         using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
-        await AdmitAsOutpatientAsync(nurse, patientId);
+        await AdmitAndMarkAdmittedAsync(nurse, patientId);
 
         using var summary = await SubmitAndWaitAsync(
             patient, "My headache is worse today and it hurts more when I lie flat.");
@@ -66,7 +66,7 @@ public sealed class CareRecommendationEndpointTests
     {
         var (patient, patientId) = await NewAdmittablePatientAsync();
         using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
-        await AdmitAsOutpatientAsync(nurse, patientId);
+        await AdmitAndMarkAdmittedAsync(nurse, patientId);
 
         using var summary = await SubmitAndWaitAsync(patient, "I have sudden chest pain and I feel dizzy.");
 
@@ -87,7 +87,7 @@ public sealed class CareRecommendationEndpointTests
     {
         var (patient, patientId) = await NewAdmittablePatientAsync();
         using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
-        await AdmitAsOutpatientAsync(nurse, patientId);
+        await AdmitAndMarkAdmittedAsync(nurse, patientId);
 
         using var summary = await SubmitAndWaitAsync(patient, "I feel a little more tired than usual today.");
         var recommendationId = summary.RootElement.GetProperty("recommendation_id").GetString()!;
@@ -115,7 +115,7 @@ public sealed class CareRecommendationEndpointTests
     {
         var (patient, patientId) = await NewAdmittablePatientAsync();
         using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
-        await AdmitAsOutpatientAsync(nurse, patientId);
+        await AdmitAndMarkAdmittedAsync(nurse, patientId);
 
         using var summary = await SubmitAndWaitAsync(patient, "Just checking in, feeling okay.");
         var recommendationId = summary.RootElement.GetProperty("recommendation_id").GetString()!;
@@ -140,7 +140,7 @@ public sealed class CareRecommendationEndpointTests
     {
         var (patient, patientId) = await NewAdmittablePatientAsync();
         using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
-        await AdmitAsOutpatientAsync(nurse, patientId);
+        await AdmitAndMarkAdmittedAsync(nurse, patientId);
 
         using var summary = await SubmitAndWaitAsync(patient, "Feeling a bit unsettled today.");
         var recommendationId = summary.RootElement.GetProperty("recommendation_id").GetString()!;
@@ -153,6 +153,110 @@ public sealed class CareRecommendationEndpointTests
         var approve = await manager.PostAsJsonAsync(
             $"/api/care-recommendations/{recommendationId}/approve", new { });
         Assert.Equal(HttpStatusCode.Forbidden, approve.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_red_flag_comes_back_straight_away_so_the_app_can_send_the_patient_for_help()
+    {
+        var (patient, patientId) = await NewAdmittablePatientAsync();
+        using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
+        await AdmitAndMarkAdmittedAsync(nurse, patientId);
+
+        var started = await patient.PostAsJsonAsync(
+            "/api/me/care-queries", new { reported_text = "I can\u2019t breathe properly" });
+        using var accepted = await ReadJsonAsync(started);
+
+        Assert.Equal(HttpStatusCode.Accepted, started.StatusCode);
+        Assert.True(accepted.RootElement.GetProperty("red_flag").GetBoolean());
+    }
+
+    [Fact]
+    public async Task A_fourth_report_inside_a_minute_is_refused_and_nothing_is_saved()
+    {
+        var (patient, patientId) = await NewAdmittablePatientAsync();
+        using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
+        await AdmitAndMarkAdmittedAsync(nurse, patientId);
+
+        for (var i = 1; i <= 3; i++)
+        {
+            var sent = await patient.PostAsJsonAsync(
+                "/api/me/care-queries", new { reported_text = $"Report number {i}, feeling tired." });
+            Assert.Equal(HttpStatusCode.Accepted, sent.StatusCode);
+        }
+
+        var fourth = await patient.PostAsJsonAsync(
+            "/api/me/care-queries", new { reported_text = "Report number 4, feeling tired." });
+        using var body = await ReadJsonAsync(fourth);
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, fourth.StatusCode);
+        Assert.Equal("cl_pat_050", body.RootElement.GetProperty("code").GetString());
+
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        Assert.Equal(3, await db.CareRecommendations.CountAsync(row => row.PatientId == patientId));
+    }
+
+    [Fact]
+    public async Task Nobody_approves_while_the_agent_is_still_writing_unless_the_run_has_died()
+    {
+        var (patient, patientId) = await NewAdmittablePatientAsync();
+        using var nurse = await StaffClientAsync(ApiApplication.NurseEmail);
+        await AdmitAndMarkAdmittedAsync(nurse, patientId);
+
+        using var summary = await SubmitAndWaitAsync(patient, "I feel a little dizzy when I stand up.");
+        var recommendationId = Guid.Parse(summary.RootElement.GetProperty("recommendation_id").GetString()!);
+
+        var openRunId = await AddOpenRunAsync(recommendationId, startedAgo: TimeSpan.FromMinutes(1));
+
+        var whileRunning = await nurse.PostAsJsonAsync(
+            $"/api/care-recommendations/{recommendationId}/approve", new { });
+        using var refused = await ReadJsonAsync(whileRunning);
+
+        Assert.Equal(HttpStatusCode.Conflict, whileRunning.StatusCode);
+        Assert.Equal("cl_pat_049", refused.RootElement.GetProperty("code").GetString());
+
+        await BackdateRunAsync(openRunId, TimeSpan.FromMinutes(11));
+
+        var afterItDied = await nurse.PostAsJsonAsync(
+            $"/api/care-recommendations/{recommendationId}/approve", new { });
+
+        Assert.Equal(HttpStatusCode.OK, afterItDied.StatusCode);
+    }
+
+    private async Task<Guid> AddOpenRunAsync(Guid recommendationId, TimeSpan startedAgo)
+    {
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        var run = new Data.Entities.Common.AgentWorkflow
+        {
+            Id = Guid.NewGuid(),
+            AgentType = Data.Enums.AgentType.PatientCareAdvisory,
+            EntityType = Agents.Patient.CareAgentExecutor.WorkflowEntityType,
+            EntityId = recommendationId,
+            CorrelationId = Guid.NewGuid(),
+            Objective = Services.Patient.CareRecommendationService.Objective,
+            Plan = "[]",
+            Status = Data.Enums.AgentWorkflowStatus.Pending,
+            StartedAt = DateTimeOffset.UtcNow - startedAgo,
+            AttemptCount = 0
+        };
+
+        db.AgentWorkflows.Add(run);
+        await db.SaveChangesAsync();
+
+        return run.Id;
+    }
+
+    private async Task BackdateRunAsync(Guid runId, TimeSpan startedAgo)
+    {
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        var run = await db.AgentWorkflows.FirstAsync(row => row.Id == runId);
+        run.StartedAt = DateTimeOffset.UtcNow - startedAgo;
+
+        await db.SaveChangesAsync();
     }
 
     private async Task<(HttpClient Client, Guid PatientId)> NewAdmittablePatientAsync()
@@ -191,13 +295,13 @@ public sealed class CareRecommendationEndpointTests
         return (client, record.Id);
     }
 
-    private async Task AdmitAsOutpatientAsync(HttpClient nurse, Guid patientId)
+    private async Task AdmitAndMarkAdmittedAsync(HttpClient nurse, Guid patientId)
     {
         var created = await nurse.PostAsJsonAsync("/api/admissions", new
         {
             patient_id = patientId,
             source = "walk_in",
-            admission_category = "outpatient",
+            admission_category = "general",
             category_set_by_staff_id = await NurseIdAsync(),
             urgency = "routine",
             is_infectious = false
@@ -206,7 +310,15 @@ public sealed class CareRecommendationEndpointTests
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
 
         using var body = await ReadJsonAsync(created);
-        Assert.Equal("admitted", body.RootElement.GetProperty("status").GetString());
+        var admissionId = Guid.Parse(body.RootElement.GetProperty("id").GetString()!);
+
+        // Every category now requires a bed - skip bed placement for this test, which only
+        // cares that an admission is in the "admitted" state, not which bed it's in.
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        var admission = await db.Admissions.FirstAsync(a => a.Id == admissionId);
+        admission.Status = Data.Enums.AdmissionStatus.Admitted;
+        await db.SaveChangesAsync();
     }
 
     /// <summary>

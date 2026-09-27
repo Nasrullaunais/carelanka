@@ -1,5 +1,6 @@
 using CareLanka.Api.Data;
 using CareLanka.Api.Data.Entities.Emergency;
+using CareLanka.Api.Data.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace CareLanka.Api.Services.Emergency;
@@ -71,6 +72,10 @@ public sealed class SceneLookupProcessor(
             DestinationLongitude = call.Longitude,
             PlannedDistanceKm = Math.Round((decimal)travel.DistanceKm, 2),
             PlannedDurationMinutes = (int)Math.Ceiling(seconds / 60.0),
+            DepartedAt = dispatch.Status is DispatchStatus.EnRouteToScene or DispatchStatus.AtScene or DispatchStatus.TransportingToHospital
+                ? dispatch.UpdatedAt : null,
+            ArrivedAt = dispatch.Status is DispatchStatus.AtScene or DispatchStatus.TransportingToHospital
+                ? dispatch.UpdatedAt : null,
             MapsApiReference = RouteProvider
         });
         await db.SaveChangesAsync(cancellationToken);

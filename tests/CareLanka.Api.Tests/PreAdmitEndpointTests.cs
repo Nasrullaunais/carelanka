@@ -124,12 +124,12 @@ public sealed class PreAdmitEndpointTests
         var id = await NewPreAdmissionIdAsync(nurse, "Pre-Admit Classify");
 
         var classified = await nurse.PostAsJsonAsync(
-            $"/api/admissions/{id}/classify", new { admission_category = "inpatient" });
+            $"/api/admissions/{id}/classify", new { admission_category = "general" });
 
         Assert.Equal(HttpStatusCode.OK, classified.StatusCode);
         using var body = await ReadJsonAsync(classified);
 
-        Assert.Equal("inpatient", body.RootElement.GetProperty("admission_category").GetString());
+        Assert.Equal("general", body.RootElement.GetProperty("admission_category").GetString());
         Assert.Equal(nurseId, body.RootElement.GetProperty("category_set_by_staff_id").GetString());
         Assert.Equal("awaiting_bed", body.RootElement.GetProperty("status").GetString());
     }
@@ -142,7 +142,7 @@ public sealed class PreAdmitEndpointTests
 
         Assert.Equal(
             HttpStatusCode.OK,
-            (await nurse.PostAsJsonAsync($"/api/admissions/{id}/classify", new { admission_category = "hdu" }))
+            (await nurse.PostAsJsonAsync($"/api/admissions/{id}/classify", new { admission_category = "general" }))
                 .StatusCode);
 
         Assert.Equal(
@@ -152,16 +152,16 @@ public sealed class PreAdmitEndpointTests
     }
 
     [Fact]
-    public async Task Classifying_as_outpatient_admits_immediately_without_a_bed()
+    public async Task Classifying_never_auto_admits_because_every_category_now_needs_a_bed()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
-        var id = await NewPreAdmissionIdAsync(nurse, "Pre-Admit Outpatient");
+        var id = await NewPreAdmissionIdAsync(nurse, "Pre-Admit Classify No Auto Admit");
 
         using var body = await ReadJsonAsync(await nurse.PostAsJsonAsync(
-            $"/api/admissions/{id}/classify", new { admission_category = "outpatient" }));
+            $"/api/admissions/{id}/classify", new { admission_category = "emergency" }));
 
-        Assert.Equal("admitted", body.RootElement.GetProperty("status").GetString());
-        Assert.NotEqual(JsonValueKind.Null, body.RootElement.GetProperty("admitted_at").ValueKind);
+        Assert.Equal("awaiting_bed", body.RootElement.GetProperty("status").GetString());
+        Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("admitted_at").ValueKind);
     }
 
     private static Task<HttpResponseMessage> PreAdmitAsync(HttpClient client, object body)

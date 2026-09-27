@@ -137,7 +137,7 @@ public sealed class WarningSweepTests
     }
 
     [Fact]
-    public async Task Done_takes_a_resolved_warning_off_the_list_with_the_code()
+    public async Task Done_takes_a_resolved_warning_off_the_list()
     {
         using var equipment = await ClientAsync(ApiApplication.EquipmentEmail);
         var itemId = await NewMedicineAsync(equipment, quantity: 2, threshold: 10);
@@ -145,28 +145,40 @@ public sealed class WarningSweepTests
         var warningId = Assert.Single(await WarningsAboutAsync(equipment, itemId, "low_stock"))
             .GetProperty("id").GetGuid();
 
-        using var administrator = await AdministratorAsync();
-        var whileOpen = await administrator.PostAsync($"/api/warnings/{warningId}/clear", null);
+        var whileOpen = await equipment.PostAsync($"/api/warnings/{warningId}/clear", null);
         using var whileOpenBody = await ReadJsonAsync(whileOpen);
 
         await equipment.PostAsJsonAsync($"/api/pharmacy-items/{itemId}/batches", new { quantity = 50 });
         await SweepAsync(equipment);
 
-        using var noCode = await ClientAsync(ApiApplication.AdministratorEmail);
-        var withoutCode = await noCode.PostAsync($"/api/warnings/{warningId}/clear", null);
-        equipment.DefaultRequestHeaders.Add(CodeHeader, ApiApplication.EquipmentConfirmationCode);
-        var byEquipmentManager = await equipment.PostAsync($"/api/warnings/{warningId}/clear", null);
-
-        var cleared = await administrator.PostAsync($"/api/warnings/{warningId}/clear", null);
-        var again = await administrator.PostAsync($"/api/warnings/{warningId}/clear", null);
+        var cleared = await equipment.PostAsync($"/api/warnings/{warningId}/clear", null);
+        var again = await equipment.PostAsync($"/api/warnings/{warningId}/clear", null);
 
         Assert.Equal(HttpStatusCode.Conflict, whileOpen.StatusCode);
         Assert.Equal("cl_equ_029", whileOpenBody.RootElement.GetProperty("code").GetString());
-        Assert.Equal(HttpStatusCode.Forbidden, withoutCode.StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, byEquipmentManager.StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, cleared.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, again.StatusCode);
         Assert.Empty(await WarningsAboutAsync(equipment, itemId, "low_stock"));
+    }
+
+    [Fact]
+    public async Task Done_is_open_to_the_administrator_too_and_closed_to_everyone_else()
+    {
+        using var equipment = await ClientAsync(ApiApplication.EquipmentEmail);
+        var itemId = await NewMedicineAsync(equipment, quantity: 2, threshold: 10);
+        await SweepAsync(equipment);
+        var warningId = Assert.Single(await WarningsAboutAsync(equipment, itemId, "low_stock"))
+            .GetProperty("id").GetGuid();
+        await equipment.PostAsJsonAsync($"/api/pharmacy-items/{itemId}/batches", new { quantity = 50 });
+        await SweepAsync(equipment);
+
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var byNurse = await nurse.PostAsync($"/api/warnings/{warningId}/clear", null);
+        using var administrator = await AdministratorAsync();
+        var byAdministrator = await administrator.PostAsync($"/api/warnings/{warningId}/clear", null);
+
+        Assert.Equal(HttpStatusCode.Forbidden, byNurse.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, byAdministrator.StatusCode);
     }
 
     [Fact]

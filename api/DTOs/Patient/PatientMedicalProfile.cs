@@ -19,8 +19,6 @@ public class PatientMedicalProfile
 
     public string? CurrentSymptoms { get; set; }
 
-    public string? RecentSituation { get; set; }
-
     public Guid? UpdatedByStaffId { get; set; }
 
     public string? UpdatedByStaffName { get; set; }

@@ -16,7 +16,7 @@ public class WardStaffingRuleConfiguration : IEntityTypeConfiguration<WardStaffi
                 "ck_ward_staffing_rules_required_role",
                 EnumWire.CheckConstraint<StaffRole>("required_role"));
             t.HasCheckConstraint(
-                "ck_wsr_min",
+                "ck_ward_staffing_rules_min",
                 "minimum_headcount > 0");
         });
 
@@ -32,10 +32,18 @@ public class WardStaffingRuleConfiguration : IEntityTypeConfiguration<WardStaffi
             .HasForeignKey(r => r.RequiredSkillId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Unique: one rule per ward+role+skill combination.
+        // Unique: one rule per ward+role+skill combination. A plain unique index would not
+        // catch duplicate role-only rules, because Postgres treats every NULL as distinct -
+        // so the null and non-null cases each need their own filtered unique index.
         builder.HasIndex(r => new { r.WardId, r.RequiredRole, r.RequiredSkillId })
             .HasDatabaseName("ux_ward_staffing_rules_ward_role_skill")
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("required_skill_id IS NOT NULL");
+
+        builder.HasIndex(r => new { r.WardId, r.RequiredRole })
+            .HasDatabaseName("ux_ward_staffing_rules_ward_role_no_skill")
+            .IsUnique()
+            .HasFilter("required_skill_id IS NULL");
 
         builder.HasIndex(r => r.WardId)
             .HasDatabaseName("ix_ward_staffing_rules_ward_id");

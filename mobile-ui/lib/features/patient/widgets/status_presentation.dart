@@ -132,7 +132,6 @@ class StatusChip extends StatelessWidget {
           Flexible(
             child: Text(
               label,
-              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: look.color,
                 fontSize: compact ? 11.5 : 13,

@@ -21,6 +21,42 @@ class _IntegrationApi implements IntegrationApi {
   final ParseErrorLogger? errorLogger;
 
   @override
+  Future<List<StaffLookupResult>> lookupStaff({
+    LookupStaffRequest? body,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    queryParameters.removeWhere((k, v) => v == null);
+    final _headers = <String, dynamic>{};
+    final _data = <String, dynamic>{};
+    _data.addAll(body?.toJson() ?? <String, dynamic>{});
+    final _options = _setStreamType<List<StaffLookupResult>>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/staff/lookup',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<List<dynamic>>(_options);
+    late List<StaffLookupResult> _value;
+    try {
+      _value = _result.data!
+          .map(
+            (dynamic i) =>
+                StaffLookupResult.fromJson(i as Map<String, dynamic>),
+          )
+          .toList();
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
   Future<WardCapacitySummary> getWardCapacity() async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};

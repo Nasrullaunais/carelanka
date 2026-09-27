@@ -2,6 +2,7 @@ using CareLanka.Api.Common.Persistence;
 using CareLanka.Api.Data;
 using CareLanka.Api.Data.Entities.Common;
 using CareLanka.Api.Data.Enums;
+using CareLanka.Api.DTOs.Patient;
 using CareLanka.Api.Services.Patient;
 using Microsoft.EntityFrameworkCore;
 using CareRecommendationEntity = CareLanka.Api.Data.Entities.Patient.CareRecommendation;
@@ -62,14 +63,36 @@ public sealed class CareAgentExecutor
             return;
         }
 
+        if (recommendation.Status != CareRecommendationStatus.PendingReview)
+        {
+            RecordAlreadyReviewed(workflow);
+            await _db.SaveChangesAsync(ct);
+
+            return;
+        }
+
         try
         {
             var run = await _agent.RunAsync(
                 new CareAgentRequest(
-                    recommendation.PatientId, recommendation.AdmissionId ?? Guid.Empty, recommendation.ReportedText),
+                    recommendation.PatientId,
+                    recommendation.AdmissionId ?? Guid.Empty,
+                    recommendation.ReportedText,
+                    steps => SaveProgressAsync(workflow, steps, ct)),
                 ct);
 
-            Record(workflow, recommendation, run);
+            // A reviewer may have acted while the model was answering, once the run outlived
+            // CareRecommendationService.RunGivenUpAfter. Their decision stands over a late draft.
+            await _db.Entry(recommendation).ReloadAsync(ct);
+
+            if (recommendation.Status != CareRecommendationStatus.PendingReview)
+            {
+                RecordAlreadyReviewed(workflow);
+            }
+            else
+            {
+                Record(workflow, recommendation, run);
+            }
         }
         catch (Exception failure)
         {
@@ -78,6 +101,13 @@ public sealed class CareAgentExecutor
             RecordFailure(workflow);
         }
 
+        await _db.SaveChangesAsync(ct);
+    }
+
+    private async Task SaveProgressAsync(
+        AgentWorkflow workflow, IReadOnlyList<CareAgentStep> steps, CancellationToken ct)
+    {
+        workflow.CompletedSteps = CareWorkflowJson.Write(steps);
         await _db.SaveChangesAsync(ct);
     }
 
@@ -131,6 +161,17 @@ public sealed class CareAgentExecutor
             // doctor or nurse can still act on the patient's own report directly.
             workflow.Status = AgentWorkflowStatus.Failed;
         }
+    }
+
+    private static void RecordAlreadyReviewed(AgentWorkflow workflow)
+    {
+        workflow.ValidationResults = CareWorkflowJson.Write(
+            new CareWorkflowValidationRecord { Passed = false, FailedRules = Array.Empty<string>() });
+        workflow.Errors = CareWorkflowJson.Write(
+            new[] { "A nurse or doctor reviewed this report before the agent finished, so its draft was not used." });
+        workflow.FinalOutcome = EnumWire.ToWire(DTOs.Patient.CareAgentOutcome.Failed);
+        workflow.Status = AgentWorkflowStatus.Failed;
+        workflow.CompletedAt = DateTimeOffset.UtcNow;
     }
 
     private static void RecordFailure(AgentWorkflow workflow)

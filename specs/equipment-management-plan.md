@@ -403,7 +403,7 @@ Repairs are left out of the overdue rule on purpose: an open repair already has 
 
 Each run reconciles against the sweep's live warnings: a problem still there updates the open warning's wording and severity rather than adding another (a partial unique index backs this up); a problem that is gone closes its warning as `action_taken`; a severity that rises re-opens a warning somebody had acknowledged. Reported faults (`raised_by = user`) are never touched — they close when the administrator confirms the repair. The agent (step 11) reads these warnings; it never decides whether one exists.
 
-**Done** *(Rev 3, 2026-09-19)*. A resolved warning stays on the Resolved tab until the hospital administrator presses **Done** and enters the confirmation code (`POST /warnings/{id}/clear`). That takes it off every list; the row stays in the database with `cleared_at` and who cleared it. Only a resolved warning can be marked done (409 `cl_equ_029` otherwise).
+**Done** *(Rev 4, 2026-09-25; Rev 3 made it administrator-only with the confirmation code)*. A resolved or dismissed warning stays on its tab until the equipment manager or the hospital administrator presses **Done** (`POST /warnings/{id}/clear`, no code). That takes it off every list; the row stays in the database with `cleared_at` and who cleared it. Only a resolved or dismissed warning can be marked done (409 `cl_equ_029` otherwise).
 
 ---
 
@@ -540,7 +540,7 @@ Two policies, not one: a nurse reads a result and acts on it, while issuing one 
 | `GET` | `/api/warnings` | Equipment Manager, Hospital Administrator *(Rev 3, 2026-09-19)* | `?status=`, `?severity=`, `?type=`. Worst first, then newest |
 | `POST` | `/api/warnings/sweep` | Equipment Manager, Hospital Administrator *(Rev 3, 2026-09-19)* | **Run check** — the deterministic sweep, §5.3. Returns raised / updated / resolved / still open |
 | `POST` | `/api/warnings/{id}/acknowledge` | Equipment Manager, Hospital Administrator *(Rev 3, 2026-09-19)* | Records who saw it. A closed warning answers 409 `cl_equ_028` |
-| `POST` | `/api/warnings/{id}/clear` | Hospital Administrator + code *(Rev 3, 2026-09-19)* | **Done** — takes a resolved warning off the list. Not resolved: 409 `cl_equ_029` |
+| `POST` | `/api/warnings/{id}/clear` | Equipment Manager, Hospital Administrator *(Rev 4, 2026-09-25)* | **Done** — takes a resolved or dismissed warning off the list. Neither: 409 `cl_equ_029` |
 | `GET` | `/api/action-requests` | Inventory Administrator | The approvals queue — **this is the demo screen** |
 | `POST` | `/api/action-requests/{id}/approve` | Inventory Administrator | **High-impact gate.** Executes the action per §3.3. |
 | `POST` | `/api/action-requests/{id}/reject` | Inventory Administrator | Requires a reason |
@@ -666,6 +666,32 @@ Per the assignment: workflow id, objective, plan, completed steps, tool calls wi
 | Timeouts / retries | Hard timeout per run, max 2 retries, then safe failure |
 | Authorization | The agent runs under the calling user's (or the scheduler's service account's) permissions |
 | Secrets | Model keys in environment variables, never in the repo |
+
+### 8.10 A second, narrower agent — the reorder-threshold advisor *(built 2026-09-22)*
+
+Built ahead of the sweep above, as a smaller first slice: a **Suggest** button next to one
+medicine's reorder threshold on the Pharmacy page. It answers a narrower question than §8.1 -
+*"given this one medicine's recent dispensing, what should its reorder threshold be?"* - on
+demand, per item, rather than as a standing sweep across the whole store.
+
+Same shape as every agent in this project (`patient-management-plan.md` §8.7's template):
+gather → draft (Gemini, with a deterministic average-usage-times-lead-time fallback) →
+deterministic validate (RT1: reject a suggestion more than 5× the current threshold, more than
+14× the peak day's usage, or negative) → persist → pause. `AgentWorkflow.entity_type =
+"ReorderSuggestion"`, sharing `AgentType.EquipmentMonitoring` with the sweep above since both
+are Equipment's own monitoring work, distinguished by `entity_type` and `objective`.
+
+**No `ActionRequest`, no approval queue.** Unlike a sweep-raised warning, nothing here is
+proposed for anyone to approve - the agent's output is read-only advice. Applying a number is a
+separate, deliberate `PATCH /pharmacy-items/{id}/reorder-threshold` a human calls afterwards,
+exactly the same shape as the bed agent's suggestion needing no approval step of its own
+(`patient-management-plan.md` §8.7).
+
+**One read tool** (`get_dispensing_history`), **no write tool at all** - there is nothing here
+for `propose_action` to create. `Equipment:ReorderLeadTimeDays` (default 7) configures the
+deterministic formula. Endpoints: `POST /pharmacy-items/{id}/reorder-suggestion`,
+`GET /pharmacy-items/reorder-suggestions/{workflowId}`,
+`PATCH /pharmacy-items/{id}/reorder-threshold`.
 
 ---
 

@@ -1,7 +1,7 @@
 namespace CareLanka.Api.Data.Entities.Patient;
 
 /// <summary>
-/// Four free-text fields a clinician typed, one row per patient. Every character in it is
+/// Three free-text fields a clinician typed, one row per patient. Every character in it is
 /// staff-authored - nothing here is a conclusion this system reached, which is why recording
 /// that a patient is asthmatic does not put diagnosis inside the project's scope.
 /// This is what the Patient Care Advisory Agent reads; before it existed that agent had nothing
@@ -23,8 +23,6 @@ public class PatientMedicalProfile : AuditedEntity
     public string? Allergies { get; set; }
 
     public string? CurrentSymptoms { get; set; }
-
-    public string? RecentSituation { get; set; }
 
     public Guid UpdatedByStaffMemberId { get; set; }
 }

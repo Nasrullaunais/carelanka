@@ -18,124 +18,28 @@ public sealed class WorklistEndpointTests
     public WorklistEndpointTests(ApiApplication application) => _application = application;
 
     [Fact]
-    public async Task An_outpatient_visit_is_admitted_from_the_start_and_never_awaits_a_bed()
+    public async Task A_new_visit_starts_on_the_bed_board()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
-        var visit = await NewVisitAsync(nurse, category: "outpatient");
-
-        Assert.Equal("admitted", visit.GetProperty("status").GetString());
-        Assert.False(visit.GetProperty("requires_bed").GetBoolean());
-        Assert.NotEqual(JsonValueKind.Null, visit.GetProperty("admitted_at").ValueKind);
-    }
-
-    [Fact]
-    public async Task A_visit_that_does_need_a_bed_still_starts_on_the_bed_board()
-    {
-        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
-        var visit = await NewVisitAsync(nurse, category: "inpatient");
+        var visit = await NewVisitAsync(nurse, category: "general");
 
         Assert.Equal("awaiting_bed", visit.GetProperty("status").GetString());
-        Assert.True(visit.GetProperty("requires_bed").GetBoolean());
+        Assert.False(visit.TryGetProperty("requires_bed", out _));
         Assert.Equal(JsonValueKind.Null, visit.GetProperty("admitted_at").ValueKind);
     }
 
     [Fact]
-    public async Task A_day_case_needs_a_bed()
+    public async Task There_is_no_complete_visit_route_any_more()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
-        var visit = await NewVisitAsync(nurse, category: "day_case");
+        var visit = await NewVisitAsync(nurse, category: "general");
 
-        Assert.True(visit.GetProperty("requires_bed").GetBoolean());
-        Assert.Equal("awaiting_bed", visit.GetProperty("status").GetString());
-    }
-
-    [Fact]
-    public async Task An_outpatient_visit_keeps_no_expected_arrival_even_when_one_was_sent()
-    {
-        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
-
-        var visit = await NewVisitAsync(
-            nurse, category: "outpatient", expectedArrival: DateTimeOffset.UtcNow.AddHours(2));
-
-        Assert.Equal(JsonValueKind.Null, visit.GetProperty("expected_arrival").ValueKind);
-    }
-
-    [Fact]
-    public async Task Assigning_a_bed_to_an_outpatient_is_refused_with_its_own_reason()
-    {
-        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
-        var ward = await NewWardAsync();
-        var bed = (await AddBedsAsync(ward, 1))[0];
-        var visit = await NewVisitAsync(nurse, category: "outpatient");
-
-        var refused = await nurse.PostAsJsonAsync(
-            $"/api/admissions/{visit.GetProperty("id").GetString()}/assign-bed",
-            new { bed_id = bed });
-
-        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
-
-        using var body = await ReadJsonAsync(refused);
-
-        Assert.Equal("cl_pat_021", body.RootElement.GetProperty("code").GetString());
-    }
-
-    [Fact]
-    public async Task Completing_an_outpatient_visit_ends_it()
-    {
-        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
-        var visit = await NewVisitAsync(nurse, category: "outpatient");
-        var id = visit.GetProperty("id").GetString();
-
-        var completed = await nurse.PostAsync($"/api/admissions/{id}/complete", null);
-
-        Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
-
-        using var body = await ReadJsonAsync(completed);
-
-        Assert.Equal("discharged", body.RootElement.GetProperty("status").GetString());
-        Assert.NotEqual(JsonValueKind.Null, body.RootElement.GetProperty("discharged_at").ValueKind);
-    }
-
-    [Fact]
-    public async Task Completing_the_same_visit_twice_is_refused()
-    {
-        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
-        var visit = await NewVisitAsync(nurse, category: "outpatient");
-        var id = visit.GetProperty("id").GetString();
-
-        Assert.Equal(
-            HttpStatusCode.OK,
-            (await nurse.PostAsync($"/api/admissions/{id}/complete", null)).StatusCode);
-
-        var again = await nurse.PostAsync($"/api/admissions/{id}/complete", null);
-
-        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
-    }
-
-    [Fact]
-    public async Task A_visit_with_a_bed_cannot_be_completed_and_is_told_to_discharge_instead()
-    {
-        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
-        var visit = await NewVisitAsync(nurse, category: "inpatient");
-
-        var refused = await nurse.PostAsync(
+        var response = await nurse.PostAsync(
             $"/api/admissions/{visit.GetProperty("id").GetString()}/complete", null);
 
-        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
-
-        using var body = await ReadJsonAsync(refused);
-
-        Assert.Equal("cl_pat_020", body.RootElement.GetProperty("code").GetString());
-    }
-
-    [Fact]
-    public async Task Completing_something_that_does_not_exist_is_a_404()
-    {
-        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
-
-        var missing = await nurse.PostAsync($"/api/admissions/{Guid.NewGuid()}/complete", null);
-
-        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        Assert.True(
+            response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed,
+            $"Expected no route, got {(int)response.StatusCode}.");
     }
 
     /// The board is people who are here. A booking is worked from the expected visits screen
@@ -166,7 +70,7 @@ public sealed class WorklistEndpointTests
             $"/api/appointments/{appointmentId}/check-in",
             new
             {
-                admission_category = "outpatient",
+                admission_category = "general",
                 category_set_by_staff_id = await NurseIdAsync(),
                 urgency = "routine",
                 is_infectious = false
@@ -177,8 +81,7 @@ public sealed class WorklistEndpointTests
         var rows = await BoardRowsAsync(nurse, patient.Name);
 
         Assert.Single(rows);
-        Assert.Equal("admitted", rows[0].GetProperty("status").GetString());
-        Assert.False(rows[0].GetProperty("requires_bed").GetBoolean());
+        Assert.Equal("awaiting_bed", rows[0].GetProperty("status").GetString());
     }
 
     [Fact]
@@ -186,12 +89,11 @@ public sealed class WorklistEndpointTests
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);
         var patient = await NewPatientAsync(nurse);
-        await AdmitAsync(nurse, patient.Id, "inpatient");
+        await AdmitAsync(nurse, patient.Id, "general");
 
         var row = await BoardRowAsync(nurse, patient.Name);
 
         Assert.Equal("awaiting_bed", row.GetProperty("status").GetString());
-        Assert.True(row.GetProperty("requires_bed").GetBoolean());
         Assert.Equal(JsonValueKind.Null, row.GetProperty("bed_number").ValueKind);
     }
 
@@ -202,7 +104,7 @@ public sealed class WorklistEndpointTests
         var ward = await NewWardAsync();
         var bed = (await AddBedsAsync(ward, 1))[0];
         var patient = await NewPatientAsync(nurse);
-        var admissionId = await AdmitAsync(nurse, patient.Id, "inpatient");
+        var admissionId = await AdmitAsync(nurse, patient.Id, "general");
 
         var assigned = await nurse.PostAsJsonAsync(
             $"/api/admissions/{admissionId}/assign-bed", new { bed_id = bed });
@@ -223,7 +125,7 @@ public sealed class WorklistEndpointTests
         var ward = await NewWardAsync();
         var bed = (await AddBedsAsync(ward, 1))[0];
         var patient = await NewPatientAsync(nurse);
-        var admissionId = await AdmitAsync(nurse, patient.Id, "inpatient");
+        var admissionId = await AdmitAsync(nurse, patient.Id, "general");
 
         await nurse.PostAsJsonAsync($"/api/admissions/{admissionId}/assign-bed", new { bed_id = bed });
         await ExpireHoldAsync(bed);
@@ -231,23 +133,6 @@ public sealed class WorklistEndpointTests
         var row = await BoardRowAsync(nurse, patient.Name);
 
         Assert.Equal(JsonValueKind.Null, row.GetProperty("bed_number").ValueKind);
-    }
-
-    [Fact]
-    public async Task A_completed_visit_is_off_the_board_until_the_archive_is_asked_for()
-    {
-        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
-        var patient = await NewPatientAsync(nurse);
-        var admissionId = await AdmitAsync(nurse, patient.Id, "outpatient");
-
-        await nurse.PostAsync($"/api/admissions/{admissionId}/complete", null);
-
-        Assert.Empty(await BoardRowsAsync(nurse, patient.Name));
-
-        var archived = await BoardRowsAsync(nurse, patient.Name, includeFinished: true);
-
-        Assert.Single(archived);
-        Assert.Equal("completed", archived[0].GetProperty("status").GetString());
     }
 
     [Fact]
@@ -259,7 +144,7 @@ public sealed class WorklistEndpointTests
 
         for (var i = 0; i < 6; i++)
         {
-            await AdmitAsync(nurse, (await NewPatientAsync(nurse, surname)).Id, "outpatient");
+            await AdmitAsync(nurse, (await NewPatientAsync(nurse, surname)).Id, "general");
         }
 
         var first = await BoardPageAsync(nurse, surname, page: 1, pageSize: 4);

@@ -6,14 +6,16 @@ public static class BillingRates
 {
     public const string Currency = "LKR";
 
+    public const decimal ConsultationFee = 1_500m;
+
     private static readonly IReadOnlyDictionary<AdmissionCategory, decimal> AdmissionFees =
         new Dictionary<AdmissionCategory, decimal>
         {
             [AdmissionCategory.Icu] = 7_500m,
-            [AdmissionCategory.Hdu] = 5_000m,
-            [AdmissionCategory.Inpatient] = 3_000m,
-            [AdmissionCategory.DayCase] = 2_500m,
-            [AdmissionCategory.Outpatient] = 1_500m
+            [AdmissionCategory.General] = 3_000m,
+            [AdmissionCategory.Surgical] = 4_500m,
+            [AdmissionCategory.Maternity] = 4_000m,
+            [AdmissionCategory.Emergency] = 5_000m
         };
 
     private static readonly IReadOnlyDictionary<WardType, decimal> BedDayRates =

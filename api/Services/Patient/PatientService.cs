@@ -1,11 +1,13 @@
 using CareLanka.Api.Common.Errors;
 using CareLanka.Api.Common.Exceptions;
+using CareLanka.Api.Common.Persistence;
 using CareLanka.Api.Data;
 using CareLanka.Api.Data.Configurations.Patient;
 using CareLanka.Api.Data.Entities.Patient;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Patient;
+using CareLanka.Api.Services.Common;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using AdmissionEntity = CareLanka.Api.Data.Entities.Patient.Admission;
@@ -25,8 +27,15 @@ public sealed class PatientService : IPatientService
     private const int SaveAttempts = 5;
 
     private readonly CareLankaDbContext _db;
+    private readonly IBedRegistryService _beds;
+    private readonly ICurrentUser _currentUser;
 
-    public PatientService(CareLankaDbContext db) => _db = db;
+    public PatientService(CareLankaDbContext db, IBedRegistryService beds, ICurrentUser currentUser)
+    {
+        _db = db;
+        _beds = beds;
+        _currentUser = currentUser;
+    }
 
     public async Task<PagedResult<PatientSummary>> ListAsync(
         string? search,
@@ -138,6 +147,38 @@ public sealed class PatientService : IPatientService
 
         var nic = Clean(request.Nic);
         var phone = Clean(request.Phone);
+
+        PatientIdentityRules.EnsureMayChange(
+            patient, request.FullName.Trim(), nic, request.Gender!.Value, _currentUser.Role);
+
+        if (request.Gender!.Value != patient.Gender)
+        {
+            var assignment = await _db.BedAssignments
+                .AsNoTracking()
+                .Where(row => row.Admission.PatientId == patient.Id
+                    && row.Status != AssignmentStatus.Released
+                    && !ClosedStatuses.Contains(row.Admission.Status))
+                .FirstOrDefaultAsync(ct);
+
+            if (assignment is not null)
+            {
+                var bed = await _beds.FindBedAsync(assignment.BedId, ct)
+                    ?? throw new NotFoundException("Bed", assignment.BedId);
+                var ward = await _db.Wards
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(row => row.Id == bed.WardId, ct);
+
+                if (ward is not null
+                    && !BedPlacementRules.AcceptsGender(ward.GenderPolicy, request.Gender!.Value))
+                {
+                    throw new ConflictException(
+                        MessageCode.BedWardGenderPolicy,
+                        bed.BedNumber,
+                        EnumWire.ToWire(ward.GenderPolicy),
+                        EnumWire.ToWire(request.Gender!.Value));
+                }
+            }
+        }
 
         if (nic is not null && nic != patient.Nic)
         {

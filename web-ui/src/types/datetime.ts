@@ -1,7 +1,7 @@
 
 
-export function utcDay(when: Date): string {
-  return when.toISOString().slice(0, 10);
+export function localDay(when: Date): string {
+  return localInputValue(when).slice(0, 10);
 }
 
 export function localTime(iso: string): string {

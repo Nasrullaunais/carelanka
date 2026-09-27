@@ -1,4 +1,6 @@
 using CareLanka.Api.Data;
+using CareLanka.Api.Data.Entities.Common;
+using CareLanka.Api.Data.Entities.Patient;
 using CareLanka.Api.Data.Entities.Emergency;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.Services.Emergency;
@@ -137,6 +139,32 @@ public sealed class PreAdmissionTests
     }
 
     [Fact]
+    public async Task The_real_gateway_creates_exactly_one_pre_admission()
+    {
+        var seed = await SeedAsync(CallPriority.Critical);
+        var now = DateTimeOffset.UtcNow.AddSeconds(1);
+
+        await SendWithRealGatewayAsync(now);
+        await SendWithRealGatewayAsync(now);
+
+        using var scope = _application.Services.CreateScope();
+        var admissions = await scope.ServiceProvider.GetRequiredService<CareLankaDbContext>()
+            .Admissions.AsNoTracking()
+            .Where(x => x.DispatchId == seed.DispatchId.ToString())
+            .ToListAsync();
+        var admission = Assert.Single(admissions);
+        Assert.Equal(AdmissionSource.Emergency, admission.Source);
+        Assert.Equal(AdmissionStatus.AwaitingBed, admission.Status);
+        Assert.Equal(AdmissionUrgency.Emergency, admission.Urgency);
+        Assert.NotNull(admission.ExpectedArrivalAt);
+        Assert.Equal(
+            seed.DispatchedAt.AddMinutes(30),
+            admission.ExpectedArrivalAt.Value,
+            TimeSpan.FromSeconds(1));
+        Assert.Equal(PreAdmissionStatus.Sent, (await NoticeAsync(seed.CallId)).Status);
+    }
+
+    [Fact]
     public async Task A_cancelled_call_is_not_pre_admitted()
     {
         var seed = await SeedAsync(callStatus: CallStatus.Cancelled);
@@ -150,12 +178,70 @@ public sealed class PreAdmissionTests
         Assert.Equal("call_cancelled", saved.FailureReason);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task A_self_report_without_a_patient_id_is_pre_admitted_using_the_account_link_or_a_provisional_patient(bool linked)
+    {
+        var seed = await SeedAsync();
+        Guid? linkedPatientId = null;
+        using (var scope = _application.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+            var account = new PatientAccount
+            {
+                Id = Guid.NewGuid(), Username = $"caller{Guid.NewGuid():N}"[..20],
+                PasswordHash = "not-used-in-this-test"
+            };
+            db.PatientAccounts.Add(account);
+            if (linked)
+            {
+                var patient = new Patient
+                {
+                    Id = Guid.NewGuid(), PatientCode = $"P{Guid.NewGuid():N}"[..8].ToUpperInvariant(),
+                    FullName = "Emergency Caller", Gender = Gender.Female,
+                    Phone = $"07{Random.Shared.NextInt64(10000000, 99999999)}",
+                    UserAccountId = account.Id
+                };
+                db.Patients.Add(patient);
+                linkedPatientId = patient.Id;
+            }
+            var call = await db.EmergencyCalls.SingleAsync(x => x.Id == seed.CallId);
+            call.PatientIsCaller = true;
+            call.CallerUserId = account.Id;
+            await db.SaveChangesAsync();
+        }
+
+        await SendWithRealGatewayAsync(DateTimeOffset.UtcNow.AddSeconds(1));
+        await SendWithRealGatewayAsync(DateTimeOffset.UtcNow.AddSeconds(2));
+
+        using var verification = _application.Services.CreateScope();
+        var context = verification.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        var admission = Assert.Single(await context.Admissions.AsNoTracking()
+            .Where(x => x.DispatchId == seed.DispatchId.ToString()).ToListAsync());
+        Assert.Equal(AdmissionStatus.AwaitingBed, admission.Status);
+        if (linked) Assert.Equal(linkedPatientId, admission.PatientId);
+        else Assert.True(await context.Patients.AnyAsync(x => x.Id == admission.PatientId));
+        Assert.Equal(PreAdmissionStatus.Sent, (await NoticeAsync(seed.CallId)).Status);
+    }
+
     private async Task SendAsync(RecordingPreAdmissionGateway gateway, DateTimeOffset now)
     {
         using var scope = _application.Services.CreateScope();
         var processor = new PreAdmissionProcessor(
             scope.ServiceProvider.GetRequiredService<CareLankaDbContext>(),
             gateway,
+            new FixedClock(now),
+            Options.Create(new EmergencyOptions { PreAdmission = { BatchSize = 1000 } }));
+        await processor.SendDueAsync();
+    }
+
+    private async Task SendWithRealGatewayAsync(DateTimeOffset now)
+    {
+        using var scope = _application.Services.CreateScope();
+        var processor = new PreAdmissionProcessor(
+            scope.ServiceProvider.GetRequiredService<CareLankaDbContext>(),
+            scope.ServiceProvider.GetRequiredService<IPreAdmissionGateway>(),
             new FixedClock(now),
             Options.Create(new EmergencyOptions { PreAdmission = { BatchSize = 1000 } }));
         await processor.SendDueAsync();

@@ -42,15 +42,15 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 40),
                   FilledButton(
-                    onPressed: () => context.go(AppRoutes.register),
+                    onPressed: () => context.go(AppRoutes.patientLogin),
                     style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-                    child: const Text('Create an account'),
+                    child: const Text('I already have an account'),
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton(
-                    onPressed: () => context.go(AppRoutes.patientLogin),
+                    onPressed: () => context.go(AppRoutes.register),
                     style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-                    child: const Text('I already have an account'),
+                    child: const Text('Create an account'),
                   ),
                   const SizedBox(height: 32),
                   TextButton(

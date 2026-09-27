@@ -32,6 +32,9 @@ public interface IPharmacyItemService
 
     Task RemoveAsync(Guid id, string? confirmationCode, CancellationToken cancellationToken = default);
 
+    Task<PharmacyItem> UpdateReorderThresholdAsync(
+        Guid id, int reorderThreshold, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<PharmacyBatch>> ListBatchesAsync(
         Guid id, CancellationToken cancellationToken = default);
 

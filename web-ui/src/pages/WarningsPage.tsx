@@ -1,14 +1,17 @@
+import { PaginationControls } from '../components/ui/pagination-controls';
+import { Table } from '../components/Table';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   acknowledgeWarningMutation,
+  clearWarningMutation,
   listWarningsOptions,
   runWarningSweepMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
-import type { Warning, WarningStatus, WarningType } from '../services/api/generated';
+import type { WarningStatus, WarningType } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
-import { canConfirmEquipment, canReadWarnings } from '../types/permissions';
+import { canReadWarnings } from '../types/permissions';
 import { localDateTime } from '../types/datetime';
 import {
   raisedByLabels,
@@ -18,7 +21,7 @@ import {
   warningTypeLabels,
   warningTypes,
 } from '../types/warnings';
-import { ClearWarningDialog } from './warnings/ClearWarningDialog';
+import { AppSelect } from '../components/ui/app-select';
 
 const PAGE_SIZE = 15;
 
@@ -26,24 +29,25 @@ export function WarningsPage() {
   const queryClient = useQueryClient();
   const session = useSession();
   const allowed = canReadWarnings(session?.principal.role);
-  // Done is the hospital administrator's, with the confirmation code.
-  const canClear = canConfirmEquipment(session?.principal.role);
 
   const [status, setStatus] = useState<WarningStatus>('open');
   const [type, setType] = useState<WarningType | ''>('');
   const [page, setPage] = useState(1);
-  const [clearing, setClearing] = useState<Warning | null>(null);
+  // The list stays hidden until the user presses Run check themselves.
+  const [hasChecked, setHasChecked] = useState(false);
 
   const warnings = useQuery({
     ...listWarningsOptions({
       query: { status, type: type || undefined, page, pageSize: PAGE_SIZE },
     }),
-    enabled: allowed,
+    enabled: allowed && hasChecked,
   });
 
   const sweep = useMutation({
     ...runWarningSweepMutation(),
     onSuccess: (result) => {
+      setHasChecked(true);
+
       const changes = [
         result.raised > 0 ? `${result.raised} new` : null,
         result.updated > 0 ? `${result.updated} updated` : null,
@@ -63,6 +67,14 @@ export function WarningsPage() {
     ...acknowledgeWarningMutation(),
     onSuccess: () => {
       toast.success('Acknowledged. It stays on the list until the problem is fixed.');
+      queryClient.invalidateQueries();
+    },
+  });
+
+  const clear = useMutation({
+    ...clearWarningMutation(),
+    onSuccess: () => {
+      toast.success('Marked done. It has left the list.');
       queryClient.invalidateQueries();
     },
   });
@@ -91,7 +103,7 @@ export function WarningsPage() {
         the problem is gone: stock delivered, the batch used up, or the service booked.
       </p>
 
-      <div className="card">
+      <div className="table-section">
         <div className="actions">
           <button type="button" disabled={sweep.isPending} onClick={() => sweep.mutate({})}>
             {sweep.isPending ? 'Checking…' : 'Run check'}
@@ -100,22 +112,19 @@ export function WarningsPage() {
 
         <div className="row">
           <div>
-            <label htmlFor="warning-type">Kind</label>
-            <select
+            <AppSelect
               id="warning-type"
+              label="Kind"
               value={type}
-              onChange={(event) => {
-                setType(event.target.value as WarningType | '');
+              onValueChange={(value) => {
+                setType(value as WarningType | '');
                 setPage(1);
               }}
-            >
-              <option value="">Every kind</option>
-              {warningTypes.map((value) => (
-                <option key={value} value={value}>
-                  {warningTypeLabels[value]}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: 'Every kind' },
+                ...warningTypes.map((value) => ({ value, label: warningTypeLabels[value] })),
+              ]}
+            />
           </div>
         </div>
 
@@ -135,9 +144,13 @@ export function WarningsPage() {
           ))}
         </div>
 
-        {warnings.isPending && <p className="empty">Loading warnings…</p>}
+        {!hasChecked && (
+          <p className="empty">Press Run check to look for warnings.</p>
+        )}
 
-        {warnings.isError && (
+        {hasChecked && warnings.isPending && <p className="empty">Loading warnings…</p>}
+
+        {hasChecked && warnings.isError && (
           <p className="empty">
             Warnings could not be loaded.{' '}
             <button type="button" className="secondary" onClick={() => warnings.refetch()}>
@@ -146,7 +159,7 @@ export function WarningsPage() {
           </p>
         )}
 
-        {warnings.isSuccess && rows.length === 0 && (
+        {hasChecked && warnings.isSuccess && rows.length === 0 && (
           <p className="empty">
             {status === 'open'
               ? 'Nothing needs attention. Run check to look again.'
@@ -154,8 +167,8 @@ export function WarningsPage() {
           </p>
         )}
 
-        {rows.length > 0 && (
-          <table>
+        {hasChecked && rows.length > 0 && (
+          <Table footer={<PaginationControls label="Warnings" page={page} totalPages={totalPages} onPageChange={setPage} />}>
             <thead>
               <tr>
                 <th>Severity</th>
@@ -163,9 +176,7 @@ export function WarningsPage() {
                 <th>About</th>
                 <th>What to do</th>
                 <th>Raised</th>
-                {(status === 'open' ||
-                  status === 'acknowledged' ||
-                  (status === 'action_taken' && canClear)) && <th />}
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -213,9 +224,13 @@ export function WarningsPage() {
                     </td>
                   )}
                   {status === 'acknowledged' && <td />}
-                  {status === 'action_taken' && canClear && (
+                  {(status === 'action_taken' || status === 'dismissed') && (
                     <td>
-                      <button type="button" onClick={() => setClearing(warning)}>
+                      <button
+                        type="button"
+                        disabled={clear.isPending}
+                        onClick={() => clear.mutate({ path: { id: warning.id } })}
+                      >
                         Done
                       </button>
                     </td>
@@ -223,44 +238,9 @@ export function WarningsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
-        )}
-
-        {totalPages > 1 && (
-          <div className="pager">
-            <button
-              type="button"
-              className="secondary"
-              disabled={page <= 1}
-              onClick={() => setPage((current) => current - 1)}
-            >
-              Previous
-            </button>
-            <span className="muted">
-              Page {page} of {totalPages}
-            </span>
-            <button
-              type="button"
-              className="secondary"
-              disabled={page >= totalPages}
-              onClick={() => setPage((current) => current + 1)}
-            >
-              Next
-            </button>
-          </div>
+          </Table>
         )}
       </div>
-
-      {clearing && (
-        <ClearWarningDialog
-          warning={clearing}
-          onClose={() => setClearing(null)}
-          onDone={() => {
-            setClearing(null);
-            queryClient.invalidateQueries();
-          }}
-        />
-      )}
     </>
   );
 }

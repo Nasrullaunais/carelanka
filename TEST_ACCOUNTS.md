@@ -22,6 +22,7 @@ Sign in with an email: `POST /api/auth/login`
 | Hospital administrator | `admin.wickrama@carelanka.lk` | `CareLanka#2026` |
 | Equipment manager | `equip.bandara@carelanka.lk` | `CareLanka#2026` |
 | Ambulance crew | `crew.fernando@carelanka.lk` | `CareLanka#2026` |
+| Ambulance crew | `crew.perera@carelanka.lk` | `CareLanka#2026` |
 | **Deactivated** | `former.gunasekara@carelanka.lk` | `CareLanka#2026` |
 
 The last one exists to fail. The password is right and login still returns 401, the same
@@ -35,6 +36,7 @@ Sign in with a username: `POST /api/auth/patient/login`
 | Username | Password |
 | :--- | :--- |
 | `chathura.w` | `Patient#2026` |
+| `demo.emergency` | `Patient#2026` |
 
 This account has no `patients` row behind it, which is the ordinary state for a fresh
 sign-up. `GET /api/auth/me` returns `patient_id: null` and every `/api/me/*` route except
@@ -43,21 +45,27 @@ sign-up. `GET /api/auth/me` returns `patient_id: null` and every `/api/me/*` rou
 Registration is open — `POST /api/auth/patient/register` with a username and a password
 makes a new one and signs you straight in.
 
+`demo.emergency` is linked to a demo patient by `docs/seed/006_emergency_demo_data.sql`.
+Use it for the complete ambulance-to-pre-admission demonstration while keeping
+`chathura.w` available for the unlinked-account scenario.
+
 ---
 
 ## What each role can do
 
 ### Reception (general staff)
-Registers walk-in patients and edits their details · assigns a bed · marks a patient
-arrived · raises, itemises and settles a bill · confirms a discharge · reads the bookings
-list, wards and bed capacity.
-**Cannot:** check a booking in, tick clinical clearance, or set prices.
+Registers and admits walk-in patients and edits their details · assigns a bed · marks a patient
+arrived · checks in a booking · raises, itemises and settles a bill · confirms a discharge · reads
+the bookings list, wards and bed capacity.
+**Cannot:** tick clinical clearance, set prices, or change a patient's name, gender or NIC once a
+NIC is on the record (an unidentified patient with no NIC yet can still be fully edited).
 
 ### Ward nurse
 Everything reception does, plus: admits a patient and moves the admission through its
 states · checks a booked patient in · cancels a booking · completes missing patient
 details · ticks the non-clinical discharge items · reads lab reports.
-**Cannot:** tick clinical clearance, or set prices.
+**Cannot:** tick clinical clearance, set prices, or change a patient's name, gender or NIC once a
+NIC is on the record.
 
 ### Doctor
 Ticks **clinical clearance** — the one item nobody else can tick, and no discharge happens
@@ -67,11 +75,13 @@ without it · reads patient details and lab reports · reads the discharge board
 ### Duty manager
 Everything reception and the ward nurse can do, plus the two things that need authority:
 **assigning a bed that does not match the assessed care level** (either direction), and
-**checking a patient in at ICU or HDU level**. Also handles emergency calls and ambulances,
+**checking a patient in at ICU level**. Also handles emergency calls and ambulances,
 and can start an agent workflow.
 
 ### Hospital administrator
 **Sets prices** — the admission fee per care level and every ward's rates. Nobody else can.
+**Edits patient details**, and is the only role that can change a patient's name, gender or NIC
+once a NIC is on the record.
 **Creates and retires wards.** Reads patient details, the bookings list and the discharge
 board. **Removes unwanted equipment categories** on the web Equipment page (the Remove categories
 card, same code; only categories no item uses). **Confirms new equipment** in the mobile app or on the web Equipment page — an item the
@@ -82,8 +92,8 @@ there, and confirming it puts the item back into service. **Runs the maintenance
 books maintenance and sees the open jobs. **Retires equipment** — the Retire button on any item, and
 Beyond repair in the maintenance unit, both ask for the same code. Retiring is permanent. A retired
 item then has **Remove**, which asks for the code again and takes it off the register for good.
-Sees the **Warnings** page too (below), and is the one who presses **Done** on a resolved warning
-to take it off the list - that asks for the same code, `equipment2026`.
+Sees the **Warnings** page too (below) and can press **Done** on a resolved or dismissed warning
+to take it off the list, the same as the equipment manager. No code.
 **Cannot:** register, admit, bed, or discharge anyone.
 
 ### Equipment manager
@@ -96,6 +106,7 @@ the patient's token), delivered, or can't fill. **Adds a batch** when a delivery
 **Warnings page** (web): medicine at or below its reorder level, batches expiring within 30 days,
 and machines overdue for service. An automatic check raises them every hour; **Run check** does it
 now. **Acknowledge** records that you have seen one; it closes by itself once the problem is fixed.
+**Done** on a resolved or dismissed warning takes it off the list. No code.
 **Cannot:** confirm an item they registered, or run the maintenance unit (booking, confirming or
 retiring) — the hospital administrator does those. Reports a fault from the Equipment page.
 
@@ -122,7 +133,7 @@ It takes four people on purpose. One account will not do the whole thing.
 | Register and admit | Reception |
 | Assign the bed | Reception, nurse or duty manager. Duty manager only if the ward does not match the care level |
 | Mark them arrived | Reception, nurse or duty manager |
-| Check in a booked visit | Nurse or duty manager. Duty manager for ICU or HDU |
+| Check in a booked visit | Nurse or duty manager. Duty manager for ICU |
 | Tick clinical clearance | **Doctor** |
 | Raise and settle the bill | Reception |
 | Confirm the discharge | Reception, nurse or duty manager |

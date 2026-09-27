@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using CareLanka.Api.Data;
 using CareLanka.Api.Data.Enums;
+using CareLanka.Api.Data.Entities.Patient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -146,19 +147,55 @@ public sealed class DischargeBillingEndpointTests
     }
 
     [Fact]
-    public async Task A_visit_with_no_bed_is_billed_the_fee_alone()
+    public async Task A_visit_still_waiting_for_a_bed_cannot_be_billed_or_settled()
     {
-        var admissionId = await NewAdmissionAsync(category: "outpatient");
+        var admissionId = await NewAdmissionAsync(category: "general");
 
         using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
-        using var body = await ReadJsonAsync(
-            await reception.PostAsync($"/api/admissions/{admissionId}/bill", null));
+        var prepared = await reception.PostAsync($"/api/admissions/{admissionId}/bill", null);
+        var settled = await reception.PostAsJsonAsync(
+            $"/api/admissions/{admissionId}/bill/settle", new { });
 
-        var lines = body.RootElement.GetProperty("lines").EnumerateArray().ToList();
+        using var body = await ReadJsonAsync(prepared);
 
-        Assert.Single(lines);
-        Assert.Equal("admission_fee", lines[0].GetProperty("source").GetString());
-        Assert.Equal(1500m, body.RootElement.GetProperty("total").GetDecimal());
+        Assert.Equal(HttpStatusCode.Conflict, prepared.StatusCode);
+        Assert.Equal("cl_pat_044", body.RootElement.GetProperty("code").GetString());
+        Assert.Equal(HttpStatusCode.Conflict, settled.StatusCode);
+        Assert.Equal("awaiting_bed", await StatusAsync(admissionId));
+    }
+
+    [Fact]
+    public async Task Settling_counts_the_nights_up_to_now_and_not_to_when_the_bill_was_raised()
+    {
+        var visit = await AdmittedVisitAsync();
+
+        using var reception = await ClientAsync(ApiApplication.ReceptionEmail);
+        await reception.PostAsync($"/api/admissions/{visit.AdmissionId}/bill", null);
+
+        await BackdateOccupancyAsync(visit.AdmissionId, TimeSpan.FromHours(30));
+
+        using var body = await ReadJsonAsync(await reception.PostAsJsonAsync(
+            $"/api/admissions/{visit.AdmissionId}/bill/settle", new { }));
+
+        var bedLine = body.RootElement.GetProperty("lines").EnumerateArray()
+            .Single(line => line.GetProperty("source").GetString() == "bed_stay");
+
+        Assert.Equal(2m, bedLine.GetProperty("quantity").GetDecimal());
+        Assert.Equal(15000m, body.RootElement.GetProperty("total").GetDecimal());
+    }
+
+    [Fact]
+    public async Task The_checklist_is_refused_for_a_patient_who_is_not_on_the_ward()
+    {
+        var admissionId = await NewAdmissionAsync(category: "general");
+
+        using var doctor = await ClientAsync(ApiApplication.DoctorEmail);
+        var ticked = await TickAsync(doctor, admissionId, new { clinical_clearance = true });
+
+        using var body = await ReadJsonAsync(ticked);
+
+        Assert.Equal(HttpStatusCode.Conflict, ticked.StatusCode);
+        Assert.Equal("cl_pat_046", body.RootElement.GetProperty("code").GetString());
     }
 
     [Fact]
@@ -410,6 +447,51 @@ public sealed class DischargeBillingEndpointTests
     }
 
     [Fact]
+    public async Task Confirming_a_discharge_closes_unanswered_care_recommendations()
+    {
+        var visit = await ReadyToGoAsync();
+
+        using (var scope = _application.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+            var admissionId = Guid.Parse(visit.AdmissionId);
+            var patientId = await db.Admissions
+                .Where(row => row.Id == admissionId)
+                .Select(row => row.PatientId)
+                .SingleAsync();
+
+            db.CareRecommendations.Add(new CareRecommendation
+            {
+                Id = Guid.NewGuid(),
+                PatientId = patientId,
+                AdmissionId = admissionId,
+                ReportedText = "I need help.",
+                ReportedAt = DateTimeOffset.UtcNow,
+                AgentMessage = "A nurse will come soon.",
+                Status = CareRecommendationStatus.PendingReview,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var confirmed = await nurse.PostAsJsonAsync($"/api/discharges/{visit.AdmissionId}/confirm", new { });
+        Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
+
+        using var verificationScope = _application.Services.CreateScope();
+        var verificationDb = verificationScope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        var recommendation = await verificationDb.CareRecommendations
+            .AsNoTracking()
+            .SingleAsync(row => row.AdmissionId == Guid.Parse(visit.AdmissionId));
+
+        Assert.Equal(CareRecommendationStatus.Rejected, recommendation.Status);
+        Assert.Equal(
+            "Closed automatically: the patient was discharged before this was answered.",
+            recommendation.RejectionReason);
+    }
+
+    [Fact]
     public async Task A_nurse_may_confirm_an_icu_discharge()
     {
         var icu = await ReadyToGoAsync(wardType: "icu", category: "icu");
@@ -582,7 +664,7 @@ public sealed class DischargeBillingEndpointTests
     private sealed record TestVisit(string AdmissionId, Guid BedId, string BedNumber);
 
     private async Task<TestVisit> AdmittedVisitAsync(
-        string wardType = "general", string category = "inpatient")
+        string wardType = "general", string category = "general")
     {
         var ward = await NewWardAsync(wardType);
         var (bedId, bedNumber) = await AddBedAsync(ward);
@@ -604,7 +686,7 @@ public sealed class DischargeBillingEndpointTests
     }
 
     private async Task<TestVisit> ReadyToGoAsync(
-        string wardType = "general", string category = "inpatient")
+        string wardType = "general", string category = "general")
     {
         var visit = await AdmittedVisitAsync(wardType, category);
 

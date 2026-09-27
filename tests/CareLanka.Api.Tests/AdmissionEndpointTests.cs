@@ -164,16 +164,18 @@ public sealed class AdmissionEndpointTests
     }
 
     [Fact]
-    public async Task Naming_a_clinician_who_does_not_exist_is_a_400_not_a_foreign_key_500()
+    public async Task Who_chose_the_care_level_is_whoever_is_signed_in_whatever_the_body_claims()
     {
         using var client = await ClientAsync(ApiApplication.NurseEmail);
-        var patientId = await NewPatientAsync(client, "No Such Clinician");
+        var patientId = await NewPatientAsync(client, "Claimed Clinician");
 
         var response = await CreateAsync(client, patientId, Guid.NewGuid().ToString());
         using var body = await ReadJsonAsync(response);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Equal("cl_pat_008", body.RootElement.GetProperty("code").GetString());
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(
+            await NurseIdAsync(),
+            body.RootElement.GetProperty("category_set_by_staff_id").GetString());
     }
 
     [Fact]
@@ -282,6 +284,22 @@ public sealed class AdmissionEndpointTests
     }
 
     [Fact]
+    public async Task Searching_matches_an_unidentified_patients_temporary_reference()
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+        var patientId = await NewPatientAsync(client, "Unidentified patient");
+        await CreateAsync(client, patientId, await NurseIdAsync());
+
+        using var patient = await ReadJsonAsync(await client.GetAsync($"/api/patients/{patientId}"));
+        var reference = patient.RootElement.GetProperty("temp_reference").GetString()!;
+
+        using var found = await ReadJsonAsync(
+            await client.GetAsync($"/api/admissions?search={reference}"));
+
+        Assert.Equal(1, found.RootElement.GetProperty("total_items").GetInt32());
+    }
+
+    [Fact]
     public async Task An_unknown_sort_field_is_a_400_and_not_a_silently_ignored_parameter()
     {
         using var client = await ClientAsync(ApiApplication.NurseEmail);
@@ -349,6 +367,21 @@ public sealed class AdmissionEndpointTests
     }
 
     [Fact]
+    public async Task A_nurse_cannot_change_a_recorded_nic_when_completing_details()
+    {
+        using var nurse = await ClientAsync(ApiApplication.NurseEmail);
+        var patientId = await NewPatientAsync(nurse, "Locked Details", NewNic());
+        var id = await CreateIdAsync(nurse, patientId, await NurseIdAsync());
+
+        var response = await nurse.PatchAsJsonAsync(
+            $"/api/admissions/{id}/details", new { nic = NewNic() });
+
+        using var body = await ReadJsonAsync(response);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal("cl_pat_052", body.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
     public async Task Completing_details_on_an_unknown_admission_is_a_404()
     {
         using var client = await ClientAsync(ApiApplication.NurseEmail);
@@ -389,7 +422,7 @@ public sealed class AdmissionEndpointTests
         var created = await nurse.PostAsJsonAsync("/api/admissions", new
         {
             patient_id = patientId,
-            admission_category = "inpatient",
+            admission_category = "general",
             category_set_by_staff_id = await NurseIdAsync(),
             urgency = "routine",
             is_infectious = false
@@ -408,7 +441,7 @@ public sealed class AdmissionEndpointTests
         {
             patient_id = patientId,
             source = "walk_in",
-            admission_category = "inpatient",
+            admission_category = "general",
             category_set_by_staff_id = await NurseIdAsync(),
             is_infectious = false
         });
@@ -788,7 +821,7 @@ public sealed class AdmissionEndpointTests
         string source = "walk_in",
         string? dispatchId = null,
         string urgency = "routine",
-        string category = "inpatient")
+        string category = "general")
         => client.PostAsJsonAsync("/api/admissions", new
         {
             patient_id = patientId,

@@ -1031,6 +1031,22 @@ select[aria-invalid='true'] {
 .profile-menu-name { font-weight: 650; margin: 0; overflow-wrap: anywhere; }
 .profile-action { display: flex; align-items: center; justify-content: flex-start; gap: .6rem; width: 100%; padding: .7rem; margin-top: .3rem; border-radius: 8px; text-decoration: none; color: var(--ink); font-size: .875rem; }
 .profile-action:hover { background: var(--canvas); }
+.workspace-topbar { display: flex; justify-content: flex-end; padding: 1rem 1.5rem 0; }
+.notification-bell { position: relative; width: 40px; height: 40px; padding: 0; border-radius: 50%; background: transparent; border: 1px solid var(--line); color: var(--ink-soft); }
+.notification-bell:hover { background: var(--canvas); }
+.notification-bell-badge { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 4px; display: inline-grid; place-items: center; border-radius: 999px; background: var(--danger); color: #fff; font-size: .65rem; font-weight: 700; }
+.notification-popover { width: 340px; max-width: calc(100vw - 2rem); padding: .75rem; }
+.notification-popover-title { font-weight: 650; margin: 0 0 .5rem; }
+.notification-popover-all { width: 100%; margin-top: .5rem; background: transparent; color: var(--accent); border-color: var(--line); }
+.notification-list { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow-y: auto; }
+.notification-item { width: 100%; text-align: left; display: flex; flex-direction: column; gap: .15rem; padding: .55rem .5rem; border-radius: 8px; background: transparent; border: 0; color: var(--ink); font-weight: 500; }
+.notification-item:hover { background: var(--canvas); }
+.notification-item--unread { background: var(--accent-soft); }
+.notification-item--unread:hover { filter: brightness(0.97); }
+.notification-item-title { font-size: .85rem; }
+.notification-item-time { font-size: .7rem; }
+.notification-row--unread { font-weight: 650; }
+.link-button { background: transparent; border: 0; padding: 0; color: var(--accent); font-weight: 650; text-decoration: underline; cursor: pointer; }
 .workspace { width: 100%; min-width: 0; }
 .workspace:focus { outline: none; }
 .eyebrow { margin: 0 0 .6rem; }

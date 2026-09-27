@@ -14,6 +14,7 @@ import { IntakePage } from './pages/IntakePage';
 import { LaboratoryPage } from './pages/LaboratoryPage';
 import { LoginPage } from './pages/LoginPage';
 import { MaintenanceUnitPage } from './pages/MaintenanceUnitPage';
+import { NotificationsPage } from './pages/NotificationsPage';
 import { WarningsPage } from './pages/WarningsPage';
 import { PatientsPage } from './pages/PatientsPage';
 import { PharmacyPage } from './pages/PharmacyPage';
@@ -61,6 +62,7 @@ export function App() {
       <Route element={<AppShell />}>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
         <Route element={<RouteAccess />}>
           <Route path="/intake" element={<IntakePage />} />
           <Route path="/patients" element={<PatientsPage />} />

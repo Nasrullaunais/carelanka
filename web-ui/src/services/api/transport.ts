@@ -62,10 +62,6 @@ client.interceptors.error.use((error, response, request) => {
     return error;
   }
 
-  if (response.status === 409) {
-    return error;
-  }
-
   toast.error(problemMessage(error as ProblemDetails) ?? `Request failed (${response.status}).`);
 
   return error;

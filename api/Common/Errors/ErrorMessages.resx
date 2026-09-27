@@ -243,6 +243,21 @@
   <data name="cl_emg_009" xml:space="preserve">
     <value>This diversion cannot be approved: {0}.</value>
   </data>
+  <data name="cl_emg_010" xml:space="preserve">
+    <value>An ambulance has already been sent to this call. Request a cancellation instead, and staff will review it.</value>
+  </data>
+  <data name="cl_emg_011" xml:space="preserve">
+    <value>This emergency call can no longer be cancelled.</value>
+  </data>
+  <data name="cl_emg_012" xml:space="preserve">
+    <value>This call has no ambulance on the way, so there is nothing to recall.</value>
+  </data>
+  <data name="cl_emg_013" xml:space="preserve">
+    <value>A cancellation for this call is already waiting for review.</value>
+  </data>
+  <data name="cl_emg_014" xml:space="preserve">
+    <value>This cancellation request has already been reviewed.</value>
+  </data>
   <data name="cl_pat_002" xml:space="preserve">
     <value>A patient with NIC {0} is already registered, as record {1}.</value>
     <comment>Look the existing patient up instead of creating a second record for the same person.</comment>

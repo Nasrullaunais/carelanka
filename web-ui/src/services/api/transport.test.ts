@@ -40,3 +40,18 @@ it('refreshes and retries a protected request once after a 401', async () => {
   expect(fetchMock).toHaveBeenCalledTimes(3);
   expect((fetchMock.mock.calls[2][0] as Request).headers.get('Authorization')).toBe('Bearer new-access');
 });
+
+it("shows the server's own message when a request conflicts with existing data", async () => {
+  const toastError = vi.fn();
+  vi.doMock('sonner', () => ({ toast: { error: toastError } }));
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(
+    { status: 409, title: 'Conflict', detail: 'That ward name is already in use.' },
+    { status: 409, headers: { 'Content-Type': 'application/problem+json' } },
+  )));
+  const { client } = await import('./generated/client.gen');
+  await import('./transport');
+
+  await client.post({ baseUrl: 'http://localhost/api', url: '/wards', body: {} });
+
+  expect(toastError).toHaveBeenCalledWith('That ward name is already in use.');
+});

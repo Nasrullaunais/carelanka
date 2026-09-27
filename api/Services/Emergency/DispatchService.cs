@@ -260,7 +260,7 @@ public sealed class DispatchService : IDispatchService
             .Include(x => x.Ambulance)
             .Include(x => x.EmergencyCall)
             .SingleOrDefaultAsync(x => x.EmergencyCallId == emergencyCallId && DispatchStatusExtensions.LiveStatuses.Contains(x.Status), ct)
-            ?? throw new ConflictException(MessageCode.IllegalTransition);
+            ?? throw new ConflictException(MessageCode.CallHasNoLiveDispatch);
         CancelCore(dispatch);
         await SaveAsync(ct);
     }

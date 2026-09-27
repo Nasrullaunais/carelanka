@@ -14,7 +14,6 @@ import { QueryState } from '../../../components/ui/query-state';
 import { PaginationControls } from '../../../components/ui/pagination-controls';
 import { ReasonDialog } from '../../../components/ui/reason-dialog';
 import { StatusChip } from '../../../components/ui/status-chip';
-import { isConflict, type ApiProblem } from '../../../services/api/errors';
 import {
   callStatusLabels,
   callStatusTones,
@@ -104,22 +103,19 @@ function CancellationCard({ request }: { request: EmergencyCancellationRequest }
     void queryClient.invalidateQueries({ queryKey: listEmergencyCancellationRequestsQueryKey() });
   }
 
-  function failed(error: ApiProblem) {
-    if (isConflict(error)) {
-      toast.error('This cancellation request was already reviewed. The queue has been refreshed.');
-    }
+  function failed() {
     void queryClient.invalidateQueries({ queryKey: listEmergencyCancellationRequestsQueryKey() });
   }
 
   const approve = useMutation({
     ...approveEmergencyCancellationRequestMutation(),
     onSuccess: () => complete('Cancellation approved. The active dispatch has been recalled.'),
-    onError: (error) => failed(error as ApiProblem),
+    onError: failed,
   });
   const reject = useMutation({
     ...rejectEmergencyCancellationRequestMutation(),
     onSuccess: () => complete('Cancellation request rejected. The emergency response continues.'),
-    onError: (error) => failed(error as ApiProblem),
+    onError: failed,
   });
 
   if (callId === '') return null;

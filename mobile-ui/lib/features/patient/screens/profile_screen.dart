@@ -10,6 +10,7 @@ import '../widgets/dialer.dart';
 import '../widgets/panels.dart';
 import '../widgets/patient_id_card.dart';
 import 'claim_record_screen.dart';
+import 'manage_account_screen.dart';
 import 'my_details_screen.dart';
 import 'my_reports_screen.dart';
 import 'past_visits_screen.dart';
@@ -128,6 +129,16 @@ class ProfileScreen extends StatelessWidget {
                   onTap: () => Navigator.of(
                     context,
                   ).push(MaterialPageRoute(builder: (_) => const MyReportsScreen())),
+                ),
+                const Divider(indent: 20, endIndent: 20),
+                ListTile(
+                  leading: const Icon(Icons.manage_accounts_outlined),
+                  title: const Text('Manage account'),
+                  subtitle: const Text('Username and password'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute(builder: (_) => const ManageAccountScreen())),
                 ),
                 const Divider(indent: 20, endIndent: 20),
                 ListTile(

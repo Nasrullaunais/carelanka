@@ -1,0 +1,96 @@
+name: carelanka-hosting
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: carelanka
+      POSTGRES_USER: carelanka
+      POSTGRES_PASSWORD: ${CARELANKA_DB_PASSWORD:?Set CARELANKA_DB_PASSWORD in deploy/.env}
+    volumes:
+      - carelanka_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U carelanka -d carelanka"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: Dockerfile.api
+      target: migrate
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__CareLanka: Host=db;Port=5432;Database=carelanka;Username=carelanka;Password=${CARELANKA_DB_PASSWORD}
+      Jwt__SigningKey: ${CARELANKA_JWT_SIGNING_KEY:?Set CARELANKA_JWT_SIGNING_KEY in deploy/.env}
+    command: ["dotnet", "ef", "database", "update", "--project", "api", "--startup-project", "api", "--configuration", "Release", "--no-build"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  seed:
+    image: postgres:16
+    environment:
+      PGHOST: db
+      PGDATABASE: carelanka
+      PGUSER: carelanka
+      PGPASSWORD: ${CARELANKA_DB_PASSWORD}
+    volumes:
+      - ../docs/seed:/seed:ro
+    # Keep this file list in step with the seed service in ../compose.yaml.
+    command:
+      - sh
+      - -ec
+      - |
+        if [ "$$(psql -Atc "SELECT to_regclass('public.local_seed_complete') IS NOT NULL")" = t ]; then
+          echo 'Demo data already seeded'; exit 0
+        fi
+        for file in /seed/001_identity.sql /seed/002_patient_wards.sql /seed/002_pharmacy_categories.sql /seed/003_equipment_beds.sql /seed/004_patient_demo_data.sql /seed/005_patient_medical_profiles.sql /seed/006_emergency_demo_data.sql /seed/007_emergency_demo_fleet.sql; do
+          psql -v ON_ERROR_STOP=1 -f "$$file"
+        done
+        psql -v ON_ERROR_STOP=1 -c 'CREATE TABLE local_seed_complete (seeded_at timestamptz NOT NULL DEFAULT now())'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile.api
+      target: runtime
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      ConnectionStrings__CareLanka: Host=db;Port=5432;Database=carelanka;Username=carelanka;Password=${CARELANKA_DB_PASSWORD}
+      Jwt__SigningKey: ${CARELANKA_JWT_SIGNING_KEY}
+      LanguageModel__ApiKey: ${CARELANKA_GEMINI_API_KEY:-}
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?Set SITE_ADDRESS in deploy/.env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  carelanka_db:
+  caddy_data:
+  caddy_config:

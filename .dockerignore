@@ -5,3 +5,5 @@
 **/build/
 .git/
 graft/
+web-ui/dist/
+**/*.tsbuildinfo

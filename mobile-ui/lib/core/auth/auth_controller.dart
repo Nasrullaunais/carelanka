@@ -133,7 +133,22 @@ class AuthController extends ChangeNotifier {
   }
 
   void _onSessionExpired() {
-    _set(AuthStatus.signedOut, null);
+    switch (_sessionExpiry.last) {
+      case SessionSignal.passwordChangeRequired:
+        _reloadPrincipal();
+      case SessionSignal.expired || null:
+        _set(AuthStatus.signedOut, null);
+    }
+  }
+
+  // The router reads must_change_password off the fresh principal and moves to the forced screen.
+  Future<void> _reloadPrincipal() async {
+    if (_status != AuthStatus.signedIn) return;
+    try {
+      _set(AuthStatus.signedIn, await callApi(_api.auth.getCurrentUser));
+    } on ApiException {
+      // A failed read leaves the session as it was; the next refused call signals again.
+    }
   }
 
   void _set(AuthStatus status, CurrentPrincipal? principal) {

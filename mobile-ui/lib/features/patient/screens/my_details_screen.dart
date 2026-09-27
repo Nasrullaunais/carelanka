@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/auth/auth_form.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/friendly_date.dart';
+import '../../../core/widgets/notice_banner.dart';
 import '../../../core/widgets/phone_width.dart';
 import '../../../services/api_client/models/gender.dart';
 import '../services/patient_service.dart';

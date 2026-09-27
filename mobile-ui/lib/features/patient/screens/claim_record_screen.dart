@@ -3,12 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/desk_help.dart';
 import '../../../core/widgets/phone_width.dart';
 import '../../../services/api_client/models/patient_claim_preview.dart';
-import '../hospital_contact.dart';
 import '../state/profile_controller.dart';
 import '../validation/patient_fields.dart';
-import '../widgets/dialer.dart';
 import '../widgets/panels.dart';
 
 void openClaimRecord(BuildContext context, ProfileController controller) {
@@ -203,7 +202,7 @@ class _ClaimRecordScreenState extends State<ClaimRecordScreen> {
             : const Text('Find my record'),
       ),
       const SizedBox(height: 24),
-      const _DeskHelp(
+      const DeskHelp(
         title: 'No slip, or the code will not work?',
         body:
             'Some records are created without a code you can use. '
@@ -271,7 +270,7 @@ class _ClaimRecordScreenState extends State<ClaimRecordScreen> {
         child: const Text('No, go back'),
       ),
       const SizedBox(height: 24),
-      const _DeskHelp(
+      const DeskHelp(
         title: 'Not you?',
         body: 'Do not continue. Call the hospital and we will sort it out.',
       ),
@@ -279,43 +278,6 @@ class _ClaimRecordScreenState extends State<ClaimRecordScreen> {
   }
 
   static final _codeFormat = RegExp(r'^[Pp][0-9A-Za-z]{7}$');
-}
-
-class _DeskHelp extends StatelessWidget {
-  const _DeskHelp({required this.title, required this.body});
-
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return NoticeBanner(
-      icon: Icons.support_agent_outlined,
-      accent: scheme.warning,
-      title: title,
-      body: body,
-      action: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          OutlinedButton.icon(
-            onPressed: () => callNumber(context, HospitalContact.reception),
-            icon: const Icon(Icons.call_outlined, size: 18),
-            label: const Text(HospitalContact.reception),
-            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 42)),
-          ),
-          OutlinedButton.icon(
-            onPressed: () => emailAddress(context, HospitalContact.email),
-            icon: const Icon(Icons.mail_outline, size: 18),
-            label: const Text(HospitalContact.email),
-            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 42)),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _UpperCaseFormatter extends TextInputFormatter {

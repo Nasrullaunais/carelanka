@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/friendly_date.dart';
 import '../../../core/widgets/async_view.dart';
+import '../../../core/widgets/notice_banner.dart';
 import '../../../services/api_client/models/my_admission.dart';
 import '../../../services/api_client/models/my_bill.dart';
 import '../services/patient_service.dart';

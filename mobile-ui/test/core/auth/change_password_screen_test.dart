@@ -1,9 +1,9 @@
 import 'package:carelanka_mobile/core/auth/auth_controller.dart';
+import 'package:carelanka_mobile/core/auth/change_password_screen.dart';
 import 'package:carelanka_mobile/core/auth/session_expiry.dart';
 import 'package:carelanka_mobile/core/auth/token_store.dart';
 import 'package:carelanka_mobile/core/network/api_exception.dart';
 import 'package:carelanka_mobile/core/routing/app_router.dart';
-import 'package:carelanka_mobile/features/patient/screens/change_password_screen.dart';
 import 'package:carelanka_mobile/services/api_client/care_lanka_api.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';

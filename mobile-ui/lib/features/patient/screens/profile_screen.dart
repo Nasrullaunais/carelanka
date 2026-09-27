@@ -3,10 +3,11 @@ import 'package:provider/provider.dart';
 
 import '../../../core/auth/auth_controller.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/dialer.dart';
 import '../../../core/utils/friendly_date.dart';
+import '../../../core/widgets/notice_banner.dart';
 import '../../../services/api_client/models/my_profile.dart';
 import '../state/profile_controller.dart';
-import '../widgets/dialer.dart';
 import '../widgets/panels.dart';
 import '../widgets/patient_id_card.dart';
 import 'claim_record_screen.dart';

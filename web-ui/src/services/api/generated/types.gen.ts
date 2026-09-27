@@ -557,6 +557,11 @@ export type CareWorkflowValidation = {
     failed_rules?: Array<string> | null;
 };
 
+export type ChangePasswordRequest = {
+    current_password: string | null;
+    new_password: string | null;
+};
+
 export type CheckInRequest = {
     admission_category: AdmissionCategory;
     urgency: AdmissionUrgency;
@@ -3983,6 +3988,39 @@ export type LogoutResponses = {
 };
 
 export type LogoutResponse = LogoutResponses[keyof LogoutResponses];
+
+export type ChangePasswordData = {
+    body?: ChangePasswordRequest;
+    path?: never;
+    query?: never;
+    url: '/auth/password';
+};
+
+export type ChangePasswordErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Too Many Requests
+     */
+    429: ProblemDetails;
+};
+
+export type ChangePasswordError = ChangePasswordErrors[keyof ChangePasswordErrors];
+
+export type ChangePasswordResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type ChangePasswordResponse = ChangePasswordResponses[keyof ChangePasswordResponses];
 
 export type GetCurrentUserData = {
     body?: never;

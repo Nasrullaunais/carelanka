@@ -95,6 +95,10 @@
   <data name="cl_err_002" xml:space="preserve">
     <value>That username is already taken.</value>
   </data>
+  <data name="cl_err_003" xml:space="preserve">
+    <value>Your current password is not correct.</value>
+    <comment>POST /auth/password. A 400, not a 401: the caller is signed in, and a 401 would make both clients treat it as an ended session.</comment>
+  </data>
   <data name="cl_equ_001" xml:space="preserve">
     <value>Bed {0} already exists in that ward.</value>
   </data>

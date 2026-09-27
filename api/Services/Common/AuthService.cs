@@ -173,6 +173,36 @@ public sealed class AuthService : IAuthService
                 ct);
     }
 
+    public async Task ChangePasswordAsync(ChangePasswordRequest request, CancellationToken ct = default)
+    {
+        var id = _currentUser.Id;
+        var isStaff = _currentUser.PrincipalType == PrincipalType.Staff;
+
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+
+        if (isStaff)
+        {
+            var staff = await _db.StaffMembers.FirstOrDefaultAsync(s => s.Id == id, ct)
+                        ?? throw new UnauthorizedException(MessageCode.NotAuthenticated);
+
+            staff.PasswordHash = ReplacePassword(staff.Email, staff.PasswordHash, request);
+        }
+        else
+        {
+            var account = await _db.PatientAccounts.FirstOrDefaultAsync(p => p.Id == id, ct)
+                          ?? throw new UnauthorizedException(MessageCode.NotAuthenticated);
+
+            account.PasswordHash = ReplacePassword(account.Username, account.PasswordHash, request);
+        }
+
+        await _db.SaveChangesAsync(ct);
+
+        await RevokeAllForPrincipalAsync(
+            isStaff ? id : null, isStaff ? null : id, "password_changed", DateTimeOffset.UtcNow, ct);
+
+        await transaction.CommitAsync(ct);
+    }
+
     public async Task<CurrentPrincipal> GetCurrentPrincipalAsync(CancellationToken ct = default)
     {
         var id = _currentUser.Id;
@@ -195,6 +225,21 @@ public sealed class AuthService : IAuthService
         }
 
         return matched;
+    }
+
+    private string ReplacePassword(string throttleKey, string storedHash, ChangePasswordRequest request)
+    {
+        _throttle.EnsureNotLockedOut(throttleKey);
+
+        if (!_passwords.Verify(storedHash, request.CurrentPassword, out _))
+        {
+            _throttle.RecordFailure(throttleKey);
+            throw new BadRequestException(MessageCode.CurrentPasswordIncorrect);
+        }
+
+        _throttle.RecordSuccess(throttleKey);
+
+        return _passwords.Hash(request.NewPassword);
     }
 
     private async Task<AuthTokens> IssueAsync(
@@ -225,12 +270,13 @@ public sealed class AuthService : IAuthService
         };
     }
 
-    private async Task RevokeAllForPrincipalAsync(
+    private Task RevokeAllForPrincipalAsync(
         RefreshToken stored, string reason, DateTimeOffset now, CancellationToken ct)
-    {
-        var staffMemberId = stored.StaffMemberId;
-        var patientAccountId = stored.PatientAccountId;
+        => RevokeAllForPrincipalAsync(stored.StaffMemberId, stored.PatientAccountId, reason, now, ct);
 
+    private async Task RevokeAllForPrincipalAsync(
+        Guid? staffMemberId, Guid? patientAccountId, string reason, DateTimeOffset now, CancellationToken ct)
+    {
         await _db.RefreshTokens
             .Where(r => r.RevokedAt == null
                         && r.StaffMemberId == staffMemberId

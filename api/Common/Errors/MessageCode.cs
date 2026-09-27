@@ -24,6 +24,8 @@ public enum MessageCode
 
     UsernameAlreadyTaken,
 
+    CurrentPasswordIncorrect,
+
     BedNumberTaken,
 
     AssetTagTaken,

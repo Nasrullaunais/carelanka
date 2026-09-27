@@ -16,6 +16,7 @@ import { LoginPage } from './pages/LoginPage';
 import { MaintenanceUnitPage } from './pages/MaintenanceUnitPage';
 import { WarningsPage } from './pages/WarningsPage';
 import { PatientsPage } from './pages/PatientsPage';
+import { PatientAppAccountsPage } from './pages/PatientAppAccountsPage';
 import { PharmacyPage } from './pages/PharmacyPage';
 import { StaffLeaveApprovalPage } from './pages/StaffLeaveApprovalPage';
 import { StaffManagementPage } from './pages/StaffManagementPage';
@@ -67,6 +68,7 @@ export function App() {
           <Route path="/appointments" element={<AppointmentsPage />} />
           <Route path="/discharge" element={<DischargePage />} />
           <Route path="/care-recommendations" element={<CareRecommendationsPage />} />
+          <Route path="/patient-accounts" element={<PatientAppAccountsPage />} />
           <Route path="/billing" element={<Navigate to="/discharge" replace />} />
           <Route path="/billing-settings" element={<BillingSettingsPage />} />
           <Route path="/capacity" element={<CapacityPage />} />

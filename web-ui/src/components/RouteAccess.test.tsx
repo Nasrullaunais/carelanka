@@ -12,11 +12,11 @@ afterEach(cleanup);
 const shared = ['/capacity', '/wards', '/equipment', '/pharmacy'];
 // Explicit expectations keep navigation and its guard from silently drifting together.
 const allowed: Record<PrincipalRole, string[]> = {
-  general_staff: [...shared, '/intake', '/patients', '/appointments', '/discharge'],
+  general_staff: [...shared, '/intake', '/patients', '/appointments', '/discharge', '/patient-accounts'],
   ward_nurse: [...shared, '/intake', '/patients', '/appointments', '/discharge', '/care-recommendations', '/laboratory'],
   doctor: [...shared, '/patients', '/discharge', '/care-recommendations', '/laboratory'],
-  duty_manager: [...shared, '/emergency', '/intake', '/patients', '/appointments', '/discharge', '/care-recommendations', '/laboratory', '/staff', '/staff/coverage', '/staff/leave-approval'],
-  hospital_administrator: [...shared, '/patients', '/appointments', '/discharge', '/billing-settings', '/maintenance-unit', '/warnings', '/staff', '/staff/coverage', '/staff/leave-approval'],
+  duty_manager: [...shared, '/emergency', '/intake', '/patients', '/appointments', '/discharge', '/care-recommendations', '/laboratory', '/patient-accounts', '/staff', '/staff/coverage', '/staff/leave-approval'],
+  hospital_administrator: [...shared, '/patients', '/appointments', '/discharge', '/patient-accounts', '/billing-settings', '/maintenance-unit', '/warnings', '/staff', '/staff/coverage', '/staff/leave-approval'],
   equipment_manager: [...shared, '/patients', '/warnings', '/laboratory'],
   ambulance_crew: shared,
   patient: [],

@@ -245,8 +245,8 @@ public sealed class PushDeliveryTests
         }
 
         var entityId = Guid.NewGuid();
-        scope.ServiceProvider.GetRequiredService<IPushNotifications>()
-            .Stage([staff.Id], "New ambulance assignment", "Open CareLanka to see your run.", "dispatch", entityId, "dispatch-assigned");
+        await scope.ServiceProvider.GetRequiredService<INotifier>()
+            .NotifyAsync(NotificationType.DispatchAssigned, Recipients.Staff(staff.Id), new NotificationSubject("dispatch", entityId));
         await db.SaveChangesAsync();
         var id = await db.Notifications.Where(x => x.EntityId == entityId).Select(x => x.Id).SingleAsync();
         return (staff.Id, id);

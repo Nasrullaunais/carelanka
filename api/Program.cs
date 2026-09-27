@@ -423,7 +423,8 @@ builder.Services.AddScoped<IEmergencyCallService, EmergencyCallService>();
 builder.Services.AddScoped<IDispatchService, DispatchService>();
 builder.Services.AddScoped<IEmergencyReportService, EmergencyReportService>();
 builder.Services.AddScoped<IDeviceTokenService, DeviceTokenService>();
-builder.Services.AddScoped<IPushNotifications, PushNotifications>();
+builder.Services.AddScoped<IRecipientResolver, RecipientResolver>();
+builder.Services.AddScoped<INotifier, Notifier>();
 builder.Services.AddScoped<PushDeliveryProcessor>();
 builder.Services.AddSingleton<IPushSender>(services =>
     string.IsNullOrWhiteSpace(services.GetRequiredService<IOptions<PushOptions>>().Value.CredentialsPath)

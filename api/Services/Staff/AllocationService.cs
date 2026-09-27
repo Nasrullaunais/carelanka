@@ -30,6 +30,44 @@ public sealed class AllocationService : IAllocationService
         _logger = logger;
     }
 
+    public async Task<IReadOnlyCollection<Guid>> FindOnShiftAsync(
+        Guid wardId, StaffRole role, DateTimeOffset at, CancellationToken cancellationToken = default)
+    {
+        var pointInTimeUtc = at.UtcDateTime;
+        var targetDate = DateOnly.FromDateTime(pointInTimeUtc);
+        var prevDate = targetDate.AddDays(-1);
+
+        var candidateShifts = await _db.Shifts
+            .AsNoTracking()
+            .Include(s => s.Allocations)
+            .Where(s => s.WardId == wardId && (s.Date == targetDate || s.Date == prevDate))
+            .ToListAsync(cancellationToken);
+
+        var onShiftStaffIds = candidateShifts
+            .Where(s => IsShiftActiveAt(s, pointInTimeUtc))
+            .SelectMany(s => s.Allocations)
+            .Where(a => a.Status == AllocationStatus.Confirmed)
+            .Select(a => a.StaffMemberId)
+            .Distinct()
+            .ToList();
+
+        if (onShiftStaffIds.Count == 0) return onShiftStaffIds;
+
+        return await _db.StaffMembers.AsNoTracking()
+            .Where(s => onShiftStaffIds.Contains(s.Id) && s.Role == role && s.IsActive)
+            .Select(s => s.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    private static bool IsShiftActiveAt(Shift shift, DateTime pointInTimeUtc)
+    {
+        var startUtc = shift.Date.ToDateTime(shift.StartTime, DateTimeKind.Utc);
+        var endUtc = shift.EndTime < shift.StartTime
+            ? shift.Date.AddDays(1).ToDateTime(shift.EndTime, DateTimeKind.Utc)
+            : shift.Date.ToDateTime(shift.EndTime, DateTimeKind.Utc);
+        return pointInTimeUtc >= startUtc && pointInTimeUtc < endUtc;
+    }
+
     public async Task<PagedResult<AllocationDto>> ListAllocationsAsync(
         ListAllocationsQueryParameters parameters,
         CancellationToken cancellationToken = default)

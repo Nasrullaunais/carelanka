@@ -6,6 +6,7 @@ using CareLanka.Api.Data.Configurations.Common;
 using CareLanka.Api.Data.Entities.Common;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Common;
+using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Npgsql;
@@ -16,6 +17,10 @@ public sealed class AuthService : IAuthService
 {
     private static readonly Lazy<string> DecoyHash =
         new(() => new PasswordService().Hash("not-a-real-password-b2f1c9"));
+
+    private const string TemporaryPasswordLetters = "ABCDEFGHJKMNPQRSTUVWXYZ";
+
+    private const int UsernameSearchLimit = 50;
 
     private readonly CareLankaDbContext _db;
     private readonly IPasswordService _passwords;
@@ -193,6 +198,7 @@ public sealed class AuthService : IAuthService
                           ?? throw new UnauthorizedException(MessageCode.NotAuthenticated);
 
             account.PasswordHash = ReplacePassword(account.Username, account.PasswordHash, request);
+            account.MustChangePassword = false;
         }
 
         await _db.SaveChangesAsync(ct);
@@ -201,6 +207,63 @@ public sealed class AuthService : IAuthService
             isStaff ? id : null, isStaff ? null : id, "password_changed", DateTimeOffset.UtcNow, ct);
 
         await transaction.CommitAsync(ct);
+    }
+
+    public async Task<PatientPasswordReset> ResetPatientPasswordAsync(
+        Guid patientAccountId, CancellationToken ct = default)
+    {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+
+        var account = await _db.PatientAccounts.FirstOrDefaultAsync(p => p.Id == patientAccountId, ct)
+                      ?? throw new NotFoundException("PatientAccount", patientAccountId);
+
+        var temporaryPassword = NewTemporaryPassword();
+
+        account.PasswordHash = _passwords.Hash(temporaryPassword);
+        account.MustChangePassword = true;
+
+        await _db.SaveChangesAsync(ct);
+
+        await RevokeAllForPrincipalAsync(null, account.Id, "password_reset", DateTimeOffset.UtcNow, ct);
+
+        await transaction.CommitAsync(ct);
+
+        _throttle.RecordSuccess(account.Username);
+
+        return new PatientPasswordReset(account.Username, temporaryPassword);
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, string>> GetPatientUsernamesAsync(
+        IReadOnlyCollection<Guid> accountIds, CancellationToken ct = default)
+    {
+        if (accountIds.Count == 0)
+        {
+            return new Dictionary<Guid, string>();
+        }
+
+        return await _db.PatientAccounts
+            .AsNoTracking()
+            .Where(p => accountIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, p => p.Username, ct);
+    }
+
+    public async Task<IReadOnlyList<Guid>> FindPatientAccountIdsByUsernameAsync(
+        string search, CancellationToken ct = default)
+    {
+        var text = UsernameRules.Normalise(search);
+
+        if (text.Length == 0)
+        {
+            return [];
+        }
+
+        return await _db.PatientAccounts
+            .AsNoTracking()
+            .Where(p => p.Username.Contains(text))
+            .OrderBy(p => p.Username)
+            .Select(p => p.Id)
+            .Take(UsernameSearchLimit)
+            .ToListAsync(ct);
     }
 
     public async Task<CurrentPrincipal> GetCurrentPrincipalAsync(CancellationToken ct = default)
@@ -225,6 +288,18 @@ public sealed class AuthService : IAuthService
         }
 
         return matched;
+    }
+
+    private static string NewTemporaryPassword()
+    {
+        var letters = new char[4];
+
+        for (var i = 0; i < letters.Length; i++)
+        {
+            letters[i] = TemporaryPasswordLetters[RandomNumberGenerator.GetInt32(TemporaryPasswordLetters.Length)];
+        }
+
+        return $"{new string(letters)}-{RandomNumberGenerator.GetInt32(10_000):D4}";
     }
 
     private string ReplacePassword(string throttleKey, string storedHash, ChangePasswordRequest request)
@@ -296,7 +371,8 @@ public sealed class AuthService : IAuthService
         DisplayName = staff.FullName,
         Email = staff.Email,
         PhoneNumber = null,
-        PatientId = null
+        PatientId = null,
+        MustChangePassword = false
     };
 
     private static CurrentPrincipal ToPrincipal(PatientAccount account) => new()
@@ -309,7 +385,8 @@ public sealed class AuthService : IAuthService
         DisplayName = account.Username,
         Email = null,
         PhoneNumber = null,
-        PatientId = null
+        PatientId = null,
+        MustChangePassword = account.MustChangePassword
     };
 
     private static CurrentPrincipal? ToPrincipalOrNull(StaffMember? staff)

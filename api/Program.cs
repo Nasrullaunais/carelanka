@@ -48,6 +48,7 @@ builder.Services
     .AddControllers(options =>
     {
         options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
+        options.Filters.Add<PasswordChangeRequiredFilter>();
         options.ModelMetadataDetailsProviders.Add(new EmergencyQueryBindingMetadataProvider());
         options.ModelBinderProviders.Insert(0, new SnakeCaseEnumModelBinderProvider());
     })
@@ -260,6 +261,11 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.PatientEditor, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.GeneralStaff),
         EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
+    options.AddPolicy(Policies.PatientPasswordReset, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.GeneralStaff),
         EnumWire.ToWire(StaffRole.DutyManager),
         EnumWire.ToWire(StaffRole.HospitalAdministrator)));
 

@@ -74,6 +74,8 @@ public sealed class PatientOpenApiContractTests
     [InlineData("MyBillLine")]
     [InlineData("PatientClaimPreview")]
     [InlineData("BookAppointmentRequest")]
+    [InlineData("PatientAppAccount")]
+    [InlineData("PatientAppPasswordReset")]
     public async Task Published_schema_required_members_match_the_contract(string schemaName)
     {
         var generated = await GeneratedOpenApi.ParseAsync();
@@ -134,6 +136,21 @@ public sealed class PatientOpenApiContractTests
             "getMyBill",
             paths.GetProperty("/me/admissions/{admissionId}/bill").GetProperty("get")
                 .GetProperty("operationId").GetString());
+    }
+
+    [Fact]
+    public async Task Patient_app_accounts_publish_their_operationIds_and_declare_their_failures()
+    {
+        var generated = await GeneratedOpenApi.ParseAsync();
+        var paths = generated.RootElement.GetProperty("paths");
+        var list = paths.GetProperty("/patient-accounts").GetProperty("get");
+        var reset = paths.GetProperty("/patient-accounts/{patientId}/reset-password").GetProperty("post");
+
+        Assert.Equal("listPatientAppAccounts", list.GetProperty("operationId").GetString());
+        Assert.Equal("resetPatientAppPassword", reset.GetProperty("operationId").GetString());
+        Assert.Equal(new[] { "200", "400", "401", "403" }, Responses(list));
+        Assert.Equal(new[] { "200", "401", "403", "404", "409" }, Responses(reset));
+        Assert.False(reset.TryGetProperty("requestBody", out _));
     }
 
     [Fact]

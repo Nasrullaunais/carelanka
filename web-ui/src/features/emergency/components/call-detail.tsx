@@ -46,10 +46,7 @@ export function CallDetail({ callId, query, ambulances, onReviewProposal, ambula
       void invalidateEmergencyQueries(queryClient);
     },
     onError: (error) => {
-      if (isConflict(error)) {
-        toast.error('Another dispatcher changed this call or ambulance first. The boards have been refreshed.');
-        void invalidateEmergencyQueries(queryClient);
-      }
+      if (isConflict(error)) void invalidateEmergencyQueries(queryClient);
     },
     onSettled: () => setDispatchingId(undefined),
   });
@@ -60,10 +57,7 @@ export function CallDetail({ callId, query, ambulances, onReviewProposal, ambula
       void invalidateEmergencyQueries(queryClient);
     },
     onError: (error) => {
-      if (isConflict(error)) {
-        toast.error('This call already has an active recommendation or dispatch.');
-        void invalidateEmergencyQueries(queryClient);
-      }
+      if (isConflict(error)) void invalidateEmergencyQueries(queryClient);
     },
   });
 

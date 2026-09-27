@@ -154,6 +154,16 @@ public enum MessageCode
 
     DispatchProposalNotApprovable,
 
+    CallAlreadyDispatched,
+
+    CallNotCancellable,
+
+    CallHasNoLiveDispatch,
+
+    CancellationAlreadyRequested,
+
+    CancellationNotPending,
+
     NicLinkedToAnotherAccount,
 
     NicDoesNotMatchYourRecord,

@@ -304,8 +304,8 @@ public sealed class EmergencyCallService : IEmergencyCallService
     public async Task<MyEmergencyCallSummary> CancelMineAsync(Guid id, RequestCancellationRequest request, CancellationToken cancellationToken = default)
     {
         var call = await MineAsync(id, cancellationToken);
-        if (call.Dispatches.Any()) throw new ConflictException(MessageCode.IllegalTransition);
-        if (call.Status != CallStatus.Received) throw new ConflictException(MessageCode.IllegalTransition);
+        if (call.Dispatches.Any()) throw new ConflictException(MessageCode.CallAlreadyDispatched);
+        if (call.Status != CallStatus.Received) throw new ConflictException(MessageCode.CallNotCancellable);
         call.Status = CallStatus.Cancelled;
         await _db.SaveChangesAsync(cancellationToken);
         return ToMine(call);
@@ -315,9 +315,9 @@ public sealed class EmergencyCallService : IEmergencyCallService
     {
         var call = await MineAsync(id, cancellationToken);
         if (!call.Dispatches.Any(dispatch => DispatchStatusExtensions.LiveStatuses.Contains(dispatch.Status)))
-            throw new ConflictException(MessageCode.IllegalTransition);
+            throw new ConflictException(MessageCode.CallHasNoLiveDispatch);
         if (call.CancellationRequestStatus == CancellationRequestStatus.Pending)
-            throw new ConflictException(MessageCode.Conflict);
+            throw new ConflictException(MessageCode.CancellationAlreadyRequested);
         call.CancellationRequestStatus = CancellationRequestStatus.Pending;
         call.CancellationRequestReason = request.Reason!.Trim();
         call.CancellationRequestedAt = _timeProvider.GetUtcNow();
@@ -410,7 +410,7 @@ public sealed class EmergencyCallService : IEmergencyCallService
             .SingleOrDefaultAsync(call => call.Id == id, cancellationToken)
             ?? throw new NotFoundException("Emergency call", id);
         if (call.CancellationRequestStatus != CancellationRequestStatus.Pending)
-            throw new ConflictException(MessageCode.IllegalTransition);
+            throw new ConflictException(MessageCode.CancellationNotPending);
         return call;
     }
 

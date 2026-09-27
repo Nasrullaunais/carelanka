@@ -68,7 +68,7 @@ describe('EmergencyDesk', () => {
     await waitFor(() => expect(mocks.dispatch.mock.calls[0]?.[0]).toEqual({ path: { id: 'call-1' }, body: { ambulance_id: 'amb-1' } }));
   });
 
-  it('explains a dispatch conflict and refreshes the operational state', async () => {
+  it('leaves a dispatch conflict to the shared error message', async () => {
     mocks.dispatch.mockRejectedValue({ status: 409, detail: 'Ambulance is no longer available.' });
     renderWithProviders(<EmergencyDesk />);
 
@@ -76,7 +76,7 @@ describe('EmergencyDesk', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Dispatch' }));
 
     await waitFor(() => expect(mocks.dispatch).toHaveBeenCalledTimes(1));
-    expect(mocks.toastError).toHaveBeenCalledWith(expect.stringMatching(/another dispatcher changed/i));
+    expect(mocks.toastError).not.toHaveBeenCalled();
   });
 
   it('logs a front-desk call with a stable idempotency key and capture time', async () => {

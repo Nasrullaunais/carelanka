@@ -112,8 +112,8 @@ settled. Nothing here is a task.
 
 - **The decisions and their reasoning:** `docs/ADR.md` — 7 accepted, 1 open (deployment).
 - **What was renamed and why, so it is not reintroduced:** `integration_of_functions.md` §11.6.
-- **The gate that keeps it clean:** `bun run check:specs`. **Run it by hand — there is no
-  CI yet** (§7 row 5).
+- **The gate that keeps it clean:** `bun run check:specs`, run by CI on every push and PR
+  to `main` (§7 row 5).
 
 ---
 
@@ -214,7 +214,7 @@ rather than discovering at the demo.
 | 3 | Spec gate | Common | **Done** — `bun run check:specs` |
 | 4 | Backend bootstrap + auth | Common | **Implemented in PR #11, verified 2026-09-08** — EF Core + PostgreSQL, base entities, `Common_AddIdentity`, login/registration/refresh/logout/`/auth/me`, policies, exception handler, `/health`. Setup: `api/README.md` |
 | 4b | Audit interceptor + `AgentWorkflow` tables | Common | **Not built, and now blocking.** The audit interceptor still blocks nobody. The `AgentWorkflow` / `AgentProposedChange` pair is a different matter: **every agent in the project needs it, and M4's two are ready to be built behind it** (`build/patient.md` steps 11–16). `BedAssignment.WorkflowId` is already a column pointing at a table that does not exist. Re-swept 2026-09-16 — no entity, no configuration, no migration, no controller |
-| 5 | CI — `.github/` | Common | Not built. §13 grades it |
+| 5 | CI — `.github/` | Common | **Built** — `.github/workflows/ci.yml`: build, tests, web, Flutter, contract drift; images to `ghcr.io`; deploy to Azure. §13 grades it |
 | 6 | Auth integration + generated-contract test project | Common | **Done in PR #11** — `CareLanka.Api.Tests`, 15 tests against disposable PostgreSQL |
 | 7 | `web-ui/` scaffold | Common | **Done** — React 19/Vite, generated API client, shared shell and role-routed operational screens are live; see `web-ui/README.md` |
 | 8 | `flutter create .` | **whoever has the SDK** | Not run. No `android/`, no APK without it |

@@ -32,7 +32,10 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using CareLanka.Api.Common.Serialization;
+using CareLanka.Api.Hubs.Common;
 using Microsoft.OpenApi.Models;
+
+const string NotificationsHubPath = "/api/hubs/notifications";
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -97,13 +100,15 @@ var connectionString = builder.Configuration.GetConnectionString("CareLanka")
 
 builder.Services.AddSingleton<TimestampInterceptor>();
 builder.Services.AddSingleton<AmbulanceStatusHistoryInterceptor>();
+builder.Services.AddScoped<NotificationSavedInterceptor>();
 
 builder.Services.AddDbContext<CareLankaDbContext>((provider, options) => options
     .UseNpgsql(connectionString)
     .UseSnakeCaseNamingConvention()
     .AddInterceptors(
         provider.GetRequiredService<AmbulanceStatusHistoryInterceptor>(),
-        provider.GetRequiredService<TimestampInterceptor>()));
+        provider.GetRequiredService<TimestampInterceptor>(),
+        provider.GetRequiredService<NotificationSavedInterceptor>()));
 
 builder.Services
     .AddOptions<JwtOptions>()
@@ -213,7 +218,20 @@ builder.Services
             },
             OnForbidden = context => ProblemResponseWriter.WriteAsync(
                 context.HttpContext, StatusCodes.Status403Forbidden,
-                "Forbidden", MessageCode.Forbidden)
+                "Forbidden", MessageCode.Forbidden),
+            // A browser cannot put a header on a WebSocket, so the hub reads the token from the
+            // query string instead — only for the hub path, never for a regular REST request.
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(accessToken)
+                    && context.HttpContext.Request.Path.StartsWithSegments(NotificationsHubPath))
+                {
+                    context.Token = accessToken;
+                }
+
+                return Task.CompletedTask;
+            }
         };
     });
 
@@ -407,7 +425,10 @@ builder.Services.AddCors(options => options.AddPolicy(WebUiCors, policy => polic
     .WithOrigins(allowedOrigins)
     .AllowAnyHeader()
     .AllowAnyMethod()
+    .AllowCredentials()
     .WithExposedHeaders(ProblemDetailsFactoryExtensions.TraceIdHeader)));
+
+builder.Services.AddSignalR();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddMemoryCache();
@@ -588,6 +609,7 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<NotificationsHub>(NotificationsHubPath);
 
 app.Run();
 

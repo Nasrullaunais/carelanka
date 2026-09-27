@@ -8,6 +8,9 @@ import { queryClient } from './services/api/queryClient';
 import './index.css';
 
 import './services/api/transport';
+import { initNotificationsRealtime } from './services/realtime/notifications';
+
+initNotificationsRealtime(queryClient);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

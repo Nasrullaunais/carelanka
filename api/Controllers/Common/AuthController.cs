@@ -78,6 +78,21 @@ public class AuthController : ControllerBase
     }
 
     [Authorize]
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
+    [HttpPost("password", Name = "changePassword")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests, "application/problem+json")]
+    public async Task<IActionResult> ChangePassword(
+        [FromBody] ChangePasswordRequest request, CancellationToken ct)
+    {
+        await _auth.ChangePasswordAsync(request, ct);
+
+        return NoContent();
+    }
+
+    [Authorize]
     [HttpGet("me", Name = "getCurrentUser")]
     [ProducesResponseType(typeof(CurrentPrincipal), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]

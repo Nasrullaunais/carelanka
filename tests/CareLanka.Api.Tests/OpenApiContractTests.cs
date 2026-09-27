@@ -36,6 +36,29 @@ public sealed class OpenApiContractTests
         AssertRequiredMatchesContract(schemas.GetProperty("CurrentPrincipal"), contract, "CurrentPrincipal");
     }
 
+    [Fact]
+    public async Task Change_password_publishes_its_contract_responses_and_required_members()
+    {
+        using var document = await GeneratedOpenApi.ParseAsync();
+        var root = document.RootElement;
+        var contract = LoadContract();
+
+        var operation = root.GetProperty("paths").GetProperty("/auth/password").GetProperty("post");
+        Assert.Equal("changePassword", operation.GetProperty("operationId").GetString());
+
+        var expectedResponses = Keys(Map(contract, "paths", "/auth/password", "post", "responses"));
+        var generatedResponses = operation.GetProperty("responses")
+            .EnumerateObject().Select(response => response.Name).ToHashSet();
+        Assert.True(expectedResponses.SetEquals(generatedResponses));
+
+        var expectedRequired = Sequence(contract, "components", "schemas", "ChangePasswordRequest", "required")
+            .Children.Cast<YamlScalarNode>().Select(item => item.Value!).ToHashSet();
+        var generatedRequired = root.GetProperty("components").GetProperty("schemas")
+            .GetProperty("ChangePasswordRequest").GetProperty("required")
+            .EnumerateArray().Select(item => item.GetString()!).ToHashSet();
+        Assert.True(expectedRequired.SetEquals(generatedRequired));
+    }
+
     private static void AssertRequiredMatchesContract(
         JsonElement generatedSchema, YamlMappingNode contract, string schemaName)
     {

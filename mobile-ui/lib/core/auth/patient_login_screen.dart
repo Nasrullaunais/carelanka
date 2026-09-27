@@ -19,7 +19,6 @@ class _PatientLoginScreenState extends State<PatientLoginScreen> {
   final _password = TextEditingController();
 
   bool _busy = false;
-  bool _obscure = true;
 
   @override
   void dispose() {
@@ -68,17 +67,12 @@ class _PatientLoginScreenState extends State<PatientLoginScreen> {
                     ? 'Enter your username'
                     : null,
               ),
-              AuthTextField(
+              AuthPasswordField(
                 controller: _password,
                 label: 'Password',
                 enabled: !_busy,
-                obscure: _obscure,
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _busy ? null : _submit(),
-                suffix: IconButton(
-                  icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                  onPressed: () => setState(() => _obscure = !_obscure),
-                ),
                 validator: (value) =>
                     (value == null || value.isEmpty) ? 'Enter your password' : null,
               ),

@@ -116,6 +116,7 @@ export 'models/care_workflow_accepted.dart';
 export 'models/care_workflow_status.dart';
 export 'models/care_workflow_summary.dart';
 export 'models/care_workflow_validation.dart';
+export 'models/change_password_request.dart';
 export 'models/check_in_request.dart';
 export 'models/checklist_item.dart';
 export 'models/checklist_update_request.dart';

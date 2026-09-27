@@ -22,6 +22,7 @@ public static class MessageCodes
             [MessageCode.Unexpected] = "cl_err_500",
             [MessageCode.RefreshTokenInvalid] = "cl_err_001",
             [MessageCode.UsernameAlreadyTaken] = "cl_err_002",
+            [MessageCode.CurrentPasswordIncorrect] = "cl_err_003",
             [MessageCode.BedNumberTaken] = "cl_equ_001",
             [MessageCode.AssetTagTaken] = "cl_equ_002",
             [MessageCode.BedOccupied] = "cl_equ_003",

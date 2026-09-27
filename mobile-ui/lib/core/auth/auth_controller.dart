@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../services/api_client/care_lanka_api.dart';
 import '../../services/api_client/models/auth_tokens.dart';
+import '../../services/api_client/models/change_password_request.dart';
 import '../../services/api_client/models/current_principal.dart';
 import '../../services/api_client/models/patient_login_request.dart';
 import '../../services/api_client/models/patient_register_request.dart';
@@ -27,6 +28,8 @@ class AuthController extends ChangeNotifier {
         _beforeSignOut = beforeSignOut {
     _sessionExpiry.addListener(_onSessionExpired);
   }
+
+  static const currentPasswordIncorrectCode = 'cl_err_003';
 
   final CareLankaApi _api;
   final TokenStore _tokens;
@@ -79,6 +82,21 @@ class AuthController extends ChangeNotifier {
     return _signIn(() => _api.auth.registerPatientAccount(
           body: PatientRegisterRequest(username: username, password: password),
         ));
+  }
+
+  /// The server ends every session on success, this one included, so this signs out too.
+  /// On failure it throws [ApiException] and stays signed in.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await callApi(() => _api.auth.changePassword(
+          body: ChangePasswordRequest(
+            currentPassword: currentPassword,
+            newPassword: newPassword,
+          ),
+        ));
+    await signOut();
   }
 
   Future<void> signOut() async {

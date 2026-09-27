@@ -17,6 +17,10 @@ import { MaintenanceUnitPage } from './pages/MaintenanceUnitPage';
 import { WarningsPage } from './pages/WarningsPage';
 import { PatientsPage } from './pages/PatientsPage';
 import { PharmacyPage } from './pages/PharmacyPage';
+import { StaffLeaveApprovalPage } from './pages/StaffLeaveApprovalPage';
+import { StaffManagementPage } from './pages/StaffManagementPage';
+import { StaffRosterProposalsPage } from './pages/staff/StaffRosterProposalsPage';
+import { WardCoveragePage } from './pages/WardCoveragePage';
 import { WardsPage } from './pages/WardsPage';
 import { clearSession } from './services/auth/session';
 import { useSession } from './services/auth/useSession';
@@ -63,7 +67,6 @@ export function App() {
           <Route path="/appointments" element={<AppointmentsPage />} />
           <Route path="/discharge" element={<DischargePage />} />
           <Route path="/care-recommendations" element={<CareRecommendationsPage />} />
-
           <Route path="/billing" element={<Navigate to="/discharge" replace />} />
           <Route path="/billing-settings" element={<BillingSettingsPage />} />
           <Route path="/capacity" element={<CapacityPage />} />
@@ -74,6 +77,10 @@ export function App() {
           <Route path="/warnings" element={<WarningsPage />} />
           <Route path="/laboratory" element={<LaboratoryPage />} />
           <Route path="/pharmacy" element={<PharmacyPage />} />
+          <Route path="/staff" element={<StaffManagementPage />} />
+          <Route path="/staff/coverage" element={<WardCoveragePage />} />
+          <Route path="/staff/leave-approval" element={<StaffLeaveApprovalPage />} />
+          <Route path="/staff/roster-proposals" element={<StaffRosterProposalsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

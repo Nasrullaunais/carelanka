@@ -12,9 +12,10 @@ import 'core/push/push_gateway.dart';
 import 'core/push/push_registration.dart';
 import 'core/routing/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'features/emergency/emergency_routes.dart';
 import 'features/equipment/equipment_routes.dart';
 import 'features/patient/patient_routes.dart';
-import 'features/emergency/emergency_routes.dart';
+import 'features/staff/staff_routes.dart';
 import 'services/api_client/care_lanka_api.dart';
 import 'services/api_client/models/current_principal.dart';
 import 'services/api_client/models/principal_role.dart';
@@ -27,12 +28,14 @@ final List<RouteBase> _featureRoutes = [
   ...emergencyRoutes,
   ...equipmentRoutes,
   ...patientRoutes,
+  ...staffRoutes,
 ];
 
 String _homePathFor(CurrentPrincipal principal) =>
     emergencyHomePathFor(principal.role) ??
     patientHomePathFor(principal.role) ??
     equipmentHomePathFor(principal.role) ??
+    staffHomePathFor(principal.role) ??
     _noScreensPath;
 
 /// Root widget of the CareLanka mobile app.

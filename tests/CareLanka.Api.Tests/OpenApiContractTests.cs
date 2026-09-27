@@ -1,6 +1,4 @@
 using System.Text.Json;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using YamlDotNet.RepresentationModel;
 using Xunit;
 
@@ -11,11 +9,7 @@ public sealed class OpenApiContractTests
     [Fact]
     public async Task Generated_auth_contract_keeps_anonymous_security_responses_and_required_members()
     {
-        using var environment = TestEnvironment.Use();
-        await using var application = new TestApplication();
-        using var client = application.CreateClient();
-
-        using var document = JsonDocument.Parse(await client.GetStringAsync("/swagger/v1/swagger.json"));
+        using var document = await GeneratedOpenApi.ParseAsync();
         var root = document.RootElement;
         var paths = root.GetProperty("paths");
         var contract = LoadContract();
@@ -93,11 +87,5 @@ public sealed class OpenApiContractTests
         }
 
         return current;
-    }
-
-    private sealed class TestApplication : WebApplicationFactory<Program>
-    {
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-            => builder.UseEnvironment("Development");
     }
 }

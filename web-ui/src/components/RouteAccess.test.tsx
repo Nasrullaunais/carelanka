@@ -10,13 +10,14 @@ vi.mock('../services/auth/useSession', () => ({ useSession: () => current.role ?
 afterEach(cleanup);
 
 const shared = ['/capacity', '/wards', '/equipment', '/pharmacy'];
+const staffManagement = ['/staff', '/staff/coverage', '/staff/leave-approval'];
 // Explicit expectations keep navigation and its guard from silently drifting together.
 const allowed: Record<PrincipalRole, string[]> = {
   general_staff: [...shared, '/intake', '/patients', '/appointments', '/discharge'],
   ward_nurse: [...shared, '/intake', '/patients', '/appointments', '/discharge', '/care-recommendations', '/laboratory'],
   doctor: [...shared, '/patients', '/discharge', '/care-recommendations', '/laboratory'],
-  duty_manager: [...shared, '/emergency', '/intake', '/patients', '/appointments', '/discharge', '/care-recommendations', '/laboratory'],
-  hospital_administrator: [...shared, '/patients', '/appointments', '/discharge', '/billing-settings', '/maintenance-unit', '/warnings'],
+  duty_manager: [...shared, '/emergency', '/intake', '/patients', '/appointments', '/discharge', '/care-recommendations', '/laboratory', ...staffManagement],
+  hospital_administrator: [...shared, '/patients', '/appointments', '/discharge', '/billing-settings', '/maintenance-unit', '/warnings', ...staffManagement],
   equipment_manager: [...shared, '/patients', '/warnings', '/laboratory'],
   ambulance_crew: shared,
   patient: [],

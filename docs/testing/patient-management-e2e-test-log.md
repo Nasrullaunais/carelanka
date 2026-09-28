@@ -312,6 +312,7 @@ pass did not exercise it and the automated suite is the evidence.
 | E25 | 09-25 | Code review | Pre-register quietly linked a NIC already on a desk record (account takeover risk) | Refused with `cl_pat_051`; app offers "Use my patient code" | Pass — TC-PAT-71, 72, 73 |
 | E26 | 09-25 | Code review | `category_set_by_staff_id` could be sent by the client | Always the signed-in user | Pass — "Admitted by Ishara Jayasuriya" (TC-PAT-23) |
 | E27 | 09-12 | Contract test | `incoming_next_2h` serialised as `incoming_next2h` | Hand-written wire name | — |
+| E28 | 09-28 | Phone test on the demo server | The care agent added the patient's recorded symptoms, diabetes, the call bell and a follow-up to every reply, even "How many doctors work here?" and "Give me a list of all the patients" | Prompt now sorts a message into health or other first; other gets a short direct answer with nothing from the record, and no guessed facts | Pass — six messages against live `gemini-3.5-flash-lite`: the four non-health ones answered without the record, the two health ones still linked diabetes and refused Bactrim (sulfa allergy) |
 
 ---
 

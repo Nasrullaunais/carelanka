@@ -20,7 +20,8 @@ export const notificationTypeLabels: Record<NotificationType, string> = {
   cancellation_answered: 'Cancellation answered',
   emergency_call_received: 'Emergency call received',
   cancellation_request_waiting: 'Cancellation request waiting',
-  dispatch_proposal_waiting: 'Dispatch proposal waiting',
+  dispatch_proposal_waiting: 'Diversion needs approval',
+  dispatch_proposal_failed: 'No ambulance recommended',
   admission_awaiting_approval: 'Admission awaiting approval',
   care_query_flagged: 'Care query flagged',
   care_reply_waiting: 'Care reply waiting',
@@ -54,9 +55,10 @@ const notificationRoutes: Record<NotificationType, (entityId: string) => string>
   ambulance_on_the_way: () => '/emergency',
   ambulance_arrived: () => '/emergency',
   cancellation_answered: () => '/emergency',
-  emergency_call_received: () => '/emergency',
-  cancellation_request_waiting: () => '/emergency',
-  dispatch_proposal_waiting: () => '/emergency',
+  emergency_call_received: emergencyCall,
+  cancellation_request_waiting: () => '/emergency/cancellations',
+  dispatch_proposal_waiting: emergencyCall,
+  dispatch_proposal_failed: emergencyCall,
   admission_awaiting_approval: () => '/intake',
   care_query_flagged: () => '/care-recommendations',
   care_reply_waiting: () => '/care-recommendations',
@@ -70,6 +72,10 @@ const notificationRoutes: Record<NotificationType, (entityId: string) => string>
   shift_changed: () => '/staff/coverage',
   roster_proposal_waiting: () => '/staff/roster-proposals',
 };
+
+function emergencyCall(callId: string): string {
+  return callId ? `/emergency/calls/${encodeURIComponent(callId)}` : '/emergency';
+}
 
 export function routeForNotification(notification: InboxNotification): string | null {
   if (!notification.type) return null;

@@ -1,14 +1,14 @@
-import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { Chip, ChipLabel, Tab, TabIndicator, TabList, TabListContainer, Tabs } from '@heroui/react';
+import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Tab, TabIndicator, TabList, TabListContainer, Tabs } from '@heroui/react';
 import { useSession } from '../../services/auth/useSession';
 import { canManageEmergency } from '../../types/permissions';
 import { EmergencyDesk } from './components/emergency-desk';
-import { ProposalQueue } from './components/proposal-queue';
 import { FleetBoard } from './components/fleet-board';
 import { AmbulanceRegister } from './components/ambulance-register';
 import { CancellationQueue } from './components/cancellation-queue';
 import { EmergencyReports } from './components/emergency-reports';
-import { useActionableProposals } from './hooks/use-actionable-proposals';
+import { emergencyCallPath } from './domain';
+import { useRefreshOnNewNotification } from './hooks/use-refresh-on-new-notification';
 
 export interface EmergencyTabDefinition {
   id: string;
@@ -18,7 +18,6 @@ export interface EmergencyTabDefinition {
 
 export const emergencyTabs: EmergencyTabDefinition[] = [
   { id: 'calls', path: '', label: 'Calls' },
-  { id: 'proposals', path: 'proposals', label: 'Proposals' },
   { id: 'fleet', path: 'fleet', label: 'Fleet' },
   { id: 'register', path: 'register', label: 'Register' },
   { id: 'cancellations', path: 'cancellations', label: 'Cancellations' },
@@ -29,7 +28,7 @@ export function EmergencyRoutes() {
   const session = useSession();
   const navigate = useNavigate();
   const location = useLocation();
-  const proposals = useActionableProposals();
+  useRefreshOnNewNotification();
 
   if (!canManageEmergency(session?.principal.role)) {
     return <AccessDenied />;
@@ -60,28 +59,35 @@ export function EmergencyRoutes() {
             {emergencyTabs.map((tab) => (
               <Tab key={tab.id} id={tab.id} className={activeTab === tab.id ? 'emergency-tab-active' : undefined}>
                 <TabIndicator />
-                <span className="flex items-center gap-2">
-                  {tab.label}
-                  {tab.id === 'proposals' && proposals.pendingCount > 0 && (
-                    <Chip size="sm" color="warning"><ChipLabel>{proposals.pendingCount}</ChipLabel></Chip>
-                  )}
-                </span>
+                {tab.label}
               </Tab>
             ))}
           </TabList>
         </TabListContainer>
       </Tabs>
       <Routes>
-        <Route index element={<EmergencyDesk initialCallId={new URLSearchParams(location.search).get("call") ?? undefined} onReviewProposal={() => navigate("/emergency/proposals")} />} />
+        <Route index element={<DeskRoute />} />
         <Route path="calls" element={<Navigate to="/emergency" replace />} />
+        <Route path="calls/:callId" element={<DeskRoute />} />
         <Route path="*" element={<Navigate to="/emergency" replace />} />
-        <Route path="proposals" element={<ProposalQueue onOpenCall={(id) => navigate(`/emergency?call=${encodeURIComponent(id)}`)} />} />
         <Route path="fleet" element={<FleetBoard />} />
         <Route path="register" element={<AmbulanceRegister />} />
         <Route path="cancellations" element={<CancellationQueue />} />
         <Route path="reports" element={<EmergencyReports />} />
       </Routes>
     </div>
+  );
+}
+
+function DeskRoute() {
+  const { callId } = useParams();
+  const navigate = useNavigate();
+  return (
+    <EmergencyDesk
+      selectedCallId={callId}
+      onSelectCall={(id) => navigate(emergencyCallPath(id))}
+      onCloseCall={() => navigate('/emergency')}
+    />
   );
 }
 

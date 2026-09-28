@@ -28,7 +28,14 @@ RUN.md
 IMPORTANT.md
 PR_DRAFT.md
 OVERALL_EXPLANATION.md
+
+## Graft (local code map) — each person runs `graft init` for their own
 graft/
+.ignore
+.mcp.json
+.claude/settings.json
+.claude/helpers/graft-hooks.cjs
+.claude/helpers/graft-statusline.cjs
 
 
 

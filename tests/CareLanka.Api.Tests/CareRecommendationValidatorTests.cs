@@ -186,6 +186,28 @@ public sealed class CareRecommendationValidatorTests
         Assert.True(result.Passed, string.Join(", ", result.FailedRules));
     }
 
+    /// <summary>
+    /// The problems go back to the model as the thing to fix, so each has to name exactly what
+    /// was wrong - the medicine, the dose, the sentence - not just the rule number.
+    /// </summary>
+    [Fact]
+    public void Each_problem_names_exactly_what_was_wrong()
+    {
+        var result = Validate(
+            "Your head should settle. You can take ibuprofen for it. The usual amount is 400mg.",
+            reportedText: "my head hurts");
+
+        Assert.Contains(result.Problems, problem => problem.Contains("ibuprofen") && problem.Contains("did not mention"));
+        Assert.Contains(result.Problems, problem => problem.Contains("400mg"));
+        Assert.Contains(result.Problems, problem => problem.Contains("\"You can take ibuprofen for it\""));
+    }
+
+    [Fact]
+    public void A_draft_that_passes_has_no_problems()
+    {
+        Assert.Empty(Validate("A nurse will come and check on you this shift.").Problems);
+    }
+
     private static CareValidationResult Validate(
         string message, string? reportedText = null)
         => CareRecommendationValidator.Validate(

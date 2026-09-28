@@ -8,5 +8,6 @@ public enum DispatchProposalStatus
     Approved,
     Executed,
     Rejected,
-    Failed
+    Failed,
+    Withdrawn
 }

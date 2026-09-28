@@ -264,6 +264,31 @@ public sealed class EmergencyOpenApiContractTests
             names);
     }
 
+    [Theory]
+    [InlineData("DispatchProposalStatus")]
+    [InlineData("DispatchWithdrawalReason")]
+    public async Task Recommendation_enum_values_match_the_contract(string schema)
+    {
+        using var document = await GeneratedOpenApi.ParseAsync();
+        var expected = Sequence(LoadContract(), "components", "schemas", schema, "enum")
+            .Children.Cast<YamlScalarNode>().Select(value => value.Value!).ToHashSet();
+        var generated = document.RootElement
+            .GetProperty("components").GetProperty("schemas").GetProperty(schema)
+            .GetProperty("enum").EnumerateArray().Select(value => value.GetString()!).ToHashSet();
+
+        Assert.True(expected.SetEquals(generated), $"{schema}: generated [{string.Join(", ", generated)}]");
+    }
+
+    [Fact]
+    public async Task Every_call_carries_its_latest_recommendation()
+    {
+        using var document = await GeneratedOpenApi.ParseAsync();
+        var summary = Keys(document.RootElement, "components", "schemas", "EmergencyCallSummary", "properties");
+
+        Assert.Contains("latest_proposal", summary);
+        Assert.DoesNotContain("open_proposal_id", summary);
+    }
+
     [Fact]
     public async Task Unknown_diversion_estimates_are_nullable()
     {

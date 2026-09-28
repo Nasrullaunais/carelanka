@@ -6,6 +6,7 @@ namespace CareLanka.Api.Services.Emergency;
 public interface IDispatchProposalService
 {
     Task<DispatchProposalSummary> StartAsync(CreateDispatchProposalRequest request, CancellationToken cancellationToken = default);
+    Task<IReadOnlyDictionary<Guid, DispatchProposalSummary>> LatestByCallAsync(IReadOnlyCollection<Guid> callIds, CancellationToken cancellationToken = default);
     Task<PagedResult<DispatchProposalSummary>> ListAsync(ListDispatchProposalsRequest request, CancellationToken cancellationToken = default);
     Task<DispatchProposalDetail> GetAsync(Guid proposalId, CancellationToken cancellationToken = default);
     Task<DispatchProposalDetail> ConfirmAsync(Guid proposalId, CancellationToken cancellationToken = default);

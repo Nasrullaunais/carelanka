@@ -24,6 +24,8 @@ public sealed class DispatchProposalDetail : DispatchProposalSummary
     public DateTimeOffset? ReviewedAt { get; set; }
     public string? ReviewNotes { get; set; }
     public DispatchRejectionReason? RejectionReason { get; set; }
+    public DispatchWithdrawalReason? WithdrawalReason { get; set; }
+    public DateTimeOffset? WithdrawnAt { get; set; }
 }
 
 public sealed class DispatchProposalError

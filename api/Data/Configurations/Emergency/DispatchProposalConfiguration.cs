@@ -8,6 +8,8 @@ namespace CareLanka.Api.Data.Configurations.Emergency;
 
 public sealed class DispatchProposalConfiguration : IEntityTypeConfiguration<DispatchProposal>
 {
+    public const string OpenPerCallUniqueIndex = "ux_dispatch_proposals_open_per_call";
+
     public void Configure(EntityTypeBuilder<DispatchProposal> builder)
     {
         builder.ToTable("dispatch_proposals", table =>
@@ -19,6 +21,9 @@ public sealed class DispatchProposalConfiguration : IEntityTypeConfiguration<Dis
             table.HasCheckConstraint(
                 "ck_dispatch_proposals_recommendation_source",
                 EnumWire.CheckConstraint<DispatchRecommendationSource>("recommendation_source"));
+            table.HasCheckConstraint(
+                "ck_dispatch_proposals_withdrawal_reason",
+                EnumWire.CheckConstraint<DispatchWithdrawalReason>("withdrawal_reason"));
         });
 
         builder.HasKey(proposal => proposal.Id);
@@ -42,6 +47,10 @@ public sealed class DispatchProposalConfiguration : IEntityTypeConfiguration<Dis
         builder.Property(proposal => proposal.RejectionReason)
             .HasConversion(new SnakeCaseEnumConverter<DispatchRejectionReason>())
             .HasMaxLength(40);
+        builder.Property(proposal => proposal.WithdrawalReason)
+            .HasConversion(new SnakeCaseEnumConverter<DispatchWithdrawalReason>())
+            .HasMaxLength(30);
+        builder.Property(proposal => proposal.Version).IsRowVersion();
         builder.Property(proposal => proposal.RecommendationSource)
             .HasConversion(new SnakeCaseEnumConverter<DispatchRecommendationSource>())
             .HasMaxLength(30);
@@ -59,7 +68,7 @@ public sealed class DispatchProposalConfiguration : IEntityTypeConfiguration<Dis
         builder.HasIndex(proposal => proposal.Status);
         builder.HasIndex(proposal => proposal.WorkflowId).IsUnique();
         builder.HasIndex(proposal => proposal.EmergencyCallId)
-            .HasDatabaseName("ux_dispatch_proposals_open_per_call")
+            .HasDatabaseName(OpenPerCallUniqueIndex)
             .IsUnique()
             .HasFilter("status IN ('pending', 'pending_confirmation', 'pending_approval')");
     }

@@ -16,6 +16,7 @@ public static class NotificationTypeExtensions
         NotificationType.AmbulanceArrived => AndroidChannels.Urgent,
         NotificationType.EmergencyCallReceived => AndroidChannels.Urgent,
         NotificationType.DispatchProposalWaiting => AndroidChannels.Urgent,
+        NotificationType.DispatchProposalFailed => AndroidChannels.Urgent,
         NotificationType.CareQueryFlagged => AndroidChannels.Urgent,
         _ => AndroidChannels.General
     };

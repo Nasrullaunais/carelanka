@@ -109,8 +109,10 @@ paths:
         `false`, the caller becomes the new patient's emergency contact once Patient
         Management creates that record.
 
-        Call intake succeeds without AI, Maps, push, or Patient Management. The Duty
-        Manager may dispatch manually or request a recommendation separately.
+        Call intake succeeds without AI, Maps, push, or Patient Management. Saving the
+        call also opens a dispatch recommendation in the same transaction, so the agent
+        is already working when the Duty Manager opens the call. The Duty Manager may
+        still dispatch manually; doing so withdraws that recommendation.
       operationId: createEmergencyCall
       requestBody:
         required: true
@@ -211,9 +213,11 @@ paths:
         Roles: DutyManager.
 
         Callers under stress give partial information, and the picture changes as
-        the dispatcher keeps them talking. Raising `priority` re-runs the agent so
-        the ranking reflects what is now known — a call upgraded to `critical` should
-        not keep waiting behind the queue it was placed in when it looked routine.
+        the dispatcher keeps them talking. Changing `priority` or the scene location
+        of a call still waiting for an ambulance withdraws its open recommendation
+        (`call_changed`) and opens a new one — a call upgraded to `critical` should
+        not keep a recommendation made when it looked routine. Saving an unchanged
+        value re-runs nothing.
       operationId: updateEmergencyCall
       requestBody:
         required: true
@@ -359,7 +363,8 @@ paths:
         call, recomputes ambulance eligibility, creates the Dispatch, snapshots all
         current AmbulanceCrewAssignment rows into DispatchCrew, and updates the call
         and ambulance projections. The agent's confirm operation delegates to this
-        same command. No ambulance moves before this human confirmation.
+        same command. No ambulance moves before this human confirmation. Dispatching
+        by hand withdraws the call's open recommendation (`dispatched_manually`).
       operationId: dispatchEmergencyCall
       requestBody:
         required: true
@@ -828,6 +833,12 @@ paths:
           `pending_approval` with a populated `diversion_impact`.
         - Nothing at all → `failed`, outcome `no_ambulance_available`. Recorded
           honestly rather than retried in a loop.
+
+        **Most recommendations open without this call.** One opens automatically when a
+        call is created, when its priority or scene changes, when a crew declines or a
+        dispatch is cancelled (excluding that ambulance), when a diversion takes the
+        call's ambulance away, and after some rejections. This operation is the Duty
+        Manager's "Re-check" for a call with no open recommendation.
       operationId: createDispatchProposal
       requestBody:
         required: true
@@ -1002,7 +1013,14 @@ paths:
 
         Nothing is applied and the call stays unassigned, so it keeps appearing in
         the `unassignedOnly` board — rejecting a proposal does not make the emergency
-        go away, and the dispatcher is expected to assign manually or re-plan.
+        go away.
+
+        Some reasons open a follow-up recommendation in the same transaction:
+
+        - `ambulance_unsuitable` → re-run, adding the rejected ambulance to the exclusions.
+        - `unsafe_diversion`, `source_call_too_urgent_to_divert` → re-run with
+          `allow_diversion: false`.
+        - Any other reason → nothing; the dispatcher assigns manually or re-checks.
 
         `reason` is required and feeds the agent-performance report: a proposal
         rejected as `unsafe_diversion` is evidence the validator missed something.
@@ -1924,7 +1942,9 @@ components:
         rather than one, because the two human gates are genuinely different sizes:
         `pending_confirmation` is a one-tap send, `pending_approval` is a diversion
         that needs reading. **There is no auto-approved state** — nothing this agent
-        proposes reaches the road without a person.
+        proposes reaches the road without a person. `withdrawn` means the system closed
+        it because it no longer applied (see `DispatchWithdrawalReason`); unlike
+        `rejected`, no person reviewed it, so it does not count in agent performance.
       enum:
         - pending
         - pending_confirmation
@@ -1933,6 +1953,18 @@ components:
         - executed
         - rejected
         - failed
+        - withdrawn
+
+    DispatchWithdrawalReason:
+      type: string
+      description: |
+        Why the system closed a recommendation. `call_changed` — priority or scene moved
+        and a new one opened. `dispatched_manually` — the Duty Manager sent an ambulance
+        by hand. `call_closed` — the call was cancelled.
+      enum:
+        - call_changed
+        - dispatched_manually
+        - call_closed
 
     DispatchRecommendationSource:
       type: string
@@ -2025,7 +2057,11 @@ components:
         latitude: { type: number, format: double }
         longitude: { type: number, format: double }
         active_dispatch_id: { type: string, format: uuid, nullable: true }
-        open_proposal_id: { type: string, format: uuid, nullable: true }
+        latest_proposal:
+          allOf:
+            - $ref: '#/components/schemas/DispatchProposalSummary'
+          nullable: true
+          description: The call's most recent dispatch recommendation, whatever its status. Null when none was ever opened.
         waiting_minutes:
           type: integer
           description: Minutes since the call came in, while still unassigned. The board sorts on this.
@@ -2040,7 +2076,11 @@ components:
               type: array
               description: Every dispatch raised against this call, including superseded ones.
               items: { $ref: '#/components/schemas/DispatchSummary' }
-            open_proposal_id: { type: string, format: uuid, nullable: true }
+            latest_proposal:
+              allOf:
+                - $ref: '#/components/schemas/DispatchProposalSummary'
+              nullable: true
+              description: The call's most recent dispatch recommendation, whatever its status. Null when none was ever opened.
 
     CreateEmergencyCallRequest:
       type: object
@@ -2295,6 +2335,11 @@ components:
               allOf:
                 - $ref: '#/components/schemas/DispatchRejectionReason'
               nullable: true
+            withdrawal_reason:
+              allOf:
+                - $ref: '#/components/schemas/DispatchWithdrawalReason'
+              nullable: true
+            withdrawn_at: { type: string, format: date-time, nullable: true }
 
     DiversionImpact:
       type: object

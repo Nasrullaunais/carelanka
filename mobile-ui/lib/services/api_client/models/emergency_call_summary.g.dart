@@ -21,7 +21,11 @@ EmergencyCallSummary _$EmergencyCallSummaryFromJson(
   latitude: (json['latitude'] as num?)?.toDouble(),
   longitude: (json['longitude'] as num?)?.toDouble(),
   activeDispatchId: json['active_dispatch_id'] as String?,
-  openProposalId: json['open_proposal_id'] as String?,
+  latestProposal: json['latest_proposal'] == null
+      ? null
+      : DispatchProposalSummary.fromJson(
+          json['latest_proposal'] as Map<String, dynamic>,
+        ),
   waitingMinutes: (json['waiting_minutes'] as num?)?.toInt(),
   createdAt: json['created_at'] == null
       ? null
@@ -39,7 +43,7 @@ Map<String, dynamic> _$EmergencyCallSummaryToJson(
   'latitude': instance.latitude,
   'longitude': instance.longitude,
   'active_dispatch_id': instance.activeDispatchId,
-  'open_proposal_id': instance.openProposalId,
+  'latest_proposal': instance.latestProposal,
   'waiting_minutes': instance.waitingMinutes,
   'created_at': instance.createdAt?.toIso8601String(),
 };

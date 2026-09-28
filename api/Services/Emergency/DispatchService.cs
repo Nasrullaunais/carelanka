@@ -24,11 +24,12 @@ public sealed class DispatchService : IDispatchService
     private readonly EmergencyOptions _options;
     private readonly ISceneLookupQueue _sceneLookups;
     private readonly INotifier _notifier;
+    private readonly IDispatchProposalLifecycle _proposals;
 
     public DispatchService(CareLankaDbContext db, IAmbulanceEligibilityService eligibility,
         ICurrentUser currentUser, TimeProvider clock, IOptions<EmergencyOptions> options, ISceneLookupQueue sceneLookups,
-        INotifier notifier)
-        => (_db, _eligibility, _currentUser, _clock, _options, _sceneLookups, _notifier) = (db, eligibility, currentUser, clock, options.Value, sceneLookups, notifier);
+        INotifier notifier, IDispatchProposalLifecycle proposals)
+        => (_db, _eligibility, _currentUser, _clock, _options, _sceneLookups, _notifier, _proposals) = (db, eligibility, currentUser, clock, options.Value, sceneLookups, notifier, proposals);
 
     private static readonly Dictionary<DispatchStatus, AmbulanceStatus> ProgressProjection = new()
     {
@@ -41,6 +42,7 @@ public sealed class DispatchService : IDispatchService
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
         var dispatch = await CreateCoreAsync(callId, request.AmbulanceId!.Value, ct);
+        await _proposals.WithdrawOpenAsync(callId, DispatchWithdrawalReason.DispatchedManually, ct);
         await SaveAsync(ct);
         await transaction.CommitAsync(ct);
         QueueRoutePlan(dispatch);
@@ -75,8 +77,10 @@ public sealed class DispatchService : IDispatchService
         var replacement = await CreateCoreAsync(newCallId, replacementAmbulanceId, ct);
         replacement.DispatchProposalId = proposalId;
         source.SupersededByDispatchId = replacement.Id;
+        var sourceRecommendation = await ReopenAsync(source, excludeOwnAmbulance: false, ct);
         await SaveAsync(ct);
         await transaction.CommitAsync(ct);
+        _proposals.Wake(sourceRecommendation);
         QueueRoutePlan(replacement);
         return ToDetail(replacement);
     }
@@ -202,7 +206,9 @@ public sealed class DispatchService : IDispatchService
         dispatch.DeclinedReason = request.Reason!.Trim();
         dispatch.Ambulance.Status = AmbulanceStatus.Available;
         dispatch.EmergencyCall.Status = CallStatus.Received;
+        var recommendation = await ReopenAsync(dispatch, excludeOwnAmbulance: true, ct);
         await SaveAsync(ct);
+        _proposals.Wake(recommendation);
         return ToDetail(dispatch);
     }
 
@@ -265,7 +271,9 @@ public sealed class DispatchService : IDispatchService
         var dispatch = await LoadAsync(id, ct);
         CancelCore(dispatch);
         dispatch.CancellationReason = request.Reason!.Trim();
+        var recommendation = await ReopenAsync(dispatch, excludeOwnAmbulance: true, ct);
         await SaveAsync(ct);
+        _proposals.Wake(recommendation);
         return ToDetail(dispatch);
     }
 
@@ -345,6 +353,13 @@ public sealed class DispatchService : IDispatchService
         return dispatch;
     }
 
+    private async Task<DispatchProposal> ReopenAsync(Dispatch returned, bool excludeOwnAmbulance, CancellationToken ct)
+    {
+        var excluded = (await _proposals.CarriedExclusionsAsync(returned.EmergencyCallId, ct)).ToList();
+        if (excludeOwnAmbulance) excluded.Add(returned.AmbulanceId);
+        return _proposals.Open(returned.EmergencyCallId, returned.EmergencyCall.Priority, allowDiversion: true, excluded);
+    }
+
     private async Task SaveAsync(CancellationToken ct)
     {
         try
@@ -364,6 +379,11 @@ public sealed class DispatchService : IDispatchService
         { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: DispatchConfiguration.ActiveCallUniqueIndex })
         {
             throw new ConflictException(MessageCode.CallNotAwaitingDispatch);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException
+        { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: DispatchProposalConfiguration.OpenPerCallUniqueIndex })
+        {
+            throw new ConflictException(MessageCode.DispatchProposalConflict);
         }
     }
 

@@ -483,6 +483,7 @@ builder.Services.AddHostedService<DemoFleetLocationWorker>();
 builder.Services.AddScoped<IDispatchAgentTools, DispatchAgentTools>();
 builder.Services.AddScoped<IDispatchAdvisor, GeminiDispatchAdvisor>();
 builder.Services.AddScoped<IDispatchAgent, DispatchAgent>();
+builder.Services.AddScoped<IDispatchProposalLifecycle, DispatchProposalLifecycle>();
 builder.Services.AddScoped<IDispatchProposalService, DispatchProposalService>();
 builder.Services.AddScoped<DispatchProposalExecutor>();
 builder.Services.AddSingleton<IDispatchRunQueue, DispatchRunQueue>();

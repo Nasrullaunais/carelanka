@@ -6,6 +6,7 @@ import 'package:json_annotation/json_annotation.dart';
 
 import 'call_priority.dart';
 import 'call_status.dart';
+import 'dispatch_proposal_summary.dart';
 
 part 'emergency_call_summary.g.dart';
 
@@ -20,7 +21,7 @@ class EmergencyCallSummary {
     this.latitude,
     this.longitude,
     this.activeDispatchId,
-    this.openProposalId,
+    this.latestProposal,
     this.waitingMinutes,
     this.createdAt,
   });
@@ -38,8 +39,8 @@ class EmergencyCallSummary {
   final double? longitude;
   @JsonKey(name: 'active_dispatch_id')
   final String? activeDispatchId;
-  @JsonKey(name: 'open_proposal_id')
-  final String? openProposalId;
+  @JsonKey(name: 'latest_proposal')
+  final DispatchProposalSummary? latestProposal;
   @JsonKey(name: 'waiting_minutes')
   final int? waitingMinutes;
   @JsonKey(name: 'created_at')

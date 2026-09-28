@@ -12,7 +12,7 @@ public sealed class EmergencyCallSummary
     public decimal Latitude { get; set; }
     public decimal Longitude { get; set; }
     public Guid? ActiveDispatchId { get; set; }
-    public Guid? OpenProposalId { get; set; }
+    public DispatchProposalSummary? LatestProposal { get; set; }
     public int WaitingMinutes { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }

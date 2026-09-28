@@ -1517,9 +1517,10 @@ export type MyLabReportPagedResult = {
 export type MyPrescription = {
     id: string;
     note?: string | null;
-    file_name: string;
-    content_type: string;
-    byte_size: number;
+    file_name?: string | null;
+    content_type?: string | null;
+    byte_size?: number | null;
+    body?: string | null;
     status: PrescriptionStatus;
     token_date?: string | null;
     token_number?: number | null;
@@ -1816,9 +1817,11 @@ export type Prescription = {
     patient_code: string;
     patient_name: string;
     note?: string | null;
-    file_name: string;
-    content_type: string;
-    byte_size: number;
+    file_name?: string | null;
+    content_type?: string | null;
+    byte_size?: number | null;
+    body?: string | null;
+    prescribed_by_staff_id?: string | null;
     status: PrescriptionStatus;
     token_date?: string | null;
     token_number?: number | null;
@@ -9351,6 +9354,47 @@ export type ListPrescriptionsResponses = {
 
 export type ListPrescriptionsResponse = ListPrescriptionsResponses[keyof ListPrescriptionsResponses];
 
+export type CreatePrescriptionData = {
+    body?: {
+        PatientId?: string;
+        Body?: string;
+        File?: Blob | File;
+    };
+    path?: never;
+    query?: never;
+    url: '/prescriptions';
+};
+
+export type CreatePrescriptionErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type CreatePrescriptionError = CreatePrescriptionErrors[keyof CreatePrescriptionErrors];
+
+export type CreatePrescriptionResponses = {
+    /**
+     * Created
+     */
+    201: Prescription;
+};
+
+export type CreatePrescriptionResponse = CreatePrescriptionResponses[keyof CreatePrescriptionResponses];
+
 export type DownloadPrescriptionData = {
     body?: never;
     path: {
@@ -9361,6 +9405,10 @@ export type DownloadPrescriptionData = {
 };
 
 export type DownloadPrescriptionErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
     /**
      * Unauthorized
      */

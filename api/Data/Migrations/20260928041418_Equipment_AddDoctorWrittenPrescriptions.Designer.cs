@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using CareLanka.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CareLanka.Api.Data.Migrations
 {
     [DbContext(typeof(CareLankaDbContext))]
-    partial class CareLankaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260928041418_Equipment_AddDoctorWrittenPrescriptions")]
+    partial class Equipment_AddDoctorWrittenPrescriptions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -585,6 +588,10 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
+                    b.Property<DateOnly?>("JoiningDate")
+                        .HasColumnType("date")
+                        .HasColumnName("joining_date");
+
                     b.Property<string>("LastName")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -602,11 +609,26 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("phone_number");
 
+                    b.Property<string>("RegistrationNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("registration_number");
+
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
                         .HasColumnName("role");
+
+                    b.Property<string>("Specialization")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("specialization");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("title");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -620,9 +642,16 @@ namespace CareLanka.Api.Data.Migrations
                         .HasDatabaseName("ux_staff_members_email")
                         .HasFilter("is_active");
 
+                    b.HasIndex("RegistrationNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ux_staff_members_registration_number")
+                        .HasFilter("is_active AND registration_number IS NOT NULL");
+
                     b.ToTable("staff_members", null, t =>
                         {
                             t.HasCheckConstraint("ck_staff_members_role", "role IN ('ward_nurse', 'doctor', 'ambulance_crew', 'general_staff', 'duty_manager', 'hospital_administrator', 'equipment_manager')");
+
+                            t.HasCheckConstraint("ck_staff_members_title", "title IN ('mr', 'mrs', 'ms', 'miss', 'dr', 'prof')");
                         });
                 });
 

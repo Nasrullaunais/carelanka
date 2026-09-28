@@ -11,14 +11,14 @@ public class MyPrescription
 
     public string? Note { get; set; }
 
-    [Required]
-    public string FileName { get; set; } = string.Empty;
+    public string? FileName { get; set; }
 
-    [Required]
-    public string ContentType { get; set; } = string.Empty;
+    public string? ContentType { get; set; }
 
-    [Required]
-    public int ByteSize { get; set; }
+    public int? ByteSize { get; set; }
+
+    /// <summary>What the doctor typed directly, when this one has no photographed file.</summary>
+    public string? Body { get; set; }
 
     [Required]
     public PrescriptionStatus Status { get; set; }

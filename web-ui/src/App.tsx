@@ -12,6 +12,7 @@ import { DischargePage } from './pages/DischargePage';
 import { EquipmentPage } from './pages/EquipmentPage';
 import { IntakePage } from './pages/IntakePage';
 import { LaboratoryPage } from './pages/LaboratoryPage';
+import { PrescriptionsPage } from './pages/PrescriptionsPage';
 import { LoginPage } from './pages/LoginPage';
 import { MaintenanceUnitPage } from './pages/MaintenanceUnitPage';
 import { WarningsPage } from './pages/WarningsPage';
@@ -79,6 +80,7 @@ export function App() {
           <Route path="/warnings" element={<WarningsPage />} />
           <Route path="/laboratory" element={<LaboratoryPage />} />
           <Route path="/pharmacy" element={<PharmacyPage />} />
+          <Route path="/prescriptions" element={<PrescriptionsPage />} />
           <Route path="/staff" element={<StaffManagementPage />} />
           <Route path="/staff/coverage" element={<WardCoveragePage />} />
           <Route path="/staff/leave-approval" element={<StaffLeaveApprovalPage />} />

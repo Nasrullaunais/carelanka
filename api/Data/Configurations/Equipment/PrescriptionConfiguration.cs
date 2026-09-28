@@ -17,14 +17,19 @@ public class PrescriptionConfiguration : IEntityTypeConfiguration<Prescription>
             t.HasCheckConstraint("ck_prescriptions_byte_size", "byte_size > 0");
             t.HasCheckConstraint(
                 "ck_prescriptions_status", EnumWire.CheckConstraint<PrescriptionStatus>("status"));
+            // Exactly one of the two ways a prescription is born: a photographed file, or a
+            // doctor's typed body. Never both, never neither.
+            t.HasCheckConstraint(
+                "ck_prescriptions_file_xor_body",
+                "(file_name IS NOT NULL AND body IS NULL) OR (file_name IS NULL AND body IS NOT NULL)");
         });
 
         builder.HasKey(p => p.Id);
 
         builder.Property(p => p.Note).HasMaxLength(500);
-        builder.Property(p => p.FileName).HasMaxLength(255).IsRequired();
-        builder.Property(p => p.ContentType).HasMaxLength(100).IsRequired();
-        builder.Property(p => p.Content).IsRequired();
+        builder.Property(p => p.FileName).HasMaxLength(255);
+        builder.Property(p => p.ContentType).HasMaxLength(100);
+        builder.Property(p => p.Body).HasMaxLength(4000);
         builder.Property(p => p.RejectionReason).HasMaxLength(500);
 
         builder.Property(p => p.Status)

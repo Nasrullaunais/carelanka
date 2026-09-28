@@ -359,6 +359,9 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.EquipmentManager),
         EnumWire.ToWire(StaffRole.HospitalAdministrator)));
 
+    options.AddPolicy(Policies.PrescriptionAuthor, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.Doctor)));
+
     options.AddPolicy(Policies.MaintenanceDesk, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.HospitalAdministrator)));
 

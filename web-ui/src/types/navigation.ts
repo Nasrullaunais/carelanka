@@ -1,4 +1,4 @@
-import { Ambulance, BedDouble, CalendarCheck, CalendarDays, ClipboardCheck, ClipboardList, FlaskConical, HeartPulse, Hospital, KeyRound, Package, Pill, Settings2, ShieldAlert, UserCog, UserPlus, Users, Wrench, type LucideIcon } from 'lucide-react';
+import { Ambulance, BedDouble, CalendarCheck, CalendarDays, ClipboardCheck, ClipboardList, FlaskConical, HeartPulse, Hospital, KeyRound, Package, Pill, Settings2, ShieldAlert, Stethoscope, UserCog, UserPlus, Users, Wrench, type LucideIcon } from 'lucide-react';
 import type { PrincipalRole } from '../services/api/generated';
 import {
   canManageEmergency,
@@ -9,6 +9,7 @@ import {
   canReadWarnings,
   canReadLabReports,
   canReadWards,
+  canWritePrescription,
   canRegisterPatient,
   canOpenAppointmentBoard,
   canOpenDischargeBoard,
@@ -144,6 +145,14 @@ export const destinations: Destination[] = [
     label: 'Pharmacy',
     description: 'Search medicines and supplies, see what is on the shelf, record what moves.',
     canAccess: canReadEquipment,
+  },
+  {
+    to: '/prescriptions',
+    icon: Stethoscope,
+    group: 'Patient care',
+    label: 'Prescriptions',
+    description: 'Look up a patient and write a prescription straight to the pharmacy queue.',
+    canAccess: canWritePrescription,
   },
   {
     to: '/staff',

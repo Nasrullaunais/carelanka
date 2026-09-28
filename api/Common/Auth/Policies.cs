@@ -104,6 +104,10 @@ public static class Policies
     // code on top of the role - the pharmacy's own staff, or the administrator.
     public const string PharmacyRemover = nameof(PharmacyRemover);
 
+    // Writing a prescription directly for a patient is clinical work - the doctor alone, the
+    // same as MedicalProfileAuthor's reasoning.
+    public const string PrescriptionAuthor = nameof(PrescriptionAuthor);
+
     // The maintenance unit is run by the hospital administrator: booking work, reading the work
     // list, and confirming it done. The equipment manager reports faults and nothing more here.
     public const string MaintenanceDesk = nameof(MaintenanceDesk);

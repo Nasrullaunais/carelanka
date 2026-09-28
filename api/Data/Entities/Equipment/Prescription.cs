@@ -2,8 +2,9 @@ using CareLanka.Api.Data.Enums;
 
 namespace CareLanka.Api.Data.Entities.Equipment;
 
-// A photo or PDF of a doctor's prescription a patient sends from the app, so the pharmacy can
-// have the medicine ready before they arrive and they collect it by token instead of queueing.
+// Two ways one of these is born: a patient photographs a paper prescription and sends it from
+// the app (FileName/ContentType/Content set, Body null), or a doctor types one directly for a
+// patient they looked up (Body set, no file). Exactly one of the two is ever present.
 public class Prescription : AuditedEntity
 {
     // Patient Management's row, id only - the same reference LabReport keeps.
@@ -11,13 +12,19 @@ public class Prescription : AuditedEntity
 
     public string? Note { get; set; }
 
-    public string FileName { get; set; } = null!;
+    public string? FileName { get; set; }
 
-    public string ContentType { get; set; } = null!;
+    public string? ContentType { get; set; }
 
-    public byte[] Content { get; set; } = null!;
+    public byte[]? Content { get; set; }
 
-    public int ByteSize { get; set; }
+    public int? ByteSize { get; set; }
+
+    /// <summary>What a doctor typed directly, in place of a photographed file.</summary>
+    public string? Body { get; set; }
+
+    /// <summary>Set only when a doctor wrote this one directly; null for a patient's own upload.</summary>
+    public Guid? PrescribedByStaffId { get; set; }
 
     public PrescriptionStatus Status { get; set; }
 

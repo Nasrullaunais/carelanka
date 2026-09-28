@@ -10,6 +10,7 @@ namespace CareLanka.Api.Tests;
 public sealed class PrescriptionEndpointTests
 {
     private static readonly byte[] Jpeg = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46];
+    private static readonly byte[] Pdf = [0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x34];
 
     private readonly ApiApplication _application;
 
@@ -159,6 +160,141 @@ public sealed class PrescriptionEndpointTests
         Assert.Equal(HttpStatusCode.OK, file.StatusCode);
         Assert.Equal("image/jpeg", file.Content.Headers.ContentType?.MediaType);
         Assert.Equal(Jpeg, await file.Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact]
+    public async Task A_doctor_writes_one_directly_and_the_pharmacy_and_patient_both_see_it()
+    {
+        using var patient = await LinkedPatientAsync("Rx Doctor Written");
+        using var doctor = await StaffAsync(ApiApplication.DoctorEmail);
+        using var pharmacy = await StaffAsync(ApiApplication.EquipmentEmail);
+
+        var patientId = await FindPatientIdAsync(doctor, "Rx Doctor Written");
+
+        var created = await CreateDirectlyAsync(
+            doctor, patientId, body: "Amoxicillin 250mg, one three times a day for five days.");
+        using var createdBody = await ReadJsonAsync(created);
+
+        using var waiting = await ReadJsonAsync(await pharmacy.GetAsync("/api/prescriptions?status=submitted"));
+        var row = Assert.Single(
+            waiting.RootElement.EnumerateArray(), p => p.GetProperty("patient_id").GetGuid() == patientId);
+
+        using var mine = await ReadJsonAsync(await patient.GetAsync("/api/me/prescriptions"));
+        var seen = Assert.Single(mine.RootElement.EnumerateArray());
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        Assert.Equal("submitted", createdBody.RootElement.GetProperty("status").GetString());
+        Assert.Equal(
+            "Amoxicillin 250mg, one three times a day for five days.",
+            createdBody.RootElement.GetProperty("body").GetString());
+        Assert.Equal("Rx Doctor Written", row.GetProperty("patient_name").GetString());
+        Assert.Equal(
+            "Amoxicillin 250mg, one three times a day for five days.",
+            seen.GetProperty("body").GetString());
+    }
+
+    [Fact]
+    public async Task Only_a_doctor_may_write_a_prescription_directly()
+    {
+        using var patient = await LinkedPatientAsync("Rx Not A Doctor");
+        using var pharmacy = await StaffAsync(ApiApplication.EquipmentEmail);
+        using var nurse = await StaffAsync(ApiApplication.NurseEmail);
+
+        var patientId = await FindPatientIdAsync(pharmacy, "Rx Not A Doctor");
+
+        var byPharmacy = await CreateDirectlyAsync(pharmacy, patientId, body: "Should not be allowed.");
+        var byNurse = await CreateDirectlyAsync(nurse, patientId, body: "Should not be allowed.");
+
+        Assert.Equal(HttpStatusCode.Forbidden, byPharmacy.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, byNurse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Writing_one_directly_needs_a_real_patient_and_exactly_one_of_body_or_file()
+    {
+        using var doctor = await StaffAsync(ApiApplication.DoctorEmail);
+
+        var unknownPatient = await CreateDirectlyAsync(doctor, Guid.NewGuid(), body: "Panadol 500mg.");
+        var neither = await CreateDirectlyAsync(doctor, Guid.NewGuid());
+        var both = await CreateDirectlyAsync(doctor, Guid.NewGuid(), body: "Panadol 500mg.", file: Pdf);
+
+        Assert.Equal(HttpStatusCode.NotFound, unknownPatient.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, neither.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, both.StatusCode);
+    }
+
+    [Fact]
+    public async Task One_written_directly_has_no_file_to_download()
+    {
+        using var patient = await LinkedPatientAsync("Rx No File");
+        using var doctor = await StaffAsync(ApiApplication.DoctorEmail);
+        using var pharmacy = await StaffAsync(ApiApplication.EquipmentEmail);
+
+        var patientId = await FindPatientIdAsync(doctor, "Rx No File");
+        using var createdBody = await ReadJsonAsync(
+            await CreateDirectlyAsync(doctor, patientId, body: "Panadol 500mg."));
+        var id = createdBody.RootElement.GetProperty("id").GetGuid();
+
+        var file = await pharmacy.GetAsync($"/api/prescriptions/{id}/file");
+        using var fileBody = await ReadJsonAsync(file);
+
+        Assert.Equal(HttpStatusCode.BadRequest, file.StatusCode);
+        Assert.Equal("cl_equ_032", fileBody.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task A_doctor_can_attach_a_pdf_instead_of_typing_it()
+    {
+        using var patient = await LinkedPatientAsync("Rx Doctor Pdf");
+        using var doctor = await StaffAsync(ApiApplication.DoctorEmail);
+        using var pharmacy = await StaffAsync(ApiApplication.EquipmentEmail);
+
+        var patientId = await FindPatientIdAsync(doctor, "Rx Doctor Pdf");
+
+        var created = await CreateDirectlyAsync(
+            doctor, patientId, file: Pdf, contentType: "application/pdf", fileName: "rx.pdf");
+        using var createdBody = await ReadJsonAsync(created);
+        var id = createdBody.RootElement.GetProperty("id").GetGuid();
+
+        var downloaded = await pharmacy.GetAsync($"/api/prescriptions/{id}/file");
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        Assert.Equal(JsonValueKind.Null, createdBody.RootElement.GetProperty("body").ValueKind);
+        Assert.Equal("application/pdf", downloaded.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(Pdf, await downloaded.Content.ReadAsByteArrayAsync());
+    }
+
+    private static Task<HttpResponseMessage> CreateDirectlyAsync(
+        HttpClient doctor,
+        Guid patientId,
+        string? body = null,
+        byte[]? file = null,
+        string contentType = "application/pdf",
+        string fileName = "rx.pdf")
+    {
+        var form = new MultipartFormDataContent { { new StringContent(patientId.ToString()), "PatientId" } };
+
+        if (body is not null)
+        {
+            form.Add(new StringContent(body), "Body");
+        }
+
+        if (file is not null)
+        {
+            var content = new ByteArrayContent(file);
+            content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+            form.Add(content, "File", fileName);
+        }
+
+        return doctor.PostAsync("/api/prescriptions", form);
+    }
+
+    private static async Task<Guid> FindPatientIdAsync(HttpClient staff, string fullName)
+    {
+        using var body = await ReadJsonAsync(
+            await staff.GetAsync($"/api/patients?search={Uri.EscapeDataString(fullName)}"));
+
+        return body.RootElement.GetProperty("items")[0].GetProperty("id").GetGuid();
     }
 
     private static async Task<Guid> UploadedIdAsync(HttpClient patient)

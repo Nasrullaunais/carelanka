@@ -1430,6 +1430,40 @@ paths:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /prescriptions:
+    post:
+      tags: [Pharmacy]
+      summary: A doctor writes one directly for a patient
+      description: |
+        Roles: Doctor. *(Rev 1, 2026-09-28; Rev 2, 2026-09-28 added the file option.)*
+
+        The other way one of these is born, alongside a patient photographing a paper one from
+        the app: the doctor looks the patient up (`GET /patients`), then either types it in or
+        attaches a file (a photo or PDF), so it reaches the pharmacy the same way and through the
+        same queue. Exactly one of `Body` or `File` is given - never both, never neither. A typed
+        one has nothing to download (`GET /prescriptions/{id}/file` answers 400).
+      operationId: createPrescription
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [PatientId]
+              properties:
+                PatientId: { type: string, format: uuid }
+                Body: { type: string, maxLength: 4000 }
+                File: { type: string, format: binary }
+      responses:
+        '201':
+          description: Created, already in the pharmacy's submitted queue
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Prescription' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
     get:
       tags: [Pharmacy]
       summary: The pharmacy's prescription list
@@ -1462,7 +1496,11 @@ paths:
     get:
       tags: [Pharmacy]
       summary: Open the uploaded prescription
-      description: 'Roles: EquipmentManager. Served inline with the stored content type.'
+      description: |
+        Roles: EquipmentManager. Served inline with the stored content type.
+
+        Only for one a patient photographed and sent. One a doctor typed directly has no file
+        and answers 400 `cl_equ_032` - read its `body` from the list instead.
       operationId: downloadPrescription
       responses:
         '200':
@@ -1470,6 +1508,7 @@ paths:
           content:
             application/octet-stream:
               schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -2680,14 +2719,20 @@ components:
 
     MyPrescription:
       type: object
-      description: What a patient sees of their own prescription. No staff ids.
-      required: [id, file_name, content_type, byte_size, status, created_at]
+      description: |
+        What a patient sees of their own prescription. No staff ids. Either the file fields are
+        set (they sent a photo) or `body` is (a doctor wrote it directly) - never both.
+      required: [id, status, created_at]
       properties:
         id: { type: string, format: uuid }
         note: { type: string, nullable: true }
-        file_name: { type: string }
-        content_type: { type: string }
-        byte_size: { type: integer }
+        file_name: { type: string, nullable: true }
+        content_type: { type: string, nullable: true }
+        byte_size: { type: integer, nullable: true }
+        body:
+          type: string
+          nullable: true
+          description: What the doctor typed, when this one has no photographed file.
         status: { $ref: '#/components/schemas/PrescriptionStatus' }
         token_date: { type: string, format: date, nullable: true, description: 'The day the token belongs to, in Sri Lanka time.' }
         token_number: { type: integer, nullable: true, description: 'Set when the pharmacy marks it ready. Restarts at 1 each day.' }
@@ -2698,17 +2743,29 @@ components:
 
     Prescription:
       type: object
-      description: The pharmacy's view - who sent it, so the medicine goes to the right person.
-      required: [id, patient_id, patient_code, patient_name, file_name, content_type, byte_size, status, created_at, updated_at]
+      description: |
+        The pharmacy's view - who sent it, so the medicine goes to the right person. Either the
+        file fields are set (a patient sent a photo) or `body` and `prescribed_by_staff_id` are
+        (a doctor wrote it directly) - never both.
+      required: [id, patient_id, patient_code, patient_name, status, created_at, updated_at]
       properties:
         id: { type: string, format: uuid }
         patient_id: { type: string, format: uuid, description: "Patient Management's patient, id only." }
         patient_code: { type: string }
         patient_name: { type: string }
         note: { type: string, nullable: true }
-        file_name: { type: string }
-        content_type: { type: string }
-        byte_size: { type: integer }
+        file_name: { type: string, nullable: true }
+        content_type: { type: string, nullable: true }
+        byte_size: { type: integer, nullable: true }
+        body:
+          type: string
+          nullable: true
+          description: What the doctor typed, when this one has no photographed file.
+        prescribed_by_staff_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Set only when a doctor wrote this one directly.
         status: { $ref: '#/components/schemas/PrescriptionStatus' }
         token_date: { type: string, format: date, nullable: true }
         token_number: { type: integer, nullable: true }

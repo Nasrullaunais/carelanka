@@ -210,5 +210,7 @@ public enum MessageCode
 
     PatientIdentityLocked,
 
-    PatientHasNoAppAccount
+    PatientHasNoAppAccount,
+
+    PrescriptionHasNoFile
 }

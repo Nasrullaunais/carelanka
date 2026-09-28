@@ -212,6 +212,10 @@
     <value>A reorder suggestion for {0} is already running. Wait for it to finish before starting another.</value>
     <comment>Stops a second click from queueing a second run for the same medicine.</comment>
   </data>
+  <data name="cl_equ_032" xml:space="preserve">
+    <value>This prescription has no file. A doctor wrote it directly; read its body instead of downloading it.</value>
+    <comment>A doctor-written prescription has a body, not a photographed file, so there is nothing to download.</comment>
+  </data>
   <data name="cl_equ_013" xml:space="preserve">
     <value>{0} is with the maintenance unit. It comes back into service when they complete the repair, not by editing its status.</value>
     <comment>Says where the item is and who releases it, because the caller's next move is to go and look at the repair queue.</comment>

@@ -422,6 +422,7 @@ One staff member may have several devices. Scoped to `StaffMember` only; see
 + Username: string (max 50, unique, non-null)          -- the login identifier (Rev 2.13)
 + PasswordHash: string (non-null)
 + LastLoginAt: DateTimeOffset (nullable)
++ MustChangePassword: bool (non-null, default false)  -- set when the hospital resets the password
 ```
 **Table:** `patient_accounts`
 **Owner:** Patient Management (Member 4).
@@ -438,6 +439,10 @@ any medical record exists, so there is no person's name to show yet.
 
 `PhoneNumber` and `FullName` were dropped in the same migration. A patient's name and contact
 number live on `patients`, which is the only place staff can trust them.
+
+`MustChangePassword` is `true` while the patient is signed in with a temporary password the
+hospital gave them (`POST /patient-accounts/{patientId}/reset-password`). The server refuses
+everything but choosing a new password until they do, and `POST /auth/password` clears it.
 
 *(Rev 2.5)* **This table was missing, and three committed specs were already pointing at
 it.** Rev 2.3 resolved Open Decision 1 in favour of patients keeping an app login, but no

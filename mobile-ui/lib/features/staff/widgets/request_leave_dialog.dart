@@ -156,7 +156,7 @@ class _RequestLeaveDialogState extends State<RequestLeaveDialog> {
               const SizedBox(height: 16),
             ],
             DropdownButtonFormField<String>(
-              value: _type,
+              initialValue: _type,
               decoration: const InputDecoration(
                 labelText: 'Leave Type',
                 prefixIcon: Icon(Icons.category_outlined),
@@ -240,7 +240,7 @@ class _RequestLeaveDialogState extends State<RequestLeaveDialog> {
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Text('Submit Request'),
                   ),

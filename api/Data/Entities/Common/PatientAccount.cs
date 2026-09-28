@@ -12,5 +12,7 @@ public class PatientAccount : SoftDeletableEntity
 
     public DateTimeOffset? LastLoginAt { get; set; }
 
+    public bool MustChangePassword { get; set; }
+
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
 }

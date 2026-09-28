@@ -29,12 +29,15 @@ public sealed class PatientService : IPatientService
     private readonly CareLankaDbContext _db;
     private readonly IBedRegistryService _beds;
     private readonly ICurrentUser _currentUser;
+    private readonly IAuthService _auth;
 
-    public PatientService(CareLankaDbContext db, IBedRegistryService beds, ICurrentUser currentUser)
+    public PatientService(
+        CareLankaDbContext db, IBedRegistryService beds, ICurrentUser currentUser, IAuthService auth)
     {
         _db = db;
         _beds = beds;
         _currentUser = currentUser;
+        _auth = auth;
     }
 
     public async Task<PagedResult<PatientSummary>> ListAsync(
@@ -228,6 +231,69 @@ public sealed class PatientService : IPatientService
             Found = true,
             Patient = ToSummary(patient),
             HasOpenAdmission = hasOpenAdmission
+        };
+    }
+
+    public async Task<PagedResult<PatientAppAccount>> ListAppAccountsAsync(
+        PatientAppAccountListRequest request, CancellationToken ct = default)
+    {
+        var query = _db.Patients.AsNoTracking().Where(p => p.UserAccountId != null);
+
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var search = request.Search.Trim();
+            var pattern = $"%{search}%";
+            var accountIds = await _auth.FindPatientAccountIdsByUsernameAsync(search, ct);
+
+            query = query.Where(p =>
+                EF.Functions.ILike(p.FullName, pattern)
+                || EF.Functions.ILike(p.PatientCode, pattern)
+                || (p.Nic != null && EF.Functions.ILike(p.Nic, pattern))
+                || accountIds.Contains(p.UserAccountId!.Value));
+        }
+
+        var totalItems = await query.CountAsync(ct);
+
+        var patients = await query
+            .OrderBy(p => p.FullName)
+            .ThenBy(p => p.Id)
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .ToListAsync(ct);
+
+        var usernames = await _auth.GetPatientUsernamesAsync(
+            patients.Select(p => p.UserAccountId!.Value).ToList(), ct);
+
+        var items = patients
+            .Select(p => new PatientAppAccount
+            {
+                PatientId = p.Id,
+                PatientCode = p.PatientCode,
+                FullName = p.FullName,
+                Nic = p.Nic,
+                DateOfBirth = p.DateOfBirth,
+                Username = usernames.GetValueOrDefault(p.UserAccountId!.Value, string.Empty)
+            })
+            .ToList();
+
+        return PagedResult<PatientAppAccount>.From(items, request.Page, request.PageSize, totalItems);
+    }
+
+    public async Task<PatientAppPasswordReset> ResetAppPasswordAsync(Guid patientId, CancellationToken ct = default)
+    {
+        var patient = await GetByIdAsync(patientId, ct);
+
+        if (patient.UserAccountId is not { } accountId)
+        {
+            throw new ConflictException(MessageCode.PatientHasNoAppAccount);
+        }
+
+        var reset = await _auth.ResetPatientPasswordAsync(accountId, ct);
+
+        return new PatientAppPasswordReset
+        {
+            Username = reset.Username,
+            TemporaryPassword = reset.TemporaryPassword
         };
     }
 

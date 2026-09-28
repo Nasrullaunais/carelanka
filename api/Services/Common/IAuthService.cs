@@ -14,5 +14,14 @@ public interface IAuthService
 
     Task LogoutAsync(string refreshToken, CancellationToken ct = default);
 
+    Task ChangePasswordAsync(ChangePasswordRequest request, CancellationToken ct = default);
+
     Task<CurrentPrincipal> GetCurrentPrincipalAsync(CancellationToken ct = default);
+
+    Task<PatientPasswordReset> ResetPatientPasswordAsync(Guid patientAccountId, CancellationToken ct = default);
+
+    Task<IReadOnlyDictionary<Guid, string>> GetPatientUsernamesAsync(
+        IReadOnlyCollection<Guid> accountIds, CancellationToken ct = default);
+
+    Task<IReadOnlyList<Guid>> FindPatientAccountIdsByUsernameAsync(string search, CancellationToken ct = default);
 }

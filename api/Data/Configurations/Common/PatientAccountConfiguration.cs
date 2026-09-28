@@ -16,6 +16,7 @@ public class PatientAccountConfiguration : IEntityTypeConfiguration<PatientAccou
 
         builder.Property(p => p.Username).HasMaxLength(50).IsRequired();
         builder.Property(p => p.PasswordHash).HasMaxLength(512).IsRequired();
+        builder.Property(p => p.MustChangePassword).IsRequired().HasDefaultValue(false);
 
         builder.HasIndex(p => p.Username)
             .HasDatabaseName(UsernameUniqueIndex)

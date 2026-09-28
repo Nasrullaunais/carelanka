@@ -57,7 +57,11 @@ class AppointmentsScreenState extends State<AppointmentsScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 44),
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+            ),
             child: const Text('Cancel visit'),
           ),
         ],
@@ -84,9 +88,18 @@ class AppointmentsScreenState extends State<AppointmentsScreen> {
     // and the API refuses it anyway. Hide the button rather than let them meet a 409.
     final admitted = context.watch<MyStayController>().state.valueOrNull is MyStayCurrent;
     Future<void> refresh() => controller.load(showLoading: false);
+    // The empty state carries its own booking button; once there is a list, this is the only way in.
+    final hasVisits = controller.appointments.valueOrNull?.isNotEmpty ?? false;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Appointments')),
+      floatingActionButton: linked && !admitted && hasVisits
+          ? FloatingActionButton.extended(
+              onPressed: controller.busy ? null : book,
+              icon: const Icon(Icons.add),
+              label: const Text('Book a visit'),
+            )
+          : null,
       body: AsyncView<List<MyAppointment>>(
         state: controller.appointments,
         onRetry: controller.load,
@@ -258,7 +271,7 @@ class _AppointmentCard extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  color: scheme.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(AppTheme.radiusM),
                 ),
                 child: Text(appointment.reason!, style: theme.textTheme.bodyMedium),
@@ -327,9 +340,9 @@ class _Notice extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.08),
+        color: accent.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(AppTheme.radiusM),
-        border: Border.all(color: accent.withValues(alpha: 0.35)),
+        border: Border.all(color: accent.withValues(alpha: 0.28)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -342,7 +355,11 @@ class _Notice extends StatelessWidget {
               children: [
                 Text(title, style: theme.textTheme.titleSmall),
                 const SizedBox(height: 4),
-                Text(body, style: theme.textTheme.bodySmall),
+                Text(
+                  body,
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
               ],
             ),
           ),

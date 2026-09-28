@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../services/api_client/models/current_principal.dart';
 import '../auth/auth_controller.dart';
+import '../auth/change_password_screen.dart';
 import '../auth/patient_login_screen.dart';
 import '../auth/patient_register_screen.dart';
 import '../auth/staff_login_screen.dart';
@@ -16,6 +17,7 @@ class AppRoutes {
   static const register = '/register';
   static const patientLogin = '/sign-in';
   static const staffLogin = '/staff/sign-in';
+  static const changePassword = '/change-password';
 
   static const signedOut = {welcome, register, patientLogin, staffLogin};
 }
@@ -34,6 +36,10 @@ GoRouter createAppRouter({
       GoRoute(path: AppRoutes.register, builder: (_, __) => const PatientRegisterScreen()),
       GoRoute(path: AppRoutes.patientLogin, builder: (_, __) => const PatientLoginScreen()),
       GoRoute(path: AppRoutes.staffLogin, builder: (_, __) => const StaffLoginScreen()),
+      GoRoute(
+        path: AppRoutes.changePassword,
+        builder: (_, __) => const ChangePasswordScreen(forced: true),
+      ),
       ...routes,
     ],
     redirect: (context, state) {
@@ -47,9 +53,14 @@ GoRouter createAppRouter({
           return AppRoutes.signedOut.contains(location) ? null : AppRoutes.welcome;
 
         case AuthStatus.signedIn:
-          final onSignedOutScreen =
-              AppRoutes.signedOut.contains(location) || location == AppRoutes.splash;
-          return onSignedOutScreen ? homePathFor(auth.principal!) : null;
+          final principal = auth.principal!;
+          if (principal.mustChangePassword) {
+            return location == AppRoutes.changePassword ? null : AppRoutes.changePassword;
+          }
+          final offLimits = AppRoutes.signedOut.contains(location) ||
+              location == AppRoutes.splash ||
+              location == AppRoutes.changePassword;
+          return offLimits ? homePathFor(principal) : null;
       }
     },
     errorBuilder: (_, state) => Scaffold(

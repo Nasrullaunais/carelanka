@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
 import '../models/auth_tokens.dart';
+import '../models/change_password_request.dart';
 import '../models/current_principal.dart';
 import '../models/patient_login_request.dart';
 import '../models/patient_register_request.dart';
@@ -41,6 +42,11 @@ abstract class AuthApi {
   @POST('/auth/logout')
   Future<void> logout({
     @Body() RefreshTokenRequest? body,
+  });
+
+  @POST('/auth/password')
+  Future<void> changePassword({
+    @Body() ChangePasswordRequest? body,
   });
 
   @GET('/auth/me')

@@ -24,6 +24,10 @@ public enum MessageCode
 
     UsernameAlreadyTaken,
 
+    CurrentPasswordIncorrect,
+
+    PasswordChangeRequired,
+
     BedNumberTaken,
 
     AssetTagTaken,
@@ -204,5 +208,7 @@ public enum MessageCode
 
     NicHasHospitalRecord,
 
-    PatientIdentityLocked
+    PatientIdentityLocked,
+
+    PatientHasNoAppAccount
 }

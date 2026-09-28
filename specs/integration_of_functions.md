@@ -501,6 +501,7 @@ servicing**, and an unknown bed id is a 404 rather than a confident "free".
 | **M3** | A readable bed register: bed id, ward, number, condition, isolation capability | Our candidate list for manual bed assignment. **This is our hardest dependency** — without it there is nothing to assign from. |
 | **M3** | Notification (or just a condition change we can read) when a bed goes in or out of service | §6.2 |
 | **Group** | Shared agent-workflow tables | §11.2 |
+| **Common** | `IAuthService.ResetPatientPasswordAsync(accountId)`, `GetPatientUsernamesAsync(accountIds)`, `FindPatientAccountIdsByUsernameAsync(search)` | The **Patient app accounts** page (`/patient-accounts`, added 2026-09-28): showing a patient's username, finding them by it, and giving them a new password. Patient Management does not read or write `PatientAccount` or `RefreshToken` directly — it holds `Patient.UserAccountId` and asks the auth service for everything else. One older exception: `PatientService.LinkAccountAsync` still checks the account exists with its own query |
 
 ---
 

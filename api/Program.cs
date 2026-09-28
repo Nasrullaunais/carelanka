@@ -48,6 +48,7 @@ builder.Services
     .AddControllers(options =>
     {
         options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
+        options.Filters.Add<PasswordChangeRequiredFilter>();
         options.ModelMetadataDetailsProviders.Add(new EmergencyQueryBindingMetadataProvider());
         options.ModelBinderProviders.Insert(0, new SnakeCaseEnumModelBinderProvider());
     })
@@ -91,7 +92,7 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
     };
 });
 
-var connectionString = builder.Configuration.GetConnectionString("CareLanka")
+var connectionString = builder.Configuration.GetConnectionString(CareLankaDatabase.ConnectionStringName)
     ?? throw new InvalidOperationException(
         "ConnectionStrings:CareLanka is not configured. See api/README.md for local setup.");
 
@@ -99,8 +100,7 @@ builder.Services.AddSingleton<TimestampInterceptor>();
 builder.Services.AddSingleton<AmbulanceStatusHistoryInterceptor>();
 
 builder.Services.AddDbContext<CareLankaDbContext>((provider, options) => options
-    .UseNpgsql(connectionString)
-    .UseSnakeCaseNamingConvention()
+    .UseCareLankaDatabase(connectionString)
     .AddInterceptors(
         provider.GetRequiredService<AmbulanceStatusHistoryInterceptor>(),
         provider.GetRequiredService<TimestampInterceptor>()));
@@ -261,6 +261,11 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.PatientEditor, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.GeneralStaff),
         EnumWire.ToWire(StaffRole.WardNurse),
+        EnumWire.ToWire(StaffRole.DutyManager),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
+    options.AddPolicy(Policies.PatientPasswordReset, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.GeneralStaff),
         EnumWire.ToWire(StaffRole.DutyManager),
         EnumWire.ToWire(StaffRole.HospitalAdministrator)));
 
@@ -480,6 +485,7 @@ builder.Services.AddScoped<IBillingRateService, BillingRateService>();
 builder.Services.AddScoped<IMeService, MeService>();
 builder.Services.AddScoped<ISkillService, SkillService>();
 builder.Services.AddScoped<IStaffMemberService, StaffMemberService>();
+builder.Services.AddScoped<IShiftService, ShiftService>();
 builder.Services.AddScoped<IAllocationService, AllocationService>();
 builder.Services.AddScoped<ILeaveRequestService, LeaveRequestService>();
 builder.Services.AddScoped<IMyRosterService, MyRosterService>();

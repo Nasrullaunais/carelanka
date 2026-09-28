@@ -557,6 +557,11 @@ export type CareWorkflowValidation = {
     failed_rules?: Array<string> | null;
 };
 
+export type ChangePasswordRequest = {
+    current_password: string | null;
+    new_password: string | null;
+};
+
 export type CheckInRequest = {
     admission_category: AdmissionCategory;
     urgency: AdmissionUrgency;
@@ -812,6 +817,7 @@ export type CurrentPrincipal = {
     email?: string | null;
     phone_number?: string | null;
     patient_id?: string | null;
+    must_change_password: boolean;
 };
 
 export type DeactivateStaffMemberRequest = {
@@ -1601,6 +1607,28 @@ export type Patient = {
     has_account: boolean;
     created_at?: string;
     updated_at?: string;
+};
+
+export type PatientAppAccount = {
+    patient_id: string;
+    patient_code: string;
+    full_name: string;
+    nic?: string | null;
+    date_of_birth?: string | null;
+    username: string;
+};
+
+export type PatientAppAccountPagedResult = {
+    items: Array<PatientAppAccount>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
+export type PatientAppPasswordReset = {
+    username: string;
+    temporary_password: string;
 };
 
 export type PatientClaimPreview = {
@@ -3983,6 +4011,39 @@ export type LogoutResponses = {
 };
 
 export type LogoutResponse = LogoutResponses[keyof LogoutResponses];
+
+export type ChangePasswordData = {
+    body?: ChangePasswordRequest;
+    path?: never;
+    query?: never;
+    url: '/auth/password';
+};
+
+export type ChangePasswordErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Too Many Requests
+     */
+    429: ProblemDetails;
+};
+
+export type ChangePasswordError = ChangePasswordErrors[keyof ChangePasswordErrors];
+
+export type ChangePasswordResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type ChangePasswordResponse = ChangePasswordResponses[keyof ChangePasswordResponses];
 
 export type GetCurrentUserData = {
     body?: never;
@@ -7729,6 +7790,82 @@ export type RecordHandoverResponses = {
 };
 
 export type RecordHandoverResponse = RecordHandoverResponses[keyof RecordHandoverResponses];
+
+export type ListPatientAppAccountsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        search?: string;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/patient-accounts';
+};
+
+export type ListPatientAppAccountsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListPatientAppAccountsError = ListPatientAppAccountsErrors[keyof ListPatientAppAccountsErrors];
+
+export type ListPatientAppAccountsResponses = {
+    /**
+     * OK
+     */
+    200: PatientAppAccountPagedResult;
+};
+
+export type ListPatientAppAccountsResponse = ListPatientAppAccountsResponses[keyof ListPatientAppAccountsResponses];
+
+export type ResetPatientAppPasswordData = {
+    body?: never;
+    path: {
+        patientId: string;
+    };
+    query?: never;
+    url: '/patient-accounts/{patientId}/reset-password';
+};
+
+export type ResetPatientAppPasswordErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ResetPatientAppPasswordError = ResetPatientAppPasswordErrors[keyof ResetPatientAppPasswordErrors];
+
+export type ResetPatientAppPasswordResponses = {
+    /**
+     * OK
+     */
+    200: PatientAppPasswordReset;
+};
+
+export type ResetPatientAppPasswordResponse = ResetPatientAppPasswordResponses[keyof ResetPatientAppPasswordResponses];
 
 export type PreRegisterSelfData = {
     body?: PreRegisterRequest;

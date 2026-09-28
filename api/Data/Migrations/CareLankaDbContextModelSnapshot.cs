@@ -448,6 +448,12 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_login_at");
 
+                    b.Property<bool>("MustChangePassword")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("must_change_password");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(512)

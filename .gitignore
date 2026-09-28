@@ -37,3 +37,6 @@ mobile-ui/android/app/google-services.json
 
 # Office lock files, created while a document is open
 ~$*
+
+# Local build plan, handed to another agent and not shared
+docs/build/patient-password-reset-plan.md

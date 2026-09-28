@@ -2,8 +2,6 @@ using System.Text.Json;
 using CareLanka.Api.Common.Persistence;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.Services.Patient;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using YamlDotNet.RepresentationModel;
 using Xunit;
 
@@ -27,7 +25,7 @@ public sealed class PatientOpenApiContractTests
     [InlineData("BillLineSource")]
     public async Task Published_enum_values_match_the_contract_in_order(string enumName)
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
 
         var expected = Sequence(LoadContract(), "components", "schemas", enumName, "enum")
             .Children.Cast<YamlScalarNode>().Select(value => value.Value!).ToArray();
@@ -76,9 +74,11 @@ public sealed class PatientOpenApiContractTests
     [InlineData("MyBillLine")]
     [InlineData("PatientClaimPreview")]
     [InlineData("BookAppointmentRequest")]
+    [InlineData("PatientAppAccount")]
+    [InlineData("PatientAppPasswordReset")]
     public async Task Published_schema_required_members_match_the_contract(string schemaName)
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
 
         var expected = RequiredFromContract(LoadContract(), schemaName);
         var actual = generated.RootElement
@@ -93,7 +93,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task Patient_self_service_publishes_the_operationIds_the_mobile_client_generates_against()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
         var paths = generated.RootElement.GetProperty("paths");
 
         Assert.Equal(
@@ -139,9 +139,24 @@ public sealed class PatientOpenApiContractTests
     }
 
     [Fact]
+    public async Task Patient_app_accounts_publish_their_operationIds_and_declare_their_failures()
+    {
+        var generated = await GeneratedOpenApi.ParseAsync();
+        var paths = generated.RootElement.GetProperty("paths");
+        var list = paths.GetProperty("/patient-accounts").GetProperty("get");
+        var reset = paths.GetProperty("/patient-accounts/{patientId}/reset-password").GetProperty("post");
+
+        Assert.Equal("listPatientAppAccounts", list.GetProperty("operationId").GetString());
+        Assert.Equal("resetPatientAppPassword", reset.GetProperty("operationId").GetString());
+        Assert.Equal(new[] { "200", "400", "401", "403" }, Responses(list));
+        Assert.Equal(new[] { "200", "401", "403", "404", "409" }, Responses(reset));
+        Assert.False(reset.TryGetProperty("requestBody", out _));
+    }
+
+    [Fact]
     public async Task The_patient_bill_publishes_none_of_the_staff_bill_fields()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
 
         var properties = generated.RootElement
             .GetProperty("components").GetProperty("schemas")
@@ -163,7 +178,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task The_claim_preview_publishes_only_masked_fields()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
 
         var properties = generated.RootElement
             .GetProperty("components").GetProperty("schemas")
@@ -184,7 +199,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task Pre_register_publishes_no_admission_shape_and_no_arrival_date()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
 
         var request = generated.RootElement
             .GetProperty("components").GetProperty("schemas")
@@ -209,7 +224,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task Every_self_service_operation_declares_its_failures_and_not_only_its_success()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
         var paths = generated.RootElement.GetProperty("paths");
 
         Assert.Equal(
@@ -247,7 +262,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task Billing_and_discharge_publish_the_operationIds_the_web_client_generates_against()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
         var paths = generated.RootElement.GetProperty("paths");
 
         Assert.Equal(
@@ -279,7 +294,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task The_checklist_request_still_publishes_billing_settled_even_though_it_is_refused()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
 
         var properties = generated.RootElement
             .GetProperty("components").GetProperty("schemas")
@@ -291,7 +306,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task Ward_routes_publish_the_operationIds_both_frontends_generate_against()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
         var wards = generated.RootElement.GetProperty("paths").GetProperty("/wards");
 
         Assert.Equal("listWards", wards.GetProperty("get").GetProperty("operationId").GetString());
@@ -301,7 +316,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task Every_ward_operation_declares_its_failures_and_not_only_its_success()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
         var wards = generated.RootElement.GetProperty("paths").GetProperty("/wards");
 
         Assert.Equal(
@@ -315,7 +330,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task The_ward_board_publishes_the_operationId_the_web_client_generates_against()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
         var paths = generated.RootElement.GetProperty("paths");
 
         Assert.Equal(
@@ -332,7 +347,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task The_ward_board_declares_its_failures_and_not_only_its_success()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
         var paths = generated.RootElement.GetProperty("paths");
 
         Assert.Equal(
@@ -343,7 +358,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task Capacity_routes_publish_the_operationIds_the_other_components_generate_against()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
         var paths = generated.RootElement.GetProperty("paths");
 
         Assert.Equal(
@@ -357,7 +372,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task Every_capacity_operation_declares_its_failures_and_not_only_its_success()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
         var paths = generated.RootElement.GetProperty("paths");
 
         Assert.Equal(
@@ -371,7 +386,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task Bed_routes_publish_the_operationIds_both_frontends_generate_against()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
         var paths = generated.RootElement.GetProperty("paths");
 
         Assert.Equal(
@@ -388,7 +403,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task Every_bed_operation_declares_its_failures_and_not_only_its_success()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
         var paths = generated.RootElement.GetProperty("paths");
 
         Assert.Equal(
@@ -406,7 +421,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task The_candidate_list_does_not_squat_on_Equipment_s_bed_register()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
         var beds = generated.RootElement.GetProperty("paths").GetProperty("/beds");
 
         Assert.Equal("listBeds", beds.GetProperty("get").GetProperty("operationId").GetString());
@@ -425,7 +440,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task Patient_routes_publish_the_operationIds_both_frontends_generate_against()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
         var paths = generated.RootElement.GetProperty("paths");
         var patients = paths.GetProperty("/patients");
         var one = paths.GetProperty("/patients/{id}");
@@ -445,7 +460,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task Every_patient_operation_declares_its_failures_and_not_only_its_success()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
         var paths = generated.RootElement.GetProperty("paths");
         var patients = paths.GetProperty("/patients");
         var one = paths.GetProperty("/patients/{id}");
@@ -465,7 +480,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task Admission_routes_publish_the_operationIds_both_frontends_generate_against()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
         var paths = generated.RootElement.GetProperty("paths");
         var admissions = paths.GetProperty("/admissions");
 
@@ -488,7 +503,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task Every_admission_operation_declares_its_failures_and_not_only_its_success()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
         var paths = generated.RootElement.GetProperty("paths");
         var admissions = paths.GetProperty("/admissions");
 
@@ -515,7 +530,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task Appointment_routes_publish_the_operationIds_both_frontends_generate_against()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
         var paths = generated.RootElement.GetProperty("paths");
         var appointments = paths.GetProperty("/appointments");
 
@@ -529,7 +544,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task Every_appointment_operation_declares_its_failures_and_not_only_its_success()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
         var paths = generated.RootElement.GetProperty("paths");
         var appointments = paths.GetProperty("/appointments");
 
@@ -545,7 +560,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task Checking_in_publishes_an_admission_because_that_is_what_the_desk_works_from_next()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
 
         var schema = generated.RootElement
             .GetProperty("paths").GetProperty("/appointments/{id}/check-in")
@@ -596,7 +611,7 @@ public sealed class PatientOpenApiContractTests
     [Fact]
     public async Task AdmissionDetail_omits_only_the_block_that_still_has_no_table_behind_it()
     {
-        var generated = await GenerateAsync();
+        var generated = await GeneratedOpenApi.ParseAsync();
         var properties = generated.RootElement
             .GetProperty("components").GetProperty("schemas").GetProperty("AdmissionDetail")
             .GetProperty("properties");
@@ -612,15 +627,6 @@ public sealed class PatientOpenApiContractTests
     private static string[] Responses(JsonElement operation)
         => operation.GetProperty("responses").EnumerateObject()
             .Select(response => response.Name).Order().ToArray();
-
-    private static async Task<JsonDocument> GenerateAsync()
-    {
-        using var environment = TestEnvironment.Use();
-        await using var application = new TestApplication();
-        using var client = application.CreateClient();
-
-        return JsonDocument.Parse(await client.GetStringAsync("/swagger/v1/swagger.json"));
-    }
 
     private static HashSet<string> RequiredFromContract(YamlMappingNode contract, string schemaName)
     {
@@ -684,11 +690,5 @@ public sealed class PatientOpenApiContractTests
         }
 
         return current;
-    }
-
-    private sealed class TestApplication : WebApplicationFactory<Program>
-    {
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-            => builder.UseEnvironment("Development");
     }
 }

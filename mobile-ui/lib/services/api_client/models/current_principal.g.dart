@@ -12,6 +12,7 @@ CurrentPrincipal _$CurrentPrincipalFromJson(Map<String, dynamic> json) =>
       principalType: PrincipalType.fromJson(json['principal_type'] as String),
       role: PrincipalRole.fromJson(json['role'] as String),
       displayName: json['display_name'] as String,
+      mustChangePassword: json['must_change_password'] as bool,
       email: json['email'] as String?,
       phoneNumber: json['phone_number'] as String?,
       patientId: json['patient_id'] as String?,
@@ -26,4 +27,5 @@ Map<String, dynamic> _$CurrentPrincipalToJson(CurrentPrincipal instance) =>
       'email': instance.email,
       'phone_number': instance.phoneNumber,
       'patient_id': instance.patientId,
+      'must_change_password': instance.mustChangePassword,
     };

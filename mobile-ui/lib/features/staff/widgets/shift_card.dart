@@ -105,7 +105,7 @@ class ShiftCard extends StatelessWidget {
                       ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.login_rounded),
                   label: const Text('Clock In'),

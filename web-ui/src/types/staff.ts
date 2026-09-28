@@ -1,4 +1,21 @@
-import type { CoverageStatus, LeaveStatus, LeaveType, StaffRole } from '../services/api/generated';
+import type {
+  CoverageStatus,
+  LeaveStatus,
+  LeaveType,
+  PersonTitle,
+  StaffRole,
+} from '../services/api/generated';
+
+export const personTitleLabels: Record<PersonTitle, string> = {
+  mr: 'Mr',
+  mrs: 'Mrs',
+  ms: 'Ms',
+  miss: 'Miss',
+  dr: 'Dr',
+  prof: 'Prof',
+};
+
+export const personTitles: PersonTitle[] = ['mr', 'mrs', 'ms', 'miss', 'dr', 'prof'];
 
 export const staffRoleLabels: Record<StaffRole, string> = {
   ward_nurse: 'Ward nurse',

@@ -32,4 +32,19 @@ public class CreateStaffMemberRequest
     public string? Department { get; set; }
 
     public List<Guid>? SkillIds { get; set; }
+
+    /// <summary>Salutation. Required when Role is Doctor.</summary>
+    public PersonTitle? Title { get; set; }
+
+    /// <summary>Clinical field, e.g. "Dermatologist". Required when Role is Doctor.</summary>
+    [MaxLength(150)]
+    public string? Specialization { get; set; }
+
+    /// <summary>Medical registration number (SLMC or equivalent). Required when Role is Doctor,
+    /// unique among active staff.</summary>
+    [MaxLength(50)]
+    public string? RegistrationNumber { get; set; }
+
+    /// <summary>The date this person starts at the hospital. Required when Role is Doctor.</summary>
+    public DateOnly? JoiningDate { get; set; }
 }

@@ -13,6 +13,11 @@ public interface IPrescriptionService
     Task<IReadOnlyList<Prescription>> ListAsync(
         PrescriptionStatus status, CancellationToken cancellationToken = default);
 
+    /// <summary>A doctor writing one directly for a patient they looked up, rather than a
+    /// patient photographing a paper one.</summary>
+    Task<Prescription> CreateAsync(
+        CreatePrescriptionRequest request, CancellationToken cancellationToken = default);
+
     Task<LabReportFile> GetFileAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<Prescription> MarkReadyAsync(Guid id, CancellationToken cancellationToken = default);

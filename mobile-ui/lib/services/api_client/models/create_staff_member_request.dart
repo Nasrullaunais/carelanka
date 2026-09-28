@@ -4,6 +4,7 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
+import 'person_title.dart';
 import 'staff_role.dart';
 
 part 'create_staff_member_request.g.dart';
@@ -19,6 +20,10 @@ class CreateStaffMemberRequest {
     this.phoneNumber,
     this.department,
     this.skillIds,
+    this.title,
+    this.specialization,
+    this.registrationNumber,
+    this.joiningDate,
   });
   
   factory CreateStaffMemberRequest.fromJson(Map<String, Object?> json) => _$CreateStaffMemberRequestFromJson(json);
@@ -36,6 +41,12 @@ class CreateStaffMemberRequest {
   final String? department;
   @JsonKey(name: 'skill_ids')
   final List<String>? skillIds;
+  final PersonTitle? title;
+  final String? specialization;
+  @JsonKey(name: 'registration_number')
+  final String? registrationNumber;
+  @JsonKey(name: 'joining_date')
+  final DateTime? joiningDate;
 
   Map<String, Object?> toJson() => _$CreateStaffMemberRequestToJson(this);
 }

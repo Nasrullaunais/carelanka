@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches the app page colour in lib/core/theme/app_theme.dart, so launch has no flash. -->
+    <color name="launch_background">#FF0A0F1C</color>
+</resources>

@@ -17,6 +17,7 @@ class StaffSummaryDto {
     required this.isActive,
     required this.skillCount,
     this.department,
+    this.specialization,
   });
   
   factory StaffSummaryDto.fromJson(Map<String, Object?> json) => _$StaffSummaryDtoFromJson(json);
@@ -26,6 +27,7 @@ class StaffSummaryDto {
   final String fullName;
   final StaffRole role;
   final String? department;
+  final String? specialization;
   @JsonKey(name: 'is_active')
   final bool isActive;
   @JsonKey(name: 'skill_count')

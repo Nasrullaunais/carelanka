@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -173,6 +174,12 @@ class _CareLankaAppState extends State<CareLankaApp> with WidgetsBindingObserver
         darkTheme: AppTheme.dark,
         scaffoldMessengerKey: _messengerKey,
         routerConfig: _router,
+        // Screens without an app bar (the patient home) would otherwise keep whatever
+        // status-bar icon colour the last one set, which vanishes against the other theme.
+        builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+          value: AppTheme.overlayStyleFor(Theme.of(context).brightness),
+          child: child!,
+        ),
       ),
     );
   }

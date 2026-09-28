@@ -26,6 +26,12 @@ public interface IPatientService
     Task<PatientLookupResult> LookupByNicAsync(
         string nic, CancellationToken cancellationToken = default);
 
+    Task<PagedResult<PatientAppAccount>> ListAppAccountsAsync(
+        PatientAppAccountListRequest request, CancellationToken cancellationToken = default);
+
+    Task<PatientAppPasswordReset> ResetAppPasswordAsync(
+        Guid patientId, CancellationToken cancellationToken = default);
+
     Task LinkAccountAsync(
         Guid id, Guid userAccountId, CancellationToken cancellationToken = default);
 

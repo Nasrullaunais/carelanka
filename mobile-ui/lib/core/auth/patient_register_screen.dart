@@ -21,7 +21,6 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
   final _confirm = TextEditingController();
 
   bool _busy = false;
-  bool _obscure = true;
 
   @override
   void dispose() {
@@ -73,23 +72,17 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                 inputFormatters: [FilteringTextInputFormatter.deny(RegExp(r'\s'))],
                 validator: validateUsername,
               ),
-              AuthTextField(
+              AuthPasswordField(
                 controller: _password,
                 label: 'Password',
                 enabled: !_busy,
-                obscure: _obscure,
                 serverErrors: fieldErrors['password'],
-                suffix: IconButton(
-                  icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                  onPressed: () => setState(() => _obscure = !_obscure),
-                ),
                 validator: validatePassword,
               ),
-              AuthTextField(
+              AuthPasswordField(
                 controller: _confirm,
                 label: 'Confirm password',
                 enabled: !_busy,
-                obscure: _obscure,
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _busy ? null : _submit(),
                 validator: (value) =>

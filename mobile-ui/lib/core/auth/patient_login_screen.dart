@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../routing/app_router.dart';
+import '../widgets/desk_help.dart';
 import 'auth_controller.dart';
 import 'auth_form.dart';
 
@@ -19,7 +20,6 @@ class _PatientLoginScreenState extends State<PatientLoginScreen> {
   final _password = TextEditingController();
 
   bool _busy = false;
-  bool _obscure = true;
 
   @override
   void dispose() {
@@ -68,19 +68,21 @@ class _PatientLoginScreenState extends State<PatientLoginScreen> {
                     ? 'Enter your username'
                     : null,
               ),
-              AuthTextField(
+              AuthPasswordField(
                 controller: _password,
                 label: 'Password',
                 enabled: !_busy,
-                obscure: _obscure,
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _busy ? null : _submit(),
-                suffix: IconButton(
-                  icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                  onPressed: () => setState(() => _obscure = !_obscure),
-                ),
                 validator: (value) =>
                     (value == null || value.isEmpty) ? 'Enter your password' : null,
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _busy ? null : () => showResetPasswordHelp(context),
+                  child: const Text('Forgot password?'),
+                ),
               ),
               const SizedBox(height: 8),
               AuthSubmitButton(label: 'Sign in', busy: _busy, onPressed: _submit),

@@ -45,6 +45,12 @@ sign-up. `GET /api/auth/me` returns `patient_id: null` and every `/api/me/*` rou
 Registration is open — `POST /api/auth/patient/register` with a username and a password
 makes a new one and signs you straight in.
 
+**Forgotten password:** sign in to the web app as reception, the duty manager or the
+administrator, open **Patient app accounts**, find the patient and press **Generate new
+password**. Sign in on the phone with the temporary password it shows; the app then asks for a
+new one. Only a patient whose account is linked to a hospital record is listed — `demo.emergency`
+is once `docs/seed/006_emergency_demo_data.sql` has run; `chathura.w` never is.
+
 `docs/seed/007_emergency_demo_fleet.sql` adds four more ambulances around Colombo, each
 with its own crew. Every crew login uses `CareLanka#2026`:
 

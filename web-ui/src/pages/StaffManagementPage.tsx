@@ -8,6 +8,7 @@ import {
   deactivateStaffMemberMutation,
   getStaffMemberOptions,
   listSkillsOptions,
+  listStaffDepartmentsOptions,
   listStaffOptions,
   lookupStaffMutation,
   reactivateStaffMemberMutation,
@@ -15,6 +16,7 @@ import {
 } from '../services/api/generated/@tanstack/react-query.gen';
 import type {
   CreateStaffMemberRequest,
+  PersonTitle,
   StaffLookupResult,
   StaffMemberDetailDto,
   StaffRole,
@@ -24,9 +26,16 @@ import type {
 import { useSession } from '../services/auth/useSession';
 import { localDateTime } from '../types/datetime';
 import { canManageStaff, canViewStaff } from '../types/permissions';
-import { staffRoleHints, staffRoleLabels, staffRoles } from '../types/staff';
+import {
+  personTitleLabels,
+  personTitles,
+  staffRoleHints,
+  staffRoleLabels,
+  staffRoles,
+} from '../types/staff';
 
 const PAGE_SIZE = 15;
+const NEW_DEPARTMENT = '__new_department__';
 
 export function StaffManagementPage() {
   const session = useSession();
@@ -298,6 +307,14 @@ export function StaffManagementPage() {
                       <span className="badge">
                         {staffRoleLabels[member.role] ?? member.role}
                       </span>
+                      {member.specialization && (
+                        <>
+                          <br />
+                          <span className="muted" style={{ fontSize: '0.75rem' }}>
+                            {member.specialization}
+                          </span>
+                        </>
+                      )}
                     </td>
                     <td>{member.department || <span className="muted">—</span>}</td>
                     <td>
@@ -612,9 +629,17 @@ function CreateStaffModal({
   const [role, setRole] = useState<StaffRole>('ward_nurse');
   const [department, setDepartment] = useState('');
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [title, setTitle] = useState<PersonTitle | ''>('');
+  const [specialization, setSpecialization] = useState('');
+  const [registrationNumber, setRegistrationNumber] = useState('');
+  const [joiningDate, setJoiningDate] = useState('');
+  const [isNewDepartment, setIsNewDepartment] = useState(false);
 
-  // Load available skills
+  const isDoctor = role === 'doctor';
+
+  // Load available skills and departments already in use
   const skillsQuery = useQuery(listSkillsOptions());
+  const departmentsQuery = useQuery(listStaffDepartmentsOptions());
 
   const createMutation = useMutation({
     ...createStaffMemberMutation(),
@@ -645,6 +670,16 @@ function CreateStaffModal({
     setPassword(generated);
   }
 
+  function handleSuggestEmail() {
+    if (!firstName.trim()) {
+      toast.error('Enter a first name first.');
+      return;
+    }
+    const prefix = isDoctor ? 'dr' : role;
+    const givenName = firstName.trim().toLowerCase().replace(/[^a-z]/g, '');
+    setEmail(`${prefix}.${givenName}@carelanka.lk`);
+  }
+
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
 
@@ -660,6 +695,10 @@ function CreateStaffModal({
       toast.error('Temporary password must be at least 12 characters.');
       return;
     }
+    if (isDoctor && (!title || !specialization.trim() || !registrationNumber.trim() || !joiningDate)) {
+      toast.error('Title, specialization, registration number and joining date are required for a doctor.');
+      return;
+    }
 
     const payload: CreateStaffMemberRequest = {
       first_name: firstName.trim(),
@@ -670,6 +709,10 @@ function CreateStaffModal({
       phone_number: phone.trim() || null,
       department: department.trim() || null,
       skill_ids: selectedSkills.length > 0 ? selectedSkills : null,
+      title: isDoctor && title ? title : undefined,
+      specialization: isDoctor ? specialization.trim() : null,
+      registration_number: isDoctor ? registrationNumber.trim() : null,
+      joining_date: isDoctor ? joiningDate : null,
     };
 
     createMutation.mutate({ body: payload });
@@ -705,7 +748,17 @@ function CreateStaffModal({
 
         <div className="row" style={{ marginTop: '0.85rem' }}>
           <div>
-            <label htmlFor="create-email">Work email *</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label htmlFor="create-email">Work email *</label>
+              <button
+                type="button"
+                className="linklike small"
+                onClick={handleSuggestEmail}
+                style={{ fontSize: '0.75rem' }}
+              >
+                Suggest
+              </button>
+            </div>
             <input
               id="create-email"
               type="email"
@@ -747,15 +800,111 @@ function CreateStaffModal({
           </div>
           <div>
             <label htmlFor="create-department">Department / Unit</label>
-            <input
-              id="create-department"
-              type="text"
-              placeholder="e.g. Emergency Care, Intensive Care, Ward 3"
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-            />
+            {isNewDepartment || (departmentsQuery.data ?? []).length === 0 ? (
+              <div style={{ display: 'flex', gap: '0.4rem' }}>
+                <input
+                  id="create-department"
+                  type="text"
+                  autoFocus={isNewDepartment}
+                  placeholder="e.g. Emergency Care, Intensive Care, Ward 3"
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
+                />
+                {(departmentsQuery.data ?? []).length > 0 && (
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => {
+                      setIsNewDepartment(false);
+                      setDepartment('');
+                    }}
+                  >
+                    Choose existing
+                  </button>
+                )}
+              </div>
+            ) : (
+              <select
+                id="create-department"
+                value={department}
+                onChange={(e) => {
+                  if (e.target.value === NEW_DEPARTMENT) {
+                    setIsNewDepartment(true);
+                    setDepartment('');
+                  } else {
+                    setDepartment(e.target.value);
+                  }
+                }}
+              >
+                <option value="">No department</option>
+                {(departmentsQuery.data ?? []).map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+                <option value={NEW_DEPARTMENT}>+ Add new department…</option>
+              </select>
+            )}
           </div>
         </div>
+
+        {isDoctor && (
+          <>
+            <div className="row" style={{ marginTop: '0.85rem' }}>
+              <div>
+                <label htmlFor="create-title">Title *</label>
+                <select
+                  id="create-title"
+                  required
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value as PersonTitle)}
+                >
+                  <option value="">Select title</option>
+                  {personTitles.map((t) => (
+                    <option key={t} value={t}>
+                      {personTitleLabels[t]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="create-specialization">Specialization *</label>
+                <input
+                  id="create-specialization"
+                  type="text"
+                  required
+                  placeholder="e.g. Dermatologist"
+                  value={specialization}
+                  onChange={(e) => setSpecialization(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="row" style={{ marginTop: '0.85rem' }}>
+              <div>
+                <label htmlFor="create-registration-number">Medical registration number *</label>
+                <input
+                  id="create-registration-number"
+                  type="text"
+                  required
+                  placeholder="e.g. SLMC12345"
+                  value={registrationNumber}
+                  onChange={(e) => setRegistrationNumber(e.target.value)}
+                />
+              </div>
+              <div>
+                <label htmlFor="create-joining-date">Joining date *</label>
+                <input
+                  id="create-joining-date"
+                  type="date"
+                  required
+                  value={joiningDate}
+                  onChange={(e) => setJoiningDate(e.target.value)}
+                />
+              </div>
+            </div>
+          </>
+        )}
 
         <div style={{ marginTop: '0.85rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -870,7 +1019,12 @@ function StaffDetailModal({
           <dl className="detail-grid">
             <div>
               <dt>Full name</dt>
-              <dd><strong>{detail.full_name}</strong></dd>
+              <dd>
+                <strong>
+                  {detail.title ? `${personTitleLabels[detail.title]} ` : ''}
+                  {detail.full_name}
+                </strong>
+              </dd>
             </div>
             <div>
               <dt>Employee ID</dt>
@@ -900,6 +1054,32 @@ function StaffDetailModal({
               <dt>Department</dt>
               <dd>{detail.department || <span className="muted">Not assigned</span>}</dd>
             </div>
+            {detail.role === 'doctor' && (
+              <>
+                <div>
+                  <dt>Specialization</dt>
+                  <dd>{detail.specialization || <span className="muted">Not set</span>}</dd>
+                </div>
+                <div>
+                  <dt>Registration number</dt>
+                  <dd>{detail.registration_number || <span className="muted">Not set</span>}</dd>
+                </div>
+                <div>
+                  <dt>Joining date</dt>
+                  <dd>
+                    {detail.joining_date ? (
+                      new Date(detail.joining_date).toLocaleDateString(undefined, {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })
+                    ) : (
+                      <span className="muted">Not set</span>
+                    )}
+                  </dd>
+                </div>
+              </>
+            )}
             <div>
               <dt>Leave balance</dt>
               <dd>{detail.leave_balance_days !== undefined && detail.leave_balance_days !== null ? `${detail.leave_balance_days} days` : '0 days'}</dd>

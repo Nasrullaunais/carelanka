@@ -57,9 +57,9 @@ export function PrescriptionsCard() {
     <div className="card">
       <h2>Prescriptions from the app</h2>
       <p className="muted" style={{ marginBottom: '0.9rem' }}>
-        Patients send a photo of their prescription from the mobile app. Get the medicine
-        ready, then mark it ready to give them a collection token for today. Mark it delivered
-        when they collect it.
+        Patients send a photo of their prescription from the mobile app, or a doctor writes one
+        directly for a patient they looked up. Get the medicine ready, then mark it ready to
+        give them a collection token for today. Mark it delivered when they collect it.
       </p>
 
       <div className="tabs">
@@ -113,7 +113,15 @@ export function PrescriptionsCard() {
                 </td>
                 <td>{prescription.note ?? <span className="muted">No note.</span>}</td>
                 <td>
-                  <OpenFileButton prescription={prescription} />
+                  {prescription.file_name ? (
+                    <OpenFileButton prescription={prescription} />
+                  ) : (
+                    <>
+                      <span className="muted">Written by the doctor:</span>
+                      <br />
+                      {prescription.body}
+                    </>
+                  )}
                 </td>
                 {status !== 'submitted' && (
                   <td>

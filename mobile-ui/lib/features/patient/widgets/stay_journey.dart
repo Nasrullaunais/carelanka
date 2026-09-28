@@ -99,8 +99,13 @@ class _Stop extends StatelessWidget {
     final dotColor = current
         ? scheme.primary
         : done
-            ? scheme.primary.withValues(alpha: 0.35)
+            ? scheme.primaryContainer
             : scheme.surfaceContainerHighest;
+    final iconColor = current
+        ? scheme.onPrimary
+        : done
+            ? scheme.onPrimaryContainer
+            : scheme.onSurfaceVariant;
 
     return IntrinsicHeight(
       child: Row(
@@ -115,7 +120,7 @@ class _Stop extends StatelessWidget {
                 child: Icon(
                   done ? Icons.check : step.icon,
                   size: 18,
-                  color: reached ? scheme.onPrimary : scheme.onSurfaceVariant,
+                  color: iconColor,
                 ),
               ),
               if (!isLast)
@@ -123,7 +128,7 @@ class _Stop extends StatelessWidget {
                   child: Container(
                     width: 2,
                     margin: const EdgeInsets.symmetric(vertical: 4),
-                    color: done ? scheme.primary.withValues(alpha: 0.35) : scheme.outlineVariant,
+                    color: done ? scheme.primary.withValues(alpha: 0.5) : scheme.outlineVariant,
                   ),
                 ),
             ],

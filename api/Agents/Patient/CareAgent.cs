@@ -111,7 +111,8 @@ public sealed class CareAgent : ICareAgent
 
         var context = new CareAdviceContext(request.ReportedText, redFlag, profile, admission, history);
 
-        var candidate = await journal.StepAsync(Draft, () => _advisor.AdviseAsync(context, ct));
+        var candidate = await journal.StepAsync(
+            Draft, () => DraftAsync(context, profile?.Allergies, ct));
 
         var validated = journal.Step(
             Validate,
@@ -127,8 +128,8 @@ public sealed class CareAgent : ICareAgent
             // The rejected text is the only evidence of whether a rule caught something real or
             // misfired, and nothing else keeps it - the row that gets saved holds the fallback.
             _logger.LogWarning(
-                "The care advisor's draft failed {FailedRules}; falling back to the deterministic "
-                + "draft. The rejected draft was: {RejectedDraft}",
+                "The care advisor's revised draft still failed {FailedRules}; falling back to the "
+                + "deterministic draft. The rejected draft was: {RejectedDraft}",
                 string.Join(", ", validated.FailedRules),
                 candidate.Message);
 
@@ -138,7 +139,8 @@ public sealed class CareAgent : ICareAgent
                 SourceNote =
                     "The AI model's draft broke a safety rule ("
                     + string.Join(", ", validated.FailedRules)
-                    + ") and was thrown away, so the standard backup note was used instead."
+                    + ") even after being asked to fix it, so it was thrown away and the standard "
+                    + "backup note was used instead."
             };
 
             validated = CareRecommendationValidator.Validate(
@@ -154,6 +156,54 @@ public sealed class CareAgent : ICareAgent
         var outcome = redFlag ? CareAgentOutcome.Escalated : CareAgentOutcome.Drafted;
 
         return journal.Finish(outcome, final, attempt);
+    }
+
+    /// <summary>
+    /// One draft, and one chance to fix it. A model draft that breaks a rule usually breaks it in a
+    /// single sentence, and throwing the whole answer away for that left the patient with the
+    /// backup note far more often than the rules actually required. The model is told exactly
+    /// what was wrong and asked again, once; the validator step after this still judges the result
+    /// on its own, so a second bad draft is caught exactly like a first.
+    /// </summary>
+    private async Task<CareDraftCandidate> DraftAsync(
+        CareAdviceContext context, string? allergies, CancellationToken ct)
+    {
+        var candidate = await _advisor.AdviseAsync(context, ct);
+
+        if (candidate.Source != CareDraftSource.Model)
+        {
+            return candidate;
+        }
+
+        var check = CareRecommendationValidator.Validate(
+            candidate, context.RedFlagMatched, allergies, context.ReportedText);
+
+        if (check.Passed)
+        {
+            return candidate;
+        }
+
+        _logger.LogWarning(
+            "The care advisor's draft failed {FailedRules}; asking it to revise. Problems: "
+            + "{Problems}. The rejected draft was: {RejectedDraft}",
+            string.Join(", ", check.FailedRules),
+            string.Join(" ", check.Problems),
+            candidate.Message);
+
+        var revised = await _advisor.AdviseAsync(
+            context with { Revision = new CareDraftRevision(candidate.Message, check.Problems) }, ct);
+
+        return revised.Source == CareDraftSource.Model
+            ? revised
+            : revised with
+            {
+                Source = CareDraftSource.ModelRejected,
+                SourceNote =
+                    "The AI model's draft broke a safety rule ("
+                    + string.Join(", ", check.FailedRules)
+                    + ") and the model could not be reached to fix it, so the standard backup "
+                    + "note was used instead."
+            };
     }
 }
 

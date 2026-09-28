@@ -55,3 +55,7 @@ swagger.json
 # them a fresh clone will not compile until someone runs build_runner. The
 # repo-wide `mobile-ui/**/*.g.dart` rule still stands for hand-written code.
 !lib/services/api_client/**/*.g.dart
+
+# Design-review screenshots from test_screens/ (regenerate with --update-goldens)
+test_screens/shots/
+test_screens/*.png

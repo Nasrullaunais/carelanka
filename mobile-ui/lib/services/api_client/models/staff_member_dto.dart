@@ -4,6 +4,7 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
+import 'person_title.dart';
 import 'staff_role.dart';
 
 part 'staff_member_dto.g.dart';
@@ -23,6 +24,10 @@ class StaffMemberDto {
     required this.updatedAt,
     this.phoneNumber,
     this.department,
+    this.title,
+    this.specialization,
+    this.registrationNumber,
+    this.joiningDate,
   });
   
   factory StaffMemberDto.fromJson(Map<String, Object?> json) => _$StaffMemberDtoFromJson(json);
@@ -41,6 +46,12 @@ class StaffMemberDto {
   final String? phoneNumber;
   final StaffRole role;
   final String? department;
+  final PersonTitle? title;
+  final String? specialization;
+  @JsonKey(name: 'registration_number')
+  final String? registrationNumber;
+  @JsonKey(name: 'joining_date')
+  final DateTime? joiningDate;
   @JsonKey(name: 'is_active')
   final bool isActive;
   @JsonKey(name: 'created_at')

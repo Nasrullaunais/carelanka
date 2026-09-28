@@ -66,6 +66,7 @@ class AuthTextField extends StatelessWidget {
     this.suffix,
     this.serverErrors,
     this.inputFormatters,
+    this.focusNode,
   });
 
   final TextEditingController controller;
@@ -79,6 +80,7 @@ class AuthTextField extends StatelessWidget {
   final Widget? suffix;
   final List<String>? serverErrors;
   final List<TextInputFormatter>? inputFormatters;
+  final FocusNode? focusNode;
 
   @override
   Widget build(BuildContext context) {
@@ -86,6 +88,7 @@ class AuthTextField extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
         controller: controller,
+        focusNode: focusNode,
         enabled: enabled,
         obscureText: obscure,
         keyboardType: keyboardType,
@@ -100,6 +103,79 @@ class AuthTextField extends StatelessWidget {
         ),
         validator: validator,
       ),
+    );
+  }
+}
+
+/// Each password box owns its own show/hide button, visible only while that box is
+/// being typed in. Leaving the box hides the text again.
+class AuthPasswordField extends StatefulWidget {
+  const AuthPasswordField({
+    super.key,
+    required this.controller,
+    required this.label,
+    required this.enabled,
+    this.validator,
+    this.textInputAction = TextInputAction.next,
+    this.onSubmitted,
+    this.serverErrors,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final bool enabled;
+  final String? Function(String?)? validator;
+  final TextInputAction textInputAction;
+  final void Function(String)? onSubmitted;
+  final List<String>? serverErrors;
+
+  @override
+  State<AuthPasswordField> createState() => _AuthPasswordFieldState();
+}
+
+class _AuthPasswordFieldState extends State<AuthPasswordField> {
+  final _focus = FocusNode();
+  bool _obscure = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(_onFocusChange);
+  }
+
+  @override
+  void dispose() {
+    _focus
+      ..removeListener(_onFocusChange)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _onFocusChange() {
+    setState(() {
+      if (!_focus.hasFocus) _obscure = true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AuthTextField(
+      controller: widget.controller,
+      focusNode: _focus,
+      label: widget.label,
+      enabled: widget.enabled,
+      obscure: _obscure,
+      textInputAction: widget.textInputAction,
+      onSubmitted: widget.onSubmitted,
+      serverErrors: widget.serverErrors,
+      validator: widget.validator,
+      suffix: _focus.hasFocus
+          ? IconButton(
+              tooltip: _obscure ? 'Show password' : 'Hide password',
+              icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+              onPressed: () => setState(() => _obscure = !_obscure),
+            )
+          : null,
     );
   }
 }

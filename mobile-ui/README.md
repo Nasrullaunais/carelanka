@@ -112,6 +112,12 @@ and it is what makes the code testable.
    `specs/*.yaml` files, not guessed from the Dart code.
 6. **Don't touch other members' routes.** `core/routing/` holds everyone's
    routes; add yours, leave theirs alone.
+7. **Take colours from the theme, never hard-code them.** `core/theme/app_theme.dart`
+   defines a light and a dark look and the app follows the phone's setting. Use
+   `Theme.of(context).colorScheme` (and `StatusColors` for warning), and
+   `BrandSurfaces.of(context)` for the home gradient and the pastel accent pairs.
+   A hex colour written in a screen looks right in one mode and wrong in the
+   other. The font (Figtree) is bundled and applied by the theme.
 
 > These mirror the rules in `specs/integration_of_functions.md`. If the two ever
 > disagree, that file wins.
@@ -151,6 +157,15 @@ flutter run
 
 If `flutter run` cannot find a device, `flutter devices` lists what it can see; Chrome counts
 as one, and the patient screens are built and tested against it.
+
+**To see every screen at once**, in both light and dark, without a device or a login:
+
+```bash
+flutter test test_screens --update-goldens
+```
+
+It renders the screens with fake data to `test_screens/shots/` (gitignored). It is not part
+of the normal `flutter test` run.
 
 ---
 

@@ -46,7 +46,7 @@ public sealed class ShiftEndpointTests
     [InlineData("/wards/{wardId}/staffing-rules", "put", "setWardStaffingRules")]
     public async Task Shift_operation_ids_match_contract(string path, string method, string expectedOperationId)
     {
-        using var document = await GenerateSwaggerAsync();
+        using var document = await GeneratedOpenApi.ParseAsync();
         var paths = document.RootElement.GetProperty("paths");
         var operation = paths.GetProperty(path).GetProperty(method);
 
@@ -64,7 +64,7 @@ public sealed class ShiftEndpointTests
     [InlineData("/wards/{wardId}/staffing-rules", "put")]
     public async Task Shift_response_statuses_match_contract(string path, string method)
     {
-        using var document = await GenerateSwaggerAsync();
+        using var document = await GeneratedOpenApi.ParseAsync();
         var contract = LoadContract();
         var expected = Keys(Map(contract, "paths", path, method, "responses"));
         var generated = Keys(document.RootElement, "paths", path, method, "responses");
@@ -909,16 +909,6 @@ public sealed class ShiftEndpointTests
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    private static async Task<JsonDocument> GenerateSwaggerAsync()
-    {
-        using var environment = TestEnvironment.Use();
-        await using var application = new SwaggerOnlyApplication();
-        using var client = application.CreateClient();
-        var response = await client.GetAsync("/swagger/v1/swagger.json");
-        response.EnsureSuccessStatusCode();
-        return JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-    }
-
     private static YamlMappingNode LoadContract()
     {
         var specPath = Path.Combine(AppContext.BaseDirectory, "../../../../../specs/staff-spec.yaml");
@@ -957,18 +947,6 @@ public sealed class ShiftEndpointTests
     private static ISet<string> Keys(YamlMappingNode node)
         => node.Children.Keys.Select(key => ((YamlScalarNode)key).Value!).ToHashSet();
 
-    private sealed class SwaggerOnlyApplication : WebApplicationFactory<Program>
-    {
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            builder.UseEnvironment("Development");
-            builder.ConfigureServices(services =>
-            {
-                services.AddScoped<IShiftService, ShiftService>();
-            });
-        }
-    }
-
     private sealed class ShiftTestApplication : WebApplicationFactory<Program>
     {
         private readonly IShiftService? _stub;
@@ -983,7 +961,6 @@ public sealed class ShiftEndpointTests
             builder.UseEnvironment("Development");
             builder.ConfigureServices(services =>
             {
-                services.AddScoped<IShiftService, ShiftService>();
                 if (_stub != null)
                 {
                     services.RemoveAll<IShiftService>();

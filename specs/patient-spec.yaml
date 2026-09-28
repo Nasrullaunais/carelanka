@@ -41,6 +41,11 @@ tags:
     description: Patient records. One row per human being, reused across visits.
   - name: Admissions
     description: One row per hospital visit, with its status workflow.
+  - name: Patient app accounts
+    description: >-
+      Finding a patient's app login and giving them a new password when they have forgotten
+      theirs. The hospital does it in person or on the phone, because no email or verified
+      phone number is ever collected to send a reset to.
   - name: Wards and Beds
     description: |
       The ward register (ours) and bed availability. The beds themselves belong to Equipment
@@ -277,6 +282,86 @@ paths:
           description: This record or this account is already linked to another.
           content:
             application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /patient-accounts:
+    get:
+      tags: [Patient app accounts]
+      summary: Find patients who have an app login
+      description: |
+        Roles: GeneralStaff, DutyManager, HospitalAdministrator.
+
+        Only patient records with a linked app account (`has_account`). `search` matches full
+        name, NIC or patient code (case-insensitive), or the app username. Ordered by full name.
+
+        The usernames are read through the shared auth service - Patient Management never
+        queries `patient_accounts` itself (`integration_of_functions.md` §3).
+      operationId: listPatientAppAccounts
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string, maxLength: 100 }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of patients with an app login
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResult'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/PatientAppAccount' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /patient-accounts/{patientId}/reset-password:
+    parameters:
+      - name: patientId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Patient app accounts]
+      summary: Give a patient a new temporary app password
+      description: |
+        Roles: GeneralStaff, DutyManager, HospitalAdministrator.
+
+        For a patient who has forgotten their password. Staff check the name, NIC, date of birth
+        and patient code against the person in front of them (or on the phone) first.
+
+        The server generates a temporary password - four capitals with no look-alike letters, a
+        hyphen and four digits, e.g. `KQTM-4821` - and saves it **in place of** the old one, so the
+        forgotten password stops working at once. Every session the patient holds is ended, and
+        any lockout from wrong guesses is cleared.
+
+        The account is flagged `must_change_password` (see `common-spec.yaml`): after signing in
+        with the temporary password the patient can do nothing but choose their own.
+
+        The temporary password is in this response **once** and nowhere else - it is stored only
+        as a hash. `Cache-Control: no-store`. No request body.
+      operationId: resetPatientAppPassword
+      responses:
+        '200':
+          description: The new temporary password. Shown once.
+          headers:
+            Cache-Control:
+              schema: { type: string, example: no-store }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatientAppPasswordReset' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: cl_pat_053 - this patient record has no app account to reset.
+          content:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /patients/{id}/medical-profile:
@@ -3383,6 +3468,36 @@ components:
           description: Present only for patients registered without an identifier, e.g. UNKNOWN-2026-0142.
         gender: { $ref: '#/components/schemas/Gender' }
         date_of_birth: { type: string, format: date, nullable: true }
+
+    PatientAppAccount:
+      type: object
+      required: [patient_id, patient_code, full_name, username]
+      description: >-
+        What staff check against the person in front of them before resetting an app password.
+      properties:
+        patient_id: { type: string, format: uuid }
+        patient_code:
+          type: string
+          minLength: 8
+          maxLength: 8
+          example: P7K2X9QM
+        full_name: { type: string }
+        nic: { type: string, nullable: true }
+        date_of_birth: { type: string, format: date, nullable: true }
+        username:
+          type: string
+          description: The app login, lower-case.
+
+    PatientAppPasswordReset:
+      type: object
+      required: [username, temporary_password]
+      properties:
+        username: { type: string }
+        temporary_password:
+          type: string
+          pattern: '^[A-HJKMNP-Z]{4}-[0-9]{4}$'
+          example: KQTM-4821
+          description: Shown once. Never stored except as a hash.
 
     Patient:
       allOf:

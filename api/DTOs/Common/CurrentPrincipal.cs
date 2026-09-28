@@ -22,4 +22,7 @@ public class CurrentPrincipal
     public string? PhoneNumber { get; set; }
 
     public Guid? PatientId { get; set; }
+
+    [Required]
+    public bool MustChangePassword { get; set; }
 }

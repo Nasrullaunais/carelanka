@@ -1051,6 +1051,26 @@ select[aria-invalid='true'] {
 .workspace:focus { outline: none; }
 .eyebrow { margin: 0 0 .6rem; }
 .tile { transition: background-color 160ms ease, border-color 160ms ease; }
+.tile { position: relative; }
+.tile > .tile-count {
+  position: absolute;
+  top: -0.55rem;
+  right: -0.55rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  border: 2px solid var(--surface);
+  background: #d92d20;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.18);
+}
 .tile-heading { display: flex; align-items: center; justify-content: space-between; color: var(--accent); margin-bottom: 1.3rem; }
 .profile-card { margin-top: 1.5rem; max-width: 42rem; padding: 2rem; }
 .profile-card > .profile-avatar { width: 60px; height: 60px; font-size: 1.1rem; margin-bottom: 1rem; }

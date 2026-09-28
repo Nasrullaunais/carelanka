@@ -27,6 +27,14 @@ StaffMemberDetailDto _$StaffMemberDetailDtoFromJson(
       .toList(),
   phoneNumber: json['phone_number'] as String?,
   department: json['department'] as String?,
+  title: json['title'] == null
+      ? null
+      : PersonTitle.fromJson(json['title'] as String),
+  specialization: json['specialization'] as String?,
+  registrationNumber: json['registration_number'] as String?,
+  joiningDate: json['joining_date'] == null
+      ? null
+      : DateTime.parse(json['joining_date'] as String),
   leaveBalanceDays: (json['leave_balance_days'] as num?)?.toDouble(),
 );
 
@@ -42,6 +50,10 @@ Map<String, dynamic> _$StaffMemberDetailDtoToJson(
   'phone_number': instance.phoneNumber,
   'role': instance.role,
   'department': instance.department,
+  'title': instance.title,
+  'specialization': instance.specialization,
+  'registration_number': instance.registrationNumber,
+  'joining_date': instance.joiningDate?.toIso8601String(),
   'is_active': instance.isActive,
   'created_at': instance.createdAt.toIso8601String(),
   'updated_at': instance.updatedAt.toIso8601String(),

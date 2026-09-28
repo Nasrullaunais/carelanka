@@ -4,12 +4,14 @@ import 'package:provider/provider.dart';
 import '../../../core/auth/auth_form.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/friendly_date.dart';
+import '../../../core/widgets/notice_banner.dart';
 import '../../../core/widgets/phone_width.dart';
 import '../../../services/api_client/models/gender.dart';
 import '../services/patient_service.dart';
 import '../state/profile_controller.dart';
 import '../validation/patient_fields.dart';
 import '../widgets/panels.dart';
+import '../widgets/pickers.dart';
 import 'claim_record_screen.dart';
 
 class MyDetailsScreen extends StatefulWidget {
@@ -72,12 +74,13 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
 
   Future<DateTime?> _pickDateOfBirth() {
     final now = DateTime.now();
-    return showDatePicker(
-      context: context,
-      initialDate: _dateOfBirth ?? DateTime(now.year - 30),
-      firstDate: DateTime(now.year - 120),
-      lastDate: now,
-      helpText: 'Date of birth',
+    final nicYear = nicBirthYear(_nic.text);
+    return showDateWheelSheet(
+      context,
+      title: 'Date of birth',
+      initial: _dateOfBirth ?? DateTime(nicYear ?? now.year - 30),
+      first: DateTime(now.year - 120),
+      last: now,
     );
   }
 
@@ -202,6 +205,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                       _Field(
                         controller: _fullName,
                         label: 'Full name',
+                        textCapitalization: TextCapitalization.words,
                         enabled: !controller.saving,
                         maxLength: PatientFieldLimits.fullName,
                         serverErrors: errors['full_name'],
@@ -210,6 +214,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                       _Field(
                         controller: _nic,
                         label: 'NIC',
+                        textCapitalization: TextCapitalization.characters,
                         enabled: !controller.saving,
                         maxLength: PatientFieldLimits.nic,
                         serverErrors: errors['nic'],
@@ -219,25 +224,11 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                         onChanged: _submitted ? (_) => setState(() {}) : null,
                       ),
                       const SizedBox(height: 12),
-                      DropdownButtonFormField<Gender>(
-                        initialValue: _gender,
-                        decoration: InputDecoration(
-                          labelText: 'Gender',
-                          errorText: _firstError(errors['gender']),
-                        ),
-                        items: _offeredGenders
-                            .map(
-                              (g) => DropdownMenuItem(
-                                value: g,
-                                child: Text(genderLabel(g)),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: controller.saving
-                            ? null
-                            : (v) => setState(() => _gender = v),
-                        validator: (v) =>
-                            v == null ? 'Choose your gender' : null,
+                      _GenderField(
+                        value: _gender,
+                        enabled: !controller.saving,
+                        serverError: _firstError(errors['gender']),
+                        onChanged: (picked) => setState(() => _gender = picked),
                       ),
                       const SizedBox(height: 12),
                       _DateOfBirthField(
@@ -295,6 +286,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                       _Field(
                         controller: _emergencyName,
                         label: 'Name (optional)',
+                        textCapitalization: TextCapitalization.words,
                         enabled: !controller.saving,
                         maxLength: PatientFieldLimits.contactName,
                         serverErrors: errors['emergency_contact_name'],
@@ -381,6 +373,75 @@ void openMyDetails(BuildContext context, ProfileController controller) {
   );
 }
 
+class _GenderField extends StatelessWidget {
+  const _GenderField({
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+    this.serverError,
+  });
+
+  final Gender? value;
+  final bool enabled;
+  final ValueChanged<Gender> onChanged;
+  final String? serverError;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return FormField<Gender>(
+      initialValue: value,
+      validator: (v) => v == null ? 'Choose your gender' : null,
+      builder: (field) {
+        final error = field.errorText ?? serverError;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 4, bottom: 8),
+              child: Text(
+                'Gender',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: error == null ? scheme.onSurfaceVariant : scheme.error,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            SegmentedButton<Gender>(
+              segments: [
+                for (final g in _offeredGenders)
+                  ButtonSegment(value: g, label: Text(genderLabel(g))),
+              ],
+              selected: {?field.value},
+              emptySelectionAllowed: field.value == null,
+              showSelectedIcon: false,
+              onSelectionChanged: enabled
+                  ? (picked) {
+                      field.didChange(picked.single);
+                      onChanged(picked.single);
+                    }
+                  : null,
+              style: error == null
+                  ? null
+                  : ButtonStyle(side: WidgetStatePropertyAll(BorderSide(color: scheme.error))),
+            ),
+            if (error != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 16, top: 6),
+                child: Text(
+                  error,
+                  style: theme.textTheme.bodySmall?.copyWith(color: scheme.error),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 class _DateOfBirthField extends StatelessWidget {
   const _DateOfBirthField({
     required this.value,
@@ -418,7 +479,7 @@ class _DateOfBirthField extends StatelessWidget {
           decoration: InputDecoration(
             labelText: 'Date of birth',
             errorText: field.errorText ?? serverError,
-            prefixIcon: const Icon(Icons.cake_outlined),
+            suffixIcon: const Icon(Icons.calendar_month_outlined),
           ),
           isEmpty: field.value == null,
           child: field.value == null
@@ -440,6 +501,7 @@ class _Field extends StatelessWidget {
     this.maxLength,
     this.serverErrors,
     this.onChanged,
+    this.textCapitalization = TextCapitalization.none,
   });
 
   final TextEditingController controller;
@@ -450,6 +512,7 @@ class _Field extends StatelessWidget {
   final int? maxLength;
   final List<String>? serverErrors;
   final ValueChanged<String>? onChanged;
+  final TextCapitalization textCapitalization;
 
   @override
   Widget build(BuildContext context) {
@@ -459,6 +522,8 @@ class _Field extends StatelessWidget {
         controller: controller,
         enabled: enabled,
         keyboardType: keyboardType,
+        textCapitalization: textCapitalization,
+        textInputAction: TextInputAction.next,
         maxLength: maxLength,
         buildCounter: nearLimitCounter(),
         decoration: InputDecoration(

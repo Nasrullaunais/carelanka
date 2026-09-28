@@ -24,6 +24,13 @@ public static class Policies
     public const string PatientEditor = nameof(PatientEditor);
 
     /// <summary>
+    /// Giving a patient a new app password after checking who they are - the desk, the duty
+    /// manager and the administrator. Not the ward nurse or the doctor: it is an identity check
+    /// at the counter or on the phone, not bedside work.
+    /// </summary>
+    public const string PatientPasswordReset = nameof(PatientPasswordReset);
+
+    /// <summary>
     /// Reading what the hospital knows about a patient's health. The duty manager is on it
     /// because they work the patients board; reception and the billing desk are not, and that is
     /// the whole point of it being a separate policy from <see cref="PatientDetails"/>.
@@ -97,6 +104,10 @@ public static class Policies
     // Removing a medicine from the register hides it from every list, so it takes the confirmation
     // code on top of the role - the pharmacy's own staff, or the administrator.
     public const string PharmacyRemover = nameof(PharmacyRemover);
+
+    // Writing a prescription directly for a patient is clinical work - the doctor alone, the
+    // same as MedicalProfileAuthor's reasoning.
+    public const string PrescriptionAuthor = nameof(PrescriptionAuthor);
 
     // The maintenance unit is run by the hospital administrator: booking work, reading the work
     // list, and confirming it done. The equipment manager reports faults and nothing more here.

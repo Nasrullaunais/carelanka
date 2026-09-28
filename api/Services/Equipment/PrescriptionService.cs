@@ -64,6 +64,7 @@ public sealed class PrescriptionService : IPrescriptionService
                 FileName = p.FileName,
                 ContentType = p.ContentType,
                 ByteSize = p.ByteSize,
+                Body = p.Body,
                 Status = p.Status,
                 TokenDate = p.TokenDate,
                 TokenNumber = p.TokenNumber,
@@ -79,8 +80,30 @@ public sealed class PrescriptionService : IPrescriptionService
         UploadPrescriptionRequest request, CancellationToken cancellationToken = default)
     {
         var patientId = await MyPatientIdAsync(cancellationToken);
-        var file = request.File!;
+        var read = await ReadValidatedFileAsync(request.File!, cancellationToken);
 
+        var prescription = new PrescriptionEntity
+        {
+            Id = Guid.NewGuid(),
+            // From the token, never the form: a patient cannot send one in somebody else's name.
+            PatientId = patientId,
+            Note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim(),
+            FileName = read.FileName,
+            ContentType = read.ContentType,
+            Content = read.Content,
+            ByteSize = read.ByteSize,
+            Status = PrescriptionStatus.Submitted
+        };
+
+        _db.Prescriptions.Add(prescription);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return ToMine(prescription);
+    }
+
+    private async Task<(string ContentType, byte[] Content, string FileName, int ByteSize)> ReadValidatedFileAsync(
+        IFormFile file, CancellationToken cancellationToken)
+    {
         if (file.Length <= 0)
         {
             throw new BadRequestException(MessageCode.PrescriptionFileEmpty);
@@ -101,23 +124,7 @@ public sealed class PrescriptionService : IPrescriptionService
         using var buffer = new MemoryStream();
         await file.CopyToAsync(buffer, cancellationToken);
 
-        var prescription = new PrescriptionEntity
-        {
-            Id = Guid.NewGuid(),
-            // From the token, never the form: a patient cannot send one in somebody else's name.
-            PatientId = patientId,
-            Note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim(),
-            FileName = Path.GetFileName(file.FileName),
-            ContentType = contentType,
-            Content = buffer.ToArray(),
-            ByteSize = (int)file.Length,
-            Status = PrescriptionStatus.Submitted
-        };
-
-        _db.Prescriptions.Add(prescription);
-        await _db.SaveChangesAsync(cancellationToken);
-
-        return ToMine(prescription);
+        return (contentType, buffer.ToArray(), Path.GetFileName(file.FileName), (int)file.Length);
     }
 
     public async Task<IReadOnlyList<Prescription>> ListAsync(
@@ -141,6 +148,8 @@ public sealed class PrescriptionService : IPrescriptionService
                 FileName = p.FileName,
                 ContentType = p.ContentType,
                 ByteSize = p.ByteSize,
+                Body = p.Body,
+                PrescribedByStaffId = p.PrescribedByStaffId,
                 Status = p.Status,
                 TokenDate = p.TokenDate,
                 TokenNumber = p.TokenNumber,
@@ -158,13 +167,53 @@ public sealed class PrescriptionService : IPrescriptionService
         return rows.Select(p => ToStaff(p, patients)).ToList();
     }
 
+    public async Task<Prescription> CreateAsync(
+        CreatePrescriptionRequest request, CancellationToken cancellationToken = default)
+    {
+        if (!await _patients.ExistsAsync(request.PatientId, cancellationToken))
+        {
+            throw new NotFoundException("Patient", request.PatientId);
+        }
+
+        var prescription = new PrescriptionEntity
+        {
+            Id = Guid.NewGuid(),
+            PatientId = request.PatientId,
+            PrescribedByStaffId = _currentUser.Id,
+            Status = PrescriptionStatus.Submitted
+        };
+
+        if (request.File is not null)
+        {
+            var read = await ReadValidatedFileAsync(request.File, cancellationToken);
+            prescription.FileName = read.FileName;
+            prescription.ContentType = read.ContentType;
+            prescription.Content = read.Content;
+            prescription.ByteSize = read.ByteSize;
+        }
+        else
+        {
+            prescription.Body = request.Body!.Trim();
+        }
+
+        _db.Prescriptions.Add(prescription);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return await ToStaffAsync(prescription, cancellationToken);
+    }
+
     public async Task<LabReportFile> GetFileAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var prescription = await _db.Prescriptions.AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken)
             ?? throw new NotFoundException("Prescription", id);
 
-        return new LabReportFile(prescription.Content, prescription.ContentType, prescription.FileName);
+        if (prescription.Content is null)
+        {
+            throw new BadRequestException(MessageCode.PrescriptionHasNoFile);
+        }
+
+        return new LabReportFile(prescription.Content, prescription.ContentType!, prescription.FileName!);
     }
 
     public async Task<Prescription> MarkReadyAsync(Guid id, CancellationToken cancellationToken = default)
@@ -287,6 +336,8 @@ public sealed class PrescriptionService : IPrescriptionService
             FileName = p.FileName,
             ContentType = p.ContentType,
             ByteSize = p.ByteSize,
+            Body = p.Body,
+            PrescribedByStaffId = p.PrescribedByStaffId,
             Status = p.Status,
             TokenDate = p.TokenDate,
             TokenNumber = p.TokenNumber,

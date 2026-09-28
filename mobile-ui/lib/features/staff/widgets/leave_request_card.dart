@@ -185,9 +185,9 @@ class _StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final (bg, fg) = switch (status) {
-      'approved' => (const Color(0xFFE8F5E9), const Color(0xFF2E7D32)),
+      'approved' => (theme.colorScheme.primaryContainer, theme.colorScheme.onPrimaryContainer),
       'rejected' => (theme.colorScheme.errorContainer, theme.colorScheme.onErrorContainer),
-      'pending' => (const Color(0xFFFFF3E0), const Color(0xFFE65100)),
+      'pending' => (theme.colorScheme.warningSurface, theme.colorScheme.warning),
       'withdrawn' => (theme.colorScheme.surfaceContainerHighest, theme.colorScheme.onSurfaceVariant),
       _ => (theme.colorScheme.surfaceContainerHighest, theme.colorScheme.onSurfaceVariant),
     };

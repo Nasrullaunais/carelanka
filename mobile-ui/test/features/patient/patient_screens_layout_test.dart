@@ -150,7 +150,8 @@ void main() {
         );
 
         expect(find.text('Chathura'), findsOneWidget);
-        expect(find.text('PTKC7Y7V'), findsOneWidget);
+        // The patient code is for the reception desk and lives on Profile, not the first screen.
+        expect(find.text('PTKC7Y7V'), findsNothing);
         // The server's own sentence, not one the app made up.
         expect(find.text('Booked. You can still cancel this.'), findsOneWidget);
         expect(tester.takeException(), isNull);
@@ -235,6 +236,7 @@ void main() {
 
       testWidgets('profile lays out with every field filled in', (tester) async {
         await pumpPatientScreen(tester, const ProfileScreen(), theme: theme, size: smallPhone);
+        expect(find.text('PTKC7Y7V'), findsOneWidget);
 
         // Off the bottom of a 320x640 screen, so the list has to be scrolled
         // before it is built at all.

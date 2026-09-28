@@ -29,6 +29,11 @@ public sealed class TokenService : ITokenService
             new(CareLankaClaims.TokenId, Guid.NewGuid().ToString())
         };
 
+        if (principal.MustChangePassword)
+        {
+            claims.Add(new Claim(CareLankaClaims.MustChangePassword, "true"));
+        }
+
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));
 
         var token = new JwtSecurityToken(

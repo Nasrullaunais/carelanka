@@ -1,6 +1,4 @@
 using System.Text.Json;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using YamlDotNet.RepresentationModel;
 using Xunit;
 
@@ -55,7 +53,7 @@ public sealed class EquipmentOpenApiContractTests
     [InlineData("/warnings/{id}/clear", "post", "clearWarning")]
     public async Task Bed_operation_ids_match_the_contract(string path, string method, string operationId)
     {
-        using var document = await GenerateAsync();
+        using var document = await GeneratedOpenApi.ParseAsync();
 
         var operation = document.RootElement.GetProperty("paths").GetProperty(path).GetProperty(method);
 
@@ -109,7 +107,7 @@ public sealed class EquipmentOpenApiContractTests
     [InlineData("/warnings/{id}/clear", "post")]
     public async Task Every_outcome_the_contract_publishes_is_declared_by_the_code(string path, string method)
     {
-        using var document = await GenerateAsync();
+        using var document = await GeneratedOpenApi.ParseAsync();
         var contract = LoadContract();
 
         var expected = Keys(Map(contract, "paths", path, method, "responses"));
@@ -125,7 +123,7 @@ public sealed class EquipmentOpenApiContractTests
     [Fact]
     public async Task The_published_bed_shape_carries_every_field_the_contract_promises()
     {
-        using var document = await GenerateAsync();
+        using var document = await GeneratedOpenApi.ParseAsync();
         var contract = LoadContract();
 
         var generated = Keys(
@@ -142,7 +140,7 @@ public sealed class EquipmentOpenApiContractTests
     [Fact]
     public async Task Bed_condition_publishes_exactly_the_two_values_the_contract_names()
     {
-        using var document = await GenerateAsync();
+        using var document = await GeneratedOpenApi.ParseAsync();
         var contract = LoadContract();
 
         var expected = Sequence(contract, "components", "schemas", "BedCondition", "enum")
@@ -153,15 +151,6 @@ public sealed class EquipmentOpenApiContractTests
 
         Assert.True(expected.SetEquals(generated),
             $"Contract: {string.Join(", ", expected)}. Generated: {string.Join(", ", generated)}.");
-    }
-
-    private static async Task<JsonDocument> GenerateAsync()
-    {
-        using var environment = TestEnvironment.Use();
-        await using var application = new SwaggerOnlyApplication();
-        using var client = application.CreateClient();
-
-        return JsonDocument.Parse(await client.GetStringAsync("/swagger/v1/swagger.json"));
     }
 
     private static YamlMappingNode BedBody(YamlMappingNode contract, params string[] path)
@@ -212,11 +201,5 @@ public sealed class EquipmentOpenApiContractTests
         }
 
         return current;
-    }
-
-    private sealed class SwaggerOnlyApplication : WebApplicationFactory<Program>
-    {
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-            => builder.UseEnvironment("Development");
     }
 }

@@ -5,6 +5,7 @@
 import 'package:json_annotation/json_annotation.dart';
 
 import 'allocation_summary_dto.dart';
+import 'person_title.dart';
 import 'staff_role.dart';
 import 'staff_skill_dto.dart';
 
@@ -27,6 +28,10 @@ class StaffMemberDetailDto {
     required this.upcomingAllocations,
     this.phoneNumber,
     this.department,
+    this.title,
+    this.specialization,
+    this.registrationNumber,
+    this.joiningDate,
     this.leaveBalanceDays,
   });
   
@@ -46,6 +51,12 @@ class StaffMemberDetailDto {
   final String? phoneNumber;
   final StaffRole role;
   final String? department;
+  final PersonTitle? title;
+  final String? specialization;
+  @JsonKey(name: 'registration_number')
+  final String? registrationNumber;
+  @JsonKey(name: 'joining_date')
+  final DateTime? joiningDate;
   @JsonKey(name: 'is_active')
   final bool isActive;
   @JsonKey(name: 'created_at')

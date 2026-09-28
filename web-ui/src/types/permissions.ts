@@ -73,6 +73,11 @@ export function canFileLabReport(role: PrincipalRole | undefined): boolean {
   return role === 'equipment_manager';
 }
 
+// Writing one directly is clinical work - the doctor alone, same reasoning as canFileLabReport.
+export function canWritePrescription(role: PrincipalRole | undefined): boolean {
+  return role === 'doctor';
+}
+
 export function canRegisterPatient(role: PrincipalRole | undefined): boolean {
   return role === 'general_staff' || role === 'ward_nurse' || role === 'duty_manager';
 }
@@ -86,6 +91,10 @@ export function canChangePatientIdentity(
   hasNic: boolean,
 ): boolean {
   return !hasNic || role === 'hospital_administrator';
+}
+
+export function canResetPatientPassword(role: PrincipalRole | undefined): boolean {
+  return role === 'general_staff' || role === 'duty_manager' || role === 'hospital_administrator';
 }
 
 export function canReadPatientDetails(role: PrincipalRole | undefined): boolean {

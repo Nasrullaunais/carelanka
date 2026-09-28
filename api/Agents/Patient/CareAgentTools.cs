@@ -62,7 +62,11 @@ public sealed class CareAgentTools : ICareAgentTools
             .Where(row => row.PatientId == patientId && row.Status != CareRecommendationStatus.PendingReview)
             .OrderByDescending(row => row.ReportedAt)
             .Take(HistoryLimit)
-            .Select(row => new CarePastRecommendation(row.ReportedText, row.UrgencyFlag, row.ReportedAt))
+            .Select(row => new CarePastRecommendation(
+                row.ReportedText,
+                row.UrgencyFlag,
+                row.ReportedAt,
+                row.Status == CareRecommendationStatus.Approved ? row.DoctorMessage : null))
             .ToListAsync(ct);
 
         return new CarePatientHistoryFacts(

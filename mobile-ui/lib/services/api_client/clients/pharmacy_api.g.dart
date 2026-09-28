@@ -542,6 +542,60 @@ class _PharmacyApi implements PharmacyApi {
   }
 
   @override
+  Future<Prescription> createPrescription({
+    String? patientId,
+    String? body,
+    File? file,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    queryParameters.removeWhere((k, v) => v == null);
+    final _headers = <String, dynamic>{};
+    final _data = FormData();
+    if (patientId != null) {
+      _data.fields.add(MapEntry('PatientId', patientId));
+    }
+    if (body != null) {
+      _data.fields.add(MapEntry('Body', body));
+    }
+    if (file != null) {
+      _data.files.add(
+        MapEntry(
+          'File',
+          MultipartFile.fromFileSync(
+            file.path,
+            filename: file.path.split(Platform.pathSeparator).last,
+          ),
+        ),
+      );
+    }
+    final _options = _setStreamType<Prescription>(
+      Options(
+            method: 'POST',
+            headers: _headers,
+            extra: _extra,
+            contentType: 'multipart/form-data',
+          )
+          .compose(
+            _dio.options,
+            '/prescriptions',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, Object?>>(_options);
+    late Prescription _value;
+    try {
+      _value = Prescription.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
   Future<List<Prescription>> listPrescriptions({
     PrescriptionStatus? status,
   }) async {

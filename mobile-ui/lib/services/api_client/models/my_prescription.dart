@@ -25,9 +25,9 @@ class MyPrescription {
     this.deliveredAt,
     this.rejectionReason,
   });
-
+  
   factory MyPrescription.fromJson(Map<String, Object?> json) => _$MyPrescriptionFromJson(json);
-
+  
   final String id;
   final String? note;
   @JsonKey(name: 'file_name')

@@ -124,6 +124,14 @@ abstract class PharmacyApi {
     @Path('workflowId') required String workflowId,
   });
 
+  @MultiPart()
+  @POST('/prescriptions')
+  Future<Prescription> createPrescription({
+    @Part(name: 'PatientId') String? patientId,
+    @Part(name: 'Body') String? body,
+    @Part(name: 'File') File? file,
+  });
+
   @GET('/prescriptions')
   Future<List<Prescription>> listPrescriptions({
     @Query('status') PrescriptionStatus? status,

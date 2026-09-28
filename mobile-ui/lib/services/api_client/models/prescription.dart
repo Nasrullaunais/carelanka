@@ -15,13 +15,15 @@ class Prescription {
     required this.patientId,
     required this.patientCode,
     required this.patientName,
-    required this.fileName,
-    required this.contentType,
-    required this.byteSize,
     required this.status,
     required this.createdAt,
     required this.updatedAt,
     this.note,
+    this.fileName,
+    this.contentType,
+    this.byteSize,
+    this.body,
+    this.prescribedByStaffId,
     this.tokenDate,
     this.tokenNumber,
     this.readyAt,
@@ -40,11 +42,14 @@ class Prescription {
   final String patientName;
   final String? note;
   @JsonKey(name: 'file_name')
-  final String fileName;
+  final String? fileName;
   @JsonKey(name: 'content_type')
-  final String contentType;
+  final String? contentType;
   @JsonKey(name: 'byte_size')
-  final int byteSize;
+  final int? byteSize;
+  final String? body;
+  @JsonKey(name: 'prescribed_by_staff_id')
+  final String? prescribedByStaffId;
   final PrescriptionStatus status;
   @JsonKey(name: 'token_date')
   final DateTime? tokenDate;

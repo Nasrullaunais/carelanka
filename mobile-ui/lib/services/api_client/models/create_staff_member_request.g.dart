@@ -19,6 +19,14 @@ CreateStaffMemberRequest _$CreateStaffMemberRequestFromJson(
   skillIds: (json['skill_ids'] as List<dynamic>?)
       ?.map((e) => e as String)
       .toList(),
+  title: json['title'] == null
+      ? null
+      : PersonTitle.fromJson(json['title'] as String),
+  specialization: json['specialization'] as String?,
+  registrationNumber: json['registration_number'] as String?,
+  joiningDate: json['joining_date'] == null
+      ? null
+      : DateTime.parse(json['joining_date'] as String),
 );
 
 Map<String, dynamic> _$CreateStaffMemberRequestToJson(
@@ -32,4 +40,8 @@ Map<String, dynamic> _$CreateStaffMemberRequestToJson(
   'role': instance.role,
   'department': instance.department,
   'skill_ids': instance.skillIds,
+  'title': instance.title,
+  'specialization': instance.specialization,
+  'registration_number': instance.registrationNumber,
+  'joining_date': instance.joiningDate?.toIso8601String(),
 };

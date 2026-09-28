@@ -16,4 +16,11 @@ public sealed record CareAdviceContext(
     bool RedFlagMatched,
     CareMedicalProfileFacts? MedicalProfile,
     CareCurrentAdmissionFacts? CurrentAdmission,
-    CarePatientHistoryFacts History);
+    CarePatientHistoryFacts History,
+    CareDraftRevision? Revision = null);
+
+/// <summary>
+/// A draft the validator threw away, handed back with what was wrong with it so the model can fix
+/// that and keep the rest - rather than the patient getting the backup note for one bad sentence.
+/// </summary>
+public sealed record CareDraftRevision(string RejectedMessage, IReadOnlyList<string> Problems);

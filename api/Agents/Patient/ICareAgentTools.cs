@@ -24,7 +24,12 @@ public sealed record CareMedicalProfileFacts(
 
 public sealed record CarePastAdmission(AdmissionCategory Category, AdmissionUrgency Urgency, DateTimeOffset? AdmittedAt);
 
-public sealed record CarePastRecommendation(string ReportedText, CareUrgency? UrgencyFlag, DateTimeOffset ReportedAt);
+/// <param name="ReplySent">
+/// What the patient was actually told - the approved reply, never an unapproved draft. Without it
+/// a follow-up like "what did you mean by that?" reads to the model as a message about nothing.
+/// </param>
+public sealed record CarePastRecommendation(
+    string ReportedText, CareUrgency? UrgencyFlag, DateTimeOffset ReportedAt, string? ReplySent);
 
 public sealed record CarePatientHistoryFacts(
     int? Age,

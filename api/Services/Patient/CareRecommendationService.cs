@@ -8,6 +8,7 @@ using CareLanka.Api.Data.Entities.Common;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Patient;
+using CareLanka.Api.Services.Common;
 using Microsoft.EntityFrameworkCore;
 using CareRecommendationEntity = CareLanka.Api.Data.Entities.Patient.CareRecommendation;
 using CareRecommendationResponse = CareLanka.Api.DTOs.Patient.CareRecommendation;
@@ -44,11 +45,13 @@ public sealed class CareRecommendationService : ICareRecommendationService
 
     private readonly CareLankaDbContext _db;
     private readonly ICareRunQueue _queue;
+    private readonly INotifier _notifier;
 
-    public CareRecommendationService(CareLankaDbContext db, ICareRunQueue queue)
+    public CareRecommendationService(CareLankaDbContext db, ICareRunQueue queue, INotifier notifier)
     {
         _db = db;
         _queue = queue;
+        _notifier = notifier;
     }
 
     public async Task<CareWorkflowAccepted> SubmitAsync(
@@ -108,6 +111,8 @@ public sealed class CareRecommendationService : ICareRecommendationService
         };
 
         _db.AgentWorkflows.Add(workflow);
+
+        await NotifyWardStaffAsync(recommendation, ct);
 
         // Both rows are on disk before a single tool runs, so a run that dies mid-flight leaves a
         // trace rather than nothing, and the caller gets a recommendation_id immediately.
@@ -289,6 +294,9 @@ public sealed class CareRecommendationService : ICareRecommendationService
         recommendation.ReviewedByStaffMemberId = reviewerStaffId;
         recommendation.ReviewedAt = DateTimeOffset.UtcNow;
 
+        await _notifier.NotifyAsync(NotificationType.CareReplyReady, Recipients.Patient(recommendation.PatientId),
+            new NotificationSubject("care_recommendation", recommendation.Id), ct);
+
         await _db.SaveChangesAsync(ct);
 
         return await GetAsync(id, ct);
@@ -404,6 +412,54 @@ public sealed class CareRecommendationService : ICareRecommendationService
         return recommendation?.Status == CareRecommendationStatus.PendingReview
             ? CareWorkflowStatus.PendingReview
             : CareWorkflowStatus.Completed;
+    }
+
+    private async Task NotifyWardStaffAsync(CareRecommendationEntity recommendation, CancellationToken ct)
+    {
+        if (recommendation.AdmissionId is not { } admissionId)
+        {
+            return;
+        }
+
+        var wardId = await WardIdForAdmissionAsync(admissionId, ct);
+        if (wardId is null)
+        {
+            return;
+        }
+
+        if (recommendation.RedFlag)
+        {
+            await _notifier.NotifyAsync(NotificationType.CareQueryFlagged, Recipients.Role(StaffRole.WardNurse, wardId),
+                new NotificationSubject("care_recommendation", recommendation.Id), ct);
+            await _notifier.NotifyAsync(NotificationType.CareQueryFlagged, Recipients.Role(StaffRole.Doctor, wardId),
+                new NotificationSubject("care_recommendation", recommendation.Id), ct);
+        }
+
+        await _notifier.NotifyAsync(NotificationType.CareReplyWaiting, Recipients.Role(StaffRole.WardNurse, wardId),
+            new NotificationSubject("care_recommendation", recommendation.Id), ct);
+        await _notifier.NotifyAsync(NotificationType.CareReplyWaiting, Recipients.Role(StaffRole.Doctor, wardId),
+            new NotificationSubject("care_recommendation", recommendation.Id), ct);
+    }
+
+    private async Task<Guid?> WardIdForAdmissionAsync(Guid admissionId, CancellationToken ct)
+    {
+        var bedId = await _db.BedAssignments
+            .AsNoTracking()
+            .Where(row => row.AdmissionId == admissionId)
+            .Where(BedHold.LiveOn(DateTimeOffset.UtcNow))
+            .Select(row => (Guid?)row.BedId)
+            .FirstOrDefaultAsync(ct);
+
+        if (bedId is null)
+        {
+            return null;
+        }
+
+        return await _db.Beds
+            .AsNoTracking()
+            .Where(row => row.Id == bedId)
+            .Select(row => (Guid?)row.WardId)
+            .FirstOrDefaultAsync(ct);
     }
 
     private static CareRecommendationResponse ToResponse(CareRecommendationEntity row, Guid? workflowId)

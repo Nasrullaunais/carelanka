@@ -32,13 +32,15 @@ public sealed class AppointmentService : IAppointmentService
     private readonly CareLankaDbContext _db;
     private readonly IAdmissionService _admissions;
     private readonly ICurrentUser _currentUser;
+    private readonly INotifier _notifier;
 
     public AppointmentService(
-        CareLankaDbContext db, IAdmissionService admissions, ICurrentUser currentUser)
+        CareLankaDbContext db, IAdmissionService admissions, ICurrentUser currentUser, INotifier notifier)
     {
         _db = db;
         _admissions = admissions;
         _currentUser = currentUser;
+        _notifier = notifier;
     }
 
     public async Task<PagedResult<AppointmentResponse>> ListAsync(
@@ -172,6 +174,9 @@ public sealed class AppointmentService : IAppointmentService
 
         appointment.Status = AppointmentStatus.Cancelled;
 
+        await _notifier.NotifyAsync(NotificationType.AppointmentCancelled, Recipients.Patient(appointment.PatientId),
+            new NotificationSubject("appointment", appointment.Id), ct, appointment.ScheduledAt);
+
         await _db.SaveChangesAsync(ct);
 
         return appointment;
@@ -237,6 +242,9 @@ public sealed class AppointmentService : IAppointmentService
         appointment.Status = AppointmentStatus.Cancelled;
         appointment.CancellationReason = request.Reason.Trim();
         appointment.CancelledByStaffMemberId = _currentUser.Id;
+
+        await _notifier.NotifyAsync(NotificationType.AppointmentCancelled, Recipients.Patient(appointment.PatientId),
+            new NotificationSubject("appointment", appointment.Id), ct, appointment.ScheduledAt);
 
         await _db.SaveChangesAsync(ct);
 
@@ -308,6 +316,10 @@ public sealed class AppointmentService : IAppointmentService
         };
 
         _db.Appointments.Add(appointment);
+
+        await _notifier.NotifyAsync(NotificationType.AppointmentBooked, Recipients.Patient(patient.Id),
+            new NotificationSubject("appointment", appointment.Id), ct, appointment.ScheduledAt);
+
         await _db.SaveChangesAsync(ct);
 
         appointment.Patient = patient;

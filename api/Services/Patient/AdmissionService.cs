@@ -32,19 +32,22 @@ public sealed class AdmissionService : IAdmissionService
     private readonly IDischargeService _discharges;
     private readonly IBillingService _billing;
     private readonly ICurrentUser _currentUser;
+    private readonly INotifier _notifier;
 
     public AdmissionService(
         CareLankaDbContext db,
         IBedRegistryService beds,
         IDischargeService discharges,
         IBillingService billing,
-        ICurrentUser currentUser)
+        ICurrentUser currentUser,
+        INotifier notifier)
     {
         _db = db;
         _beds = beds;
         _discharges = discharges;
         _billing = billing;
         _currentUser = currentUser;
+        _notifier = notifier;
     }
 
     public async Task<PagedResult<AdmissionSummary>> ListAsync(
@@ -181,6 +184,11 @@ public sealed class AdmissionService : IAdmissionService
 
         _db.Admissions.Add(admission);
 
+        // No ward is known yet - nobody has been assigned a bed - so this is a hospital-wide
+        // alert to every duty manager, not one scoped to a ward.
+        await _notifier.NotifyAsync(NotificationType.AdmissionAwaitingApproval, Recipients.Role(StaffRole.DutyManager),
+            new NotificationSubject("admission", admission.Id), ct);
+
         try
         {
             await _db.SaveChangesAsync(ct);
@@ -242,6 +250,9 @@ public sealed class AdmissionService : IAdmissionService
         };
 
         _db.Admissions.Add(admission);
+
+        await _notifier.NotifyAsync(NotificationType.AdmissionAwaitingApproval, Recipients.Role(StaffRole.DutyManager),
+            new NotificationSubject("admission", admission.Id), ct);
 
         try
         {

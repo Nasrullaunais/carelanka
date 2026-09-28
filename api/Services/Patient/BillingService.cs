@@ -29,19 +29,22 @@ public sealed class BillingService : IBillingService
     private readonly IDischargeService _discharges;
     private readonly IBillingRateService _rates;
     private readonly ICurrentUser _currentUser;
+    private readonly INotifier _notifier;
 
     public BillingService(
         CareLankaDbContext db,
         IBedRegistryService beds,
         IDischargeService discharges,
         IBillingRateService rates,
-        ICurrentUser currentUser)
+        ICurrentUser currentUser,
+        INotifier notifier)
     {
         _db = db;
         _beds = beds;
         _discharges = discharges;
         _rates = rates;
         _currentUser = currentUser;
+        _notifier = notifier;
     }
 
     public async Task<BillResponse> GetAsync(Guid admissionId, CancellationToken ct = default)
@@ -119,6 +122,10 @@ public sealed class BillingService : IBillingService
             bill.SettlementNote = Clean(request.SettlementNote);
 
             await _discharges.MarkBillingSettledAsync(admissionId, true, ct);
+
+            var total = decimal.Round(bill.LineItems.Sum(line => line.LineTotal), 2);
+            await _notifier.NotifyAsync(NotificationType.BillSettled, Recipients.Patient(admission.PatientId),
+                new NotificationSubject("bill", bill.Id), ct, total, BillingRates.Currency);
         }, ct);
 
     public async Task<BillResponse> GetForAppointmentAsync(
@@ -432,6 +439,9 @@ public sealed class BillingService : IBillingService
         };
 
         _db.Bills.Add(bill);
+
+        await _notifier.NotifyAsync(NotificationType.BillRaised, Recipients.Patient(admission.PatientId),
+            new NotificationSubject("bill", bill.Id), ct);
 
         return bill;
     }

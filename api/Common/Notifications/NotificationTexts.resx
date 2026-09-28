@@ -65,4 +65,192 @@
   <data name="dispatch_assigned_body" xml:space="preserve">
     <value>Open CareLanka to see your run.</value>
   </data>
+
+  <data name="appointment_booked_title" xml:space="preserve">
+    <value>Appointment booked</value>
+  </data>
+  <data name="appointment_booked_body" xml:space="preserve">
+    <value>Your appointment is booked for {0}.</value>
+  </data>
+  <data name="appointment_rescheduled_title" xml:space="preserve">
+    <value>Appointment rescheduled</value>
+  </data>
+  <data name="appointment_rescheduled_body" xml:space="preserve">
+    <value>Your appointment has moved to {0}.</value>
+  </data>
+  <data name="appointment_cancelled_title" xml:space="preserve">
+    <value>Appointment cancelled</value>
+  </data>
+  <data name="appointment_cancelled_body" xml:space="preserve">
+    <value>Your appointment for {0} has been cancelled.</value>
+  </data>
+  <data name="appointment_reminder_title" xml:space="preserve">
+    <value>Appointment reminder</value>
+  </data>
+  <data name="appointment_reminder_body" xml:space="preserve">
+    <value>Your appointment is coming up on {0}.</value>
+  </data>
+  <data name="admission_approved_title" xml:space="preserve">
+    <value>Admission approved</value>
+  </data>
+  <data name="admission_approved_body" xml:space="preserve">
+    <value>Your admission has been approved.</value>
+  </data>
+  <data name="bed_assigned_title" xml:space="preserve">
+    <value>Bed assigned</value>
+  </data>
+  <data name="bed_assigned_body" xml:space="preserve">
+    <value>You have been assigned bed {0} in {1}.</value>
+  </data>
+  <data name="discharge_ready_title" xml:space="preserve">
+    <value>Ready for discharge</value>
+  </data>
+  <data name="discharge_ready_body" xml:space="preserve">
+    <value>You are cleared for discharge. Check with your ward for the next steps.</value>
+  </data>
+  <data name="bill_raised_title" xml:space="preserve">
+    <value>Bill raised</value>
+  </data>
+  <data name="bill_raised_body" xml:space="preserve">
+    <value>A bill has been raised for your visit.</value>
+  </data>
+  <data name="bill_settled_title" xml:space="preserve">
+    <value>Bill settled</value>
+  </data>
+  <data name="bill_settled_body" xml:space="preserve">
+    <value>Your bill of {0} {1} has been settled.</value>
+  </data>
+  <data name="care_reply_ready_title" xml:space="preserve">
+    <value>Your care question was answered</value>
+  </data>
+  <data name="care_reply_ready_body" xml:space="preserve">
+    <value>A doctor or nurse has replied to your question.</value>
+  </data>
+  <data name="prescription_ready_title" xml:space="preserve">
+    <value>Prescription ready</value>
+  </data>
+  <data name="prescription_ready_body" xml:space="preserve">
+    <value>Your prescription is ready, token {0}.</value>
+  </data>
+  <data name="prescription_delivered_title" xml:space="preserve">
+    <value>Prescription delivered</value>
+  </data>
+  <data name="prescription_delivered_body" xml:space="preserve">
+    <value>Your prescription has been handed over.</value>
+  </data>
+  <data name="lab_report_ready_title" xml:space="preserve">
+    <value>Lab report ready</value>
+  </data>
+  <data name="lab_report_ready_body" xml:space="preserve">
+    <value>Your {0} result is ready to view.</value>
+  </data>
+  <data name="ambulance_on_the_way_title" xml:space="preserve">
+    <value>Ambulance on the way</value>
+  </data>
+  <data name="ambulance_on_the_way_body" xml:space="preserve">
+    <value>An ambulance is on its way to you.</value>
+  </data>
+  <data name="ambulance_arrived_title" xml:space="preserve">
+    <value>Ambulance arrived</value>
+  </data>
+  <data name="ambulance_arrived_body" xml:space="preserve">
+    <value>Your ambulance has arrived.</value>
+  </data>
+  <data name="cancellation_answered_title" xml:space="preserve">
+    <value>Cancellation request answered</value>
+  </data>
+  <data name="cancellation_answered_body" xml:space="preserve">
+    <value>Your request to cancel the ambulance has been {0}.</value>
+  </data>
+
+  <data name="emergency_call_received_title" xml:space="preserve">
+    <value>New emergency call</value>
+  </data>
+  <data name="emergency_call_received_body" xml:space="preserve">
+    <value>A new emergency call has come in and needs a dispatch decision.</value>
+  </data>
+  <data name="cancellation_request_waiting_title" xml:space="preserve">
+    <value>Cancellation request waiting</value>
+  </data>
+  <data name="cancellation_request_waiting_body" xml:space="preserve">
+    <value>A caller has asked to cancel their ambulance and is waiting on a decision.</value>
+  </data>
+  <data name="dispatch_proposal_waiting_title" xml:space="preserve">
+    <value>Dispatch recommendation waiting</value>
+  </data>
+  <data name="dispatch_proposal_waiting_body" xml:space="preserve">
+    <value>The dispatch agent has a recommendation waiting for review.</value>
+  </data>
+  <data name="admission_awaiting_approval_title" xml:space="preserve">
+    <value>Admission awaiting a bed</value>
+  </data>
+  <data name="admission_awaiting_approval_body" xml:space="preserve">
+    <value>An admission is waiting for a bed to be assigned.</value>
+  </data>
+  <data name="care_query_flagged_title" xml:space="preserve">
+    <value>Urgent care question flagged</value>
+  </data>
+  <data name="care_query_flagged_body" xml:space="preserve">
+    <value>A patient's question was flagged as urgent and needs attention now.</value>
+  </data>
+  <data name="care_reply_waiting_title" xml:space="preserve">
+    <value>Care question waiting for review</value>
+  </data>
+  <data name="care_reply_waiting_body" xml:space="preserve">
+    <value>A patient's question is waiting for a doctor or nurse to review.</value>
+  </data>
+  <data name="equipment_warning_raised_title" xml:space="preserve">
+    <value>New equipment warnings</value>
+  </data>
+  <data name="equipment_warning_raised_body" xml:space="preserve">
+    <value>The warning sweep raised {0} warning(s) that need a look.</value>
+  </data>
+  <data name="maintenance_due_title" xml:space="preserve">
+    <value>Maintenance due today</value>
+  </data>
+  <data name="maintenance_due_body" xml:space="preserve">
+    <value>{0} scheduled maintenance job(s) are due today.</value>
+  </data>
+  <data name="pharmacy_stock_low_title" xml:space="preserve">
+    <value>Pharmacy stock low</value>
+  </data>
+  <data name="pharmacy_stock_low_body" xml:space="preserve">
+    <value>{0} is running low and may need reordering.</value>
+  </data>
+  <data name="lab_test_requested_title" xml:space="preserve">
+    <value>Lab test requested</value>
+  </data>
+  <data name="lab_test_requested_body" xml:space="preserve">
+    <value>A lab test has been requested for {0}.</value>
+  </data>
+  <data name="leave_requested_title" xml:space="preserve">
+    <value>Leave request waiting</value>
+  </data>
+  <data name="leave_requested_body" xml:space="preserve">
+    <value>{0} has asked for leave and is waiting on a decision.</value>
+  </data>
+  <data name="leave_approved_title" xml:space="preserve">
+    <value>Leave approved</value>
+  </data>
+  <data name="leave_approved_body" xml:space="preserve">
+    <value>Your leave request has been approved.</value>
+  </data>
+  <data name="leave_rejected_title" xml:space="preserve">
+    <value>Leave rejected</value>
+  </data>
+  <data name="leave_rejected_body" xml:space="preserve">
+    <value>Your leave request has been rejected.</value>
+  </data>
+  <data name="shift_changed_title" xml:space="preserve">
+    <value>Your shift changed</value>
+  </data>
+  <data name="shift_changed_body" xml:space="preserve">
+    <value>Your roster has changed. Check your schedule for the details.</value>
+  </data>
+  <data name="roster_proposal_waiting_title" xml:space="preserve">
+    <value>Roster proposal waiting</value>
+  </data>
+  <data name="roster_proposal_waiting_body" xml:space="preserve">
+    <value>A roster proposal is waiting for approval.</value>
+  </data>
 </root>

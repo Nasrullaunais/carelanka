@@ -228,6 +228,21 @@ public sealed class DispatchService : IDispatchService
             dispatch.Ambulance.CurrentLongitude = request.Longitude!.Value;
             dispatch.Ambulance.LocationUpdatedAt = _clock.GetUtcNow();
         }
+
+        if (dispatch.EmergencyCall.PatientId is { } patientId)
+        {
+            if (target == DispatchStatus.EnRouteToScene)
+            {
+                await _notifier.NotifyAsync(NotificationType.AmbulanceOnTheWay, Recipients.Patient(patientId),
+                    new NotificationSubject("dispatch", dispatch.Id), ct);
+            }
+            else if (target == DispatchStatus.AtScene)
+            {
+                await _notifier.NotifyAsync(NotificationType.AmbulanceArrived, Recipients.Patient(patientId),
+                    new NotificationSubject("dispatch", dispatch.Id), ct);
+            }
+        }
+
         await SaveAsync(ct);
         return ToDetail(dispatch);
     }

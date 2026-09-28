@@ -25,16 +25,19 @@ public sealed class RosterProposalService : IRosterProposalService
     private readonly IStaffAllocationAgent _agent;
     private readonly ICurrentUser _currentUser;
     private readonly TimeProvider _clock;
+    private readonly INotifier _notifier;
 
     public RosterProposalService(
         CareLankaDbContext db,
         IStaffAllocationAgent agent,
         ICurrentUser currentUser,
+        INotifier notifier,
         TimeProvider? clock = null)
     {
         _db = db;
         _agent = agent;
         _currentUser = currentUser;
+        _notifier = notifier;
         _clock = clock ?? TimeProvider.System;
     }
 
@@ -236,6 +239,13 @@ public sealed class RosterProposalService : IRosterProposalService
         var run = await _agent.RunAsync(agentRequest, cancellationToken);
 
         _db.AgentWorkflows.Add(run.Workflow);
+
+        if (run.Workflow.Status == AgentWorkflowStatus.PendingApproval)
+        {
+            await _notifier.NotifyAsync(NotificationType.RosterProposalWaiting, Recipients.Role(StaffRole.HospitalAdministrator),
+                new NotificationSubject("roster_proposal", run.Workflow.Id), cancellationToken);
+        }
+
         await _db.SaveChangesAsync(cancellationToken);
 
         return ToSummary(run.Workflow, shift, run.TargetWardName);

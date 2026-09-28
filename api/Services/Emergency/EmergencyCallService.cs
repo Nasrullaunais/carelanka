@@ -21,6 +21,7 @@ public sealed class EmergencyCallService : IEmergencyCallService
     private readonly EmergencyOptions _options;
     private readonly IDispatchService _dispatches;
     private readonly ISceneLookupQueue _sceneLookups;
+    private readonly INotifier _notifier;
 
     public EmergencyCallService(
         CareLankaDbContext db,
@@ -28,7 +29,8 @@ public sealed class EmergencyCallService : IEmergencyCallService
         TimeProvider timeProvider,
         IOptions<EmergencyOptions> options,
         IDispatchService dispatches,
-        ISceneLookupQueue sceneLookups)
+        ISceneLookupQueue sceneLookups,
+        INotifier notifier)
     {
         _db = db;
         _currentUser = currentUser;
@@ -36,6 +38,7 @@ public sealed class EmergencyCallService : IEmergencyCallService
         _options = options.Value;
         _dispatches = dispatches;
         _sceneLookups = sceneLookups;
+        _notifier = notifier;
     }
 
     public async Task<EmergencyCallDetail> CreateAsync(
@@ -91,6 +94,10 @@ public sealed class EmergencyCallService : IEmergencyCallService
         };
 
         _db.EmergencyCalls.Add(call);
+
+        // No ward is known yet at intake, so this is hospital-wide - every duty manager, not one ward's.
+        await _notifier.NotifyAsync(NotificationType.EmergencyCallReceived, Recipients.Role(StaffRole.DutyManager),
+            new NotificationSubject("emergency_call", call.Id), cancellationToken);
 
         try
         {
@@ -321,6 +328,10 @@ public sealed class EmergencyCallService : IEmergencyCallService
         call.CancellationRequestStatus = CancellationRequestStatus.Pending;
         call.CancellationRequestReason = request.Reason!.Trim();
         call.CancellationRequestedAt = _timeProvider.GetUtcNow();
+
+        await _notifier.NotifyAsync(NotificationType.CancellationRequestWaiting, Recipients.Role(StaffRole.DutyManager),
+            new NotificationSubject("emergency_call", call.Id), cancellationToken);
+
         await _db.SaveChangesAsync(cancellationToken);
         return ToCancellationRequest(call);
     }
@@ -353,6 +364,7 @@ public sealed class EmergencyCallService : IEmergencyCallService
         await _dispatches.CancelForApprovedCancellationRequestAsync(id, cancellationToken);
         call.Status = CallStatus.Cancelled;
         ReviewCancellation(call, CancellationRequestStatus.Approved, request.Notes);
+        await NotifyCancellationAnsweredAsync(call, "approved", cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return ToCancellationRequest(call);
@@ -363,8 +375,21 @@ public sealed class EmergencyCallService : IEmergencyCallService
     {
         var call = await LoadPendingCancellationAsync(id, cancellationToken);
         ReviewCancellation(call, CancellationRequestStatus.Rejected, request.Notes);
+        await NotifyCancellationAnsweredAsync(call, "rejected", cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
         return ToCancellationRequest(call);
+    }
+
+    private async Task NotifyCancellationAnsweredAsync(
+        EmergencyCallEntity call, string outcome, CancellationToken cancellationToken)
+    {
+        if (call.PatientId is not { } patientId)
+        {
+            return;
+        }
+
+        await _notifier.NotifyAsync(NotificationType.CancellationAnswered, Recipients.Patient(patientId),
+            new NotificationSubject("emergency_call", call.Id), cancellationToken, outcome);
     }
 
     private async Task<EmergencyCallDetail> DetailAsync(Guid id, CancellationToken cancellationToken)

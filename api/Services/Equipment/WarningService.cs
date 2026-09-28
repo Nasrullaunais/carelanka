@@ -35,17 +35,20 @@ public sealed class WarningService : IWarningService
     private readonly ICurrentUser _currentUser;
     private readonly TimeProvider _clock;
     private readonly EquipmentOptions _options;
+    private readonly INotifier _notifier;
 
     public WarningService(
         CareLankaDbContext db,
         ICurrentUser currentUser,
         TimeProvider clock,
-        IOptions<EquipmentOptions> options)
+        IOptions<EquipmentOptions> options,
+        INotifier notifier)
     {
         _db = db;
         _currentUser = currentUser;
         _clock = clock;
         _options = options.Value;
+        _notifier = notifier;
     }
 
     public async Task<PagedResult<Warning>> ListAsync(
@@ -225,6 +228,14 @@ public sealed class WarningService : IWarningService
                 RaisedBy = RaisedBy.System
             });
             raised++;
+        }
+
+        if (raised > 0)
+        {
+            // One notification per sweep, not one per warning - an alert storm of 50 raised
+            // warnings must not become 50 pushes.
+            await _notifier.NotifyAsync(NotificationType.EquipmentWarningRaised, Recipients.Role(StaffRole.EquipmentManager),
+                new NotificationSubject("warning_sweep", Guid.NewGuid()), cancellationToken, raised);
         }
 
         await _db.SaveChangesAsync(cancellationToken);

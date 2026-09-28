@@ -18,16 +18,19 @@ public class LeaveRequestService : ILeaveRequestService
     private readonly TimeProvider _clock;
     private readonly IRosterProposalService? _rosterProposalService;
     private readonly ILogger<LeaveRequestService>? _logger;
+    private readonly INotifier _notifier;
 
     public LeaveRequestService(
         CareLankaDbContext db,
         ICurrentUser currentUser,
+        INotifier notifier,
         TimeProvider? clock = null,
         IRosterProposalService? rosterProposalService = null,
         ILogger<LeaveRequestService>? logger = null)
     {
         _db = db;
         _currentUser = currentUser;
+        _notifier = notifier;
         _clock = clock ?? TimeProvider.System;
         _rosterProposalService = rosterProposalService;
         _logger = logger;
@@ -197,6 +200,10 @@ public class LeaveRequestService : ILeaveRequestService
         };
 
         _db.LeaveRequests.Add(leaveRequest);
+
+        await _notifier.NotifyAsync(NotificationType.LeaveRequested, Recipients.Role(StaffRole.DutyManager),
+            new NotificationSubject("leave_request", leaveRequest.Id), cancellationToken, requester.FullName);
+
         await _db.SaveChangesAsync(cancellationToken);
 
         return await GetLeaveRequestDetailAsync(leaveRequest.Id, cancellationToken);
@@ -364,11 +371,18 @@ public class LeaveRequestService : ILeaveRequestService
         if (isReject)
         {
             leave.Status = LeaveStatus.Rejected;
+
+            await _notifier.NotifyAsync(NotificationType.LeaveRejected, Recipients.Staff(leave.StaffMemberId),
+                new NotificationSubject("leave_request", leave.Id), cancellationToken);
+
             await _db.SaveChangesAsync(cancellationToken);
         }
         else
         {
             leave.Status = LeaveStatus.Approved;
+
+            await _notifier.NotifyAsync(NotificationType.LeaveApproved, Recipients.Staff(leave.StaffMemberId),
+                new NotificationSubject("leave_request", leave.Id), cancellationToken);
 
             if (leave.Type == LeaveType.ShiftSwap && leave.SwapShiftId.HasValue && leave.SwapWithStaffMemberId.HasValue)
             {

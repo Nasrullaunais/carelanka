@@ -790,6 +790,10 @@ export type CreateStaffMemberRequest = {
     role: StaffRole;
     department?: string | null;
     skill_ids?: Array<string> | null;
+    title?: PersonTitle;
+    specialization?: string | null;
+    registration_number?: string | null;
+    joining_date?: string | null;
 };
 
 export type CreateWalkInAppointmentRequest = {
@@ -1709,6 +1713,8 @@ export type PendingEquipmentCount = {
     count: number;
 };
 
+export type PersonTitle = 'mr' | 'mrs' | 'ms' | 'miss' | 'dr' | 'prof';
+
 export type PharmacyBatch = {
     id: string;
     pharmacy_item_id: string;
@@ -2201,6 +2207,10 @@ export type StaffMemberDetailDto = {
     phone_number?: string | null;
     role: StaffRole;
     department?: string | null;
+    title?: PersonTitle;
+    specialization?: string | null;
+    registration_number?: string | null;
+    joining_date?: string | null;
     is_active: boolean;
     created_at: string;
     updated_at: string;
@@ -2219,6 +2229,10 @@ export type StaffMemberDto = {
     phone_number?: string | null;
     role: StaffRole;
     department?: string | null;
+    title?: PersonTitle;
+    specialization?: string | null;
+    registration_number?: string | null;
+    joining_date?: string | null;
     is_active: boolean;
     created_at: string;
     updated_at: string;
@@ -2240,6 +2254,7 @@ export type StaffSummaryDto = {
     full_name: string;
     role: StaffRole;
     department?: string | null;
+    specialization?: string | null;
     is_active: boolean;
     skill_count: number;
 };
@@ -10585,6 +10600,35 @@ export type CreateStaffMemberResponses = {
 };
 
 export type CreateStaffMemberResponse = CreateStaffMemberResponses[keyof CreateStaffMemberResponses];
+
+export type ListStaffDepartmentsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/staff/departments';
+};
+
+export type ListStaffDepartmentsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListStaffDepartmentsError = ListStaffDepartmentsErrors[keyof ListStaffDepartmentsErrors];
+
+export type ListStaffDepartmentsResponses = {
+    /**
+     * OK
+     */
+    200: Array<string>;
+};
+
+export type ListStaffDepartmentsResponse = ListStaffDepartmentsResponses[keyof ListStaffDepartmentsResponses];
 
 export type GetStaffMemberData = {
     body?: never;

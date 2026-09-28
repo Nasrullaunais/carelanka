@@ -14,6 +14,7 @@ StaffSummaryDto _$StaffSummaryDtoFromJson(Map<String, dynamic> json) =>
       isActive: json['is_active'] as bool,
       skillCount: (json['skill_count'] as num).toInt(),
       department: json['department'] as String?,
+      specialization: json['specialization'] as String?,
     );
 
 Map<String, dynamic> _$StaffSummaryDtoToJson(StaffSummaryDto instance) =>
@@ -22,6 +23,7 @@ Map<String, dynamic> _$StaffSummaryDtoToJson(StaffSummaryDto instance) =>
       'full_name': instance.fullName,
       'role': instance.role,
       'department': instance.department,
+      'specialization': instance.specialization,
       'is_active': instance.isActive,
       'skill_count': instance.skillCount,
     };

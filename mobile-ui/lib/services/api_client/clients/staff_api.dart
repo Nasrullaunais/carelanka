@@ -39,6 +39,9 @@ abstract class StaffApi {
     @Query('sortDir') String? sortDir,
   });
 
+  @GET('/staff/departments')
+  Future<List<String>> listStaffDepartments();
+
   @GET('/staff/{id}')
   Future<StaffMemberDetailDto> getStaffMember({
     @Path('id') required String id,

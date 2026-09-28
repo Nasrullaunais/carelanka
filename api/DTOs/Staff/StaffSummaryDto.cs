@@ -16,6 +16,8 @@ public class StaffSummaryDto
 
     public string? Department { get; set; }
 
+    public string? Specialization { get; set; }
+
     [Required]
     public bool IsActive { get; set; }
 

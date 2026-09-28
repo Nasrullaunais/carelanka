@@ -48,6 +48,22 @@ public sealed class StaffMemberService : IStaffMemberService
                 $"An inactive staff member already exists with email '{email}'. Use POST /api/staff/{inactiveStaff.Id}/reactivate to reactivate.");
         }
 
+        var registrationNumber = string.IsNullOrWhiteSpace(request.RegistrationNumber)
+            ? null
+            : request.RegistrationNumber.Trim();
+
+        if (registrationNumber is not null)
+        {
+            var registrationConflict = await _db.StaffMembers
+                .AnyAsync(s => s.RegistrationNumber == registrationNumber && s.IsActive, ct);
+            if (registrationConflict)
+            {
+                throw new ConflictException(
+                    MessageCode.Conflict,
+                    $"An active staff member already uses the registration number '{registrationNumber}'.");
+            }
+        }
+
         var skillIds = request.SkillIds?.Distinct().ToList() ?? new List<Guid>();
         if (skillIds.Count > 0)
         {
@@ -77,6 +93,10 @@ public sealed class StaffMemberService : IStaffMemberService
             PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber) ? null : request.PhoneNumber.Trim(),
             Role = request.Role,
             Department = string.IsNullOrWhiteSpace(request.Department) ? null : request.Department.Trim(),
+            Title = request.Title,
+            Specialization = string.IsNullOrWhiteSpace(request.Specialization) ? null : request.Specialization.Trim(),
+            RegistrationNumber = registrationNumber,
+            JoiningDate = request.JoiningDate,
             IsActive = true,
             CreatedAt = now,
             UpdatedAt = now
@@ -379,6 +399,22 @@ public sealed class StaffMemberService : IStaffMemberService
         return ToDto(staff);
     }
 
+    public async Task<IReadOnlyList<string>> ListDepartmentsAsync(CancellationToken ct = default)
+    {
+        var departments = await _db.StaffMembers
+            .Where(s => s.Department != null)
+            .Select(s => s.Department!)
+            .Distinct()
+            .ToListAsync(ct);
+
+        // The database dedupes exactly; "ICU" and "icu" would otherwise both reach the caller.
+        return departments
+            .GroupBy(d => d.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .OrderBy(d => d, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
     public static string ToEmployeeNumber(Guid id) => $"EMP-{id.ToString("N")[..8].ToUpperInvariant()}";
 
     public static StaffMemberDto ToDto(StaffMember member) => new()
@@ -392,6 +428,10 @@ public sealed class StaffMemberService : IStaffMemberService
         PhoneNumber = member.PhoneNumber,
         Role = member.Role,
         Department = member.Department,
+        Title = member.Title,
+        Specialization = member.Specialization,
+        RegistrationNumber = member.RegistrationNumber,
+        JoiningDate = member.JoiningDate,
         IsActive = member.IsActive,
         CreatedAt = member.CreatedAt,
         UpdatedAt = member.UpdatedAt
@@ -403,6 +443,7 @@ public sealed class StaffMemberService : IStaffMemberService
         FullName = member.FullName,
         Role = member.Role,
         Department = member.Department,
+        Specialization = member.Specialization,
         IsActive = member.IsActive,
         SkillCount = skillCount
     };
@@ -421,6 +462,10 @@ public sealed class StaffMemberService : IStaffMemberService
         PhoneNumber = member.PhoneNumber,
         Role = member.Role,
         Department = member.Department,
+        Title = member.Title,
+        Specialization = member.Specialization,
+        RegistrationNumber = member.RegistrationNumber,
+        JoiningDate = member.JoiningDate,
         IsActive = member.IsActive,
         CreatedAt = member.CreatedAt,
         UpdatedAt = member.UpdatedAt,

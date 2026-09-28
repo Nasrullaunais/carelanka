@@ -8,6 +8,7 @@ import '../auth/patient_login_screen.dart';
 import '../auth/patient_register_screen.dart';
 import '../auth/staff_login_screen.dart';
 import '../auth/welcome_screen.dart';
+import 'splash_screen.dart';
 
 class AppRoutes {
   const AppRoutes._();
@@ -27,11 +28,16 @@ GoRouter createAppRouter({
   required List<RouteBase> routes,
   required String Function(CurrentPrincipal principal) homePathFor,
 }) {
+  final splashFinished = ValueNotifier(false);
+
   return GoRouter(
     initialLocation: AppRoutes.splash,
-    refreshListenable: auth,
+    refreshListenable: Listenable.merge([auth, splashFinished]),
     routes: [
-      GoRoute(path: AppRoutes.splash, builder: (_, __) => const _SplashScreen()),
+      GoRoute(
+        path: AppRoutes.splash,
+        builder: (_, __) => SplashScreen(onFinished: () => splashFinished.value = true),
+      ),
       GoRoute(path: AppRoutes.welcome, builder: (_, __) => const WelcomeScreen()),
       GoRoute(path: AppRoutes.register, builder: (_, __) => const PatientRegisterScreen()),
       GoRoute(path: AppRoutes.patientLogin, builder: (_, __) => const PatientLoginScreen()),
@@ -44,6 +50,8 @@ GoRouter createAppRouter({
     ],
     redirect: (context, state) {
       final location = state.matchedLocation;
+
+      if (location == AppRoutes.splash && !splashFinished.value) return null;
 
       switch (auth.status) {
         case AuthStatus.restoring:
@@ -67,13 +75,4 @@ GoRouter createAppRouter({
       body: Center(child: Text('No screen at ${state.uri}')),
     ),
   );
-}
-
-class _SplashScreen extends StatelessWidget {
-  const _SplashScreen();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
-  }
 }

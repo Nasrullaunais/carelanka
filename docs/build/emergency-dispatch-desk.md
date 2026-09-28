@@ -17,6 +17,16 @@
   dispatch, so it cannot have an open recommendation.
 - **"No ambulance" gets its own bell**, `dispatch_proposal_failed`, instead of reusing
   `dispatch_proposal_waiting`, which now means only "a diversion needs approval".
+- **Every path that opens a recommendation or dispatches a call locks the call row first**
+  (`IDispatchProposalLifecycle.LockCallAsync`), then reads. Without it, a priority change and a
+  manual dispatch landing together left a dispatched call holding an open recommendation.
+- **Send and Approve mark the recommendation executed inside the dispatch's own transaction.**
+  Before, a withdrawal between the two saves reported a 409 after the ambulance had gone.
+- **Each recommendation rings its own bell.** The bell still opens the call, but the duplicate
+  check uses the recommendation id (`NotificationSubject.OccurrenceId`), so a second failure on
+  the same call rings again.
+- **Calls already waiting when this ships get no recommendation until someone presses
+  Re-check.** Migrations are table changes only, so nothing back-fills them.
 - **Not checked in a browser yet.** Everything below is covered by tests, not by eye.
 
 ## The problem

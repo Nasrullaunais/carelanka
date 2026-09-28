@@ -271,6 +271,142 @@ public sealed class DispatchRecommendationLifecycleTests
         Assert.False(await db.Notifications.AnyAsync(x => x.EntityId == callId && x.Type != NotificationType.EmergencyCallReceived));
     }
 
+    [Fact]
+    public async Task Moving_the_scene_replaces_the_recommendation_but_saving_the_same_spot_does_not()
+    {
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+        var callId = await CreateCallAsync(manager, Guid.NewGuid());
+        await MakeReadyAsync(callId);
+
+        var same = await manager.PatchAsJsonAsync($"/api/emergency-calls/{callId}", new { latitude = 6.927079, longitude = 79.861244 });
+        Assert.Equal(HttpStatusCode.OK, same.StatusCode);
+        Assert.Equal(1, await ProposalCountAsync(callId));
+
+        var moved = await manager.PatchAsJsonAsync($"/api/emergency-calls/{callId}", new { latitude = 6.95, longitude = 79.88 });
+
+        Assert.Equal(HttpStatusCode.OK, moved.StatusCode);
+        var proposals = await ProposalsAsync(callId);
+        Assert.Equal(2, proposals.Count);
+        Assert.Equal(DispatchWithdrawalReason.CallChanged, proposals[0].WithdrawalReason);
+    }
+
+    [Fact]
+    public async Task Cancelling_a_dispatch_opens_a_new_recommendation_without_that_ambulance()
+    {
+        var ambulance = await SeedAmbulanceAsync();
+        var callId = await SeedCallAsync();
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+        var dispatch = await ReadAsync(await manager.PostAsJsonAsync(
+            $"/api/emergency-calls/{callId}/dispatch", new { ambulance_id = ambulance.Id }));
+
+        var cancelled = await manager.PostAsJsonAsync($"/api/dispatches/{dispatch.GetProperty("id").GetGuid()}/cancel", new { reason = "Wrong vehicle" });
+
+        Assert.Equal(HttpStatusCode.OK, cancelled.StatusCode);
+        var reopened = Assert.Single(await ProposalsAsync(callId));
+        Assert.Contains(ambulance.Id, JsonSerializer.Deserialize<List<Guid>>(reopened.ExcludeAmbulanceIdsJson!)!);
+    }
+
+    [Fact]
+    public async Task A_diversion_opens_a_new_recommendation_for_the_call_that_lost_its_ambulance()
+    {
+        var others = await AmbulanceIdsAsync();
+        var ambulance = await SeedAmbulanceAsync();
+        var sourceCall = await SeedCallAsync(CallPriority.Low);
+        var urgentCall = await SeedCallAsync(CallPriority.Critical);
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+        Assert.Equal(HttpStatusCode.Created,
+            (await manager.PostAsJsonAsync($"/api/emergency-calls/{sourceCall}/dispatch", new { ambulance_id = ambulance.Id })).StatusCode);
+        var proposal = await SettledAsync(manager, await StartAsync(manager, urgentCall, others));
+        Assert.Equal("pending_approval", proposal.GetProperty("status").GetString());
+
+        var approved = await manager.PostAsJsonAsync(
+            $"/api/dispatch-proposals/{proposal.GetProperty("id").GetGuid()}/approve", new { notes = "Cardiac arrest" });
+
+        Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
+        var executed = (await ProposalsAsync(urgentCall)).Single(x => x.Id == proposal.GetProperty("id").GetGuid());
+        Assert.Equal(DispatchProposalStatus.Executed, executed.Status);
+        Assert.Equal("Cardiac arrest", executed.ReviewNotes);
+        var reopened = Assert.Single(await ProposalsAsync(sourceCall));
+        Assert.NotEqual(DispatchProposalStatus.Withdrawn, reopened.Status);
+    }
+
+    [Fact]
+    public async Task A_crew_can_decline_a_call_still_holding_an_old_open_recommendation()
+    {
+        var ambulance = await SeedAmbulanceAsync();
+        var callId = await SeedCallAsync();
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+        var dispatch = await ReadAsync(await manager.PostAsJsonAsync(
+            $"/api/emergency-calls/{callId}/dispatch", new { ambulance_id = ambulance.Id }));
+        using (var scope = _application.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<IDispatchProposalLifecycle>()
+                .Open(callId, CallPriority.High, allowDiversion: true, []).Status = DispatchProposalStatus.PendingConfirmation;
+            await scope.ServiceProvider.GetRequiredService<CareLankaDbContext>().SaveChangesAsync();
+        }
+        using var crew = await ClientAsync(ambulance.CrewEmail);
+
+        var declined = await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatch.GetProperty("id").GetGuid()}/decline", new { reason = "Flat tyre" });
+
+        Assert.Equal(HttpStatusCode.OK, declined.StatusCode);
+        var proposals = await ProposalsAsync(callId);
+        Assert.Equal(2, proposals.Count);
+        Assert.Equal(DispatchProposalStatus.Withdrawn, proposals[0].Status);
+    }
+
+    [Fact]
+    public async Task Sending_a_recommendation_withdrawn_mid_send_dispatches_nothing()
+    {
+        var others = await AmbulanceIdsAsync();
+        await SeedAmbulanceAsync();
+        var callId = await SeedCallAsync();
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+        var proposalId = (await SettledAsync(manager, await StartAsync(manager, callId, others))).GetProperty("id").GetGuid();
+
+        HttpResponseMessage sent;
+        using (var scope = _application.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            await scope.ServiceProvider.GetRequiredService<IDispatchProposalLifecycle>().LockCallAsync(callId);
+            var send = manager.PostAsync($"/api/dispatch-proposals/{proposalId}/confirm", null);
+            await WaitForLockWaiterAsync();
+            await scope.ServiceProvider.GetRequiredService<IDispatchProposalLifecycle>()
+                .WithdrawOpenAsync(callId, DispatchWithdrawalReason.CallChanged);
+            await db.SaveChangesAsync();
+            await transaction.CommitAsync();
+            sent = await send;
+        }
+
+        Assert.Equal(HttpStatusCode.Conflict, sent.StatusCode);
+        using var check = _application.Services.CreateScope();
+        var state = check.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        Assert.False(await state.Dispatches.AnyAsync(x => x.EmergencyCallId == callId));
+        Assert.Equal(CallStatus.Received, (await state.EmergencyCalls.FindAsync(callId))!.Status);
+    }
+
+    [Fact]
+    public async Task Each_failed_recommendation_for_a_call_rings_its_own_bell()
+    {
+        var others = await AmbulanceIdsAsync();
+        var callId = await SeedCallAsync();
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            var create = await manager.PostAsJsonAsync("/api/dispatch-proposals", new
+            {
+                emergency_call_id = callId, allow_diversion = false, exclude_ambulance_ids = others
+            });
+            Assert.Equal("failed", (await SettledAsync(manager, (await ReadAsync(create)).GetProperty("id").GetGuid())).GetProperty("status").GetString());
+        }
+
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        var managers = await db.StaffMembers.CountAsync(x => x.Role == StaffRole.DutyManager && x.IsActive);
+        Assert.Equal(2 * managers, await db.Notifications.CountAsync(x => x.Type == NotificationType.DispatchProposalFailed && x.EntityId == callId));
+    }
+
     private sealed class WithdrawingAgent(IServiceProvider services, Guid callId) : IDispatchAgent
     {
         public async Task<DispatchAgentRun> RunAsync(DispatchAgentRequest request, CancellationToken cancellationToken = default)
@@ -282,6 +418,19 @@ public sealed class DispatchRecommendationLifecycleTests
 
             return new DispatchAgentRun([], [], [], DispatchOutcome.FreeAmbulanceProposed, false,
                 Guid.NewGuid(), "LATE-1", 4, "Too late", null, null, []);
+        }
+    }
+
+    private async Task WaitForLockWaiterAsync()
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        while (await db.Database.SqlQuery<int>(
+            $"SELECT count(*)::int AS \"Value\" FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE '%emergency_calls%FOR UPDATE%'").SingleAsync() == 0)
+        {
+            if (DateTime.UtcNow > deadline) Assert.Fail("The send never waited on the call lock.");
+            await Task.Delay(20);
         }
     }
 

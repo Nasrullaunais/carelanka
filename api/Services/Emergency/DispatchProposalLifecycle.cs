@@ -3,6 +3,7 @@ using CareLanka.Api.Data;
 using CareLanka.Api.Data.Entities.Common;
 using CareLanka.Api.Data.Entities.Emergency;
 using CareLanka.Api.Data.Enums;
+using CareLanka.Api.Services.Common;
 using Microsoft.EntityFrameworkCore;
 
 namespace CareLanka.Api.Services.Emergency;
@@ -20,13 +21,22 @@ public sealed class DispatchProposalLifecycle : IDispatchProposalLifecycle
 
     private readonly CareLankaDbContext _db;
     private readonly IDispatchRunQueue _queue;
+    private readonly ICurrentUser _currentUser;
     private readonly TimeProvider _clock;
 
-    public DispatchProposalLifecycle(CareLankaDbContext db, IDispatchRunQueue queue, TimeProvider clock)
+    public DispatchProposalLifecycle(CareLankaDbContext db, IDispatchRunQueue queue, ICurrentUser currentUser, TimeProvider clock)
     {
         _db = db;
         _queue = queue;
+        _currentUser = currentUser;
         _clock = clock;
+    }
+
+    public async Task LockCallAsync(Guid callId, CancellationToken cancellationToken = default)
+    {
+        if (_db.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("Locking an emergency call needs an open transaction.");
+        await _db.Database.ExecuteSqlAsync($"SELECT id FROM emergency_calls WHERE id = {callId} FOR UPDATE", cancellationToken);
     }
 
     public DispatchProposal Open(
@@ -81,6 +91,22 @@ public sealed class DispatchProposalLifecycle : IDispatchProposalLifecycle
         }
 
         return proposal;
+    }
+
+    public async Task MarkExecutedAsync(Guid proposalId, Guid dispatchId, string? reviewNotes, CancellationToken cancellationToken = default)
+    {
+        var proposal = await _db.DispatchProposals.SingleAsync(row => row.Id == proposalId, cancellationToken);
+        proposal.Status = DispatchProposalStatus.Executed;
+        proposal.ResultingDispatchId = dispatchId;
+        proposal.ReviewedByStaffMemberId = _currentUser.Id;
+        proposal.ReviewedAt = _clock.GetUtcNow();
+        proposal.ReviewNotes = reviewNotes?.Trim();
+
+        var workflow = await _db.AgentWorkflows.SingleOrDefaultAsync(row => row.Id == proposal.WorkflowId, cancellationToken);
+        if (workflow is null) return;
+        workflow.Status = AgentWorkflowStatus.Executed;
+        workflow.ReviewedByStaffMemberId = proposal.ReviewedByStaffMemberId;
+        workflow.ReviewedAt = proposal.ReviewedAt;
     }
 
     public async Task<IReadOnlyList<Guid>> CarriedExclusionsAsync(Guid callId, CancellationToken cancellationToken = default)

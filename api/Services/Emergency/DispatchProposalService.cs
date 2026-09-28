@@ -42,6 +42,8 @@ public sealed class DispatchProposalService : IDispatchProposalService
 
     public async Task<DispatchProposalSummary> StartAsync(CreateDispatchProposalRequest request, CancellationToken ct = default)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        await _lifecycle.LockCallAsync(request.EmergencyCallId, ct);
         var call = await _db.EmergencyCalls
             .Include(x => x.Dispatches)
             .SingleOrDefaultAsync(x => x.Id == request.EmergencyCallId, ct)
@@ -60,6 +62,7 @@ public sealed class DispatchProposalService : IDispatchProposalService
 
         var proposal = _lifecycle.Open(call.Id, call.Priority, request.AllowDiversion, request.ExcludeAmbulanceIds ?? []);
         await SaveAsync(ct);
+        await transaction.CommitAsync(ct);
         _lifecycle.Wake(proposal);
 
         return await ToSummaryAsync(proposal, ct);
@@ -121,15 +124,7 @@ public sealed class DispatchProposalService : IDispatchProposalService
                 MessageCode.DispatchProposalNotConfirmable, null, [check.Check], check.Detail);
         }
 
-        var dispatch = await _dispatches.DispatchFromProposalAsync(proposal.EmergencyCallId, ambulanceId, proposal.Id, ct);
-
-        proposal.Status = DispatchProposalStatus.Executed;
-        proposal.ResultingDispatchId = dispatch.Id;
-        proposal.ReviewedByStaffMemberId = _currentUser.Id;
-        proposal.ReviewedAt = _clock.GetUtcNow();
-        await SetWorkflowExecutedAsync(proposal, ct);
-        await SaveAsync(ct);
-
+        await _dispatches.DispatchFromProposalAsync(proposal.EmergencyCallId, ambulanceId, proposal.Id, ct);
         return await ToDetailAsync(proposal, ct);
     }
 
@@ -173,17 +168,8 @@ public sealed class DispatchProposalService : IDispatchProposalService
                 string.Join(", ", failedChecks));
         }
 
-        var dispatch = await _dispatches.ApplyDiversionAsync(
+        await _dispatches.ApplyDiversionAsync(
             sourceDispatchId, proposal.EmergencyCallId, ambulanceId, proposal.Id, request.Notes, ct);
-
-        proposal.Status = DispatchProposalStatus.Executed;
-        proposal.ResultingDispatchId = dispatch.Id;
-        proposal.ReviewedByStaffMemberId = _currentUser.Id;
-        proposal.ReviewedAt = _clock.GetUtcNow();
-        proposal.ReviewNotes = request.Notes?.Trim();
-        await SetWorkflowExecutedAsync(proposal, ct);
-        await SaveAsync(ct);
-
         return await ToDetailAsync(proposal, ct);
     }
 
@@ -197,6 +183,7 @@ public sealed class DispatchProposalService : IDispatchProposalService
         }
 
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        await _lifecycle.LockCallAsync(proposal.EmergencyCallId, ct);
         proposal.Status = DispatchProposalStatus.Rejected;
         proposal.RejectionReason = request.Reason;
         proposal.ReviewNotes = request.Notes?.Trim();
@@ -268,15 +255,6 @@ public sealed class DispatchProposalService : IDispatchProposalService
         {
             throw new ConflictException(MessageCode.DispatchProposalConflict);
         }
-    }
-
-    private async Task SetWorkflowExecutedAsync(DispatchProposal proposal, CancellationToken ct)
-    {
-        var workflow = await _db.AgentWorkflows.SingleOrDefaultAsync(x => x.Id == proposal.WorkflowId, ct);
-        if (workflow is null) return;
-        workflow.Status = AgentWorkflowStatus.Executed;
-        workflow.ReviewedByStaffMemberId = _currentUser.Id;
-        workflow.ReviewedAt = proposal.ReviewedAt;
     }
 
     private async Task AppendValidationAsync(DispatchProposal proposal, DispatchValidationResult check, CancellationToken ct)

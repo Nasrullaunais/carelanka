@@ -1,4 +1,5 @@
 import type { InboxNotification, NotificationType } from '../services/api/generated';
+import { emergencyCallPath } from '../features/emergency/domain';
 
 export const notificationTypeLabels: Record<NotificationType, string> = {
   dispatch_assigned: 'Dispatch assigned',
@@ -37,7 +38,7 @@ export const notificationTypeLabels: Record<NotificationType, string> = {
 };
 
 // One route per NotificationType so a new type with no route is a compile error, not a dead click.
-const notificationRoutes: Record<NotificationType, (entityId: string) => string> = {
+const notificationRoutes: Record<NotificationType, (notification: InboxNotification) => string> = {
   dispatch_assigned: () => '/emergency',
   appointment_booked: () => '/appointments',
   appointment_rescheduled: () => '/appointments',
@@ -73,11 +74,11 @@ const notificationRoutes: Record<NotificationType, (entityId: string) => string>
   roster_proposal_waiting: () => '/staff/roster-proposals',
 };
 
-function emergencyCall(callId: string): string {
-  return callId ? `/emergency/calls/${encodeURIComponent(callId)}` : '/emergency';
+function emergencyCall({ entity_type, entity_id }: InboxNotification): string {
+  return entity_type === 'emergency_call' && entity_id ? emergencyCallPath(entity_id) : '/emergency';
 }
 
 export function routeForNotification(notification: InboxNotification): string | null {
   if (!notification.type) return null;
-  return notificationRoutes[notification.type](notification.entity_id ?? '');
+  return notificationRoutes[notification.type](notification);
 }

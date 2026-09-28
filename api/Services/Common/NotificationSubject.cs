@@ -1,3 +1,4 @@
 namespace CareLanka.Api.Services.Common;
 
-public readonly record struct NotificationSubject(string EntityType, Guid EntityId);
+// OccurrenceId separates repeat events about one entity, e.g. each failed recommendation for the same call.
+public readonly record struct NotificationSubject(string EntityType, Guid EntityId, Guid? OccurrenceId = null);

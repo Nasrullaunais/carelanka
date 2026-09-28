@@ -55,6 +55,7 @@ public sealed class DispatchService : IDispatchService
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
         var dispatch = await CreateCoreAsync(callId, ambulanceId, ct);
         dispatch.DispatchProposalId = proposalId;
+        await _proposals.MarkExecutedAsync(proposalId, dispatch.Id, null, ct);
         await SaveAsync(ct);
         await transaction.CommitAsync(ct);
         QueueRoutePlan(dispatch);
@@ -65,6 +66,10 @@ public sealed class DispatchService : IDispatchService
         Guid sourceDispatchId, Guid newCallId, Guid replacementAmbulanceId, Guid proposalId, string? reason, CancellationToken ct = default)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        var sourceCallId = await _db.Dispatches.Where(x => x.Id == sourceDispatchId).Select(x => (Guid?)x.EmergencyCallId).SingleOrDefaultAsync(ct)
+            ?? throw new NotFoundException("Dispatch", sourceDispatchId);
+        // Same order every time, so two diversions between the same calls cannot deadlock.
+        foreach (var callId in new[] { sourceCallId, newCallId }.Order()) await _proposals.LockCallAsync(callId, ct);
         var source = await LoadAsync(sourceDispatchId, ct);
         RequirePrePickup(source, DispatchStatus.Reassigned);
         source.Status = DispatchStatus.Reassigned;
@@ -77,6 +82,7 @@ public sealed class DispatchService : IDispatchService
         var replacement = await CreateCoreAsync(newCallId, replacementAmbulanceId, ct);
         replacement.DispatchProposalId = proposalId;
         source.SupersededByDispatchId = replacement.Id;
+        await _proposals.MarkExecutedAsync(proposalId, replacement.Id, reason, ct);
         var sourceRecommendation = await ReopenAsync(source, excludeOwnAmbulance: false, ct);
         await SaveAsync(ct);
         await transaction.CommitAsync(ct);
@@ -201,13 +207,16 @@ public sealed class DispatchService : IDispatchService
 
     public async Task<DispatchDetail> DeclineAsync(Guid id, DeclineDispatchRequest request, CancellationToken ct = default)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
         var dispatch = await OwnedAsync(id, ct);
+        await _proposals.LockCallAsync(dispatch.EmergencyCallId, ct);
         Move(dispatch, DispatchStatus.Declined);
         dispatch.DeclinedReason = request.Reason!.Trim();
         dispatch.Ambulance.Status = AmbulanceStatus.Available;
         dispatch.EmergencyCall.Status = CallStatus.Received;
         var recommendation = await ReopenAsync(dispatch, excludeOwnAmbulance: true, ct);
         await SaveAsync(ct);
+        await transaction.CommitAsync(ct);
         _proposals.Wake(recommendation);
         return ToDetail(dispatch);
     }
@@ -268,11 +277,14 @@ public sealed class DispatchService : IDispatchService
 
     public async Task<DispatchDetail> CancelAsync(Guid id, CancelDispatchRequest request, CancellationToken ct = default)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
         var dispatch = await LoadAsync(id, ct);
+        await _proposals.LockCallAsync(dispatch.EmergencyCallId, ct);
         CancelCore(dispatch);
         dispatch.CancellationReason = request.Reason!.Trim();
         var recommendation = await ReopenAsync(dispatch, excludeOwnAmbulance: true, ct);
         await SaveAsync(ct);
+        await transaction.CommitAsync(ct);
         _proposals.Wake(recommendation);
         return ToDetail(dispatch);
     }
@@ -309,6 +321,7 @@ public sealed class DispatchService : IDispatchService
 
     private async Task<Dispatch> CreateCoreAsync(Guid callId, Guid ambulanceId, CancellationToken ct)
     {
+        await _proposals.LockCallAsync(callId, ct);
         var call = await _db.EmergencyCalls.Include(x => x.Dispatches)
             .SingleOrDefaultAsync(x => x.Id == callId, ct) ?? throw new NotFoundException("Emergency call", callId);
         if (call.Status != CallStatus.Received || call.Dispatches.Any(x => x.Status.IsLive()))
@@ -355,6 +368,9 @@ public sealed class DispatchService : IDispatchService
 
     private async Task<DispatchProposal> ReopenAsync(Dispatch returned, bool excludeOwnAmbulance, CancellationToken ct)
     {
+        // A call dispatched before withdrawals existed can still hold an open one.
+        if (await _proposals.WithdrawOpenAsync(returned.EmergencyCallId, DispatchWithdrawalReason.CallChanged, ct) is not null)
+            await SaveAsync(ct);
         var excluded = (await _proposals.CarriedExclusionsAsync(returned.EmergencyCallId, ct)).ToList();
         if (excludeOwnAmbulance) excluded.Add(returned.AmbulanceId);
         return _proposals.Open(returned.EmergencyCallId, returned.EmergencyCall.Priority, allowDiversion: true, excluded);

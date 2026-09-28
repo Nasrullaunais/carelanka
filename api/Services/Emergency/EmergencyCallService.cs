@@ -248,6 +248,8 @@ public sealed class EmergencyCallService : IEmergencyCallService
         UpdateEmergencyCallRequest request,
         CancellationToken cancellationToken = default)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        await _lifecycle.LockCallAsync(id, cancellationToken);
         var call = await _db.EmergencyCalls.Include(item => item.Dispatches)
             .FirstOrDefaultAsync(item => item.Id == id, cancellationToken)
             ?? throw new NotFoundException("Emergency call", id);
@@ -286,7 +288,6 @@ public sealed class EmergencyCallService : IEmergencyCallService
             && call.Status == CallStatus.Received
             && !call.Dispatches.Any(dispatch => dispatch.Status.IsLive());
 
-        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         if (needsNewRecommendation)
         {
             await _lifecycle.WithdrawOpenAsync(call.Id, DispatchWithdrawalReason.CallChanged, cancellationToken);
@@ -341,12 +342,15 @@ public sealed class EmergencyCallService : IEmergencyCallService
 
     public async Task<MyEmergencyCallSummary> CancelMineAsync(Guid id, RequestCancellationRequest request, CancellationToken cancellationToken = default)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        await _lifecycle.LockCallAsync(id, cancellationToken);
         var call = await MineAsync(id, cancellationToken);
         if (call.Dispatches.Any()) throw new ConflictException(MessageCode.CallAlreadyDispatched);
         if (call.Status != CallStatus.Received) throw new ConflictException(MessageCode.CallNotCancellable);
         call.Status = CallStatus.Cancelled;
         await _lifecycle.WithdrawOpenAsync(call.Id, DispatchWithdrawalReason.CallClosed, cancellationToken);
-        await _db.SaveChangesAsync(cancellationToken);
+        await SaveAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return ToMine(call);
     }
 

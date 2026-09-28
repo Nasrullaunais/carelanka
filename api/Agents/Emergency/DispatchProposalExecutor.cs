@@ -144,6 +144,6 @@ public sealed class DispatchProposalExecutor
         if (type is null) return;
 
         await _notifier.NotifyAsync(type.Value, Recipients.Role(StaffRole.DutyManager),
-            new NotificationSubject("emergency_call", proposal.EmergencyCallId), ct);
+            new NotificationSubject("emergency_call", proposal.EmergencyCallId, proposal.Id), ct);
     }
 }

@@ -45,7 +45,7 @@ it('reveals the temporary password only after the reset is confirmed', async () 
   renderWithProviders(<PatientAppAccountsPage />);
 
   await userEvent.click(await screen.findByRole('button', { name: 'Generate new password' }));
-  expect(await screen.findByText(/Their current password stops working straight away/)).toBeInTheDocument();
+  expect(await screen.findByText(/make sure you are speaking to/)).toBeInTheDocument();
   expect(screen.queryByText('KQTM-4821')).not.toBeInTheDocument();
 
   const dialog = screen.getByRole('alertdialog');

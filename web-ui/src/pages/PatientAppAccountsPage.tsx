@@ -147,10 +147,27 @@ export function PatientAppAccountsPage() {
             <TemporaryPassword username={reset.data.username} password={reset.data.temporary_password} />
           ) : (
             target && (
-              <p>
-                Generate a new password for {target.full_name}? Their current password stops
-                working straight away. Check their NIC and date of birth first.
-              </p>
+              <>
+                <p>
+                  Before you hand over a new password, make sure you are speaking to{' '}
+                  {target.full_name}. Ask them for their NIC and date of birth, and check that both
+                  match this record.
+                </p>
+                <dl className="detail-grid">
+                  <div>
+                    <dt>NIC</dt>
+                    <dd>{target.nic ?? 'Not recorded'}</dd>
+                  </div>
+                  <div>
+                    <dt>Date of birth</dt>
+                    <dd>{target.date_of_birth ?? 'Not recorded'}</dd>
+                  </div>
+                </dl>
+                <p>
+                  If either does not match, do not generate a password. Their current password stops
+                  working as soon as you generate a new one.
+                </p>
+              </>
             )
           )
         }

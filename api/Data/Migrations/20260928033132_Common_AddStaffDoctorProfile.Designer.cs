@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using CareLanka.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CareLanka.Api.Data.Migrations
 {
     [DbContext(typeof(CareLankaDbContext))]
-    partial class CareLankaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260928033132_Common_AddStaffDoctorProfile")]
+    partial class Common_AddStaffDoctorProfile
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2069,20 +2072,17 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<string>("Body")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("body");
-
-                    b.Property<int?>("ByteSize")
+                    b.Property<int>("ByteSize")
                         .HasColumnType("integer")
                         .HasColumnName("byte_size");
 
                     b.Property<byte[]>("Content")
+                        .IsRequired()
                         .HasColumnType("bytea")
                         .HasColumnName("content");
 
                     b.Property<string>("ContentType")
+                        .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("content_type");
@@ -2100,6 +2100,7 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnName("delivered_by_staff_id");
 
                     b.Property<string>("FileName")
+                        .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
                         .HasColumnName("file_name");
@@ -2112,10 +2113,6 @@ namespace CareLanka.Api.Data.Migrations
                     b.Property<Guid>("PatientId")
                         .HasColumnType("uuid")
                         .HasColumnName("patient_id");
-
-                    b.Property<Guid?>("PrescribedByStaffId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("prescribed_by_staff_id");
 
                     b.Property<DateTimeOffset?>("ReadyAt")
                         .HasColumnType("timestamp with time zone")
@@ -2174,8 +2171,6 @@ namespace CareLanka.Api.Data.Migrations
                     b.ToTable("prescriptions", null, t =>
                         {
                             t.HasCheckConstraint("ck_prescriptions_byte_size", "byte_size > 0");
-
-                            t.HasCheckConstraint("ck_prescriptions_file_xor_body", "(file_name IS NOT NULL AND body IS NULL) OR (file_name IS NULL AND body IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_prescriptions_status", "status IN ('submitted', 'ready', 'delivered', 'rejected')");
                         });

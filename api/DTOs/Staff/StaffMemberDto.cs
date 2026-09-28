@@ -30,6 +30,14 @@ public class StaffMemberDto
 
     public string? Department { get; set; }
 
+    public PersonTitle? Title { get; set; }
+
+    public string? Specialization { get; set; }
+
+    public string? RegistrationNumber { get; set; }
+
+    public DateOnly? JoiningDate { get; set; }
+
     [Required]
     public bool IsActive { get; set; }
 

@@ -20,6 +20,14 @@ StaffMemberDto _$StaffMemberDtoFromJson(Map<String, dynamic> json) =>
       updatedAt: DateTime.parse(json['updated_at'] as String),
       phoneNumber: json['phone_number'] as String?,
       department: json['department'] as String?,
+      title: json['title'] == null
+          ? null
+          : PersonTitle.fromJson(json['title'] as String),
+      specialization: json['specialization'] as String?,
+      registrationNumber: json['registration_number'] as String?,
+      joiningDate: json['joining_date'] == null
+          ? null
+          : DateTime.parse(json['joining_date'] as String),
     );
 
 Map<String, dynamic> _$StaffMemberDtoToJson(StaffMemberDto instance) =>
@@ -33,6 +41,10 @@ Map<String, dynamic> _$StaffMemberDtoToJson(StaffMemberDto instance) =>
       'phone_number': instance.phoneNumber,
       'role': instance.role,
       'department': instance.department,
+      'title': instance.title,
+      'specialization': instance.specialization,
+      'registration_number': instance.registrationNumber,
+      'joining_date': instance.joiningDate?.toIso8601String(),
       'is_active': instance.isActive,
       'created_at': instance.createdAt.toIso8601String(),
       'updated_at': instance.updatedAt.toIso8601String(),

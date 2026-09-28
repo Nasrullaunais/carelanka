@@ -1,4 +1,5 @@
-﻿using CareLanka.Api.DTOs.Staff;
+﻿using CareLanka.Api.Data.Enums;
+using CareLanka.Api.DTOs.Staff;
 using FluentValidation;
 
 namespace CareLanka.Api.Validators.Staff;
@@ -18,7 +19,9 @@ public sealed class CreateStaffMemberRequestValidator : AbstractValidator<Create
         RuleFor(x => x.Email)
             .NotEmpty().WithMessage("Email is required.")
             .EmailAddress().WithMessage("A valid email address is required.")
-            .MaximumLength(255).WithMessage("Email must not exceed 255 characters.");
+            .MaximumLength(255).WithMessage("Email must not exceed 255 characters.")
+            .Must(email => email.EndsWith("@carelanka.lk", StringComparison.OrdinalIgnoreCase))
+            .WithMessage("Work email must be a carelanka.lk address.");
 
         RuleFor(x => x.TemporaryPassword)
             .NotEmpty().WithMessage("Temporary password is required.")
@@ -34,5 +37,30 @@ public sealed class CreateStaffMemberRequestValidator : AbstractValidator<Create
         RuleFor(x => x.Department)
             .MaximumLength(100).WithMessage("Department must not exceed 100 characters.")
             .When(x => !string.IsNullOrEmpty(x.Department));
+
+        RuleFor(x => x.Specialization)
+            .MaximumLength(150).WithMessage("Specialization must not exceed 150 characters.")
+            .When(x => !string.IsNullOrEmpty(x.Specialization));
+
+        RuleFor(x => x.RegistrationNumber)
+            .MaximumLength(50).WithMessage("Registration number must not exceed 50 characters.")
+            .When(x => !string.IsNullOrEmpty(x.RegistrationNumber));
+
+        // A doctor's professional details are required; nobody else is asked for them today.
+        RuleFor(x => x.Title)
+            .NotNull().WithMessage("Title is required for a doctor.")
+            .When(x => x.Role == StaffRole.Doctor);
+
+        RuleFor(x => x.Specialization)
+            .NotEmpty().WithMessage("Specialization is required for a doctor.")
+            .When(x => x.Role == StaffRole.Doctor);
+
+        RuleFor(x => x.RegistrationNumber)
+            .NotEmpty().WithMessage("Registration number is required for a doctor.")
+            .When(x => x.Role == StaffRole.Doctor);
+
+        RuleFor(x => x.JoiningDate)
+            .NotNull().WithMessage("Joining date is required for a doctor.")
+            .When(x => x.Role == StaffRole.Doctor);
     }
 }

@@ -10,4 +10,9 @@ public interface INotifier
         NotificationSubject subject,
         CancellationToken cancellationToken = default,
         params object[] args);
+
+    Task ResolveAsync(
+        NotificationType type,
+        NotificationSubject subject,
+        CancellationToken cancellationToken = default);
 }

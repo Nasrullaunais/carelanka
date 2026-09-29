@@ -95,6 +95,36 @@ public sealed class PatientNotificationTests
     }
 
     [Fact]
+    public async Task Approving_an_admission_marks_every_duty_managers_waiting_alert_as_read()
+    {
+        using var manager = await _kit.StaffAsync(ApiApplication.ManagerEmail);
+        await _kit.SeedStaffAsync(StaffRole.DutyManager);
+        var patient = await _kit.NewPatientAsync();
+        var admissionId = await AdmitAsync(manager, patient);
+        Assert.True(await _kit.UnreadCountAsync(NotificationType.AdmissionAwaitingApproval, admissionId) > 0);
+
+        await AssignBedAsync(manager, admissionId, await NewBedAsync());
+
+        Assert.Equal(0, await _kit.UnreadCountAsync(NotificationType.AdmissionAwaitingApproval, admissionId));
+    }
+
+    [Fact]
+    public async Task Cancelling_an_admission_marks_every_duty_managers_waiting_alert_as_read()
+    {
+        using var manager = await _kit.StaffAsync(ApiApplication.ManagerEmail);
+        await _kit.SeedStaffAsync(StaffRole.DutyManager);
+        var patient = await _kit.NewPatientAsync();
+        var admissionId = await AdmitAsync(manager, patient);
+        Assert.True(await _kit.UnreadCountAsync(NotificationType.AdmissionAwaitingApproval, admissionId) > 0);
+
+        var cancelled = await manager.PostAsJsonAsync(
+            $"/api/admissions/{admissionId}/cancel", new { reason = "false_alarm" });
+        Assert.Equal(HttpStatusCode.OK, cancelled.StatusCode);
+
+        Assert.Equal(0, await _kit.UnreadCountAsync(NotificationType.AdmissionAwaitingApproval, admissionId));
+    }
+
+    [Fact]
     public async Task Assigning_a_bed_tells_the_patient_the_admission_is_approved()
     {
         using var nurse = await _kit.StaffAsync(ApiApplication.NurseEmail);

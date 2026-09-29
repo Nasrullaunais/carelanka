@@ -151,6 +151,13 @@ internal sealed class NotificationTestKit
         }
     }
 
+    public async Task<int> UnreadCountAsync(NotificationType type, Guid entityId)
+    {
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        return await db.Notifications.CountAsync(n => n.Type == type && n.EntityId == entityId && n.ReadAt == null);
+    }
+
     public async Task<int> CountAsync(NotificationType type, Guid entityId)
     {
         using var scope = _application.Services.CreateScope();

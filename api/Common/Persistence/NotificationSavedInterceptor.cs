@@ -49,7 +49,8 @@ public sealed class NotificationSavedInterceptor(IHubContext<NotificationsHub> h
         // (PushDeliveryTests asserts it throws DbUpdateException) - this only reads entries that
         // already satisfy it, so a malformed row fails at the constraint, not in here first.
         _pendingGroups = context.ChangeTracker.Entries<Notification>()
-            .Where(entry => entry.State == EntityState.Added)
+            .Where(entry => entry.State == EntityState.Added
+                || (entry.State == EntityState.Modified && entry.Property(n => n.ReadAt).IsModified))
             .Where(entry => entry.Entity.RecipientStaffMemberId is not null
                 || entry.Entity.RecipientPatientAccountId is not null)
             .Select(entry => entry.Entity.RecipientStaffMemberId is { } staffId

@@ -302,6 +302,8 @@ public sealed class BedAssignmentService : IBedAssignmentService
         admission.Status = AdmissionStatus.BedReserved;
         _db.BedAssignments.Add(assignment);
 
+        await _notifier.ResolveAsync(NotificationType.AdmissionAwaitingApproval,
+            new NotificationSubject("admission", admission.Id), ct);
         await _notifier.NotifyAsync(NotificationType.AdmissionApproved, Recipients.Patient(admission.PatientId),
             new NotificationSubject("admission", admission.Id), ct);
         await _notifier.NotifyAsync(NotificationType.BedAssigned, Recipients.Patient(admission.PatientId),

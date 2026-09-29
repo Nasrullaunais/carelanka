@@ -1,17 +1,27 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
+COPY .config/dotnet-tools.json .config/
+RUN dotnet tool restore
 COPY api/CareLanka.Api.csproj api/
 RUN dotnet restore api/CareLanka.Api.csproj
 COPY api/ api/
-RUN dotnet publish api/CareLanka.Api.csproj -c Release -o /out --no-restore
+RUN dotnet publish api/CareLanka.Api.csproj -c Release -o /out/api --no-restore
 
-FROM build AS migrate
-RUN dotnet tool install --global dotnet-ef --version '8.*'
-ENV PATH="/root/.dotnet/tools:${PATH}"
+FROM build AS migrate-build
+RUN dotnet ef migrations bundle --project api --startup-project api --configuration Release \
+    --self-contained --target-runtime linux-x64 --output /out/efbundle
+
+# Applies every pending migration, then exits. Reads ConnectionStrings__CareLanka.
+FROM mcr.microsoft.com/dotnet/runtime-deps:8.0 AS migrate
+WORKDIR /app
+COPY --from=migrate-build /out/efbundle .
+USER $APP_UID
+ENTRYPOINT ["./efbundle"]
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
-COPY --from=build /out .
+COPY --from=build /out/api .
+USER $APP_UID
 ENV ASPNETCORE_URLS=http://0.0.0.0:5231
 EXPOSE 5231
 ENTRYPOINT ["dotnet", "CareLanka.Api.dll"]

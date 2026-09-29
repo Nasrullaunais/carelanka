@@ -342,17 +342,21 @@ class _AdmissionsApi implements AdmissionsApi {
 
   @override
   Future<AppointmentPagedResult> listAppointments({
+    bool? includeFinished = false,
     int? page = 1,
     int? pageSize = 20,
     DateTime? date,
     AppointmentStatus? status,
+    String? search,
   }) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{
+      r'includeFinished': includeFinished,
       r'page': page,
       r'pageSize': pageSize,
       r'date': date?.toIso8601String(),
       r'status': status?.toJson(),
+      r'search': search,
     };
     queryParameters.removeWhere((k, v) => v == null);
     final _headers = <String, dynamic>{};
@@ -393,6 +397,37 @@ class _AdmissionsApi implements AdmissionsApi {
           .compose(
             _dio.options,
             '/appointments',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, Object?>>(_options);
+    late Appointment _value;
+    try {
+      _value = Appointment.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
+  Future<Appointment> createWalkInAppointment({
+    CreateWalkInAppointmentRequest? body,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    queryParameters.removeWhere((k, v) => v == null);
+    final _headers = <String, dynamic>{};
+    final _data = <String, dynamic>{};
+    _data.addAll(body?.toJson() ?? <String, dynamic>{});
+    final _options = _setStreamType<Appointment>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/appointments/walk-in',
             queryParameters: queryParameters,
             data: _data,
           )

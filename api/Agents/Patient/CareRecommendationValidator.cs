@@ -85,6 +85,7 @@ public static partial class CareRecommendationValidator
         string? reportedText = null)
     {
         var failedRules = new List<string>();
+        var problems = new List<string>();
         var message = candidate.Message ?? string.Empty;
 
         // Anything the patient raised themselves, plus anything already on their allergy record.
@@ -96,28 +97,53 @@ public static partial class CareRecommendationValidator
             .Where(drug => written.Contains(Normalise(drug)))
             .ToList();
 
-        if (DosagePattern().IsMatch(message) ||
-            named.Any(drug => !raised.Contains(Normalise(drug))))
+        var dose = DosagePattern().Match(message);
+        var introduced = named.Where(drug => !raised.Contains(Normalise(drug))).ToList();
+
+        if (dose.Success)
+        {
+            problems.Add($"It gave a dose or an amount (\"{dose.Value}\").");
+        }
+
+        problems.AddRange(introduced.Select(drug =>
+            $"It named {drug}, which the patient did not mention and is not on their record."));
+
+        if (dose.Success || introduced.Count > 0)
         {
             failedRules.Add("CR1");
         }
 
         var allergens = Substances(allergiesText);
+        var directing = SentencesDirectingThemToIt(message, named.Concat(allergens)).ToList();
 
-        if (SomeSentenceDirectsThemToIt(message, named.Concat(allergens)))
+        if (directing.Count > 0)
         {
             failedRules.Add("CR5");
+            problems.AddRange(directing.Select(sentence =>
+                $"This sentence points the patient towards a medicine: \"{sentence}\""));
         }
 
         // CR4: the keyword screen outranks the model. A lower urgency here is overwritten rather
         // than trusted - the same instinct as the bed agent's hard rules.
         var urgency = redFlagMatched ? CareUrgency.High : candidate.UrgencyFlag;
 
-        return new CareValidationResult(failedRules.Count == 0, failedRules, urgency);
+        return new CareValidationResult(failedRules.Count == 0, failedRules, urgency, problems);
     }
 
     /// <summary>
-    /// Whether any sentence points the patient at one of <paramref name="substances"/> - tells them
+    /// Whether the patient's own words name any medicine - one on the list above, or one on their
+    /// allergy record.
+    /// </summary>
+    public static bool NamesAMedicine(string? text, string? allergiesText)
+    {
+        var normalised = Normalise(text);
+
+        return DrugDenylist.Any(drug => normalised.Contains(Normalise(drug)))
+            || Substances(allergiesText).Any(substance => Names(text, substance));
+    }
+
+    /// <summary>
+    /// The sentences that point the patient at one of <paramref name="substances"/> - tell them
     /// to take it, use it, or ask someone for it - without saying not to in that same sentence.
     /// Sentence by sentence rather than whole-message, so one "do not take" cannot license a
     /// recommendation three sentences later.
@@ -129,7 +155,8 @@ public static partial class CareRecommendationValidator
     /// what it was always for: a draft must never tell a patient to take something. Describing a
     /// medicine is not directing them at it, and a nurse or doctor still reads every word.
     /// </remarks>
-    private static bool SomeSentenceDirectsThemToIt(string message, IEnumerable<string> substances)
+    private static IEnumerable<string> SentencesDirectingThemToIt(
+        string message, IEnumerable<string> substances)
     {
         var wanted = substances
             .Select(Normalise)
@@ -139,16 +166,20 @@ public static partial class CareRecommendationValidator
 
         if (wanted.Count == 0)
         {
-            return false;
+            return [];
         }
 
         var sentences = message.Split(
-            new[] { '.', '!', '?', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            new[] { '.', '!', '?', ';', '\n' },
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         return sentences
-            .Select(Normalise)
-            .Where(sentence => wanted.Any(sentence.Contains))
-            .Any(sentence => Directs(sentence) && !IsNegative(sentence));
+            .Where(sentence =>
+            {
+                var normalised = Normalise(sentence);
+
+                return wanted.Any(normalised.Contains) && Directs(normalised) && !IsNegative(normalised);
+            });
     }
 
     /// <summary>
@@ -284,5 +315,8 @@ public sealed record CareDraftCandidate(
     CareDraftSource Source = CareDraftSource.Model,
     string? SourceNote = null);
 
+/// <param name="Problems">
+/// Each failure in words, specific enough to hand back to the model as the thing to fix.
+/// </param>
 public sealed record CareValidationResult(
-    bool Passed, IReadOnlyList<string> FailedRules, CareUrgency UrgencyFlag);
+    bool Passed, IReadOnlyList<string> FailedRules, CareUrgency UrgencyFlag, IReadOnlyList<string> Problems);

@@ -14,6 +14,8 @@ public class DispatchProposal : AuditedEntity
     public bool AllowDiversion { get; set; }
     public string? ExcludeAmbulanceIdsJson { get; set; }
     public string? Rationale { get; set; }
+    public DispatchRecommendationSource? RecommendationSource { get; set; }
+    public string? RecommendationNote { get; set; }
 
     public Guid? ProposedAmbulanceId { get; set; }
     public int? EstimatedMinutesToScene { get; set; }

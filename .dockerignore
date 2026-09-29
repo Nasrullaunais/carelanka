@@ -5,3 +5,11 @@
 **/build/
 .git/
 graft/
+web-ui/dist/
+**/*.tsbuildinfo
+**/.env
+**/appsettings.Development.json
+**/*.user
+mobile-ui/
+tests/
+AssignmentDocs/

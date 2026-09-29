@@ -24,6 +24,10 @@ public enum MessageCode
 
     UsernameAlreadyTaken,
 
+    CurrentPasswordIncorrect,
+
+    PasswordChangeRequired,
+
     BedNumberTaken,
 
     AssetTagTaken,
@@ -154,6 +158,16 @@ public enum MessageCode
 
     DispatchProposalNotApprovable,
 
+    CallAlreadyDispatched,
+
+    CallNotCancellable,
+
+    CallHasNoLiveDispatch,
+
+    CancellationAlreadyRequested,
+
+    CancellationNotPending,
+
     NicLinkedToAnotherAccount,
 
     NicDoesNotMatchYourRecord,
@@ -194,5 +208,9 @@ public enum MessageCode
 
     NicHasHospitalRecord,
 
-    PatientIdentityLocked
+    PatientIdentityLocked,
+
+    PatientHasNoAppAccount,
+
+    PrescriptionHasNoFile
 }

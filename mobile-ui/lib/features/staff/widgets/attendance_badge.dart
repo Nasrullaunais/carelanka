@@ -32,8 +32,8 @@ class AttendanceBadge extends StatelessWidget {
       return _BadgePill(
         icon: Icons.login_rounded,
         label: 'Clocked In at $inTime',
-        backgroundColor: const Color(0xFFE0F2F1), // Soft teal
-        foregroundColor: const Color(0xFF00695C), // Brand teal
+        backgroundColor: theme.colorScheme.primaryContainer,
+        foregroundColor: theme.colorScheme.onPrimaryContainer,
       );
     }
 

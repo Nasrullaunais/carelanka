@@ -1934,6 +1934,14 @@ components:
         - rejected
         - failed
 
+    DispatchRecommendationSource:
+      type: string
+      description: >-
+        Who chose the proposed ambulance. Only model is the language model weighing this
+        call; the other two are the fixed fastest-first rule, and the Duty Manager has to be
+        told which one they are reading.
+      enum: [model, model_unavailable, model_rejected]
+
     DispatchOutcome:
       type: string
       description: |
@@ -2232,6 +2240,17 @@ components:
               type: string
               nullable: true
               description: Why the agent picked this ambulance. Shown to the dispatcher.
+            recommendation_source:
+              allOf:
+                - $ref: '#/components/schemas/DispatchRecommendationSource'
+              nullable: true
+              description: Null until the agent has proposed an ambulance.
+            recommendation_note:
+              type: string
+              nullable: true
+              description: >-
+                Plain-language reason the fastest-first rule was used instead of the
+                language model's pick. Null when recommendation_source is model.
             diversion_impact:
               allOf:
                 - $ref: '#/components/schemas/DiversionImpact'

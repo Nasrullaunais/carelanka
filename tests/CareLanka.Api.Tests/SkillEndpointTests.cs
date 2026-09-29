@@ -44,7 +44,7 @@ public sealed class SkillEndpointTests
     [InlineData("/staff/{staffId}/skills/{skillId}", "delete", "revokeStaffSkill")]
     public async Task Skill_operation_ids_match_contract(string path, string method, string expectedOperationId)
     {
-        using var document = await GenerateSwaggerAsync();
+        using var document = await GeneratedOpenApi.ParseAsync();
         var paths = document.RootElement.GetProperty("paths");
         var operation = paths.GetProperty(path).GetProperty(method);
 
@@ -61,7 +61,7 @@ public sealed class SkillEndpointTests
     [InlineData("/staff/{staffId}/skills/{skillId}", "delete")]
     public async Task Skill_response_statuses_match_contract(string path, string method)
     {
-        using var document = await GenerateSwaggerAsync();
+        using var document = await GeneratedOpenApi.ParseAsync();
         var contract = LoadContract();
         var expected = Keys(Map(contract, "paths", path, method, "responses"));
         var generated = Keys(document.RootElement, "paths", path, method, "responses");
@@ -560,14 +560,6 @@ public sealed class SkillEndpointTests
         return tokenHandler.WriteToken(token);
     }
 
-    private static async Task<JsonDocument> GenerateSwaggerAsync()
-    {
-        using var environment = TestEnvironment.Use();
-        await using var application = new SwaggerOnlyApplication();
-        using var client = application.CreateClient();
-        return JsonDocument.Parse(await client.GetStringAsync("/swagger/v1/swagger.json"));
-    }
-
     private static YamlMappingNode LoadContract()
     {
         using var reader = File.OpenText(Path.Combine(
@@ -603,12 +595,6 @@ public sealed class SkillEndpointTests
         }
 
         return current;
-    }
-
-    private sealed class SwaggerOnlyApplication : WebApplicationFactory<Program>
-    {
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-            => builder.UseEnvironment("Development");
     }
 
     private sealed class SkillTestApplication : WebApplicationFactory<Program>

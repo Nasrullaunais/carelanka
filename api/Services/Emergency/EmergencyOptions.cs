@@ -17,6 +17,26 @@ public sealed class EmergencyOptions
     public GeocodingOptions Geocoding { get; set; } = new();
 
     public PreAdmissionOptions PreAdmission { get; set; } = new();
+
+    public DemoFleetOptions DemoFleet { get; set; } = new();
+}
+
+public sealed class DemoFleetOptions
+{
+    public bool Enabled { get; set; }
+
+    public int IntervalMinutes { get; set; } = 3;
+
+    public List<DemoAmbulanceOptions> Ambulances { get; set; } = [];
+}
+
+public sealed class DemoAmbulanceOptions
+{
+    public string Registration { get; set; } = string.Empty;
+
+    public decimal Latitude { get; set; }
+
+    public decimal Longitude { get; set; }
 }
 
 public sealed class PreAdmissionOptions

@@ -1,4 +1,4 @@
-import { Ambulance, BedDouble, CalendarDays, ClipboardCheck, FlaskConical, HeartPulse, Hospital, Package, Pill, Settings2, ShieldAlert, UserPlus, Users, Wrench, type LucideIcon } from 'lucide-react';
+import { Ambulance, BedDouble, CalendarCheck, CalendarDays, ClipboardCheck, ClipboardList, FlaskConical, HeartPulse, Hospital, KeyRound, Package, Pill, Settings2, ShieldAlert, Stethoscope, UserCog, UserPlus, Users, Wrench, type LucideIcon } from 'lucide-react';
 import type { PrincipalRole } from '../services/api/generated';
 import {
   canManageEmergency,
@@ -9,11 +9,13 @@ import {
   canReadWarnings,
   canReadLabReports,
   canReadWards,
+  canWritePrescription,
   canRegisterPatient,
   canOpenAppointmentBoard,
   canOpenDischargeBoard,
   canSetBillingRates,
   canReadCareQueue,
+  canResetPatientPassword,
   canViewStaff,
   canManageLeave,
 } from './permissions';
@@ -71,6 +73,14 @@ export const destinations: Destination[] = [
     description:
       "What patients have reported about how they feel, and the agent's draft note for a nurse or doctor to check.",
     canAccess: canReadCareQueue,
+  },
+  {
+    to: '/patient-accounts',
+    icon: KeyRound,
+    group: 'Patient care',
+    label: 'Patient app accounts',
+    description: "Find a patient's app login and give them a new password when they have forgotten theirs.",
+    canAccess: canResetPatientPassword,
   },
   {
     to: '/billing-settings',
@@ -137,19 +147,33 @@ export const destinations: Destination[] = [
     canAccess: canReadEquipment,
   },
   {
+    to: '/prescriptions',
+    icon: Stethoscope,
+    group: 'Patient care',
+    label: 'Prescriptions',
+    description: 'Look up a patient and write a prescription straight to the pharmacy queue.',
+    canAccess: canWritePrescription,
+  },
+  {
     to: '/staff',
+    icon: UserCog,
+    group: 'Administration',
     label: 'Staff management',
     description: 'Staff directory, account creation, role assignments, and active status.',
     canAccess: canViewStaff,
   },
   {
     to: '/staff/coverage',
+    icon: ClipboardList,
+    group: 'Administration',
     label: 'Ward staffing coverage',
     description: 'Real-time ward staffing levels, headcount requirements, and coverage status.',
     canAccess: canViewStaff,
   },
   {
     to: '/staff/leave-approval',
+    icon: CalendarCheck,
+    group: 'Administration',
     label: 'Staff leave approval',
     description: 'Review and decide staff leave requests, evaluate coverage impacts, and trigger roster proposals.',
     canAccess: canManageLeave,

@@ -1,0 +1,306 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  PUBLISH: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+
+jobs:
+  api:
+    name: API build and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 8.0.x
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - run: dotnet restore CareLanka.sln
+      - run: dotnet build CareLanka.sln --configuration Release --no-restore
+      - run: dotnet test CareLanka.sln --configuration Release --no-build --logger trx --results-directory test-results
+
+      - if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: api-test-results
+          path: test-results
+
+  web:
+    name: Web app checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web-ui
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun run test
+      - run: bun run build
+
+  mobile:
+    name: Phone app checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: mobile-ui
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: 3.47.5
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+  contract:
+    name: API contract and generated clients
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: carelanka
+          POSTGRES_USER: carelanka
+          POSTGRES_PASSWORD: carelanka_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U carelanka -d carelanka"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://localhost:5231
+      ConnectionStrings__CareLanka: Host=localhost;Port=5432;Database=carelanka;Username=carelanka;Password=carelanka_ci
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 8.0.x
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: 3.47.5
+          channel: stable
+          cache: true
+
+      - name: Validate the hand-written specs
+        run: |
+          bun install --frozen-lockfile
+          bun run check:specs
+          bun run lint:specs
+
+      - run: dotnet tool restore
+
+      - name: Check every model change has a migration
+        run: dotnet ef migrations has-pending-model-changes --project api
+
+      - name: Apply migrations
+        run: dotnet ef database update --project api
+
+      - name: Start the API
+        run: |
+          Jwt__SigningKey="$(openssl rand -hex 32)" \
+            nohup dotnet run --project api --configuration Release --no-launch-profile > "$RUNNER_TEMP/api.log" 2>&1 &
+          curl --fail --silent --show-error --retry 60 --retry-all-errors --retry-delay 2 http://localhost:5231/api/health
+
+      - name: Regenerate the web client
+        working-directory: web-ui
+        run: |
+          bun install --frozen-lockfile
+          bun run codegen
+
+      - name: Regenerate the phone client
+        working-directory: mobile-ui
+        run: |
+          flutter pub get
+          dart run swagger_parser
+          dart run build_runner build --delete-conflicting-outputs
+
+      - name: Fail if a generated client is out of date
+        run: |
+          drift="$(git status --porcelain -- web-ui/src/services/api/generated mobile-ui/lib/services/api_client)"
+          if [ -n "$drift" ]; then
+            echo "::error::A generated API client does not match the API. Regenerate it against the running API and commit the result."
+            echo "$drift"
+            git diff --stat
+            exit 1
+          fi
+
+      - if: failure()
+        run: cat "$RUNNER_TEMP/api.log" || true
+
+  changes:
+    name: Does this change the images?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      images: ${{ steps.diff.outputs.images }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      # App code is already covered by the checks; only packaging changes need an image build on a PR.
+      - id: diff
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            echo "images=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only HEAD^1 HEAD | grep -qE '^(Dockerfile\.api|\.dockerignore|deploy/|\.config/|\.github/workflows/)'; then
+            echo "images=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "images=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  images:
+    name: Image (${{ matrix.image }})
+    needs: [changes, api, web, mobile, contract]
+    if: needs.changes.outputs.images == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - image: api
+            file: Dockerfile.api
+            target: runtime
+          - image: migrate
+            file: Dockerfile.api
+            target: migrate
+          - image: db-setup
+            file: deploy/db-setup/Dockerfile
+          - image: web
+            file: deploy/Dockerfile.web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - if: env.PUBLISH == 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: name
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/carelanka-${{ matrix.image }}" >> "$GITHUB_OUTPUT"
+
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ steps.name.outputs.image }}
+          tags: |
+            type=sha,format=long
+            type=raw,value=latest,enable=${{ env.PUBLISH }}
+
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          target: ${{ matrix.target }}
+          platforms: linux/amd64
+          push: ${{ env.PUBLISH == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  deploy:
+    name: Deploy to Azure
+    needs: images
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://${{ vars.DEPLOY_HOST }}
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    env:
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+      IMAGE_TAG: sha-${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: deploy/compose.yaml
+          sparse-checkout-cone-mode: false
+
+      - name: Set up SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Copy the compose file
+        run: scp -q deploy/compose.yaml "$DEPLOY_USER@$DEPLOY_HOST:carelanka/compose.yaml"
+
+      - name: Roll out
+        run: |
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" sh -s -- "$IMAGE_TAG" <<'EOF'
+          set -eu
+          cd carelanka
+          export CARELANKA_IMAGE_TAG="$1"
+          docker compose pull --quiet
+          docker compose up -d --remove-orphans
+          docker image prune -f
+          EOF
+
+      - name: Check the site answers
+        run: curl --fail --silent --show-error --retry 30 --retry-all-errors --retry-delay 5 "https://$DEPLOY_HOST/api/health"

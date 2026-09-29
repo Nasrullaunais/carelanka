@@ -78,9 +78,8 @@ void main() {
   testWidgets('the shell still shows all five tabs', (tester) async {
     await pumpUnlinked(tester, const PatientShell());
 
-    expect(find.byType(NavigationBar), findsOneWidget);
-    for (final label in ['Home', 'Appointments', 'My stay', 'Prescriptions', 'Profile']) {
-      expect(find.text(label), findsOneWidget, reason: '$label tab is missing');
+    for (final label in ['Home', 'My visits', 'My stay', 'Prescriptions', 'Profile']) {
+      expect(find.byTooltip(label), findsOneWidget, reason: '$label tab is missing');
     }
     expect(tester.takeException(), isNull);
   });

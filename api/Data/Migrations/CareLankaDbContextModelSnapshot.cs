@@ -448,6 +448,12 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_login_at");
 
+                    b.Property<bool>("MustChangePassword")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("must_change_password");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(512)
@@ -579,6 +585,10 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
+                    b.Property<DateOnly?>("JoiningDate")
+                        .HasColumnType("date")
+                        .HasColumnName("joining_date");
+
                     b.Property<string>("LastName")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -596,11 +606,26 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("phone_number");
 
+                    b.Property<string>("RegistrationNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("registration_number");
+
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
                         .HasColumnName("role");
+
+                    b.Property<string>("Specialization")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("specialization");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("title");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -614,9 +639,16 @@ namespace CareLanka.Api.Data.Migrations
                         .HasDatabaseName("ux_staff_members_email")
                         .HasFilter("is_active");
 
+                    b.HasIndex("RegistrationNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ux_staff_members_registration_number")
+                        .HasFilter("is_active AND registration_number IS NOT NULL");
+
                     b.ToTable("staff_members", null, t =>
                         {
                             t.HasCheckConstraint("ck_staff_members_role", "role IN ('ward_nurse', 'doctor', 'ambulance_crew', 'general_staff', 'duty_manager', 'hospital_administrator', 'equipment_manager')");
+
+                            t.HasCheckConstraint("ck_staff_members_title", "title IN ('mr', 'mrs', 'ms', 'miss', 'dr', 'prof')");
                         });
                 });
 
@@ -999,6 +1031,16 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("rationale");
 
+                    b.Property<string>("RecommendationNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("recommendation_note");
+
+                    b.Property<string>("RecommendationSource")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("recommendation_source");
+
                     b.Property<string>("RejectionReason")
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
@@ -1088,6 +1130,8 @@ namespace CareLanka.Api.Data.Migrations
                     b.ToTable("dispatch_proposals", null, t =>
                         {
                             t.HasCheckConstraint("ck_dispatch_proposals_priority", "call_priority IN ('critical', 'high', 'medium', 'low')");
+
+                            t.HasCheckConstraint("ck_dispatch_proposals_recommendation_source", "recommendation_source IN ('model', 'model_unavailable', 'model_rejected')");
 
                             t.HasCheckConstraint("ck_dispatch_proposals_status", "status IN ('pending', 'pending_confirmation', 'pending_approval', 'approved', 'executed', 'rejected', 'failed')");
                         });
@@ -2025,17 +2069,20 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<int>("ByteSize")
+                    b.Property<string>("Body")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("body");
+
+                    b.Property<int?>("ByteSize")
                         .HasColumnType("integer")
                         .HasColumnName("byte_size");
 
                     b.Property<byte[]>("Content")
-                        .IsRequired()
                         .HasColumnType("bytea")
                         .HasColumnName("content");
 
                     b.Property<string>("ContentType")
-                        .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("content_type");
@@ -2053,7 +2100,6 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnName("delivered_by_staff_id");
 
                     b.Property<string>("FileName")
-                        .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
                         .HasColumnName("file_name");
@@ -2066,6 +2112,10 @@ namespace CareLanka.Api.Data.Migrations
                     b.Property<Guid>("PatientId")
                         .HasColumnType("uuid")
                         .HasColumnName("patient_id");
+
+                    b.Property<Guid?>("PrescribedByStaffId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("prescribed_by_staff_id");
 
                     b.Property<DateTimeOffset?>("ReadyAt")
                         .HasColumnType("timestamp with time zone")
@@ -2124,6 +2174,8 @@ namespace CareLanka.Api.Data.Migrations
                     b.ToTable("prescriptions", null, t =>
                         {
                             t.HasCheckConstraint("ck_prescriptions_byte_size", "byte_size > 0");
+
+                            t.HasCheckConstraint("ck_prescriptions_file_xor_body", "(file_name IS NOT NULL AND body IS NULL) OR (file_name IS NULL AND body IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_prescriptions_status", "status IN ('submitted', 'ready', 'delivered', 'rejected')");
                         });
@@ -3655,15 +3707,21 @@ namespace CareLanka.Api.Data.Migrations
                     b.HasIndex("WardId")
                         .HasDatabaseName("ix_ward_staffing_rules_ward_id");
 
+                    b.HasIndex("WardId", "RequiredRole")
+                        .IsUnique()
+                        .HasDatabaseName("ux_ward_staffing_rules_ward_role_no_skill")
+                        .HasFilter("required_skill_id IS NULL");
+
                     b.HasIndex("WardId", "RequiredRole", "RequiredSkillId")
                         .IsUnique()
-                        .HasDatabaseName("ux_ward_staffing_rules_ward_role_skill");
+                        .HasDatabaseName("ux_ward_staffing_rules_ward_role_skill")
+                        .HasFilter("required_skill_id IS NOT NULL");
 
                     b.ToTable("ward_staffing_rules", null, t =>
                         {
-                            t.HasCheckConstraint("ck_ward_staffing_rules_required_role", "required_role IN ('ward_nurse', 'doctor', 'ambulance_crew', 'general_staff', 'duty_manager', 'hospital_administrator', 'equipment_manager')");
+                            t.HasCheckConstraint("ck_ward_staffing_rules_min", "minimum_headcount > 0");
 
-                            t.HasCheckConstraint("ck_wsr_min", "minimum_headcount > 0");
+                            t.HasCheckConstraint("ck_ward_staffing_rules_required_role", "required_role IN ('ward_nurse', 'doctor', 'ambulance_crew', 'general_staff', 'duty_manager', 'hospital_administrator', 'equipment_manager')");
                         });
                 });
 

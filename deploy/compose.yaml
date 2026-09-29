@@ -1,0 +1,73 @@
+name: carelanka-hosting
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: carelanka
+      POSTGRES_USER: carelanka
+      POSTGRES_PASSWORD: ${CARELANKA_DB_PASSWORD:?Set CARELANKA_DB_PASSWORD in .env}
+    volumes:
+      - carelanka_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U carelanka -d carelanka"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    image: ghcr.io/nasrullaunais/carelanka-migrate:${CARELANKA_IMAGE_TAG:-latest}
+    environment:
+      ConnectionStrings__CareLanka: Host=db;Port=5432;Database=carelanka;Username=carelanka;Password=${CARELANKA_DB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  db-setup:
+    image: ghcr.io/nasrullaunais/carelanka-db-setup:${CARELANKA_IMAGE_TAG:-latest}
+    environment:
+      PGHOST: db
+      PGDATABASE: carelanka
+      PGUSER: carelanka
+      PGPASSWORD: ${CARELANKA_DB_PASSWORD}
+      CARELANKA_DB_APP_PASSWORD: ${CARELANKA_DB_APP_PASSWORD:?Set CARELANKA_DB_APP_PASSWORD in .env}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  api:
+    image: ghcr.io/nasrullaunais/carelanka-api:${CARELANKA_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      Swagger__Enabled: "true"
+      ConnectionStrings__CareLanka: Host=db;Port=5432;Database=carelanka;Username=carelanka_app;Password=${CARELANKA_DB_APP_PASSWORD}
+      Jwt__SigningKey: ${CARELANKA_JWT_SIGNING_KEY:?Set CARELANKA_JWT_SIGNING_KEY in .env}
+      LanguageModel__ApiKey: ${CARELANKA_GEMINI_API_KEY:-}
+    depends_on:
+      db-setup:
+        condition: service_completed_successfully
+
+  web:
+    image: ghcr.io/nasrullaunais/carelanka-web:${CARELANKA_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?Set SITE_ADDRESS in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  carelanka_db:
+  caddy_data:
+  caddy_config:

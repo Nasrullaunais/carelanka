@@ -40,13 +40,14 @@ public sealed class StaffMemberEndpointTests
     [Theory]
     [InlineData("/staff", "post", "createStaffMember")]
     [InlineData("/staff", "get", "listStaff")]
+    [InlineData("/staff/departments", "get", "listStaffDepartments")]
     [InlineData("/staff/{id}", "get", "getStaffMember")]
     [InlineData("/staff/{id}", "put", "updateStaffMember")]
     [InlineData("/staff/{id}/deactivate", "post", "deactivateStaffMember")]
     [InlineData("/staff/{id}/reactivate", "post", "reactivateStaffMember")]
     public async Task Staff_operation_ids_match_contract(string path, string method, string expectedOperationId)
     {
-        using var document = await GenerateSwaggerAsync();
+        using var document = await GeneratedOpenApi.ParseAsync();
         var paths = document.RootElement.GetProperty("paths");
         var operation = paths.GetProperty(path).GetProperty(method);
 
@@ -56,13 +57,14 @@ public sealed class StaffMemberEndpointTests
     [Theory]
     [InlineData("/staff", "post")]
     [InlineData("/staff", "get")]
+    [InlineData("/staff/departments", "get")]
     [InlineData("/staff/{id}", "get")]
     [InlineData("/staff/{id}", "put")]
     [InlineData("/staff/{id}/deactivate", "post")]
     [InlineData("/staff/{id}/reactivate", "post")]
     public async Task Staff_response_statuses_match_contract(string path, string method)
     {
-        using var document = await GenerateSwaggerAsync();
+        using var document = await GeneratedOpenApi.ParseAsync();
         var contract = LoadContract();
         var expected = Keys(Map(contract, "paths", path, method, "responses"));
         var generated = Keys(document.RootElement, "paths", path, method, "responses");
@@ -158,7 +160,7 @@ public sealed class StaffMemberEndpointTests
             FirstName = "Alice",
             LastName = "Smith",
             FullName = "Alice Smith",
-            Email = "alice@hospital.invalid",
+            Email = "alice@carelanka.lk",
             Role = StaffRole.WardNurse,
             IsActive = true,
             CreatedAt = DateTimeOffset.UtcNow,
@@ -190,7 +192,7 @@ public sealed class StaffMemberEndpointTests
             FirstName = "Bob",
             LastName = "Taylor",
             FullName = "Bob Taylor",
-            Email = "bob@hospital.invalid",
+            Email = "bob@carelanka.lk",
             Role = StaffRole.Doctor,
             IsActive = true,
             CreatedAt = DateTimeOffset.UtcNow,
@@ -255,7 +257,7 @@ public sealed class StaffMemberEndpointTests
         {
             FirstName = "John",
             LastName = "Doe",
-            Email = "john.doe@hospital.invalid",
+            Email = "john.doe@carelanka.lk",
             TemporaryPassword = "short",
             Role = StaffRole.WardNurse
         }, JsonOptions);
@@ -324,7 +326,7 @@ public sealed class StaffMemberEndpointTests
         {
             FirstName = "Kaveesha",
             LastName = "Rajapaksha",
-            Email = "kaveesha.rajapaksha77@carelanka.invalid",
+            Email = "kaveesha.rajapaksha77@carelanka.lk",
             TemporaryPassword = "SecurePassword123#",
             Role = StaffRole.HospitalAdministrator,
             Department = "Administration",
@@ -345,11 +347,111 @@ public sealed class StaffMemberEndpointTests
         Assert.Equal("Kaveesha", created.FirstName);
         Assert.Equal("Rajapaksha", created.LastName);
         Assert.Equal("Kaveesha Rajapaksha", created.FullName);
-        Assert.Equal("kaveesha.rajapaksha77@carelanka.invalid", created.Email);
+        Assert.Equal("kaveesha.rajapaksha77@carelanka.lk", created.Email);
         Assert.Equal(StaffRole.HospitalAdministrator, created.Role);
         Assert.True(created.IsActive);
         Assert.DoesNotContain("TemporaryPassword", content);
         Assert.DoesNotContain("PasswordHash", content);
+    }
+
+    [Fact]
+    public async Task Create_staff_member_requires_doctor_profile_fields()
+    {
+        using var environment = TestEnvironment.Use();
+        var stub = new StubStaffMemberService();
+        await using var app = new StaffTestApplication(stub);
+        using var client = app.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", CreateToken("hospital_administrator", "staff"));
+
+        var response = await client.PostAsJsonAsync("/api/staff", new CreateStaffMemberRequest
+        {
+            FirstName = "New",
+            LastName = "Doctor",
+            Email = "new.doctor@carelanka.lk",
+            TemporaryPassword = "SecurePassword123#",
+            Role = StaffRole.Doctor
+        }, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var json = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Specialization", json);
+        Assert.Contains("Registration number", json);
+        Assert.Contains("Joining date", json);
+        Assert.Contains("Title", json);
+    }
+
+    [Fact]
+    public async Task Create_staff_member_succeeds_with_doctor_profile_fields()
+    {
+        using var environment = TestEnvironment.Use();
+        var stub = new StubStaffMemberService();
+        await using var app = new StaffTestApplication(stub);
+        using var client = app.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", CreateToken("hospital_administrator", "staff"));
+
+        var request = new CreateStaffMemberRequest
+        {
+            FirstName = "Nadeesha",
+            LastName = "Perera",
+            Email = "dr.perera@carelanka.lk",
+            TemporaryPassword = "SecurePassword123#",
+            Role = StaffRole.Doctor,
+            Title = PersonTitle.Dr,
+            Specialization = "Dermatologist",
+            RegistrationNumber = "SLMC12345",
+            JoiningDate = new DateOnly(2026, 10, 1)
+        };
+
+        var response = await client.PostAsJsonAsync("/api/staff", request, JsonOptions);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var created = JsonSerializer.Deserialize<StaffMemberDto>(
+            await response.Content.ReadAsStringAsync(), JsonOptions);
+
+        Assert.NotNull(created);
+        Assert.Equal(PersonTitle.Dr, created.Title);
+        Assert.Equal("Dermatologist", created.Specialization);
+        Assert.Equal("SLMC12345", created.RegistrationNumber);
+        Assert.Equal(new DateOnly(2026, 10, 1), created.JoiningDate);
+    }
+
+    [Fact]
+    public async Task Create_staff_member_rejects_active_registration_number_collision_with_409()
+    {
+        using var environment = TestEnvironment.Use();
+        var stub = new StubStaffMemberService();
+        stub.AddMember(new StaffMemberDto
+        {
+            Id = Guid.NewGuid(),
+            FirstName = "Existing",
+            LastName = "Doctor",
+            Email = "existing.doctor@carelanka.lk",
+            Role = StaffRole.Doctor,
+            RegistrationNumber = "SLMC99999",
+            IsActive = true
+        });
+
+        await using var app = new StaffTestApplication(stub);
+        using var client = app.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", CreateToken("hospital_administrator", "staff"));
+
+        var response = await client.PostAsJsonAsync("/api/staff", new CreateStaffMemberRequest
+        {
+            FirstName = "New",
+            LastName = "Doctor",
+            Email = "new.doctor2@carelanka.lk",
+            TemporaryPassword = "SecurePassword123#",
+            Role = StaffRole.Doctor,
+            Title = PersonTitle.Dr,
+            Specialization = "Cardiology",
+            RegistrationNumber = "SLMC99999",
+            JoiningDate = new DateOnly(2026, 10, 1)
+        }, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
 
     [Fact]
@@ -363,7 +465,7 @@ public sealed class StaffMemberEndpointTests
             EmployeeNumber = "EMP-AAAAAAAA",
             FirstName = "Active",
             LastName = "User",
-            Email = "collision@hospital.invalid",
+            Email = "collision@carelanka.lk",
             Role = StaffRole.WardNurse,
             IsActive = true
         });
@@ -377,9 +479,13 @@ public sealed class StaffMemberEndpointTests
         {
             FirstName = "New",
             LastName = "User",
-            Email = "collision@hospital.invalid",
+            Email = "collision@carelanka.lk",
             TemporaryPassword = "ValidPassword123#",
-            Role = StaffRole.Doctor
+            Role = StaffRole.Doctor,
+            Title = PersonTitle.Dr,
+            Specialization = "Cardiology",
+            RegistrationNumber = "SLMC00001",
+            JoiningDate = new DateOnly(2026, 10, 1)
         }, JsonOptions);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -397,7 +503,7 @@ public sealed class StaffMemberEndpointTests
             EmployeeNumber = "EMP-BBBBBBBB",
             FirstName = "Former",
             LastName = "Employee",
-            Email = "former@hospital.invalid",
+            Email = "former@carelanka.lk",
             Role = StaffRole.WardNurse,
             IsActive = false
         });
@@ -411,7 +517,7 @@ public sealed class StaffMemberEndpointTests
         {
             FirstName = "Rehired",
             LastName = "Employee",
-            Email = "former@hospital.invalid",
+            Email = "former@carelanka.lk",
             TemporaryPassword = "ValidPassword123#",
             Role = StaffRole.WardNurse
         }, JsonOptions);
@@ -440,7 +546,7 @@ public sealed class StaffMemberEndpointTests
         {
             FirstName = "Staff",
             LastName = "Member",
-            Email = "staff@hospital.invalid",
+            Email = "staff@carelanka.lk",
             TemporaryPassword = "ValidPassword123#",
             Role = StaffRole.WardNurse,
             SkillIds = new List<Guid> { fakeSkillId }
@@ -451,6 +557,29 @@ public sealed class StaffMemberEndpointTests
         using var doc = JsonDocument.Parse(json);
         Assert.True(doc.RootElement.TryGetProperty("invalid_skill_ids", out var invalidIdsProp));
         Assert.Contains(fakeSkillId.ToString(), invalidIdsProp.ToString());
+    }
+
+    [Fact]
+    public async Task List_staff_departments_returns_distinct_sorted_names()
+    {
+        using var environment = TestEnvironment.Use();
+        var stub = new StubStaffMemberService();
+        stub.AddMember(new StaffMemberDto { Id = Guid.NewGuid(), FirstName = "John", LastName = "Doe", FullName = "John Doe", Role = StaffRole.Doctor, Department = "Cardiology", IsActive = true });
+        stub.AddMember(new StaffMemberDto { Id = Guid.NewGuid(), FirstName = "Jane", LastName = "Smith", FullName = "Jane Smith", Role = StaffRole.WardNurse, Department = "ICU", IsActive = true });
+        stub.AddMember(new StaffMemberDto { Id = Guid.NewGuid(), FirstName = "Extra", LastName = "Nurse", FullName = "Extra Nurse", Role = StaffRole.WardNurse, Department = "cardiology", IsActive = true });
+        stub.AddMember(new StaffMemberDto { Id = Guid.NewGuid(), FirstName = "No", LastName = "Department", FullName = "No Department", Role = StaffRole.GeneralStaff, Department = null, IsActive = true });
+
+        await using var app = new StaffTestApplication(stub);
+        using var client = app.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", CreateToken("hospital_administrator", "staff"));
+
+        var response = await client.GetAsync("/api/staff/departments");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var departments = JsonSerializer.Deserialize<List<string>>(await response.Content.ReadAsStringAsync(), JsonOptions);
+        Assert.NotNull(departments);
+        Assert.Equal(new[] { "Cardiology", "ICU" }, departments);
     }
 
     [Fact]
@@ -504,7 +633,7 @@ public sealed class StaffMemberEndpointTests
             FirstName = "Sarah",
             LastName = "Connor",
             FullName = "Sarah Connor",
-            Email = "sarah@hospital.invalid",
+            Email = "sarah@carelanka.lk",
             Role = StaffRole.WardNurse,
             IsActive = true
         });
@@ -757,14 +886,6 @@ public sealed class StaffMemberEndpointTests
         return tokenHandler.WriteToken(token);
     }
 
-    private static async Task<JsonDocument> GenerateSwaggerAsync()
-    {
-        using var environment = TestEnvironment.Use();
-        await using var application = new SwaggerOnlyApplication();
-        using var client = application.CreateClient();
-        return JsonDocument.Parse(await client.GetStringAsync("/swagger/v1/swagger.json"));
-    }
-
     private static YamlMappingNode LoadContract()
     {
         using var reader = File.OpenText(Path.Combine(
@@ -800,12 +921,6 @@ public sealed class StaffMemberEndpointTests
         }
 
         return current;
-    }
-
-    private sealed class SwaggerOnlyApplication : WebApplicationFactory<Program>
-    {
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-            => builder.UseEnvironment("Development");
     }
 
     private sealed class StaffTestApplication : WebApplicationFactory<Program>
@@ -864,6 +979,14 @@ public sealed class StaffMemberEndpointTests
                 throw new StaffEmailConflictException(inactive.Id, $"An inactive staff member already exists with email '{email}'. Use POST /api/staff/{inactive.Id}/reactivate to reactivate.");
             }
 
+            if (!string.IsNullOrWhiteSpace(request.RegistrationNumber) &&
+                _members.Any(m => m.IsActive && m.RegistrationNumber == request.RegistrationNumber))
+            {
+                throw new ConflictException(
+                    MessageCode.Conflict,
+                    $"An active staff member already uses the registration number '{request.RegistrationNumber}'.");
+            }
+
             if (request.SkillIds != null && request.SkillIds.Any(id => InvalidSkillIdsToReject.Contains(id)))
             {
                 var invalids = request.SkillIds.Where(id => InvalidSkillIdsToReject.Contains(id)).ToList();
@@ -882,12 +1005,28 @@ public sealed class StaffMemberEndpointTests
                 PhoneNumber = request.PhoneNumber,
                 Role = request.Role,
                 Department = request.Department,
+                Title = request.Title,
+                Specialization = request.Specialization,
+                RegistrationNumber = request.RegistrationNumber,
+                JoiningDate = request.JoiningDate,
                 IsActive = true,
                 CreatedAt = DateTimeOffset.UtcNow,
                 UpdatedAt = DateTimeOffset.UtcNow
             };
             _members.Add(member);
             return Task.FromResult(member);
+        }
+
+        public Task<IReadOnlyList<string>> ListDepartmentsAsync(CancellationToken ct = default)
+        {
+            IReadOnlyList<string> departments = _members
+                .Where(m => m.IsActive && m.Department != null)
+                .Select(m => m.Department!)
+                .GroupBy(d => d, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .OrderBy(d => d, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            return Task.FromResult(departments);
         }
 
         public Task<PagedResult<StaffSummaryDto>> ListStaffAsync(ListStaffQueryParameters parameters, CancellationToken ct = default)

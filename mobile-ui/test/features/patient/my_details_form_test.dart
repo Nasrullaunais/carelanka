@@ -70,7 +70,7 @@ void main() {
 
   Future<void> fillTextFields(WidgetTester tester) async {
     // The date of birth has to match the birth year in the NIC. pickDateOfBirth accepts the
-    // picker's starting date, thirty years back, so the NIC is built to carry that same year.
+    // wheel's starting date, which opens on the NIC's birth year.
     final nic = '${DateTime.now().year - 30}12345678';
 
     await tester.enterText(find.widgetWithText(TextFormField, 'Full name'), 'Chathura');
@@ -84,16 +84,16 @@ void main() {
   }
 
   Future<void> chooseGender(WidgetTester tester, String label) async {
-    await tester.tap(find.byType(DropdownButtonFormField<Gender>));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(label).last);
+    await tester.tap(
+      find.descendant(of: find.byType(SegmentedButton<Gender>), matching: find.text(label)),
+    );
     await tester.pumpAndSettle();
   }
 
   Future<void> pickDateOfBirth(WidgetTester tester) async {
     await tester.tap(find.widgetWithText(InkWell, 'Date of birth').first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('OK'));
+    await tester.tap(find.text('Done'));
     await tester.pumpAndSettle();
   }
 
@@ -156,13 +156,22 @@ void main() {
   testWidgets('the gender picker offers male and female only', (tester) async {
     await pumpFirstRunForm(tester);
 
-    await tester.tap(find.byType(DropdownButtonFormField<Gender>));
+    final segments = tester
+        .widget<SegmentedButton<Gender>>(find.byType(SegmentedButton<Gender>))
+        .segments
+        .map((segment) => segment.value);
+
+    expect(segments, [Gender.male, Gender.female]);
+  });
+
+  testWidgets('the date of birth wheel opens on the year the NIC gives', (tester) async {
+    await pumpFirstRunForm(tester);
+
+    await tester.enterText(find.widgetWithText(TextFormField, 'NIC'), '198812345678');
+    await tester.tap(find.widgetWithText(InkWell, 'Date of birth').first);
     await tester.pumpAndSettle();
 
-    expect(find.text('Male'), findsWidgets);
-    expect(find.text('Female'), findsWidgets);
-    expect(find.text('Other'), findsNothing);
-    expect(find.text('Prefer not to say'), findsNothing);
+    expect(find.textContaining('January 1988'), findsOneWidget);
   });
 
   testWidgets('first-time setup is a page you can leave, not a wall', (tester) async {

@@ -91,6 +91,10 @@ paths:
         Email is unique among *active* staff. Re-employing someone whose record was
         deactivated reuses the existing row via `POST /staff/{id}/reactivate` rather than
         creating a second one.
+
+        A doctor also needs a title, specialization and medical registration number, and the
+        date they start — required only when `role` is `doctor` *(Rev 1, 2026-09-28)*. The
+        registration number is unique among active staff, the same as email.
       operationId: createStaffMember
       requestBody:
         required: true
@@ -108,8 +112,9 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
           description: |
-            An active staff member already uses this email. The response carries the
-            existing id so the caller can reactivate instead.
+            An active staff member already uses this email (the response carries the existing
+            id so the caller can reactivate instead), or, for a doctor, this registration
+            number.
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -164,6 +169,28 @@ paths:
                       items:
                         type: array
                         items: { $ref: '#/components/schemas/StaffSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /staff/departments:
+    get:
+      tags: [Staff]
+      summary: Every department already in use
+      description: |
+        Roles: HospitalAdministrator, DutyManager.
+
+        Distinct, case-insensitively, from active staff, sorted alphabetically. Department has
+        no fixed list — this is what the create-staff form offers instead of asking the
+        administrator to retype one that already exists. *(Rev 1, 2026-09-28.)*
+      operationId: listStaffDepartments
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: string }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
@@ -1679,6 +1706,13 @@ components:
         - hospital_administrator
         - equipment_manager
 
+    PersonTitle:
+      type: string
+      description: |
+        Salutation. Only asked for when creating a doctor today *(Rev 1, 2026-09-28)*, but not
+        tied to role at the data level, since other roles may want it later.
+      enum: [mr, mrs, ms, miss, dr, prof]
+
     AllocationStatus:
       type: string
       description: |
@@ -1769,6 +1803,20 @@ components:
         phone_number: { type: string, nullable: true }
         role: { $ref: '#/components/schemas/StaffRole' }
         department: { type: string, nullable: true }
+        title: { allOf: [{ $ref: '#/components/schemas/PersonTitle' }], nullable: true }
+        specialization:
+          type: string
+          nullable: true
+          description: A doctor's clinical field, e.g. "Dermatologist".
+        registration_number:
+          type: string
+          nullable: true
+          description: A doctor's medical registration number (SLMC or equivalent).
+        joining_date:
+          type: string
+          format: date
+          nullable: true
+          description: The date this person starts at the hospital.
         is_active: { type: boolean }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
@@ -1781,6 +1829,7 @@ components:
         full_name: { type: string }
         role: { $ref: '#/components/schemas/StaffRole' }
         department: { type: string, nullable: true }
+        specialization: { type: string, nullable: true }
         is_active: { type: boolean }
         skill_count: { type: integer }
 
@@ -1806,7 +1855,10 @@ components:
       properties:
         first_name: { type: string, maxLength: 100 }
         last_name: { type: string, maxLength: 100 }
-        email: { type: string, format: email }
+        email:
+          type: string
+          format: email
+          description: Must be a carelanka.lk address.
         temporary_password:
           type: string
           minLength: 12
@@ -1818,6 +1870,27 @@ components:
           type: array
           description: Optional. Grants these skills with no expiry.
           items: { type: string, format: uuid }
+        title:
+          allOf: [{ $ref: '#/components/schemas/PersonTitle' }]
+          nullable: true
+          description: Required when role is doctor.
+        specialization:
+          type: string
+          maxLength: 150
+          nullable: true
+          description: Required when role is doctor, e.g. "Dermatologist".
+        registration_number:
+          type: string
+          maxLength: 50
+          nullable: true
+          description: |
+            Required when role is doctor. A medical registration number (SLMC or equivalent),
+            unique among active staff.
+        joining_date:
+          type: string
+          format: date
+          nullable: true
+          description: Required when role is doctor. The date this person starts at the hospital.
 
     UpdateStaffMemberRequest:
       type: object

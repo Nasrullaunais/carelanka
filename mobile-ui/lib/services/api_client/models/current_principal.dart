@@ -16,6 +16,7 @@ class CurrentPrincipal {
     required this.principalType,
     required this.role,
     required this.displayName,
+    required this.mustChangePassword,
     this.email,
     this.phoneNumber,
     this.patientId,
@@ -34,6 +35,8 @@ class CurrentPrincipal {
   final String? phoneNumber;
   @JsonKey(name: 'patient_id')
   final String? patientId;
+  @JsonKey(name: 'must_change_password')
+  final bool mustChangePassword;
 
   Map<String, Object?> toJson() => _$CurrentPrincipalToJson(this);
 }

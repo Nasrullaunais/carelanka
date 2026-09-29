@@ -44,10 +44,7 @@ export function CrewManagement({ ambulanceId, registrationNumber }: {
       void candidates.refetch();
     },
     onError: (error) => {
-      if (isConflict(error)) {
-        toast.error('Crew is locked while this ambulance has a live dispatch.');
-        void refresh();
-      }
+      if (isConflict(error)) void refresh();
     },
   });
 
@@ -64,11 +61,7 @@ export function CrewManagement({ ambulanceId, registrationNumber }: {
         assignedCount++;
       } catch (error) {
         failures.push(person);
-        if (isConflict(error as ApiProblem)) {
-          setAssignError('One or more crew members could not be assigned. The ambulance may have a live dispatch, or a person may have been assigned elsewhere.');
-        } else {
-          setAssignError(problemMessage(error as ApiProblem, 'One or more crew members could not be assigned.') ?? 'One or more crew members could not be assigned.');
-        }
+        setAssignError(problemMessage(error as ApiProblem, 'One or more crew members could not be assigned.') ?? 'One or more crew members could not be assigned.');
       }
     }
     setSelected(failures);

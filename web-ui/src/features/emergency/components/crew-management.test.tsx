@@ -47,13 +47,13 @@ describe('CrewManagement', () => {
     expect(screen.getByRole('button', { name: 'Remove M. Fernando' })).toBeInTheDocument();
   });
 
-  it('explains a live-run conflict without leaving the action pending', async () => {
+  it('leaves a live-run conflict to the shared error message without leaving the action pending', async () => {
     mocks.unassign.mockRejectedValue({ status: 409 });
     renderWithProviders(<CrewManagement ambulanceId="amb-1" registrationNumber="WP-CA-1234" />);
 
     await userEvent.click(await screen.findByRole('button', { name: 'Unassign' }));
 
-    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith(expect.stringMatching(/locked while this ambulance has a live dispatch/i)));
-    expect(screen.getByRole('button', { name: 'Unassign' })).toBeEnabled();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Unassign' })).toBeEnabled());
+    expect(mocks.toastError).not.toHaveBeenCalled();
   });
 });

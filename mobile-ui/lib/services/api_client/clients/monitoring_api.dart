@@ -38,6 +38,5 @@ abstract class MonitoringApi {
   @POST('/warnings/{id}/clear')
   Future<void> clearWarning({
     @Path('id') required String id,
-    @Header('X-Confirmation-Code') required String xConfirmationCode,
   });
 }

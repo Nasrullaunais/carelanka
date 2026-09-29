@@ -12,10 +12,12 @@ import { DischargePage } from './pages/DischargePage';
 import { EquipmentPage } from './pages/EquipmentPage';
 import { IntakePage } from './pages/IntakePage';
 import { LaboratoryPage } from './pages/LaboratoryPage';
+import { PrescriptionsPage } from './pages/PrescriptionsPage';
 import { LoginPage } from './pages/LoginPage';
 import { MaintenanceUnitPage } from './pages/MaintenanceUnitPage';
 import { WarningsPage } from './pages/WarningsPage';
 import { PatientsPage } from './pages/PatientsPage';
+import { PatientAppAccountsPage } from './pages/PatientAppAccountsPage';
 import { PharmacyPage } from './pages/PharmacyPage';
 import { StaffLeaveApprovalPage } from './pages/StaffLeaveApprovalPage';
 import { StaffManagementPage } from './pages/StaffManagementPage';
@@ -69,6 +71,7 @@ export function App() {
           <Route path="/appointments" element={<AppointmentsPage />} />
           <Route path="/discharge" element={<DischargePage />} />
           <Route path="/care-recommendations" element={<CareRecommendationsPage />} />
+          <Route path="/patient-accounts" element={<PatientAppAccountsPage />} />
           <Route path="/billing" element={<Navigate to="/discharge" replace />} />
           <Route path="/billing-settings" element={<BillingSettingsPage />} />
           <Route path="/capacity" element={<CapacityPage />} />
@@ -79,6 +82,7 @@ export function App() {
           <Route path="/warnings" element={<WarningsPage />} />
           <Route path="/laboratory" element={<LaboratoryPage />} />
           <Route path="/pharmacy" element={<PharmacyPage />} />
+          <Route path="/prescriptions" element={<PrescriptionsPage />} />
           <Route path="/staff" element={<StaffManagementPage />} />
           <Route path="/staff/shifts" element={<StaffShiftsPage />} />
           <Route path="/staff/coverage" element={<WardCoveragePage />} />

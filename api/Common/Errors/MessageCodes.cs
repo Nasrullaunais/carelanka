@@ -22,6 +22,8 @@ public static class MessageCodes
             [MessageCode.Unexpected] = "cl_err_500",
             [MessageCode.RefreshTokenInvalid] = "cl_err_001",
             [MessageCode.UsernameAlreadyTaken] = "cl_err_002",
+            [MessageCode.CurrentPasswordIncorrect] = "cl_err_003",
+            [MessageCode.PasswordChangeRequired] = "cl_err_004",
             [MessageCode.BedNumberTaken] = "cl_equ_001",
             [MessageCode.AssetTagTaken] = "cl_equ_002",
             [MessageCode.BedOccupied] = "cl_equ_003",
@@ -53,6 +55,7 @@ public static class MessageCodes
             [MessageCode.WarningNotResolved] = "cl_equ_029",
             [MessageCode.EquipmentCategoryInUse] = "cl_equ_030",
             [MessageCode.ReorderSuggestionAlreadyRunning] = "cl_equ_031",
+            [MessageCode.PrescriptionHasNoFile] = "cl_equ_032",
             [MessageCode.WardNameTaken] = "cl_pat_001",
             [MessageCode.PatientNicTaken] = "cl_pat_002",
             [MessageCode.PatientAlreadyHasAccount] = "cl_pat_003",
@@ -87,6 +90,11 @@ public static class MessageCodes
             [MessageCode.DispatchProposalConflict] = "cl_emg_007",
             [MessageCode.DispatchProposalNotConfirmable] = "cl_emg_008",
             [MessageCode.DispatchProposalNotApprovable] = "cl_emg_009",
+            [MessageCode.CallAlreadyDispatched] = "cl_emg_010",
+            [MessageCode.CallNotCancellable] = "cl_emg_011",
+            [MessageCode.CallHasNoLiveDispatch] = "cl_emg_012",
+            [MessageCode.CancellationAlreadyRequested] = "cl_emg_013",
+            [MessageCode.CancellationNotPending] = "cl_emg_014",
             [MessageCode.NicLinkedToAnotherAccount] = "cl_pat_031",
             [MessageCode.NicDoesNotMatchYourRecord] = "cl_pat_032",
             [MessageCode.AccountHasNoPatientRecord] = "cl_pat_033",
@@ -107,7 +115,8 @@ public static class MessageCodes
             [MessageCode.CareAgentStillDrafting] = "cl_pat_049",
             [MessageCode.TooManyCareQueries] = "cl_pat_050",
             [MessageCode.NicHasHospitalRecord] = "cl_pat_051",
-            [MessageCode.PatientIdentityLocked] = "cl_pat_052"
+            [MessageCode.PatientIdentityLocked] = "cl_pat_052",
+            [MessageCode.PatientHasNoAppAccount] = "cl_pat_053"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

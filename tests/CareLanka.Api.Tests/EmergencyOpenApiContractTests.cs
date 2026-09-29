@@ -1,6 +1,4 @@
 using System.Text.Json;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 using YamlDotNet.RepresentationModel;
 
@@ -100,7 +98,7 @@ public sealed class EmergencyOpenApiContractTests
         string method,
         string operationId)
     {
-        using var document = await GenerateAsync();
+        using var document = await GeneratedOpenApi.ParseAsync();
         var operation = document.RootElement.GetProperty("paths").GetProperty(path).GetProperty(method);
 
         Assert.Equal(operationId, operation.GetProperty("operationId").GetString());
@@ -118,7 +116,7 @@ public sealed class EmergencyOpenApiContractTests
     [InlineData("/ambulances/{ambulanceId}/crew/{staffMemberId}", "delete")]
     public async Task Ambulance_response_statuses_match_the_contract(string path, string method)
     {
-        using var document = await GenerateAsync();
+        using var document = await GeneratedOpenApi.ParseAsync();
         var contract = LoadContract();
         var expected = Keys(Map(contract, "paths", path, method, "responses"));
         var generated = Keys(document.RootElement, "paths", path, method, "responses");
@@ -131,7 +129,7 @@ public sealed class EmergencyOpenApiContractTests
     [Fact]
     public async Task Ambulance_status_values_match_the_contract()
     {
-        using var document = await GenerateAsync();
+        using var document = await GeneratedOpenApi.ParseAsync();
         var contract = LoadContract();
         var expected = Sequence(contract, "components", "schemas", "AmbulanceStatus", "enum")
             .Children.Cast<YamlScalarNode>().Select(value => value.Value!).ToHashSet();
@@ -145,7 +143,7 @@ public sealed class EmergencyOpenApiContractTests
     [Fact]
     public async Task Phase_one_eligibility_shape_matches_the_contract()
     {
-        using var document = await GenerateAsync();
+        using var document = await GeneratedOpenApi.ParseAsync();
         var contract = LoadContract();
         var expectedReasons = Sequence(
                 contract,
@@ -177,7 +175,7 @@ public sealed class EmergencyOpenApiContractTests
     [Fact]
     public async Task Phase_one_request_and_query_wire_contract_is_generated()
     {
-        using var document = await GenerateAsync();
+        using var document = await GeneratedOpenApi.ParseAsync();
         var operation = document.RootElement.GetProperty("paths").GetProperty("/ambulances")
             .GetProperty("get");
         var parameterNames = operation.GetProperty("parameters").EnumerateArray()
@@ -203,7 +201,7 @@ public sealed class EmergencyOpenApiContractTests
         string method,
         string operationId)
     {
-        using var document = await GenerateAsync();
+        using var document = await GeneratedOpenApi.ParseAsync();
         Assert.Equal(operationId, document.RootElement.GetProperty("paths").GetProperty(path)
             .GetProperty(method).GetProperty("operationId").GetString());
     }
@@ -216,7 +214,7 @@ public sealed class EmergencyOpenApiContractTests
     [InlineData("/me/emergency-calls", "get")]
     public async Task Phase_two_response_statuses_match_the_published_contract(string path, string method)
     {
-        using var document = await GenerateAsync();
+        using var document = await GeneratedOpenApi.ParseAsync();
         var contract = LoadContract();
         var expected = Keys(Map(contract, "paths", path, method, "responses"));
         var generated = Keys(document.RootElement, "paths", path, method, "responses");
@@ -229,7 +227,7 @@ public sealed class EmergencyOpenApiContractTests
     [Fact]
     public async Task Patient_intake_request_and_own_call_shapes_are_generated_without_caller_input()
     {
-        using var document = await GenerateAsync();
+        using var document = await GeneratedOpenApi.ParseAsync();
         var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
         var request = schemas.GetProperty("CreateEmergencyCallRequest");
         var required = request.GetProperty("required").EnumerateArray()
@@ -256,7 +254,7 @@ public sealed class EmergencyOpenApiContractTests
     [Fact]
     public async Task Dispatcher_call_board_query_names_match_the_published_wire_contract()
     {
-        using var document = await GenerateAsync();
+        using var document = await GeneratedOpenApi.ParseAsync();
         var names = document.RootElement.GetProperty("paths").GetProperty("/emergency-calls")
             .GetProperty("get").GetProperty("parameters").EnumerateArray()
             .Select(parameter => parameter.GetProperty("name").GetString()!).ToHashSet();
@@ -269,18 +267,10 @@ public sealed class EmergencyOpenApiContractTests
     [Fact]
     public async Task Unknown_diversion_estimates_are_nullable()
     {
-        using var document = await GenerateAsync();
+        using var document = await GeneratedOpenApi.ParseAsync();
         var properties = document.RootElement.GetProperty("components").GetProperty("schemas").GetProperty("DiversionImpact").GetProperty("properties");
         Assert.True(properties.GetProperty("source_call_additional_wait_minutes").GetProperty("nullable").GetBoolean());
         Assert.True(properties.GetProperty("minutes_saved_for_this_call").GetProperty("nullable").GetBoolean());
-    }
-
-    private static async Task<JsonDocument> GenerateAsync()
-    {
-        using var environment = TestEnvironment.Use();
-        await using var application = new SwaggerOnlyApplication();
-        using var client = application.CreateClient();
-        return JsonDocument.Parse(await client.GetStringAsync("/swagger/v1/swagger.json"));
     }
 
     private static YamlMappingNode LoadContract()
@@ -324,11 +314,5 @@ public sealed class EmergencyOpenApiContractTests
         }
 
         return current;
-    }
-
-    private sealed class SwaggerOnlyApplication : WebApplicationFactory<Program>
-    {
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-            => builder.UseEnvironment("Development");
     }
 }

@@ -8,9 +8,11 @@ namespace CareLanka.Api.Agents.Patient;
 /// timeout - and the one this validator always accepts, because everything free-text in it is a
 /// fixed sentence.
 /// <para>
-/// Addressed to the patient, like the model's own draft. It cannot answer their question - there
-/// is no model here to read it - so it says what is true whatever they asked: someone is coming,
-/// and medicines come from the nurse.
+/// Addressed to the patient, like the model's own draft. It cannot tell what they asked - there is
+/// no model here to read it - so it must read sensibly whatever they wrote, "how many doctors work
+/// here?" as much as "my chest feels tight". It says only what is true either way: the ward team
+/// has the message and will answer in person. The medicine line is added only when the patient
+/// named one.
 /// </para>
 /// <para>
 /// The one thing it does answer is the dangerous one. If the patient's own words name a substance
@@ -33,18 +35,20 @@ public sealed class DeterministicCareAdvisor : ICareAdvisor
             ? CareUrgency.High
             : hasHistory ? CareUrgency.Medium : CareUrgency.Low;
 
+        var namesAMedicine = CareRecommendationValidator.NamesAMedicine(
+            context.ReportedText, context.MedicalProfile?.Allergies);
+
         var message = Warning(context) + (context.RedFlagMatched
             ? "Thank you for telling us. The ward staff have been told, and someone will come to " +
               "you as soon as they can. Please stay where you are, and press the call bell now if " +
               "you feel worse. Do not take anything that was not given to you here."
-            : hasHistory
-                ? "Thank you for telling us. A nurse or doctor will come and check on you this " +
-                  "shift, and they will look at your record before they do. Please do not take " +
-                  "anything that was not given to you here - ask your nurse first. Press the call " +
-                  "bell if you feel worse before they arrive."
-                : "Thank you for telling us. A nurse or doctor will come and check on you this " +
-                  "shift. Please do not take anything that was not given to you here - ask your " +
-                  "nurse first. Press the call bell if you feel worse before they arrive.");
+            : "Thank you for your message. The ward team has read it, and a nurse or doctor will " +
+              "answer you in person. " +
+              (namesAMedicine
+                  ? "Please do not take any medicine that was not given to you here - ask your " +
+                    "nurse first. "
+                  : string.Empty) +
+              "If you feel unwell in the meantime, press the call bell.");
 
         // Marked as the backup by default. Callers that know the specific cause replace the note.
         return Task.FromResult(

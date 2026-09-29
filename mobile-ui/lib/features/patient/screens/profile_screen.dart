@@ -3,12 +3,15 @@ import 'package:provider/provider.dart';
 
 import '../../../core/auth/auth_controller.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/dialer.dart';
 import '../../../core/utils/friendly_date.dart';
+import '../../../core/widgets/notice_banner.dart';
 import '../../../services/api_client/models/my_profile.dart';
 import '../state/profile_controller.dart';
-import '../widgets/dialer.dart';
 import '../widgets/panels.dart';
+import '../widgets/patient_id_card.dart';
 import 'claim_record_screen.dart';
+import 'manage_account_screen.dart';
 import 'my_details_screen.dart';
 import 'my_reports_screen.dart';
 import 'past_visits_screen.dart';
@@ -58,6 +61,8 @@ class ProfileScreen extends StatelessWidget {
           ] else ...[
             _Header(profile: profile),
             const SizedBox(height: 20),
+            PatientIdCard(patientCode: profile.patientCode),
+            const SizedBox(height: 16),
             if (!profile.detailsComplete) ...[
               NoticeBanner(
                 icon: Icons.info_outline,
@@ -125,6 +130,16 @@ class ProfileScreen extends StatelessWidget {
                   onTap: () => Navigator.of(
                     context,
                   ).push(MaterialPageRoute(builder: (_) => const MyReportsScreen())),
+                ),
+                const Divider(indent: 20, endIndent: 20),
+                ListTile(
+                  leading: const Icon(Icons.manage_accounts_outlined),
+                  title: const Text('Manage account'),
+                  subtitle: const Text('Username and password'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute(builder: (_) => const ManageAccountScreen())),
                 ),
                 const Divider(indent: 20, endIndent: 20),
                 ListTile(
@@ -211,21 +226,6 @@ class _Header extends StatelessWidget {
                 style: theme.textTheme.titleLarge,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  profile.patientCode,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                    letterSpacing: 1,
-                  ),
-                ),
               ),
             ],
           ),

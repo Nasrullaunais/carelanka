@@ -1,6 +1,4 @@
 using System.Text.Json;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using YamlDotNet.RepresentationModel;
 using Xunit;
 
@@ -11,11 +9,7 @@ public sealed class OpenApiContractTests
     [Fact]
     public async Task Generated_auth_contract_keeps_anonymous_security_responses_and_required_members()
     {
-        using var environment = TestEnvironment.Use();
-        await using var application = new TestApplication();
-        using var client = application.CreateClient();
-
-        using var document = JsonDocument.Parse(await client.GetStringAsync("/swagger/v1/swagger.json"));
+        using var document = await GeneratedOpenApi.ParseAsync();
         var root = document.RootElement;
         var paths = root.GetProperty("paths");
         var contract = LoadContract();
@@ -40,6 +34,43 @@ public sealed class OpenApiContractTests
         var schemas = root.GetProperty("components").GetProperty("schemas");
         AssertRequiredMatchesContract(schemas.GetProperty("AuthTokens"), contract, "AuthTokens");
         AssertRequiredMatchesContract(schemas.GetProperty("CurrentPrincipal"), contract, "CurrentPrincipal");
+    }
+
+    [Fact]
+    public async Task Change_password_publishes_its_contract_responses_and_required_members()
+    {
+        using var document = await GeneratedOpenApi.ParseAsync();
+        var root = document.RootElement;
+        var contract = LoadContract();
+
+        var operation = root.GetProperty("paths").GetProperty("/auth/password").GetProperty("post");
+        Assert.Equal("changePassword", operation.GetProperty("operationId").GetString());
+
+        var expectedResponses = Keys(Map(contract, "paths", "/auth/password", "post", "responses"));
+        var generatedResponses = operation.GetProperty("responses")
+            .EnumerateObject().Select(response => response.Name).ToHashSet();
+        Assert.True(expectedResponses.SetEquals(generatedResponses));
+
+        var expectedRequired = Sequence(contract, "components", "schemas", "ChangePasswordRequest", "required")
+            .Children.Cast<YamlScalarNode>().Select(item => item.Value!).ToHashSet();
+        var generatedRequired = root.GetProperty("components").GetProperty("schemas")
+            .GetProperty("ChangePasswordRequest").GetProperty("required")
+            .EnumerateArray().Select(item => item.GetString()!).ToHashSet();
+        Assert.True(expectedRequired.SetEquals(generatedRequired));
+    }
+
+    [Fact]
+    public async Task The_current_principal_always_says_whether_a_password_change_is_required()
+    {
+        using var document = await GeneratedOpenApi.ParseAsync();
+
+        var principal = document.RootElement.GetProperty("components").GetProperty("schemas")
+            .GetProperty("CurrentPrincipal");
+
+        Assert.Contains("must_change_password",
+            principal.GetProperty("required").EnumerateArray().Select(item => item.GetString()));
+        Assert.Equal("boolean",
+            principal.GetProperty("properties").GetProperty("must_change_password").GetProperty("type").GetString());
     }
 
     private static void AssertRequiredMatchesContract(
@@ -93,11 +124,5 @@ public sealed class OpenApiContractTests
         }
 
         return current;
-    }
-
-    private sealed class TestApplication : WebApplicationFactory<Program>
-    {
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-            => builder.UseEnvironment("Development");
     }
 }

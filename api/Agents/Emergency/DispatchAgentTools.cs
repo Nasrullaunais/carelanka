@@ -54,9 +54,14 @@ public sealed class DispatchAgentTools : IDispatchAgentTools
                 ambulance.CurrentLatitude.HasValue && ambulance.CurrentLongitude.HasValue,
                 ambulance.LocationUpdatedAt));
 
-            if (decision.IsEligible && ambulance.CurrentLatitude is { } lat && ambulance.CurrentLongitude is { } lon)
+            if (decision.IsEligible
+                && ambulance.CurrentLatitude is { } lat
+                && ambulance.CurrentLongitude is { } lon
+                && ambulance.LocationUpdatedAt is { } locationUpdatedAt)
             {
-                candidates.Add(new EligibleAmbulanceCandidate(ambulance.Id, ambulance.RegistrationNumber, lat, lon));
+                candidates.Add(new EligibleAmbulanceCandidate(
+                    ambulance.Id, ambulance.RegistrationNumber, lat, lon,
+                    crewCounts.GetValueOrDefault(ambulance.Id), locationUpdatedAt));
             }
         }
 

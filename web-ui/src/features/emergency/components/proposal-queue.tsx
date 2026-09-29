@@ -9,7 +9,7 @@ import { ReasonDialog } from '../../../components/ui/reason-dialog';
 import { StatusChip } from '../../../components/ui/status-chip';
 import { isConflict, problemMessage, problemStringList } from '../../../services/api/errors';
 import type { ApiProblem } from '../../../services/api/errors';
-import { dispatchStatusLabels, formatTimestamp, priorityLabels, priorityTones, proposalOutcomeLabels, proposalStatusLabels, proposalStatusTones, rejectionReasonLabels } from '../domain';
+import { dispatchStatusLabels, formatTimestamp, priorityLabels, priorityTones, proposalOutcomeLabels, proposalStatusLabels, proposalStatusTones, recommendationSourceLabels, recommendationSourceTones, rejectionReasonLabels } from '../domain';
 import { useActionableProposals } from '../hooks/use-actionable-proposals';
 import { invalidateEmergencyQueries } from '../query-invalidation';
 
@@ -73,6 +73,7 @@ function ProposalCard({ proposal, onOpenCall }: { proposal: DispatchProposalSumm
           <p className="font-medium">{data.proposed_ambulance_registration ?? 'No ambulance proposed'}</p>
           <p className="text-sm text-muted">{data.estimated_minutes_to_scene == null ? 'ETA unavailable' : `${data.estimated_minutes_to_scene} min to scene`}</p>
           {data.proposed_ambulance_registration && <p className="text-sm text-muted">Crew readiness: {crewReadiness(data)}</p>}
+          {data.recommendation_source && <div className="mt-2 flex flex-col gap-1"><StatusChip tone={recommendationSourceTones[data.recommendation_source]}>{recommendationSourceLabels[data.recommendation_source]}</StatusChip>{data.recommendation_note && <p className="text-sm text-muted">{data.recommendation_note}</p>}</div>}
           <p className="mt-2">{data.rationale ?? (data.outcome ? proposalOutcomeLabels[data.outcome] : status === 'pending' ? 'The agent is checking available crews and routes. This recommendation updates automatically.' : 'No reasoning is available.')}</p>
         </div>
         {data.emergency_call_id && onOpenCall && <Button variant="outline" onPress={() => onOpenCall(data.emergency_call_id!)}>{status === 'failed' ? 'Return to call and retry or dispatch manually' : 'View emergency call'}</Button>}

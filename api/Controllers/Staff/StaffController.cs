@@ -52,6 +52,18 @@ public sealed class StaffController : ControllerBase
     }
 
     [Authorize(Roles = "hospital_administrator,duty_manager")]
+    [HttpGet("departments", Name = "listStaffDepartments")]
+    [ProducesResponseType(typeof(IReadOnlyList<string>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    public async Task<ActionResult<IReadOnlyList<string>>> ListStaffDepartments(
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _staffService.ListDepartmentsAsync(cancellationToken);
+        return Ok(result);
+    }
+
+    [Authorize(Roles = "hospital_administrator,duty_manager")]
     [HttpGet("{id:guid}", Name = "getStaffMember")]
     [ProducesResponseType(typeof(StaffMemberDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]

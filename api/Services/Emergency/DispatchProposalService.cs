@@ -339,6 +339,8 @@ public sealed class DispatchProposalService : IDispatchProposalService
             ProposedAmbulanceCurrentCrewCount = proposedAmbulance?.CrewCount,
             ProposedAmbulanceRequiredCrewCount = proposedEligibility?.RequiredCrewCount,
             Rationale = proposal.Rationale,
+            RecommendationSource = proposal.RecommendationSource,
+            RecommendationNote = proposal.RecommendationNote,
             DiversionImpact = proposal.IsDiversion && proposal.SourceDispatchId is { } sourceId
                 ? new DiversionImpact
                 {

@@ -9,6 +9,7 @@ import 'dispatch_outcome.dart';
 import 'dispatch_plan_step.dart';
 import 'dispatch_proposal_error.dart';
 import 'dispatch_proposal_status.dart';
+import 'dispatch_recommendation_source.dart';
 import 'dispatch_rejection_reason.dart';
 import 'dispatch_tool_call.dart';
 import 'dispatch_validation_result.dart';
@@ -34,6 +35,8 @@ class DispatchProposalDetail {
     this.proposedAmbulanceCurrentCrewCount,
     this.proposedAmbulanceRequiredCrewCount,
     this.rationale,
+    this.recommendationSource,
+    this.recommendationNote,
     this.diversionImpact,
     this.plan,
     this.validation,
@@ -76,6 +79,10 @@ class DispatchProposalDetail {
   @JsonKey(name: 'proposed_ambulance_required_crew_count')
   final int? proposedAmbulanceRequiredCrewCount;
   final String? rationale;
+  @JsonKey(name: 'recommendation_source')
+  final DispatchRecommendationSource? recommendationSource;
+  @JsonKey(name: 'recommendation_note')
+  final String? recommendationNote;
   @JsonKey(name: 'diversion_impact')
   final DiversionImpact? diversionImpact;
   final List<DispatchPlanStep>? plan;

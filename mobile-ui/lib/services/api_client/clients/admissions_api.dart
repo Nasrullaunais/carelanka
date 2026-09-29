@@ -25,6 +25,7 @@ import '../models/complete_details_request.dart';
 import '../models/correct_bed_request.dart';
 import '../models/create_admission_request.dart';
 import '../models/create_appointment_request.dart';
+import '../models/create_walk_in_appointment_request.dart';
 import '../models/pre_admit_request.dart';
 import '../models/sort_direction.dart';
 import '../models/worklist_row_paged_result.dart';
@@ -100,15 +101,22 @@ abstract class AdmissionsApi {
 
   @GET('/appointments')
   Future<AppointmentPagedResult> listAppointments({
+    @Query('includeFinished') bool? includeFinished = false,
     @Query('page') int? page = 1,
     @Query('pageSize') int? pageSize = 20,
     @Query('date') DateTime? date,
     @Query('status') AppointmentStatus? status,
+    @Query('search') String? search,
   });
 
   @POST('/appointments')
   Future<Appointment> createAppointment({
     @Body() CreateAppointmentRequest? body,
+  });
+
+  @POST('/appointments/walk-in')
+  Future<Appointment> createWalkInAppointment({
+    @Body() CreateWalkInAppointmentRequest? body,
   });
 
   @POST('/appointments/{id}/confirm')

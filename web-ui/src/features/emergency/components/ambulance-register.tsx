@@ -39,10 +39,7 @@ export function AmbulanceRegister() {
   const mutationHandlers = (success: string) => ({
     onSuccess: () => { setDialog(undefined); setConfirm(undefined); toast.success(success); void refresh(); },
     onError: (error: Parameters<typeof isConflict>[0]) => {
-      if (isConflict(error)) {
-        toast.error('The ambulance changed or has an active run. The register has been refreshed.');
-        void refresh();
-      }
+      if (isConflict(error)) void refresh();
     },
   });
   const create = useMutation({ ...createAmbulanceMutation(), ...mutationHandlers('Ambulance added.') });

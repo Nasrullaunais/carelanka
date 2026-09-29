@@ -12,12 +12,13 @@ part 'my_prescription.g.dart';
 class MyPrescription {
   const MyPrescription({
     required this.id,
-    required this.fileName,
-    required this.contentType,
-    required this.byteSize,
     required this.status,
     required this.createdAt,
     this.note,
+    this.fileName,
+    this.contentType,
+    this.byteSize,
+    this.body,
     this.tokenDate,
     this.tokenNumber,
     this.readyAt,
@@ -30,11 +31,12 @@ class MyPrescription {
   final String id;
   final String? note;
   @JsonKey(name: 'file_name')
-  final String fileName;
+  final String? fileName;
   @JsonKey(name: 'content_type')
-  final String contentType;
+  final String? contentType;
   @JsonKey(name: 'byte_size')
-  final int byteSize;
+  final int? byteSize;
+  final String? body;
   final PrescriptionStatus status;
   @JsonKey(name: 'token_date')
   final DateTime? tokenDate;

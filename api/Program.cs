@@ -48,6 +48,7 @@ builder.Services
     .AddControllers(options =>
     {
         options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
+        options.Filters.Add<PasswordChangeRequiredFilter>();
         options.ModelMetadataDetailsProviders.Add(new EmergencyQueryBindingMetadataProvider());
         options.ModelBinderProviders.Insert(0, new SnakeCaseEnumModelBinderProvider());
     })
@@ -91,7 +92,7 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
     };
 });
 
-var connectionString = builder.Configuration.GetConnectionString("CareLanka")
+var connectionString = builder.Configuration.GetConnectionString(CareLankaDatabase.ConnectionStringName)
     ?? throw new InvalidOperationException(
         "ConnectionStrings:CareLanka is not configured. See api/README.md for local setup.");
 
@@ -99,8 +100,7 @@ builder.Services.AddSingleton<TimestampInterceptor>();
 builder.Services.AddSingleton<AmbulanceStatusHistoryInterceptor>();
 
 builder.Services.AddDbContext<CareLankaDbContext>((provider, options) => options
-    .UseNpgsql(connectionString)
-    .UseSnakeCaseNamingConvention()
+    .UseCareLankaDatabase(connectionString)
     .AddInterceptors(
         provider.GetRequiredService<AmbulanceStatusHistoryInterceptor>(),
         provider.GetRequiredService<TimestampInterceptor>()));
@@ -118,6 +118,9 @@ builder.Services
         "Emergency:MinimumReadyCrew must be greater than zero.")
     .Validate(options => options.LocationMaxAgeMinutes > 0,
         "Emergency:LocationMaxAgeMinutes must be greater than zero.")
+    .Validate(options => !options.DemoFleet.Enabled
+            || (options.DemoFleet.IntervalMinutes > 0 && options.DemoFleet.IntervalMinutes < options.LocationMaxAgeMinutes),
+        "Emergency:DemoFleet:IntervalMinutes must be above zero and below LocationMaxAgeMinutes.")
     .Validate(options => options.HospitalEntrance.Latitude is >= -90 and <= 90
             && options.HospitalEntrance.Longitude is >= -180 and <= 180
             && (options.HospitalEntrance.Latitude != 0 || options.HospitalEntrance.Longitude != 0),
@@ -261,6 +264,11 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.DutyManager),
         EnumWire.ToWire(StaffRole.HospitalAdministrator)));
 
+    options.AddPolicy(Policies.PatientPasswordReset, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.GeneralStaff),
+        EnumWire.ToWire(StaffRole.DutyManager),
+        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+
     options.AddPolicy(Policies.MedicalProfileReader, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.WardNurse),
         EnumWire.ToWire(StaffRole.Doctor),
@@ -351,6 +359,9 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.EquipmentManager),
         EnumWire.ToWire(StaffRole.HospitalAdministrator)));
 
+    options.AddPolicy(Policies.PrescriptionAuthor, policy => policy.RequireRole(
+        EnumWire.ToWire(StaffRole.Doctor)));
+
     options.AddPolicy(Policies.MaintenanceDesk, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.HospitalAdministrator)));
 
@@ -437,11 +448,14 @@ builder.Services.AddHostedService<SceneLookupWorker>();
 builder.Services.AddScoped<IPreAdmissionGateway, PreAdmissionGateway>();
 builder.Services.AddScoped<PreAdmissionProcessor>();
 builder.Services.AddHostedService<PreAdmissionWorker>();
+builder.Services.AddScoped<DemoFleetLocationProcessor>();
+builder.Services.AddHostedService<DemoFleetLocationWorker>();
 
 // The Dispatch & Routing Agent. Three read-only tools, no write tool at all - a dispatch only
 // exists once a Duty Manager confirms or approves through the proposal API. Its own queue and
 // worker, separate from the bed and care agents' for the same single-reader-channel reason.
 builder.Services.AddScoped<IDispatchAgentTools, DispatchAgentTools>();
+builder.Services.AddScoped<IDispatchAdvisor, GeminiDispatchAdvisor>();
 builder.Services.AddScoped<IDispatchAgent, DispatchAgent>();
 builder.Services.AddScoped<IDispatchProposalService, DispatchProposalService>();
 builder.Services.AddScoped<DispatchProposalExecutor>();
@@ -474,6 +488,7 @@ builder.Services.AddScoped<IBillingRateService, BillingRateService>();
 builder.Services.AddScoped<IMeService, MeService>();
 builder.Services.AddScoped<ISkillService, SkillService>();
 builder.Services.AddScoped<IStaffMemberService, StaffMemberService>();
+builder.Services.AddScoped<IShiftService, ShiftService>();
 builder.Services.AddScoped<IAllocationService, AllocationService>();
 builder.Services.AddScoped<ILeaveRequestService, LeaveRequestService>();
 builder.Services.AddScoped<IMyRosterService, MyRosterService>();
@@ -561,12 +576,13 @@ var app = builder.Build();
 
 app.UseExceptionHandler();
 
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Swagger:Enabled"))
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-else
+
+if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
 }

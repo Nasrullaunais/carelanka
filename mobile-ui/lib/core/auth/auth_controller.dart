@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../services/api_client/care_lanka_api.dart';
 import '../../services/api_client/models/auth_tokens.dart';
+import '../../services/api_client/models/change_password_request.dart';
 import '../../services/api_client/models/current_principal.dart';
 import '../../services/api_client/models/patient_login_request.dart';
 import '../../services/api_client/models/patient_register_request.dart';
@@ -27,6 +28,8 @@ class AuthController extends ChangeNotifier {
         _beforeSignOut = beforeSignOut {
     _sessionExpiry.addListener(_onSessionExpired);
   }
+
+  static const currentPasswordIncorrectCode = 'cl_err_003';
 
   final CareLankaApi _api;
   final TokenStore _tokens;
@@ -81,6 +84,21 @@ class AuthController extends ChangeNotifier {
         ));
   }
 
+  /// The server ends every session on success, this one included, so this signs out too.
+  /// On failure it throws [ApiException] and stays signed in.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await callApi(() => _api.auth.changePassword(
+          body: ChangePasswordRequest(
+            currentPassword: currentPassword,
+            newPassword: newPassword,
+          ),
+        ));
+    await signOut();
+  }
+
   Future<void> signOut() async {
     await _beforeSignOut?.call();
     final refreshToken = await _tokens.readRefreshToken();
@@ -115,7 +133,22 @@ class AuthController extends ChangeNotifier {
   }
 
   void _onSessionExpired() {
-    _set(AuthStatus.signedOut, null);
+    switch (_sessionExpiry.last) {
+      case SessionSignal.passwordChangeRequired:
+        _reloadPrincipal();
+      case SessionSignal.expired || null:
+        _set(AuthStatus.signedOut, null);
+    }
+  }
+
+  // The router reads must_change_password off the fresh principal and moves to the forced screen.
+  Future<void> _reloadPrincipal() async {
+    if (_status != AuthStatus.signedIn) return;
+    try {
+      _set(AuthStatus.signedIn, await callApi(_api.auth.getCurrentUser));
+    } on ApiException {
+      // A failed read leaves the session as it was; the next refused call signals again.
+    }
   }
 
   void _set(AuthStatus status, CurrentPrincipal? principal) {

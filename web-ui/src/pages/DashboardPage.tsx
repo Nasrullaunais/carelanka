@@ -37,13 +37,13 @@ export function DashboardPage() {
         <div className="tiles">
           {tiles.map((tile) => (
             <Link key={tile.to} to={tile.to} className="tile">
+              {tile.to === '/care-recommendations' && waitingCount > 0 && (
+                <span className="tile-count" aria-label={`${waitingCount} waiting for a reply`}>
+                  {waitingCount > 99 ? '99+' : waitingCount}
+                </span>
+              )}
               <div className="tile-heading">
                 <tile.icon size={22} aria-hidden="true" />
-                {tile.to === '/care-recommendations' && waitingCount > 0 && (
-                  <span className="badge severity-high" aria-label={`${waitingCount} waiting for a reply`}>
-                    {waitingCount}
-                  </span>
-                )}
                 <ArrowUpRight size={17} aria-hidden="true" />
               </div>
               <strong>{tile.label}</strong>

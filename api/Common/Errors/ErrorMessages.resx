@@ -95,6 +95,14 @@
   <data name="cl_err_002" xml:space="preserve">
     <value>That username is already taken.</value>
   </data>
+  <data name="cl_err_003" xml:space="preserve">
+    <value>Your current password is not correct.</value>
+    <comment>POST /auth/password. A 400, not a 401: the caller is signed in, and a 401 would make both clients treat it as an ended session.</comment>
+  </data>
+  <data name="cl_err_004" xml:space="preserve">
+    <value>Choose a new password before continuing.</value>
+    <comment>Any route except POST /auth/password, POST /auth/logout, POST /auth/refresh and GET /auth/me, while the access token carries pwd_change. Set when the hospital gives a patient a temporary password; cleared when they choose their own.</comment>
+  </data>
   <data name="cl_equ_001" xml:space="preserve">
     <value>Bed {0} already exists in that ward.</value>
   </data>
@@ -204,6 +212,10 @@
     <value>A reorder suggestion for {0} is already running. Wait for it to finish before starting another.</value>
     <comment>Stops a second click from queueing a second run for the same medicine.</comment>
   </data>
+  <data name="cl_equ_032" xml:space="preserve">
+    <value>This prescription has no file. A doctor wrote it directly; read its body instead of downloading it.</value>
+    <comment>A doctor-written prescription has a body, not a photographed file, so there is nothing to download.</comment>
+  </data>
   <data name="cl_equ_013" xml:space="preserve">
     <value>{0} is with the maintenance unit. It comes back into service when they complete the repair, not by editing its status.</value>
     <comment>Says where the item is and who releases it, because the caller's next move is to go and look at the repair queue.</comment>
@@ -242,6 +254,21 @@
   </data>
   <data name="cl_emg_009" xml:space="preserve">
     <value>This diversion cannot be approved: {0}.</value>
+  </data>
+  <data name="cl_emg_010" xml:space="preserve">
+    <value>An ambulance has already been sent to this call. Request a cancellation instead, and staff will review it.</value>
+  </data>
+  <data name="cl_emg_011" xml:space="preserve">
+    <value>This emergency call can no longer be cancelled.</value>
+  </data>
+  <data name="cl_emg_012" xml:space="preserve">
+    <value>This call has no ambulance on the way, so there is nothing to recall.</value>
+  </data>
+  <data name="cl_emg_013" xml:space="preserve">
+    <value>A cancellation for this call is already waiting for review.</value>
+  </data>
+  <data name="cl_emg_014" xml:space="preserve">
+    <value>This cancellation request has already been reviewed.</value>
   </data>
   <data name="cl_pat_002" xml:space="preserve">
     <value>A patient with NIC {0} is already registered, as record {1}.</value>
@@ -421,5 +448,9 @@
   <data name="cl_pat_052" xml:space="preserve">
     <value>Only an administrator can change a patient's name, gender or NIC once a NIC is recorded.</value>
     <comment>PUT /patients/{id} and PATCH /admissions/{id}/details. A record with no NIC yet is an unidentified arrival and stays open to the desk and ward; once a NIC is on it, changing who the record identifies is an administrator's decision.</comment>
+  </data>
+  <data name="cl_pat_053" xml:space="preserve">
+    <value>This patient has no app account to reset.</value>
+    <comment>POST /patient-accounts/{patientId}/reset-password. The hospital record exists but no app login is linked to it, so there is no password to replace.</comment>
   </data>
 </root>

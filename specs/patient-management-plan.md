@@ -869,6 +869,29 @@ It is named `is_final` and not `final` because `final` is a reserved word in Dar
 
 Appointment bills are **not** exposed here. A `Bill` carries either an `admission_id` or an `appointment_id`, and only the admission side has a patient-facing route today.
 
+### 7.6d A forgotten app password — the hospital resets it
+
+*Added 2026-09-28.*
+
+| Method | Route | Role | Notes |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/patient-accounts` | General staff, Duty Manager, Administrator | Patients **with** an app login. Search by name, NIC, patient code or username |
+| `POST` | `/api/patient-accounts/{patientId}/reset-password` | General staff, Duty Manager, Administrator | Replaces the password with a temporary one and returns it once. 409 `cl_pat_053` when the record has no app login |
+
+**Why the hospital does it.** We never collect an email or a verified phone number, so there is nowhere to send a reset link or code. The hospital resets it the way a bank resets a card PIN: the patient calls or comes to the desk, staff check the name, NIC, date of birth and patient code against the person, and press **Generate new password**.
+
+**The flow.**
+
+1. In the app, **Forgot password?** (sign-in) or **Reset password** (Profile → Manage account) shows the hospital's number and email. Nothing is sent from the app.
+2. Staff find the patient on the **Patient app accounts** page and generate a new password — e.g. `KQTM-4821`.
+3. The old password stops working at once and every session ends. There is never more than one working password.
+4. The patient signs in with the temporary one and the app goes straight to **Choose a new password**. Until they do, the server answers every other route with 403 `cl_err_004` — the forced screen is enforced by the API, not just drawn by the app.
+5. They choose their own. The flag clears, every session ends again, and they sign in with the new password.
+
+**Why the password is shown once.** It is stored only as a hash, like any password. The response carries it with `Cache-Control: no-store`, the React page keeps it only while the dialog is open, and the server never logs it. If staff lose it before handing it over, they generate another — that is cheaper and safer than keeping a copy anywhere.
+
+**Who owns what.** `PatientAccount` and `RefreshToken` are Common tables. The password logic lives in `AuthService`; Patient Management finds the patient record and asks `IAuthService` for anything about the login (`integration_of_functions.md` §10).
+
 ### 7.7 Care recommendations and the second agent
 
 | Method | Route | Role | Notes |
@@ -1574,9 +1597,11 @@ nothing else — nobody on staff has a reason to open it.)*
 
 | Screen | Contents |
 | :--- | :--- |
+| Home | *(Rev 2026-09-28.)* Greeting, then one card for what is happening now: the current stay with a step progress bar built from `StayJourney`, else the next visit, else "No upcoming visits". Round shortcuts (Book a visit, My reports, Prescriptions, Past visits; while admitted, booking and past visits give way to Profile), the ambulance request, and the emergency contact with a call button. **No patient code here** — see Profile |
+| Profile | The patient's details and emergency contact, plus the **patient code** card ("Show this at reception", copy button). No QR code: nothing in the project scans one, reception types the code *(removed 2026-09-28)* |
 | My status | "You are in Ward 5B, Bed 12" — the narrow DTO from §7.6 |
 | Book a visit | Date/time picker, optional reason. `POST /me/appointments`. No calendars or slots — the patient says when they intend to come |
-| My visits | Upcoming and past bookings, cancel while still `scheduled` |
+| My visits | Upcoming and past bookings, cancel while still `scheduled`. A "Book a visit" button stays on the list once there are bookings, hidden while admitted *(fixed 2026-09-28: it used to exist only on the empty list, so a second visit could not be booked)* |
 | Pre-register | Details ahead of a planned visit |
 | Discharge info | Summary note and instructions |
 | **Call an ambulance** | Minimum details + location, posted to Emergency's endpoint. Because the caller is logged in, we already know who they are — the pre-admission starts complete. |

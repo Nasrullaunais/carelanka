@@ -67,7 +67,15 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
             if (locationNotice != null)
               MaterialBanner(
                 content: Text(locationNotice),
-                actions: const [SizedBox.shrink()],
+                actions: [
+                  if (_locationFixLabel(reporter.state) case final label?)
+                    TextButton(
+                      onPressed: reporter.fixAccess,
+                      child: Text(label),
+                    )
+                  else
+                    const SizedBox.shrink(),
+                ],
               ),
             if (error != null)
               MaterialBanner(
@@ -153,13 +161,25 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
     CrewLocationReportingState.reporting =>
       'Sharing your assigned ambulance location while this screen is open.',
     CrewLocationReportingState.stopped => null,
+    CrewLocationReportingState.approximateOnly =>
+      'Only approximate location is allowed. Dispatch needs precise location to send the nearest ambulance.',
     CrewLocationReportingState.permissionDenied =>
       'Location permission is needed to report this ambulance position.',
     CrewLocationReportingState.permissionPermanentlyDenied =>
       'Enable location permission in device settings to report this ambulance position.',
     CrewLocationReportingState.unavailable =>
-      'Location services are unavailable on this device.',
+      'Location is turned off on this phone.',
     CrewLocationReportingState.failed =>
       'Could not update ambulance location. Retrying shortly.',
   };
+
+  String? _locationFixLabel(CrewLocationReportingState state) =>
+      switch (state) {
+        CrewLocationReportingState.permissionDenied => 'Allow',
+        CrewLocationReportingState.approximateOnly ||
+        CrewLocationReportingState.permissionPermanentlyDenied =>
+          'Open settings',
+        CrewLocationReportingState.unavailable => 'Turn on location',
+        _ => null,
+      };
 }

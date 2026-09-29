@@ -157,6 +157,7 @@ class PrescriptionCard extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final note = prescription.note;
+    final body = prescription.body;
     final token = prescription.tokenNumber;
 
     final (label, color, icon) = switch (prescription.status) {
@@ -186,6 +187,14 @@ class PrescriptionCard extends StatelessWidget {
               'Sent ${FriendlyDate.full(prescription.createdAt)}',
               style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
             ),
+            if (body != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Written by your doctor',
+                style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+              Text(body, style: theme.textTheme.bodyMedium),
+            ],
             if (note != null) ...[
               const SizedBox(height: 6),
               Text(note, style: theme.textTheme.bodyMedium),

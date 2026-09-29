@@ -557,6 +557,11 @@ export type CareWorkflowValidation = {
     failed_rules?: Array<string> | null;
 };
 
+export type ChangePasswordRequest = {
+    current_password: string | null;
+    new_password: string | null;
+};
+
 export type CheckInRequest = {
     admission_category: AdmissionCategory;
     urgency: AdmissionUrgency;
@@ -785,6 +790,10 @@ export type CreateStaffMemberRequest = {
     role: StaffRole;
     department?: string | null;
     skill_ids?: Array<string> | null;
+    title?: PersonTitle;
+    specialization?: string | null;
+    registration_number?: string | null;
+    joining_date?: string | null;
 };
 
 export type CreateWalkInAppointmentRequest = {
@@ -812,6 +821,7 @@ export type CurrentPrincipal = {
     email?: string | null;
     phone_number?: string | null;
     patient_id?: string | null;
+    must_change_password: boolean;
 };
 
 export type DeactivateStaffMemberRequest = {
@@ -929,6 +939,8 @@ export type DispatchProposalDetail = {
     proposed_ambulance_current_crew_count?: number | null;
     proposed_ambulance_required_crew_count?: number | null;
     rationale?: string | null;
+    recommendation_source?: DispatchRecommendationSource;
+    recommendation_note?: string | null;
     diversion_impact?: DiversionImpact;
     plan?: Array<DispatchPlanStep> | null;
     validation?: Array<DispatchValidationResult> | null;
@@ -972,6 +984,8 @@ export type DispatchProposalSummaryPagedResult = {
     total_items: number;
     total_pages: number;
 };
+
+export type DispatchRecommendationSource = 'model' | 'model_unavailable' | 'model_rejected';
 
 export type DispatchRejectionReason = 'unsafe_diversion' | 'source_call_too_urgent_to_divert' | 'ambulance_unsuitable' | 'handled_another_way' | 'no_longer_needed' | 'other';
 
@@ -1507,9 +1521,10 @@ export type MyLabReportPagedResult = {
 export type MyPrescription = {
     id: string;
     note?: string | null;
-    file_name: string;
-    content_type: string;
-    byte_size: number;
+    file_name?: string | null;
+    content_type?: string | null;
+    byte_size?: number | null;
+    body?: string | null;
     status: PrescriptionStatus;
     token_date?: string | null;
     token_number?: number | null;
@@ -1599,6 +1614,28 @@ export type Patient = {
     updated_at?: string;
 };
 
+export type PatientAppAccount = {
+    patient_id: string;
+    patient_code: string;
+    full_name: string;
+    nic?: string | null;
+    date_of_birth?: string | null;
+    username: string;
+};
+
+export type PatientAppAccountPagedResult = {
+    items: Array<PatientAppAccount>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
+export type PatientAppPasswordReset = {
+    username: string;
+    temporary_password: string;
+};
+
 export type PatientClaimPreview = {
     patient_code: string;
     masked_full_name: string;
@@ -1676,6 +1713,8 @@ export type PatientSummaryPagedResult = {
 export type PendingEquipmentCount = {
     count: number;
 };
+
+export type PersonTitle = 'mr' | 'mrs' | 'ms' | 'miss' | 'dr' | 'prof';
 
 export type PharmacyBatch = {
     id: string;
@@ -1784,9 +1823,11 @@ export type Prescription = {
     patient_code: string;
     patient_name: string;
     note?: string | null;
-    file_name: string;
-    content_type: string;
-    byte_size: number;
+    file_name?: string | null;
+    content_type?: string | null;
+    byte_size?: number | null;
+    body?: string | null;
+    prescribed_by_staff_id?: string | null;
     status: PrescriptionStatus;
     token_date?: string | null;
     token_number?: number | null;
@@ -2169,6 +2210,10 @@ export type StaffMemberDetailDto = {
     phone_number?: string | null;
     role: StaffRole;
     department?: string | null;
+    title?: PersonTitle;
+    specialization?: string | null;
+    registration_number?: string | null;
+    joining_date?: string | null;
     is_active: boolean;
     created_at: string;
     updated_at: string;
@@ -2187,6 +2232,10 @@ export type StaffMemberDto = {
     phone_number?: string | null;
     role: StaffRole;
     department?: string | null;
+    title?: PersonTitle;
+    specialization?: string | null;
+    registration_number?: string | null;
+    joining_date?: string | null;
     is_active: boolean;
     created_at: string;
     updated_at: string;
@@ -2208,6 +2257,7 @@ export type StaffSummaryDto = {
     full_name: string;
     role: StaffRole;
     department?: string | null;
+    specialization?: string | null;
     is_active: boolean;
     skill_count: number;
 };
@@ -3979,6 +4029,39 @@ export type LogoutResponses = {
 };
 
 export type LogoutResponse = LogoutResponses[keyof LogoutResponses];
+
+export type ChangePasswordData = {
+    body?: ChangePasswordRequest;
+    path?: never;
+    query?: never;
+    url: '/auth/password';
+};
+
+export type ChangePasswordErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Too Many Requests
+     */
+    429: ProblemDetails;
+};
+
+export type ChangePasswordError = ChangePasswordErrors[keyof ChangePasswordErrors];
+
+export type ChangePasswordResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type ChangePasswordResponse = ChangePasswordResponses[keyof ChangePasswordResponses];
 
 export type GetCurrentUserData = {
     body?: never;
@@ -7726,6 +7809,82 @@ export type RecordHandoverResponses = {
 
 export type RecordHandoverResponse = RecordHandoverResponses[keyof RecordHandoverResponses];
 
+export type ListPatientAppAccountsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        search?: string;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/patient-accounts';
+};
+
+export type ListPatientAppAccountsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListPatientAppAccountsError = ListPatientAppAccountsErrors[keyof ListPatientAppAccountsErrors];
+
+export type ListPatientAppAccountsResponses = {
+    /**
+     * OK
+     */
+    200: PatientAppAccountPagedResult;
+};
+
+export type ListPatientAppAccountsResponse = ListPatientAppAccountsResponses[keyof ListPatientAppAccountsResponses];
+
+export type ResetPatientAppPasswordData = {
+    body?: never;
+    path: {
+        patientId: string;
+    };
+    query?: never;
+    url: '/patient-accounts/{patientId}/reset-password';
+};
+
+export type ResetPatientAppPasswordErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type ResetPatientAppPasswordError = ResetPatientAppPasswordErrors[keyof ResetPatientAppPasswordErrors];
+
+export type ResetPatientAppPasswordResponses = {
+    /**
+     * OK
+     */
+    200: PatientAppPasswordReset;
+};
+
+export type ResetPatientAppPasswordResponse = ResetPatientAppPasswordResponses[keyof ResetPatientAppPasswordResponses];
+
 export type PreRegisterSelfData = {
     body?: PreRegisterRequest;
     path?: never;
@@ -9210,6 +9369,47 @@ export type ListPrescriptionsResponses = {
 
 export type ListPrescriptionsResponse = ListPrescriptionsResponses[keyof ListPrescriptionsResponses];
 
+export type CreatePrescriptionData = {
+    body?: {
+        PatientId?: string;
+        Body?: string;
+        File?: Blob | File;
+    };
+    path?: never;
+    query?: never;
+    url: '/prescriptions';
+};
+
+export type CreatePrescriptionErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type CreatePrescriptionError = CreatePrescriptionErrors[keyof CreatePrescriptionErrors];
+
+export type CreatePrescriptionResponses = {
+    /**
+     * Created
+     */
+    201: Prescription;
+};
+
+export type CreatePrescriptionResponse = CreatePrescriptionResponses[keyof CreatePrescriptionResponses];
+
 export type DownloadPrescriptionData = {
     body?: never;
     path: {
@@ -9220,6 +9420,10 @@ export type DownloadPrescriptionData = {
 };
 
 export type DownloadPrescriptionErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
     /**
      * Unauthorized
      */
@@ -10444,6 +10648,35 @@ export type CreateStaffMemberResponses = {
 };
 
 export type CreateStaffMemberResponse = CreateStaffMemberResponses[keyof CreateStaffMemberResponses];
+
+export type ListStaffDepartmentsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/staff/departments';
+};
+
+export type ListStaffDepartmentsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListStaffDepartmentsError = ListStaffDepartmentsErrors[keyof ListStaffDepartmentsErrors];
+
+export type ListStaffDepartmentsResponses = {
+    /**
+     * OK
+     */
+    200: Array<string>;
+};
+
+export type ListStaffDepartmentsResponse = ListStaffDepartmentsResponses[keyof ListStaffDepartmentsResponses];
 
 export type GetStaffMemberData = {
     body?: never;

@@ -1,3 +1,4 @@
+using CareLanka.Api.Agents;
 using CareLanka.Api.Data;
 using CareLanka.Api.Data.Entities.Common;
 using CareLanka.Api.Data.Enums;
@@ -73,6 +74,11 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
             // Tests run the pre-admission pass themselves and never call Patient Management.
             services.Remove(services.Single(service =>
                 service.ServiceType == typeof(IHostedService) && service.ImplementationType == typeof(PreAdmissionWorker)));
+            // Tests run the demo fleet refresh themselves so it never moves another test's ambulance.
+            services.Remove(services.Single(service =>
+                service.ServiceType == typeof(IHostedService) && service.ImplementationType == typeof(DemoFleetLocationWorker)));
+            // A key in the developer's shell must never make a test spend live model quota (ADR 2).
+            services.Replace(ServiceDescriptor.Singleton<ILanguageModel, NoLanguageModel>());
         });
     }
 

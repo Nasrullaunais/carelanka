@@ -12,7 +12,10 @@ abstract final class PatientFieldLimits {
   static const careReportMax = 2000;
 }
 
-const _nicPattern = r'^(\d{9}[VvXx]|\d{12}|(?=.*[A-Za-z])[A-Za-z0-9]{6,15})$';
+const _nicPattern = r'^(\d{9}[VvXx]|\d{12}|[A-Za-z][A-Za-z0-9]{5,14})$';
+
+const _twelveDigitsOnlyFromYear = 2000;
+const _maxAgeYears = 120;
 
 String? validateNic(String? value) {
   final text = value?.trim() ?? '';
@@ -20,18 +23,24 @@ String? validateNic(String? value) {
 
   if (!RegExp(_nicPattern).hasMatch(text)) {
     return 'Nine digits and a V (199534501V), twelve digits (199745600321), '
-        'or a passport number.';
+        'or a passport number starting with a letter.';
+  }
+
+  final year = nicBirthYear(text);
+  final thisYear = DateTime.now().year;
+  if (year != null && (year > thisYear || year < thisYear - _maxAgeYears)) {
+    return 'An NIC starts with the birth year, and $year is not a possible one. '
+        'Check the NIC.';
   }
   return null;
 }
 
-final _oldNicPattern = RegExp(r'^(\d{2})\d{3}\d{3}\d[VvXx]$');
-final _newNicPattern = RegExp(r'^(\d{4})\d{3}\d{5}$');
+final _oldNicPattern = RegExp(r'^(\d{2})\d{7}[VvXx]$');
+final _newNicPattern = RegExp(r'^(\d{4})\d{8}$');
 
-// A Sri Lankan NIC encodes the birth year in its leading digits: two digits (assumed 19xx —
-// the old format was retired before 2000) in the nine-digit form, four in the twelve-digit
-// form. A passport number carries no such encoding, so this returns null for one. Mirrors
-// nicBirthYear in web-ui/src/types/identifiers.ts.
+// Mirrors SriLankanNic on the server and nicBirthYear in web-ui/src/types/identifiers.ts. The
+// nine-digit form gives the last two digits of a 19xx year and was never issued to anyone born
+// from 2000 on; the twelve-digit form gives the full year. A passport number carries no year.
 int? nicBirthYear(String nic) {
   final text = nic.trim();
 
@@ -49,13 +58,20 @@ int? nicBirthYear(String nic) {
 }
 
 String? validateDateOfBirthAgainstNic(DateTime? dateOfBirth, String nic) {
-  if (dateOfBirth == null) return null;
+  if (dateOfBirth == null || nic.trim().isEmpty || validateNic(nic) != null) return null;
 
   final expected = nicBirthYear(nic);
-  if (expected == null || expected == dateOfBirth.year) return null;
+  if (expected == null) return null;
 
-  return "Doesn't match the NIC — its first digits say $expected, not "
-      '${dateOfBirth.year}.';
+  if (_oldNicPattern.hasMatch(nic.trim()) && dateOfBirth.year >= _twelveDigitsOnlyFromYear) {
+    return 'Someone born in 2000 or later has a twelve-digit NIC, not nine digits '
+        'and a V or X. Check the NIC and the date of birth.';
+  }
+
+  if (expected == dateOfBirth.year) return null;
+
+  return 'The NIC gives a birth year of $expected, but the date of birth is in '
+      '${dateOfBirth.year}. Check both.';
 }
 
 String? validateFullName(String? value) {

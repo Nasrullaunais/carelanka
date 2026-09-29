@@ -10,9 +10,6 @@ public sealed class ClaimByPatientCodeRequestValidator : AbstractValidator<Claim
     private static readonly Regex CodeFormat =
         new(PatientIdentifierFormats.PatientCode, RegexOptions.Compiled);
 
-    private static readonly Regex NicFormat =
-        new(PatientIdentifierFormats.Nic, RegexOptions.Compiled);
-
     public ClaimByPatientCodeRequestValidator()
     {
         RuleLevelCascadeMode = CascadeMode.Stop;
@@ -24,7 +21,6 @@ public sealed class ClaimByPatientCodeRequestValidator : AbstractValidator<Claim
 
         RuleFor(request => request.Nic)
             .NotEmpty().WithMessage("Enter the NIC from your hospital slip.")
-            .Must(nic => NicFormat.IsMatch(nic.Trim()))
-            .WithMessage(PatientIdentifierFormats.NicMessage);
+            .PatientNic();
     }
 }

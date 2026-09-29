@@ -170,6 +170,13 @@ public sealed class MaintenanceService : IMaintenanceService
         => _db.MaintenanceSchedules.Where(
             s => s.Status == MaintenanceStatus.Scheduled || s.Status == MaintenanceStatus.InProgress);
 
+    public async Task<IReadOnlyList<ScheduleEntity>> ListScheduledOnAsync(
+        DateOnly date, CancellationToken cancellationToken = default)
+        => await _db.MaintenanceSchedules.AsNoTracking()
+            .Where(s => s.ScheduledDate == date && s.Status == MaintenanceStatus.Scheduled)
+            .OrderBy(s => s.CreatedAt)
+            .ToListAsync(cancellationToken);
+
     public Task<ScheduleEntity?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default)
         => _db.MaintenanceSchedules.FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
 

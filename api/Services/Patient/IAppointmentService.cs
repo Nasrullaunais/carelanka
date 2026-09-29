@@ -42,6 +42,9 @@ public interface IAppointmentService
 
     Task<AppointmentResponse> MarkNoShowAsync(Guid id, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<AppointmentEntity>> ListOpenStartingBetweenAsync(
+        DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken = default);
+
     Task<AppointmentEntity?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<AppointmentEntity> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);

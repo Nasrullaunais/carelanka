@@ -21,6 +21,9 @@ public interface IMaintenanceService
     Task<MaintenanceSchedule> ConfirmDoneAsync(
         Guid id, string? confirmationCode, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<ScheduleEntity>> ListScheduledOnAsync(
+        DateOnly date, CancellationToken cancellationToken = default);
+
     Task<ScheduleEntity?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<ScheduleEntity> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);

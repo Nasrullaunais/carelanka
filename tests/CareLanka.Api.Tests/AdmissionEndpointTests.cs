@@ -367,6 +367,26 @@ public sealed class AdmissionEndpointTests
     }
 
     [Fact]
+    public async Task Completing_details_checks_a_new_nic_against_the_date_of_birth_already_recorded()
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+        var patientId = await NewPatientAsync(client, "Birth Year Recorded First");
+        var id = await CreateIdAsync(client, patientId, await NurseIdAsync());
+
+        var dated = await client.PatchAsJsonAsync(
+            $"/api/admissions/{id}/details", new { date_of_birth = "1990-02-14" });
+        Assert.Equal(HttpStatusCode.OK, dated.StatusCode);
+
+        var response = await client.PatchAsJsonAsync(
+            $"/api/admissions/{id}/details",
+            new { nic = $"1997{Random.Shared.NextInt64(10000000, 99999999)}" });
+        using var body = await ReadJsonAsync(response);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("cl_pat_056", body.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
     public async Task A_nurse_cannot_change_a_recorded_nic_when_completing_details()
     {
         using var nurse = await ClientAsync(ApiApplication.NurseEmail);

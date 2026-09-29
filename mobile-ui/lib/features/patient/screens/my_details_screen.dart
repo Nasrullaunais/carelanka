@@ -31,6 +31,8 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
   final _emergencyName = TextEditingController();
   final _emergencyPhone = TextEditingController();
 
+  final _dateOfBirthField = GlobalKey<FormFieldState<DateTime>>();
+
   Gender? _gender;
   DateTime? _dateOfBirth;
 
@@ -70,6 +72,14 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
       controller.dispose();
     }
     super.dispose();
+  }
+
+  // A date of birth already on the record was never touched, so Flutter would not re-check it
+  // on its own. Waits a frame so the check sees the NIC that was just typed.
+  void _recheckDateOfBirth() {
+    setState(() {});
+    if (_dateOfBirth == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _dateOfBirthField.currentState?.validate());
   }
 
   Future<DateTime?> _pickDateOfBirth() {
@@ -219,9 +229,8 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                         maxLength: PatientFieldLimits.nic,
                         serverErrors: errors['nic'],
                         validator: validateNic,
-                        // Re-validates the date of birth field against the new NIC as it's typed,
-                        // once the form has been submitted once.
-                        onChanged: _submitted ? (_) => setState(() {}) : null,
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        onChanged: (_) => _recheckDateOfBirth(),
                       ),
                       const SizedBox(height: 12),
                       _GenderField(
@@ -232,6 +241,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                       ),
                       const SizedBox(height: 12),
                       _DateOfBirthField(
+                        fieldKey: _dateOfBirthField,
                         value: _dateOfBirth,
                         nic: _nic.text,
                         enabled: !controller.saving,
@@ -444,6 +454,7 @@ class _GenderField extends StatelessWidget {
 
 class _DateOfBirthField extends StatelessWidget {
   const _DateOfBirthField({
+    required this.fieldKey,
     required this.value,
     required this.nic,
     required this.enabled,
@@ -452,6 +463,7 @@ class _DateOfBirthField extends StatelessWidget {
     this.serverError,
   });
 
+  final GlobalKey<FormFieldState<DateTime>> fieldKey;
   final DateTime? value;
   final String nic;
   final bool enabled;
@@ -462,7 +474,9 @@ class _DateOfBirthField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FormField<DateTime>(
+      key: fieldKey,
       initialValue: value,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
       validator: (v) =>
           v == null ? 'Enter your date of birth' : validateDateOfBirthAgainstNic(v, nic),
       builder: (field) => InkWell(
@@ -479,6 +493,7 @@ class _DateOfBirthField extends StatelessWidget {
           decoration: InputDecoration(
             labelText: 'Date of birth',
             errorText: field.errorText ?? serverError,
+            errorMaxLines: 3,
             suffixIcon: const Icon(Icons.calendar_month_outlined),
           ),
           isEmpty: field.value == null,
@@ -501,6 +516,7 @@ class _Field extends StatelessWidget {
     this.maxLength,
     this.serverErrors,
     this.onChanged,
+    this.autovalidateMode,
     this.textCapitalization = TextCapitalization.none,
   });
 
@@ -512,6 +528,7 @@ class _Field extends StatelessWidget {
   final int? maxLength;
   final List<String>? serverErrors;
   final ValueChanged<String>? onChanged;
+  final AutovalidateMode? autovalidateMode;
   final TextCapitalization textCapitalization;
 
   @override
@@ -529,8 +546,10 @@ class _Field extends StatelessWidget {
         decoration: InputDecoration(
           labelText: label,
           errorText: _firstError(serverErrors),
+          errorMaxLines: 3,
         ),
         validator: validator,
+        autovalidateMode: autovalidateMode,
         onChanged: onChanged,
       ),
     );

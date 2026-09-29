@@ -116,7 +116,10 @@ public static class MessageCodes
             [MessageCode.TooManyCareQueries] = "cl_pat_050",
             [MessageCode.NicHasHospitalRecord] = "cl_pat_051",
             [MessageCode.PatientIdentityLocked] = "cl_pat_052",
-            [MessageCode.PatientHasNoAppAccount] = "cl_pat_053"
+            [MessageCode.PatientHasNoAppAccount] = "cl_pat_053",
+            [MessageCode.NicBirthYearImpossible] = "cl_pat_054",
+            [MessageCode.NicOldFormatAfter2000] = "cl_pat_055",
+            [MessageCode.NicBirthYearMismatch] = "cl_pat_056"
         };
 
     public static string ToWire(this MessageCode code) => Wire[code];

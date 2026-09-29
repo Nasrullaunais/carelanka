@@ -680,14 +680,100 @@ public sealed class PatientEndpointTests
         Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
     }
 
-    [Fact]
-    public async Task A_near_miss_nic_with_a_letter_in_it_is_accepted_and_that_is_the_known_cost()
+    [Theory]
+    [InlineData("199534501Z")]       // an old NIC with the wrong last letter
+    [InlineData("2947382939772v")]   // thirteen digits and a v, typed at the desk
+    public async Task A_mistyped_nic_with_a_letter_in_it_is_not_taken_for_a_passport(string nic)
     {
         using var client = await ClientAsync(ApiApplication.NurseEmail);
 
-        var created = await CreateAsync(client, "Near Miss", nic: "199534501Z");
+        var refused = await CreateAsync(client, "Near Miss", nic: nic);
+
+        await AssertFieldRefusedAsync(refused, "nic");
+    }
+
+    [Fact]
+    public async Task A_twelve_digit_nic_whose_year_cannot_be_a_birth_year_is_refused()
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+
+        var refused = await CreateAsync(client, "Born In 2947", nic: "294738293977");
+
+        await AssertFieldRefusedAsync(refused, "nic");
+    }
+
+    [Theory]
+    [InlineData(1997, "1997-11-02")]  // renewed to twelve digits, born before 2000
+    [InlineData(2003, "2003-01-15")]
+    public async Task A_twelve_digit_nic_is_accepted_when_it_starts_with_the_birth_year(
+        int year, string dateOfBirth)
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+
+        var created = await CreateAsync(
+            client, "Year Matches", nic: TwelveDigitNic(year), dateOfBirth: dateOfBirth);
 
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+    }
+
+    [Fact]
+    public async Task An_old_nic_is_accepted_when_its_two_digits_are_the_birth_year()
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+
+        var created = await CreateAsync(
+            client, "Old Card", nic: NineDigitNic(92), dateOfBirth: "1992-03-25");
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_passport_is_not_checked_against_the_date_of_birth()
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+
+        var created = await CreateAsync(client, "Visitor", nic: NewNic(), dateOfBirth: "2001-06-01");
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+    }
+
+    [Fact]
+    public async Task An_nic_whose_year_is_not_the_birth_year_is_refused_on_the_date_of_birth()
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+
+        var refused = await CreateAsync(
+            client, "Year Differs", nic: TwelveDigitNic(1997), dateOfBirth: "1995-04-07");
+
+        await AssertFieldRefusedAsync(refused, "date_of_birth");
+    }
+
+    [Fact]
+    public async Task Someone_born_in_2000_or_later_cannot_have_an_old_nic()
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+
+        var refused = await CreateAsync(
+            client, "Too Young For Old Card", nic: NineDigitNic(99), dateOfBirth: "2003-05-10");
+
+        await AssertFieldRefusedAsync(refused, "date_of_birth");
+    }
+
+    [Fact]
+    public async Task Updating_a_patient_checks_the_nic_against_the_date_of_birth_too()
+    {
+        using var client = await ClientAsync(ApiApplication.NurseEmail);
+        var id = await CreateIdAsync(client, "Update Year Check", NewNic());
+
+        var refused = await client.PutAsJsonAsync($"/api/patients/{id}", new
+        {
+            full_name = "Update Year Check",
+            nic = TwelveDigitNic(1990),
+            gender = "male",
+            date_of_birth = "1988-01-01"
+        });
+
+        await AssertFieldRefusedAsync(refused, "date_of_birth");
     }
 
     [Fact]
@@ -758,14 +844,24 @@ public sealed class PatientEndpointTests
         string fullName,
         string? nic = null,
         string? phone = null,
-        string gender = "male")
+        string gender = "male",
+        string? dateOfBirth = null)
         => client.PostAsJsonAsync("/api/patients", new
         {
             full_name = fullName,
             nic,
             gender,
-            phone
+            phone,
+            date_of_birth = dateOfBirth
         });
+
+    private static async Task AssertFieldRefusedAsync(HttpResponseMessage response, string field)
+    {
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        using var body = await ReadJsonAsync(response);
+        Assert.True(body.RootElement.GetProperty("errors").TryGetProperty(field, out _));
+    }
 
     private static async Task<string> CreateIdAsync(HttpClient client, string fullName, string nic)
     {
@@ -847,6 +943,12 @@ public sealed class PatientEndpointTests
             .Select(item => item.GetProperty("id").GetString()!);
 
     private static string NewNic() => $"T{Guid.NewGuid():N}"[..12];
+
+    private static string TwelveDigitNic(int birthYear)
+        => $"{birthYear}{Random.Shared.NextInt64(10000000, 99999999)}";
+
+    private static string NineDigitNic(int lastTwoDigitsOfYear)
+        => $"{lastTwoDigitsOfYear:D2}{Random.Shared.Next(1000000, 9999999)}V";
 
     private static string NewPhone() => $"07{Random.Shared.NextInt64(10000000, 99999999)}";
 }

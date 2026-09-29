@@ -2,7 +2,7 @@
 
 **Owner:** Nasrulla Unais, with the group's permission to add the triggers inside all four components.
 
-**Status:** Phases 1 to 8 are built and phase 10 (docs) is written, 2026-09-30. Phase 8 (scheduled jobs, commit `a07241f`) is still on branch `worktree-agent-ae8289d17d2582c2a`, not yet on this branch. Phase 9 (Firebase and deploy, §11) is the by-hand setup still to be done. Two catalogue types have no trigger yet: `pharmacy_stock_low` and `lab_test_requested`; `appointment_rescheduled` waits for a reschedule action.
+**Status:** Phases 1 to 10 are built, 2026-09-30, except Phase 9's by-hand step: putting the Firebase key on the server (§11) and confirming a real push. Three catalogue types are reserved and not raised: `pharmacy_stock_low` and `lab_test_requested` (see §5), and `appointment_rescheduled` (there is no reschedule action).
 
 **Contract:** `specs/common-spec.yaml` (the inbox endpoints are added there — notifications are common, not one member's).
 
@@ -269,8 +269,8 @@ makes the change, **inside the same save**. Wording is final in the resource fil
 | `care_reply_waiting` | `CareRecommendationService` | Nurses + doctors, that ward | general |
 | `equipment_warning_raised` | `WarningService` / `WarningSweepWorker` | Equipment managers | general |
 | `maintenance_due` | schedule job | Equipment managers | general |
-| `pharmacy_stock_low` | `ReorderSuggestionService` | Equipment managers | general |
-| `lab_test_requested` | `LabReportService` | Equipment managers (lab) | general |
+| `pharmacy_stock_low` | **Reserved, not raised.** Low stock is already reported inside `equipment_warning_raised` by the warning sweep's low-stock rule | Equipment managers | general |
+| `lab_test_requested` | **Reserved, not raised.** There is no way to request a lab test yet; it needs that feature first | Equipment managers (lab) | general |
 | `leave_requested` | `LeaveRequestService` | Duty managers | general |
 | `leave_approved` / `_rejected` | `LeaveRequestService` | The requester | general |
 | `shift_changed` | `AllocationService` | The staff member | general |

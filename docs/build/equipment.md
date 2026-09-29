@@ -4,7 +4,7 @@
 
 **Owns:** `EquipmentCategory`, `EquipmentItem`, **`Bed`**, `PharmacyCategory`,
 `PharmacyItem`, `PharmacyTransaction`, `MaintenanceSchedule`, `Warning`, `ActionRequest`
-**Notifications raised:** `prescription_ready`, `prescription_delivered`, `lab_report_ready` (the patient); `equipment_warning_raised` and `maintenance_due` (equipment managers). `pharmacy_stock_low` and `lab_test_requested` are in the catalogue but no service raises them yet. See `notifications.md` §5.
+**Notifications raised:** `prescription_ready`, `prescription_delivered`, `lab_report_ready` (the patient); `equipment_warning_raised` and `maintenance_due` (equipment managers). `pharmacy_stock_low` and `lab_test_requested` are reserved: low stock already arrives inside `equipment_warning_raised`, and there is no lab test request feature to raise the other. See `notifications.md` §5.
 
 **Contract:** `specs/equipment-spec.yaml` (28 paths) · **Design:** `specs/equipment-management-plan.md`
 **Boundaries:** `specs/integration_of_functions.md` §13–§16

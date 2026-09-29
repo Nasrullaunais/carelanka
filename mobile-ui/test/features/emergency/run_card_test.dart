@@ -1,22 +1,28 @@
 import 'package:carelanka_mobile/features/emergency/widgets/run_card.dart';
 import 'package:carelanka_mobile/services/api_client/models/dispatch_detail.dart';
+import 'package:carelanka_mobile/services/api_client/models/dispatch_status.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Future<void> pumpCard(WidgetTester tester, DispatchDetail run) =>
-    tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: RunCard(
-            run: run,
-            busy: false,
-            onStep: () {},
-            onDecline: () {},
-            onNavigate: () {},
-          ),
-        ),
+Future<void> pumpCard(
+  WidgetTester tester,
+  DispatchDetail run, {
+  bool busy = false,
+  VoidCallback? onEndAtScene,
+}) => tester.pumpWidget(
+  MaterialApp(
+    home: Scaffold(
+      body: RunCard(
+        run: run,
+        busy: busy,
+        onStep: () {},
+        onDecline: () {},
+        onNavigate: () {},
+        onEndAtScene: onEndAtScene ?? () {},
       ),
-    );
+    ),
+  ),
+);
 
 void main() {
   group('scene', () {
@@ -137,6 +143,55 @@ void main() {
 
       expect(find.text('No caller details recorded'), findsOneWidget);
       expect(find.text('Call caller'), findsNothing);
+    });
+  });
+
+  group('finishing at the scene', () {
+    const finish = 'Finish without going to hospital';
+
+    testWidgets('is offered at the scene, under the hospital step', (
+      tester,
+    ) async {
+      var finished = 0;
+      await pumpCard(
+        tester,
+        const DispatchDetail(status: DispatchStatus.atScene),
+        onEndAtScene: () => finished++,
+      );
+
+      await tester.tap(find.text(finish));
+
+      expect(finished, 1);
+      expect(find.text('Patient on board, going to hospital'), findsOneWidget);
+    });
+
+    for (final status in [
+      DispatchStatus.assigned,
+      DispatchStatus.acknowledged,
+      DispatchStatus.enRouteToScene,
+      DispatchStatus.transportingToHospital,
+    ]) {
+      testWidgets('is not offered while ${status.name}', (tester) async {
+        await pumpCard(tester, DispatchDetail(status: status));
+
+        expect(find.text(finish), findsNothing);
+      });
+    }
+
+    testWidgets('cannot be tapped while another action is running', (
+      tester,
+    ) async {
+      var finished = 0;
+      await pumpCard(
+        tester,
+        const DispatchDetail(status: DispatchStatus.atScene),
+        busy: true,
+        onEndAtScene: () => finished++,
+      );
+
+      await tester.tap(find.text(finish));
+
+      expect(finished, 0);
     });
   });
 }

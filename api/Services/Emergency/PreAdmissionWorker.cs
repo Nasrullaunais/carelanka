@@ -15,7 +15,7 @@ public sealed class PreAdmissionWorker(
             try
             {
                 using var scope = scopes.CreateScope();
-                await scope.ServiceProvider.GetRequiredService<PreAdmissionProcessor>().SendDueAsync(stoppingToken);
+                await scope.ServiceProvider.GetRequiredService<PreAdmissionProcessor>().ProcessDueAsync(stoppingToken);
             }
             catch (Exception exception) when (!stoppingToken.IsCancellationRequested)
             {

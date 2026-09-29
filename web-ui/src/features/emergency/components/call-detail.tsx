@@ -13,7 +13,7 @@ import { AppSelect } from '../../../components/ui/app-select';
 import { QueryState } from '../../../components/ui/query-state';
 import { StatusChip } from '../../../components/ui/status-chip';
 import { isConflict } from '../../../services/api/errors';
-import { awaitsDispatch, callStatusLabels, callStatusTones, dispatchStatusLabels, dispatchStatusTones, formatTimestamp, priorityLabels } from '../domain';
+import { awaitsDispatch, callStatusLabels, callStatusTones, dispatchStatusLabels, dispatchStatusTones, formatTimestamp, priorityLabels, sceneOutcomeLabels } from '../domain';
 import { invalidateEmergencyQueries } from '../query-invalidation';
 import { CallRecommendation } from './call-recommendation';
 import { EligibleAmbulanceList } from './eligible-ambulance-list';
@@ -77,6 +77,12 @@ export function CallDetail({ callId, query, ambulances, onDispatched, ambulanceP
               <DetailField label="Patient is caller">{call.patient_is_caller ? 'Yes' : 'No'}</DetailField>
             </div>
             <DetailField label="Emergency details">{call.details ?? 'No caller report was recorded.'}</DetailField>
+            {call.scene_outcome && (
+              <DetailField label="How it ended">
+                {sceneOutcomeLabels[call.scene_outcome]}
+                {call.scene_outcome_notes && <span className="block text-muted">{call.scene_outcome_notes}</span>}
+              </DetailField>
+            )}
             {call.latitude != null && call.longitude != null && (
               <section className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-3">

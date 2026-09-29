@@ -212,6 +212,15 @@ entrance and sends no ward choice.
 **Settled for this release (§11.3):** Emergency calls Patient Management after the
 dispatch commits. A future Coordinator may orchestrate the same published operation.
 
+**When nobody is coming after all** *(2026-09-30)*: if the crew finishes at the scene, or a
+caller's cancellation is approved after dispatch, Emergency cancels the waiting admission by
+its `dispatch_id` through Patient Management's own `CancelAsync`. The reason sent is a
+`CancelReason`: `treated_at_scene`, `patient_refused`, `no_show`, `false_alarm`,
+`died_at_scene` or `call_cancelled`. The last three of those exist for this and were added to
+the enum. Like the pre-admit, it runs in the background, retries on an outage, and never
+blocks the crew. Patient Management refuses once the admission has been admitted; Emergency
+records that as `withdrawal_failed` and logs it.
+
 ### 4.3 Patient Management prepares the hospital side
 
 This release serves one CareLanka Hospital emergency entrance. Emergency does not choose a

@@ -14,6 +14,7 @@ class MyCallTracking {
   const MyCallTracking({
     this.emergencyCallId,
     this.callStatus,
+    this.transported,
     this.ambulanceIsOnTheWay,
     this.ambulanceLatitude,
     this.ambulanceLongitude,
@@ -29,6 +30,7 @@ class MyCallTracking {
   final String? emergencyCallId;
   @JsonKey(name: 'call_status')
   final CallStatus? callStatus;
+  final bool? transported;
   @JsonKey(name: 'ambulance_is_on_the_way')
   final bool? ambulanceIsOnTheWay;
   @JsonKey(name: 'ambulance_latitude')

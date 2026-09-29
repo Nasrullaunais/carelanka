@@ -12,4 +12,6 @@ public class PreAdmissionNotice : AuditedEntity
     public DateTimeOffset NextAttemptAt { get; set; }
     public DateTimeOffset? SentAt { get; set; }
     public string? FailureReason { get; set; }
+    public CancelReason? WithdrawalReason { get; set; }
+    public uint Version { get; set; }
 }

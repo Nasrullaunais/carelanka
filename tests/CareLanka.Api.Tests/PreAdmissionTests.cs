@@ -6,6 +6,7 @@ using CareLanka.Api.Data.Enums;
 using CareLanka.Api.Services.Emergency;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
 
@@ -17,22 +18,48 @@ public sealed class RecordingPreAdmissionGateway(Guid dispatchId) : IPreAdmissio
 
     public List<PreAdmissionRequest> Sent { get; } = [];
 
+    private readonly Queue<PreAdmissionWithdrawalOutcome> _withdrawalScript = new();
+
     public PreAdmissionOutcome Default { get; set; } = PreAdmissionOutcome.Created;
+
+    public PreAdmissionWithdrawalOutcome DefaultWithdrawal { get; set; } = PreAdmissionWithdrawalOutcome.Withdrawn;
+
+    public List<(Guid DispatchId, CancelReason Reason)> Withdrawn { get; } = [];
+
+    public Func<Task>? WhileSending { get; set; }
+
+    public void ScriptWithdrawals(params PreAdmissionWithdrawalOutcome[] outcomes)
+    {
+        foreach (var outcome in outcomes) _withdrawalScript.Enqueue(outcome);
+    }
 
     public void Script(params PreAdmissionOutcome[] outcomes)
     {
         foreach (var outcome in outcomes) _script.Enqueue(outcome);
     }
 
-    public Task<PreAdmissionOutcome> SendAsync(PreAdmissionRequest request, CancellationToken cancellationToken = default)
+    public async Task<PreAdmissionOutcome> SendAsync(PreAdmissionRequest request, CancellationToken cancellationToken = default)
     {
         if (request.DispatchId != dispatchId)
         {
-            return Task.FromResult(PreAdmissionOutcome.Created);
+            return PreAdmissionOutcome.Created;
         }
 
         Sent.Add(request);
-        return Task.FromResult(_script.Count > 0 ? _script.Dequeue() : Default);
+        if (WhileSending is not null) await WhileSending();
+        return _script.Count > 0 ? _script.Dequeue() : Default;
+    }
+
+    public Task<PreAdmissionWithdrawalOutcome> WithdrawAsync(
+        Guid withdrawnDispatchId, CancelReason reason, CancellationToken cancellationToken = default)
+    {
+        if (withdrawnDispatchId != dispatchId)
+        {
+            return Task.FromResult(PreAdmissionWithdrawalOutcome.Withdrawn);
+        }
+
+        Withdrawn.Add((withdrawnDispatchId, reason));
+        return Task.FromResult(_withdrawalScript.Count > 0 ? _withdrawalScript.Dequeue() : DefaultWithdrawal);
     }
 }
 
@@ -174,8 +201,187 @@ public sealed class PreAdmissionTests
 
         Assert.Empty(gateway.Sent);
         var saved = await NoticeAsync(seed.CallId);
-        Assert.Equal(PreAdmissionStatus.Failed, saved.Status);
-        Assert.Equal("call_cancelled", saved.FailureReason);
+        Assert.Equal(PreAdmissionStatus.Withdrawn, saved.Status);
+        Assert.Equal(CancelReason.CallCancelled, saved.WithdrawalReason);
+    }
+
+    [Fact]
+    public async Task A_withdrawing_notice_is_withdrawn_with_its_reason_and_never_sent()
+    {
+        var seed = await SeedAsync(noticeStatus: PreAdmissionStatus.Withdrawing, withdrawalReason: CancelReason.PatientRefused);
+        var gateway = new RecordingPreAdmissionGateway(seed.DispatchId);
+
+        await SendAsync(gateway, DateTimeOffset.UtcNow);
+        await SendAsync(gateway, DateTimeOffset.UtcNow);
+
+        Assert.Empty(gateway.Sent);
+        var withdrawn = Assert.Single(gateway.Withdrawn);
+        Assert.Equal(CancelReason.PatientRefused, withdrawn.Reason);
+        Assert.Equal(PreAdmissionStatus.Withdrawn, (await NoticeAsync(seed.CallId)).Status);
+    }
+
+    [Fact]
+    public async Task A_withdrawal_during_an_outage_is_retried_until_it_lands()
+    {
+        var seed = await SeedAsync(noticeStatus: PreAdmissionStatus.Withdrawing, withdrawalReason: CancelReason.FalseAlarm);
+        var gateway = new RecordingPreAdmissionGateway(seed.DispatchId);
+        gateway.ScriptWithdrawals(PreAdmissionWithdrawalOutcome.Unavailable);
+        var now = DateTimeOffset.UtcNow;
+
+        await SendAsync(gateway, now);
+        var afterOutage = await NoticeAsync(seed.CallId);
+        Assert.Equal(PreAdmissionStatus.Withdrawing, afterOutage.Status);
+        Assert.True(afterOutage.NextAttemptAt > now);
+        await SendAsync(gateway, now);
+        Assert.Single(gateway.Withdrawn);
+
+        await SendAsync(gateway, afterOutage.NextAttemptAt.AddSeconds(1));
+        Assert.Equal(2, gateway.Withdrawn.Count);
+        Assert.Equal(PreAdmissionStatus.Withdrawn, (await NoticeAsync(seed.CallId)).Status);
+    }
+
+    [Fact]
+    public async Task A_withdrawal_that_keeps_failing_is_given_up_on()
+    {
+        var seed = await SeedAsync(noticeStatus: PreAdmissionStatus.Withdrawing, withdrawalReason: CancelReason.FalseAlarm);
+        var gateway = new RecordingPreAdmissionGateway(seed.DispatchId)
+        {
+            DefaultWithdrawal = PreAdmissionWithdrawalOutcome.Unavailable
+        };
+        var when = DateTimeOffset.UtcNow;
+
+        for (var attempt = 0; attempt < 8; attempt++)
+        {
+            await SendAsync(gateway, when);
+            when = (await NoticeAsync(seed.CallId)).NextAttemptAt.AddSeconds(1);
+        }
+
+        var saved = await NoticeAsync(seed.CallId);
+        Assert.Equal(PreAdmissionStatus.WithdrawalFailed, saved.Status);
+        Assert.Equal("gave_up", saved.FailureReason);
+        Assert.Equal(8, saved.AttemptCount);
+    }
+
+    [Fact]
+    public async Task A_refused_withdrawal_is_not_retried()
+    {
+        var seed = await SeedAsync(noticeStatus: PreAdmissionStatus.Withdrawing, withdrawalReason: CancelReason.FalseAlarm);
+        var gateway = new RecordingPreAdmissionGateway(seed.DispatchId)
+        {
+            DefaultWithdrawal = PreAdmissionWithdrawalOutcome.Rejected
+        };
+
+        await SendAsync(gateway, DateTimeOffset.UtcNow);
+        await SendAsync(gateway, DateTimeOffset.UtcNow.AddHours(1));
+
+        Assert.Single(gateway.Withdrawn);
+        var saved = await NoticeAsync(seed.CallId);
+        Assert.Equal(PreAdmissionStatus.WithdrawalFailed, saved.Status);
+        Assert.Equal("rejected", saved.FailureReason);
+    }
+
+    [Theory]
+    [InlineData(PreAdmissionStatus.Queued)]
+    [InlineData(PreAdmissionStatus.Sent)]
+    public async Task Requesting_a_withdrawal_queues_it_for_the_worker_and_restarts_the_attempts(PreAdmissionStatus before)
+    {
+        var seed = await SeedAsync(noticeStatus: before);
+        await using (var scope = _application.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+            var notice = await db.PreAdmissionNotices.SingleAsync(x => x.EmergencyCallId == seed.CallId);
+            notice.AttemptCount = 3;
+            notice.NextAttemptAt = DateTimeOffset.UtcNow.AddHours(1);
+            await db.SaveChangesAsync();
+        }
+
+        await RequestWithdrawalAsync(seed.CallId, CancelReason.TreatedAtScene);
+
+        var saved = await NoticeAsync(seed.CallId);
+        Assert.Equal(PreAdmissionStatus.Withdrawing, saved.Status);
+        Assert.Equal(CancelReason.TreatedAtScene, saved.WithdrawalReason);
+        Assert.Equal(0, saved.AttemptCount);
+        Assert.True(saved.NextAttemptAt <= DateTimeOffset.UtcNow);
+    }
+
+    [Theory]
+    [InlineData(PreAdmissionStatus.Failed)]
+    [InlineData(PreAdmissionStatus.Withdrawn)]
+    [InlineData(PreAdmissionStatus.Withdrawing)]
+    [InlineData(PreAdmissionStatus.WithdrawalFailed)]
+    public async Task A_notice_that_is_not_waiting_or_sent_is_left_alone(PreAdmissionStatus status)
+    {
+        var seed = await SeedAsync(noticeStatus: status, withdrawalReason: status is PreAdmissionStatus.Failed ? null : CancelReason.FalseAlarm);
+
+        await RequestWithdrawalAsync(seed.CallId, CancelReason.DiedAtScene);
+
+        var saved = await NoticeAsync(seed.CallId);
+        Assert.Equal(status, saved.Status);
+        Assert.NotEqual(CancelReason.DiedAtScene, saved.WithdrawalReason);
+    }
+
+    [Fact]
+    public async Task A_call_without_a_notice_needs_no_withdrawal()
+    {
+        await RequestWithdrawalAsync(Guid.NewGuid(), CancelReason.CallCancelled);
+    }
+
+    [Fact]
+    public async Task A_withdrawal_requested_while_a_send_is_in_flight_is_not_overwritten()
+    {
+        var seed = await SeedAsync();
+        var gateway = new RecordingPreAdmissionGateway(seed.DispatchId)
+        {
+            WhileSending = () => RequestWithdrawalAsync(seed.CallId, CancelReason.PatientRefused)
+        };
+        var now = DateTimeOffset.UtcNow;
+
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => SendAsync(gateway, now));
+
+        var saved = await NoticeAsync(seed.CallId);
+        Assert.Equal(PreAdmissionStatus.Withdrawing, saved.Status);
+        gateway.WhileSending = null;
+        await SendAsync(gateway, now.AddSeconds(1));
+        Assert.Equal(CancelReason.PatientRefused, Assert.Single(gateway.Withdrawn).Reason);
+        Assert.Equal(PreAdmissionStatus.Withdrawn, (await NoticeAsync(seed.CallId)).Status);
+    }
+
+    [Theory]
+    [InlineData(AdmissionStatus.AwaitingBed, PreAdmissionStatus.Withdrawn, AdmissionStatus.Cancelled)]
+    [InlineData(AdmissionStatus.BedReserved, PreAdmissionStatus.Withdrawn, AdmissionStatus.Cancelled)]
+    [InlineData(AdmissionStatus.Admitted, PreAdmissionStatus.WithdrawalFailed, AdmissionStatus.Admitted)]
+    public async Task The_real_gateway_cancels_the_waiting_admission_and_leaves_an_admitted_one(
+        AdmissionStatus admissionStatus, PreAdmissionStatus expectedNotice, AdmissionStatus expectedAdmission)
+    {
+        var seed = await SeedAsync(CallPriority.Critical);
+        await SendWithRealGatewayAsync(DateTimeOffset.UtcNow.AddSeconds(1));
+        await SetAdmissionStatusAsync(seed.DispatchId, admissionStatus);
+        await RequestWithdrawalAsync(seed.CallId, CancelReason.TreatedAtScene);
+
+        await SendWithRealGatewayAsync(DateTimeOffset.UtcNow.AddSeconds(2));
+
+        Assert.Equal(expectedNotice, (await NoticeAsync(seed.CallId)).Status);
+        var admission = await AdmissionAsync(seed.DispatchId);
+        Assert.Equal(expectedAdmission, admission.Status);
+        Assert.Equal(
+            expectedAdmission == AdmissionStatus.Cancelled ? CancelReason.TreatedAtScene : null, admission.CancelReason);
+    }
+
+    [Fact]
+    public async Task The_real_gateway_treats_a_missing_or_already_cancelled_admission_as_withdrawn()
+    {
+        var neverSent = await SeedAsync(noticeStatus: PreAdmissionStatus.Withdrawing, withdrawalReason: CancelReason.CallCancelled);
+        var cancelled = await SeedAsync(CallPriority.Critical);
+        await SendWithRealGatewayAsync(DateTimeOffset.UtcNow.AddSeconds(1));
+        await RequestWithdrawalAsync(cancelled.CallId, CancelReason.FalseAlarm);
+        await SendWithRealGatewayAsync(DateTimeOffset.UtcNow.AddSeconds(2));
+        await SetNoticeAsync(cancelled.CallId, PreAdmissionStatus.Withdrawing);
+
+        await SendWithRealGatewayAsync(DateTimeOffset.UtcNow.AddSeconds(3));
+
+        Assert.Equal(PreAdmissionStatus.Withdrawn, (await NoticeAsync(neverSent.CallId)).Status);
+        Assert.Equal(PreAdmissionStatus.Withdrawn, (await NoticeAsync(cancelled.CallId)).Status);
+        Assert.Equal(CancelReason.FalseAlarm, (await AdmissionAsync(cancelled.DispatchId)).CancelReason);
     }
 
     [Theory]
@@ -225,6 +431,39 @@ public sealed class PreAdmissionTests
         Assert.Equal(PreAdmissionStatus.Sent, (await NoticeAsync(seed.CallId)).Status);
     }
 
+    private async Task RequestWithdrawalAsync(Guid callId, CancelReason reason)
+    {
+        await using var scope = _application.Services.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<IPreAdmissionWithdrawals>().RequestAsync(callId, reason);
+        await scope.ServiceProvider.GetRequiredService<CareLankaDbContext>().SaveChangesAsync();
+    }
+
+    private async Task<Admission> AdmissionAsync(Guid dispatchId)
+    {
+        using var scope = _application.Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<CareLankaDbContext>()
+            .Admissions.AsNoTracking().SingleAsync(x => x.DispatchId == dispatchId.ToString());
+    }
+
+    private async Task SetAdmissionStatusAsync(Guid dispatchId, AdmissionStatus status)
+    {
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        var admission = await db.Admissions.SingleAsync(x => x.DispatchId == dispatchId.ToString());
+        admission.Status = status;
+        await db.SaveChangesAsync();
+    }
+
+    private async Task SetNoticeAsync(Guid callId, PreAdmissionStatus status)
+    {
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        var notice = await db.PreAdmissionNotices.SingleAsync(x => x.EmergencyCallId == callId);
+        notice.Status = status;
+        notice.NextAttemptAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+    }
+
     private async Task SendAsync(RecordingPreAdmissionGateway gateway, DateTimeOffset now)
     {
         using var scope = _application.Services.CreateScope();
@@ -232,8 +471,9 @@ public sealed class PreAdmissionTests
             scope.ServiceProvider.GetRequiredService<CareLankaDbContext>(),
             gateway,
             new FixedClock(now),
-            Options.Create(new EmergencyOptions { PreAdmission = { BatchSize = 1000 } }));
-        await processor.SendDueAsync();
+            Options.Create(new EmergencyOptions { PreAdmission = { BatchSize = 1000 } }),
+            NullLogger<PreAdmissionProcessor>.Instance);
+        await processor.ProcessDueAsync();
     }
 
     private async Task SendWithRealGatewayAsync(DateTimeOffset now)
@@ -243,8 +483,9 @@ public sealed class PreAdmissionTests
             scope.ServiceProvider.GetRequiredService<CareLankaDbContext>(),
             scope.ServiceProvider.GetRequiredService<IPreAdmissionGateway>(),
             new FixedClock(now),
-            Options.Create(new EmergencyOptions { PreAdmission = { BatchSize = 1000 } }));
-        await processor.SendDueAsync();
+            Options.Create(new EmergencyOptions { PreAdmission = { BatchSize = 1000 } }),
+            NullLogger<PreAdmissionProcessor>.Instance);
+        await processor.ProcessDueAsync();
     }
 
     private async Task<PreAdmissionNotice> NoticeAsync(Guid callId)
@@ -254,7 +495,11 @@ public sealed class PreAdmissionTests
             .PreAdmissionNotices.AsNoTracking().SingleAsync(x => x.EmergencyCallId == callId);
     }
 
-    private async Task<Seed> SeedAsync(CallPriority priority = CallPriority.High, CallStatus callStatus = CallStatus.Dispatched)
+    private async Task<Seed> SeedAsync(
+        CallPriority priority = CallPriority.High,
+        CallStatus callStatus = CallStatus.Dispatched,
+        PreAdmissionStatus noticeStatus = PreAdmissionStatus.Queued,
+        CancelReason? withdrawalReason = null)
     {
         using var scope = _application.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
@@ -279,7 +524,7 @@ public sealed class PreAdmissionTests
         db.PreAdmissionNotices.Add(new PreAdmissionNotice
         {
             Id = Guid.NewGuid(), EmergencyCallId = call.Id, DispatchId = dispatch.Id,
-            Status = PreAdmissionStatus.Queued, NextAttemptAt = dispatch.DispatchedAt
+            Status = noticeStatus, NextAttemptAt = dispatch.DispatchedAt, WithdrawalReason = withdrawalReason
         });
         await db.SaveChangesAsync();
         return new Seed(call.Id, dispatch.Id, dispatch.DispatchedAt);

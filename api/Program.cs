@@ -485,6 +485,7 @@ builder.Services.AddSingleton<ISceneLookupQueue>(services => services.GetRequire
 builder.Services.AddScoped<SceneLookupProcessor>();
 builder.Services.AddHostedService<SceneLookupWorker>();
 builder.Services.AddScoped<IPreAdmissionGateway, PreAdmissionGateway>();
+builder.Services.AddScoped<IPreAdmissionWithdrawals, PreAdmissionWithdrawals>();
 builder.Services.AddScoped<PreAdmissionProcessor>();
 builder.Services.AddHostedService<PreAdmissionWorker>();
 builder.Services.AddScoped<DemoFleetLocationProcessor>();

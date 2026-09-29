@@ -41,5 +41,7 @@ public interface IAdmissionService
 
     Task<AdmissionEntity?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
+    Task<AdmissionEntity?> FindByDispatchIdAsync(string dispatchId, CancellationToken cancellationToken = default);
+
     Task<AdmissionEntity> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 }

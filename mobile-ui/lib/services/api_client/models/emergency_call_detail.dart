@@ -9,6 +9,7 @@ import 'call_status.dart';
 import 'cancellation_request_status.dart';
 import 'dispatch_proposal_summary.dart';
 import 'dispatch_summary.dart';
+import 'scene_outcome.dart';
 
 part 'emergency_call_detail.g.dart';
 
@@ -30,8 +31,9 @@ class EmergencyCallDetail {
     this.details,
     this.priority,
     this.status,
-    this.outcome,
     this.transported,
+    this.sceneOutcome,
+    this.sceneOutcomeNotes,
     this.cancellationRequestStatus,
     this.createdAt,
     this.updatedAt,
@@ -65,8 +67,11 @@ class EmergencyCallDetail {
   final String? details;
   final CallPriority? priority;
   final CallStatus? status;
-  final String? outcome;
   final bool? transported;
+  @JsonKey(name: 'scene_outcome')
+  final SceneOutcome? sceneOutcome;
+  @JsonKey(name: 'scene_outcome_notes')
+  final String? sceneOutcomeNotes;
   @JsonKey(name: 'cancellation_request_status')
   final CancellationRequestStatus? cancellationRequestStatus;
   @JsonKey(name: 'created_at')

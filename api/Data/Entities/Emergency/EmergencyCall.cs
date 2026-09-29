@@ -18,8 +18,9 @@ public class EmergencyCall : AuditedEntity
     public string? Details { get; set; }
     public CallPriority Priority { get; set; }
     public CallStatus Status { get; set; }
-    public string? Outcome { get; set; }
     public bool? Transported { get; set; }
+    public SceneOutcome? SceneOutcome { get; set; }
+    public string? SceneOutcomeNotes { get; set; }
     public CancellationRequestStatus? CancellationRequestStatus { get; set; }
     public string? CancellationRequestReason { get; set; }
     public DateTimeOffset? CancellationRequestedAt { get; set; }

@@ -5,29 +5,23 @@
 import 'package:json_annotation/json_annotation.dart';
 
 @JsonEnum()
-enum CancelReason {
-  @JsonValue('diverted_to_other_hospital')
-  divertedToOtherHospital('diverted_to_other_hospital'),
-  @JsonValue('false_alarm')
-  falseAlarm('false_alarm'),
-  @JsonValue('died_en_route')
-  diedEnRoute('died_en_route'),
-  @JsonValue('patient_refused')
-  patientRefused('patient_refused'),
-  @JsonValue('no_show')
-  noShow('no_show'),
+enum SceneOutcome {
   @JsonValue('treated_at_scene')
   treatedAtScene('treated_at_scene'),
-  @JsonValue('died_at_scene')
-  diedAtScene('died_at_scene'),
-  @JsonValue('call_cancelled')
-  callCancelled('call_cancelled'),
+  @JsonValue('patient_refused')
+  patientRefused('patient_refused'),
+  @JsonValue('patient_not_found')
+  patientNotFound('patient_not_found'),
+  @JsonValue('false_alarm')
+  falseAlarm('false_alarm'),
+  @JsonValue('patient_deceased')
+  patientDeceased('patient_deceased'),
   /// Default value for all unparsed values, allows backward compatibility when adding new values on the backend.
   $unknown(null);
 
-  const CancelReason(this.json);
+  const SceneOutcome(this.json);
 
-  factory CancelReason.fromJson(String json) => values.firstWhere(
+  factory SceneOutcome.fromJson(String json) => values.firstWhere(
         (e) => e.json == json,
         orElse: () => $unknown,
       );
@@ -45,5 +39,5 @@ enum CancelReason {
   @override
   String toString() => json?.toString() ?? super.toString();
   /// Returns all defined enum values excluding the $unknown value.
-  static List<CancelReason> get $valuesDefined => values.where((value) => value != $unknown).toList();
+  static List<SceneOutcome> get $valuesDefined => values.where((value) => value != $unknown).toList();
 }

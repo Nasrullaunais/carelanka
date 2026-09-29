@@ -505,8 +505,9 @@ more often than a hospital would like.
 + Details: string (nullable)
 + Priority: CallPriority (non-null)
 + Status: CallStatus (non-null)
-+ Outcome: string (nullable)
-+ Transported: bool (nullable)                              -- (Rev 2.4 — new)
++ Transported: bool (nullable)                              -- (Rev 2.4 — new; written on completion)
++ SceneOutcome: SceneOutcome (nullable)                     -- why nobody was transported
++ SceneOutcomeNotes: string (nullable, max 1000)
 + CancellationRequestStatus: CancellationRequestStatus (nullable) -- (Rev 3.1 — new)
 + CancellationRequestReason: string (nullable)              -- (Rev 3.1 — new)
 + CancellationRequestedAt: DateTimeOffset (nullable)        -- (Rev 3.1 — new)
@@ -616,19 +617,24 @@ crew changes do not alter the snapshot. *(Decision 30; Rev 3.1)*
 ```
 + EmergencyCallId: Guid (unique, non-null) FK → EmergencyCall.Id
 + DispatchId: Guid (non-null) FK → Dispatch.Id
-+ Status: PreAdmissionStatus (non-null)   // queued | sent | failed
++ Status: PreAdmissionStatus (non-null)   // queued | sent | failed | withdrawing | withdrawn | withdrawal_failed
 + AttemptCount: int (non-null)
 + NextAttemptAt: DateTimeOffset (non-null)
 + SentAt: DateTimeOffset (nullable)
-+ FailureReason: string (nullable)        // gave_up | rejected | call_cancelled
++ FailureReason: string (nullable)        // gave_up | rejected
++ WithdrawalReason: CancelReason (nullable)  // why the admission is being cancelled
++ Version: uint (row version)
 ```
 **Table:** `pre_admission_notices`
-**Index:** partial `ix_pre_admission_notices_due` on `status = 'queued'`
+**Index:** partial `ix_pre_admission_notices_due` on `status IN ('queued', 'withdrawing')`
 **Note:** One row per emergency call, not per dispatch. A reassign creates a new dispatch for
 the same patient, and a second row would open a second admission for them. `DispatchId` is
 the first dispatch, the id Patient Management is given. Written in the dispatch transaction
 and sent afterwards by `PreAdmissionWorker`, so a Patient Management outage never undoes a
 dispatch.
+When nobody will be transported the notice becomes `withdrawing`, and the worker cancels the
+admission through `IPreAdmissionGateway.WithdrawAsync`. `withdrawal_failed` means Patient
+Management refused (for example the patient was already admitted) or the retries ran out.
 
 ---
 
@@ -1831,13 +1837,23 @@ Available, Dispatched, EnRoute, AtScene, Transporting, OutOfService
 ### DispatchStatus
 ```
 Assigned, Acknowledged, EnRouteToScene, AtScene, TransportingToHospital,
-HandedOver, Declined, Cancelled, Reassigned
+HandedOver, Declined, Cancelled, Reassigned, EndedAtScene
 ```
 Serialized as `assigned`, `acknowledged`, `en_route_to_scene`, `at_scene`,
-`transporting_to_hospital`, `handed_over`, `declined`, `cancelled`, `reassigned`.
+`transporting_to_hospital`, `handed_over`, `declined`, `cancelled`, `reassigned`,
+`ended_at_scene`.
 The normal path follows the first six in order. `Declined` is terminal from `Assigned`;
 `Cancelled` and `Reassigned` are terminal pre-arrival alternatives. No diversion or
-reassignment is legal from `AtScene` onward.
+reassignment is legal from `AtScene` onward. `EndedAtScene` is a terminal alternative to
+`TransportingToHospital`, legal only from `AtScene`: the crew finished there and nobody was
+transported.
+
+### SceneOutcome
+```
+TreatedAtScene, PatientRefused, PatientNotFound, FalseAlarm, PatientDeceased
+```
+Serialized as `treated_at_scene`, `patient_refused`, `patient_not_found`, `false_alarm`,
+`patient_deceased`. Set on `EmergencyCall` only when the crew finishes at the scene.
 
 ### CancellationRequestStatus *(Rev 3.1 — new)*
 ```
@@ -2193,10 +2209,12 @@ restarts.
 
 ### CancelReason *(Rev 2.2 — new)*
 ```
-DivertedToOtherHospital, FalseAlarm, DiedEnRoute, PatientRefused, NoShow
+DivertedToOtherHospital, FalseAlarm, DiedEnRoute, PatientRefused, NoShow,
+TreatedAtScene, DiedAtScene, CallCancelled
 ```
 Serialized as `diverted_to_other_hospital`, `false_alarm`, `died_en_route`,
-`patient_refused`, `no_show` — as published in `patient-spec.yaml`. `Admission.Cancelled`
+`patient_refused`, `no_show`, `treated_at_scene`, `died_at_scene`, `call_cancelled` — as published in
+`patient-spec.yaml`. The last three are used when Emergency withdraws a pre-admission. `Admission.Cancelled`
 already existed as a state with nothing recording *why*; the closed enum was in the spec
 but had no home in this document.
 

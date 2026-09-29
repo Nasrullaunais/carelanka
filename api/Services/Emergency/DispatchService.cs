@@ -25,11 +25,12 @@ public sealed class DispatchService : IDispatchService
     private readonly ISceneLookupQueue _sceneLookups;
     private readonly INotifier _notifier;
     private readonly IDispatchProposalLifecycle _proposals;
+    private readonly IPreAdmissionWithdrawals _withdrawals;
 
     public DispatchService(CareLankaDbContext db, IAmbulanceEligibilityService eligibility,
         ICurrentUser currentUser, TimeProvider clock, IOptions<EmergencyOptions> options, ISceneLookupQueue sceneLookups,
-        INotifier notifier, IDispatchProposalLifecycle proposals)
-        => (_db, _eligibility, _currentUser, _clock, _options, _sceneLookups, _notifier, _proposals) = (db, eligibility, currentUser, clock, options.Value, sceneLookups, notifier, proposals);
+        INotifier notifier, IDispatchProposalLifecycle proposals, IPreAdmissionWithdrawals withdrawals)
+        => (_db, _eligibility, _currentUser, _clock, _options, _sceneLookups, _notifier, _proposals, _withdrawals) = (db, eligibility, currentUser, clock, options.Value, sceneLookups, notifier, proposals, withdrawals);
 
     private const string CallerCancelledReason = "The caller no longer needs an ambulance";
 
@@ -279,6 +280,24 @@ public sealed class DispatchService : IDispatchService
         dispatch.CompletedAt = _clock.GetUtcNow();
         dispatch.Ambulance.Status = AmbulanceStatus.Available;
         dispatch.EmergencyCall.Status = CallStatus.Completed;
+        dispatch.EmergencyCall.Transported = true;
+        await SaveAsync(ct);
+        return ToDetail(dispatch);
+    }
+
+    public async Task<DispatchDetail> EndAtSceneAsync(Guid id, EndAtSceneRequest request, CancellationToken ct = default)
+    {
+        var dispatch = await OwnedAsync(id, ct);
+        Move(dispatch, DispatchStatus.EndedAtScene);
+        var outcome = request.Outcome!.Value;
+        var call = dispatch.EmergencyCall;
+        dispatch.CompletedAt = _clock.GetUtcNow();
+        dispatch.Ambulance.Status = AmbulanceStatus.Available;
+        call.Status = CallStatus.Completed;
+        call.Transported = false;
+        call.SceneOutcome = outcome;
+        call.SceneOutcomeNotes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
+        await _withdrawals.RequestAsync(call.Id, WithdrawalReasonFor(outcome), ct);
         await SaveAsync(ct);
         return ToDetail(dispatch);
     }
@@ -309,6 +328,7 @@ public sealed class DispatchService : IDispatchService
         CancelCore(dispatch);
         dispatch.CancellationReason = CallerCancelledReason;
         await TellCrewRunEndedAsync(dispatch, NotificationType.DispatchCancelled, ct);
+        await _withdrawals.RequestAsync(emergencyCallId, CancelReason.CallCancelled, ct);
         await SaveAsync(ct);
     }
 
@@ -454,6 +474,16 @@ public sealed class DispatchService : IDispatchService
         dispatch.EmergencyCall.Status = CallStatus.Received;
     }
 
+    private static CancelReason WithdrawalReasonFor(SceneOutcome outcome) => outcome switch
+    {
+        SceneOutcome.TreatedAtScene => CancelReason.TreatedAtScene,
+        SceneOutcome.PatientRefused => CancelReason.PatientRefused,
+        SceneOutcome.PatientNotFound => CancelReason.NoShow,
+        SceneOutcome.FalseAlarm => CancelReason.FalseAlarm,
+        SceneOutcome.PatientDeceased => CancelReason.DiedAtScene,
+        _ => throw new ArgumentOutOfRangeException(nameof(outcome))
+    };
+
     private static void Move(Dispatch dispatch, DispatchStatus target)
     {
         var legal = (dispatch.Status, target) switch
@@ -461,7 +491,7 @@ public sealed class DispatchService : IDispatchService
             (DispatchStatus.Assigned, DispatchStatus.Acknowledged) or (DispatchStatus.Assigned, DispatchStatus.Declined) => true,
             (DispatchStatus.Acknowledged, DispatchStatus.EnRouteToScene) => true,
             (DispatchStatus.EnRouteToScene, DispatchStatus.AtScene) => true,
-            (DispatchStatus.AtScene, DispatchStatus.TransportingToHospital) => true,
+            (DispatchStatus.AtScene, DispatchStatus.TransportingToHospital) or (DispatchStatus.AtScene, DispatchStatus.EndedAtScene) => true,
             (DispatchStatus.TransportingToHospital, DispatchStatus.HandedOver) => true,
             _ => false
         };

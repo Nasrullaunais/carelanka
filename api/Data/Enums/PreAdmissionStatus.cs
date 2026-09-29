@@ -4,5 +4,8 @@ public enum PreAdmissionStatus
 {
     Queued,
     Sent,
-    Failed
+    Failed,
+    Withdrawn,
+    Withdrawing,
+    WithdrawalFailed
 }

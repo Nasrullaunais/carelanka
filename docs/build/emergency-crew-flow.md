@@ -1,6 +1,6 @@
 # Emergency crew flow — from "new run" to handover
 
-**Owner:** Emergency (Nasrulla Unais) · **Status:** planned 2026-09-30, nothing built yet
+**Owner:** Emergency (Nasrulla Unais) · **Status:** planned 2026-09-30 · Fixes 1–4 built on `feat/emergency-crew-flow`
 
 ## The problem
 
@@ -28,13 +28,12 @@ After:  accept → drive (location live) → arrive → hospital OR finish at sc
 
 | Ask | Who | Why |
 | :--- | :--- | :--- |
-| Add `IAdmissionService.FindByDispatchIdAsync(string dispatchId)` | Lochana (Patient) | Emergency must cancel a pre-admission when no patient is coming (Fix 4) |
-| Add `TreatedAtScene`, `DiedAtScene`, `CallCancelled` to `CancelReason` | Lochana (Patient) | Patient's cancel reasons have no honest match for these three (Fix 4) |
+| Add `IAdmissionService.FindByDispatchIdAsync(string dispatchId)` | Lochana (Patient) | Emergency must cancel a pre-admission when no patient is coming (Fix 4). **Added in Fix 4 by the Emergency owner, with Patient's permission.** |
+| Add `TreatedAtScene`, `DiedAtScene`, `CallCancelled` to `CancelReason` | Lochana (Patient) | Patient's cancel reasons have no honest match for these three (Fix 4). **Added in Fix 4, same way.** |
 | Show the crew handover on the emergency admission's detail | Lochana (Patient) | That is the hospital's screen, not ours (Fix 5) |
 | Edit `AndroidManifest.xml` and `Info.plist` | Group | These phone settings files are shared (Fix 1, Fix 2) |
 
-If Patient's method is not merged when we reach Fix 4, stub it — see Fix 4, "Until Patient's
-method lands".
+Both Patient additions were made in Fix 4 itself, so no stub was needed.
 
 **Every contract change moves together.** For each fix that changes the API, update these in
 the same commit:
@@ -427,7 +426,7 @@ at_scene ──► transporting_to_hospital ──► handed_over
   - the agent sees it as free
   - the one-live-run-per-ambulance rule releases it
 - Enums are stored as text (ADR 5), but the column has a check constraint listing every value,
-  so the new value **needs a migration** (it goes in `Emergency_CallSceneOutcome`, Fix 4).
+  so the new value **needs a migration** (`Emergency_CallSceneOutcome`, below).
 
 **New endpoint — `POST /api/me/dispatches/{id}/end-at-scene`, operation `endMyDispatchAtScene`.**
 - Body: `EndAtSceneRequest`
@@ -453,10 +452,15 @@ at_scene ──► transporting_to_hospital ──► handed_over
 it ended.
 
 **Data change — migration `Emergency_CallSceneOutcome`:**
-- The unused text column `EmergencyCall.Outcome` becomes `SceneOutcome? SceneOutcome` (stored
-  as text), plus `SceneOutcomeNotes` (max 1000).
+- The unused text column `EmergencyCall.Outcome` is renamed `SceneOutcomeNotes` (max 1000), and
+  a new `SceneOutcome? SceneOutcome` column is added (stored as text with a check constraint).
 - Safe: nothing has ever written `Outcome`, so every row is empty.
-- Update `entity_diagram.md` and the `EmergencyCall` schema in the spec.
+- The migration also carries the check constraints for the new `DispatchStatus`,
+  `PreAdmissionStatus` and Patient `CancelReason` values, the new `withdrawal_reason` column and
+  a row version on `pre_admission_notices`, and the widened "due" index.
+- `entity_diagram.md` and the `EmergencyCall` schema in the spec are updated.
+- The spec's old, never-built `POST /emergency-calls/{id}/outcome` is removed: this fix
+  replaces it.
 
 ### Backend — tell the hospital nobody is coming
 
@@ -468,21 +472,30 @@ admission sits in the ward's list forever, maybe holding a bed.
 `PreAdmissionProcessor` only skips *unsent* notices of cancelled calls. This fix closes both
 cases through one path.
 
+**Only an approved caller cancellation ends the call with nobody coming.** A desk cancel,
+decline or reassign puts the call back to `received` for another ambulance, so its admission
+must stay.
+
 **New `PreAdmissionStatus` values:**
 
 | Status | Meaning |
 | :--- | :--- |
-| `Withdrawn` | Stopped before it was ever sent, or the admission was cancelled |
+| `Withdrawn` | The admission is cancelled, or was never created |
 | `Withdrawing` | Sent already; a withdrawal is waiting to go out |
 | `WithdrawalFailed` | Patient refused the cancel, e.g. the patient was already admitted |
 
-**Inside `EndAtSceneAsync`, and inside both cancel paths when the call goes back to nobody:**
-- Notice still `Queued` → set `Withdrawn`. Nothing is ever sent.
-- Notice `Sent` → set `Withdrawing`, and store the reason.
+**Inside `EndAtSceneAsync`, and inside the approved-cancellation path**
+(`IPreAdmissionWithdrawals.RequestAsync`, saved with the caller's own change):
+- Notice `Queued` **or** `Sent` → set `Withdrawing`, store the reason, restart the attempt count.
+  A queued notice is not shortcut to `Withdrawn`: the worker might be sending it at that very
+  moment, and the admission it creates must still be cancelled.
+- `PreAdmissionNotice` has a row version, so a send that was already in flight cannot overwrite
+  the withdrawal. The worker's save fails, the next pass sees `Withdrawing` and cancels the
+  admission the send just made.
 
 **`PreAdmissionProcessor` also processes `Withdrawing`.** It calls a new
 `IPreAdmissionGateway.WithdrawAsync(dispatchId, reason)`:
-- `Withdrawn` on success.
+- `Withdrawn` on success, when no admission exists, or when it is already cancelled.
 - Retry with the same growing gaps on `Unavailable`.
 - `WithdrawalFailed` on a refusal. That is logged at `Warning`, not retried.
 
@@ -493,18 +506,17 @@ finishing a run** — the same rule Phase 9 set for pre-admit.
 
 | Why | Patient `CancelReason` |
 | :--- | :--- |
-| `PatientRefused` | `PatientRefused` (exists) |
-| `FalseAlarm` | `FalseAlarm` (exists) |
-| `PatientNotFound` | `NoShow` (exists) |
-| `TreatedAtScene` | `TreatedAtScene` (**ask Lochana**) |
-| `PatientDeceased` | `DiedAtScene` (**ask Lochana**) — `DiedEnRoute` would be recorded wrong |
-| Call cancelled after dispatch | `CallCancelled` (**ask Lochana**) |
+| `PatientRefused` | `PatientRefused` |
+| `FalseAlarm` | `FalseAlarm` |
+| `PatientNotFound` | `NoShow` |
+| `TreatedAtScene` | `TreatedAtScene` (new) |
+| `PatientDeceased` | `DiedAtScene` (new) — `DiedEnRoute` would be recorded wrong |
+| Call cancelled after dispatch | `CallCancelled` (new) |
 
-**Until Patient's method lands:**
-- `WithdrawAsync` returns `Unavailable`, marked `// STUB` with a new `STUBS.md` row (owner:
-  Patient).
-- Notices wait in `Withdrawing` and go out by themselves once the real method is registered.
-- Nothing pretends the admission was cancelled.
+**Patient's side (added here).** `IAdmissionService.FindByDispatchIdAsync`, and the three new
+`CancelReason` values in the enum, the Patient spec, the entity diagram and the web label maps.
+`PreAdmissionGateway.WithdrawAsync` finds the admission by dispatch and calls Patient's own
+`CancelAsync`, so Patient's rules decide what can still be cancelled. No stub is involved.
 
 ### Patient's tracking screen
 
@@ -517,7 +529,8 @@ finishing a run** — the same rule Phase 9 set for pre-admit.
 ### Web (duty manager)
 
 `domain.ts` — `ended_at_scene` in `dispatchStatusLabels` ("Finished at scene") and
-`dispatchStatusTones`. The label maps are keyed by the generated enum, so forgetting it is a
+`dispatchStatusTones`. The call detail also gets a "How it ended" field (reason and notes)
+whenever the call finished at the scene. The label maps are keyed by the generated enum, so forgetting it is a
 compile error.
 
 ### Edge cases

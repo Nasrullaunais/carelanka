@@ -8,6 +8,7 @@ import 'package:retrofit/retrofit.dart';
 import '../models/decline_dispatch_request.dart';
 import '../models/dispatch_detail.dart';
 import '../models/dispatch_summary_paged_result.dart';
+import '../models/end_at_scene_request.dart';
 import '../models/navigation_target.dart';
 import '../models/record_handover_request.dart';
 import '../models/update_my_dispatch_status_request.dart';
@@ -54,6 +55,12 @@ abstract class MyRunApi {
   Future<DispatchDetail> updateMyDispatchStatus({
     @Path('id') required String id,
     @Body() UpdateMyDispatchStatusRequest? body,
+  });
+
+  @POST('/me/dispatches/{id}/end-at-scene')
+  Future<DispatchDetail> endMyDispatchAtScene({
+    @Path('id') required String id,
+    @Body() EndAtSceneRequest? body,
   });
 
   @POST('/me/dispatches/{id}/handover')

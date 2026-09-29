@@ -67,6 +67,9 @@ const cancelReasonLabels: Record<CancelReason, string> = {
   died_en_route: 'Died en route',
   patient_refused: 'Patient refused admission',
   no_show: 'Did not arrive',
+  treated_at_scene: 'Treated at the scene',
+  died_at_scene: 'Died at the scene',
+  call_cancelled: 'Emergency call cancelled',
 };
 
 export function PatientsPage() {

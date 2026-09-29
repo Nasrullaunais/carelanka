@@ -18,6 +18,9 @@ public sealed class EmergencyCallConfiguration : IEntityTypeConfiguration<Emerge
         {
             table.HasCheckConstraint("ck_emergency_calls_priority", EnumWire.CheckConstraint<CallPriority>("priority"));
             table.HasCheckConstraint("ck_emergency_calls_status", EnumWire.CheckConstraint<CallStatus>("status"));
+            table.HasCheckConstraint(
+                "ck_emergency_calls_scene_outcome",
+                $"scene_outcome IS NULL OR {EnumWire.CheckConstraint<SceneOutcome>("scene_outcome")}");
             table.HasCheckConstraint("ck_emergency_calls_latitude", "latitude BETWEEN -90 AND 90");
             table.HasCheckConstraint("ck_emergency_calls_longitude", "longitude BETWEEN -180 AND 180");
         });
@@ -27,7 +30,7 @@ public sealed class EmergencyCallConfiguration : IEntityTypeConfiguration<Emerge
         builder.Property(call => call.CallerPhone).HasMaxLength(20);
         builder.Property(call => call.AddressLabel).HasMaxLength(500);
         builder.Property(call => call.Details).HasMaxLength(1000);
-        builder.Property(call => call.Outcome).HasMaxLength(1000);
+        builder.Property(call => call.SceneOutcomeNotes).HasMaxLength(1000);
         builder.Property(call => call.CancellationRequestReason).HasMaxLength(500);
         builder.Property(call => call.CancellationReviewNotes).HasMaxLength(500);
         builder.Property(call => call.Latitude).HasPrecision(9, 6).IsRequired();
@@ -43,6 +46,9 @@ public sealed class EmergencyCallConfiguration : IEntityTypeConfiguration<Emerge
             .HasConversion(new SnakeCaseEnumConverter<CallStatus>())
             .HasMaxLength(20)
             .IsRequired();
+        builder.Property(call => call.SceneOutcome)
+            .HasConversion(new SnakeCaseEnumConverter<SceneOutcome>())
+            .HasMaxLength(20);
         builder.Property(call => call.CancellationRequestStatus)
             .HasConversion(new SnakeCaseEnumConverter<CancellationRequestStatus>())
             .HasMaxLength(20);

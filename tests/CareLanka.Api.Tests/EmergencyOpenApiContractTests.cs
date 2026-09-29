@@ -43,7 +43,8 @@ public sealed class EmergencyOpenApiContractTests
             "handed_over",
             "declined",
             "cancelled",
-            "reassigned"
+            "reassigned",
+            "ended_at_scene"
         };
 
         Assert.Equal(expected, actual);

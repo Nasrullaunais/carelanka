@@ -6,5 +6,8 @@ public enum CancelReason
     FalseAlarm,
     DiedEnRoute,
     PatientRefused,
-    NoShow
+    NoShow,
+    TreatedAtScene,
+    DiedAtScene,
+    CallCancelled
 }

@@ -10,6 +10,7 @@ import 'package:carelanka_mobile/services/api_client/models/dispatch_status.dart
 import 'package:carelanka_mobile/services/api_client/models/dispatch_summary.dart';
 import 'package:carelanka_mobile/services/api_client/models/dispatch_summary_paged_result.dart';
 import 'package:carelanka_mobile/services/api_client/models/navigation_target.dart';
+import 'package:carelanka_mobile/services/api_client/models/scene_outcome.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 DispatchDetail _run(DispatchStatus status, {String id = 'run-1'}) =>
@@ -76,6 +77,14 @@ final class FakeRunService implements CrewRunService {
   }) => _reply('handover:$notes|$patientCondition', DispatchStatus.handedOver);
 
   @override
+  Future<DispatchDetail> endAtScene(
+    String id,
+    SceneOutcome outcome, {
+    String? notes,
+  }) =>
+      _reply('endAtScene:${outcome.json}|$notes', DispatchStatus.endedAtScene);
+
+  @override
   Future<DispatchSummaryPagedResult> history({required int page}) async {
     calls.add('history:$page');
     return DispatchSummaryPagedResult(
@@ -106,6 +115,11 @@ void main() {
     expect(DispatchStatus.acknowledged.canDecline, isFalse);
     expect(DispatchStatus.assigned.canNavigate, isFalse);
     expect(DispatchStatus.atScene.canNavigate, isTrue);
+    expect(DispatchStatus.atScene.canEndAtScene, isTrue);
+    expect(DispatchStatus.enRouteToScene.canEndAtScene, isFalse);
+    expect(DispatchStatus.transportingToHospital.canEndAtScene, isFalse);
+    expect(DispatchStatus.endedAtScene.isLive, isFalse);
+    expect(DispatchStatus.endedAtScene.nextStep, isNull);
   });
 
   test(
@@ -153,6 +167,21 @@ void main() {
 
     expect(done, isTrue);
     expect(service.calls, ['handover:Handed to triage|Stable']);
+    expect(controller.state.valueOrNull, isNull);
+  });
+
+  test('finishing at the scene sends the reason and clears the run', () async {
+    final service = FakeRunService()..active = _run(DispatchStatus.atScene);
+    final controller = MyRunController(service);
+    await controller.load();
+
+    final done = await controller.endAtScene(
+      SceneOutcome.patientRefused,
+      notes: 'Wants her own doctor',
+    );
+
+    expect(done, isTrue);
+    expect(service.calls, ['endAtScene:patient_refused|Wants her own doctor']);
     expect(controller.state.valueOrNull, isNull);
   });
 
@@ -305,6 +334,32 @@ void main() {
 
       expect(controller.ending?.kind, RunEndingKind.handedOver);
       expect(service.calls.where((call) => call.startsWith('getRun')), isEmpty);
+    });
+
+    test('finishing at the scene is confirmed without asking again', () async {
+      final service = FakeRunService()..active = _run(DispatchStatus.atScene);
+      final controller = MyRunController(service);
+      await controller.load();
+
+      await controller.endAtScene(SceneOutcome.falseAlarm);
+
+      expect(controller.ending?.kind, RunEndingKind.endedAtScene);
+      expect(controller.ending?.title, 'Run finished at the scene');
+      expect(service.calls.where((call) => call.startsWith('getRun')), isEmpty);
+    });
+
+    test('a run your partner finished at the scene explains itself', () async {
+      final (service, controller) = await liveRun();
+      service.active = null;
+      service.ended['run-1'] = _ended(DispatchStatus.endedAtScene);
+
+      await controller.load(showLoading: false);
+
+      expect(controller.ending?.kind, RunEndingKind.endedAtScene);
+      expect(
+        controller.ending?.message,
+        'AMB-3 is available for the next run.',
+      );
     });
 
     test('declining a run leaves no panel', () async {

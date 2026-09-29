@@ -112,6 +112,166 @@ public sealed class DispatchEndpointTests
     }
 
     [Fact]
+    public async Task Crew_can_finish_at_the_scene_and_the_ambulance_is_free_again()
+    {
+        var run = await SeedRunAsync();
+        var (dispatchId, crew) = await RunAtSceneAsync(run);
+        using var _ = crew;
+
+        var response = await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/end-at-scene", new
+        {
+            outcome = "treated_at_scene",
+            notes = "  Wound dressed, left with family.  "
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await ReadAsync(response);
+        Assert.Equal("ended_at_scene", body.GetProperty("status").GetString());
+        Assert.NotEqual(JsonValueKind.Null, body.GetProperty("completed_at").ValueKind);
+        var call = await CallAsync(run.CallId);
+        Assert.Equal(CallStatus.Completed, call.Status);
+        Assert.False(call.Transported);
+        Assert.Equal(SceneOutcome.TreatedAtScene, call.SceneOutcome);
+        Assert.Equal("Wound dressed, left with family.", call.SceneOutcomeNotes);
+        Assert.Equal(AmbulanceStatus.Available, (await AmbulanceAsync(run.AmbulanceId)).Status);
+        Assert.Equal(0, await LiveDispatchCountForCallAsync(run.CallId));
+        Assert.Equal(HttpStatusCode.NotFound, (await crew.GetAsync("/api/me/dispatches/active")).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_finished_ambulance_can_be_sent_to_the_next_call()
+    {
+        var run = await SeedRunAsync();
+        var next = await SeedCallAsync();
+        var (dispatchId, crew) = await RunAtSceneAsync(run);
+        using var _ = crew;
+        await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/end-at-scene", new { outcome = "false_alarm" });
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+
+        var response = await manager.PostAsJsonAsync($"/api/emergency-calls/{next}/dispatch", new { ambulance_id = run.AmbulanceId });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_handover_marks_the_call_as_transported()
+    {
+        var run = await SeedRunAsync();
+        var (dispatchId, crew) = await RunAtSceneAsync(run);
+        using var _ = crew;
+        await ProgressAsync(crew, dispatchId, "transporting_to_hospital");
+
+        await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/handover", new { });
+
+        var call = await CallAsync(run.CallId);
+        Assert.True(call.Transported);
+        Assert.Null(call.SceneOutcome);
+    }
+
+    [Theory]
+    [InlineData("treated_at_scene", CancelReason.TreatedAtScene)]
+    [InlineData("patient_refused", CancelReason.PatientRefused)]
+    [InlineData("patient_not_found", CancelReason.NoShow)]
+    [InlineData("false_alarm", CancelReason.FalseAlarm)]
+    [InlineData("patient_deceased", CancelReason.DiedAtScene)]
+    public async Task Finishing_at_the_scene_withdraws_the_pre_admission_with_the_matching_reason(
+        string outcome, CancelReason expected)
+    {
+        var run = await SeedRunAsync();
+        var (dispatchId, crew) = await RunAtSceneAsync(run);
+        using var _ = crew;
+
+        var response = await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/end-at-scene", new { outcome });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var notice = await NoticeAsync(run.CallId);
+        Assert.Equal(PreAdmissionStatus.Withdrawing, notice.Status);
+        Assert.Equal(expected, notice.WithdrawalReason);
+    }
+
+    [Theory]
+    [InlineData("acknowledged")]
+    [InlineData("en_route_to_scene")]
+    [InlineData("transporting_to_hospital")]
+    public async Task A_run_can_only_finish_at_the_scene_from_at_scene(string state)
+    {
+        var run = await SeedRunAsync();
+        var dispatchId = await DispatchAsync(run);
+        using var crew = await ClientAsync(run.CrewEmails[0]);
+        await PostStatusAsync(crew, $"/api/me/dispatches/{dispatchId}/acknowledge");
+        if (state != "acknowledged") await ProgressAsync(crew, dispatchId, "en_route_to_scene");
+        if (state == "transporting_to_hospital")
+        {
+            await ProgressAsync(crew, dispatchId, "at_scene");
+            await ProgressAsync(crew, dispatchId, "transporting_to_hospital");
+        }
+
+        var response = await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/end-at-scene", new { outcome = "false_alarm" });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Null((await CallAsync(run.CallId)).SceneOutcome);
+    }
+
+    [Fact]
+    public async Task A_run_that_already_ended_cannot_be_finished_again()
+    {
+        var run = await SeedRunAsync();
+        var (dispatchId, crew) = await RunAtSceneAsync(run);
+        using var _ = crew;
+        await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/end-at-scene", new { outcome = "false_alarm" });
+
+        var again = await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/end-at-scene", new { outcome = "patient_refused" });
+
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+        Assert.Equal(SceneOutcome.FalseAlarm, (await CallAsync(run.CallId)).SceneOutcome);
+    }
+
+    [Fact]
+    public async Task Only_the_responding_crew_can_finish_a_run_at_the_scene()
+    {
+        var run = await SeedRunAsync();
+        var (dispatchId, crew) = await RunAtSceneAsync(run);
+        using var _ = crew;
+        var outsider = await SeedCrewAsync();
+        using var stranger = await ClientAsync(outsider.Email);
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+
+        var fromStranger = await stranger.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/end-at-scene", new { outcome = "false_alarm" });
+        var fromManager = await manager.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/end-at-scene", new { outcome = "false_alarm" });
+        var unknown = await crew.PostAsJsonAsync($"/api/me/dispatches/{Guid.NewGuid()}/end-at-scene", new { outcome = "false_alarm" });
+
+        Assert.Equal(HttpStatusCode.Forbidden, fromStranger.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, fromManager.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_reason_for_finishing_at_the_scene_is_required_and_the_notes_are_length_limited()
+    {
+        var run = await SeedRunAsync();
+        var (dispatchId, crew) = await RunAtSceneAsync(run);
+        using var _ = crew;
+        var url = $"/api/me/dispatches/{dispatchId}/end-at-scene";
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await crew.PostAsJsonAsync(url, new { })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await crew.PostAsJsonAsync(url, new { outcome = "gone_home" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await crew.PostAsJsonAsync(url, new { outcome = "false_alarm", notes = new string('x', 1001) })).StatusCode);
+        Assert.Equal(DispatchStatus.AtScene, (await LoadDispatchAsync(dispatchId)).Status);
+    }
+
+    [Fact]
+    public async Task Blank_notes_are_stored_as_nothing()
+    {
+        var run = await SeedRunAsync();
+        var (dispatchId, crew) = await RunAtSceneAsync(run);
+        using var _ = crew;
+
+        await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/end-at-scene", new { outcome = "false_alarm", notes = "   " });
+
+        Assert.Null((await CallAsync(run.CallId)).SceneOutcomeNotes);
+    }
+
+    [Fact]
     public async Task Crew_sees_the_scene_and_how_to_reach_the_caller_while_the_run_is_live()
     {
         var run = await SeedRunAsync();
@@ -687,6 +847,23 @@ public sealed class DispatchEndpointTests
         var response = await client.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return (await ReadAsync(response)).GetProperty("status").GetString();
+    }
+
+    private async Task<(Guid DispatchId, HttpClient Crew)> RunAtSceneAsync(Run run)
+    {
+        var dispatchId = await DispatchAsync(run);
+        var crew = await ClientAsync(run.CrewEmails[0]);
+        await PostStatusAsync(crew, $"/api/me/dispatches/{dispatchId}/acknowledge");
+        await ProgressAsync(crew, dispatchId, "en_route_to_scene");
+        await ProgressAsync(crew, dispatchId, "at_scene");
+        return (dispatchId, crew);
+    }
+
+    private async Task<PreAdmissionNotice> NoticeAsync(Guid callId)
+    {
+        using var scope = _application.Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<CareLankaDbContext>()
+            .PreAdmissionNotices.AsNoTracking().SingleAsync(x => x.EmergencyCallId == callId);
     }
 
     private async Task<Dispatch> LoadDispatchAsync(Guid id)

@@ -40,6 +40,8 @@ extension DispatchStatusRun on DispatchStatus {
 
   bool get canDecline => this == DispatchStatus.assigned;
 
+  bool get canEndAtScene => this == DispatchStatus.atScene;
+
   bool get canNavigate => isLive && this != DispatchStatus.assigned;
 
   String get crewLabel => switch (this) {
@@ -52,6 +54,7 @@ extension DispatchStatusRun on DispatchStatus {
     DispatchStatus.declined => 'Declined',
     DispatchStatus.cancelled => 'Cancelled',
     DispatchStatus.reassigned => 'Given to another ambulance',
+    DispatchStatus.endedAtScene => 'Finished at the scene',
     DispatchStatus.$unknown => 'Unknown',
   };
 }

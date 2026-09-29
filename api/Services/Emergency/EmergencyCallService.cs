@@ -317,7 +317,7 @@ public sealed class EmergencyCallService : IEmergencyCallService
             .Where(item => item.Id == id)
             .Select(item => new
             {
-                item.Id, item.CallerUserId, item.Status, item.CancellationRequestStatus, item.UpdatedAt,
+                item.Id, item.CallerUserId, item.Status, item.Transported, item.CancellationRequestStatus, item.UpdatedAt,
                 Dispatch = item.Dispatches.Where(dispatch => DispatchStatusExtensions.LiveStatuses.Contains(dispatch.Status))
                     .Select(dispatch => new { dispatch.Status, dispatch.DispatchedAt, dispatch.Ambulance.CurrentLatitude, dispatch.Ambulance.CurrentLongitude, dispatch.Ambulance.LocationUpdatedAt })
                     .FirstOrDefault()
@@ -331,6 +331,7 @@ public sealed class EmergencyCallService : IEmergencyCallService
         {
             EmergencyCallId = call.Id,
             CallStatus = call.Status,
+            Transported = call.Transported,
             AmbulanceIsOnTheWay = call.Dispatch?.Status is DispatchStatus.Assigned or DispatchStatus.Acknowledged or DispatchStatus.EnRouteToScene,
             AmbulanceLatitude = call.Dispatch?.CurrentLatitude,
             AmbulanceLongitude = call.Dispatch?.CurrentLongitude,
@@ -592,8 +593,9 @@ public sealed class EmergencyCallService : IEmergencyCallService
         Details = call.Details,
         Priority = call.Priority,
         Status = call.Status,
-        Outcome = call.Outcome,
         Transported = call.Transported,
+        SceneOutcome = call.SceneOutcome,
+        SceneOutcomeNotes = call.SceneOutcomeNotes,
         CancellationRequestStatus = call.CancellationRequestStatus,
         CreatedAt = call.CreatedAt,
         UpdatedAt = call.UpdatedAt

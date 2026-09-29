@@ -280,41 +280,6 @@ paths:
             application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
-  /emergency-calls/{id}/outcome:
-    parameters:
-      - $ref: '#/components/parameters/PathId'
-    post:
-      tags: [Calls]
-      summary: Record the call outcome
-      description: |
-        Roles: DutyManager, AmbulanceCrew.
-
-        Set once the crew has handed the patient over, or the call resolved without
-        transport. Moves the call to `completed` and closes the response-time clock
-        the reports measure.
-      operationId: recordEmergencyCallOutcome
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [outcome]
-              properties:
-                outcome: { type: string, maxLength: 1000 }
-                transported: { type: boolean, default: true }
-      responses:
-        '200':
-          description: Outcome recorded
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/EmergencyCall' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/IllegalTransition' }
-
   /emergency-calls/{id}/cancel:
     parameters:
       - $ref: '#/components/parameters/PathId'
@@ -1479,6 +1444,38 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/IllegalTransition' }
 
+  /me/dispatches/{id}/end-at-scene:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      tags: [My Run]
+      summary: Finish the run at the scene, with nobody going to hospital
+      description: |
+        Roles: AmbulanceCrew, assigned to this dispatch only. Legal only from `at_scene`.
+
+        For runs that end where they started: treated there, the patient refused to go,
+        nobody was found, a false alarm, or the patient died. Moves the dispatch to
+        `ended_at_scene`, frees the ambulance and completes the call with
+        `transported: false`. The waiting pre-admission is withdrawn from Patient
+        Management in the background, so a Patient Management outage never blocks the crew.
+      operationId: endMyDispatchAtScene
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EndAtSceneRequest' }
+      responses:
+        '200':
+          description: The finished run
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DispatchDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IllegalTransition' }
+
   /me/dispatches/{id}/handover:
     parameters:
       - $ref: '#/components/parameters/PathId'
@@ -1942,6 +1939,24 @@ components:
         - declined
         - cancelled
         - reassigned
+        - ended_at_scene
+
+    SceneOutcome:
+      type: string
+      description: Why a run ended at the scene with nobody going to hospital.
+      enum:
+        - treated_at_scene
+        - patient_refused
+        - patient_not_found
+        - false_alarm
+        - patient_deceased
+
+    EndAtSceneRequest:
+      type: object
+      required: [outcome]
+      properties:
+        outcome: { $ref: '#/components/schemas/SceneOutcome' }
+        notes: { type: string, maxLength: 1000, nullable: true }
 
     CancellationRequestStatus:
       type: string
@@ -2058,8 +2073,16 @@ components:
         details: { type: string, nullable: true }
         priority: { $ref: '#/components/schemas/CallPriority' }
         status: { $ref: '#/components/schemas/CallStatus' }
-        outcome: { type: string, nullable: true }
-        transported: { type: boolean, nullable: true }
+        transported:
+          type: boolean
+          nullable: true
+          description: Set when the call completes. False when the crew finished at the scene.
+        scene_outcome:
+          allOf:
+            - $ref: '#/components/schemas/SceneOutcome'
+          nullable: true
+          description: Set only when `transported` is false.
+        scene_outcome_notes: { type: string, nullable: true }
         cancellation_request_status:
           allOf:
             - $ref: '#/components/schemas/CancellationRequestStatus'
@@ -2601,6 +2624,12 @@ components:
       properties:
         emergency_call_id: { type: string, format: uuid }
         call_status: { $ref: '#/components/schemas/CallStatus' }
+        transported:
+          type: boolean
+          nullable: true
+          description: |
+            Null until the call completes. False means the crew finished at the scene. The
+            reason is deliberately not shown to the caller.
         ambulance_is_on_the_way: { type: boolean }
         ambulance_latitude: { type: number, format: double, nullable: true }
         ambulance_longitude: { type: number, format: double, nullable: true }

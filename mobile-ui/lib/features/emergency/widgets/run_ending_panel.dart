@@ -21,7 +21,10 @@ class RunEndingPanel extends StatelessWidget {
       RunEndingKind.cancelled => (Icons.cancel_outlined, scheme.error),
       RunEndingKind.reassigned => (Icons.swap_horiz, scheme.warning),
       RunEndingKind.diverted => (Icons.alt_route, scheme.warning),
-      RunEndingKind.handedOver => (Icons.check_circle_outline, scheme.primary),
+      RunEndingKind.handedOver || RunEndingKind.endedAtScene => (
+        Icons.check_circle_outline,
+        scheme.primary,
+      ),
       RunEndingKind.unavailable => (Icons.info_outline, scheme.warning),
     };
 

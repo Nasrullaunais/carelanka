@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../services/api_client/models/scene_outcome.dart';
+import '../models/scene_outcome_labels.dart';
+
 Future<String?> askDeclineReason(BuildContext context) => showDialog<String>(
   context: context,
   builder: (_) => const _DeclineDialog(),
@@ -12,6 +15,16 @@ Future<HandoverDetails?> askHandoverDetails(BuildContext context) =>
       context: context,
       isScrollControlled: true,
       builder: (_) => const _HandoverSheet(),
+    );
+
+typedef SceneFinish = ({SceneOutcome outcome, String? notes});
+
+Future<SceneFinish?> askSceneOutcome(BuildContext context) =>
+    showModalBottomSheet<SceneFinish>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => const _SceneOutcomeSheet(),
     );
 
 String? _blankToNull(String text) => text.trim().isEmpty ? null : text.trim();
@@ -120,6 +133,79 @@ class _HandoverSheetState extends State<_HandoverSheet> {
               patientCondition: _blankToNull(_condition.text),
             )),
             child: const Text('Confirm handover'),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _SceneOutcomeSheet extends StatefulWidget {
+  const _SceneOutcomeSheet();
+
+  @override
+  State<_SceneOutcomeSheet> createState() => _SceneOutcomeSheetState();
+}
+
+class _SceneOutcomeSheetState extends State<_SceneOutcomeSheet> {
+  final _notes = TextEditingController();
+  SceneOutcome? _outcome;
+
+  @override
+  void dispose() {
+    _notes.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+    padding: EdgeInsets.fromLTRB(
+      20,
+      4,
+      20,
+      20 + MediaQuery.viewInsetsOf(context).bottom,
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Why is nobody going to hospital?',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 8),
+        RadioGroup<SceneOutcome>(
+          groupValue: _outcome,
+          onChanged: (value) => setState(() => _outcome = value),
+          child: Column(
+            children: [
+              for (final outcome in SceneOutcome.$valuesDefined)
+                RadioListTile<SceneOutcome>(
+                  value: outcome,
+                  title: Text(outcome.crewLabel),
+                  contentPadding: EdgeInsets.zero,
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _notes,
+          maxLength: 1000,
+          maxLines: 3,
+          decoration: const InputDecoration(labelText: 'Notes (optional)'),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: _outcome == null
+                ? null
+                : () => Navigator.pop(context, (
+                    outcome: _outcome!,
+                    notes: _blankToNull(_notes.text),
+                  )),
+            child: const Text('Finish run'),
           ),
         ),
       ],

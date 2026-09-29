@@ -6,8 +6,10 @@ import '../../../services/api_client/models/decline_dispatch_request.dart';
 import '../../../services/api_client/models/dispatch_detail.dart';
 import '../../../services/api_client/models/dispatch_status.dart';
 import '../../../services/api_client/models/dispatch_summary_paged_result.dart';
+import '../../../services/api_client/models/end_at_scene_request.dart';
 import '../../../services/api_client/models/navigation_target.dart';
 import '../../../services/api_client/models/record_handover_request.dart';
+import '../../../services/api_client/models/scene_outcome.dart';
 import '../../../services/api_client/models/update_my_dispatch_status_request.dart';
 
 const historyPageSize = 20;
@@ -22,6 +24,11 @@ abstract interface class CrewRunService {
     String id, {
     String? notes,
     String? patientCondition,
+  });
+  Future<DispatchDetail> endAtScene(
+    String id,
+    SceneOutcome outcome, {
+    String? notes,
   });
   Future<NavigationTarget> navigationTarget(String id);
   Future<DispatchSummaryPagedResult> history({required int page});
@@ -78,6 +85,18 @@ final class GeneratedCrewRunService implements CrewRunService {
         notes: notes,
         patientCondition: patientCondition,
       ),
+    ),
+  );
+
+  @override
+  Future<DispatchDetail> endAtScene(
+    String id,
+    SceneOutcome outcome, {
+    String? notes,
+  }) => callApi(
+    () => _run.endMyDispatchAtScene(
+      id: id,
+      body: EndAtSceneRequest(outcome: outcome, notes: notes),
     ),
   );
 

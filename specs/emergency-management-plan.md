@@ -76,8 +76,9 @@ Patient (Patient's table, read-only FK) ──< EmergencyCall >── Dispatch �
 | `details` | text, nullable | Free-text description of the emergency |
 | `priority` | `CallPriority` | `critical` `high` `medium` `low` — **set by the dispatcher, never the agent** |
 | `status` | `CallStatus` | `received` `dispatched` `en_route` `completed` `cancelled` |
-| `outcome` | text, nullable | Set once the crew hands over — see §8 |
-| `transported` | boolean, nullable | *Addition* — not every call ends in a hospital trip |
+| `transported` | boolean, nullable | *Addition* — not every call ends in a hospital trip. Set when the call completes: true on handover, false when the crew finishes at the scene |
+| `scene_outcome` | `SceneOutcome`, nullable | Why nobody went to hospital: `treated_at_scene` `patient_refused` `patient_not_found` `false_alarm` `patient_deceased`. Set only with `transported = false` |
+| `scene_outcome_notes` | text, nullable | Optional crew notes, up to 1000 characters |
 | `cancellation_request_status` | `CancellationRequestStatus`, nullable | `pending`, `approved`, or `rejected`; null until a post-assignment request exists |
 | `cancellation_request_reason` | text, nullable | Patient's reason, visible to the Duty Manager |
 | `cancellation_requested_at` | timestamptz, nullable | When the caller requested review |
@@ -119,7 +120,7 @@ The ready-crew minimum starts at two and is read from configuration.
 | `id` | uuid, PK | |
 | `emergency_call_id` | uuid, FK → EmergencyCall | |
 | `ambulance_id` | uuid, FK → Ambulance | |
-| `status` | `DispatchStatus` | `assigned` `acknowledged` `en_route_to_scene` `at_scene` `transporting_to_hospital` `handed_over`, plus terminal `declined` `cancelled` `reassigned` |
+| `status` | `DispatchStatus` | `assigned` `acknowledged` `en_route_to_scene` `at_scene` `transporting_to_hospital` `handed_over`, plus terminal `declined` `cancelled` `reassigned` `ended_at_scene` |
 | `superseded_by_dispatch_id` | uuid, FK → Dispatch, nullable | *Addition* — on a diverted run, points at the dispatch that replaced it, so the chain is followable |
 | `dispatched_at` | timestamptz | |
 | `completed_at` | timestamptz, nullable | |
@@ -212,11 +213,13 @@ received ──► dispatched ──► en_route ──► completed
 ```
 assigned ──► acknowledged ──► en_route_to_scene ──► at_scene
     │                                      │                 │
-    └──► declined                         └──► reassigned      └──► transporting_to_hospital ──► handed_over
-    └──► cancelled
+    └──► declined                         └──► reassigned      ├──► transporting_to_hospital ──► handed_over
+    └──► cancelled                                             └──► ended_at_scene
 ```
 
-`declined` is legal only from `assigned`. `cancelled` and `reassigned` are legal only
+`declined` is legal only from `assigned`. `ended_at_scene` is legal only from `at_scene`: the
+crew finishes there with a `SceneOutcome` and nobody goes to hospital. It is not a live status,
+so the ambulance is free again. `cancelled` and `reassigned` are legal only
 before `at_scene`. A diverted run keeps its own row and gains
 `superseded_by_dispatch_id`; the replacement gets a new row.
 
@@ -412,11 +415,11 @@ provisional implementation suggestions.
 
 | Area | Endpoints |
 | :--- | :--- |
-| **Calls** | `POST /emergency-calls`, `GET /emergency-calls`, `GET/PATCH /emergency-calls/{id}`, `POST /emergency-calls/{id}/link-patient`, `POST /emergency-calls/{id}/outcome`, `POST /emergency-calls/{id}/cancel`, `POST /emergency-calls/{id}/dispatch` |
+| **Calls** | `POST /emergency-calls`, `GET /emergency-calls`, `GET/PATCH /emergency-calls/{id}`, `POST /emergency-calls/{id}/link-patient`, `POST /emergency-calls/{id}/cancel`, `POST /emergency-calls/{id}/dispatch` |
 | **Ambulances** | `GET/POST /ambulances`, `GET/PATCH /ambulances/{id}`, retire/reinstate/location/history operations, plus `GET/POST /ambulances/{id}/crew` and `DELETE /ambulances/{ambulanceId}/crew/{staffMemberId}` for current crew |
 | **Dispatch Agent** | `GET /dispatch-proposals`, `POST /dispatch-proposals`, `GET /dispatch-proposals/{id}`, `POST /dispatch-proposals/{id}/confirm`, `POST /dispatch-proposals/{id}/approve`, `POST /dispatch-proposals/{id}/reject` |
 | **Dispatches** | `GET /dispatches`, `GET /dispatches/{id}`, divert/cancel/route operations, and read-only `GET /dispatches/{id}/crew` snapshot |
-| **My Run** (Flutter, crew) | active/history, `GET /me/dispatches/{id}` (how a finished run ended), `POST /me/dispatches/{id}/acknowledge`, `POST /me/dispatches/{id}/decline`, status progress, Google Maps navigation target, and handover |
+| **My Run** (Flutter, crew) | active/history, `GET /me/dispatches/{id}` (how a finished run ended), `POST /me/dispatches/{id}/acknowledge`, `POST /me/dispatches/{id}/decline`, status progress, Google Maps navigation target, `POST /me/dispatches/{id}/end-at-scene`, and handover |
 | **My Calls** (patient APIs; screen owned by M4) | own-call list/tracking, direct pre-dispatch cancel, post-assignment cancellation request |
 | **Cancellation review** | Duty Manager list plus approve/reject operations under `/emergency-cancellation-requests` |
 | **Reports** | `GET /reports/emergency/response-times`, `GET /reports/emergency/fleet-utilisation`, `GET /reports/emergency/agent-performance` |
@@ -461,6 +464,7 @@ Flutter is where the work gets done, and this component has **two distinct Flutt
 | **Navigate** | Launch Google Maps to the scene, then to CareLanka Hospital's configured emergency entrance |
 | **Status buttons** | Acknowledge or decline, then en route to scene → at scene → transporting to hospital → handed over |
 | **Handover** | Condition on arrival, notes, and any identity details a relative gave at the scene |
+| **Finish at the scene** | From `at_scene`, when nobody is going to hospital: pick a reason (treated, refused, not found, false alarm, patient died) and add optional notes |
 | **My history** | Past runs, paged |
 
 **Patient — narrow self-service, with screens owned by Patient Management:**

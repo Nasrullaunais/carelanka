@@ -14,6 +14,9 @@ public sealed class PreAdmissionNoticeConfiguration : IEntityTypeConfiguration<P
         {
             table.HasCheckConstraint("ck_pre_admission_notices_status", EnumWire.CheckConstraint<PreAdmissionStatus>("status"));
             table.HasCheckConstraint("ck_pre_admission_notices_attempts", "attempt_count >= 0");
+            table.HasCheckConstraint(
+                "ck_pre_admission_notices_withdrawal_reason",
+                $"withdrawal_reason IS NULL OR {EnumWire.CheckConstraint<CancelReason>("withdrawal_reason")}");
         });
 
         builder.HasKey(notice => notice.Id);
@@ -22,6 +25,10 @@ public sealed class PreAdmissionNoticeConfiguration : IEntityTypeConfiguration<P
             .HasMaxLength(20)
             .IsRequired();
         builder.Property(notice => notice.FailureReason).HasMaxLength(200);
+        builder.Property(notice => notice.Version).IsRowVersion();
+        builder.Property(notice => notice.WithdrawalReason)
+            .HasConversion(new SnakeCaseEnumConverter<CancelReason>())
+            .HasMaxLength(30);
         builder.HasOne(notice => notice.EmergencyCall)
             .WithMany()
             .HasForeignKey(notice => notice.EmergencyCallId)
@@ -35,6 +42,6 @@ public sealed class PreAdmissionNoticeConfiguration : IEntityTypeConfiguration<P
             .IsUnique();
         builder.HasIndex(notice => notice.NextAttemptAt)
             .HasDatabaseName("ix_pre_admission_notices_due")
-            .HasFilter("status = 'queued'");
+            .HasFilter("status IN ('queued', 'withdrawing')");
     }
 }

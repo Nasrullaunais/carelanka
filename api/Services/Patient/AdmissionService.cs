@@ -474,6 +474,9 @@ public sealed class AdmissionService : IAdmissionService
     public Task<AdmissionEntity?> FindByIdAsync(Guid id, CancellationToken ct = default)
         => _db.Admissions.FirstOrDefaultAsync(a => a.Id == id, ct);
 
+    public Task<AdmissionEntity?> FindByDispatchIdAsync(string dispatchId, CancellationToken ct = default)
+        => _db.Admissions.FirstOrDefaultAsync(a => a.DispatchId == dispatchId, ct);
+
     public async Task<AdmissionEntity> GetByIdAsync(Guid id, CancellationToken ct = default)
         => await FindByIdAsync(id, ct) ?? throw new NotFoundException("Admission", id);
 

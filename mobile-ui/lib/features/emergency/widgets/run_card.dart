@@ -13,6 +13,7 @@ class RunCard extends StatelessWidget {
     required this.onStep,
     required this.onDecline,
     required this.onNavigate,
+    required this.onEndAtScene,
   });
 
   final DispatchDetail run;
@@ -20,6 +21,7 @@ class RunCard extends StatelessWidget {
   final VoidCallback onStep;
   final VoidCallback onDecline;
   final VoidCallback onNavigate;
+  final VoidCallback onEndAtScene;
 
   @override
   Widget build(BuildContext context) {
@@ -68,6 +70,16 @@ class RunCard extends StatelessWidget {
                   )
                 : Text(step.label),
           ),
+        if (status?.canEndAtScene ?? false) ...[
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: busy ? null : onEndAtScene,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+            ),
+            child: const Text('Finish without going to hospital'),
+          ),
+        ],
         if (status?.canNavigate ?? false) ...[
           const SizedBox(height: 12),
           OutlinedButton.icon(

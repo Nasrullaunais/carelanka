@@ -10,5 +10,6 @@ public enum DispatchStatus
     HandedOver,
     Declined,
     Cancelled,
-    Reassigned
+    Reassigned,
+    EndedAtScene
 }

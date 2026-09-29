@@ -495,6 +495,13 @@ misreported as successful duplicates. `caller_user_id` and `patient_id` are sent
 patient’s name. Nothing shows the dispatcher that a pre-admission failed except the row and
 the log.
 
+**Withdrawing it again** *(2026-09-30, `emergency-crew-flow.md` Fix 4).* When the crew finishes at
+the scene, or an approved caller cancellation ends a dispatched call, the notice goes to
+`withdrawing` and `PreAdmissionWorker` cancels the admission through
+`IPreAdmissionGateway.WithdrawAsync`. Patient Management's `CancelReason` gained
+`treated_at_scene`, `died_at_scene` and `call_cancelled` for it. The notice has a row version so a
+withdrawal can never be overwritten by a send that was already in flight.
+
 ### Phase 10 — Dispatch & Routing AI agent
 
 > **Follow-up (2026-09-28):** the agent now runs by itself and the desk is one screen — see `emergency-dispatch-desk.md`.

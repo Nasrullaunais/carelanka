@@ -13,6 +13,7 @@ import type {
   DispatchStatus,
   DispatchWithdrawalReason,
   EmergencyCallSummary,
+  SceneOutcome,
 } from '../../services/api/generated';
 
 export type StatusTone = ChipVariants['color'];
@@ -75,6 +76,7 @@ export const dispatchStatusLabels: Record<DispatchStatus, string> = {
   declined: 'Declined',
   cancelled: 'Cancelled',
   reassigned: 'Reassigned',
+  ended_at_scene: 'Finished at scene',
 };
 
 export const dispatchStatusTones: Record<DispatchStatus, StatusTone> = {
@@ -87,6 +89,7 @@ export const dispatchStatusTones: Record<DispatchStatus, StatusTone> = {
   declined: 'danger',
   cancelled: 'danger',
   reassigned: 'danger',
+  ended_at_scene: 'default',
 };
 
 export const proposalStatusLabels: Record<DispatchProposalStatus, string> = {
@@ -157,6 +160,17 @@ export const cancelReasonLabels: Record<CancelReason, string> = {
   died_en_route: 'Patient died en route',
   patient_refused: 'Patient refused transport',
   no_show: 'No show',
+  treated_at_scene: 'Treated at the scene',
+  died_at_scene: 'Patient died at the scene',
+  call_cancelled: 'Emergency call cancelled',
+};
+
+export const sceneOutcomeLabels: Record<SceneOutcome, string> = {
+  treated_at_scene: 'Treated at the scene',
+  patient_refused: 'Patient refused to go',
+  patient_not_found: 'Patient not found at the location',
+  false_alarm: 'False alarm',
+  patient_deceased: 'Patient died at the scene',
 };
 
 export const blockReasonLabels: Record<AmbulanceEligibilityBlockReason, string> = {

@@ -3281,6 +3281,9 @@ components:
         - died_en_route
         - patient_refused
         - no_show
+        - treated_at_scene
+        - died_at_scene
+        - call_cancelled
 
     WardType:
       type: string

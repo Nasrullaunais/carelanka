@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../services/api_client/models/call_status.dart';
+import '../models/tracking_headline.dart';
 import '../state/patient_emergency_controller.dart';
 
 class EmergencyTrackingScreen extends StatefulWidget {
@@ -91,7 +92,7 @@ class _EmergencyTrackingScreenState extends State<EmergencyTrackingScreen>
           padding: const EdgeInsets.all(AppTheme.gutter),
           children: [
             Text(
-              _statusLabel(tracking?.callStatus),
+              tracking.headline,
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 12),
@@ -128,13 +129,4 @@ class _EmergencyTrackingScreenState extends State<EmergencyTrackingScreen>
       ),
     );
   }
-
-  static String _statusLabel(CallStatus? status) => switch (status) {
-    CallStatus.received => 'Request received',
-    CallStatus.dispatched => 'An ambulance is on the way',
-    CallStatus.enRoute => 'Ambulance response in progress',
-    CallStatus.completed => 'Response completed',
-    CallStatus.cancelled => 'Request cancelled',
-    _ => 'Checking your request…',
-  };
 }

@@ -67,6 +67,15 @@ public sealed class MyDispatchesController(IDispatchService dispatches) : Contro
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
     public async Task<ActionResult<DispatchDetail>> Progress(Guid id, UpdateMyDispatchStatusRequest request, CancellationToken ct) => Ok(await dispatches.ProgressAsync(id, request, ct));
 
+    [HttpPost("{id:guid}/end-at-scene", Name = "endMyDispatchAtScene")]
+    [ProducesResponseType(typeof(DispatchDetail), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<DispatchDetail>> EndAtScene(Guid id, EndAtSceneRequest request, CancellationToken ct) => Ok(await dispatches.EndAtSceneAsync(id, request, ct));
+
     [HttpPost("{id:guid}/handover", Name = "recordHandover")]
     [ProducesResponseType(typeof(DispatchDetail), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]

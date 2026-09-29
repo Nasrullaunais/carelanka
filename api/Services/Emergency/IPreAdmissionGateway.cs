@@ -18,7 +18,17 @@ public enum PreAdmissionOutcome
     Unavailable
 }
 
+public enum PreAdmissionWithdrawalOutcome
+{
+    Withdrawn,
+    Rejected,
+    Unavailable
+}
+
 public interface IPreAdmissionGateway
 {
     Task<PreAdmissionOutcome> SendAsync(PreAdmissionRequest request, CancellationToken cancellationToken = default);
+
+    Task<PreAdmissionWithdrawalOutcome> WithdrawAsync(
+        Guid dispatchId, CancelReason reason, CancellationToken cancellationToken = default);
 }

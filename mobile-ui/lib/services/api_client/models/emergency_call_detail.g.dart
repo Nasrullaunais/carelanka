@@ -30,8 +30,11 @@ EmergencyCallDetail _$EmergencyCallDetailFromJson(Map<String, dynamic> json) =>
       status: json['status'] == null
           ? null
           : CallStatus.fromJson(json['status'] as String),
-      outcome: json['outcome'] as String?,
       transported: json['transported'] as bool?,
+      sceneOutcome: json['scene_outcome'] == null
+          ? null
+          : SceneOutcome.fromJson(json['scene_outcome'] as String),
+      sceneOutcomeNotes: json['scene_outcome_notes'] as String?,
       cancellationRequestStatus: json['cancellation_request_status'] == null
           ? null
           : CancellationRequestStatus.fromJson(
@@ -71,8 +74,9 @@ Map<String, dynamic> _$EmergencyCallDetailToJson(
   'details': instance.details,
   'priority': instance.priority,
   'status': instance.status,
-  'outcome': instance.outcome,
   'transported': instance.transported,
+  'scene_outcome': instance.sceneOutcome,
+  'scene_outcome_notes': instance.sceneOutcomeNotes,
   'cancellation_request_status': instance.cancellationRequestStatus,
   'created_at': instance.createdAt?.toIso8601String(),
   'updated_at': instance.updatedAt?.toIso8601String(),

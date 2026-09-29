@@ -6,6 +6,7 @@ public sealed class MyCallTracking
 {
     public Guid EmergencyCallId { get; set; }
     public CallStatus CallStatus { get; set; }
+    public bool? Transported { get; set; }
     public bool AmbulanceIsOnTheWay { get; set; }
     public decimal? AmbulanceLatitude { get; set; }
     public decimal? AmbulanceLongitude { get; set; }

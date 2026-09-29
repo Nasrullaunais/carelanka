@@ -24,6 +24,8 @@ enum DispatchStatus {
   cancelled('cancelled'),
   @JsonValue('reassigned')
   reassigned('reassigned'),
+  @JsonValue('ended_at_scene')
+  endedAtScene('ended_at_scene'),
   /// Default value for all unparsed values, allows backward compatibility when adding new values on the backend.
   $unknown(null);
 

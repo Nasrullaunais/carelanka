@@ -6,6 +6,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/widgets/async_data.dart';
 import '../../../services/api_client/models/dispatch_detail.dart';
 import '../../../services/api_client/models/navigation_target.dart';
+import '../../../services/api_client/models/scene_outcome.dart';
 import '../models/run_ending.dart';
 import '../models/run_step.dart';
 import '../services/crew_run_service.dart';
@@ -77,6 +78,9 @@ class MyRunController extends ChangeNotifier {
       patientCondition: patientCondition,
     ),
   );
+
+  Future<bool> endAtScene(SceneOutcome outcome, {String? notes}) =>
+      _act((run) => _service.endAtScene(run.id!, outcome, notes: notes));
 
   Future<NavigationTarget?> navigationTarget() async {
     final run = _state.valueOrNull;

@@ -125,6 +125,7 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
                             _step(context, controller, run.status?.nextStep),
                         onDecline: () => _decline(context, controller),
                         onNavigate: () => _navigate(context, controller),
+                        onEndAtScene: () => _endAtScene(context, controller),
                       ),
               ),
             ),
@@ -154,6 +155,16 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
         break;
       default:
         await controller.advance();
+    }
+  }
+
+  Future<void> _endAtScene(
+    BuildContext context,
+    MyRunController controller,
+  ) async {
+    final finish = await askSceneOutcome(context);
+    if (finish != null) {
+      await controller.endAtScene(finish.outcome, notes: finish.notes);
     }
   }
 

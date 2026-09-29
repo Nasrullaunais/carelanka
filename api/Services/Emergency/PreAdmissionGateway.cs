@@ -1,5 +1,6 @@
 using CareLanka.Api.Common.Errors;
 using CareLanka.Api.Common.Exceptions;
+using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Patient;
 using CareLanka.Api.Services.Patient;
 
@@ -36,6 +37,30 @@ public sealed class PreAdmissionGateway(IAdmissionService admissions) : IPreAdmi
         catch (NotFoundException)
         {
             return PreAdmissionOutcome.Rejected;
+        }
+    }
+
+    public async Task<PreAdmissionWithdrawalOutcome> WithdrawAsync(
+        Guid dispatchId, CancelReason reason, CancellationToken cancellationToken = default)
+    {
+        var admission = await admissions.FindByDispatchIdAsync(dispatchId.ToString(), cancellationToken);
+        if (admission is null || admission.Status == AdmissionStatus.Cancelled)
+        {
+            return PreAdmissionWithdrawalOutcome.Withdrawn;
+        }
+
+        try
+        {
+            await admissions.CancelAsync(admission.Id, new CancelAdmissionRequest { Reason = reason }, cancellationToken);
+            return PreAdmissionWithdrawalOutcome.Withdrawn;
+        }
+        catch (ConflictException)
+        {
+            return PreAdmissionWithdrawalOutcome.Rejected;
+        }
+        catch (NotFoundException)
+        {
+            return PreAdmissionWithdrawalOutcome.Withdrawn;
         }
     }
 }

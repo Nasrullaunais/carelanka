@@ -2,7 +2,14 @@ import '../../../core/utils/friendly_date.dart';
 import '../../../services/api_client/models/dispatch_detail.dart';
 import '../../../services/api_client/models/dispatch_status.dart';
 
-enum RunEndingKind { cancelled, reassigned, diverted, handedOver, unavailable }
+enum RunEndingKind {
+  cancelled,
+  reassigned,
+  diverted,
+  handedOver,
+  endedAtScene,
+  unavailable,
+}
 
 final class RunEnding {
   const RunEnding._(
@@ -41,6 +48,7 @@ final class RunEnding {
             : RunEndingKind.reassigned,
       ),
       DispatchStatus.handedOver => of(RunEndingKind.handedOver),
+      DispatchStatus.endedAtScene => of(RunEndingKind.endedAtScene),
       _ => null,
     };
   }
@@ -53,6 +61,7 @@ final class RunEnding {
       completedAt == null
           ? 'Handover recorded'
           : 'Handover recorded at ${FriendlyDate.time(completedAt!)}',
+    RunEndingKind.endedAtScene => 'Run finished at the scene',
     RunEndingKind.unavailable => 'This run is no longer assigned to you',
   };
 
@@ -66,7 +75,7 @@ final class RunEnding {
           ? 'Another ambulance is taking this call.'
           : 'Reason: $reason',
     RunEndingKind.diverted => 'Accept the new run below.',
-    RunEndingKind.handedOver =>
+    RunEndingKind.handedOver || RunEndingKind.endedAtScene =>
       '${registration ?? 'Your ambulance'} is available for the next run.',
     RunEndingKind.unavailable => 'Check with the duty manager if unsure.',
   };

@@ -173,6 +173,41 @@ public sealed class EmergencyCallEndpointTests
         Assert.Equal(HttpStatusCode.OK, completedTracking.StatusCode);
         using var completedTrackingBody = JsonDocument.Parse(await completedTracking.Content.ReadAsStringAsync());
         Assert.Equal("completed", completedTrackingBody.RootElement.GetProperty("call_status").GetString());
+        Assert.True(completedTrackingBody.RootElement.GetProperty("transported").GetBoolean());
+    }
+
+    [Fact]
+    public async Task A_call_finished_at_the_scene_tells_the_caller_only_that_nobody_was_transported()
+    {
+        using var patient = await PatientClientAsync();
+        using var manager = await StaffClientAsync(ApiApplication.ManagerEmail);
+        var callId = await CreatePatientCallAsync(patient);
+        var ready = await CreateReadyAmbulanceAsync(manager);
+        using var crew = await StaffClientAsync(ready.FirstCrewEmail);
+        using var dispatched = await manager.PostAsJsonAsync($"/api/emergency-calls/{callId}/dispatch", new { ambulance_id = ready.AmbulanceId });
+        using var dispatchBody = JsonDocument.Parse(await dispatched.Content.ReadAsStringAsync());
+        var dispatchId = dispatchBody.RootElement.GetProperty("id").GetGuid();
+        (await crew.PostAsync($"/api/me/dispatches/{dispatchId}/acknowledge", null)).EnsureSuccessStatusCode();
+        (await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status = "en_route_to_scene" })).EnsureSuccessStatusCode();
+        (await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status = "at_scene" })).EnsureSuccessStatusCode();
+
+        using var ended = await crew.PostAsJsonAsync(
+            $"/api/me/dispatches/{dispatchId}/end-at-scene", new { outcome = "patient_deceased", notes = "Declared at 14:05" });
+        Assert.Equal(HttpStatusCode.OK, ended.StatusCode);
+
+        using var tracking = await patient.GetAsync($"/api/me/emergency-calls/{callId}/tracking");
+        var trackingText = await tracking.Content.ReadAsStringAsync();
+        using var trackingBody = JsonDocument.Parse(trackingText);
+        Assert.Equal("completed", trackingBody.RootElement.GetProperty("call_status").GetString());
+        Assert.False(trackingBody.RootElement.GetProperty("transported").GetBoolean());
+        Assert.DoesNotContain("patient_deceased", trackingText);
+        Assert.DoesNotContain("Declared at 14:05", trackingText);
+
+        using var detail = await manager.GetAsync($"/api/emergency-calls/{callId}");
+        using var detailBody = JsonDocument.Parse(await detail.Content.ReadAsStringAsync());
+        Assert.False(detailBody.RootElement.GetProperty("transported").GetBoolean());
+        Assert.Equal("patient_deceased", detailBody.RootElement.GetProperty("scene_outcome").GetString());
+        Assert.Equal("Declared at 14:05", detailBody.RootElement.GetProperty("scene_outcome_notes").GetString());
     }
 
     [Fact]
@@ -302,6 +337,12 @@ public sealed class EmergencyCallEndpointTests
         Assert.Equal(HttpStatusCode.OK, tracking.StatusCode);
         using var trackingBody = JsonDocument.Parse(await tracking.Content.ReadAsStringAsync());
         Assert.Equal("cancelled", trackingBody.RootElement.GetProperty("call_status").GetString());
+
+        using var scope = _application.Services.CreateScope();
+        var notice = await scope.ServiceProvider.GetRequiredService<CareLankaDbContext>()
+            .PreAdmissionNotices.AsNoTracking().SingleAsync(x => x.EmergencyCallId == callId);
+        Assert.Equal(PreAdmissionStatus.Withdrawing, notice.Status);
+        Assert.Equal(CancelReason.CallCancelled, notice.WithdrawalReason);
     }
 
     [Fact]

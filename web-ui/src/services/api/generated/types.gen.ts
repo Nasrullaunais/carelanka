@@ -464,7 +464,7 @@ export type CancelDispatchRequest = {
     reason?: string | null;
 };
 
-export type CancelReason = 'diverted_to_other_hospital' | 'false_alarm' | 'died_en_route' | 'patient_refused' | 'no_show';
+export type CancelReason = 'diverted_to_other_hospital' | 'false_alarm' | 'died_en_route' | 'patient_refused' | 'no_show' | 'treated_at_scene' | 'died_at_scene' | 'call_cancelled';
 
 export type CancellationRequestStatus = 'pending' | 'approved' | 'rejected';
 
@@ -999,7 +999,7 @@ export type DispatchRecommendationSource = 'model' | 'model_unavailable' | 'mode
 
 export type DispatchRejectionReason = 'unsafe_diversion' | 'source_call_too_urgent_to_divert' | 'ambulance_unsuitable' | 'handled_another_way' | 'no_longer_needed' | 'other';
 
-export type DispatchStatus = 'assigned' | 'acknowledged' | 'en_route_to_scene' | 'at_scene' | 'transporting_to_hospital' | 'handed_over' | 'declined' | 'cancelled' | 'reassigned';
+export type DispatchStatus = 'assigned' | 'acknowledged' | 'en_route_to_scene' | 'at_scene' | 'transporting_to_hospital' | 'handed_over' | 'declined' | 'cancelled' | 'reassigned' | 'ended_at_scene';
 
 export type DispatchSummary = {
     id?: string;
@@ -1089,8 +1089,9 @@ export type EmergencyCallDetail = {
     details?: string | null;
     priority?: CallPriority;
     status?: CallStatus;
-    outcome?: string | null;
     transported?: boolean | null;
+    scene_outcome?: SceneOutcome;
+    scene_outcome_notes?: string | null;
     cancellation_request_status?: CancellationRequestStatus;
     created_at?: string;
     updated_at?: string;
@@ -1156,6 +1157,11 @@ export type EndAllocationResponse = {
     allocation: AllocationDto;
     shift_coverage: ShiftCoverageDto;
     roster_proposal_id?: string | null;
+};
+
+export type EndAtSceneRequest = {
+    outcome?: SceneOutcome;
+    notes?: string | null;
 };
 
 export type EquipmentCategory = {
@@ -1486,6 +1492,7 @@ export type MyBillLine = {
 export type MyCallTracking = {
     emergency_call_id?: string;
     call_status?: CallStatus;
+    transported?: boolean | null;
     ambulance_is_on_the_way?: boolean;
     ambulance_latitude?: number | null;
     ambulance_longitude?: number | null;
@@ -2118,6 +2125,8 @@ export type RouteLog = {
     arrived_at?: string | null;
     maps_api_reference?: string | null;
 };
+
+export type SceneOutcome = 'treated_at_scene' | 'patient_refused' | 'patient_not_found' | 'false_alarm' | 'patient_deceased';
 
 export type SettleBillRequest = {
     settlement_note?: string | null;
@@ -7837,6 +7846,49 @@ export type UpdateMyDispatchStatusResponses = {
 };
 
 export type UpdateMyDispatchStatusResponse = UpdateMyDispatchStatusResponses[keyof UpdateMyDispatchStatusResponses];
+
+export type EndMyDispatchAtSceneData = {
+    body?: EndAtSceneRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/dispatches/{id}/end-at-scene';
+};
+
+export type EndMyDispatchAtSceneErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type EndMyDispatchAtSceneError = EndMyDispatchAtSceneErrors[keyof EndMyDispatchAtSceneErrors];
+
+export type EndMyDispatchAtSceneResponses = {
+    /**
+     * OK
+     */
+    200: DispatchDetail;
+};
+
+export type EndMyDispatchAtSceneResponse = EndMyDispatchAtSceneResponses[keyof EndMyDispatchAtSceneResponses];
 
 export type RecordHandoverData = {
     body?: RecordHandoverRequest;

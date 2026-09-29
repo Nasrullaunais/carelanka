@@ -12,6 +12,7 @@ MyCallTracking _$MyCallTrackingFromJson(Map<String, dynamic> json) =>
       callStatus: json['call_status'] == null
           ? null
           : CallStatus.fromJson(json['call_status'] as String),
+      transported: json['transported'] as bool?,
       ambulanceIsOnTheWay: json['ambulance_is_on_the_way'] as bool?,
       ambulanceLatitude: (json['ambulance_latitude'] as num?)?.toDouble(),
       ambulanceLongitude: (json['ambulance_longitude'] as num?)?.toDouble(),
@@ -32,6 +33,7 @@ Map<String, dynamic> _$MyCallTrackingToJson(MyCallTracking instance) =>
     <String, dynamic>{
       'emergency_call_id': instance.emergencyCallId,
       'call_status': instance.callStatus,
+      'transported': instance.transported,
       'ambulance_is_on_the_way': instance.ambulanceIsOnTheWay,
       'ambulance_latitude': instance.ambulanceLatitude,
       'ambulance_longitude': instance.ambulanceLongitude,

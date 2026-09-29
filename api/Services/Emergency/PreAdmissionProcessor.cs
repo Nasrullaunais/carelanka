@@ -9,23 +9,33 @@ public sealed class PreAdmissionProcessor(
     CareLankaDbContext db,
     IPreAdmissionGateway gateway,
     TimeProvider clock,
-    IOptions<EmergencyOptions> options)
+    IOptions<EmergencyOptions> options,
+    ILogger<PreAdmissionProcessor> logger)
 {
     private readonly PreAdmissionOptions _options = options.Value.PreAdmission;
 
-    public async Task<int> SendDueAsync(CancellationToken ct = default)
+    public async Task<int> ProcessDueAsync(CancellationToken ct = default)
     {
         var now = clock.GetUtcNow();
         var due = await db.PreAdmissionNotices
             .Include(x => x.EmergencyCall)
-            .Where(x => x.Status == PreAdmissionStatus.Queued && x.NextAttemptAt <= now)
+            .Where(x => (x.Status == PreAdmissionStatus.Queued || x.Status == PreAdmissionStatus.Withdrawing)
+                && x.NextAttemptAt <= now)
             .OrderBy(x => x.NextAttemptAt)
             .Take(_options.BatchSize)
             .ToListAsync(ct);
 
         foreach (var notice in due)
         {
-            await SendAsync(notice, ct);
+            if (notice.Status == PreAdmissionStatus.Withdrawing)
+            {
+                await WithdrawAsync(notice, ct);
+            }
+            else
+            {
+                await SendAsync(notice, ct);
+            }
+
             await db.SaveChangesAsync(ct);
         }
 
@@ -37,8 +47,8 @@ public sealed class PreAdmissionProcessor(
         var call = notice.EmergencyCall;
         if (call.Status == CallStatus.Cancelled)
         {
-            notice.Status = PreAdmissionStatus.Failed;
-            notice.FailureReason = "call_cancelled";
+            notice.Status = PreAdmissionStatus.Withdrawn;
+            notice.WithdrawalReason = CancelReason.CallCancelled;
             return;
         }
 
@@ -79,9 +89,44 @@ public sealed class PreAdmissionProcessor(
                 notice.FailureReason = "gave_up";
                 break;
             default:
-                var delay = TimeSpan.FromSeconds(_options.RetryBaseSeconds * Math.Pow(3, notice.AttemptCount - 1));
-                notice.NextAttemptAt = clock.GetUtcNow() + delay;
+                ScheduleRetry(notice);
                 break;
         }
+    }
+
+    private async Task WithdrawAsync(Data.Entities.Emergency.PreAdmissionNotice notice, CancellationToken ct)
+    {
+        var outcome = await gateway.WithdrawAsync(notice.DispatchId, notice.WithdrawalReason!.Value, ct);
+        notice.AttemptCount++;
+        switch (outcome)
+        {
+            case PreAdmissionWithdrawalOutcome.Withdrawn:
+                notice.Status = PreAdmissionStatus.Withdrawn;
+                break;
+            case PreAdmissionWithdrawalOutcome.Rejected:
+                FailWithdrawal(notice, "rejected");
+                break;
+            case var _ when notice.AttemptCount >= _options.MaxAttempts:
+                FailWithdrawal(notice, "gave_up");
+                break;
+            default:
+                ScheduleRetry(notice);
+                break;
+        }
+    }
+
+    private void FailWithdrawal(Data.Entities.Emergency.PreAdmissionNotice notice, string reason)
+    {
+        notice.Status = PreAdmissionStatus.WithdrawalFailed;
+        notice.FailureReason = reason;
+        logger.LogWarning(
+            "Pre-admission for dispatch {DispatchId} could not be withdrawn ({Reason}); it needs a manual cancel.",
+            notice.DispatchId, reason);
+    }
+
+    private void ScheduleRetry(Data.Entities.Emergency.PreAdmissionNotice notice)
+    {
+        var delay = TimeSpan.FromSeconds(_options.RetryBaseSeconds * Math.Pow(3, notice.AttemptCount - 1));
+        notice.NextAttemptAt = clock.GetUtcNow() + delay;
     }
 }

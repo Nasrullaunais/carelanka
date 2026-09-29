@@ -93,7 +93,6 @@ public sealed class Notifier(
     private static string DedupeKey(NotificationType type, NotificationSubject subject, NotificationRecipient recipient)
     {
         var recipientKey = recipient.StaffMemberId?.ToString() ?? recipient.PatientAccountId!.Value.ToString();
-        var occasion = subject.Occasion is null ? string.Empty : $"{subject.Occasion}:";
-        return $"{EnumWire.ToWire(type)}:{subject.EntityId}:{occasion}{recipientKey}";
+        return $"{EnumWire.ToWire(type)}:{subject.OccurrenceId ?? subject.EntityId}:{recipientKey}";
     }
 }

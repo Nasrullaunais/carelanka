@@ -20,6 +20,8 @@ enum DispatchProposalStatus {
   rejected('rejected'),
   @JsonValue('failed')
   failed('failed'),
+  @JsonValue('withdrawn')
+  withdrawn('withdrawn'),
   /// Default value for all unparsed values, allows backward compatibility when adding new values on the backend.
   $unknown(null);
 

@@ -212,5 +212,11 @@ public enum MessageCode
 
     PatientHasNoAppAccount,
 
+    NicBirthYearImpossible,
+
+    NicOldFormatAfter2000,
+
+    NicBirthYearMismatch,
+
     PrescriptionHasNoFile
 }

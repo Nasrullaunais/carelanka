@@ -453,4 +453,16 @@
     <value>This patient has no app account to reset.</value>
     <comment>POST /patient-accounts/{patientId}/reset-password. The hospital record exists but no app login is linked to it, so there is no password to replace.</comment>
   </data>
+  <data name="cl_pat_054" xml:space="preserve">
+    <value>An NIC starts with the birth year, and {0} is not a possible one. Check the NIC.</value>
+    <comment>Any NIC input. The first two digits (19xx) of the nine-digit form, or the first four of the twelve-digit form, are a year in the future or more than 120 years ago.</comment>
+  </data>
+  <data name="cl_pat_055" xml:space="preserve">
+    <value>Someone born in 2000 or later has a twelve-digit NIC, not nine digits and a V or X. Check the NIC and the date of birth.</value>
+    <comment>Any NIC input with a date of birth. The nine-digit form was only issued to people born before 2000.</comment>
+  </data>
+  <data name="cl_pat_056" xml:space="preserve">
+    <value>The NIC gives a birth year of {0}, but the date of birth is in {1}. Check both.</value>
+    <comment>Any NIC input with a date of birth, including PATCH /admissions/{id}/details where one of the two is already on the record.</comment>
+  </data>
 </root>

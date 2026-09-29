@@ -954,6 +954,8 @@ export type DispatchProposalDetail = {
     reviewed_at?: string | null;
     review_notes?: string | null;
     rejection_reason?: DispatchRejectionReason;
+    withdrawal_reason?: DispatchWithdrawalReason;
+    withdrawn_at?: string | null;
 };
 
 export type DispatchProposalError = {
@@ -962,7 +964,7 @@ export type DispatchProposalError = {
     occurred_at?: string;
 };
 
-export type DispatchProposalStatus = 'pending' | 'pending_confirmation' | 'pending_approval' | 'approved' | 'executed' | 'rejected' | 'failed';
+export type DispatchProposalStatus = 'pending' | 'pending_confirmation' | 'pending_approval' | 'approved' | 'executed' | 'rejected' | 'failed' | 'withdrawn';
 
 export type DispatchProposalSummary = {
     id?: string;
@@ -1030,6 +1032,8 @@ export type DispatchValidationResult = {
     checked_at?: string;
 };
 
+export type DispatchWithdrawalReason = 'call_changed' | 'dispatched_manually' | 'call_closed';
+
 export type DiversionImpact = {
     source_dispatch_id?: string;
     source_call_id?: string;
@@ -1083,7 +1087,7 @@ export type EmergencyCallDetail = {
     created_at?: string;
     updated_at?: string;
     dispatches?: Array<DispatchSummary>;
-    open_proposal_id?: string | null;
+    latest_proposal?: DispatchProposalSummary;
 };
 
 export type EmergencyCallSortField = 'priority' | 'created_at' | 'status';
@@ -1097,7 +1101,7 @@ export type EmergencyCallSummary = {
     latitude?: number;
     longitude?: number;
     active_dispatch_id?: string | null;
-    open_proposal_id?: string | null;
+    latest_proposal?: DispatchProposalSummary;
     waiting_minutes?: number;
     created_at?: string;
 };
@@ -1593,7 +1597,7 @@ export type NavigationTarget = {
 
 export type NavigationWaypoint = 'scene' | 'hospital_emergency_entrance';
 
-export type NotificationType = 'dispatch_assigned' | 'appointment_booked' | 'appointment_rescheduled' | 'appointment_cancelled' | 'appointment_reminder' | 'admission_approved' | 'bed_assigned' | 'discharge_ready' | 'bill_raised' | 'bill_settled' | 'care_reply_ready' | 'prescription_ready' | 'prescription_delivered' | 'lab_report_ready' | 'ambulance_on_the_way' | 'ambulance_arrived' | 'cancellation_answered' | 'emergency_call_received' | 'cancellation_request_waiting' | 'dispatch_proposal_waiting' | 'admission_awaiting_approval' | 'care_query_flagged' | 'care_reply_waiting' | 'equipment_warning_raised' | 'maintenance_due' | 'pharmacy_stock_low' | 'lab_test_requested' | 'leave_requested' | 'leave_approved' | 'leave_rejected' | 'shift_changed' | 'roster_proposal_waiting';
+export type NotificationType = 'dispatch_assigned' | 'appointment_booked' | 'appointment_rescheduled' | 'appointment_cancelled' | 'appointment_reminder' | 'admission_approved' | 'bed_assigned' | 'discharge_ready' | 'bill_raised' | 'bill_settled' | 'care_reply_ready' | 'prescription_ready' | 'prescription_delivered' | 'lab_report_ready' | 'ambulance_on_the_way' | 'ambulance_arrived' | 'cancellation_answered' | 'emergency_call_received' | 'cancellation_request_waiting' | 'dispatch_proposal_waiting' | 'dispatch_proposal_failed' | 'admission_awaiting_approval' | 'care_query_flagged' | 'care_reply_waiting' | 'equipment_warning_raised' | 'maintenance_due' | 'pharmacy_stock_low' | 'lab_test_requested' | 'leave_requested' | 'leave_approved' | 'leave_rejected' | 'shift_changed' | 'roster_proposal_waiting';
 
 export type OutstandingBill = {
     admission_id: string;

@@ -3398,20 +3398,26 @@ components:
           type: string
           maxLength: 20
           nullable: true
-          pattern: '^(\d{9}[VvXx]|\d{12}|(?=.*[A-Za-z])[A-Za-z0-9]{6,15})$'
+          pattern: '^(\d{9}[VvXx]|\d{12}|[A-Za-z][A-Za-z0-9]{5,14})$'
           description: |
             A Sri Lankan NIC in either form, or a passport number. Omit for an unidentified
             arrival; the server then generates a temp_reference.
 
             Three alternatives: the old NIC (nine digits and a V or an X), the new NIC (twelve
-            digits), or a passport (six to fifteen letters and digits, **with at least one
-            letter**). That last condition is what makes the check worth having - without it
-            every mistyped NIC would be waved through as "a passport, presumably".
+            digits), or a passport (six to fifteen letters and digits, **starting with a
+            letter**). That last condition is what makes the check worth having - with only
+            "has a letter somewhere", `2947382939772v` passed as a passport. Changed
+            2026-09-30.
 
-            The known cost: `199534501Z` is an old NIC with the wrong final letter, and also a
-            perfectly ordinary passport number in some country. No pattern can tell those
-            apart, so it is accepted. Passport numbering is not standardised, and a wide range
-            beats registering every foreign patient against a temp reference.
+            **The NIC carries the birth year**, and the server checks it (`cl_pat_054`-`056`,
+            reported under `date_of_birth` when the pair disagrees):
+            - Nine-digit form: the first two digits are a 19xx year. Nobody born in 2000 or
+              later has one.
+            - Twelve-digit form: the first four digits are the full year. Held by everyone born
+              from 2000 on, and by people born earlier who have renewed.
+            - The year must be possible (not in the future, not more than 120 years ago) and,
+              when a date of birth is given, the same as its year.
+            - A passport carries no year and is not checked against the date of birth.
           example: '199745600321'
         gender: { $ref: '#/components/schemas/Gender' }
         date_of_birth:
@@ -4289,7 +4295,7 @@ components:
         nic:
           type: string
           maxLength: 20
-          pattern: '^(\d{9}[VvXx]|\d{12}|(?=.*[A-Za-z])[A-Za-z0-9]{6,15})$'
+          pattern: '^(\d{9}[VvXx]|\d{12}|[A-Za-z][A-Za-z0-9]{5,14})$'
           description: |
             Required here, unlike at the desk, so the desk can find a patient who signed up in the
             app first.

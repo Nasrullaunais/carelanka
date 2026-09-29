@@ -46,6 +46,8 @@ enum NotificationType {
   cancellationRequestWaiting('cancellation_request_waiting'),
   @JsonValue('dispatch_proposal_waiting')
   dispatchProposalWaiting('dispatch_proposal_waiting'),
+  @JsonValue('dispatch_proposal_failed')
+  dispatchProposalFailed('dispatch_proposal_failed'),
   @JsonValue('admission_awaiting_approval')
   admissionAwaitingApproval('admission_awaiting_approval'),
   @JsonValue('care_query_flagged')

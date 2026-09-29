@@ -2258,7 +2258,7 @@ note near the top of this document. `PatientAdmissionBed` is unchanged.
 ### AgentWorkflowStatus *(Rev 2 — changed)*
 ```
 Pending, PendingApproval, AutoApproved, Approved,
-RevisionRequested, Rejected, Executed, Failed
+RevisionRequested, Rejected, Executed, Failed, Withdrawn
 ```
 Was `{Pending, AutoApproved, Approved, Rejected}`. The staff flow persists the proposal as
 `Pending`, then "the workflow state advances to `PendingApproval`" once deterministic
@@ -2266,7 +2266,10 @@ validation passes — the old enum could not distinguish those. `RevisionRequest
 required by spec §9.1 ("approves, rejects **or requests revision**") and by the React
 approve/reject/revise controls in spec §7. `Executed` separates "a human said yes" from
 "the domain write actually landed". `Failed` is required by spec §9.1's "safe, clearly
-recorded failure".
+recorded failure". `Withdrawn` *(added 2026-09-28)* is a system closure: the thing the
+agent was working on changed or went away before anyone reviewed it (the dispatch agent's
+call was cancelled, dispatched by hand, or re-prioritised). It is not `Rejected`, because no
+person said no, and reports must not count it as one.
 
 Valid transitions:
 ```
@@ -2274,7 +2277,8 @@ Pending ──► PendingApproval ──► Approved ──────► Execu
    │              │         └──► RevisionRequested ──► Pending
    │              └────────► Rejected
    ├──► AutoApproved ──────────────────────────► Executed
-   └──► Failed        (any state may fail; Errors is populated)
+   ├──► Failed        (any state may fail; Errors is populated)
+   └──► Withdrawn     (from Pending or PendingApproval, by the system only)
 ```
 
 ### ProposedChangeType *(Rev 2 — new)*

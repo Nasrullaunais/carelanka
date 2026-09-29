@@ -28,6 +28,7 @@ const Map<NotificationType, String? Function(InboxNotification)> _routes = {
   NotificationType.emergencyCallReceived: _noMobileScreen,
   NotificationType.cancellationRequestWaiting: _noMobileScreen,
   NotificationType.dispatchProposalWaiting: _noMobileScreen,
+  NotificationType.dispatchProposalFailed: _noMobileScreen,
   NotificationType.admissionAwaitingApproval: _noMobileScreen,
   NotificationType.careQueryFlagged: _noMobileScreen,
   NotificationType.careReplyWaiting: _noMobileScreen,

@@ -140,25 +140,27 @@ public sealed class EmergencyNotificationTests
     }
 
     [Fact]
-    public async Task A_dispatch_proposal_ready_for_review_alerts_the_other_duty_managers_but_not_the_one_who_asked()
+    public async Task A_diversion_waiting_for_approval_alerts_the_other_duty_managers_but_not_the_one_who_asked()
     {
         using var manager = await _kit.StaffAsync(ApiApplication.ManagerEmail);
         var managerId = await _kit.StaffIdAsync(ApiApplication.ManagerEmail);
         await _kit.SeedStaffAsync(StaffRole.DutyManager);
         var others = await OtherAmbulanceIdsAsync();
-        await SeedAmbulanceAsync();
-        var callId = await SeedCallAsync(patientId: null);
+        var ambulance = await SeedAmbulanceAsync();
+        await DispatchAsync(manager, await SeedCallAsync(patientId: null, CallPriority.Low), ambulance);
+        var callId = await SeedCallAsync(patientId: null, CallPriority.Critical);
 
         var created = await manager.PostAsJsonAsync("/api/dispatch-proposals", new
         {
             emergency_call_id = callId,
+            allow_diversion = true,
             exclude_ambulance_ids = others
         });
         Assert.Equal(HttpStatusCode.Accepted, created.StatusCode);
         var proposalId = await IdAsync(created);
         await WaitUntilSettledAsync(manager, proposalId);
 
-        await _kit.AssertSentAsync(NotificationType.DispatchProposalWaiting, proposalId,
+        await _kit.AssertSentAsync(NotificationType.DispatchProposalWaiting, callId,
             staff: await _kit.RoleAsync(StaffRole.DutyManager, managerId), patientAccounts: [],
             actorStaffId: managerId);
     }
@@ -289,7 +291,7 @@ public sealed class EmergencyNotificationTests
         return new Ambulance(ambulance.Id, crew.ToArray());
     }
 
-    private async Task<Guid> SeedCallAsync(Guid? patientId)
+    private async Task<Guid> SeedCallAsync(Guid? patientId, CallPriority priority = CallPriority.High)
     {
         using var scope = _application.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
@@ -299,7 +301,7 @@ public sealed class EmergencyNotificationTests
             PatientId = patientId,
             Latitude = 6.9271m,
             Longitude = 79.8612m,
-            Priority = CallPriority.High,
+            Priority = priority,
             Status = CallStatus.Received
         };
         db.EmergencyCalls.Add(call);

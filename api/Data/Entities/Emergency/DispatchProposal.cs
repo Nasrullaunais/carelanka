@@ -39,4 +39,9 @@ public class DispatchProposal : AuditedEntity
     public DateTimeOffset? ReviewedAt { get; set; }
     public string? ReviewNotes { get; set; }
     public DispatchRejectionReason? RejectionReason { get; set; }
+
+    public DispatchWithdrawalReason? WithdrawalReason { get; set; }
+    public DateTimeOffset? WithdrawnAt { get; set; }
+
+    public uint Version { get; set; }
 }

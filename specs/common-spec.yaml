@@ -1004,6 +1004,7 @@ components:
         - emergency_call_received
         - cancellation_request_waiting
         - dispatch_proposal_waiting
+        - dispatch_proposal_failed
         - admission_awaiting_approval
         - care_query_flagged
         - care_reply_waiting
@@ -1058,6 +1059,7 @@ components:
 
     AgentWorkflowStatus:
       type: string
+      description: '`withdrawn` - closed by the system because it no longer applied; no person reviewed it.'
       enum:
         - running
         - awaiting_approval
@@ -1066,6 +1068,7 @@ components:
         - revision_requested
         - completed
         - failed
+        - withdrawn
 
     WorkflowObjective:
       type: string

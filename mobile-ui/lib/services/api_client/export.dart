@@ -178,6 +178,7 @@ export 'models/dispatch_summary.dart';
 export 'models/dispatch_summary_paged_result.dart';
 export 'models/dispatch_tool_call.dart';
 export 'models/dispatch_validation_result.dart';
+export 'models/dispatch_withdrawal_reason.dart';
 export 'models/diversion_impact.dart';
 export 'models/emergency_agent_performance_report.dart';
 export 'models/emergency_call_detail.dart';

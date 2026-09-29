@@ -495,6 +495,8 @@ the log.
 
 ### Phase 10 — Dispatch & Routing AI agent
 
+> **Follow-up (2026-09-28):** the agent now runs by itself and the desk is one screen — see `emergency-dispatch-desk.md`.
+
 **Goal:** add explained decision support over the proven manual workflow.
 
 The agent may read only allow-listed facts:

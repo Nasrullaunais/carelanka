@@ -2,7 +2,9 @@
 
 export const maxAgeYears = 120;
 
-const nicPattern = /^(\d{9}[VvXx]|\d{12}|(?=.*[A-Za-z])[A-Za-z0-9]{6,15})$/;
+const nicPattern = /^(\d{9}[VvXx]|\d{12}|[A-Za-z][A-Za-z0-9]{5,14})$/;
+
+const twelveDigitsOnlyFromYear = 2000;
 
 const phonePattern = /^(0\d{9}|\+94\d{9})$/;
 
@@ -15,19 +17,30 @@ export const fieldLimits = {
 export function nicProblem(value: string): string | null {
   const trimmed = value.trim();
 
-  if (trimmed.length === 0 || nicPattern.test(trimmed)) {
+  if (trimmed.length === 0) {
     return null;
   }
 
-  return 'Nine digits and a V (199534501V), twelve digits (199745600321), or a passport number.';
+  if (!nicPattern.test(trimmed)) {
+    return 'Nine digits and a V (199534501V), twelve digits (199745600321), or a passport number starting with a letter.';
+  }
+
+  const year = nicBirthYear(trimmed);
+  const thisYear = new Date().getFullYear();
+
+  if (year !== null && (year > thisYear || year < thisYear - maxAgeYears)) {
+    return `An NIC starts with the birth year, and ${year} is not a possible one. Check the NIC.`;
+  }
+
+  return null;
 }
 
-const oldNicPattern = /^(\d{2})\d{3}\d{3}\d[VvXx]$/;
-const newNicPattern = /^(\d{4})\d{3}\d{5}$/;
+const oldNicPattern = /^(\d{2})\d{7}[VvXx]$/;
+const newNicPattern = /^(\d{4})\d{8}$/;
 
-// A Sri Lankan NIC encodes the birth year in its leading digits: two digits (assumed 19xx —
-// the old format was retired before 2000) in the nine-digit form, four in the twelve-digit
-// form. A passport number carries no such encoding, so this returns null for one.
+// Mirrors SriLankanNic on the server. The nine-digit form gives the last two digits of a 19xx
+// year and was never issued to anyone born from 2000 on; the twelve-digit form gives the full
+// year. A passport number carries no year, so this returns null for one.
 export function nicBirthYear(nic: string): number | null {
   const trimmed = nic.trim();
 
@@ -47,17 +60,25 @@ export function nicBirthYear(nic: string): number | null {
 export function nicBirthYearProblem(nic: string, birthYear: number | null): string | null {
   const trimmedNic = nic.trim();
 
-  if (trimmedNic.length === 0 || birthYear === null) {
+  if (trimmedNic.length === 0 || birthYear === null || nicProblem(trimmedNic) !== null) {
     return null;
   }
 
   const expected = nicBirthYear(trimmedNic);
 
-  if (expected === null || expected === birthYear) {
+  if (expected === null) {
     return null;
   }
 
-  return `Doesn't match the NIC — its first digits say ${expected}, not ${birthYear}.`;
+  if (oldNicPattern.test(trimmedNic) && birthYear >= twelveDigitsOnlyFromYear) {
+    return 'Someone born in 2000 or later has a twelve-digit NIC, not nine digits and a V or X. Check the NIC and the date of birth.';
+  }
+
+  if (expected === birthYear) {
+    return null;
+  }
+
+  return `The NIC gives a birth year of ${expected}, but the date of birth is in ${birthYear}. Check both.`;
 }
 
 export function phoneProblem(value: string): string | null {

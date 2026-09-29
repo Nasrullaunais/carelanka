@@ -24,6 +24,7 @@ public enum NotificationType
     EmergencyCallReceived,
     CancellationRequestWaiting,
     DispatchProposalWaiting,
+    DispatchProposalFailed,
     AdmissionAwaitingApproval,
     CareQueryFlagged,
     CareReplyWaiting,

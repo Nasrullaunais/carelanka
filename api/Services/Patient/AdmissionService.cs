@@ -380,6 +380,14 @@ public sealed class AdmissionService : IAdmissionService
             patient.Gender,
             _currentUser.Role);
 
+        if ((nic is not null || request.DateOfBirth is not null)
+            && (nic ?? patient.Nic) is { } finalNic
+            && (request.DateOfBirth ?? patient.DateOfBirth) is { } finalDateOfBirth
+            && SriLankanNic.DateOfBirthProblem(finalNic, finalDateOfBirth) is { } problem)
+        {
+            throw new BadRequestException(problem.Code, problem.Args);
+        }
+
         if (nic is not null && nic != patient.Nic)
         {
             var takenBy = await _db.Patients

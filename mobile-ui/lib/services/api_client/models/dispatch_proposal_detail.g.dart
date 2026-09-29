@@ -75,6 +75,12 @@ DispatchProposalDetail _$DispatchProposalDetailFromJson(
   rejectionReason: json['rejection_reason'] == null
       ? null
       : DispatchRejectionReason.fromJson(json['rejection_reason'] as String),
+  withdrawalReason: json['withdrawal_reason'] == null
+      ? null
+      : DispatchWithdrawalReason.fromJson(json['withdrawal_reason'] as String),
+  withdrawnAt: json['withdrawn_at'] == null
+      ? null
+      : DateTime.parse(json['withdrawn_at'] as String),
 );
 
 Map<String, dynamic> _$DispatchProposalDetailToJson(
@@ -112,4 +118,6 @@ Map<String, dynamic> _$DispatchProposalDetailToJson(
   'reviewed_at': instance.reviewedAt?.toIso8601String(),
   'review_notes': instance.reviewNotes,
   'rejection_reason': instance.rejectionReason,
+  'withdrawal_reason': instance.withdrawalReason,
+  'withdrawn_at': instance.withdrawnAt?.toIso8601String(),
 };

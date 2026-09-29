@@ -2,6 +2,7 @@ using CareLanka.Api.Agents.Emergency;
 using CareLanka.Api.Common.Errors;
 using CareLanka.Api.Common.Exceptions;
 using CareLanka.Api.Data;
+using CareLanka.Api.Data.Configurations.Emergency;
 using CareLanka.Api.Data.Entities.Common;
 using CareLanka.Api.Data.Entities.Emergency;
 using CareLanka.Api.Data.Enums;
@@ -9,6 +10,7 @@ using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Emergency;
 using CareLanka.Api.Services.Common;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace CareLanka.Api.Services.Emergency;
 
@@ -19,22 +21,20 @@ namespace CareLanka.Api.Services.Emergency;
 /// </summary>
 public sealed class DispatchProposalService : IDispatchProposalService
 {
-    public const string Objective = "recommend_best_eligible_ambulance";
-
     private readonly CareLankaDbContext _db;
     private readonly IDispatchService _dispatches;
-    private readonly IDispatchRunQueue _queue;
+    private readonly IDispatchProposalLifecycle _lifecycle;
     private readonly IAmbulanceEligibilityService _eligibility;
     private readonly ICurrentUser _currentUser;
     private readonly TimeProvider _clock;
 
     public DispatchProposalService(
-        CareLankaDbContext db, IDispatchService dispatches, IDispatchRunQueue queue,
+        CareLankaDbContext db, IDispatchService dispatches, IDispatchProposalLifecycle lifecycle,
         IAmbulanceEligibilityService eligibility, ICurrentUser currentUser, TimeProvider clock)
     {
         _db = db;
         _dispatches = dispatches;
-        _queue = queue;
+        _lifecycle = lifecycle;
         _eligibility = eligibility;
         _currentUser = currentUser;
         _clock = clock;
@@ -42,6 +42,8 @@ public sealed class DispatchProposalService : IDispatchProposalService
 
     public async Task<DispatchProposalSummary> StartAsync(CreateDispatchProposalRequest request, CancellationToken ct = default)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        await _lifecycle.LockCallAsync(request.EmergencyCallId, ct);
         var call = await _db.EmergencyCalls
             .Include(x => x.Dispatches)
             .SingleOrDefaultAsync(x => x.Id == request.EmergencyCallId, ct)
@@ -58,38 +60,27 @@ public sealed class DispatchProposalService : IDispatchProposalService
             throw new ConflictException(MessageCode.DispatchProposalConflict);
         }
 
-        var workflow = new AgentWorkflow
-        {
-            Id = Guid.NewGuid(),
-            AgentType = AgentType.DispatchRouting,
-            EntityType = "EmergencyCall",
-            EntityId = call.Id,
-            CorrelationId = Guid.NewGuid(),
-            Objective = Objective,
-            Status = AgentWorkflowStatus.Pending,
-            StartedAt = _clock.GetUtcNow(),
-            AttemptCount = 1
-        };
-        _db.AgentWorkflows.Add(workflow);
-
-        var proposal = new DispatchProposal
-        {
-            Id = Guid.NewGuid(),
-            WorkflowId = workflow.Id,
-            EmergencyCallId = call.Id,
-            CallPriority = call.Priority,
-            Status = DispatchProposalStatus.Pending,
-            AllowDiversion = request.AllowDiversion,
-            RequestedByStaffMemberId = _currentUser.Id,
-            ExcludeAmbulanceIdsJson = request.ExcludeAmbulanceIds is { Count: > 0 }
-                ? DispatchWorkflowJson.Write(request.ExcludeAmbulanceIds) : null
-        };
-        _db.DispatchProposals.Add(proposal);
-
-        await _db.SaveChangesAsync(ct);
-        _queue.Enqueue(proposal.Id);
+        var proposal = _lifecycle.Open(
+            call.Id, call.Priority, request.AllowDiversion, request.ExcludeAmbulanceIds ?? [], _currentUser.Id);
+        await SaveAsync(ct);
+        await transaction.CommitAsync(ct);
+        _lifecycle.Wake(proposal);
 
         return await ToSummaryAsync(proposal, ct);
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, DispatchProposalSummary>> LatestByCallAsync(
+        IReadOnlyCollection<Guid> callIds, CancellationToken ct = default)
+    {
+        if (callIds.Count == 0) return new Dictionary<Guid, DispatchProposalSummary>();
+
+        var rows = await _db.DispatchProposals.AsNoTracking()
+            .Where(x => callIds.Contains(x.EmergencyCallId))
+            .GroupBy(x => x.EmergencyCallId)
+            .Select(group => group.OrderByDescending(x => x.CreatedAt).First())
+            .ToListAsync(ct);
+        var registrations = await RegistrationsAsync(rows.Select(x => x.ProposedAmbulanceId), ct);
+        return rows.ToDictionary(x => x.EmergencyCallId, x => ToSummary(x, registrations));
     }
 
     public async Task<PagedResult<DispatchProposalSummary>> ListAsync(ListDispatchProposalsRequest request, CancellationToken ct = default)
@@ -129,20 +120,12 @@ public sealed class DispatchProposalService : IDispatchProposalService
 
         if (!eligible)
         {
-            await _db.SaveChangesAsync(ct);
+            await SaveAsync(ct);
             throw new DispatchProposalRejectedException(
                 MessageCode.DispatchProposalNotConfirmable, null, [check.Check], check.Detail);
         }
 
-        var dispatch = await _dispatches.DispatchFromProposalAsync(proposal.EmergencyCallId, ambulanceId, proposal.Id, ct);
-
-        proposal.Status = DispatchProposalStatus.Executed;
-        proposal.ResultingDispatchId = dispatch.Id;
-        proposal.ReviewedByStaffMemberId = _currentUser.Id;
-        proposal.ReviewedAt = _clock.GetUtcNow();
-        await SetWorkflowExecutedAsync(proposal, ct);
-        await _db.SaveChangesAsync(ct);
-
+        await _dispatches.DispatchFromProposalAsync(proposal.EmergencyCallId, ambulanceId, proposal.Id, ct);
         return await ToDetailAsync(proposal, ct);
     }
 
@@ -174,7 +157,7 @@ public sealed class DispatchProposalService : IDispatchProposalService
 
         if (!sourceStillPrePickup || !eligible)
         {
-            await _db.SaveChangesAsync(ct);
+            await SaveAsync(ct);
             var failedChecks = new List<string>();
             if (!sourceStillPrePickup) failedChecks.Add(prePickupCheck.Check);
             if (!eligible) failedChecks.Add(eligibleCheck.Check);
@@ -186,17 +169,8 @@ public sealed class DispatchProposalService : IDispatchProposalService
                 string.Join(", ", failedChecks));
         }
 
-        var dispatch = await _dispatches.ApplyDiversionAsync(
+        await _dispatches.ApplyDiversionAsync(
             sourceDispatchId, proposal.EmergencyCallId, ambulanceId, proposal.Id, request.Notes, ct);
-
-        proposal.Status = DispatchProposalStatus.Executed;
-        proposal.ResultingDispatchId = dispatch.Id;
-        proposal.ReviewedByStaffMemberId = _currentUser.Id;
-        proposal.ReviewedAt = _clock.GetUtcNow();
-        proposal.ReviewNotes = request.Notes?.Trim();
-        await SetWorkflowExecutedAsync(proposal, ct);
-        await _db.SaveChangesAsync(ct);
-
         return await ToDetailAsync(proposal, ct);
     }
 
@@ -209,6 +183,8 @@ public sealed class DispatchProposalService : IDispatchProposalService
             throw new IllegalTransitionException("DispatchProposal", proposal.Status.ToString(), "rejected");
         }
 
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        await _lifecycle.LockCallAsync(proposal.EmergencyCallId, ct);
         proposal.Status = DispatchProposalStatus.Rejected;
         proposal.RejectionReason = request.Reason;
         proposal.ReviewNotes = request.Notes?.Trim();
@@ -224,18 +200,62 @@ public sealed class DispatchProposalService : IDispatchProposalService
             workflow.ReviewNotes = proposal.ReviewNotes;
         }
 
-        await _db.SaveChangesAsync(ct);
+        // Save first: the one-open-per-call index would otherwise see two open rows.
+        await SaveAsync(ct);
+        var followUp = await OpenFollowUpAsync(proposal, request.Reason, ct);
+        await SaveAsync(ct);
+        await transaction.CommitAsync(ct);
+        if (followUp is not null) _lifecycle.Wake(followUp);
 
         return await ToDetailAsync(proposal, ct);
     }
 
-    private async Task SetWorkflowExecutedAsync(DispatchProposal proposal, CancellationToken ct)
+    private async Task<DispatchProposal?> OpenFollowUpAsync(DispatchProposal rejected, DispatchRejectionReason reason, CancellationToken ct)
     {
-        var workflow = await _db.AgentWorkflows.SingleOrDefaultAsync(x => x.Id == proposal.WorkflowId, ct);
-        if (workflow is null) return;
-        workflow.Status = AgentWorkflowStatus.Executed;
-        workflow.ReviewedByStaffMemberId = _currentUser.Id;
-        workflow.ReviewedAt = proposal.ReviewedAt;
+        var exclusions = DispatchWorkflowJson.Read<List<Guid>>(rejected.ExcludeAmbulanceIdsJson) ?? [];
+        bool allowDiversion;
+        switch (reason)
+        {
+            case DispatchRejectionReason.AmbulanceUnsuitable when rejected.ProposedAmbulanceId is { } ambulanceId:
+                exclusions.Add(ambulanceId);
+                allowDiversion = rejected.AllowDiversion;
+                break;
+            case DispatchRejectionReason.UnsafeDiversion or DispatchRejectionReason.SourceCallTooUrgentToDivert:
+                allowDiversion = false;
+                break;
+            default:
+                return null;
+        }
+
+        var call = await _db.EmergencyCalls.AsNoTracking()
+            .Where(x => x.Id == rejected.EmergencyCallId)
+            .Select(x => new
+            {
+                x.Priority,
+                x.Status,
+                HasLiveDispatch = x.Dispatches.Any(d => DispatchStatusExtensions.LiveStatuses.Contains(d.Status))
+            })
+            .SingleAsync(ct);
+        if (call.Status != CallStatus.Received || call.HasLiveDispatch) return null;
+
+        return _lifecycle.Open(rejected.EmergencyCallId, call.Priority, allowDiversion, exclusions);
+    }
+
+    private async Task SaveAsync(CancellationToken ct)
+    {
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConflictException(MessageCode.DispatchProposalConflict);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException
+        { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: DispatchProposalConfiguration.OpenPerCallUniqueIndex })
+        {
+            throw new ConflictException(MessageCode.DispatchProposalConflict);
+        }
     }
 
     private async Task AppendValidationAsync(DispatchProposal proposal, DispatchValidationResult check, CancellationToken ct)
@@ -335,7 +355,7 @@ public sealed class DispatchProposalService : IDispatchProposalService
             ProposedAmbulanceRegistration = proposal.ProposedAmbulanceId is { } id && registrations.TryGetValue(id, out var reg) ? reg : null,
             EstimatedMinutesToScene = proposal.EstimatedMinutesToScene,
             CreatedAt = proposal.CreatedAt,
-            Objective = Objective,
+            Objective = DispatchProposalLifecycle.Objective,
             ProposedAmbulanceId = proposal.ProposedAmbulanceId,
             ProposedAmbulanceCurrentCrewCount = proposedAmbulance?.CrewCount,
             ProposedAmbulanceRequiredCrewCount = proposedEligibility?.RequiredCrewCount,
@@ -369,7 +389,9 @@ public sealed class DispatchProposalService : IDispatchProposalService
             ReviewedByStaffMemberId = proposal.ReviewedByStaffMemberId,
             ReviewedAt = proposal.ReviewedAt,
             ReviewNotes = proposal.ReviewNotes,
-            RejectionReason = proposal.RejectionReason
+            RejectionReason = proposal.RejectionReason,
+            WithdrawalReason = proposal.WithdrawalReason,
+            WithdrawnAt = proposal.WithdrawnAt
         };
     }
 

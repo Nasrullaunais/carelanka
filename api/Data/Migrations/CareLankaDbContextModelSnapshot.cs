@@ -264,7 +264,7 @@ namespace CareLanka.Api.Data.Migrations
 
                             t.HasCheckConstraint("ck_agent_workflows_attempts", "attempt_count >= 0");
 
-                            t.HasCheckConstraint("ck_agent_workflows_status", "status IN ('pending', 'pending_approval', 'auto_approved', 'approved', 'revision_requested', 'rejected', 'executed', 'failed')");
+                            t.HasCheckConstraint("ck_agent_workflows_status", "status IN ('pending', 'pending_approval', 'auto_approved', 'approved', 'revision_requested', 'rejected', 'executed', 'failed', 'withdrawn')");
                         });
                 });
 
@@ -419,7 +419,7 @@ namespace CareLanka.Api.Data.Migrations
                         {
                             t.HasCheckConstraint("ck_notifications_one_recipient", "num_nonnulls(recipient_staff_member_id, recipient_patient_account_id) = 1");
 
-                            t.HasCheckConstraint("ck_notifications_type", "type IN ('dispatch_assigned', 'appointment_booked', 'appointment_rescheduled', 'appointment_cancelled', 'appointment_reminder', 'admission_approved', 'bed_assigned', 'discharge_ready', 'bill_raised', 'bill_settled', 'care_reply_ready', 'prescription_ready', 'prescription_delivered', 'lab_report_ready', 'ambulance_on_the_way', 'ambulance_arrived', 'cancellation_answered', 'emergency_call_received', 'cancellation_request_waiting', 'dispatch_proposal_waiting', 'admission_awaiting_approval', 'care_query_flagged', 'care_reply_waiting', 'equipment_warning_raised', 'maintenance_due', 'pharmacy_stock_low', 'lab_test_requested', 'leave_requested', 'leave_approved', 'leave_rejected', 'shift_changed', 'roster_proposal_waiting')");
+                            t.HasCheckConstraint("ck_notifications_type", "type IN ('dispatch_assigned', 'appointment_booked', 'appointment_rescheduled', 'appointment_cancelled', 'appointment_reminder', 'admission_approved', 'bed_assigned', 'discharge_ready', 'bill_raised', 'bill_settled', 'care_reply_ready', 'prescription_ready', 'prescription_delivered', 'lab_report_ready', 'ambulance_on_the_way', 'ambulance_arrived', 'cancellation_answered', 'emergency_call_received', 'cancellation_request_waiting', 'dispatch_proposal_waiting', 'dispatch_proposal_failed', 'admission_awaiting_approval', 'care_query_flagged', 'care_reply_waiting', 'equipment_warning_raised', 'maintenance_due', 'pharmacy_stock_low', 'lab_test_requested', 'leave_requested', 'leave_approved', 'leave_rejected', 'shift_changed', 'roster_proposal_waiting')");
                         });
                 });
 
@@ -1176,6 +1176,21 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("WithdrawalReason")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("withdrawal_reason");
+
+                    b.Property<DateTimeOffset?>("WithdrawnAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("withdrawn_at");
+
                     b.Property<Guid>("WorkflowId")
                         .HasColumnType("uuid")
                         .HasColumnName("workflow_id");
@@ -1201,7 +1216,9 @@ namespace CareLanka.Api.Data.Migrations
 
                             t.HasCheckConstraint("ck_dispatch_proposals_recommendation_source", "recommendation_source IN ('model', 'model_unavailable', 'model_rejected')");
 
-                            t.HasCheckConstraint("ck_dispatch_proposals_status", "status IN ('pending', 'pending_confirmation', 'pending_approval', 'approved', 'executed', 'rejected', 'failed')");
+                            t.HasCheckConstraint("ck_dispatch_proposals_status", "status IN ('pending', 'pending_confirmation', 'pending_approval', 'approved', 'executed', 'rejected', 'failed', 'withdrawn')");
+
+                            t.HasCheckConstraint("ck_dispatch_proposals_withdrawal_reason", "withdrawal_reason IN ('call_changed', 'dispatched_manually', 'call_closed')");
                         });
                 });
 

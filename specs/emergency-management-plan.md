@@ -295,6 +295,29 @@ Follows the same gather → filter → rank → propose → validate → human g
 
 **Objective:** *"recommend the best eligible ambulance and explain why."*
 
+**When it runs — without anyone asking** *(2026-09-28)*. A call waiting for an ambulance
+always has a recommendation in progress, ready, or honestly failed. Nobody presses
+"Ask the agent"; by the time the Duty Manager opens the call, the answer is usually there.
+
+| Event | What happens to the recommendation |
+| :--- | :--- |
+| Call created (staff or patient app) | One opens in the same transaction as the call |
+| Priority or scene changes | Open one withdrawn (`call_changed`), a new one opens |
+| Dispatched by hand | Open one withdrawn (`dispatched_manually`) |
+| Patient cancels before dispatch | Open one withdrawn (`call_closed`) |
+| Crew declines, or the dispatch is cancelled | A new one opens, excluding that ambulance |
+| A diversion takes the call's ambulance | A new one opens for the call that lost it |
+| Rejected as `ambulance_unsuitable` | A new one opens, excluding that ambulance |
+| Rejected as `unsafe_diversion` / `source_call_too_urgent_to_divert` | A new one opens with diversion off |
+
+`withdrawn` is a system closure, not a rejection: no person reviewed it, and the
+agent-performance report does not count it. `POST /dispatch-proposals` stays as the
+Duty Manager's **Re-check** for a call with no open recommendation.
+
+**Races.** One open recommendation per call is enforced by a partial unique index, and the
+proposal row carries a row version. Two opens at once end in one success and one `409`; an
+agent answer that lands after its recommendation was withdrawn is dropped.
+
 **Tools — read-only, allow-listed, no write access to any table:**
 
 | Tool | Reads |
@@ -416,9 +439,8 @@ React is where the decisions get made (`docs/CareLanka_Component_Plan.md` §2.1,
 
 | Screen | What it does |
 | :--- | :--- |
-| **Live call board** | Every open call, priority then waiting time. Set/adjust priority, open a call, see which are still unassigned |
-| **Dispatch queue** | Both gates in one list: one-tap **Send** on routine proposals, **Review** on diversions. Shows the agent's ranking, ETA and reasoning |
-| **Diversion review** | The full `DiversionImpact` — who loses their ambulance, extra wait, replacement — with approve / reject and a required rejection reason |
+| **Dispatch desk** | Call list and the open call side by side. Each row shows its recommendation ("Checking…", "AMB-03 · 6 min", "Diversion — needs approval", "Pick by hand"). The open call shows the scene, the caller's report, the map and the recommendation with one-tap **Send** — both gates on one screen, with the manual ambulance list underneath. After Send, the next waiting call opens |
+| **Diversion review** | Inside the open call: the full `DiversionImpact` — who loses their ambulance, extra wait, replacement — with approve / reject and a required rejection reason |
 | **Fleet map & board** | Live ambulance positions, active routes, status per vehicle, `is_divertible` at a glance |
 | **Ambulance register** | Full CRUD: add, edit, retire, reinstate, plus per-vehicle dispatch history |
 | **Crew assignment** | Manage current ambulance crew; changes are blocked during a live run |

@@ -176,10 +176,16 @@
     <value>A caller has asked to cancel their ambulance and is waiting on a decision.</value>
   </data>
   <data name="dispatch_proposal_waiting_title" xml:space="preserve">
-    <value>Dispatch recommendation waiting</value>
+    <value>Diversion needs your approval</value>
   </data>
   <data name="dispatch_proposal_waiting_body" xml:space="preserve">
-    <value>The dispatch agent has a recommendation waiting for review.</value>
+    <value>The dispatch agent wants to take an ambulance from another call. Review the impact before approving.</value>
+  </data>
+  <data name="dispatch_proposal_failed_title" xml:space="preserve">
+    <value>No ambulance recommended</value>
+  </data>
+  <data name="dispatch_proposal_failed_body" xml:space="preserve">
+    <value>The dispatch agent could not recommend an ambulance for a call. Pick one by hand.</value>
   </data>
   <data name="admission_awaiting_approval_title" xml:space="preserve">
     <value>Admission awaiting a bed</value>

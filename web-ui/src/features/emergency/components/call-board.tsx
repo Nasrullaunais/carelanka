@@ -3,7 +3,7 @@ import { Button } from '@heroui/react';
 import type { EmergencyCallSummary, ListEmergencyCallsError } from '../../../services/api/generated';
 import { DataTable, type DataTableColumn } from '../../../components/ui/data-table';
 import { StatusChip } from '../../../components/ui/status-chip';
-import { callStatusLabels, callStatusTones, formatWaiting, priorityLabels, priorityTones } from '../domain';
+import { callStatusLabels, callStatusTones, compareByUrgency, formatWaiting, priorityLabels, priorityTones, recommendationLine } from '../domain';
 
 export function CallBoard({ calls, selectedId, isLoading, error, onRetry, onSelect, page, totalPages, onPageChange, filter, onFilterChange }: {
   filter: 'received' | 'all';
@@ -18,9 +18,7 @@ export function CallBoard({ calls, selectedId, isLoading, error, onRetry, onSele
   totalPages: number;
   onPageChange: (page: number) => void;
 }) {
-  const rows = useMemo(() => [...(calls ?? [])].sort((left, right) =>
-    priorityRank(right.priority) - priorityRank(left.priority)
-    || (right.waiting_minutes ?? 0) - (left.waiting_minutes ?? 0)), [calls]);
+  const rows = useMemo(() => [...(calls ?? [])].sort(compareByUrgency), [calls]);
 
   const columns: Array<DataTableColumn<EmergencyCallSummary>> = [
     {
@@ -37,7 +35,6 @@ export function CallBoard({ calls, selectedId, isLoading, error, onRetry, onSele
       cell: (call) => (
         <span className={selectedId === call.id ? 'font-semibold' : undefined}>
           {call.caller_name ?? 'Unnamed caller'}
-          {call.open_proposal_id && <span className="ml-2 text-xs text-accent">Recommendation pending</span>}
         </span>
       ),
     },
@@ -47,6 +44,14 @@ export function CallBoard({ calls, selectedId, isLoading, error, onRetry, onSele
       cell: (call) => {
         const status = call.status ?? 'received';
         return <StatusChip tone={callStatusTones[status]}>{callStatusLabels[status]}</StatusChip>;
+      },
+    },
+    {
+      key: 'recommendation',
+      header: 'Recommendation',
+      cell: (call) => {
+        const line = recommendationLine(call);
+        return line ? <StatusChip tone={line.tone}>{line.label}</StatusChip> : null;
       },
     },
     { key: 'location', header: 'Location', cell: (call) => call.address_label ?? 'Address resolving' },
@@ -74,8 +79,4 @@ export function CallBoard({ calls, selectedId, isLoading, error, onRetry, onSele
       />
     </div>
   );
-}
-
-function priorityRank(priority: EmergencyCallSummary['priority']): number {
-  return { low: 0, medium: 1, high: 2, critical: 3 }[priority ?? 'high'];
 }

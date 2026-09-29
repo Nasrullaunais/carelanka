@@ -359,6 +359,8 @@ handling; a `409` caused by another dispatcher refreshes the affected call and f
 
 ### Phase 5 — Crew Flutter vertical slice — **COMPLETE 2026-09-19**
 
+> **Follow-up (2026-09-30):** gaps found walking the crew flow end to end are planned in `emergency-crew-flow.md`.
+
 **Goal:** let the assigned crew complete a run from their phone.
 
 Screens and behaviour:

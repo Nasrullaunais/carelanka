@@ -1,24 +1,38 @@
 import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
+  createSkillMutation,
   createStaffMemberMutation,
   deactivateStaffMemberMutation,
   getStaffMemberOptions,
+  grantStaffSkillMutation,
   listSkillsOptions,
+  listSkillsQueryKey,
   listStaffOptions,
+  listStaffSkillsOptions,
+  listStaffSkillsQueryKey,
   lookupStaffMutation,
   reactivateStaffMemberMutation,
+  retireSkillMutation,
+  revokeStaffSkillMutation,
+  updateSkillMutation,
   updateStaffMemberMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
 import type {
+  AllocationSummaryDto,
+  CreateSkillRequest,
   CreateStaffMemberRequest,
+  GrantStaffSkillRequest,
+  SkillDto,
   StaffLookupResult,
   StaffMemberDetailDto,
   StaffRole,
+  StaffSkillDto,
   StaffSummaryDto,
+  UpdateSkillRequest,
   UpdateStaffMemberRequest,
 } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
@@ -44,6 +58,21 @@ export function StaffManagementPage() {
   const [includeInactive, setIncludeInactive] = useState(false);
   const [page, setPage] = useState(1);
 
+  // Tab state
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') === 'skills' ? 'skills' : 'directory';
+  const setActiveTab = (tab: 'directory' | 'skills') => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (tab === 'skills') {
+        next.set('tab', 'skills');
+      } else {
+        next.delete('tab');
+      }
+      return next;
+    });
+  };
+
   // Modals state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [detailStaffId, setDetailStaffId] = useState<string | null>(null);
@@ -51,6 +80,13 @@ export function StaffManagementPage() {
   const [deactivateStaff, setDeactivateStaff] = useState<{ id: string; name: string } | null>(null);
   const [reactivateStaff, setReactivateStaff] = useState<{ id: string; name: string } | null>(null);
   const [showLookupSection, setShowLookupSection] = useState(false);
+
+  // Skills Administration Modals state
+  const [createSkillOpen, setCreateSkillOpen] = useState(false);
+  const [editingSkill, setEditingSkill] = useState<SkillDto | null>(null);
+  const [retiringSkill, setRetiringSkill] = useState<SkillDto | null>(null);
+  const [grantingStaff, setGrantingStaff] = useState<{ id: string; name: string } | null>(null);
+  const [revokingSkill, setRevokingSkill] = useState<{ staffId: string; staffName: string; skillId: string; skillName: string } | null>(null);
 
   // Queries
   const staffQuery = useQuery({
@@ -69,8 +105,10 @@ export function StaffManagementPage() {
 
   const invalidateStaffQueries = () => {
     void queryClient.invalidateQueries({
-      predicate: (query) =>
-        (query.queryKey[0] as { _id?: string } | undefined)?._id === 'listStaff',
+      predicate: (query) => {
+        const id = (query.queryKey[0] as { _id?: string } | undefined)?._id;
+        return id === 'listStaff' || id === 'listSkills' || id === 'listStaffSkills';
+      },
     });
     if (detailStaffId) {
       void queryClient.invalidateQueries({
@@ -123,6 +161,13 @@ export function StaffManagementPage() {
 
         <div className="actions">
           <Link
+            to="/staff/shifts"
+            className="secondary button"
+            style={{ textDecoration: 'none' }}
+          >
+            Shifts & roster
+          </Link>
+          <Link
             to="/staff/coverage"
             className="secondary button"
             style={{ textDecoration: 'none' }}
@@ -143,6 +188,13 @@ export function StaffManagementPage() {
           >
             Roster proposals
           </Link>
+          <Link
+            to="/staff/reports"
+            className="secondary button"
+            style={{ textDecoration: 'none' }}
+          >
+            Staff reports
+          </Link>
           <button
             type="button"
             className="secondary"
@@ -150,24 +202,68 @@ export function StaffManagementPage() {
           >
             {showLookupSection ? 'Hide quick lookup' : 'Quick ID lookup'}
           </button>
-          {canManage && (
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => setActiveTab(activeTab === 'directory' ? 'skills' : 'directory')}
+          >
+            {activeTab === 'directory' ? 'Skills administration' : 'Staff directory'}
+          </button>
+          {canManage && activeTab === 'directory' && (
             <button type="button" onClick={() => setShowCreateModal(true)}>
               + Add staff member
+            </button>
+          )}
+          {canManage && activeTab === 'skills' && (
+            <button type="button" onClick={() => setCreateSkillOpen(true)}>
+              + Create skill
             </button>
           )}
         </div>
       </div>
 
-      {showLookupSection && (
-        <StaffLookupCard
-          onOpenDetails={(id) => {
-            setDetailStaffId(id);
-          }}
-        />
-      )}
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--line)', paddingBottom: '0.5rem' }}>
+        <button
+          type="button"
+          className={activeTab === 'directory' ? '' : 'secondary'}
+          onClick={() => setActiveTab('directory')}
+          style={{ fontWeight: activeTab === 'directory' ? 600 : 400 }}
+        >
+          Staff directory
+        </button>
+        <button
+          type="button"
+          className={activeTab === 'skills' ? '' : 'secondary'}
+          onClick={() => setActiveTab('skills')}
+          style={{ fontWeight: activeTab === 'skills' ? 600 : 400 }}
+        >
+          Skills administration
+        </button>
+      </div>
 
-      {/* Filter bar */}
-      <div className="card">
+      {activeTab === 'skills' ? (
+        <SkillsAdministrationView
+          canManage={canManage}
+          onCreateSkill={() => setCreateSkillOpen(true)}
+          onEditSkill={(skill) => setEditingSkill(skill)}
+          onRetireSkill={(skill) => setRetiringSkill(skill)}
+          onGrantSkill={(id, name) => setGrantingStaff({ id, name })}
+          onRevokeSkill={(staffId, staffName, skillId, skillName) =>
+            setRevokingSkill({ staffId, staffName, skillId, skillName })
+          }
+        />
+      ) : (
+        <>
+          {showLookupSection && (
+            <StaffLookupCard
+              onOpenDetails={(id) => {
+                setDetailStaffId(id);
+              }}
+            />
+          )}
+
+          {/* Filter bar */}
+          <div className="card">
         <h2>Filter directory</h2>
         <form onSubmit={handleSearchSubmit}>
           <div className="row">
@@ -390,6 +486,8 @@ export function StaffManagementPage() {
           </>
         )}
       </div>
+      </>
+      )}
 
       {/* Modal: Create Staff Member */}
       {showCreateModal && (
@@ -420,6 +518,10 @@ export function StaffManagementPage() {
             setDetailStaffId(null);
             setReactivateStaff({ id, name });
           }}
+          onGrantSkill={(id, name) => setGrantingStaff({ id, name })}
+          onRevokeSkill={(staffId, staffName, skillId, skillName) =>
+            setRevokingSkill({ staffId, staffName, skillId, skillName })
+          }
         />
       )}
 
@@ -457,6 +559,73 @@ export function StaffManagementPage() {
           onSuccess={() => {
             setReactivateStaff(null);
             invalidateStaffQueries();
+          }}
+        />
+      )}
+
+      {/* Modal: Create Skill */}
+      {createSkillOpen && (
+        <CreateSkillModal
+          onClose={() => setCreateSkillOpen(false)}
+          onSuccess={() => {
+            void queryClient.invalidateQueries({ queryKey: listSkillsQueryKey() });
+          }}
+        />
+      )}
+
+      {/* Modal: Edit Skill */}
+      {editingSkill && (
+        <EditSkillModal
+          skill={editingSkill}
+          onClose={() => setEditingSkill(null)}
+          onSuccess={() => {
+            void queryClient.invalidateQueries({ queryKey: listSkillsQueryKey() });
+            invalidateStaffQueries();
+          }}
+        />
+      )}
+
+      {/* Modal: Retire Skill Confirmation */}
+      {retiringSkill && (
+        <RetireSkillConfirmModal
+          skill={retiringSkill}
+          onClose={() => setRetiringSkill(null)}
+          onSuccess={() => {
+            void queryClient.invalidateQueries({ queryKey: listSkillsQueryKey() });
+            invalidateStaffQueries();
+          }}
+        />
+      )}
+
+      {/* Modal: Grant Staff Skill */}
+      {grantingStaff && (
+        <GrantStaffSkillModal
+          staffId={grantingStaff.id}
+          staffName={grantingStaff.name}
+          onClose={() => setGrantingStaff(null)}
+          onSuccess={() => {
+            invalidateStaffQueries();
+            if (grantingStaff.id) {
+              void queryClient.invalidateQueries({
+                queryKey: listStaffSkillsQueryKey({ path: { id: grantingStaff.id } }),
+              });
+            }
+          }}
+        />
+      )}
+
+      {/* Modal: Revoke Staff Skill Confirmation */}
+      {revokingSkill && (
+        <RevokeStaffSkillConfirmModal
+          revoking={revokingSkill}
+          onClose={() => setRevokingSkill(null)}
+          onSuccess={() => {
+            invalidateStaffQueries();
+            if (revokingSkill.staffId) {
+              void queryClient.invalidateQueries({
+                queryKey: listStaffSkillsQueryKey({ path: { id: revokingSkill.staffId } }),
+              });
+            }
           }}
         />
       )}
@@ -823,6 +992,8 @@ function StaffDetailModal({
   onEdit,
   onDeactivate,
   onReactivate,
+  onGrantSkill,
+  onRevokeSkill,
 }: {
   staffId: string;
   canManage: boolean;
@@ -830,9 +1001,13 @@ function StaffDetailModal({
   onEdit: (detail: StaffMemberDetailDto) => void;
   onDeactivate: (id: string, name: string) => void;
   onReactivate: (id: string, name: string) => void;
+  onGrantSkill?: (id: string, name: string) => void;
+  onRevokeSkill?: (staffId: string, staffName: string, skillId: string, skillName: string) => void;
 }) {
   const detailQuery = useQuery(getStaffMemberOptions({ path: { id: staffId } }));
+  const staffSkillsQuery = useQuery(listStaffSkillsOptions({ path: { id: staffId } }));
   const detail = detailQuery.data;
+  const skillsList = staffSkillsQuery.data ?? detail?.skills ?? [];
 
   return (
     <ModalDialog
@@ -916,8 +1091,19 @@ function StaffDetailModal({
 
           {/* Skills section */}
           <div style={{ marginTop: '1.25rem', borderTop: '1px solid var(--line)', paddingTop: '0.85rem' }}>
-            <h3>Skills & Certifications ({detail.skills?.length ?? 0})</h3>
-            {detail.skills && detail.skills.length > 0 ? (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+              <h3 style={{ margin: 0 }}>Skills & Certifications ({skillsList.length})</h3>
+              {canManage && (
+                <button
+                  type="button"
+                  className="secondary small"
+                  onClick={() => onGrantSkill?.(detail.id, detail.full_name)}
+                >
+                  + Grant skill
+                </button>
+              )}
+            </div>
+            {skillsList.length > 0 ? (
               <table style={{ marginTop: '0.4rem' }}>
                 <thead>
                   <tr>
@@ -925,10 +1111,11 @@ function StaffDetailModal({
                     <th>Status</th>
                     <th>Granted</th>
                     <th>Expires</th>
+                    {canManage && <th style={{ textAlign: 'right' }}>Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {detail.skills.map((s) => (
+                  {skillsList.map((s) => (
                     <tr key={s.skill_id}>
                       <td><strong>{s.skill_name}</strong></td>
                       <td>
@@ -942,6 +1129,19 @@ function StaffDetailModal({
                       <td>
                         {s.expires_at ? localDateTime(s.expires_at) : <span className="muted">Permanent</span>}
                       </td>
+                      {canManage && (
+                        <td style={{ textAlign: 'right' }}>
+                          <button
+                            type="button"
+                            className="secondary danger small"
+                            onClick={() =>
+                              onRevokeSkill?.(detail.id, detail.full_name, s.skill_id, s.skill_name)
+                            }
+                          >
+                            Revoke
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -1303,6 +1503,747 @@ function ReactivateStaffModal({
           {reactivateMutation.isPending ? 'Reactivating...' : 'Confirm reactivation'}
         </button>
       </div>
+    </ModalDialog>
+  );
+}
+
+// -------------------------------------------------------------
+// Skills Administration View
+// -------------------------------------------------------------
+
+function SkillsAdministrationView({
+  canManage,
+  onCreateSkill,
+  onEditSkill,
+  onRetireSkill,
+  onGrantSkill,
+  onRevokeSkill,
+}: {
+  canManage: boolean;
+  onCreateSkill: () => void;
+  onEditSkill: (skill: SkillDto) => void;
+  onRetireSkill: (skill: SkillDto) => void;
+  onGrantSkill: (id: string, name: string) => void;
+  onRevokeSkill: (staffId: string, staffName: string, skillId: string, skillName: string) => void;
+}) {
+  const skillsQuery = useQuery(listSkillsOptions());
+  const [skillFilter, setSkillFilter] = useState('');
+
+  // Staff member qualifications section state
+  const [selectedStaffId, setSelectedStaffId] = useState<string>('');
+  const staffQuery = useQuery(
+    listStaffOptions({
+      query: {
+        pageSize: 100,
+      },
+    }),
+  );
+
+  const staffSkillsQuery = useQuery({
+    ...listStaffSkillsOptions({ path: { id: selectedStaffId } }),
+    enabled: Boolean(selectedStaffId),
+  });
+
+  const skills = (skillsQuery.data ?? []).filter((s) => {
+    if (!skillFilter.trim()) return true;
+    const q = skillFilter.toLowerCase();
+    return (
+      s.name.toLowerCase().includes(q) ||
+      (s.description?.toLowerCase().includes(q) ?? false)
+    );
+  });
+
+  const selectedStaff = staffQuery.data?.items.find((s) => s.id === selectedStaffId);
+  const staffSkills: StaffSkillDto[] = staffSkillsQuery.data ?? [];
+
+  return (
+    <div>
+      {/* Hospital Skills Catalog */}
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+          <div>
+            <h2 style={{ margin: 0 }}>Hospital Skills Catalog</h2>
+            <p className="muted" style={{ margin: '0.25rem 0 0 0' }}>
+              Specialized clinical competencies, certifications, and qualification requirements.
+            </p>
+          </div>
+          {canManage && (
+            <button type="button" onClick={onCreateSkill}>
+              + Create skill
+            </button>
+          )}
+        </div>
+
+        {/* Catalog search bar */}
+        <div style={{ marginBottom: '1rem' }}>
+          <label htmlFor="skill-filter">Search skills</label>
+          <input
+            id="skill-filter"
+            type="text"
+            placeholder="Search by skill name or description..."
+            value={skillFilter}
+            onChange={(e) => setSkillFilter(e.target.value)}
+          />
+        </div>
+
+        {skillsQuery.isLoading ? (
+          <p className="empty">Loading skills catalog...</p>
+        ) : skillsQuery.isError ? (
+          <div className="empty">
+            <p style={{ color: 'var(--danger)' }}>Failed to load skills catalog.</p>
+            <button type="button" className="secondary" onClick={() => void skillsQuery.refetch()}>
+              Retry
+            </button>
+          </div>
+        ) : skills.length === 0 ? (
+          <p className="empty">No skills found matching your filters.</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Skill name</th>
+                <th>Description</th>
+                <th>Qualified staff</th>
+                {canManage && <th style={{ textAlign: 'right' }}>Actions</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {skills.map((s) => (
+                <tr key={s.id}>
+                  <td>
+                    <strong>{s.name}</strong>
+                  </td>
+                  <td>{s.description || <span className="muted">—</span>}</td>
+                  <td>
+                    <span>
+                      {s.staff_count} member{s.staff_count === 1 ? '' : 's'}
+                    </span>
+                  </td>
+                  {canManage && (
+                    <td>
+                      <div className="actions" style={{ justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          className="secondary small"
+                          onClick={() => onEditSkill(s)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary danger small"
+                          onClick={() => onRetireSkill(s)}
+                        >
+                          Retire
+                        </button>
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Staff Qualifications Management */}
+      <div className="card" style={{ marginTop: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+          <div>
+            <h2 style={{ margin: 0 }}>Staff Member Qualifications</h2>
+            <p className="muted" style={{ margin: '0.25rem 0 0 0' }}>
+              View, grant, or revoke skill certifications for individual healthcare personnel.
+            </p>
+          </div>
+          {canManage && selectedStaff && (
+            <button
+              type="button"
+              onClick={() => onGrantSkill(selectedStaff.id, selectedStaff.full_name)}
+            >
+              + Grant skill to member
+            </button>
+          )}
+        </div>
+
+        <div style={{ marginBottom: '1rem' }}>
+          <label htmlFor="staff-member-select">Select staff member</label>
+          <select
+            id="staff-member-select"
+            value={selectedStaffId}
+            onChange={(e) => setSelectedStaffId(e.target.value)}
+          >
+            <option value="">-- Choose a staff member to view qualifications --</option>
+            {(staffQuery.data?.items ?? []).map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.full_name} ({staffRoleLabels[m.role] ?? m.role})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {selectedStaff ? (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: '6px', marginBottom: '1rem' }}>
+              <div>
+                <strong>{selectedStaff.full_name}</strong>
+                <span className="badge" style={{ marginLeft: '0.5rem' }}>
+                  {staffRoleLabels[selectedStaff.role] ?? selectedStaff.role}
+                </span>
+                {selectedStaff.department && (
+                  <span className="muted" style={{ marginLeft: '0.5rem' }}>
+                    Dept: {selectedStaff.department}
+                  </span>
+                )}
+              </div>
+              <span className="muted" style={{ fontSize: '0.85rem' }}>
+                ID: {selectedStaff.id.slice(0, 8)}...
+              </span>
+            </div>
+
+            {staffSkillsQuery.isLoading ? (
+              <p className="empty">Loading qualifications...</p>
+            ) : staffSkillsQuery.isError ? (
+              <div className="empty">
+                <p style={{ color: 'var(--danger)' }}>Failed to load qualifications for this staff member.</p>
+                <button type="button" className="secondary" onClick={() => void staffSkillsQuery.refetch()}>
+                  Retry
+                </button>
+              </div>
+            ) : staffSkills.length === 0 ? (
+              <p className="empty">No specialized skills currently assigned to {selectedStaff.full_name}.</p>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Skill name</th>
+                    <th>Status</th>
+                    <th>Valid from</th>
+                    <th>Expires</th>
+                    <th>Granted</th>
+                    {canManage && <th style={{ textAlign: 'right' }}>Actions</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {staffSkills.map((s) => (
+                    <tr key={s.skill_id}>
+                      <td><strong>{s.skill_name}</strong></td>
+                      <td>
+                        {s.is_valid ? (
+                          <span className="badge">Valid</span>
+                        ) : (
+                          <span className="badge retired">Expired</span>
+                        )}
+                      </td>
+                      <td>{s.valid_from ?? '—'}</td>
+                      <td>
+                        {s.expires_at ? localDateTime(s.expires_at) : <span className="muted">Permanent</span>}
+                      </td>
+                      <td>{localDateTime(s.granted_at)}</td>
+                      {canManage && (
+                        <td style={{ textAlign: 'right' }}>
+                          <button
+                            type="button"
+                            className="secondary danger small"
+                            onClick={() =>
+                              onRevokeSkill(
+                                selectedStaff.id,
+                                selectedStaff.full_name,
+                                s.skill_id,
+                                s.skill_name,
+                              )
+                            }
+                          >
+                            Revoke
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        ) : (
+          <p className="empty">Select a staff member from the dropdown above to view and manage their skills.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
+// Create Skill Modal
+// -------------------------------------------------------------
+
+function CreateSkillModal({
+  onClose,
+  onSuccess,
+}: {
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+
+  const createMutation = useMutation({
+    ...createSkillMutation(),
+    onSuccess: (data) => {
+      toast.success(`Skill "${data.name}" created successfully.`);
+      onSuccess();
+      onClose();
+    },
+    onError: (err) => {
+      const msg =
+        (err as { detail?: string; title?: string })?.detail ??
+        (err as { message?: string })?.message ??
+        'Failed to create skill.';
+      toast.error(msg);
+    },
+  });
+
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (name.trim().length < 2) {
+      toast.error('Skill name must be at least 2 characters.');
+      return;
+    }
+
+    const payload: CreateSkillRequest = {
+      name: name.trim(),
+      ...(description.trim() ? { description: description.trim() } : {}),
+    };
+
+    createMutation.mutate({ body: payload });
+  }
+
+  return (
+    <ModalDialog title="Create new skill qualification" onClose={onClose} maxWidth="32rem">
+      <form onSubmit={handleSubmit}>
+        <div>
+          <label htmlFor="create-skill-name">Skill name *</label>
+          <input
+            id="create-skill-name"
+            type="text"
+            required
+            minLength={2}
+            maxLength={100}
+            placeholder="e.g. Advanced Cardiac Life Support (ACLS)"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+
+        <div style={{ marginTop: '0.85rem' }}>
+          <label htmlFor="create-skill-desc">Description (optional)</label>
+          <textarea
+            id="create-skill-desc"
+            rows={3}
+            maxLength={500}
+            placeholder="Detailed description or requirements of this qualification..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </div>
+
+        <div className="actions" style={{ marginTop: '1.25rem', justifyContent: 'flex-end' }}>
+          <button type="button" className="secondary" onClick={onClose} disabled={createMutation.isPending}>
+            Cancel
+          </button>
+          <button type="submit" disabled={createMutation.isPending || name.trim().length < 2}>
+            {createMutation.isPending ? 'Creating...' : 'Create skill'}
+          </button>
+        </div>
+      </form>
+    </ModalDialog>
+  );
+}
+
+// -------------------------------------------------------------
+// Edit Skill Modal
+// -------------------------------------------------------------
+
+function EditSkillModal({
+  skill,
+  onClose,
+  onSuccess,
+}: {
+  skill: SkillDto;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [name, setName] = useState(skill.name);
+  const [description, setDescription] = useState(skill.description ?? '');
+
+  const updateMutation = useMutation({
+    ...updateSkillMutation(),
+    onSuccess: (data) => {
+      toast.success(`Skill "${data.name}" updated successfully.`);
+      onSuccess();
+      onClose();
+    },
+    onError: (err) => {
+      const msg =
+        (err as { detail?: string; title?: string })?.detail ??
+        (err as { message?: string })?.message ??
+        'Failed to update skill.';
+      toast.error(msg);
+    },
+  });
+
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (name.trim().length < 2) {
+      toast.error('Skill name must be at least 2 characters.');
+      return;
+    }
+
+    const payload: UpdateSkillRequest = {
+      name: name.trim(),
+      description: description.trim() || null,
+    };
+
+    updateMutation.mutate({
+      path: { id: skill.id },
+      body: payload,
+    });
+  }
+
+  return (
+    <ModalDialog title={`Edit skill: ${skill.name}`} onClose={onClose} maxWidth="32rem">
+      <form onSubmit={handleSubmit}>
+        <div>
+          <label htmlFor="edit-skill-name">Skill name *</label>
+          <input
+            id="edit-skill-name"
+            type="text"
+            required
+            minLength={2}
+            maxLength={100}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+
+        <div style={{ marginTop: '0.85rem' }}>
+          <label htmlFor="edit-skill-desc">Description (optional)</label>
+          <textarea
+            id="edit-skill-desc"
+            rows={3}
+            maxLength={500}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </div>
+
+        <div className="actions" style={{ marginTop: '1.25rem', justifyContent: 'flex-end' }}>
+          <button type="button" className="secondary" onClick={onClose} disabled={updateMutation.isPending}>
+            Cancel
+          </button>
+          <button type="submit" disabled={updateMutation.isPending || name.trim().length < 2}>
+            {updateMutation.isPending ? 'Saving...' : 'Save changes'}
+          </button>
+        </div>
+      </form>
+    </ModalDialog>
+  );
+}
+
+// -------------------------------------------------------------
+// Retire Skill Confirmation Modal
+// -------------------------------------------------------------
+
+function RetireSkillConfirmModal({
+  skill,
+  onClose,
+  onSuccess,
+}: {
+  skill: SkillDto;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [conflictError, setConflictError] = useState<string | null>(null);
+
+  const retireMutation = useMutation({
+    ...retireSkillMutation(),
+    onSuccess: () => {
+      toast.success(`Skill "${skill.name}" retired successfully.`);
+      onSuccess();
+      onClose();
+    },
+    onError: (err) => {
+      const msg =
+        (err as { detail?: string; title?: string })?.detail ??
+        (err as { message?: string })?.message ??
+        'Failed to retire skill. Ensure no active or upcoming shifts require this qualification.';
+      setConflictError(msg);
+      toast.error(msg);
+    },
+  });
+
+  return (
+    <ModalDialog title={`Retire skill: ${skill.name}`} onClose={onClose} maxWidth="32rem">
+      <div className="stub-note" style={{ borderColor: 'var(--danger)', color: 'var(--danger)', background: '#fdf2f2' }}>
+        <strong>Warning:</strong> Retiring this skill will prevent it from being granted to staff members or assigned to new ward staffing rules.
+      </div>
+
+      <p style={{ marginTop: '0.85rem' }}>
+        Currently <strong>{skill.staff_count}</strong> staff member{skill.staff_count === 1 ? '' : 's'} hold this qualification.
+      </p>
+
+      {conflictError && (
+        <div style={{ marginTop: '0.85rem', padding: '0.75rem', background: '#fee2e2', border: '1px solid #ef4444', borderRadius: '4px', color: '#b91c1c' }}>
+          <strong>Conflict (409):</strong> {conflictError}
+        </div>
+      )}
+
+      <div className="actions" style={{ marginTop: '1.25rem', justifyContent: 'flex-end' }}>
+        <button type="button" className="secondary" onClick={onClose} disabled={retireMutation.isPending}>
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="danger"
+          disabled={retireMutation.isPending}
+          onClick={() => {
+            setConflictError(null);
+            retireMutation.mutate({ path: { id: skill.id } });
+          }}
+        >
+          {retireMutation.isPending ? 'Retiring...' : 'Confirm retirement'}
+        </button>
+      </div>
+    </ModalDialog>
+  );
+}
+
+// -------------------------------------------------------------
+// Grant Staff Skill Modal
+// -------------------------------------------------------------
+
+function GrantStaffSkillModal({
+  staffId,
+  staffName,
+  onClose,
+  onSuccess,
+}: {
+  staffId: string;
+  staffName: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const skillsQuery = useQuery(listSkillsOptions());
+  const availableSkills = skillsQuery.data ?? [];
+
+  const [selectedSkillId, setSelectedSkillId] = useState('');
+  const [validFrom, setValidFrom] = useState('');
+  const [expiresAt, setExpiresAt] = useState('');
+
+  const grantMutation = useMutation({
+    ...grantStaffSkillMutation(),
+    onSuccess: (data) => {
+      toast.success(`Skill "${data.skill_name}" granted to ${staffName}.`);
+      onSuccess();
+      onClose();
+    },
+    onError: (err) => {
+      const msg =
+        (err as { detail?: string; title?: string })?.detail ??
+        (err as { message?: string })?.message ??
+        'Failed to grant skill.';
+      toast.error(msg);
+    },
+  });
+
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (!selectedSkillId) {
+      toast.error('Please select a skill.');
+      return;
+    }
+
+    const payload: GrantStaffSkillRequest = {
+      skill_id: selectedSkillId,
+      ...(validFrom ? { valid_from: validFrom } : {}),
+      ...(expiresAt ? { expires_at: new Date(expiresAt).toISOString() } : {}),
+    };
+
+    grantMutation.mutate({
+      path: { id: staffId },
+      body: payload,
+    });
+  }
+
+  return (
+    <ModalDialog title={`Grant skill: ${staffName}`} onClose={onClose} maxWidth="32rem">
+      <form onSubmit={handleSubmit}>
+        <div>
+          <label htmlFor="grant-skill-select">Select skill qualification *</label>
+          <select
+            id="grant-skill-select"
+            required
+            value={selectedSkillId}
+            onChange={(e) => setSelectedSkillId(e.target.value)}
+          >
+            <option value="">-- Choose skill --</option>
+            {availableSkills.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="row" style={{ marginTop: '0.85rem' }}>
+          <div>
+            <label htmlFor="grant-valid-from">Valid from (optional)</label>
+            <input
+              id="grant-valid-from"
+              type="date"
+              value={validFrom}
+              onChange={(e) => setValidFrom(e.target.value)}
+            />
+          </div>
+          <div>
+            <label htmlFor="grant-expires-at">Expires at (optional)</label>
+            <input
+              id="grant-expires-at"
+              type="date"
+              value={expiresAt}
+              onChange={(e) => setExpiresAt(e.target.value)}
+            />
+            <span className="muted" style={{ fontSize: '0.75rem' }}>
+              Leave empty for permanent qualification
+            </span>
+          </div>
+        </div>
+
+        <div className="actions" style={{ marginTop: '1.25rem', justifyContent: 'flex-end' }}>
+          <button type="button" className="secondary" onClick={onClose} disabled={grantMutation.isPending}>
+            Cancel
+          </button>
+          <button type="submit" disabled={grantMutation.isPending || !selectedSkillId}>
+            {grantMutation.isPending ? 'Granting...' : 'Grant qualification'}
+          </button>
+        </div>
+      </form>
+    </ModalDialog>
+  );
+}
+
+// -------------------------------------------------------------
+// Revoke Staff Skill Confirmation Modal
+// -------------------------------------------------------------
+
+function RevokeStaffSkillConfirmModal({
+  revoking,
+  onClose,
+  onSuccess,
+}: {
+  revoking: { staffId: string; staffName: string; skillId: string; skillName: string };
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [affectedAllocations, setAffectedAllocations] = useState<AllocationSummaryDto[] | null>(null);
+
+  const revokeMutation = useMutation({
+    ...revokeStaffSkillMutation(),
+    onSuccess: (data) => {
+      if (data.affected_allocations && data.affected_allocations.length > 0) {
+        setAffectedAllocations(data.affected_allocations);
+        toast.warning(
+          `Skill revoked. ${data.affected_allocations.length} upcoming shift allocation(s) were affected.`,
+        );
+      } else {
+        toast.success(`Skill "${revoking.skillName}" revoked from ${revoking.staffName}.`);
+        onSuccess();
+        onClose();
+      }
+    },
+    onError: (err) => {
+      const msg =
+        (err as { detail?: string; title?: string })?.detail ??
+        (err as { message?: string })?.message ??
+        'Failed to revoke skill.';
+      toast.error(msg);
+    },
+  });
+
+  return (
+    <ModalDialog title={`Revoke skill: ${revoking.skillName}`} onClose={onClose} maxWidth="34rem">
+      {affectedAllocations ? (
+        <div>
+          <div className="stub-note" style={{ borderColor: 'var(--warning, #eab308)', color: '#854d0e', background: '#fefce8' }}>
+            <strong>Skill qualification revoked successfully.</strong>
+            <p style={{ margin: '0.25rem 0 0 0' }}>
+              The following {affectedAllocations.length} upcoming shift allocation{affectedAllocations.length === 1 ? '' : 's'} require this qualification and were affected:
+            </p>
+          </div>
+
+          <table style={{ marginTop: '0.85rem' }}>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Ward</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {affectedAllocations.map((a) => (
+                <tr key={a.allocation_id}>
+                  <td><strong>{a.date}</strong></td>
+                  <td>{a.start_time} - {a.end_time}</td>
+                  <td>{a.ward_name}</td>
+                  <td><span className="badge">{a.status}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div className="actions" style={{ marginTop: '1.25rem', justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              onClick={() => {
+                onSuccess();
+                onClose();
+              }}
+            >
+              Acknowledge & Close
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <div className="stub-note" style={{ borderColor: 'var(--danger)', color: 'var(--danger)', background: '#fdf2f2' }}>
+            <strong>Warning:</strong> Revoking this qualification will immediately disqualify <strong>{revoking.staffName}</strong> from ward shifts requiring this skill.
+          </div>
+
+          <p style={{ marginTop: '0.85rem' }}>
+            Are you sure you want to revoke <strong>{revoking.skillName}</strong> from <strong>{revoking.staffName}</strong>?
+          </p>
+
+          <div className="actions" style={{ marginTop: '1.25rem', justifyContent: 'flex-end' }}>
+            <button type="button" className="secondary" onClick={onClose} disabled={revokeMutation.isPending}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="danger"
+              disabled={revokeMutation.isPending}
+              onClick={() => {
+                revokeMutation.mutate({
+                  path: {
+                    staffId: revoking.staffId,
+                    skillId: revoking.skillId,
+                  },
+                });
+              }}
+            >
+              {revokeMutation.isPending ? 'Revoking...' : 'Confirm revocation'}
+            </button>
+          </div>
+        </div>
+      )}
     </ModalDialog>
   );
 }

@@ -158,6 +158,57 @@ public sealed class DispatchEndpointTests
     }
 
     [Fact]
+    public async Task Crew_can_read_a_run_they_were_on_whether_it_is_live_or_finished()
+    {
+        var run = await SeedRunAsync();
+        var dispatchId = await DispatchAsync(run);
+        using var crew = await ClientAsync(run.CrewEmails[0]);
+
+        var live = await crew.GetFromJsonAsync<JsonElement>($"/api/me/dispatches/{dispatchId}");
+        Assert.Equal("assigned", live.GetProperty("status").GetString());
+
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+        await manager.PostAsJsonAsync($"/api/dispatches/{dispatchId}/cancel", new { reason = "Caller called back" });
+
+        var finished = await crew.GetFromJsonAsync<JsonElement>($"/api/me/dispatches/{dispatchId}");
+        Assert.Equal("cancelled", finished.GetProperty("status").GetString());
+        Assert.Equal("Caller called back", finished.GetProperty("cancellation_reason").GetString());
+    }
+
+    [Fact]
+    public async Task Crew_cannot_read_a_run_they_were_not_on_and_an_unknown_run_is_not_found()
+    {
+        var run = await SeedRunAsync();
+        var dispatchId = await DispatchAsync(run);
+        var outsider = await SeedCrewAsync();
+        using var stranger = await ClientAsync(outsider.Email);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await stranger.GetAsync($"/api/me/dispatches/{dispatchId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await stranger.GetAsync($"/api/me/dispatches/{Guid.NewGuid()}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_reassigned_run_points_to_the_run_that_replaced_it()
+    {
+        var run = await SeedRunAsync();
+        var replacement = await SeedRunAsync();
+        var dispatchId = await DispatchAsync(run);
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+        var reassigned = await ReadAsync(await manager.PostAsJsonAsync($"/api/dispatches/{dispatchId}/reassign", new
+        {
+            replacement_ambulance_id = replacement.AmbulanceId,
+            reason = "Closer ambulance became free"
+        }));
+        using var crew = await ClientAsync(run.CrewEmails[0]);
+
+        var old = await crew.GetFromJsonAsync<JsonElement>($"/api/me/dispatches/{dispatchId}");
+
+        Assert.Equal("reassigned", old.GetProperty("status").GetString());
+        Assert.Equal("Closer ambulance became free", old.GetProperty("reassignment_reason").GetString());
+        Assert.Equal(reassigned.GetProperty("id").GetGuid(), old.GetProperty("superseded_by_dispatch_id").GetGuid());
+    }
+
+    [Fact]
     public async Task A_status_cannot_be_skipped()
     {
         var run = await SeedRunAsync();

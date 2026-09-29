@@ -1696,8 +1696,9 @@ invalid plan can be returned for revision instead of rejected wholesale.
 - `ck_notifications_one_recipient`: `num_nonnulls(recipient_staff_member_id, recipient_patient_account_id) = 1`.
   Two real foreign keys instead of one loose id, so the database refuses a notification for
   someone who does not exist.
-- `ck_notifications_type`: `type` must be one of the **31** `NotificationType` values (widened from
-  the single `dispatch_assigned` by `Common_ExpandNotificationTypeCatalogue`).
+- `ck_notifications_type`: `type` must be one of the **35** `NotificationType` values (widened from
+  the single `dispatch_assigned` by `Common_ExpandNotificationTypeCatalogue`, then by
+  `Emergency_NotifyCrewOfEndedRuns` for the two crew values).
 - Both recipient keys cascade on delete.
 
 **Note:** *(Rev 2)* No notification entity existed before, yet both flows depend on one:
@@ -2297,17 +2298,17 @@ Pending, Passed, Failed
 
 ### NotificationType *(Rev 3.3 — new)*
 ```
-DispatchAssigned,
+DispatchAssigned, DispatchCancelled, DispatchReassigned,
 AppointmentBooked, AppointmentRescheduled, AppointmentCancelled, AppointmentReminder,
 AdmissionApproved, BedAssigned, DischargeReady, BillRaised, BillSettled, CareReplyReady,
 PrescriptionReady, PrescriptionDelivered, LabReportReady, AmbulanceOnTheWay, AmbulanceArrived,
 CancellationAnswered,
-EmergencyCallReceived, CancellationRequestWaiting, DispatchProposalWaiting,
+EmergencyCallReceived, CancellationRequestWaiting, DispatchProposalWaiting, DispatchProposalFailed,
 AdmissionAwaitingApproval, CareQueryFlagged, CareReplyWaiting, EquipmentWarningRaised,
 MaintenanceDue, PharmacyStockLow, LabTestRequested, LeaveRequested, LeaveApproved,
 LeaveRejected, ShiftChanged, RosterProposalWaiting
 ```
-31 values, stored snake_case (ADR 5). The list of who is told about which is
+35 values, stored snake_case (ADR 5). The list of who is told about which is
 `docs/build/notifications.md` §5.
 
 ### NotificationChannel *(Rev 2 — new)*

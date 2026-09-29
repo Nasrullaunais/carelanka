@@ -416,7 +416,7 @@ provisional implementation suggestions.
 | **Ambulances** | `GET/POST /ambulances`, `GET/PATCH /ambulances/{id}`, retire/reinstate/location/history operations, plus `GET/POST /ambulances/{id}/crew` and `DELETE /ambulances/{ambulanceId}/crew/{staffMemberId}` for current crew |
 | **Dispatch Agent** | `GET /dispatch-proposals`, `POST /dispatch-proposals`, `GET /dispatch-proposals/{id}`, `POST /dispatch-proposals/{id}/confirm`, `POST /dispatch-proposals/{id}/approve`, `POST /dispatch-proposals/{id}/reject` |
 | **Dispatches** | `GET /dispatches`, `GET /dispatches/{id}`, divert/cancel/route operations, and read-only `GET /dispatches/{id}/crew` snapshot |
-| **My Run** (Flutter, crew) | active/history, `POST /me/dispatches/{id}/acknowledge`, `POST /me/dispatches/{id}/decline`, status progress, Google Maps navigation target, and handover |
+| **My Run** (Flutter, crew) | active/history, `GET /me/dispatches/{id}` (how a finished run ended), `POST /me/dispatches/{id}/acknowledge`, `POST /me/dispatches/{id}/decline`, status progress, Google Maps navigation target, and handover |
 | **My Calls** (patient APIs; screen owned by M4) | own-call list/tracking, direct pre-dispatch cancel, post-assignment cancellation request |
 | **Cancellation review** | Duty Manager list plus approve/reject operations under `/emergency-cancellation-requests` |
 | **Reports** | `GET /reports/emergency/response-times`, `GET /reports/emergency/fleet-utilisation`, `GET /reports/emergency/agent-performance` |

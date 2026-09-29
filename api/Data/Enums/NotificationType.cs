@@ -3,6 +3,8 @@ namespace CareLanka.Api.Data.Enums;
 public enum NotificationType
 {
     DispatchAssigned,
+    DispatchCancelled,
+    DispatchReassigned,
 
     AppointmentBooked,
     AppointmentRescheduled,

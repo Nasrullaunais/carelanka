@@ -28,6 +28,7 @@ class DispatchDetail {
     this.declinedReason,
     this.cancellationReason,
     this.reassignmentReason,
+    this.supersededByDispatchId,
     this.handoverNotes,
     this.patientCondition,
     this.sceneAddressLabel,
@@ -73,6 +74,8 @@ class DispatchDetail {
   final String? cancellationReason;
   @JsonKey(name: 'reassignment_reason')
   final String? reassignmentReason;
+  @JsonKey(name: 'superseded_by_dispatch_id')
+  final String? supersededByDispatchId;
   @JsonKey(name: 'handover_notes')
   final String? handoverNotes;
   @JsonKey(name: 'patient_condition')

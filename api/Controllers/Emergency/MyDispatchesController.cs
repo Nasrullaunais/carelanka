@@ -19,6 +19,13 @@ public sealed class MyDispatchesController(IDispatchService dispatches) : Contro
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
     public async Task<ActionResult<DispatchDetail>> Active(CancellationToken ct) => Ok(await dispatches.GetMyActiveAsync(ct));
 
+    [HttpGet("{id:guid}", Name = "getMyDispatch")]
+    [ProducesResponseType(typeof(DispatchDetail), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<ActionResult<DispatchDetail>> Get(Guid id, CancellationToken ct) => Ok(await dispatches.GetMineAsync(id, ct));
+
     [HttpGet("history", Name = "getMyDispatchHistory")]
     [ProducesResponseType(typeof(PagedResult<DispatchSummary>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]

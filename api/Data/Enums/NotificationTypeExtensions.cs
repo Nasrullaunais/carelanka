@@ -8,10 +8,12 @@ public static class AndroidChannels
 
 public static class NotificationTypeExtensions
 {
-    // Crew assignment, a new emergency call and urgent care flags pop up loudly; everything else is quiet.
+    // A crew's run changing, a new emergency call and urgent care flags pop up loudly; everything else is quiet.
     public static string AndroidChannel(this NotificationType type) => type switch
     {
         NotificationType.DispatchAssigned => AndroidChannels.Urgent,
+        NotificationType.DispatchCancelled => AndroidChannels.Urgent,
+        NotificationType.DispatchReassigned => AndroidChannels.Urgent,
         NotificationType.AmbulanceOnTheWay => AndroidChannels.Urgent,
         NotificationType.AmbulanceArrived => AndroidChannels.Urgent,
         NotificationType.EmergencyCallReceived => AndroidChannels.Urgent,

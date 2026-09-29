@@ -308,8 +308,11 @@ plain reassignment.
 
 | Type | Raised in | Text |
 | :--- | :--- | :--- |
-| `DispatchCancelled` | `CancelAsync`, `CancelForApprovedCancellationRequestAsync` | "Run cancelled for {registration}: {reason}" |
-| `DispatchReassigned` | `ReassignAsync`, `ApplyDiversionAsync` | "Run for {registration} given to another ambulance: {reason}" |
+| `DispatchCancelled` | `CancelAsync`, `CancelForApprovedCancellationRequestAsync` | "The run for {registration} was cancelled. Open CareLanka to see why." |
+| `DispatchReassigned` | `ReassignAsync`, `ApplyDiversionAsync` | "The run for {registration} was given to another ambulance. Open CareLanka for details." |
+
+The reason is **not** in the push text: a lock screen is visible to bystanders. The reason
+shows inside the app.
 
 - If the same ambulance is diverted, its crew gets `DispatchReassigned` for the old run *and*
   `DispatchAssigned` for the new one. That is correct: two things happened.
@@ -327,6 +330,8 @@ wrote them for the duty manager, not the crew.
 - `NotificationType.cs`
 - `NotificationTypeExtensions.cs` (the `Urgent` channel)
 - `NotificationTexts.resx`
+- migration `Emergency_NotifyCrewOfEndedRuns` (the `type` column has a check constraint that
+  lists every value)
 - `notification_route.dart` (both go to `_myRun`)
 - `web-ui/src/types/notifications.ts`
 - the type list in `docs/build/notifications.md`
@@ -421,7 +426,8 @@ at_scene ──► transporting_to_hospital ──► handed_over
   - the ambulance becomes available again
   - the agent sees it as free
   - the one-live-run-per-ambulance rule releases it
-- Enums are stored as text (ADR 5), so the new value needs **no migration**.
+- Enums are stored as text (ADR 5), but the column has a check constraint listing every value,
+  so the new value **needs a migration** (it goes in `Emergency_CallSceneOutcome`, Fix 4).
 
 **New endpoint — `POST /api/me/dispatches/{id}/end-at-scene`, operation `endMyDispatchAtScene`.**
 - Body: `EndAtSceneRequest`

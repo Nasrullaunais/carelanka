@@ -3,6 +3,8 @@ import { emergencyCallPath } from '../features/emergency/domain';
 
 export const notificationTypeLabels: Record<NotificationType, string> = {
   dispatch_assigned: 'Dispatch assigned',
+  dispatch_cancelled: 'Run cancelled',
+  dispatch_reassigned: 'Run given to another ambulance',
   appointment_booked: 'Appointment booked',
   appointment_rescheduled: 'Appointment rescheduled',
   appointment_cancelled: 'Appointment cancelled',
@@ -40,6 +42,8 @@ export const notificationTypeLabels: Record<NotificationType, string> = {
 // One route per NotificationType so a new type with no route is a compile error, not a dead click.
 const notificationRoutes: Record<NotificationType, (notification: InboxNotification) => string> = {
   dispatch_assigned: () => '/emergency',
+  dispatch_cancelled: () => '/emergency',
+  dispatch_reassigned: () => '/emergency',
   appointment_booked: () => '/appointments',
   appointment_rescheduled: () => '/appointments',
   appointment_cancelled: () => '/appointments',

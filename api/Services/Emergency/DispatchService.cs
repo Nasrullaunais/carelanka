@@ -31,6 +31,8 @@ public sealed class DispatchService : IDispatchService
         INotifier notifier, IDispatchProposalLifecycle proposals)
         => (_db, _eligibility, _currentUser, _clock, _options, _sceneLookups, _notifier, _proposals) = (db, eligibility, currentUser, clock, options.Value, sceneLookups, notifier, proposals);
 
+    private const string CallerCancelledReason = "The caller no longer needs an ambulance";
+
     private static readonly Dictionary<DispatchStatus, AmbulanceStatus> ProgressProjection = new()
     {
         [DispatchStatus.EnRouteToScene] = AmbulanceStatus.EnRoute,
@@ -78,6 +80,7 @@ public sealed class DispatchService : IDispatchService
         source.CompletedAt = _clock.GetUtcNow();
         source.Ambulance.Status = AmbulanceStatus.Available;
         source.EmergencyCall.Status = CallStatus.Received;
+        await TellCrewRunEndedAsync(source, NotificationType.DispatchReassigned, ct);
         await SaveAsync(ct);
         var replacement = await CreateCoreAsync(newCallId, replacementAmbulanceId, ct);
         replacement.DispatchProposalId = proposalId;
@@ -134,6 +137,9 @@ public sealed class DispatchService : IDispatchService
             .FirstOrDefaultAsync(ct);
         return dispatch is null ? throw new NotFoundException("Live dispatch", _currentUser.Id) : ToDetail(dispatch);
     }
+
+    public async Task<DispatchDetail> GetMineAsync(Guid id, CancellationToken ct = default)
+        => ToDetail(await OwnedAsync(id, ct));
 
     public async Task<PagedResult<DispatchSummary>> ListMyHistoryAsync(MyDispatchHistoryRequest request, CancellationToken ct = default)
     {
@@ -201,6 +207,7 @@ public sealed class DispatchService : IDispatchService
         dispatch.AcknowledgedAt = _clock.GetUtcNow();
         dispatch.AcknowledgedByStaffId = _currentUser.Id;
         dispatch.Ambulance.Status = AmbulanceStatus.Dispatched;
+        await _notifier.ResolveAsync(NotificationType.DispatchAssigned, AssignmentSubject(dispatch), ct);
         await SaveAsync(ct);
         return ToDetail(dispatch);
     }
@@ -214,6 +221,7 @@ public sealed class DispatchService : IDispatchService
         dispatch.DeclinedReason = request.Reason!.Trim();
         dispatch.Ambulance.Status = AmbulanceStatus.Available;
         dispatch.EmergencyCall.Status = CallStatus.Received;
+        await _notifier.ResolveAsync(NotificationType.DispatchAssigned, AssignmentSubject(dispatch), ct);
         var recommendation = await ReopenAsync(dispatch, excludeOwnAmbulance: true, ct);
         await SaveAsync(ct);
         await transaction.CommitAsync(ct);
@@ -282,6 +290,7 @@ public sealed class DispatchService : IDispatchService
         await _proposals.LockCallAsync(dispatch.EmergencyCallId, ct);
         CancelCore(dispatch);
         dispatch.CancellationReason = request.Reason!.Trim();
+        await TellCrewRunEndedAsync(dispatch, NotificationType.DispatchCancelled, ct);
         var recommendation = await ReopenAsync(dispatch, excludeOwnAmbulance: true, ct);
         await SaveAsync(ct);
         await transaction.CommitAsync(ct);
@@ -292,11 +301,14 @@ public sealed class DispatchService : IDispatchService
     public async Task CancelForApprovedCancellationRequestAsync(Guid emergencyCallId, CancellationToken ct = default)
     {
         var dispatch = await _db.Dispatches
+            .Include(x => x.Crew)
             .Include(x => x.Ambulance)
             .Include(x => x.EmergencyCall)
             .SingleOrDefaultAsync(x => x.EmergencyCallId == emergencyCallId && DispatchStatusExtensions.LiveStatuses.Contains(x.Status), ct)
             ?? throw new ConflictException(MessageCode.CallHasNoLiveDispatch);
         CancelCore(dispatch);
+        dispatch.CancellationReason = CallerCancelledReason;
+        await TellCrewRunEndedAsync(dispatch, NotificationType.DispatchCancelled, ct);
         await SaveAsync(ct);
     }
 
@@ -310,6 +322,7 @@ public sealed class DispatchService : IDispatchService
         old.CompletedAt = _clock.GetUtcNow();
         old.Ambulance.Status = AmbulanceStatus.Available;
         old.EmergencyCall.Status = CallStatus.Received;
+        await TellCrewRunEndedAsync(old, NotificationType.DispatchReassigned, ct);
         await SaveAsync(ct);
         var replacement = await CreateCoreAsync(old.EmergencyCallId, request.ReplacementAmbulanceId!.Value, ct);
         old.SupersededByDispatchId = replacement.Id;
@@ -364,6 +377,19 @@ public sealed class DispatchService : IDispatchService
         }
 
         return dispatch;
+    }
+
+    private static NotificationSubject AssignmentSubject(Dispatch dispatch) => new("dispatch", dispatch.Id);
+
+    private async Task TellCrewRunEndedAsync(Dispatch dispatch, NotificationType type, CancellationToken ct)
+    {
+        var subject = AssignmentSubject(dispatch);
+        await _notifier.ResolveAsync(NotificationType.DispatchAssigned, subject, ct);
+        foreach (var member in dispatch.Crew)
+        {
+            await _notifier.NotifyAsync(type, Recipients.Staff(member.StaffMemberId), subject, ct,
+                dispatch.Ambulance.RegistrationNumber);
+        }
     }
 
     private async Task<DispatchProposal> ReopenAsync(Dispatch returned, bool excludeOwnAmbulance, CancellationToken ct)
@@ -454,7 +480,8 @@ public sealed class DispatchService : IDispatchService
             Status = dispatch.Status, DispatchedAt = dispatch.DispatchedAt, CompletedAt = dispatch.CompletedAt,
             AcknowledgedAt = dispatch.AcknowledgedAt, AcknowledgedByStaffId = dispatch.AcknowledgedByStaffId,
             DeclinedReason = dispatch.DeclinedReason, CancellationReason = dispatch.CancellationReason,
-            ReassignmentReason = dispatch.ReassignmentReason, HandoverNotes = dispatch.HandoverNotes,
+            ReassignmentReason = dispatch.ReassignmentReason, SupersededByDispatchId = dispatch.SupersededByDispatchId,
+            HandoverNotes = dispatch.HandoverNotes,
             PatientCondition = dispatch.PatientCondition, SceneAddressLabel = call.AddressLabel,
             SceneDetails = showsCaller ? call.Details : null,
             SceneLatitude = call.Latitude, SceneLongitude = call.Longitude,

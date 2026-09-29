@@ -14,6 +14,7 @@ const historyPageSize = 20;
 
 abstract interface class CrewRunService {
   Future<DispatchDetail?> activeRun();
+  Future<DispatchDetail> getRun(String id);
   Future<DispatchDetail> acknowledge(String id);
   Future<DispatchDetail> decline(String id, String reason);
   Future<DispatchDetail> advance(String id, DispatchStatus next);
@@ -40,6 +41,10 @@ final class GeneratedCrewRunService implements CrewRunService {
       rethrow;
     }
   }
+
+  @override
+  Future<DispatchDetail> getRun(String id) =>
+      callApi(() => _run.getMyDispatch(id: id));
 
   @override
   Future<DispatchDetail> acknowledge(String id) =>

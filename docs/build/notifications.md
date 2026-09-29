@@ -262,6 +262,8 @@ makes the change, **inside the same save**. Wording is final in the resource fil
 | :--- | :--- | :--- | :--- |
 | `emergency_call_received` | `EmergencyCallService` | Duty managers | urgent |
 | `dispatch_assigned` *(exists)* | `DispatchService` | The crew | urgent |
+| `dispatch_cancelled` | `DispatchService`, a run cancelled after the crew was told | The crew | urgent |
+| `dispatch_reassigned` | `DispatchService`, a run given to another ambulance (reassign or diversion) | The crew | urgent |
 | `cancellation_request_waiting` | `EmergencyCallService` | Duty managers | general |
 | `dispatch_proposal_waiting` | `DispatchProposalExecutor`, diversion needing approval only | Duty managers | urgent |
 | `dispatch_proposal_failed` | `DispatchProposalExecutor`, no ambulance recommended | Duty managers | urgent |

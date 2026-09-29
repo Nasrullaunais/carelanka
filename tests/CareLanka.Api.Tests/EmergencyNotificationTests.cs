@@ -165,6 +165,124 @@ public sealed class EmergencyNotificationTests
             actorStaffId: managerId);
     }
 
+    [Fact]
+    public async Task Cancelling_a_run_tells_each_crew_member_and_clears_the_new_run_alert()
+    {
+        using var manager = await _kit.StaffAsync(ApiApplication.ManagerEmail);
+        var ambulance = await SeedAmbulanceAsync();
+        var dispatchId = await DispatchAsync(manager, await SeedCallAsync(patientId: null), ambulance);
+        Assert.Equal(2, await _kit.UnreadCountAsync(NotificationType.DispatchAssigned, dispatchId));
+
+        var cancelled = await manager.PostAsJsonAsync($"/api/dispatches/{dispatchId}/cancel", new { reason = "Caller called back" });
+        Assert.Equal(HttpStatusCode.OK, cancelled.StatusCode);
+
+        await _kit.AssertSentAsync(NotificationType.DispatchCancelled, dispatchId,
+            staff: ambulance.Crew.Select(member => member.Id), patientAccounts: [],
+            actorStaffId: await _kit.StaffIdAsync(ApiApplication.ManagerEmail));
+        Assert.Equal(0, await _kit.UnreadCountAsync(NotificationType.DispatchAssigned, dispatchId));
+    }
+
+    [Fact]
+    public async Task Approving_the_callers_cancellation_tells_the_crew_and_gives_them_a_reason()
+    {
+        var (patient, callId, dispatchId, ambulance) = await DispatchedPatientRunAsync();
+        using var manager = await _kit.StaffAsync(ApiApplication.ManagerEmail);
+        await patient.Client.PostAsJsonAsync(
+            $"/api/me/emergency-calls/{callId}/cancellation-request", new { reason = "Private details for the desk" });
+
+        var approved = await manager.PostAsJsonAsync(
+            $"/api/emergency-calls/{callId}/cancellation-request/approve", new { notes = "Confirmed" });
+        Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
+
+        await _kit.AssertSentAsync(NotificationType.DispatchCancelled, dispatchId,
+            staff: ambulance.Crew.Select(member => member.Id), patientAccounts: [],
+            actorStaffId: await _kit.StaffIdAsync(ApiApplication.ManagerEmail));
+        using var crew = await _kit.StaffAsync(ambulance.Crew[0].Email);
+        var run = await crew.GetFromJsonAsync<JsonElement>($"/api/me/dispatches/{dispatchId}");
+        Assert.Equal("The caller no longer needs an ambulance", run.GetProperty("cancellation_reason").GetString());
+    }
+
+    [Fact]
+    public async Task Reassigning_a_run_tells_the_old_crew_and_the_new_crew()
+    {
+        using var manager = await _kit.StaffAsync(ApiApplication.ManagerEmail);
+        var old = await SeedAmbulanceAsync();
+        var replacement = await SeedAmbulanceAsync();
+        var oldDispatchId = await DispatchAsync(manager, await SeedCallAsync(patientId: null), old);
+
+        var reassigned = await manager.PostAsJsonAsync($"/api/dispatches/{oldDispatchId}/reassign", new
+        {
+            replacement_ambulance_id = replacement.Id,
+            reason = "Closer ambulance became free"
+        });
+        Assert.Equal(HttpStatusCode.OK, reassigned.StatusCode);
+
+        var actor = await _kit.StaffIdAsync(ApiApplication.ManagerEmail);
+        await _kit.AssertSentAsync(NotificationType.DispatchReassigned, oldDispatchId,
+            staff: old.Crew.Select(member => member.Id), patientAccounts: [], actorStaffId: actor);
+        await _kit.AssertSentAsync(NotificationType.DispatchAssigned, await IdAsync(reassigned),
+            staff: replacement.Crew.Select(member => member.Id), patientAccounts: [], actorStaffId: actor);
+        Assert.Equal(0, await _kit.UnreadCountAsync(NotificationType.DispatchAssigned, oldDispatchId));
+    }
+
+    [Fact]
+    public async Task A_diversion_tells_the_same_crew_about_the_old_run_and_the_new_one()
+    {
+        using var manager = await _kit.StaffAsync(ApiApplication.ManagerEmail);
+        var others = await OtherAmbulanceIdsAsync();
+        var ambulance = await SeedAmbulanceAsync();
+        var sourceCallId = await SeedCallAsync(patientId: null, CallPriority.Low);
+        var sourceDispatchId = await DispatchAsync(manager, sourceCallId, ambulance);
+        var urgentCallId = await SeedCallAsync(patientId: null, CallPriority.Critical);
+        var created = await manager.PostAsJsonAsync("/api/dispatch-proposals", new
+        {
+            emergency_call_id = urgentCallId,
+            allow_diversion = true,
+            exclude_ambulance_ids = others
+        });
+        Assert.Equal(HttpStatusCode.Accepted, created.StatusCode);
+        var proposalId = await IdAsync(created);
+        await WaitUntilSettledAsync(manager, proposalId);
+
+        var approved = await manager.PostAsJsonAsync($"/api/dispatch-proposals/{proposalId}/approve", new { notes = "Urgent" });
+        Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
+
+        var actor = await _kit.StaffIdAsync(ApiApplication.ManagerEmail);
+        await _kit.AssertSentAsync(NotificationType.DispatchReassigned, sourceDispatchId,
+            staff: ambulance.Crew.Select(member => member.Id), patientAccounts: [], actorStaffId: actor);
+        Guid newDispatchId;
+        using (var scope = _application.Services.CreateScope())
+        {
+            newDispatchId = await scope.ServiceProvider.GetRequiredService<CareLankaDbContext>().Dispatches
+                .Where(x => x.EmergencyCallId == urgentCallId).Select(x => x.Id).SingleAsync();
+        }
+        await _kit.AssertSentAsync(NotificationType.DispatchAssigned, newDispatchId,
+            staff: ambulance.Crew.Select(member => member.Id), patientAccounts: [], actorStaffId: actor);
+    }
+
+    [Fact]
+    public async Task Accepting_a_run_clears_the_new_run_alert_for_the_whole_crew()
+    {
+        var (_, dispatchId, crew) = await AcknowledgedRunAsync();
+
+        Assert.Equal(0, await _kit.UnreadCountAsync(NotificationType.DispatchAssigned, dispatchId));
+        crew.Dispose();
+    }
+
+    [Fact]
+    public async Task Declining_a_run_clears_the_new_run_alert_for_the_whole_crew()
+    {
+        using var manager = await _kit.StaffAsync(ApiApplication.ManagerEmail);
+        var ambulance = await SeedAmbulanceAsync();
+        var dispatchId = await DispatchAsync(manager, await SeedCallAsync(patientId: null), ambulance);
+        using var crew = await _kit.StaffAsync(ambulance.Crew[0].Email);
+
+        var declined = await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/decline", new { reason = "Vehicle problem" });
+        Assert.Equal(HttpStatusCode.OK, declined.StatusCode);
+
+        Assert.Equal(0, await _kit.UnreadCountAsync(NotificationType.DispatchAssigned, dispatchId));
+    }
+
     private async Task<(NotificationTestKit.LinkedPatient Patient, Guid DispatchId, HttpClient Crew)> AcknowledgedRunAsync()
     {
         using var manager = await _kit.StaffAsync(ApiApplication.ManagerEmail);
@@ -182,6 +300,12 @@ public sealed class EmergencyNotificationTests
 
     private async Task<(NotificationTestKit.LinkedPatient Patient, Guid CallId)> DispatchedPatientCallAsync()
     {
+        var (patient, callId, _, _) = await DispatchedPatientRunAsync();
+        return (patient, callId);
+    }
+
+    private async Task<(NotificationTestKit.LinkedPatient Patient, Guid CallId, Guid DispatchId, Ambulance Ambulance)> DispatchedPatientRunAsync()
+    {
         using var manager = await _kit.StaffAsync(ApiApplication.ManagerEmail);
         var patient = await _kit.NewPatientAsync();
 
@@ -197,9 +321,10 @@ public sealed class EmergencyNotificationTests
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var callId = await IdAsync(created);
 
-        await DispatchAsync(manager, callId, await SeedAmbulanceAsync());
+        var ambulance = await SeedAmbulanceAsync();
+        var dispatchId = await DispatchAsync(manager, callId, ambulance);
 
-        return (patient, callId);
+        return (patient, callId, dispatchId, ambulance);
     }
 
     private static async Task<Guid> DispatchAsync(HttpClient manager, Guid callId, Ambulance ambulance)

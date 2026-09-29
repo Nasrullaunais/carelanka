@@ -1304,6 +1304,28 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /me/dispatches/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      tags: [My Run]
+      summary: Read one of my runs, live or finished
+      description: |
+        Roles: AmbulanceCrew recorded in this dispatch's DispatchCrew snapshot.
+
+        Lets the crew app see how a run ended after it stops being the active one. The
+        scene details and caller contact are hidden once the run is no longer live.
+      operationId: getMyDispatch
+      responses:
+        '200':
+          description: The run
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DispatchDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /me/dispatches/history:
     get:
       tags: [My Run]

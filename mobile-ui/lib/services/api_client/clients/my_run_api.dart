@@ -21,6 +21,11 @@ abstract class MyRunApi {
   @GET('/me/dispatches/active')
   Future<DispatchDetail> getMyActiveDispatch();
 
+  @GET('/me/dispatches/{id}')
+  Future<DispatchDetail> getMyDispatch({
+    @Path('id') required String id,
+  });
+
   @GET('/me/dispatches/history')
   Future<DispatchSummaryPagedResult> getMyDispatchHistory({
     @Query('from') DateTime? from,

@@ -8,6 +8,7 @@ public sealed class DispatchDetail : DispatchSummary
     public string? DeclinedReason { get; set; }
     public string? CancellationReason { get; set; }
     public string? ReassignmentReason { get; set; }
+    public Guid? SupersededByDispatchId { get; set; }
     public string? HandoverNotes { get; set; }
     public string? PatientCondition { get; set; }
     public string? SceneAddressLabel { get; set; }

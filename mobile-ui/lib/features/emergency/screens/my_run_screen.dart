@@ -11,6 +11,7 @@ import '../state/my_run_controller.dart';
 import '../widgets/crew_location_lifecycle.dart';
 import '../widgets/maps_launcher.dart';
 import '../widgets/run_card.dart';
+import '../widgets/run_ending_panel.dart';
 import '../widgets/run_prompts.dart';
 
 class MyRunScreen extends StatefulWidget {
@@ -97,6 +98,11 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
                     child: const Text('Dismiss'),
                   ),
                 ],
+              ),
+            if (controller.ending case final ending?)
+              RunEndingPanel(
+                ending: ending,
+                onDismiss: controller.dismissEnding,
               ),
             Expanded(
               child: AsyncView(

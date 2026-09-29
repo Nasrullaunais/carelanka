@@ -9,6 +9,8 @@ import '../../services/api_client/models/notification_type.dart';
 /// same as an unknown type.
 const Map<NotificationType, String? Function(InboxNotification)> _routes = {
   NotificationType.dispatchAssigned: _myRun,
+  NotificationType.dispatchCancelled: _myRun,
+  NotificationType.dispatchReassigned: _myRun,
   NotificationType.appointmentBooked: _patientHome,
   NotificationType.appointmentRescheduled: _patientHome,
   NotificationType.appointmentCancelled: _patientHome,
@@ -67,9 +69,11 @@ String? routeForPushData(Map<String, String> data) {
   final typeWire = data['type'];
   if (typeWire == null) return null;
 
-  return routeForNotification(InboxNotification(
-    type: NotificationType.fromJson(typeWire),
-    entityType: data['entity_type'],
-    entityId: data['entity_id'],
-  ));
+  return routeForNotification(
+    InboxNotification(
+      type: NotificationType.fromJson(typeWire),
+      entityType: data['entity_type'],
+      entityId: data['entity_id'],
+    ),
+  );
 }

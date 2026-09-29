@@ -1371,6 +1371,7 @@ Mirrors §9's, §15's and §20's format, from Emergency's side. All JWT-protecte
 | `POST /emergency-calls/{id}/dispatch` | Duty Manager manual path and the service reused by proposal confirmation | Assigned dispatch with immutable responding-crew snapshot |
 | `GET/POST /ambulances/{id}/crew`; `DELETE /ambulances/{ambulanceId}/crew/{staffMemberId}` | Duty Manager fleet readiness | Current ambulance crew; one current ambulance per crew member |
 | `POST /me/dispatches/{id}/acknowledge`; `POST /me/dispatches/{id}/decline` | Responding crew | One crew member's decision for the response unit |
+| `GET /me/dispatches/{id}` | Responding crew | One of their own runs, live or finished, so the app can show how a run ended. Scene details and caller contact are hidden once it is no longer live |
 | `GET /dispatches/{id}` | Patient Management / a future orchestrator | Authoritative dispatch status, ambulance, responding crew, route and ETA |
 | `GET /me/emergency-calls/{id}/tracking` | The patient's own Flutter screen | Ambulance position and ETA for a call **they** raised. Deliberately narrow — no crew names, no notes, no other calls. Emergency's own endpoint, not a filtered staff response |
 | `POST /me/emergency-calls/{id}/cancel` | Patient Management's patient screen | Direct cancellation only before dispatch |

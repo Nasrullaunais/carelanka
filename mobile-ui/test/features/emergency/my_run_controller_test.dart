@@ -1,5 +1,6 @@
 import 'package:carelanka_mobile/core/network/api_exception.dart';
 import 'package:carelanka_mobile/core/widgets/async_data.dart';
+import 'package:carelanka_mobile/features/emergency/models/run_ending.dart';
 import 'package:carelanka_mobile/features/emergency/models/run_step.dart';
 import 'package:carelanka_mobile/features/emergency/services/crew_run_service.dart';
 import 'package:carelanka_mobile/features/emergency/state/my_run_controller.dart';
@@ -11,12 +12,28 @@ import 'package:carelanka_mobile/services/api_client/models/dispatch_summary_pag
 import 'package:carelanka_mobile/services/api_client/models/navigation_target.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-DispatchDetail _run(DispatchStatus status) =>
-    DispatchDetail(id: 'run-1', status: status);
+DispatchDetail _run(DispatchStatus status, {String id = 'run-1'}) =>
+    DispatchDetail(id: id, status: status);
+
+DispatchDetail _ended(
+  DispatchStatus status, {
+  String? cancellationReason,
+  String? reassignmentReason,
+  String? supersededBy,
+}) => DispatchDetail(
+  id: 'run-1',
+  status: status,
+  ambulanceRegistration: 'AMB-3',
+  cancellationReason: cancellationReason,
+  reassignmentReason: reassignmentReason,
+  supersededByDispatchId: supersededBy,
+  completedAt: DateTime.utc(2026, 9, 30, 5, 22),
+);
 
 final class FakeRunService implements CrewRunService {
   DispatchDetail? active;
   Object? nextError;
+  final ended = <String, DispatchDetail>{};
   final calls = <String>[];
 
   Future<DispatchDetail> _reply(String call, DispatchStatus status) async {
@@ -31,6 +48,13 @@ final class FakeRunService implements CrewRunService {
 
   @override
   Future<DispatchDetail?> activeRun() async => active;
+
+  @override
+  Future<DispatchDetail> getRun(String id) async {
+    calls.add('getRun:$id');
+    return ended[id] ??
+        (throw const ApiException(message: 'offline', statusCode: null));
+  }
 
   @override
   Future<DispatchDetail> acknowledge(String id) =>
@@ -143,7 +167,7 @@ void main() {
     expect(controller.state.valueOrNull, isNull);
   });
 
-  test('a conflict shows the server message and re-reads the run', () async {
+  test('a conflict explains itself through the ending panel', () async {
     final service = FakeRunService()
       ..active = _run(DispatchStatus.acknowledged);
     final controller = MyRunController(service);
@@ -153,12 +177,30 @@ void main() {
       statusCode: 409,
     );
     service.active = null;
+    service.ended['run-1'] = _ended(DispatchStatus.cancelled);
 
     final done = await controller.advance();
 
     expect(done, isFalse);
-    expect(controller.actionError?.message, 'Run was cancelled');
+    expect(controller.actionError, isNull);
+    expect(controller.ending?.kind, RunEndingKind.cancelled);
     expect(controller.state.valueOrNull, isNull);
+  });
+
+  test('a conflict with the run still live keeps the server message', () async {
+    final service = FakeRunService()
+      ..active = _run(DispatchStatus.acknowledged);
+    final controller = MyRunController(service);
+    await controller.load();
+    service.nextError = const ApiException(
+      message: 'Not allowed now',
+      statusCode: 409,
+    );
+
+    await controller.advance();
+
+    expect(controller.actionError?.message, 'Not allowed now');
+    expect(controller.ending, isNull);
   });
 
   test(
@@ -175,6 +217,146 @@ void main() {
       expect(controller.state.valueOrNull?.status, DispatchStatus.assigned);
     },
   );
+
+  group('when a run ends', () {
+    Future<(FakeRunService, MyRunController)> liveRun() async {
+      final service = FakeRunService()
+        ..active = _run(DispatchStatus.enRouteToScene);
+      final controller = MyRunController(service);
+      await controller.load();
+      return (service, controller);
+    }
+
+    test('nothing is shown for a run the app never saw', () async {
+      final service = FakeRunService();
+      final controller = MyRunController(service);
+
+      await controller.load();
+
+      expect(controller.ending, isNull);
+      expect(service.calls, isEmpty);
+    });
+
+    test('a cancelled run says why', () async {
+      final (service, controller) = await liveRun();
+      service.active = null;
+      service.ended['run-1'] = _ended(
+        DispatchStatus.cancelled,
+        cancellationReason: ' Caller called back ',
+      );
+
+      await controller.load(showLoading: false);
+
+      final ending = controller.ending!;
+      expect(ending.kind, RunEndingKind.cancelled);
+      expect(ending.reason, 'Caller called back');
+      expect(ending.message, contains('You can stop driving.'));
+      expect(controller.state.valueOrNull, isNull);
+    });
+
+    test('a run given to another ambulance shows the reason', () async {
+      final (service, controller) = await liveRun();
+      service.active = null;
+      service.ended['run-1'] = _ended(
+        DispatchStatus.reassigned,
+        reassignmentReason: 'Closer ambulance became free',
+      );
+
+      await controller.load(showLoading: false);
+
+      expect(controller.ending?.kind, RunEndingKind.reassigned);
+      expect(
+        controller.ending?.message,
+        'Reason: Closer ambulance became free',
+      );
+    });
+
+    test('a diversion is told apart and the new run stays visible', () async {
+      final (service, controller) = await liveRun();
+      service.active = _run(DispatchStatus.assigned, id: 'run-2');
+      service.ended['run-1'] = _ended(
+        DispatchStatus.reassigned,
+        supersededBy: 'run-2',
+      );
+
+      await controller.load(showLoading: false);
+
+      expect(controller.ending?.kind, RunEndingKind.diverted);
+      expect(controller.state.valueOrNull?.id, 'run-2');
+    });
+
+    test('a reassignment to a different run is not a diversion', () async {
+      final (service, controller) = await liveRun();
+      service.active = _run(DispatchStatus.assigned, id: 'run-3');
+      service.ended['run-1'] = _ended(
+        DispatchStatus.reassigned,
+        supersededBy: 'run-2',
+      );
+
+      await controller.load(showLoading: false);
+
+      expect(controller.ending?.kind, RunEndingKind.reassigned);
+    });
+
+    test('a handover is confirmed without asking the server again', () async {
+      final (service, controller) = await liveRun();
+
+      await controller.handOver();
+
+      expect(controller.ending?.kind, RunEndingKind.handedOver);
+      expect(service.calls.where((call) => call.startsWith('getRun')), isEmpty);
+    });
+
+    test('declining a run leaves no panel', () async {
+      final service = FakeRunService()..active = _run(DispatchStatus.assigned);
+      final controller = MyRunController(service);
+      await controller.load();
+
+      await controller.decline('Flat tyre');
+
+      expect(controller.ending, isNull);
+    });
+
+    test('never invents a reason when the details cannot be fetched', () async {
+      final (service, controller) = await liveRun();
+      service.active = null;
+
+      await controller.load(showLoading: false);
+
+      expect(controller.ending?.kind, RunEndingKind.unavailable);
+      expect(controller.ending?.title, 'This run is no longer assigned to you');
+    });
+
+    test('the panel survives refreshes until it is dismissed', () async {
+      final (service, controller) = await liveRun();
+      service.active = null;
+      service.ended['run-1'] = _ended(DispatchStatus.cancelled);
+      await controller.load(showLoading: false);
+
+      await controller.load(showLoading: false);
+      expect(controller.ending?.kind, RunEndingKind.cancelled);
+      expect(
+        service.calls.where((call) => call.startsWith('getRun')),
+        hasLength(1),
+      );
+
+      controller.dismissEnding();
+      expect(controller.ending, isNull);
+    });
+
+    test('a new run does not clear the previous ending', () async {
+      final (service, controller) = await liveRun();
+      service.active = null;
+      service.ended['run-1'] = _ended(DispatchStatus.handedOver);
+      await controller.load(showLoading: false);
+
+      service.active = _run(DispatchStatus.assigned, id: 'run-2');
+      await controller.load(showLoading: false);
+
+      expect(controller.ending?.kind, RunEndingKind.handedOver);
+      expect(controller.state.valueOrNull?.id, 'run-2');
+    });
+  });
 
   test(
     'history loads the first page, then older runs on request, then stops',

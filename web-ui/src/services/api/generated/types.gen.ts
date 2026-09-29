@@ -907,6 +907,7 @@ export type DispatchDetail = {
     declined_reason?: string | null;
     cancellation_reason?: string | null;
     reassignment_reason?: string | null;
+    superseded_by_dispatch_id?: string | null;
     handover_notes?: string | null;
     patient_condition?: string | null;
     scene_address_label?: string | null;
@@ -1604,7 +1605,7 @@ export type NavigationTarget = {
 
 export type NavigationWaypoint = 'scene' | 'hospital_emergency_entrance';
 
-export type NotificationType = 'dispatch_assigned' | 'appointment_booked' | 'appointment_rescheduled' | 'appointment_cancelled' | 'appointment_reminder' | 'admission_approved' | 'bed_assigned' | 'discharge_ready' | 'bill_raised' | 'bill_settled' | 'care_reply_ready' | 'prescription_ready' | 'prescription_delivered' | 'lab_report_ready' | 'ambulance_on_the_way' | 'ambulance_arrived' | 'cancellation_answered' | 'emergency_call_received' | 'cancellation_request_waiting' | 'dispatch_proposal_waiting' | 'dispatch_proposal_failed' | 'admission_awaiting_approval' | 'care_query_flagged' | 'care_reply_waiting' | 'equipment_warning_raised' | 'maintenance_due' | 'pharmacy_stock_low' | 'lab_test_requested' | 'leave_requested' | 'leave_approved' | 'leave_rejected' | 'shift_changed' | 'roster_proposal_waiting';
+export type NotificationType = 'dispatch_assigned' | 'dispatch_cancelled' | 'dispatch_reassigned' | 'appointment_booked' | 'appointment_rescheduled' | 'appointment_cancelled' | 'appointment_reminder' | 'admission_approved' | 'bed_assigned' | 'discharge_ready' | 'bill_raised' | 'bill_settled' | 'care_reply_ready' | 'prescription_ready' | 'prescription_delivered' | 'lab_report_ready' | 'ambulance_on_the_way' | 'ambulance_arrived' | 'cancellation_answered' | 'emergency_call_received' | 'cancellation_request_waiting' | 'dispatch_proposal_waiting' | 'dispatch_proposal_failed' | 'admission_awaiting_approval' | 'care_query_flagged' | 'care_reply_waiting' | 'equipment_warning_raised' | 'maintenance_due' | 'pharmacy_stock_low' | 'lab_test_requested' | 'leave_requested' | 'leave_approved' | 'leave_rejected' | 'shift_changed' | 'roster_proposal_waiting';
 
 export type OutstandingBill = {
     admission_id: string;
@@ -7603,6 +7604,41 @@ export type GetMyActiveDispatchResponses = {
 };
 
 export type GetMyActiveDispatchResponse = GetMyActiveDispatchResponses[keyof GetMyActiveDispatchResponses];
+
+export type GetMyDispatchData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/dispatches/{id}';
+};
+
+export type GetMyDispatchErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetMyDispatchError = GetMyDispatchErrors[keyof GetMyDispatchErrors];
+
+export type GetMyDispatchResponses = {
+    /**
+     * OK
+     */
+    200: DispatchDetail;
+};
+
+export type GetMyDispatchResponse = GetMyDispatchResponses[keyof GetMyDispatchResponses];
 
 export type GetMyDispatchHistoryData = {
     body?: never;

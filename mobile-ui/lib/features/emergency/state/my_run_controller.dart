@@ -6,6 +6,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/widgets/async_data.dart';
 import '../../../services/api_client/models/dispatch_detail.dart';
 import '../../../services/api_client/models/navigation_target.dart';
+import '../models/run_ending.dart';
 import '../models/run_step.dart';
 import '../services/crew_run_service.dart';
 
@@ -21,10 +22,13 @@ class MyRunController extends ChangeNotifier {
   bool _disposed = false;
 
   AsyncData<DispatchDetail?> _state = const AsyncData.loading();
+  String? _liveRunId;
+  RunEnding? _ending;
   bool _busy = false;
   ApiException? _actionError;
 
   AsyncData<DispatchDetail?> get state => _state;
+  RunEnding? get ending => _ending;
   bool get busy => _busy;
   ApiException? get actionError => _actionError;
 
@@ -42,12 +46,17 @@ class MyRunController extends ChangeNotifier {
       notifyListeners();
     }
     try {
-      _show(await _service.activeRun());
+      await _show(await _service.activeRun());
     } on ApiException catch (error) {
       if (showLoading || _state is! AsyncReady<DispatchDetail?>) {
         _state = AsyncData.failed(error);
       }
     }
+    _notify();
+  }
+
+  void dismissEnding() {
+    _ending = null;
     _notify();
   }
 
@@ -95,11 +104,11 @@ class MyRunController extends ChangeNotifier {
     _actionError = null;
     notifyListeners();
     try {
-      _show(await action(run));
+      await _show(await action(run));
       return true;
     } on ApiException catch (error) {
       _actionError = error;
-      await _refreshAfterConflict(error);
+      if (await _refreshAfterConflict(error)) _actionError = null;
       return false;
     } finally {
       _busy = false;
@@ -107,19 +116,42 @@ class MyRunController extends ChangeNotifier {
     }
   }
 
-  // A 409 means the run moved under us (cancelled or reassigned by the duty manager): show the truth.
-  Future<void> _refreshAfterConflict(ApiException error) async {
-    if (!error.isConflict && !error.isNotFound) return;
+  // A 409 means the run moved under us. Returns true when the reload found the run ended, since the panel explains it better than the error.
+  Future<bool> _refreshAfterConflict(ApiException error) async {
+    if (!error.isConflict && !error.isNotFound) return false;
     try {
-      _show(await _service.activeRun());
+      final before = _ending;
+      await _show(await _service.activeRun());
+      return _ending != null && !identical(_ending, before);
     } on ApiException {
-      return;
+      return false;
     }
   }
 
-  void _show(DispatchDetail? run) {
-    final live = run != null && (run.status?.isLive ?? false);
-    _state = AsyncData.ready(live ? run : null);
+  Future<void> _show(DispatchDetail? run) async {
+    final live = run != null && (run.status?.isLive ?? false) ? run : null;
+    final endedRunId = _liveRunId;
+    if (endedRunId != null && endedRunId != live?.id) {
+      final ending = await _endingOf(endedRunId, live?.id, knownEnd: run);
+      if (ending != null) _ending = ending;
+    }
+    _liveRunId = live?.id;
+    _state = AsyncData.ready(live);
+  }
+
+  Future<RunEnding?> _endingOf(
+    String runId,
+    String? activeRunId, {
+    DispatchDetail? knownEnd,
+  }) async {
+    try {
+      final ended = knownEnd?.id == runId
+          ? knownEnd!
+          : await _service.getRun(runId);
+      return RunEnding.from(ended, activeRunId: activeRunId);
+    } on ApiException {
+      return const RunEnding.unavailable();
+    }
   }
 
   void _notify() {

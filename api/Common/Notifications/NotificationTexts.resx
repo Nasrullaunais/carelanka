@@ -65,6 +65,18 @@
   <data name="dispatch_assigned_body" xml:space="preserve">
     <value>Open CareLanka to see your run.</value>
   </data>
+  <data name="dispatch_cancelled_title" xml:space="preserve">
+    <value>Run cancelled</value>
+  </data>
+  <data name="dispatch_cancelled_body" xml:space="preserve">
+    <value>The run for {0} was cancelled. Open CareLanka to see why.</value>
+  </data>
+  <data name="dispatch_reassigned_title" xml:space="preserve">
+    <value>Run given to another ambulance</value>
+  </data>
+  <data name="dispatch_reassigned_body" xml:space="preserve">
+    <value>The run for {0} was given to another ambulance. Open CareLanka for details.</value>
+  </data>
 
   <data name="appointment_booked_title" xml:space="preserve">
     <value>Appointment booked</value>

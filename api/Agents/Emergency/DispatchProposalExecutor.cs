@@ -143,7 +143,11 @@ public sealed class DispatchProposalExecutor
         };
         if (type is null) return;
 
-        await _notifier.NotifyAsync(type.Value, Recipients.Role(StaffRole.DutyManager),
+        // The worker has no signed-in user, so the requester is left out by name. A failure still
+        // reaches everyone: the requester did not cause it and has to know it happened.
+        var requester = type == NotificationType.DispatchProposalWaiting ? proposal.RequestedByStaffMemberId : null;
+        await _notifier.NotifyAsync(type.Value,
+            Recipients.Role(StaffRole.DutyManager, exceptStaffId: requester),
             new NotificationSubject("emergency_call", proposal.EmergencyCallId, proposal.Id), ct);
     }
 }

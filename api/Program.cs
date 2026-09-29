@@ -156,6 +156,13 @@ builder.Services
     .ValidateOnStart();
 
 builder.Services
+    .AddOptions<NotificationOptions>()
+    .Bind(builder.Configuration.GetSection(NotificationOptions.SectionName))
+    .Validate(options => options.RetentionDays > 0 && options.ReminderLeadHours > 0,
+        "Notifications:RetentionDays and ReminderLeadHours must be greater than zero.")
+    .ValidateOnStart();
+
+builder.Services
     .AddOptions<LanguageModelOptions>()
     .Bind(builder.Configuration.GetSection(LanguageModelOptions.SectionName))
     .Validate(options => options.TimeoutSeconds > 0 && options.MaxRetries >= 0,
@@ -464,6 +471,10 @@ builder.Services.AddSingleton<IPushSender>(services =>
         ? ActivatorUtilities.CreateInstance<LoggingPushSender>(services)
         : ActivatorUtilities.CreateInstance<FirebasePushSender>(services));
 builder.Services.AddHostedService<PushDeliveryWorker>();
+builder.Services.AddScoped<IAppointmentReminderService, AppointmentReminderService>();
+builder.Services.AddScoped<IMaintenanceDueService, MaintenanceDueService>();
+builder.Services.AddScoped<IInboxCleanupService, InboxCleanupService>();
+builder.Services.AddHostedService<NotificationScheduleWorker>();
 builder.Services.AddScoped<CareLanka.Api.Services.Emergency.IStaffLookupService, StubStaffLookupService>();
 builder.Services.AddHttpClient<IAmbulanceDistanceService, OsrmAmbulanceDistanceService>();
 builder.Services.AddHttpClient<IReverseGeocoder, NominatimReverseGeocoder>();

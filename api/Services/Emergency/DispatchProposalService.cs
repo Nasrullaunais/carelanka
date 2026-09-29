@@ -60,7 +60,8 @@ public sealed class DispatchProposalService : IDispatchProposalService
             throw new ConflictException(MessageCode.DispatchProposalConflict);
         }
 
-        var proposal = _lifecycle.Open(call.Id, call.Priority, request.AllowDiversion, request.ExcludeAmbulanceIds ?? []);
+        var proposal = _lifecycle.Open(
+            call.Id, call.Priority, request.AllowDiversion, request.ExcludeAmbulanceIds ?? [], _currentUser.Id);
         await SaveAsync(ct);
         await transaction.CommitAsync(ct);
         _lifecycle.Wake(proposal);

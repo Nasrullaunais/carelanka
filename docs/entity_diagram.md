@@ -5,6 +5,12 @@ single hospital / multiple wards, unified staff identity, generic agent-workflow
 audit-log schemas). PKs are `Guid` (PostgreSQL `uuid`, `default: gen_random_uuid()`)
 throughout.
 
+**Revision 3.3** *(2026-09-30)* — notifications are split in two, in the
+`Common_SplitNotificationDeliveries` and `Common_ExpandNotificationTypeCatalogue` migrations.
+`notifications` is now only the inbox (what a person was told). The push attempts moved into a new
+`notification_deliveries` table. Both `notifications` and `device_tokens` can belong to a patient
+account as well as a staff member. Changes marked *(Rev 3.3)*. The reasoning is `ADR.md` ADR 9.
+
 **Revision 3.2** *(2026-09-16)* — both Patient Management agents were redesigned after the rest
 of that component was built and tested. Three schema-visible consequences, all marked *(Rev 3.2)*:
 
@@ -405,8 +411,9 @@ means a token was stolen.
 
 #### DeviceToken extends AuditedEntity *(Rev 2 — new)*
 ```
-+ StaffMemberId: Guid (non-null) FK → StaffMember.Id
-+ Token: string (unique, non-null)                     -- FCM/APNs registration token
++ StaffMemberId: Guid (nullable) FK → StaffMember.Id          -- Rev 3.3
++ PatientAccountId: Guid (nullable) FK → PatientAccount.Id    -- Rev 3.3
++ Token: string (max 512, unique, non-null)            -- FCM/APNs registration token
 + Platform: DevicePlatform (non-null)
 + LastSeenAt: DateTimeOffset (non-null)
 + RevokedAt: DateTimeOffset (nullable)
@@ -414,8 +421,14 @@ means a token was stolen.
 **Table:** `device_tokens`
 **Note:** *(Rev 2)* Required by both flows — the staff flow pushes "report to the ICU" to
 the reassigned nurse's Flutter app, and the patient flow pushes the bed assignment.
-One staff member may have several devices. Scoped to `StaffMember` only; see
-[Open Decisions](#open-decisions) for the patient-device question.
+One staff member may have several devices.
+
+*(Rev 3.3)* **A device belongs to a staff member or a patient account, never both and never
+neither:** `CHECK (num_nonnulls(staff_member_id, patient_account_id) = 1)`
+(`ck_device_tokens_one_owner`). Both keys cascade on delete. Partial indexes on each owner
+column where `revoked_at IS NULL`. When a phone signs in as a different person its token moves
+to the new person and the old registration is revoked, so a shared ward phone never shows the
+last user's alerts.
 
 #### PatientAccount extends SoftDeletableEntity *(Rev 2.5 — new)*
 ```
@@ -1666,38 +1679,62 @@ soft-deleted nurse) and what let the approval query filter by content without
 `jsonb_path_query`. `ValidationStatus` records the step-3 verdict per change, so a partly
 invalid plan can be returned for revision instead of rejected wholesale.
 
-#### Notification extends AuditedEntity *(Rev 2 — new)*
+#### Notification extends AuditedEntity *(Rev 2 — new; Rev 3.3 — reshaped as the inbox)*
 ```
-+ RecipientStaffMemberId: Guid (non-null) FK → StaffMember.Id
-+ Channel: NotificationChannel (non-null)
-+ Title: string (non-null)
-+ Body: string (non-null)
-+ EntityType: string (nullable)     -- deep-link target
++ RecipientStaffMemberId: Guid (nullable) FK → StaffMember.Id          -- Rev 3.3
++ RecipientPatientAccountId: Guid (nullable) FK → PatientAccount.Id    -- Rev 3.3
++ Type: NotificationType (non-null, max 50)                            -- Rev 3.3
++ Title: string (max 200, non-null)
++ Body: string (max 500, non-null)
++ EntityType: string (max 50, nullable)     -- deep-link target
 + EntityId: Guid (nullable)
-+ Status: NotificationStatus (non-null)
-+ SentAt: DateTimeOffset (nullable)
-+ ReadAt: DateTimeOffset (nullable)
-+ FailureReason: string (nullable)
-+ DedupeKey: string (max 200, unique, non-null)   -- Rev 2.14: one push per reason, entity and person
-+ AttemptCount: int (non-null, default 0)        -- Rev 2.14: delivery tries so far
-+ NextAttemptAt: DateTimeOffset (non-null)        -- Rev 2.14: when a Queued push is next due
++ DedupeKey: string (max 200, unique, non-null)   -- one notification per type, entity and person
++ ReadAt: DateTimeOffset (nullable)               -- null = unread
 ```
 **Table:** `notifications`
+**Constraints:** *(Rev 3.3)*
+- `ck_notifications_one_recipient`: `num_nonnulls(recipient_staff_member_id, recipient_patient_account_id) = 1`.
+  Two real foreign keys instead of one loose id, so the database refuses a notification for
+  someone who does not exist.
+- `ck_notifications_type`: `type` must be one of the **31** `NotificationType` values (widened from
+  the single `dispatch_assigned` by `Common_ExpandNotificationTypeCatalogue`).
+- Both recipient keys cascade on delete.
+
 **Note:** *(Rev 2)* No notification entity existed before, yet both flows depend on one:
 the staff flow "pushes a live alert to the administrative system" (React) and sends the
 reassigned nurse "an immediate push notification" (Flutter); the patient flow notifies on
-bed assignment. `Channel` distinguishes in-app alerts from device push. Delivery uses
-`DeviceToken`. `(EntityType, EntityId)` lets the client deep-link to the workflow awaiting
-approval.
+bed assignment. `(EntityType, EntityId)` lets the client deep-link to the thing the
+notification is about.
 
-*(Rev 2.14)* **`notifications` is also the retry queue.** A push is saved as `Queued` in the
-same transaction as the change that caused it, so it can never be lost or sent for a change
-that rolled back. A background worker sends what is due, marks it `Sent`, retries `Failed`
-sends with growing gaps, and gives up after five tries (`FailureReason = gave_up`).
-`no_device` means the person had no active `DeviceToken`. `DedupeKey`
-(`{reason}:{entity id}:{staff id}`) makes staging the same push twice impossible. A phone
-the push service rejects gets `DeviceToken.RevokedAt`. The push text is generic on purpose:
-no patient or incident detail reaches a lock screen.
+*(Rev 3.3)* **This table is the inbox and nothing else.** `Title` and `Body` are stored as
+rendered, so an old item still reads correctly after the wording changes. A row is staged in the
+same `SaveChanges` as the change that caused it, so a rolled-back change leaves no notification.
+`DedupeKey` (`{type}:{entity id}:{recipient}[:occurrence]`) makes staging the same
+notification twice impossible. The old `Channel`, `Status`, `SentAt`, `FailureReason`,
+`AttemptCount` and `NextAttemptAt` columns moved to `notification_deliveries`; existing rows
+were copied across inside the migration. A scheduled job deletes rows older than 90 days.
+
+#### NotificationDelivery extends AuditedEntity *(Rev 3.3 — new)*
+```
++ NotificationId: Guid (non-null) FK → Notification.Id
++ Channel: NotificationChannel (non-null, max 20)
++ Status: NotificationStatus (non-null, max 20)
++ AttemptCount: int (non-null, default 0)
++ NextAttemptAt: DateTimeOffset (non-null)        -- when a Queued delivery is next due
++ SentAt: DateTimeOffset (nullable)
++ FailureReason: string (max 200, nullable)
+```
+**Table:** `notification_deliveries`
+**Constraints:** check constraints on `channel` and `status`. `notification_id` cascades on
+delete, so deleting an old inbox row removes its deliveries.
+
+**Note:** *(Rev 3.3)* **One row per attempt to reach a person through one channel.** Only `push`
+is used today; `sms` is reserved. A background worker sends what is due, marks it `Sent`,
+retries `Failed` sends with growing gaps and gives up after five tries
+(`FailureReason = gave_up`). `no_device` means the person had no active `DeviceToken`. A phone
+the push service rejects gets `DeviceToken.RevokedAt`. Push text is full detail by default;
+`Notifications:LockScreenDetail = Generic` swaps it for one general sentence (ADR 9). The
+partial index `ix_notification_deliveries_due` replaces the old `ix_notifications_due`.
 
 #### AuditLog extends Entity
 ```
@@ -2258,6 +2295,21 @@ proposes — a new `CareRecommendation` row, same shape as `ReserveBed`.
 Pending, Passed, Failed
 ```
 
+### NotificationType *(Rev 3.3 — new)*
+```
+DispatchAssigned,
+AppointmentBooked, AppointmentRescheduled, AppointmentCancelled, AppointmentReminder,
+AdmissionApproved, BedAssigned, DischargeReady, BillRaised, BillSettled, CareReplyReady,
+PrescriptionReady, PrescriptionDelivered, LabReportReady, AmbulanceOnTheWay, AmbulanceArrived,
+CancellationAnswered,
+EmergencyCallReceived, CancellationRequestWaiting, DispatchProposalWaiting,
+AdmissionAwaitingApproval, CareQueryFlagged, CareReplyWaiting, EquipmentWarningRaised,
+MaintenanceDue, PharmacyStockLow, LabTestRequested, LeaveRequested, LeaveApproved,
+LeaveRejected, ShiftChanged, RosterProposalWaiting
+```
+31 values, stored snake_case (ADR 5). The list of who is told about which is
+`docs/build/notifications.md` §5.
+
 ### NotificationChannel *(Rev 2 — new)*
 ```
 InApp, Push, Sms
@@ -2351,7 +2403,7 @@ CREATE UNIQUE INDEX ux_allocations_confirmed ON allocations (shift_id, staff_mem
 CREATE UNIQUE INDEX ux_refresh_tokens_hash ON refresh_tokens (token_hash);
 CREATE UNIQUE INDEX ux_device_tokens_token ON device_tokens (token);
 CREATE UNIQUE INDEX ux_notifications_dedupe_key ON notifications (dedupe_key);
-CREATE INDEX ix_notifications_due ON notifications (next_attempt_at) WHERE status = 'queued';
+CREATE INDEX ix_notification_deliveries_due ON notification_deliveries (next_attempt_at) WHERE status = 'queued';
 ```
 
 ### CHECK constraints
@@ -2425,7 +2477,11 @@ CREATE INDEX ix_agent_workflows_queue  ON agent_workflows (required_approver_rol
     WHERE status = 'pending_approval';
 CREATE INDEX ix_warnings_open          ON warnings (severity, created_at DESC) WHERE status = 'open';
 CREATE INDEX ix_emergency_calls_open   ON emergency_calls (status, created_at DESC);
-CREATE INDEX ix_notifications_unread   ON notifications (recipient_staff_member_id, created_at DESC)
+CREATE INDEX ix_notifications_staff_recipient   ON notifications (recipient_staff_member_id, created_at);
+CREATE INDEX ix_notifications_patient_recipient ON notifications (recipient_patient_account_id, created_at);
+CREATE INDEX ix_notifications_staff_unread      ON notifications (recipient_staff_member_id)
+    WHERE read_at IS NULL;
+CREATE INDEX ix_notifications_patient_unread    ON notifications (recipient_patient_account_id)
     WHERE read_at IS NULL;
 
 -- agent query paths
@@ -2461,7 +2517,7 @@ CREATE INDEX ix_admissions_missing_fields ON admissions USING gin (missing_field
 - **FK delete behaviour:** `ON DELETE RESTRICT` to every soft-deletable target;
   `ON DELETE CASCADE` for owned children — `staff_member_skills`, `dispatch_crew`,
   `agent_proposed_changes`, `discharge_checklist_items`, `device_tokens`,
-  `refresh_tokens`, `notifications`.
+  `refresh_tokens`, `notifications`, `notification_deliveries`.
 - **`text[]` → `string[]`.** Npgsql maps this natively; no value converter needed.
   `missing_fields` uses a **GIN** index because the queries are containment
   (`'nic' = ANY(...)`), which b-tree cannot serve. *(Rev 2.1)*
@@ -2494,6 +2550,8 @@ CREATE INDEX ix_admissions_missing_fields ON admissions USING gin (missing_field
 | StaffMember | RefreshToken | 1:N | RefreshToken.StaffMemberId |
 | StaffMember | DeviceToken | 1:N | DeviceToken.StaffMemberId |
 | StaffMember | Notification | 1:N | Notification.RecipientStaffMemberId |
+| PatientAccount | Notification | 1:N | Notification.RecipientPatientAccountId *(Rev 3.3)* |
+| Notification | NotificationDelivery | 1:N | NotificationDelivery.NotificationId *(Rev 3.3)* |
 | StaffMember | LeaveRequest | 1:N | LeaveRequest.StaffMemberId |
 | Patient | Admission | 1:N | Admission.PatientId |
 | Patient | Appointment | 1:N | Appointment.PatientId |
@@ -2599,6 +2657,7 @@ rows are mutated after insert; pure join/append-only tables (`DispatchCrew`,
 | AgentWorkflow | agent_workflows | | changed |
 | AgentProposedChange | agent_proposed_changes | | **new** |
 | Notification | notifications | | **new** |
+| NotificationDelivery | notification_deliveries | | **new** *(Rev 3.3)* |
 | AuditLog | audit_logs | | changed |
 
 **35 tables** (was 25). *(Rev 3.1 added `AmbulanceCrewAssignment`.)*
@@ -2686,7 +2745,8 @@ the first half of that contrast disappears.
 **Knock-on changes this creates, still to do:**
 
 - `Notification` and `DeviceToken` are written staff-only. Both need a nullable `PatientId`
-  and a polymorphic recipient. *Owner: group / leader.*
+  and a polymorphic recipient. *Owner: group / leader. **Done in Rev 3.3:** two nullable
+  foreign keys with an exactly-one check, not a polymorphic id.*
 - `Appointment.BookedByStaffMemberId` stays nullable — it is null for a self-booking.
   *Already modelled correctly (Rev 2).*
 - `patient-spec.yaml` now publishes the booking endpoints: `POST /me/appointments`,

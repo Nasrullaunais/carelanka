@@ -24,7 +24,7 @@ class UpdatePatientRequest {
   factory UpdatePatientRequest.fromJson(Map<String, Object?> json) => _$UpdatePatientRequestFromJson(json);
   
   @JsonKey(name: 'full_name')
-  final String fullName;
+  final String? fullName;
   final String? nic;
   final Gender gender;
   @JsonKey(name: 'date_of_birth')

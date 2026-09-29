@@ -5,6 +5,8 @@
 **Owns:** `Patient`, `PatientAccount`, `Admission`, **`Ward`**, `BedAssignment`,
 `Discharge`, `DischargeChecklistItem`, `Appointment`, `Bill`, `BillLineItem`, `BillingRate`,
 `AdmissionFeeRate`, **`CareRecommendation`**, **`PatientMedicalProfile`**
+**Notifications raised:** to patients `appointment_booked`, `appointment_cancelled`, `appointment_reminder` (`appointment_rescheduled` is in the catalogue but there is no reschedule action yet), `admission_approved`, `bed_assigned`, `discharge_ready`, `bill_raised`, `bill_settled`, `care_reply_ready`; to staff `admission_awaiting_approval`, `care_query_flagged`, `care_reply_waiting`. See `notifications.md` §5.
+
 **Contract:** `specs/patient-spec.yaml` (61 paths, 71 operations) · **Design:** `specs/patient-management-plan.md`
 **Boundaries:** `specs/integration_of_functions.md` §4–§11
 

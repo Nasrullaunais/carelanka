@@ -9,7 +9,7 @@ part of 'update_patient_request.dart';
 UpdatePatientRequest _$UpdatePatientRequestFromJson(
   Map<String, dynamic> json,
 ) => UpdatePatientRequest(
-  fullName: json['full_name'] as String,
+  fullName: json['full_name'] as String?,
   gender: Gender.fromJson(json['gender'] as String),
   nic: json['nic'] as String?,
   dateOfBirth: json['date_of_birth'] == null

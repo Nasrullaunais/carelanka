@@ -4,6 +4,8 @@
 
 **Status:** Phases 0–10 complete; the Phase 11 report slice, Duty Manager UI and Emergency demo fixtures are complete. History, reconciliation, audit and broader resilience work remain.
 
+**Notifications raised:** `emergency_call_received`, `cancellation_request_waiting`, `dispatch_proposal_waiting` (duty managers); `dispatch_assigned` (the crew); `ambulance_on_the_way`, `ambulance_arrived`, `cancellation_answered` (the patient). See `notifications.md` §5.
+
 **Contract:** `specs/emergency-spec.yaml`
 
 **Design:** `specs/emergency-management-plan.md`

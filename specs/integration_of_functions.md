@@ -126,7 +126,8 @@ The second version keeps working when hold expiry, out-of-service beds or a new 
 | `Ward` — name, type, gender policy | **Patient (M4)** — *see §11.1* | All | Patient only |
 | `AgentWorkflow`, `AgentProposedChange` | **Common (group-owned)** — *DECIDED §11.2, **built 2026-09-20** by the group in PR #80 (`Common_AddAgentWorkflows`)* | The four agents currently running | All four, by `workflow_id` — down from five agents / all five when this row was first written; the bed agent that used a fifth was removed 2026-09-22, see §11.17 |
 | `StaffMember`, `PatientAccount`, `RefreshToken`, login, JWT issuing | **Common (group-owned)** — `specs/common-spec.yaml` | All | Common only |
-| `AuditLog`, `Notification`, `DeviceToken` | **Common (group-owned)** | All | Written by the audit interceptor, never by hand |
+| `AuditLog` | **Common (group-owned)** | All | Written by the audit interceptor, never by hand |
+| `Notification`, `NotificationDelivery`, `DeviceToken` | **Common (group-owned)** — see §27 | The person it is for, through their own inbox | `INotifier` stages notifications; the push worker and device registration write the rest. Nobody writes these tables directly |
 
 **The rule for everything else: if it does not belong to a specific member, it is
 common.** Common parts are group-owned and built **once**, not four times.
@@ -1385,3 +1386,37 @@ Mirrors §10's, §16's and §21's format, from Emergency's side.
 | **M4 (Patient)** | Patient-facing emergency report, tracking and cancellation screens | M4 owns the patient experience; M1 publishes the generated Emergency contract |
 | **M2 (Staff)** | `POST /staff/lookup` | Verify `ambulance_crew` and resolve current/responding crew without copying staff data |
 | **Group** | Shared agent-workflow tables | The Dispatch & Routing Agent links to the common workflow contract |
+
+## 27. Notifications — a common service every component calls *(added 2026-09-30)*
+
+Design is `docs/build/notifications.md`; the reasons are ADR 9 in `docs/ADR.md`.
+
+**`INotifier` is common.** Any component that needs to tell a patient or a staff member
+something calls `INotifier.NotifyAsync(type, recipients, subject, args)` from inside its own
+service method, before its own `SaveChanges`. It only stages rows; the caller's save commits
+them together with the change. Nobody builds a `Notification` row by hand, and nobody writes
+`notifications`, `notification_deliveries` or `device_tokens` from a component (§2's one-writer
+rule, with Common as the writer). Recipients are one of: a staff member, a patient, or a role
+(on shift for a ward, else the whole role).
+
+**What each component raises** is in that component's build doc under `docs/build/`; the full
+catalogue with recipients is `docs/build/notifications.md` §5.
+
+**New read methods other components now provide** (read-only, so §2 holds):
+
+| Method | Owner | Used by | Returns |
+| :--- | :--- | :--- | :--- |
+| `AllocationService.FindOnShiftAsync(wardId, role, at)` | **Staff (M2)** | The recipient resolver, to find who is on shift for a ward | Ids of staff with a live allocation on a shift for that ward covering `at`, excluding ended or cancelled allocations |
+| `IAppointmentService.ListOpenStartingBetweenAsync(from, to)` | **Patient (M4)** | Appointment reminder job | Appointments still open that start inside the window |
+| `IMaintenanceService.ListScheduledOnAsync(date)` | **Equipment (M3)** | Maintenance-due job | Maintenance schedules due on that day |
+
+The last two are on branch `worktree-agent-ae8289d17d2582c2a` (commit `a07241f`) and reach
+`main` with the scheduled-jobs phase.
+
+**11.23 (OPEN — raised by the notifications track on 2026-09-30) — who hears `maintenance_due`?**
+The notification plan sends `maintenance_due` to equipment managers. But §11.19 says the
+maintenance unit became administrator-only on 2026-09-17 (only the hospital administrator sees
+and confirms maintenance). If the alert goes to equipment managers, they are told about work
+they cannot open. Three ways out: send it to hospital administrators instead, send it to both,
+or reopen §11.19. **Not decided here.** Needs M3 and the group. Until then the job sends it to
+equipment managers as the plan says.

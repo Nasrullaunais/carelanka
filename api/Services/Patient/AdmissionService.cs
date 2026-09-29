@@ -493,6 +493,12 @@ public sealed class AdmissionService : IAdmissionService
 
         change(admission);
 
+        if (admission.Status == AdmissionStatus.Cancelled)
+        {
+            await _notifier.ResolveAsync(NotificationType.AdmissionAwaitingApproval,
+                new NotificationSubject("admission", admission.Id), ct);
+        }
+
         await _db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
 

@@ -38,7 +38,10 @@ public sealed class RecipientResolver(
             ? await OnShiftOrFallbackAsync(wardId, role.StaffRole, cancellationToken)
             : await ActiveStaffWithRoleAsync(role.StaffRole, cancellationToken);
 
-        return staffIds.Select(id => new NotificationRecipient(id, null)).ToList();
+        return staffIds
+            .Where(id => id != role.ExceptStaffId)
+            .Select(id => new NotificationRecipient(id, null))
+            .ToList();
     }
 
     private async Task<IReadOnlyCollection<Guid>> OnShiftOrFallbackAsync(

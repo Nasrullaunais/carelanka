@@ -40,7 +40,8 @@ public sealed class DispatchProposalLifecycle : IDispatchProposalLifecycle
     }
 
     public DispatchProposal Open(
-        Guid callId, CallPriority priority, bool allowDiversion, IReadOnlyCollection<Guid> excludeAmbulanceIds)
+        Guid callId, CallPriority priority, bool allowDiversion, IReadOnlyCollection<Guid> excludeAmbulanceIds,
+        Guid? requestedByStaffMemberId = null)
     {
         var workflow = new AgentWorkflow
         {
@@ -64,6 +65,7 @@ public sealed class DispatchProposalLifecycle : IDispatchProposalLifecycle
             CallPriority = priority,
             Status = DispatchProposalStatus.Pending,
             AllowDiversion = allowDiversion,
+            RequestedByStaffMemberId = requestedByStaffMemberId,
             ExcludeAmbulanceIdsJson = excludeAmbulanceIds.Count > 0
                 ? DispatchWorkflowJson.Write(excludeAmbulanceIds.Distinct().ToList()) : null
         };

@@ -9,7 +9,9 @@ public interface IDispatchProposalLifecycle
     // Anything that opens a recommendation or dispatches the call takes this first, then reads.
     Task LockCallAsync(Guid callId, CancellationToken cancellationToken = default);
 
-    DispatchProposal Open(Guid callId, CallPriority priority, bool allowDiversion, IReadOnlyCollection<Guid> excludeAmbulanceIds);
+    DispatchProposal Open(
+        Guid callId, CallPriority priority, bool allowDiversion, IReadOnlyCollection<Guid> excludeAmbulanceIds,
+        Guid? requestedByStaffMemberId = null);
 
     Task<DispatchProposal?> WithdrawOpenAsync(Guid callId, DispatchWithdrawalReason reason, CancellationToken cancellationToken = default);
 

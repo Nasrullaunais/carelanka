@@ -21,6 +21,7 @@ component's decisions and the group ones below.
 | 6 | React state management | **Accepted** | 2026-09-07 |
 | 7 | Flutter state management | **Accepted** | 2026-09-07 |
 | 8 | Cloud deployment platform | **Open — needs a group call** | — |
+| 9 | Notifications | **Accepted** | 2026-09-30 |
 
 ---
 
@@ -413,3 +414,80 @@ The deployment evidence is worth marks under "Documentation and Deployment (10)"
 "evaluator access is clear and setup is fully reproducible" is the difference between the
 top band and the one below. A deployment attempted in the final week usually discovers a
 connection-string or migration problem that takes a day.
+
+
+---
+
+## ADR 9 — Notifications
+
+**Status: Accepted, 2026-09-30**
+
+### Context
+
+Patients and staff need to hear when something that concerns them happens: an approved
+admission, a new emergency call, a lab report, a leave decision. Before this, one event
+notified anyone (a crew assigned to a run), and a single `notifications` table mixed two
+different things — what the person is told, and one attempt to push it to a phone. It also
+allowed only staff as recipients. Full design: `docs/build/notifications.md`.
+
+### Options considered
+
+| Question | Options | Chosen |
+| :--- | :--- | :--- |
+| When is a notification written? | Send from the request, or write a row in the same save and send later | **Write in the same save, send later** |
+| One table or two? | One table for message and delivery, or an inbox plus a delivery table | **Two tables** |
+| How does the website learn about new items? | Ask the server every few seconds, or the server tells the browser | **Server tells the browser (SignalR)** |
+| How many servers? | One, or several behind a Redis backplane | **One, no backplane** |
+| What does a locked phone show? | Full detail, or one general sentence | **Full detail, one setting to change it** |
+| How do timed events (reminders) fire? | An external scheduler, or a worker inside the API | **A worker inside the API** |
+
+### Decision
+
+**Outbox plus inbox.** Every service calls one `INotifier` and never builds rows itself.
+`INotifier` only stages rows; the service's own `SaveChanges` commits the change and its
+notifications together. So a change that fails leaves no notification, and a change that
+succeeds always has one. A background worker sends the push afterwards and retries when
+Firebase fails. Sending to Firebase in the middle of a request would either slow the request
+or announce a change that then failed to save.
+
+**Two tables.** `notifications` is the inbox: the truth of what a person was told, kept 90
+days. `notification_deliveries` holds each push attempt with its retry state. This lets email
+or SMS be added later without touching the inbox. The inbox is the truth; push and the live
+signal are only nudges, so a lost push or a closed website loses nothing.
+
+**SignalR, not polling.** The hub at `/api/hubs/notifications` sends one message,
+`inboxChanged`, with no data in it. The browser then re-reads the inbox through the generated
+REST client, so no hand-written model exists and the "clients are generated" rule holds. The
+signal is sent by a save interceptor only after the save commits. The browser cannot put a
+header on a WebSocket, so the JWT is read from the query string for the hub path only.
+Polling was rejected because it either lags or hammers the server across every open tab;
+the trade is a long-lived connection to look after. On every reconnect the client re-reads the
+inbox, so anything missed while offline appears.
+
+**One server, no backplane.** SignalR keeps its list of connected browsers in memory, so it
+only works while there is one API instance. We run one. Moving to several would need Redis to
+share that list. Recorded here, not built.
+
+**Lock-screen text is full detail.** The group chose that a push shows the real text, for
+example "Lab report ready". Anyone near a locked phone can read it. A real hospital would
+probably need general text for anything about someone's health. Setting
+`Notifications:LockScreenDetail` to `Generic` swaps every push for "You have a new update from
+CareLanka" with no code change; the inbox needs a sign-in and keeps the detail. To be said
+plainly at the viva.
+
+**Scheduled jobs run in the API.** One `NotificationScheduleWorker` (a background service, the
+same pattern as the push worker) sends appointment reminders every 15 minutes, maintenance-due
+alerts hourly, and deletes inbox rows older than 90 days daily. Dedupe keys make repeat runs
+harmless. It reads Patient's and Equipment's data only through their services
+(`integration_of_functions.md` §27).
+
+### Consequences
+
+- **Good:** no lost or phantom notifications; one place to add a new event; the website
+  updates instantly; the inbox catches up after any gap.
+- **Cost:** every trigger sits inside a component's service and must be in the same save.
+  Forgetting that reintroduces the phantom-notification bug.
+- **Cost:** a scheduled worker in the API means two API instances would each run every job.
+  The dedupe keys stop double notifications, but it is one more reason to stay on one server.
+- **Cost:** the lock-screen choice is a privacy risk we accepted knowingly.
+- **Not built:** email, SMS, browser push, iPhone push, per-user settings, a Redis backplane.

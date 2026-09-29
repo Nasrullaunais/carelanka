@@ -63,6 +63,21 @@ public sealed class Notifier(
         }
     }
 
+    // For alerts sent to a whole group: once one person acts, everyone else's copy is marked read.
+    public async Task ResolveAsync(
+        NotificationType type,
+        NotificationSubject subject,
+        CancellationToken cancellationToken = default)
+    {
+        var now = clock.GetUtcNow();
+        var open = await db.Notifications
+            .Where(n => n.Type == type && n.EntityType == subject.EntityType
+                && n.EntityId == subject.EntityId && n.ReadAt == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var notification in open) notification.ReadAt = now;
+    }
+
     private (Guid? StaffId, Guid? PatientAccountId) CurrentActor()
     {
         if (!currentUser.IsAuthenticated) return (null, null);

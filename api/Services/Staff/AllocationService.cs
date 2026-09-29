@@ -328,7 +328,7 @@ public sealed class AllocationService : IAllocationService
         allocation.UpdatedAt = DateTimeOffset.UtcNow;
 
         await Notifier.NotifyAsync(NotificationType.ShiftChanged, Recipients.Staff(allocation.StaffMemberId),
-            new NotificationSubject("allocation", allocation.Id), cancellationToken);
+            new NotificationSubject("allocation", allocation.Id, Guid.NewGuid()), cancellationToken);
 
         await _db.SaveChangesAsync(cancellationToken);
 

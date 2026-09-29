@@ -368,6 +368,13 @@ public sealed class AppointmentService : IAppointmentService
         return admission;
     }
 
+    public async Task<IReadOnlyList<AppointmentEntity>> ListOpenStartingBetweenAsync(
+        DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default)
+        => await _db.Appointments.AsNoTracking()
+            .Where(a => OpenStatuses.Contains(a.Status) && a.ScheduledAt >= from && a.ScheduledAt <= to)
+            .OrderBy(a => a.ScheduledAt)
+            .ToListAsync(ct);
+
     public Task<AppointmentEntity?> FindByIdAsync(Guid id, CancellationToken ct = default)
         => _db.Appointments.FirstOrDefaultAsync(a => a.Id == id, ct);
 

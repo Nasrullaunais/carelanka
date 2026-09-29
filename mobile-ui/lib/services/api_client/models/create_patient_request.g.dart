@@ -9,7 +9,7 @@ part of 'create_patient_request.dart';
 CreatePatientRequest _$CreatePatientRequestFromJson(
   Map<String, dynamic> json,
 ) => CreatePatientRequest(
-  fullName: json['full_name'] as String,
+  fullName: json['full_name'] as String?,
   gender: Gender.fromJson(json['gender'] as String),
   nic: json['nic'] as String?,
   dateOfBirth: json['date_of_birth'] == null

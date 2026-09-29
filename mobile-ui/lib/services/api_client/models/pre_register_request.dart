@@ -23,9 +23,9 @@ class PreRegisterRequest {
   
   factory PreRegisterRequest.fromJson(Map<String, Object?> json) => _$PreRegisterRequestFromJson(json);
   
-  final String nic;
+  final String? nic;
   @JsonKey(name: 'full_name')
-  final String fullName;
+  final String? fullName;
   final Gender gender;
   @JsonKey(name: 'date_of_birth')
   final DateTime? dateOfBirth;

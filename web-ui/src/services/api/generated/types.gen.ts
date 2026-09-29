@@ -726,7 +726,7 @@ export type CreateMaintenanceScheduleRequest = {
 };
 
 export type CreatePatientRequest = {
-    full_name: string;
+    full_name: string | null;
     nic?: string | null;
     gender: Gender;
     date_of_birth?: string | null;
@@ -1832,8 +1832,8 @@ export type PreAdmitRequest = {
 };
 
 export type PreRegisterRequest = {
-    nic: string;
-    full_name: string;
+    nic: string | null;
+    full_name: string | null;
     gender: Gender;
     date_of_birth?: string | null;
     phone?: string | null;
@@ -2361,7 +2361,7 @@ export type UpdateMyDispatchStatusRequest = {
 };
 
 export type UpdatePatientRequest = {
-    full_name: string;
+    full_name: string | null;
     nic?: string | null;
     gender: Gender;
     date_of_birth?: string | null;

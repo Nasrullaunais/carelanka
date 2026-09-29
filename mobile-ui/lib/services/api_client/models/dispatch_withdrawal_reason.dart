@@ -5,29 +5,19 @@
 import 'package:json_annotation/json_annotation.dart';
 
 @JsonEnum()
-enum DispatchProposalStatus {
-  @JsonValue('pending')
-  pending('pending'),
-  @JsonValue('pending_confirmation')
-  pendingConfirmation('pending_confirmation'),
-  @JsonValue('pending_approval')
-  pendingApproval('pending_approval'),
-  @JsonValue('approved')
-  approved('approved'),
-  @JsonValue('executed')
-  executed('executed'),
-  @JsonValue('rejected')
-  rejected('rejected'),
-  @JsonValue('failed')
-  failed('failed'),
-  @JsonValue('withdrawn')
-  withdrawn('withdrawn'),
+enum DispatchWithdrawalReason {
+  @JsonValue('call_changed')
+  callChanged('call_changed'),
+  @JsonValue('dispatched_manually')
+  dispatchedManually('dispatched_manually'),
+  @JsonValue('call_closed')
+  callClosed('call_closed'),
   /// Default value for all unparsed values, allows backward compatibility when adding new values on the backend.
   $unknown(null);
 
-  const DispatchProposalStatus(this.json);
+  const DispatchWithdrawalReason(this.json);
 
-  factory DispatchProposalStatus.fromJson(String json) => values.firstWhere(
+  factory DispatchWithdrawalReason.fromJson(String json) => values.firstWhere(
         (e) => e.json == json,
         orElse: () => $unknown,
       );
@@ -45,5 +35,5 @@ enum DispatchProposalStatus {
   @override
   String toString() => json?.toString() ?? super.toString();
   /// Returns all defined enum values excluding the $unknown value.
-  static List<DispatchProposalStatus> get $valuesDefined => values.where((value) => value != $unknown).toList();
+  static List<DispatchWithdrawalReason> get $valuesDefined => values.where((value) => value != $unknown).toList();
 }

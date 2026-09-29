@@ -1,4 +1,5 @@
 using CareLanka.Api.Data;
+using CareLanka.Api.Data.Entities.Emergency;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.Services.Common;
 using CareLanka.Api.Services.Emergency;
@@ -81,13 +82,7 @@ public sealed class DispatchProposalExecutor
                 _ => DispatchProposalStatus.Failed
             };
 
-            // Only notify once the agent has actually produced something to review -
-            // notifying at Pending would send a duty manager to an empty screen.
-            if (proposal.Status is DispatchProposalStatus.PendingConfirmation or DispatchProposalStatus.PendingApproval)
-            {
-                await _notifier.NotifyAsync(NotificationType.DispatchProposalWaiting, Recipients.Role(StaffRole.DutyManager),
-                    new NotificationSubject("dispatch_proposal", proposal.Id), ct);
-            }
+            await NotifyIfNeedsAttentionAsync(proposal, ct);
 
             if (workflow is not null)
             {
@@ -123,8 +118,32 @@ public sealed class DispatchProposalExecutor
                 workflow.Errors = DispatchWorkflowJson.Write(new[] { failure.Message });
                 workflow.CompletedAt = DateTimeOffset.UtcNow;
             }
+
+            await NotifyIfNeedsAttentionAsync(proposal, ct);
         }
 
-        await _db.SaveChangesAsync(ct);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            _log.LogInformation("Dispatch proposal {ProposalId} was closed while the agent ran; its answer is dropped.", proposalId);
+        }
+    }
+
+    // A ready recommendation needs no bell: the call itself already rang and the desk shows it.
+    private async Task NotifyIfNeedsAttentionAsync(DispatchProposal proposal, CancellationToken ct)
+    {
+        var type = proposal.Status switch
+        {
+            DispatchProposalStatus.PendingApproval => NotificationType.DispatchProposalWaiting,
+            DispatchProposalStatus.Failed => NotificationType.DispatchProposalFailed,
+            _ => (NotificationType?)null
+        };
+        if (type is null) return;
+
+        await _notifier.NotifyAsync(type.Value, Recipients.Role(StaffRole.DutyManager),
+            new NotificationSubject("emergency_call", proposal.EmergencyCallId, proposal.Id), ct);
     }
 }

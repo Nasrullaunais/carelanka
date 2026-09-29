@@ -9,6 +9,7 @@ using CareLanka.Api.Services.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using DispatchProposal = CareLanka.Api.Data.Entities.Emergency.DispatchProposal;
 using EmergencyCallEntity = CareLanka.Api.Data.Entities.Emergency.EmergencyCall;
 
 namespace CareLanka.Api.Services.Emergency;
@@ -22,6 +23,8 @@ public sealed class EmergencyCallService : IEmergencyCallService
     private readonly IDispatchService _dispatches;
     private readonly ISceneLookupQueue _sceneLookups;
     private readonly INotifier _notifier;
+    private readonly IDispatchProposalLifecycle _lifecycle;
+    private readonly IDispatchProposalService _proposals;
 
     public EmergencyCallService(
         CareLankaDbContext db,
@@ -30,7 +33,9 @@ public sealed class EmergencyCallService : IEmergencyCallService
         IOptions<EmergencyOptions> options,
         IDispatchService dispatches,
         ISceneLookupQueue sceneLookups,
-        INotifier notifier)
+        INotifier notifier,
+        IDispatchProposalLifecycle lifecycle,
+        IDispatchProposalService proposals)
     {
         _db = db;
         _currentUser = currentUser;
@@ -39,6 +44,8 @@ public sealed class EmergencyCallService : IEmergencyCallService
         _dispatches = dispatches;
         _sceneLookups = sceneLookups;
         _notifier = notifier;
+        _lifecycle = lifecycle;
+        _proposals = proposals;
     }
 
     public async Task<EmergencyCallDetail> CreateAsync(
@@ -98,6 +105,7 @@ public sealed class EmergencyCallService : IEmergencyCallService
         // No ward is known yet at intake, so this is hospital-wide - every duty manager, not one ward's.
         await _notifier.NotifyAsync(NotificationType.EmergencyCallReceived, Recipients.Role(StaffRole.DutyManager),
             new NotificationSubject("emergency_call", call.Id), cancellationToken);
+        var recommendation = _lifecycle.Open(call.Id, call.Priority, allowDiversion: true, []);
 
         try
         {
@@ -109,7 +117,7 @@ public sealed class EmergencyCallService : IEmergencyCallService
             ConstraintName: EmergencyCallConfiguration.IdempotencyKeyUniqueIndex
         })
         {
-            _db.Entry(call).State = EntityState.Detached;
+            _db.ChangeTracker.Clear();
             existing = await _db.EmergencyCalls
                 .AsNoTracking()
                 .SingleAsync(stored => stored.IdempotencyKey == key, cancellationToken);
@@ -117,6 +125,7 @@ public sealed class EmergencyCallService : IEmergencyCallService
             return await DetailAsync(existing.Id, cancellationToken);
         }
 
+        _lifecycle.Wake(recommendation);
         _sceneLookups.Enqueue(new AddressLookupJob(call.Id));
         return await DetailAsync(call.Id, cancellationToken);
     }
@@ -178,7 +187,8 @@ public sealed class EmergencyCallService : IEmergencyCallService
             })
             .ToListAsync(cancellationToken);
         var now = _timeProvider.GetUtcNow();
-        var items = rows.Select(row => ToSummary(row.Call, row.ActiveDispatchId, now)).ToList();
+        var latest = await _proposals.LatestByCallAsync(rows.Select(row => row.Call.Id).ToList(), cancellationToken);
+        var items = rows.Select(row => ToSummary(row.Call, row.ActiveDispatchId, latest.GetValueOrDefault(row.Call.Id), now)).ToList();
         return PagedResult<EmergencyCallSummary>.From(items, request.Page, request.PageSize, totalItems);
     }
 
@@ -238,8 +248,14 @@ public sealed class EmergencyCallService : IEmergencyCallService
         UpdateEmergencyCallRequest request,
         CancellationToken cancellationToken = default)
     {
-        var call = await _db.EmergencyCalls.FirstOrDefaultAsync(item => item.Id == id, cancellationToken)
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        await _lifecycle.LockCallAsync(id, cancellationToken);
+        var call = await _db.EmergencyCalls.Include(item => item.Dispatches)
+            .FirstOrDefaultAsync(item => item.Id == id, cancellationToken)
             ?? throw new NotFoundException("Emergency call", id);
+        var sceneMoved = request.Latitude is { } latitude && request.Longitude is { } longitude
+            && (latitude != call.Latitude || longitude != call.Longitude);
+        var priorityChanged = request.Priority is { } newPriority && newPriority != call.Priority;
 
         if (request.Priority is { } priority)
         {
@@ -261,18 +277,34 @@ public sealed class EmergencyCallService : IEmergencyCallService
             call.CallerPhone = Clean(request.CallerPhone);
         }
 
-        if (request.Latitude is { } latitude && request.Longitude is { } longitude)
+        if (sceneMoved)
         {
-            call.Latitude = latitude;
-            call.Longitude = longitude;
+            call.Latitude = request.Latitude!.Value;
+            call.Longitude = request.Longitude!.Value;
             call.AddressLabel = null;
         }
 
-        await _db.SaveChangesAsync(cancellationToken);
-        if (request.Latitude is not null && request.Longitude is not null)
+        var needsNewRecommendation = (priorityChanged || sceneMoved)
+            && call.Status == CallStatus.Received
+            && !call.Dispatches.Any(dispatch => dispatch.Status.IsLive());
+
+        if (needsNewRecommendation)
         {
-            _sceneLookups.Enqueue(new AddressLookupJob(call.Id));
+            await _lifecycle.WithdrawOpenAsync(call.Id, DispatchWithdrawalReason.CallChanged, cancellationToken);
         }
+
+        await SaveAsync(cancellationToken);
+        DispatchProposal? recommendation = null;
+        if (needsNewRecommendation)
+        {
+            var excluded = await _lifecycle.CarriedExclusionsAsync(call.Id, cancellationToken);
+            recommendation = _lifecycle.Open(call.Id, call.Priority, allowDiversion: true, excluded);
+            await SaveAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        if (recommendation is not null) _lifecycle.Wake(recommendation);
+        if (sceneMoved) _sceneLookups.Enqueue(new AddressLookupJob(call.Id));
 
         return await DetailAsync(id, cancellationToken);
     }
@@ -310,11 +342,15 @@ public sealed class EmergencyCallService : IEmergencyCallService
 
     public async Task<MyEmergencyCallSummary> CancelMineAsync(Guid id, RequestCancellationRequest request, CancellationToken cancellationToken = default)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        await _lifecycle.LockCallAsync(id, cancellationToken);
         var call = await MineAsync(id, cancellationToken);
         if (call.Dispatches.Any()) throw new ConflictException(MessageCode.CallAlreadyDispatched);
         if (call.Status != CallStatus.Received) throw new ConflictException(MessageCode.CallNotCancellable);
         call.Status = CallStatus.Cancelled;
-        await _db.SaveChangesAsync(cancellationToken);
+        await _lifecycle.WithdrawOpenAsync(call.Id, DispatchWithdrawalReason.CallClosed, cancellationToken);
+        await SaveAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return ToMine(call);
     }
 
@@ -399,6 +435,7 @@ public sealed class EmergencyCallService : IEmergencyCallService
             .Include(item => item.Dispatches).ThenInclude(dispatch => dispatch.Crew)
             .SingleAsync(item => item.Id == id, cancellationToken);
         var response = ToCall(call);
+        response.LatestProposal = (await _proposals.LatestByCallAsync([call.Id], cancellationToken)).GetValueOrDefault(call.Id);
         response.Dispatches = call.Dispatches.OrderBy(dispatch => dispatch.DispatchedAt)
             .Select(dispatch => new DispatchSummary
             {
@@ -564,6 +601,7 @@ public sealed class EmergencyCallService : IEmergencyCallService
     private static EmergencyCallSummary ToSummary(
         EmergencyCallEntity call,
         Guid? activeDispatchId,
+        DispatchProposalSummary? latestProposal,
         DateTimeOffset now) => new()
     {
         Id = call.Id,
@@ -574,11 +612,32 @@ public sealed class EmergencyCallService : IEmergencyCallService
         Latitude = call.Latitude,
         Longitude = call.Longitude,
         ActiveDispatchId = activeDispatchId,
+        LatestProposal = latestProposal,
         WaitingMinutes = activeDispatchId is null
             ? Math.Max(0, (int)(now - call.CreatedAt).TotalMinutes)
             : 0,
         CreatedAt = call.CreatedAt
     };
+
+    private async Task SaveAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConflictException(MessageCode.DispatchProposalConflict);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: DispatchProposalConfiguration.OpenPerCallUniqueIndex
+        })
+        {
+            throw new ConflictException(MessageCode.DispatchProposalConflict);
+        }
+    }
 
     private static string? Clean(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

@@ -456,6 +456,27 @@ button.secondary {
 .emergency-form { align-items: end; }
 .emergency-action { flex: 0 0 auto; }
 
+.emergency-desk { display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+.emergency-desk-call { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow-y: auto; }
+.emergency-desk-back { display: none; }
+.emergency-desk-placeholder { display: none; }
+
+@media (min-width: 1100px) {
+  .emergency-desk { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
+  .emergency-desk-placeholder { display: block; }
+}
+
+@media (max-width: 1099px) {
+  .emergency-desk-open .emergency-desk-list { display: none; }
+  .emergency-desk-back { display: inline-flex; margin-bottom: .75rem; }
+  .emergency-desk-call { position: static; max-height: none; }
+}
+
+.call-recommendation { display: flex; flex-direction: column; gap: .75rem; border: 1px solid var(--line); border-left-width: 4px; border-radius: var(--radius); padding: 1rem; }
+.call-recommendation-ready { border-left-color: var(--accent); background: var(--accent-soft); }
+.call-recommendation-diversion { border-left-color: var(--warn); background: #fdf6e7; }
+.call-recommendation-empty { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; border-left-color: var(--danger); }
+
 @media (max-width: 640px) {
   .emergency-ambulance { align-items: stretch; flex-direction: column; }
 }

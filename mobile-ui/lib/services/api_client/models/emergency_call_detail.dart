@@ -7,6 +7,7 @@ import 'package:json_annotation/json_annotation.dart';
 import 'call_priority.dart';
 import 'call_status.dart';
 import 'cancellation_request_status.dart';
+import 'dispatch_proposal_summary.dart';
 import 'dispatch_summary.dart';
 
 part 'emergency_call_detail.g.dart';
@@ -35,7 +36,7 @@ class EmergencyCallDetail {
     this.createdAt,
     this.updatedAt,
     this.dispatches,
-    this.openProposalId,
+    this.latestProposal,
   });
   
   factory EmergencyCallDetail.fromJson(Map<String, Object?> json) => _$EmergencyCallDetailFromJson(json);
@@ -73,8 +74,8 @@ class EmergencyCallDetail {
   @JsonKey(name: 'updated_at')
   final DateTime? updatedAt;
   final List<DispatchSummary>? dispatches;
-  @JsonKey(name: 'open_proposal_id')
-  final String? openProposalId;
+  @JsonKey(name: 'latest_proposal')
+  final DispatchProposalSummary? latestProposal;
 
   Map<String, Object?> toJson() => _$EmergencyCallDetailToJson(this);
 }

@@ -46,7 +46,11 @@ EmergencyCallDetail _$EmergencyCallDetailFromJson(Map<String, dynamic> json) =>
       dispatches: (json['dispatches'] as List<dynamic>?)
           ?.map((e) => DispatchSummary.fromJson(e as Map<String, dynamic>))
           .toList(),
-      openProposalId: json['open_proposal_id'] as String?,
+      latestProposal: json['latest_proposal'] == null
+          ? null
+          : DispatchProposalSummary.fromJson(
+              json['latest_proposal'] as Map<String, dynamic>,
+            ),
     );
 
 Map<String, dynamic> _$EmergencyCallDetailToJson(
@@ -73,5 +77,5 @@ Map<String, dynamic> _$EmergencyCallDetailToJson(
   'created_at': instance.createdAt?.toIso8601String(),
   'updated_at': instance.updatedAt?.toIso8601String(),
   'dispatches': instance.dispatches,
-  'open_proposal_id': instance.openProposalId,
+  'latest_proposal': instance.latestProposal,
 };

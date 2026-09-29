@@ -13,6 +13,7 @@ import 'dispatch_recommendation_source.dart';
 import 'dispatch_rejection_reason.dart';
 import 'dispatch_tool_call.dart';
 import 'dispatch_validation_result.dart';
+import 'dispatch_withdrawal_reason.dart';
 import 'diversion_impact.dart';
 
 part 'dispatch_proposal_detail.g.dart';
@@ -50,6 +51,8 @@ class DispatchProposalDetail {
     this.reviewedAt,
     this.reviewNotes,
     this.rejectionReason,
+    this.withdrawalReason,
+    this.withdrawnAt,
   });
   
   factory DispatchProposalDetail.fromJson(Map<String, Object?> json) => _$DispatchProposalDetailFromJson(json);
@@ -106,6 +109,10 @@ class DispatchProposalDetail {
   final String? reviewNotes;
   @JsonKey(name: 'rejection_reason')
   final DispatchRejectionReason? rejectionReason;
+  @JsonKey(name: 'withdrawal_reason')
+  final DispatchWithdrawalReason? withdrawalReason;
+  @JsonKey(name: 'withdrawn_at')
+  final DateTime? withdrawnAt;
 
   Map<String, Object?> toJson() => _$DispatchProposalDetailToJson(this);
 }

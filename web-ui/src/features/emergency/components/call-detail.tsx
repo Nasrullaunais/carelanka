@@ -1,10 +1,9 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, CardContent, CardTitle } from '@heroui/react';
+import { Button, Card, CardContent, CardTitle, Disclosure } from '@heroui/react';
 import { toast } from 'sonner';
 import type { AmbulanceSummaryPagedResult, CallPriority, EmergencyCallDetail, ListAmbulancesError, ProblemDetails } from '../../../services/api/generated';
 import {
-  createDispatchProposalMutation,
   dispatchEmergencyCallMutation,
   updateEmergencyCallMutation,
 } from '../../../services/api/generated/@tanstack/react-query.gen';
@@ -14,18 +13,21 @@ import { AppSelect } from '../../../components/ui/app-select';
 import { QueryState } from '../../../components/ui/query-state';
 import { StatusChip } from '../../../components/ui/status-chip';
 import { isConflict } from '../../../services/api/errors';
-import { callStatusLabels, callStatusTones, dispatchStatusLabels, dispatchStatusTones, formatTimestamp, priorityLabels } from '../domain';
+import { awaitsDispatch, callStatusLabels, callStatusTones, dispatchStatusLabels, dispatchStatusTones, formatTimestamp, priorityLabels } from '../domain';
 import { invalidateEmergencyQueries } from '../query-invalidation';
+import { CallRecommendation } from './call-recommendation';
 import { EligibleAmbulanceList } from './eligible-ambulance-list';
 import type { UseQueryResult } from '@tanstack/react-query';
 
+const liveDispatchStatuses = new Set(['assigned', 'acknowledged', 'en_route_to_scene', 'at_scene', 'transporting_to_hospital']);
+
 const LocationPicker = lazy(() => import('./location-picker').then((module) => ({ default: module.LocationPicker })));
 
-export function CallDetail({ callId, query, ambulances, onReviewProposal, ambulancePage = 1, onAmbulancePageChange }: {
+export function CallDetail({ callId, query, ambulances, onDispatched, ambulancePage = 1, onAmbulancePageChange }: {
   ambulancePage?: number;
   onAmbulancePageChange?: (page: number) => void;
   callId: string;
-  onReviewProposal?: () => void;
+  onDispatched?: () => void;
   query: UseQueryResult<EmergencyCallDetail, ProblemDetails>;
   ambulances: UseQueryResult<AmbulanceSummaryPagedResult, ListAmbulancesError>;
 }) {
@@ -44,29 +46,21 @@ export function CallDetail({ callId, query, ambulances, onReviewProposal, ambula
     onSuccess: () => {
       toast.success('Ambulance assigned. Waiting for crew acknowledgement.');
       void invalidateEmergencyQueries(queryClient);
+      onDispatched?.();
     },
     onError: (error) => {
       if (isConflict(error)) void invalidateEmergencyQueries(queryClient);
     },
     onSettled: () => setDispatchingId(undefined),
   });
-  const proposal = useMutation({
-    ...createDispatchProposalMutation(),
-    onSuccess: () => {
-      toast.success('Dispatch recommendation requested.');
-      void invalidateEmergencyQueries(queryClient);
-    },
-    onError: (error) => {
-      if (isConflict(error)) void invalidateEmergencyQueries(queryClient);
-    },
-  });
 
   return (
     <QueryState query={query} errorContext="Could not load this call.">
       {(call) => {
         const status = call.status ?? 'received';
-        const canDispatch = status === 'received' && !(call.dispatches ?? []).some((item) => ['assigned', 'acknowledged', 'en_route_to_scene', 'at_scene', 'transporting_to_hospital'].includes(item.status ?? ''));
-        const busy = dispatch.isPending || proposal.isPending || priorityUpdate.isPending;
+        const canDispatch = awaitsDispatch({ status, active_dispatch_id: (call.dispatches ?? []).find((item) => liveDispatchStatuses.has(item.status ?? ''))?.id });
+        const recommendationReady = call.latest_proposal?.status === 'pending_confirmation' || call.latest_proposal?.status === 'pending_approval';
+        const busy = dispatch.isPending || priorityUpdate.isPending;
         return (
           <div className="flex flex-col gap-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -100,33 +94,35 @@ export function CallDetail({ callId, query, ambulances, onReviewProposal, ambula
                 pending={busy}
                 onSave={(priority) => priorityUpdate.mutate({ path: { id: callId }, body: { priority } })}
               />
-              {canDispatch && <Button
-                variant="outline"
-                isDisabled={busy || Boolean(call.open_proposal_id)}
-                onPress={() => proposal.mutate({ body: { emergency_call_id: callId, allow_diversion: true } })}
-              >
-                {call.open_proposal_id ? 'Recommendation pending' : proposal.isPending ? 'Requesting…' : 'Ask the agent'}
-              </Button>}
             </div>}
-            {(call.open_proposal_id || proposal.isSuccess) && onReviewProposal && <div className="workflow-notice" role="status"><p>The agent recommendation is available in Proposals. Review it before sending an ambulance.</p><Button variant="outline" onPress={onReviewProposal}>Review recommendation</Button></div>}
+            {canDispatch && <CallRecommendation callId={callId} latest={call.latest_proposal} onSent={() => onDispatched?.()} />}
             {!canDispatch && <p className="workflow-notice">{status === 'completed' || status === 'cancelled' ? 'This call is closed. Its response history is shown below.' : 'A response is already active. Follow its progress below; another ambulance cannot be assigned to this call.'}</p>}
             <DispatchHistory dispatches={call.dispatches ?? []} />
-            {canDispatch && <section className="flex flex-col gap-2">
-              <h3 className="font-semibold">Ambulance choices</h3>
-              <EligibleAmbulanceList
-                ambulances={ambulances.data?.items}
-                isLoading={ambulances.isPending}
-                error={ambulances.error}
-                dispatchingId={dispatchingId}
-                isDisabled={busy}
-                onRetry={() => void ambulances.refetch()}
-                onDispatch={(ambulanceId) => {
-                  setDispatchingId(ambulanceId);
-                  dispatch.mutate({ path: { id: callId }, body: { ambulance_id: ambulanceId } });
-                }}
-              />
-              {ambulances.data && onAmbulancePageChange && <PaginationControls label="Ambulance choices" page={ambulancePage} totalPages={ambulances.data.total_pages} onPageChange={onAmbulancePageChange} />}
-            </section>}
+            {canDispatch && <Disclosure key={`${callId}-${recommendationReady}`} defaultExpanded={!recommendationReady}>
+              <Disclosure.Heading>
+                <Disclosure.Trigger className="font-semibold">
+                  {recommendationReady ? 'Other ambulances' : 'Ambulance choices'}
+                  <Disclosure.Indicator />
+                </Disclosure.Trigger>
+              </Disclosure.Heading>
+              <Disclosure.Content>
+                <Disclosure.Body className="flex flex-col gap-2">
+                  <EligibleAmbulanceList
+                    ambulances={ambulances.data?.items}
+                    isLoading={ambulances.isPending}
+                    error={ambulances.error}
+                    dispatchingId={dispatchingId}
+                    isDisabled={busy}
+                    onRetry={() => void ambulances.refetch()}
+                    onDispatch={(ambulanceId) => {
+                      setDispatchingId(ambulanceId);
+                      dispatch.mutate({ path: { id: callId }, body: { ambulance_id: ambulanceId } });
+                    }}
+                  />
+                  {ambulances.data && onAmbulancePageChange && <PaginationControls label="Ambulance choices" page={ambulancePage} totalPages={ambulances.data.total_pages} onPageChange={onAmbulancePageChange} />}
+                </Disclosure.Body>
+              </Disclosure.Content>
+            </Disclosure>}
           </div>
         );
       }}

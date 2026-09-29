@@ -11,6 +11,8 @@ import type {
   DispatchRecommendationSource,
   DispatchRejectionReason,
   DispatchStatus,
+  DispatchWithdrawalReason,
+  EmergencyCallSummary,
 } from '../../services/api/generated';
 
 export type StatusTone = ChipVariants['color'];
@@ -95,6 +97,7 @@ export const proposalStatusLabels: Record<DispatchProposalStatus, string> = {
   executed: 'Executed',
   rejected: 'Rejected',
   failed: 'Failed',
+  withdrawn: 'Withdrawn',
 };
 
 export const proposalStatusTones: Record<DispatchProposalStatus, StatusTone> = {
@@ -105,6 +108,13 @@ export const proposalStatusTones: Record<DispatchProposalStatus, StatusTone> = {
   executed: 'success',
   rejected: 'danger',
   failed: 'danger',
+  withdrawn: 'default',
+};
+
+export const withdrawalReasonLabels: Record<DispatchWithdrawalReason, string> = {
+  call_changed: 'The call changed',
+  dispatched_manually: 'Dispatched by hand',
+  call_closed: 'The call was closed',
 };
 
 export const proposalOutcomeLabels: Record<DispatchOutcome, string> = {
@@ -172,4 +182,47 @@ export function formatDriveMinutes(minutes?: number | null): string {
 
 export function formatTimestamp(iso?: string | null): string {
   return iso ? new Date(iso).toLocaleString() : 'Unknown';
+}
+
+export interface RecommendationLine {
+  label: string;
+  tone: StatusTone;
+}
+
+export function awaitsDispatch(call: Pick<EmergencyCallSummary, 'status' | 'active_dispatch_id'>): boolean {
+  return (call.status ?? 'received') === 'received' && !call.active_dispatch_id;
+}
+
+export function recommendationLine(call: EmergencyCallSummary): RecommendationLine | null {
+  if (!awaitsDispatch(call)) return null;
+  const proposal = call.latest_proposal;
+  switch (proposal?.status) {
+    case 'pending':
+      return { label: 'Checking…', tone: 'default' };
+    case 'pending_confirmation':
+      return {
+        label: [proposal.proposed_ambulance_registration, proposal.estimated_minutes_to_scene != null && `${proposal.estimated_minutes_to_scene} min`]
+          .filter(Boolean).join(' · ') || 'Ready to send',
+        tone: 'success',
+      };
+    case 'pending_approval':
+      return { label: 'Diversion — needs approval', tone: 'warning' };
+    default:
+      return { label: 'Pick by hand', tone: 'danger' };
+  }
+}
+
+const priorityRank: Record<CallPriority, number> = { low: 0, medium: 1, high: 2, critical: 3 };
+
+export function compareByUrgency(left: EmergencyCallSummary, right: EmergencyCallSummary): number {
+  return priorityRank[right.priority ?? 'high'] - priorityRank[left.priority ?? 'high']
+    || (right.waiting_minutes ?? 0) - (left.waiting_minutes ?? 0);
+}
+
+export function nextCallToOpen(calls: EmergencyCallSummary[] | undefined, currentId: string): string | undefined {
+  return (calls ?? []).filter((call) => call.id !== currentId && awaitsDispatch(call)).sort(compareByUrgency)[0]?.id;
+}
+
+export function emergencyCallPath(callId: string): string {
+  return `/emergency/calls/${encodeURIComponent(callId)}`;
 }

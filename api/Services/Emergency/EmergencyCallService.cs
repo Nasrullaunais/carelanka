@@ -325,7 +325,7 @@ public sealed class EmergencyCallService : IEmergencyCallService
         if (call.CallerUserId != callerId) throw new ForbiddenException(MessageCode.Forbidden);
         var updatedAt = call.Dispatch?.LocationUpdatedAt ?? call.Dispatch?.DispatchedAt ?? call.UpdatedAt;
         var stale = call.Dispatch is not null &&
-            _timeProvider.GetUtcNow() - updatedAt > TimeSpan.FromMinutes(_options.LocationMaxAgeMinutes);
+            _timeProvider.GetUtcNow() - updatedAt > TimeSpan.FromSeconds(_options.TrackingLocationMaxAgeSeconds);
         return new MyCallTracking
         {
             EmergencyCallId = call.Id,

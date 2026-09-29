@@ -25,12 +25,16 @@
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>CareLanka sends your location with an ambulance request so the crew can find you, and shares the ambulance position while a crew member is on a run.</string>
+	<string>CareLanka sends your location with an ambulance request so the crew can find you, and keeps sharing the ambulance position while a crew member is on a run, even when the app is not on screen.</string>
 	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
 	<dict>
 		<key>EmergencyLocation</key>
 		<string>An ambulance needs your exact location to reach you.</string>
 	</dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

@@ -42,9 +42,27 @@ final class CrewPosition {
   int get hashCode => Object.hash(latitude, longitude);
 }
 
+final class CrewReportingMode {
+  const CrewReportingMode.foreground() : runRegistration = null;
+  const CrewReportingMode.run(String this.runRegistration);
+
+  final String? runRegistration;
+
+  bool get isRun => runRegistration != null;
+
+  @override
+  bool operator ==(Object other) =>
+      other is CrewReportingMode && other.runRegistration == runRegistration;
+
+  @override
+  int get hashCode => runRegistration.hashCode;
+}
+
 abstract interface class CrewLocationGateway {
   Future<CrewLocationPermission> requestPermission();
+  Future<CrewLocationPermission> currentPermission();
   Future<CrewPosition> currentPosition();
+  Stream<CrewPosition> positions(CrewReportingMode mode);
   Future<bool> openAppSettings();
   Future<bool> openLocationSettings();
 }
@@ -54,52 +72,68 @@ abstract interface class CrewDispatchGateway {
   Future<void> report(String ambulanceId, CrewPosition position);
 }
 
+/// Shares the crew's ambulance position. With no live run it only does so
+/// while the app is on screen; on a run it keeps going in the background.
 final class CrewLocationReporter extends ChangeNotifier {
   CrewLocationReporter({
     required CrewDispatchGateway dispatches,
     required CrewLocationGateway location,
-    this.interval = const Duration(seconds: 12),
+    this.minUploadGap = const Duration(seconds: 10),
+    this.heartbeat = const Duration(seconds: 30),
+    this.retryDelay = const Duration(seconds: 30),
   }) : _dispatches = dispatches,
        _location = location;
 
+  static const distanceFilterMetres = 25;
+
   final CrewDispatchGateway _dispatches;
   final CrewLocationGateway _location;
-  final Duration interval;
-  Timer? _timer;
-  bool _reporting = false;
+  final Duration minUploadGap;
+  final Duration heartbeat;
+  final Duration retryDelay;
+
+  CrewReportingMode _mode = const CrewReportingMode.foreground();
   CrewLocationReportingState _state = CrewLocationReportingState.stopped;
+  StreamSubscription<CrewPosition>? _subscription;
+  Timer? _throttle;
+  Timer? _heartbeat;
+  Timer? _retry;
+  CrewPosition? _pending;
+  String? _ambulanceId;
+  DateTime? _lastAttemptAt;
+  bool _visible = false;
+  bool _uploading = false;
+  bool _disposed = false;
+  int _generation = 0;
 
   CrewLocationReportingState get state => _state;
 
-  int _generation = 0;
+  bool get _wanted => _visible || _mode.isRun;
 
   Future<void> resume() async {
-    _stop();
-    final generation = _generation;
-    try {
-      final permission = await _location.requestPermission();
-      if (generation != _generation) return;
-      if (permission != CrewLocationPermission.granted) {
-        _setState(switch (permission) {
-          CrewLocationPermission.approximateOnly =>
-            CrewLocationReportingState.approximateOnly,
-          CrewLocationPermission.denied =>
-            CrewLocationReportingState.permissionDenied,
-          CrewLocationPermission.permanentlyDenied =>
-            CrewLocationReportingState.permissionPermanentlyDenied,
-          CrewLocationPermission.unavailable =>
-            CrewLocationReportingState.unavailable,
-          CrewLocationPermission.granted => CrewLocationReportingState.stopped,
-        });
-        return;
-      }
-      await _reportCurrent(generation);
-      if (generation != _generation) return;
-      _timer = Timer.periodic(interval, (_) => _reportCurrent(generation));
-    } catch (_) {
-      if (generation == _generation) {
-        _setState(CrewLocationReportingState.failed);
-      }
+    _visible = true;
+    if (_subscription != null) return;
+    await _restart();
+  }
+
+  Future<void> pause() async {
+    _visible = false;
+    if (!_mode.isRun) _stopReporting();
+  }
+
+  Future<void> stop() async {
+    _visible = false;
+    _mode = const CrewReportingMode.foreground();
+    _stopReporting();
+  }
+
+  Future<void> useMode(CrewReportingMode mode) async {
+    if (_mode == mode) return;
+    _mode = mode;
+    if (_wanted) {
+      await _restart();
+    } else {
+      _stopReporting();
     }
   }
 
@@ -119,53 +153,176 @@ final class CrewLocationReporter extends ChangeNotifier {
     }
   }
 
-  Future<void> pause() => stop();
-
-  Future<void> stop() async => _stop();
-
-  void _stop() {
-    _generation++;
-    _timer?.cancel();
-    _timer = null;
-    if (_state == CrewLocationReportingState.reporting) {
-      _setState(CrewLocationReportingState.stopped);
+  Future<void> _restart() async {
+    _teardown();
+    final generation = _generation;
+    try {
+      final permission = await _location.requestPermission();
+      if (generation != _generation) return;
+      if (permission != CrewLocationPermission.granted) {
+        _blocked(permission);
+        return;
+      }
+      _ambulanceId = await _dispatches.assignedAmbulanceId();
+      if (generation != _generation) return;
+      if (_ambulanceId == null) {
+        _setState(CrewLocationReportingState.stopped);
+        _scheduleRetry();
+        return;
+      }
+      _subscription = _location
+          .positions(_mode)
+          .listen(_offer, onError: (Object _) => _streamFailed(generation));
+      _armHeartbeat(Duration.zero);
+    } catch (_) {
+      if (generation != _generation) return;
+      _teardown();
+      _setState(CrewLocationReportingState.failed);
+      _scheduleRetry();
     }
   }
 
-  Future<void> _reportCurrent(int generation) async {
-    if (_reporting || generation != _generation) return;
-    _reporting = true;
+  Future<void> _streamFailed(int generation) async {
+    if (generation != _generation) return;
+    _teardown();
+    final current = _generation;
     try {
-      final ambulanceId = await _dispatches.assignedAmbulanceId();
+      final permission = await _location.currentPermission();
+      if (current != _generation) return;
+      if (permission == CrewLocationPermission.granted) {
+        _setState(CrewLocationReportingState.failed);
+        _scheduleRetry();
+      } else {
+        _blocked(permission);
+      }
+    } catch (_) {
+      if (current != _generation) return;
+      _setState(CrewLocationReportingState.failed);
+      _scheduleRetry();
+    }
+  }
+
+  void _blocked(CrewLocationPermission permission) {
+    _setState(switch (permission) {
+      CrewLocationPermission.approximateOnly =>
+        CrewLocationReportingState.approximateOnly,
+      CrewLocationPermission.denied =>
+        CrewLocationReportingState.permissionDenied,
+      CrewLocationPermission.permanentlyDenied =>
+        CrewLocationReportingState.permissionPermanentlyDenied,
+      CrewLocationPermission.unavailable =>
+        CrewLocationReportingState.unavailable,
+      CrewLocationPermission.granted => CrewLocationReportingState.stopped,
+    });
+    if (permission == CrewLocationPermission.unavailable) _scheduleRetry();
+  }
+
+  void _offer(CrewPosition position) {
+    _pending = position;
+    if (_uploading || _throttle != null) return;
+    final generation = _generation;
+    final gap = _lastAttemptAt == null
+        ? Duration.zero
+        : minUploadGap - DateTime.now().difference(_lastAttemptAt!);
+    if (gap <= Duration.zero) {
+      unawaited(_upload(generation));
+      return;
+    }
+    _throttle = Timer(gap, () {
+      _throttle = null;
+      unawaited(_upload(generation));
+    });
+  }
+
+  Future<void> _upload(int generation) async {
+    final position = _pending;
+    if (position == null || generation != _generation) return;
+    _pending = null;
+    _uploading = true;
+    _lastAttemptAt = DateTime.now();
+    try {
+      final ambulanceId = _ambulanceId ??= await _dispatches
+          .assignedAmbulanceId();
       if (generation != _generation) return;
       if (ambulanceId == null) {
+        _teardown();
         _setState(CrewLocationReportingState.stopped);
+        _scheduleRetry();
         return;
       }
-      final position = await _location.currentPosition();
-      if (generation != _generation) return;
       await _dispatches.report(ambulanceId, position);
       if (generation == _generation) {
         _setState(CrewLocationReportingState.reporting);
       }
     } catch (_) {
-      if (generation == _generation) {
-        _setState(CrewLocationReportingState.failed);
-      }
+      if (generation != _generation) return;
+      _ambulanceId = null;
+      _setState(CrewLocationReportingState.failed);
     } finally {
-      _reporting = false;
+      if (generation == _generation) {
+        _uploading = false;
+        _armHeartbeat(heartbeat);
+        if (_pending case final next?) _offer(next);
+      }
     }
+  }
+
+  /// Stationary phones send no stream updates, which would make a parked
+  /// ambulance look stale; this asks for a fresh fix after a silence.
+  void _armHeartbeat(Duration after) {
+    _heartbeat?.cancel();
+    final generation = _generation;
+    _heartbeat = Timer(after, () async {
+      try {
+        final position = await _location.currentPosition();
+        if (generation == _generation) _offer(position);
+      } catch (_) {
+        if (generation != _generation) return;
+        _setState(CrewLocationReportingState.failed);
+        _armHeartbeat(heartbeat);
+      }
+    });
+  }
+
+  void _scheduleRetry() {
+    _retry?.cancel();
+    _retry = Timer(retryDelay, () {
+      if (_wanted) unawaited(_restart());
+    });
+  }
+
+  void _stopReporting() {
+    _teardown();
+    if (_state == CrewLocationReportingState.reporting ||
+        _state == CrewLocationReportingState.failed) {
+      _setState(CrewLocationReportingState.stopped);
+    }
+  }
+
+  void _teardown() {
+    _generation++;
+    _subscription?.cancel();
+    _subscription = null;
+    _throttle?.cancel();
+    _throttle = null;
+    _heartbeat?.cancel();
+    _heartbeat = null;
+    _retry?.cancel();
+    _retry = null;
+    _pending = null;
+    _uploading = false;
+    _lastAttemptAt = null;
   }
 
   @override
   void dispose() {
-    _generation++;
-    _timer?.cancel();
+    _disposed = true;
+    _teardown();
     super.dispose();
   }
 
   void _setState(CrewLocationReportingState state) {
-    if (_state == state) return;
+    if (_state == state || _disposed) return;
     _state = state;
     notifyListeners();
   }
@@ -180,7 +337,10 @@ final class GeolocatorCrewLocationGateway implements CrewLocationGateway {
 
   @override
   Future<CrewLocationPermission> requestPermission() async =>
-      switch (await _location.requestAccess()) {
+      _permissionFor(await _location.requestAccess());
+
+  static CrewLocationPermission _permissionFor(LocationAccess access) =>
+      switch (access) {
         LocationAccess.precise => CrewLocationPermission.granted,
         LocationAccess.approximate => CrewLocationPermission.approximateOnly,
         LocationAccess.denied => CrewLocationPermission.denied,
@@ -190,10 +350,28 @@ final class GeolocatorCrewLocationGateway implements CrewLocationGateway {
       };
 
   @override
+  Future<CrewLocationPermission> currentPermission() async =>
+      _permissionFor(await _location.checkAccess());
+
+  @override
   Future<CrewPosition> currentPosition() async {
     final fix = await _location.currentFix(_fixTimeLimit);
     return CrewPosition(fix.latitude, fix.longitude);
   }
+
+  @override
+  Stream<CrewPosition> positions(CrewReportingMode mode) => _location
+      .fixes(
+        distanceFilterMetres: CrewLocationReporter.distanceFilterMetres,
+        background: switch (mode.runRegistration) {
+          final registration? => BackgroundTracking(
+            notificationTitle: 'Sharing ambulance location',
+            notificationText: 'Run in progress for $registration',
+          ),
+          null => null,
+        },
+      )
+      .map((fix) => CrewPosition(fix.latitude, fix.longitude));
 
   @override
   Future<bool> openAppSettings() => _location.openAppSettings();

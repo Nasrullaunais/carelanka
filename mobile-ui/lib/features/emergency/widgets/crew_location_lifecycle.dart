@@ -6,10 +6,12 @@ final class CrewLocationLifecycle extends StatefulWidget {
   const CrewLocationLifecycle({
     super.key,
     required this.reporter,
+    required this.mode,
     required this.child,
   });
 
   final CrewLocationReporter reporter;
+  final CrewReportingMode mode;
   final Widget child;
 
   @override
@@ -23,8 +25,16 @@ final class _CrewLocationLifecycleState extends State<CrewLocationLifecycle>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) widget.reporter.resume();
+      if (!mounted) return;
+      widget.reporter.useMode(widget.mode);
+      widget.reporter.resume();
     });
+  }
+
+  @override
+  void didUpdateWidget(CrewLocationLifecycle oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.mode != widget.mode) widget.reporter.useMode(widget.mode);
   }
 
   @override

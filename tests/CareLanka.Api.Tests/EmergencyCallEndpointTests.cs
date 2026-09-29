@@ -233,8 +233,10 @@ public sealed class EmergencyCallEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, (await unrelatedCrew.PostAsJsonAsync($"/api/ambulances/{ready.AmbulanceId}/location", new { latitude = 6.927079, longitude = 79.861244 })).StatusCode);
     }
 
-    [Fact]
-    public async Task Tracking_marks_an_old_ambulance_position_as_stale()
+    [Theory]
+    [InlineData(-1, true)]
+    [InlineData(30, false)]
+    public async Task Tracking_flags_an_ambulance_position_older_than_the_tracking_limit(int secondsBeforeLimit, bool expectedStale)
     {
         using var patient = await PatientClientAsync();
         using var manager = await StaffClientAsync(ApiApplication.ManagerEmail);
@@ -246,15 +248,15 @@ public sealed class EmergencyCallEndpointTests
         {
             var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
             var ambulance = await db.Ambulances.SingleAsync(item => item.Id == ready.AmbulanceId);
-            var maxAge = scope.ServiceProvider.GetRequiredService<IOptions<EmergencyOptions>>().Value.LocationMaxAgeMinutes;
-            ambulance.LocationUpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-maxAge - 1);
+            var limit = scope.ServiceProvider.GetRequiredService<IOptions<EmergencyOptions>>().Value.TrackingLocationMaxAgeSeconds;
+            ambulance.LocationUpdatedAt = DateTimeOffset.UtcNow.AddSeconds(-(limit - secondsBeforeLimit));
             await db.SaveChangesAsync();
         }
 
         using var tracking = await patient.GetAsync($"/api/me/emergency-calls/{callId}/tracking");
         tracking.EnsureSuccessStatusCode();
         using var body = JsonDocument.Parse(await tracking.Content.ReadAsStringAsync());
-        Assert.True(body.RootElement.GetProperty("ambulance_location_is_stale").GetBoolean());
+        Assert.Equal(expectedStale, body.RootElement.GetProperty("ambulance_location_is_stale").GetBoolean());
     }
 
     [Fact]

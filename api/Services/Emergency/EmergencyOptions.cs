@@ -8,6 +8,8 @@ public sealed class EmergencyOptions
 
     public int LocationMaxAgeMinutes { get; set; } = 5;
 
+    public int TrackingLocationMaxAgeSeconds { get; set; } = 90;
+
     public int AcknowledgementTimeoutSeconds { get; set; } = 30;
 
     public HospitalEntranceOptions HospitalEntrance { get; set; } = new();

@@ -19,6 +19,16 @@ final class LocationFix {
   final DateTime capturedAt;
 }
 
+final class BackgroundTracking {
+  const BackgroundTracking({
+    required this.notificationTitle,
+    required this.notificationText,
+  });
+
+  final String notificationTitle;
+  final String notificationText;
+}
+
 abstract interface class DeviceLocation {
   Future<LocationAccess> checkAccess();
 
@@ -28,7 +38,13 @@ abstract interface class DeviceLocation {
 
   Future<LocationFix?> recentFix(Duration maxAge);
   Future<LocationFix> currentFix(Duration timeLimit);
-  Stream<LocationFix> fixes();
+
+  /// With [background] set, updates keep arriving while the app is not on
+  /// screen, and Android shows an ongoing notification for as long as it runs.
+  Stream<LocationFix> fixes({
+    int distanceFilterMetres = 0,
+    BackgroundTracking? background,
+  });
   Future<bool> openLocationSettings();
   Future<bool> openAppSettings();
 }
@@ -84,8 +100,15 @@ final class GeolocatorDeviceLocation implements DeviceLocation {
   );
 
   @override
-  Stream<LocationFix> fixes() =>
-      Geolocator.getPositionStream(locationSettings: _settings()).map(_fix);
+  Stream<LocationFix> fixes({
+    int distanceFilterMetres = 0,
+    BackgroundTracking? background,
+  }) => Geolocator.getPositionStream(
+    locationSettings: _settings(
+      distanceFilterMetres: distanceFilterMetres,
+      background: background,
+    ),
+  ).map(_fix);
 
   @override
   Future<bool> openLocationSettings() => Geolocator.openLocationSettings();
@@ -106,23 +129,41 @@ final class GeolocatorDeviceLocation implements DeviceLocation {
       ? LocationAccess.precise
       : fallback;
 
-  static LocationSettings _settings({Duration? timeLimit}) =>
-      switch (defaultTargetPlatform) {
-        TargetPlatform.android => AndroidSettings(
-          accuracy: LocationAccuracy.best,
-          intervalDuration: const Duration(seconds: 2),
-          timeLimit: timeLimit,
-        ),
-        TargetPlatform.iOS => AppleSettings(
-          accuracy: LocationAccuracy.best,
-          activityType: ActivityType.other,
-          timeLimit: timeLimit,
-        ),
-        _ => LocationSettings(
-          accuracy: LocationAccuracy.best,
-          timeLimit: timeLimit,
-        ),
-      };
+  static LocationSettings _settings({
+    Duration? timeLimit,
+    int distanceFilterMetres = 0,
+    BackgroundTracking? background,
+  }) => switch (defaultTargetPlatform) {
+    TargetPlatform.android => AndroidSettings(
+      accuracy: LocationAccuracy.best,
+      distanceFilter: distanceFilterMetres,
+      intervalDuration: const Duration(seconds: 2),
+      timeLimit: timeLimit,
+      foregroundNotificationConfig: background == null
+          ? null
+          : ForegroundNotificationConfig(
+              notificationTitle: background.notificationTitle,
+              notificationText: background.notificationText,
+              notificationChannelName: 'Ambulance location sharing',
+              setOngoing: true,
+              enableWakeLock: true,
+            ),
+    ),
+    TargetPlatform.iOS => AppleSettings(
+      accuracy: LocationAccuracy.best,
+      distanceFilter: distanceFilterMetres,
+      activityType: ActivityType.other,
+      timeLimit: timeLimit,
+      pauseLocationUpdatesAutomatically: false,
+      allowBackgroundLocationUpdates: background != null,
+      showBackgroundLocationIndicator: background != null,
+    ),
+    _ => LocationSettings(
+      accuracy: LocationAccuracy.best,
+      distanceFilter: distanceFilterMetres,
+      timeLimit: timeLimit,
+    ),
+  };
 
   static LocationFix _fix(Position position) => LocationFix(
     latitude: position.latitude,

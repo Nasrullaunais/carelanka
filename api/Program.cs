@@ -123,6 +123,8 @@ builder.Services
         "Emergency:MinimumReadyCrew must be greater than zero.")
     .Validate(options => options.LocationMaxAgeMinutes > 0,
         "Emergency:LocationMaxAgeMinutes must be greater than zero.")
+    .Validate(options => options.TrackingLocationMaxAgeSeconds > 0,
+        "Emergency:TrackingLocationMaxAgeSeconds must be greater than zero.")
     .Validate(options => !options.DemoFleet.Enabled
             || (options.DemoFleet.IntervalMinutes > 0 && options.DemoFleet.IntervalMinutes < options.LocationMaxAgeMinutes),
         "Emergency:DemoFleet:IntervalMinutes must be above zero and below LocationMaxAgeMinutes.")

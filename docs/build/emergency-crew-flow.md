@@ -124,6 +124,9 @@ app is open. The crew never has to grant "Allow all the time".
 - Always send the first point straight away.
 - One upload at a time. A new point that arrives while one is uploading replaces any point
   still waiting.
+- **Heartbeat:** a phone that is not moving sends no stream updates, which would make a parked
+  ambulance look stale. After 30 s of silence the reporter asks for a fresh fix and sends it.
+- The ambulance id is looked up once and only again after a failed upload, not on every send.
 
 **Stop cleanly:**
 - The run ends (any way — Fix 3 detects every way): stop the stream, and the notification goes.
@@ -155,8 +158,8 @@ app is open. The crew never has to grant "Allow all the time".
 | Case | What happens |
 | :--- | :--- |
 | Android 13+ and notifications refused | The service still runs; Android just hides the notification. No change to sharing. |
-| Precise location off | Existing "approximate only" banner. A run still shares the approximate point, because a rough dot beats a frozen one. |
-| GPS switched off mid-run | The stream errors → "Location is turned off" banner with "Turn on location". It resumes by itself when GPS is back. |
+| Precise location off | Existing "approximate only" banner. Nothing is shared: dispatch needs a precise position, so a rough dot would mislead more than it helps. |
+| GPS switched off mid-run | The stream errors → "Location is turned off" banner with "Turn on location". It looks again every 30 s and resumes by itself when GPS is back. |
 | No signal for 5 min | Points are dropped, not queued — an old position is useless. The first point after reconnecting goes out at once. |
 | Android kills the app anyway | The run is on the server. The next launch opens My run and the stream restarts. |
 | Two crew phones on one ambulance | Both report. The server keeps the latest. That is fine and needs no change. |

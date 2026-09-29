@@ -47,11 +47,20 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final reporter = context.watch<CrewLocationReporter>();
     final controller = context.watch<MyRunController>();
-    final locationNotice = _locationNotice(reporter.state);
     final error = controller.actionError;
+    final liveRun = controller.state.valueOrNull;
+    final locationNotice = _locationNotice(
+      reporter.state,
+      onRun: liveRun != null,
+    );
 
     return CrewLocationLifecycle(
       reporter: reporter,
+      mode: liveRun == null
+          ? const CrewReportingMode.foreground()
+          : CrewReportingMode.run(
+              liveRun.ambulanceRegistration ?? 'your ambulance',
+            ),
       child: Scaffold(
         appBar: AppBar(
           title: const Text('My run'),
@@ -159,9 +168,14 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
     if (url != null && context.mounted) await openInMaps(context, url);
   }
 
-  String? _locationNotice(CrewLocationReportingState state) => switch (state) {
+  String? _locationNotice(
+    CrewLocationReportingState state, {
+    required bool onRun,
+  }) => switch (state) {
     CrewLocationReportingState.reporting =>
-      'Sharing your assigned ambulance location while this screen is open.',
+      onRun
+          ? 'Sharing your ambulance location until this run ends.'
+          : 'Sharing your assigned ambulance location while this screen is open.',
     CrewLocationReportingState.stopped => null,
     CrewLocationReportingState.approximateOnly =>
       'Only approximate location is allowed. Dispatch needs precise location to send the nearest ambulance.',

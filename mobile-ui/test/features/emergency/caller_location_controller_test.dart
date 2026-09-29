@@ -159,7 +159,10 @@ final class FakeDeviceLocation implements DeviceLocation {
       throw UnimplementedError();
 
   @override
-  Stream<LocationFix> fixes() {
+  Stream<LocationFix> fixes({
+    int distanceFilterMetres = 0,
+    BackgroundTracking? background,
+  }) {
     _fixes?.close();
     _fixes = StreamController<LocationFix>();
     return _fixes!.stream;

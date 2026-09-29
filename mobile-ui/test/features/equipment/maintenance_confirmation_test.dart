@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
+import '../../fake_inbox.dart';
 import 'fake_confirmations.dart';
 
 Widget maintenanceApp(MaintenanceConfirmationController controller) {
@@ -104,6 +105,7 @@ void main() {
             FakeMaintenanceConfirmationService(jobs: [openJob(), openJob(id: 'job-2')]),
           ),
         ),
+        fakeInboxProvider(),
       ],
       child: MaterialApp(theme: AppTheme.light, home: const EquipmentHomeScreen()),
     ));

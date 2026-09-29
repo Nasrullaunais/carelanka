@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
+import '../../fake_inbox.dart';
 import 'fake_lab_reports.dart';
 
 Widget app(FakeLabReportsService service, FakeReportFileSource files) {
@@ -16,6 +17,7 @@ Widget app(FakeLabReportsService service, FakeReportFileSource files) {
     providers: [
       Provider<LabReportsService>.value(value: service),
       Provider<ReportFileSource>.value(value: files),
+      fakeInboxProvider(),
     ],
     child: MaterialApp(theme: AppTheme.light, home: const LabReportsScreen()),
   );

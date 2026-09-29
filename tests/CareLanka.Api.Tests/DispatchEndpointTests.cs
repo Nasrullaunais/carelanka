@@ -404,11 +404,13 @@ public sealed class DispatchEndpointTests
         using var scope = _application.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
         var pushes = await db.Notifications.Where(x => x.EntityId == dispatchId).ToListAsync();
+        var deliveries = await db.NotificationDeliveries
+            .Where(x => pushes.Select(p => p.Id).Contains(x.NotificationId)).ToListAsync();
 
         Assert.Equal(2, pushes.Count);
+        Assert.All(deliveries, delivery => Assert.Equal(NotificationStatus.Queued, delivery.Status));
         Assert.All(pushes, push =>
         {
-            Assert.Equal(NotificationStatus.Queued, push.Status);
             Assert.Equal("dispatch", push.EntityType);
             Assert.Equal("New ambulance assignment", push.Title);
             Assert.Equal("Open CareLanka to see your run.", push.Body);

@@ -9,7 +9,7 @@ namespace CareLanka.Api.Controllers.Common;
 [ApiController]
 [Route("api/device-tokens")]
 [Tags("Device tokens")]
-[Authorize(Policy = Policies.AnyStaff)]
+[Authorize(Policy = Policies.AnyPrincipal)]
 public sealed class DeviceTokensController(IDeviceTokenService devices) : ControllerBase
 {
     [HttpPut(Name = "registerDevice")]

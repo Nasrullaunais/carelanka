@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/notifications/notification_bell.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/dialer.dart';
 import '../../../core/utils/friendly_date.dart';
@@ -184,6 +185,7 @@ class _Greeting extends StatelessWidget {
             ],
           ),
         ),
+        const NotificationBell(),
         Tooltip(
           message: 'Profile',
           child: Material(

@@ -1266,6 +1266,25 @@ export type HealthStatus = {
     checked_at?: string;
 };
 
+export type InboxNotification = {
+    id?: string;
+    type?: NotificationType;
+    title?: string | null;
+    body?: string | null;
+    entity_type?: string | null;
+    entity_id?: string | null;
+    read_at?: string | null;
+    created_at?: string;
+};
+
+export type InboxNotificationPagedResult = {
+    items: Array<InboxNotification>;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+};
+
 export type LabReport = {
     id: string;
     patient_id: string;
@@ -1573,6 +1592,8 @@ export type NavigationTarget = {
 };
 
 export type NavigationWaypoint = 'scene' | 'hospital_emergency_entrance';
+
+export type NotificationType = 'dispatch_assigned' | 'appointment_booked' | 'appointment_rescheduled' | 'appointment_cancelled' | 'appointment_reminder' | 'admission_approved' | 'bed_assigned' | 'discharge_ready' | 'bill_raised' | 'bill_settled' | 'care_reply_ready' | 'prescription_ready' | 'prescription_delivered' | 'lab_report_ready' | 'ambulance_on_the_way' | 'ambulance_arrived' | 'cancellation_answered' | 'emergency_call_received' | 'cancellation_request_waiting' | 'dispatch_proposal_waiting' | 'admission_awaiting_approval' | 'care_query_flagged' | 'care_reply_waiting' | 'equipment_warning_raised' | 'maintenance_due' | 'pharmacy_stock_low' | 'lab_test_requested' | 'leave_requested' | 'leave_approved' | 'leave_rejected' | 'shift_changed' | 'roster_proposal_waiting';
 
 export type OutstandingBill = {
     admission_id: string;
@@ -2281,6 +2302,10 @@ export type ToolCallDto = {
     error?: string | null;
     summary?: string | null;
     called_at?: string;
+};
+
+export type UnreadNotificationCount = {
+    count?: number;
 };
 
 export type UpdateAmbulanceRequest = {
@@ -7808,6 +7833,136 @@ export type RecordHandoverResponses = {
 };
 
 export type RecordHandoverResponse = RecordHandoverResponses[keyof RecordHandoverResponses];
+
+export type ListMyNotificationsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        unreadOnly?: boolean;
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/notifications';
+};
+
+export type ListMyNotificationsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListMyNotificationsError = ListMyNotificationsErrors[keyof ListMyNotificationsErrors];
+
+export type ListMyNotificationsResponses = {
+    /**
+     * OK
+     */
+    200: InboxNotificationPagedResult;
+};
+
+export type ListMyNotificationsResponse = ListMyNotificationsResponses[keyof ListMyNotificationsResponses];
+
+export type GetMyUnreadNotificationCountData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/notifications/unread-count';
+};
+
+export type GetMyUnreadNotificationCountErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type GetMyUnreadNotificationCountError = GetMyUnreadNotificationCountErrors[keyof GetMyUnreadNotificationCountErrors];
+
+export type GetMyUnreadNotificationCountResponses = {
+    /**
+     * OK
+     */
+    200: UnreadNotificationCount;
+};
+
+export type GetMyUnreadNotificationCountResponse = GetMyUnreadNotificationCountResponses[keyof GetMyUnreadNotificationCountResponses];
+
+export type MarkNotificationReadData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/notifications/{id}/read';
+};
+
+export type MarkNotificationReadErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type MarkNotificationReadError = MarkNotificationReadErrors[keyof MarkNotificationReadErrors];
+
+export type MarkNotificationReadResponses = {
+    /**
+     * OK
+     */
+    200: InboxNotification;
+};
+
+export type MarkNotificationReadResponse = MarkNotificationReadResponses[keyof MarkNotificationReadResponses];
+
+export type MarkAllNotificationsReadData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/notifications/read-all';
+};
+
+export type MarkAllNotificationsReadErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type MarkAllNotificationsReadError = MarkAllNotificationsReadErrors[keyof MarkAllNotificationsReadErrors];
+
+export type MarkAllNotificationsReadResponses = {
+    /**
+     * OK
+     */
+    200: UnreadNotificationCount;
+};
+
+export type MarkAllNotificationsReadResponse = MarkAllNotificationsReadResponses[keyof MarkAllNotificationsReadResponses];
 
 export type ListPatientAppAccountsData = {
     body?: never;

@@ -33,17 +33,20 @@ public sealed class PrescriptionService : IPrescriptionService
     private readonly IPatientDirectory _patients;
     private readonly ICurrentUser _currentUser;
     private readonly TimeProvider _clock;
+    private readonly INotifier _notifier;
 
     public PrescriptionService(
         CareLankaDbContext db,
         IPatientDirectory patients,
         ICurrentUser currentUser,
-        TimeProvider clock)
+        TimeProvider clock,
+        INotifier notifier)
     {
         _db = db;
         _patients = patients;
         _currentUser = currentUser;
         _clock = clock;
+        _notifier = notifier;
     }
 
     public async Task<IReadOnlyList<MyPrescription>> ListMineAsync(
@@ -233,6 +236,9 @@ public sealed class PrescriptionService : IPrescriptionService
                 .Where(p => p.TokenDate == today && p.TokenNumber != null)
                 .MaxAsync(p => p.TokenNumber, cancellationToken) ?? 0);
 
+            await _notifier.NotifyAsync(NotificationType.PrescriptionReady, Recipients.Patient(prescription.PatientId),
+                new NotificationSubject("prescription", prescription.Id), cancellationToken, prescription.TokenNumber);
+
             try
             {
                 await _db.SaveChangesAsync(cancellationToken);
@@ -255,6 +261,9 @@ public sealed class PrescriptionService : IPrescriptionService
         prescription.Status = PrescriptionStatus.Delivered;
         prescription.DeliveredAt = _clock.GetUtcNow();
         prescription.DeliveredByStaffId = _currentUser.Id;
+
+        await _notifier.NotifyAsync(NotificationType.PrescriptionDelivered, Recipients.Patient(prescription.PatientId),
+            new NotificationSubject("prescription", prescription.Id), cancellationToken);
 
         await _db.SaveChangesAsync(cancellationToken);
 

@@ -1,5 +1,6 @@
 using CareLanka.Api.Data;
 using CareLanka.Api.Data.Enums;
+using CareLanka.Api.Services.Common;
 using CareLanka.Api.Services.Emergency;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,12 +15,15 @@ public sealed class DispatchProposalExecutor
 {
     private readonly CareLankaDbContext _db;
     private readonly IDispatchAgent _agent;
+    private readonly INotifier _notifier;
     private readonly ILogger<DispatchProposalExecutor> _log;
 
-    public DispatchProposalExecutor(CareLankaDbContext db, IDispatchAgent agent, ILogger<DispatchProposalExecutor> log)
+    public DispatchProposalExecutor(
+        CareLankaDbContext db, IDispatchAgent agent, INotifier notifier, ILogger<DispatchProposalExecutor> log)
     {
         _db = db;
         _agent = agent;
+        _notifier = notifier;
         _log = log;
     }
 
@@ -76,6 +80,14 @@ public sealed class DispatchProposalExecutor
                 DispatchOutcome.NoAmbulanceAvailable => DispatchProposalStatus.Failed,
                 _ => DispatchProposalStatus.Failed
             };
+
+            // Only notify once the agent has actually produced something to review -
+            // notifying at Pending would send a duty manager to an empty screen.
+            if (proposal.Status is DispatchProposalStatus.PendingConfirmation or DispatchProposalStatus.PendingApproval)
+            {
+                await _notifier.NotifyAsync(NotificationType.DispatchProposalWaiting, Recipients.Role(StaffRole.DutyManager),
+                    new NotificationSubject("dispatch_proposal", proposal.Id), ct);
+            }
 
             if (workflow is not null)
             {

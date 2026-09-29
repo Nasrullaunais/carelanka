@@ -884,6 +884,10 @@ public sealed class AllocationEndpointTests
 
     private sealed class StubAllocationService : IAllocationService
     {
+        public Task<IReadOnlyCollection<Guid>> FindOnShiftAsync(
+            Guid wardId, StaffRole role, DateTimeOffset at, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyCollection<Guid>>([]);
+
         public List<AllocationDto> Allocations { get; } = new();
         public Dictionary<Guid, Guid> ShiftWardMap { get; } = new();
         public Dictionary<Guid, DateOnly> ShiftDateMap { get; } = new();

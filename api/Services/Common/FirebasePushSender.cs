@@ -7,8 +7,6 @@ namespace CareLanka.Api.Services.Common;
 
 public sealed class FirebasePushSender : IPushSender
 {
-    public const string AndroidChannelId = "dispatch_alerts";
-
     private readonly FirebaseMessaging _messaging;
     private readonly ILogger<FirebasePushSender> _logger;
 
@@ -35,7 +33,7 @@ public sealed class FirebasePushSender : IPushSender
             {
                 Priority = Priority.High,
                 CollapseKey = message.CollapseKey,
-                Notification = new AndroidNotification { ChannelId = AndroidChannelId, Tag = message.CollapseKey }
+                Notification = new AndroidNotification { ChannelId = message.AndroidChannel, Tag = message.CollapseKey }
             }
         };
 

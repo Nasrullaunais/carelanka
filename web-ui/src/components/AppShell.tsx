@@ -9,6 +9,7 @@ import { useSession } from '../services/auth/useSession';
 import { roleLabels } from '../types/permissions';
 import { destinationsFor } from '../types/navigation';
 import { Brand } from './Brand';
+import { NotificationBell } from './NotificationBell';
 import { ProfileAvatar } from './ProfileAvatar';
 
 export function AppShell() {
@@ -86,6 +87,9 @@ export function AppShell() {
         </Popover>
       </div>}
     </aside>
-    <main id="workspace" className="workspace" tabIndex={-1}><Outlet /></main>
+    <main id="workspace" className="workspace" tabIndex={-1}>
+      <div className="workspace-topbar"><NotificationBell /></div>
+      <Outlet />
+    </main>
   </div>;
 }

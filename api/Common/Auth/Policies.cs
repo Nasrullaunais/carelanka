@@ -12,6 +12,7 @@ public static class Policies
 
     public const string AnyStaff = nameof(AnyStaff);
     public const string PatientOnly = nameof(PatientOnly);
+    public const string AnyPrincipal = nameof(AnyPrincipal);
     public const string WorkflowReader = nameof(WorkflowReader);
     public const string WorkflowStarter = nameof(WorkflowStarter);
     public const string EmergencyResponder = nameof(EmergencyResponder);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/auth/auth_controller.dart';
+import '../../../core/notifications/notification_bell.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/phone_width.dart';
 import '../services/lab_reports_service.dart';
@@ -39,6 +40,7 @@ class LabReportsScreen extends StatelessWidget {
         appBar: AppBar(
           title: const Text('Lab reports'),
           actions: [
+            const NotificationBell(),
             IconButton(
               icon: const Icon(Icons.logout),
               tooltip: 'Sign out',

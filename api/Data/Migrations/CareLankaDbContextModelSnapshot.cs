@@ -283,6 +283,10 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_seen_at");
 
+                    b.Property<Guid?>("PatientAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_account_id");
+
                     b.Property<string>("Platform")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -293,7 +297,7 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("revoked_at");
 
-                    b.Property<Guid>("StaffMemberId")
+                    b.Property<Guid?>("StaffMemberId")
                         .HasColumnType("uuid")
                         .HasColumnName("staff_member_id");
 
@@ -310,6 +314,10 @@ namespace CareLanka.Api.Data.Migrations
                     b.HasKey("Id")
                         .HasName("pk_device_tokens");
 
+                    b.HasIndex("PatientAccountId")
+                        .HasDatabaseName("ix_device_tokens_patient_account")
+                        .HasFilter("revoked_at IS NULL");
+
                     b.HasIndex("StaffMemberId")
                         .HasDatabaseName("ix_device_tokens_staff_member")
                         .HasFilter("revoked_at IS NULL");
@@ -320,6 +328,8 @@ namespace CareLanka.Api.Data.Migrations
 
                     b.ToTable("device_tokens", null, t =>
                         {
+                            t.HasCheckConstraint("ck_device_tokens_one_owner", "num_nonnulls(staff_member_id, patient_account_id) = 1");
+
                             t.HasCheckConstraint("ck_device_tokens_platform", "platform IN ('android', 'ios', 'web')");
                         });
                 });
@@ -331,21 +341,11 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<int>("AttemptCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("attempt_count");
-
                     b.Property<string>("Body")
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("body");
-
-                    b.Property<string>("Channel")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("channel");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -366,38 +366,29 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("entity_type");
 
-                    b.Property<string>("FailureReason")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("failure_reason");
-
-                    b.Property<DateTimeOffset>("NextAttemptAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("next_attempt_at");
-
                     b.Property<DateTimeOffset?>("ReadAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("read_at");
 
-                    b.Property<Guid>("RecipientStaffMemberId")
+                    b.Property<Guid?>("RecipientPatientAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recipient_patient_account_id");
+
+                    b.Property<Guid?>("RecipientStaffMemberId")
                         .HasColumnType("uuid")
                         .HasColumnName("recipient_staff_member_id");
-
-                    b.Property<DateTimeOffset?>("SentAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("sent_at");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("status");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("title");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("type");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -410,18 +401,91 @@ namespace CareLanka.Api.Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_notifications_dedupe_key");
 
-                    b.HasIndex("NextAttemptAt")
-                        .HasDatabaseName("ix_notifications_due")
-                        .HasFilter("status = 'queued'");
+                    b.HasIndex("RecipientPatientAccountId")
+                        .HasDatabaseName("ix_notifications_patient_unread")
+                        .HasFilter("read_at IS NULL");
+
+                    b.HasIndex("RecipientStaffMemberId")
+                        .HasDatabaseName("ix_notifications_staff_unread")
+                        .HasFilter("read_at IS NULL");
+
+                    b.HasIndex("RecipientPatientAccountId", "CreatedAt")
+                        .HasDatabaseName("ix_notifications_patient_recipient");
 
                     b.HasIndex("RecipientStaffMemberId", "CreatedAt")
-                        .HasDatabaseName("ix_notifications_recipient");
+                        .HasDatabaseName("ix_notifications_staff_recipient");
 
                     b.ToTable("notifications", null, t =>
                         {
-                            t.HasCheckConstraint("ck_notifications_channel", "channel IN ('in_app', 'push', 'sms')");
+                            t.HasCheckConstraint("ck_notifications_one_recipient", "num_nonnulls(recipient_staff_member_id, recipient_patient_account_id) = 1");
 
-                            t.HasCheckConstraint("ck_notifications_status", "status IN ('queued', 'sent', 'failed')");
+                            t.HasCheckConstraint("ck_notifications_type", "type IN ('dispatch_assigned', 'appointment_booked', 'appointment_rescheduled', 'appointment_cancelled', 'appointment_reminder', 'admission_approved', 'bed_assigned', 'discharge_ready', 'bill_raised', 'bill_settled', 'care_reply_ready', 'prescription_ready', 'prescription_delivered', 'lab_report_ready', 'ambulance_on_the_way', 'ambulance_arrived', 'cancellation_answered', 'emergency_call_received', 'cancellation_request_waiting', 'dispatch_proposal_waiting', 'admission_awaiting_approval', 'care_query_flagged', 'care_reply_waiting', 'equipment_warning_raised', 'maintenance_due', 'pharmacy_stock_low', 'lab_test_requested', 'leave_requested', 'leave_approved', 'leave_rejected', 'shift_changed', 'roster_proposal_waiting')");
+                        });
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Common.NotificationDelivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("channel");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<DateTimeOffset>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<Guid>("NotificationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("notification_id");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_notification_deliveries");
+
+                    b.HasIndex("NextAttemptAt")
+                        .HasDatabaseName("ix_notification_deliveries_due")
+                        .HasFilter("status = 'queued'");
+
+                    b.HasIndex("NotificationId")
+                        .HasDatabaseName("ix_notification_deliveries_notification_id");
+
+                    b.ToTable("notification_deliveries", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_notification_deliveries_channel", "channel IN ('in_app', 'push', 'sms')");
+
+                            t.HasCheckConstraint("ck_notification_deliveries_status", "status IN ('queued', 'sent', 'failed')");
                         });
                 });
 
@@ -3776,26 +3840,52 @@ namespace CareLanka.Api.Data.Migrations
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Common.DeviceToken", b =>
                 {
+                    b.HasOne("CareLanka.Api.Data.Entities.Common.PatientAccount", "PatientAccount")
+                        .WithMany()
+                        .HasForeignKey("PatientAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_device_tokens_patient_accounts_patient_account_id");
+
                     b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", "StaffMember")
                         .WithMany()
                         .HasForeignKey("StaffMemberId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
                         .HasConstraintName("fk_device_tokens_staff_members_staff_member_id");
+
+                    b.Navigation("PatientAccount");
 
                     b.Navigation("StaffMember");
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Common.Notification", b =>
                 {
+                    b.HasOne("CareLanka.Api.Data.Entities.Common.PatientAccount", "RecipientPatientAccount")
+                        .WithMany()
+                        .HasForeignKey("RecipientPatientAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_notifications_patient_accounts_recipient_patient_account_id");
+
                     b.HasOne("CareLanka.Api.Data.Entities.Common.StaffMember", "RecipientStaffMember")
                         .WithMany()
                         .HasForeignKey("RecipientStaffMemberId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
                         .HasConstraintName("fk_notifications_staff_members_recipient_staff_member_id");
 
+                    b.Navigation("RecipientPatientAccount");
+
                     b.Navigation("RecipientStaffMember");
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Common.NotificationDelivery", b =>
+                {
+                    b.HasOne("CareLanka.Api.Data.Entities.Common.Notification", "Notification")
+                        .WithMany("Deliveries")
+                        .HasForeignKey("NotificationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_notification_deliveries_notifications_notification_id");
+
+                    b.Navigation("Notification");
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Common.RefreshToken", b =>
@@ -4355,6 +4445,11 @@ namespace CareLanka.Api.Data.Migrations
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Common.AgentWorkflow", b =>
                 {
                     b.Navigation("ProposedChanges");
+                });
+
+            modelBuilder.Entity("CareLanka.Api.Data.Entities.Common.Notification", b =>
+                {
+                    b.Navigation("Deliveries");
                 });
 
             modelBuilder.Entity("CareLanka.Api.Data.Entities.Common.PatientAccount", b =>

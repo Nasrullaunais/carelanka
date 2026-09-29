@@ -39,13 +39,15 @@ public sealed class DischargeService : IDischargeService
     private readonly CareLankaDbContext _db;
     private readonly IBedRegistryService _beds;
     private readonly ICurrentUser _currentUser;
+    private readonly INotifier _notifier;
 
     public DischargeService(
-        CareLankaDbContext db, IBedRegistryService beds, ICurrentUser currentUser)
+        CareLankaDbContext db, IBedRegistryService beds, ICurrentUser currentUser, INotifier notifier)
     {
         _db = db;
         _beds = beds;
         _currentUser = currentUser;
+        _notifier = notifier;
     }
 
     public async Task<PagedResult<DischargeCandidate>> ListCandidatesAsync(
@@ -127,7 +129,9 @@ public sealed class DischargeService : IDischargeService
             Tick(discharge, item, ticked, _currentUser.Id);
         }
 
+        var wasReady = admission.Status == AdmissionStatus.ReadyForDischarge;
         ApplyFlag(admission, discharge);
+        await NotifyIfNewlyReadyAsync(admission, wasReady, ct);
 
         await _db.SaveChangesAsync(ct);
 
@@ -213,8 +217,18 @@ public sealed class DischargeService : IDischargeService
 
         Tick(discharge, DischargeChecklistItemType.BillingSettled, settled, _currentUser.Id);
 
+        var wasReady = admission.Status == AdmissionStatus.ReadyForDischarge;
         ApplyFlag(admission, discharge);
+        await NotifyIfNewlyReadyAsync(admission, wasReady, ct);
+    }
 
+    private async Task NotifyIfNewlyReadyAsync(AdmissionEntity admission, bool wasReady, CancellationToken ct)
+    {
+        if (!wasReady && admission.Status == AdmissionStatus.ReadyForDischarge)
+        {
+            await _notifier.NotifyAsync(NotificationType.DischargeReady, Recipients.Patient(admission.PatientId),
+                new NotificationSubject("admission", admission.Id), ct);
+        }
     }
 
     private static void ApplyFlag(AdmissionEntity admission, DischargeEntity discharge)

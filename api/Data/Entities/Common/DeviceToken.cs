@@ -4,9 +4,13 @@ namespace CareLanka.Api.Data.Entities.Common;
 
 public class DeviceToken : AuditedEntity
 {
-    public Guid StaffMemberId { get; set; }
+    public Guid? StaffMemberId { get; set; }
 
-    public StaffMember StaffMember { get; set; } = null!;
+    public StaffMember? StaffMember { get; set; }
+
+    public Guid? PatientAccountId { get; set; }
+
+    public PatientAccount? PatientAccount { get; set; }
 
     public string Token { get; set; } = null!;
 

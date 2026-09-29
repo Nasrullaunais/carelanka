@@ -1,6 +1,7 @@
 using CareLanka.Api.Common.Errors;
 using CareLanka.Api.Common.Exceptions;
 using CareLanka.Api.Data;
+using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Equipment;
 using CareLanka.Api.Services.Common;
@@ -24,15 +25,18 @@ public sealed class LabReportService : ILabReportService
     private readonly CareLankaDbContext _db;
     private readonly IPatientDirectory _patients;
     private readonly ICurrentUser _currentUser;
+    private readonly INotifier _notifier;
 
     public LabReportService(
         CareLankaDbContext db,
         IPatientDirectory patients,
-        ICurrentUser currentUser)
+        ICurrentUser currentUser,
+        INotifier notifier)
     {
         _db = db;
         _patients = patients;
         _currentUser = currentUser;
+        _notifier = notifier;
     }
 
     public async Task<PagedResult<LabReport>> ListForPatientAsync(
@@ -116,6 +120,10 @@ public sealed class LabReportService : ILabReportService
         };
 
         _db.LabReports.Add(report);
+
+        await _notifier.NotifyAsync(NotificationType.LabReportReady, Recipients.Patient(report.PatientId),
+            new NotificationSubject("lab_report", report.Id), cancellationToken, report.TestName);
+
         await _db.SaveChangesAsync(cancellationToken);
 
         return ToDto(report);

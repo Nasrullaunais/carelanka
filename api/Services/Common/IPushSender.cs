@@ -4,6 +4,7 @@ public sealed record PushMessage(
     string Title,
     string Body,
     string CollapseKey,
+    string AndroidChannel,
     IReadOnlyDictionary<string, string> Data);
 
 public enum PushOutcome

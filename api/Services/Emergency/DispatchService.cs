@@ -23,12 +23,12 @@ public sealed class DispatchService : IDispatchService
     private readonly TimeProvider _clock;
     private readonly EmergencyOptions _options;
     private readonly ISceneLookupQueue _sceneLookups;
-    private readonly IPushNotifications _push;
+    private readonly INotifier _notifier;
 
     public DispatchService(CareLankaDbContext db, IAmbulanceEligibilityService eligibility,
         ICurrentUser currentUser, TimeProvider clock, IOptions<EmergencyOptions> options, ISceneLookupQueue sceneLookups,
-        IPushNotifications push)
-        => (_db, _eligibility, _currentUser, _clock, _options, _sceneLookups, _push) = (db, eligibility, currentUser, clock, options.Value, sceneLookups, push);
+        INotifier notifier)
+        => (_db, _eligibility, _currentUser, _clock, _options, _sceneLookups, _notifier) = (db, eligibility, currentUser, clock, options.Value, sceneLookups, notifier);
 
     private static readonly Dictionary<DispatchStatus, AmbulanceStatus> ProgressProjection = new()
     {
@@ -228,6 +228,21 @@ public sealed class DispatchService : IDispatchService
             dispatch.Ambulance.CurrentLongitude = request.Longitude!.Value;
             dispatch.Ambulance.LocationUpdatedAt = _clock.GetUtcNow();
         }
+
+        if (dispatch.EmergencyCall.PatientId is { } patientId)
+        {
+            if (target == DispatchStatus.EnRouteToScene)
+            {
+                await _notifier.NotifyAsync(NotificationType.AmbulanceOnTheWay, Recipients.Patient(patientId),
+                    new NotificationSubject("dispatch", dispatch.Id), ct);
+            }
+            else if (target == DispatchStatus.AtScene)
+            {
+                await _notifier.NotifyAsync(NotificationType.AmbulanceArrived, Recipients.Patient(patientId),
+                    new NotificationSubject("dispatch", dispatch.Id), ct);
+            }
+        }
+
         await SaveAsync(ct);
         return ToDetail(dispatch);
     }
@@ -321,8 +336,12 @@ public sealed class DispatchService : IDispatchService
             });
         }
 
-        _push.Stage(dispatch.Crew.Select(x => x.StaffMemberId), "New ambulance assignment",
-            "Open CareLanka to see your run.", "dispatch", dispatch.Id, "dispatch-assigned");
+        foreach (var crewMember in dispatch.Crew)
+        {
+            await _notifier.NotifyAsync(NotificationType.DispatchAssigned, Recipients.Staff(crewMember.StaffMemberId),
+                new NotificationSubject("dispatch", dispatch.Id), ct);
+        }
+
         return dispatch;
     }
 

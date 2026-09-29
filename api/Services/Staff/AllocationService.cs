@@ -7,6 +7,7 @@ using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Staff;
 using CareLanka.Api.Services.Common;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace CareLanka.Api.Services.Staff;
@@ -15,19 +16,65 @@ public sealed class AllocationService : IAllocationService
 {
     private readonly CareLankaDbContext _db;
     private readonly ICurrentUser _currentUser;
-    private readonly IRosterProposalService? _rosterProposalService;
     private readonly ILogger<AllocationService>? _logger;
+    private readonly IServiceProvider _services;
 
     public AllocationService(
         CareLankaDbContext db,
         ICurrentUser currentUser,
-        IRosterProposalService? rosterProposalService = null,
+        IServiceProvider services,
         ILogger<AllocationService>? logger = null)
     {
         _db = db;
         _currentUser = currentUser;
-        _rosterProposalService = rosterProposalService;
+        _services = services;
         _logger = logger;
+    }
+
+    // Resolved lazily, never through the constructor: IRecipientResolver reads on-shift staff
+    // through this service, so a constructor-injected INotifier or IRosterProposalService here
+    // would be circular (both of those depend on INotifier themselves, which depends on
+    // IRecipientResolver, which depends on this service).
+    private INotifier Notifier => _services.GetRequiredService<INotifier>();
+
+    private IRosterProposalService? RosterProposalService => _services.GetService<IRosterProposalService>();
+
+    public async Task<IReadOnlyCollection<Guid>> FindOnShiftAsync(
+        Guid wardId, StaffRole role, DateTimeOffset at, CancellationToken cancellationToken = default)
+    {
+        var pointInTimeUtc = at.UtcDateTime;
+        var targetDate = DateOnly.FromDateTime(pointInTimeUtc);
+        var prevDate = targetDate.AddDays(-1);
+
+        var candidateShifts = await _db.Shifts
+            .AsNoTracking()
+            .Include(s => s.Allocations)
+            .Where(s => s.WardId == wardId && (s.Date == targetDate || s.Date == prevDate))
+            .ToListAsync(cancellationToken);
+
+        var onShiftStaffIds = candidateShifts
+            .Where(s => IsShiftActiveAt(s, pointInTimeUtc))
+            .SelectMany(s => s.Allocations)
+            .Where(a => a.Status == AllocationStatus.Confirmed)
+            .Select(a => a.StaffMemberId)
+            .Distinct()
+            .ToList();
+
+        if (onShiftStaffIds.Count == 0) return onShiftStaffIds;
+
+        return await _db.StaffMembers.AsNoTracking()
+            .Where(s => onShiftStaffIds.Contains(s.Id) && s.Role == role && s.IsActive)
+            .Select(s => s.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    private static bool IsShiftActiveAt(Shift shift, DateTime pointInTimeUtc)
+    {
+        var startUtc = shift.Date.ToDateTime(shift.StartTime, DateTimeKind.Utc);
+        var endUtc = shift.EndTime < shift.StartTime
+            ? shift.Date.AddDays(1).ToDateTime(shift.EndTime, DateTimeKind.Utc)
+            : shift.Date.ToDateTime(shift.EndTime, DateTimeKind.Utc);
+        return pointInTimeUtc >= startUtc && pointInTimeUtc < endUtc;
     }
 
     public async Task<PagedResult<AllocationDto>> ListAllocationsAsync(
@@ -241,6 +288,10 @@ public sealed class AllocationService : IAllocationService
         };
 
         _db.Allocations.Add(allocation);
+
+        await Notifier.NotifyAsync(NotificationType.ShiftChanged, Recipients.Staff(staffMember.Id),
+            new NotificationSubject("allocation", allocation.Id), cancellationToken);
+
         await _db.SaveChangesAsync(cancellationToken);
 
         return MapToDto(allocation, staffMember.FullName);
@@ -276,6 +327,9 @@ public sealed class AllocationService : IAllocationService
         allocation.EndedAt = DateTimeOffset.UtcNow;
         allocation.UpdatedAt = DateTimeOffset.UtcNow;
 
+        await Notifier.NotifyAsync(NotificationType.ShiftChanged, Recipients.Staff(allocation.StaffMemberId),
+            new NotificationSubject("allocation", allocation.Id), cancellationToken);
+
         await _db.SaveChangesAsync(cancellationToken);
 
         var staffMember = await _db.StaffMembers.AsNoTracking()
@@ -285,11 +339,12 @@ public sealed class AllocationService : IAllocationService
         var coverage = ComputeCoverage(allocation.Shift);
 
         Guid? rosterProposalId = null;
-        if (!request.SuppressAgent && _rosterProposalService != null && coverage.ShortfallToMinimum > 0)
+        var rosterProposalService = RosterProposalService;
+        if (!request.SuppressAgent && rosterProposalService != null && coverage.ShortfallToMinimum > 0)
         {
             try
             {
-                rosterProposalId = await _rosterProposalService.TriggerProposalIfUnderstaffedAsync(allocation.ShiftId, cancellationToken);
+                rosterProposalId = await rosterProposalService.TriggerProposalIfUnderstaffedAsync(allocation.ShiftId, cancellationToken);
             }
             catch (Exception ex)
             {

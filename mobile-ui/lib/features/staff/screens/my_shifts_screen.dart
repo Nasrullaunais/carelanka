@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/auth/auth_controller.dart';
+import '../../../core/notifications/notification_bell.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/async_view.dart';
 import '../models/my_shift_item.dart';
@@ -34,6 +35,7 @@ class MyShiftsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('My Shifts'),
         actions: [
+          const NotificationBell(),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Refresh',

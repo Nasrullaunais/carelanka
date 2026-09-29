@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/auth/auth_controller.dart';
+import '../../../core/notifications/notification_bell.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/async_data.dart';
 import '../../../core/widgets/phone_width.dart';
@@ -58,6 +59,7 @@ class _EquipmentHomeScreenState extends State<EquipmentHomeScreen> {
         appBar: AppBar(
           title: const Text('Equipment'),
           actions: [
+            const NotificationBell(),
             IconButton(
               icon: const Icon(Icons.logout),
               tooltip: 'Sign out',

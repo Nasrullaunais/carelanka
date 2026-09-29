@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/notifications/notification_bell.dart';
 import '../../../core/widgets/async_view.dart';
 import '../emergency_routes.dart';
 import '../models/run_step.dart';
@@ -55,6 +56,7 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
         appBar: AppBar(
           title: const Text('My run'),
           actions: [
+            const NotificationBell(),
             IconButton(
               tooltip: 'Past runs',
               icon: const Icon(Icons.history),

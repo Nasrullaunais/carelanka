@@ -21,17 +21,20 @@ public sealed class BedAssignmentService : IBedAssignmentService
     private readonly IBedRegistryService _beds;
     private readonly IBedOccupancyService _occupancy;
     private readonly ICurrentUser _currentUser;
+    private readonly INotifier _notifier;
 
     public BedAssignmentService(
         CareLankaDbContext db,
         IBedRegistryService beds,
         IBedOccupancyService occupancy,
-        ICurrentUser currentUser)
+        ICurrentUser currentUser,
+        INotifier notifier)
     {
         _db = db;
         _beds = beds;
         _occupancy = occupancy;
         _currentUser = currentUser;
+        _notifier = notifier;
     }
 
     public async Task<PagedResult<AdmissionBed>> ListAvailabilityAsync(
@@ -298,6 +301,11 @@ public sealed class BedAssignmentService : IBedAssignmentService
 
         admission.Status = AdmissionStatus.BedReserved;
         _db.BedAssignments.Add(assignment);
+
+        await _notifier.NotifyAsync(NotificationType.AdmissionApproved, Recipients.Patient(admission.PatientId),
+            new NotificationSubject("admission", admission.Id), ct);
+        await _notifier.NotifyAsync(NotificationType.BedAssigned, Recipients.Patient(admission.PatientId),
+            new NotificationSubject("bed", bed.Id), ct, bed.BedNumber, ward!.Name);
 
         try
         {

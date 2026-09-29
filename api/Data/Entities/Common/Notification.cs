@@ -4,11 +4,15 @@ namespace CareLanka.Api.Data.Entities.Common;
 
 public class Notification : AuditedEntity
 {
-    public Guid RecipientStaffMemberId { get; set; }
+    public Guid? RecipientStaffMemberId { get; set; }
 
-    public StaffMember RecipientStaffMember { get; set; } = null!;
+    public StaffMember? RecipientStaffMember { get; set; }
 
-    public NotificationChannel Channel { get; set; }
+    public Guid? RecipientPatientAccountId { get; set; }
+
+    public PatientAccount? RecipientPatientAccount { get; set; }
+
+    public NotificationType Type { get; set; }
 
     public string Title { get; set; } = null!;
 
@@ -18,17 +22,9 @@ public class Notification : AuditedEntity
 
     public Guid? EntityId { get; set; }
 
-    public NotificationStatus Status { get; set; }
-
     public string DedupeKey { get; set; } = null!;
-
-    public int AttemptCount { get; set; }
-
-    public DateTimeOffset NextAttemptAt { get; set; }
-
-    public DateTimeOffset? SentAt { get; set; }
 
     public DateTimeOffset? ReadAt { get; set; }
 
-    public string? FailureReason { get; set; }
+    public List<NotificationDelivery> Deliveries { get; set; } = [];
 }

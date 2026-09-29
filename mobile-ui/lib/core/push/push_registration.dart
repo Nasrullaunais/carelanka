@@ -5,9 +5,10 @@ import 'package:flutter/foundation.dart';
 import '../auth/auth_controller.dart';
 import '../network/api_exception.dart';
 import 'device_registrar.dart';
+import 'permission_asked_store.dart';
 import 'push_gateway.dart';
 
-/// Keeps this phone registered for push while a staff member is signed in.
+/// Keeps this phone registered for push while anyone - staff or patient - is signed in.
 /// Push is only a nudge: every failure here is logged and swallowed, because the
 /// app still finds new work by asking the server.
 final class PushRegistration {
@@ -15,16 +16,22 @@ final class PushRegistration {
     required PushGateway gateway,
     required DeviceRegistrar registrar,
     required AuthController auth,
-    required VoidCallback onNotificationOpened,
+    required void Function(PushNotificationEvent event) onNotificationOpened,
+    required void Function(PushNotificationEvent event) onForegroundMessage,
+    PermissionAskedStore? permissionAskedStore,
   })  : _gateway = gateway,
         _registrar = registrar,
         _auth = auth,
-        _onNotificationOpened = onNotificationOpened;
+        _onNotificationOpened = onNotificationOpened,
+        _onForegroundMessage = onForegroundMessage,
+        _permissionAskedStore = permissionAskedStore ?? SecurePermissionAskedStore();
 
   final PushGateway _gateway;
   final DeviceRegistrar _registrar;
   final AuthController _auth;
-  final VoidCallback _onNotificationOpened;
+  final void Function(PushNotificationEvent event) _onNotificationOpened;
+  final void Function(PushNotificationEvent event) _onForegroundMessage;
+  final PermissionAskedStore _permissionAskedStore;
 
   final _subscriptions = <StreamSubscription<Object?>>[];
   String? _registrationId;
@@ -34,8 +41,17 @@ final class PushRegistration {
     _auth.addListener(_onAuthChanged);
     _subscriptions
       ..add(_gateway.tokenRefreshes.listen((token) => _register(token)))
-      ..add(_gateway.opened.listen((_) => _onNotificationOpened()));
+      ..add(_gateway.opened.listen(_onNotificationOpened))
+      ..add(_gateway.foregroundMessages.listen(_onForegroundMessage));
     _onAuthChanged();
+    unawaited(_handleColdStart());
+  }
+
+  // getInitialMessage only ever answers once, right after a cold start - a later call
+  // (e.g. a hot restart during development) correctly returns null.
+  Future<void> _handleColdStart() async {
+    final message = await _gateway.initialMessage();
+    if (message != null) _onNotificationOpened(message);
   }
 
   Future<void> stop() async {
@@ -58,7 +74,7 @@ final class PushRegistration {
   }
 
   void _onAuthChanged() {
-    if (_auth.status == AuthStatus.signedIn && _auth.isStaff) {
+    if (_auth.status == AuthStatus.signedIn) {
       _registerCurrentToken();
     } else if (_auth.status == AuthStatus.signedOut) {
       _registrationId = null;
@@ -69,7 +85,7 @@ final class PushRegistration {
     if (_registering || _registrationId != null) return;
     _registering = true;
     try {
-      if (!await _gateway.requestPermission()) return;
+      if (!await _hasPermission()) return;
       final token = await _gateway.token();
       if (token != null) await _register(token);
     } catch (error) {
@@ -79,8 +95,16 @@ final class PushRegistration {
     }
   }
 
+  // Android remembers the user's answer once asked, so asking again on a later launch would
+  // only re-show the system dialog for someone who denied without checking "don't ask again".
+  Future<bool> _hasPermission() async {
+    if (await _permissionAskedStore.hasAsked()) return _gateway.hasPermission();
+    await _permissionAskedStore.markAsked();
+    return _gateway.requestPermission();
+  }
+
   Future<void> _register(String token) async {
-    if (_auth.status != AuthStatus.signedIn || !_auth.isStaff) return;
+    if (_auth.status != AuthStatus.signedIn) return;
     try {
       _registrationId = await _registrar.register(token);
     } on ApiException catch (error) {

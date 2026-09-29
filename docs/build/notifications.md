@@ -2,11 +2,11 @@
 
 **Owner:** Nasrulla Unais, with the group's permission to add the triggers inside all four components.
 
-**Status:** Planned 2026-09-27. Not started.
+**Status:** Phases 1 to 8 are built and phase 10 (docs) is written, 2026-09-30. Phase 8 (scheduled jobs, commit `a07241f`) is still on branch `worktree-agent-ae8289d17d2582c2a`, not yet on this branch. Phase 9 (Firebase and deploy, §11) is the by-hand setup still to be done. Two catalogue types have no trigger yet: `pharmacy_stock_low` and `lab_test_requested`; `appointment_rescheduled` waits for a reschedule action.
 
 **Contract:** `specs/common-spec.yaml` (the inbox endpoints are added there — notifications are common, not one member's).
 
-**Today:** only one event notifies anyone — a crew assigned to a run (`DispatchService.cs`). The hosted server has no Firebase key and phone builds have no `google-services.json`, so even that alert never reaches a phone.
+**Before this track:** only one event notified anyone — a crew assigned to a run (`DispatchService.cs`). The hosted server has no Firebase key and phone builds have no `google-services.json`, so even that alert never reaches a phone.
 
 ---
 
@@ -362,7 +362,7 @@ Each phase ends with everything green: `dotnet test`, `check:specs`, `check:code
 | 7 | **Triggers** — the §5 catalogue, one component at a time: Emergency → Patient → Equipment → Staff | One test per type: the action creates exactly one notification for the right people |
 | 8 | **Scheduled jobs** (§4.7) | Tests with a fake clock: reminder once, clean-up at 90 days |
 | 9 | **Firebase + deploy** (§11) | A real push reaches a real phone from the hosted server |
-| 10 | **Docs** (§9) | ADR 9 written; spec sweep 0 collisions |
+| 10 | **Docs** (§9) | ADR 9 written; spec sweep 0 collisions. **Done 2026-09-30** |
 
 Phases 4–6 can run in parallel once 3 is merged. Phase 7 per component can start after 2.
 

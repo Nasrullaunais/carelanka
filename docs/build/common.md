@@ -10,6 +10,9 @@ endpoint in every other spec sits behind `[Authorize]`, and until something issu
 there is nothing to authorize. This is why this track goes first and why it is one
 person's.
 
+Notifications (inbox, push, live updates, scheduled jobs) are common too and have their own
+track: `notifications.md`. Decision record: ADR 9.
+
 Read §7 if you are *not* the owner of this track — it is the short version of what auth
 means for your component.
 

@@ -3,6 +3,8 @@
 **Owner: Kaveesha (Member 2)** · **Index:** `docs/BUILD_PLAN.md`
 
 **Owns:** `Skill`, `StaffMemberSkill`, `Shift`, `Allocation`, `LeaveRequest`, `WardStaffingRule`
+**Notifications raised:** `leave_requested` (duty managers); `leave_approved`, `leave_rejected` (the requester); `shift_changed` (the staff member); `roster_proposal_waiting` (hospital administrators). See `notifications.md` §5.
+
 **Contract:** `specs/staff-spec.yaml` (32 paths) · **Design:** no plan document yet — see below
 **Boundaries:** `specs/integration_of_functions.md` §17–§21
 

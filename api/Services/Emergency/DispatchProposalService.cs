@@ -80,6 +80,7 @@ public sealed class DispatchProposalService : IDispatchProposalService
             CallPriority = call.Priority,
             Status = DispatchProposalStatus.Pending,
             AllowDiversion = request.AllowDiversion,
+            RequestedByStaffMemberId = _currentUser.Id,
             ExcludeAmbulanceIdsJson = request.ExcludeAmbulanceIds is { Count: > 0 }
                 ? DispatchWorkflowJson.Write(request.ExcludeAmbulanceIds) : null
         };

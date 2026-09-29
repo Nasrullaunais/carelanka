@@ -85,7 +85,9 @@ public sealed class DispatchProposalExecutor
             // notifying at Pending would send a duty manager to an empty screen.
             if (proposal.Status is DispatchProposalStatus.PendingConfirmation or DispatchProposalStatus.PendingApproval)
             {
-                await _notifier.NotifyAsync(NotificationType.DispatchProposalWaiting, Recipients.Role(StaffRole.DutyManager),
+                // The worker has no signed-in user, so the requester is left out by name.
+                await _notifier.NotifyAsync(NotificationType.DispatchProposalWaiting,
+                    Recipients.Role(StaffRole.DutyManager, exceptStaffId: proposal.RequestedByStaffMemberId),
                     new NotificationSubject("dispatch_proposal", proposal.Id), ct);
             }
 

@@ -33,6 +33,8 @@ public class DispatchProposal : AuditedEntity
     public Guid? ResultingDispatchId { get; set; }
     public string? PreAdmissionSentJson { get; set; }
 
+    public Guid? RequestedByStaffMemberId { get; set; }
+
     public Guid? ReviewedByStaffMemberId { get; set; }
     public DateTimeOffset? ReviewedAt { get; set; }
     public string? ReviewNotes { get; set; }

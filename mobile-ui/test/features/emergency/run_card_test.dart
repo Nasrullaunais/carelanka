@@ -3,15 +3,12 @@ import 'package:carelanka_mobile/services/api_client/models/dispatch_detail.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-void main() {
-  testWidgets('shows the reverse-geocoded scene address when available', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
+Future<void> pumpCard(WidgetTester tester, DispatchDetail run) =>
+    tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: RunCard(
-            run: const DispatchDetail(sceneAddressLabel: 'Galle Face, Colombo'),
+            run: run,
             busy: false,
             onStep: () {},
             onDecline: () {},
@@ -21,7 +18,125 @@ void main() {
       ),
     );
 
-    expect(find.text('Scene'), findsOneWidget);
-    expect(find.text('Galle Face, Colombo'), findsOneWidget);
+void main() {
+  group('scene', () {
+    testWidgets('shows the reverse-geocoded scene address when available', (
+      tester,
+    ) async {
+      await pumpCard(
+        tester,
+        const DispatchDetail(sceneAddressLabel: 'Galle Face, Colombo'),
+      );
+
+      expect(find.text('Scene'), findsOneWidget);
+      expect(find.text('Galle Face, Colombo'), findsOneWidget);
+    });
+
+    testWidgets('falls back to coordinates while the street name is missing', (
+      tester,
+    ) async {
+      await pumpCard(
+        tester,
+        const DispatchDetail(sceneLatitude: 6.9271, sceneLongitude: 79.8612),
+      );
+
+      expect(find.text('6.92710, 79.86120'), findsOneWidget);
+      expect(find.text('Street name not available yet'), findsOneWidget);
+    });
+
+    testWidgets('shows what the caller said, and hides the line when empty', (
+      tester,
+    ) async {
+      await pumpCard(
+        tester,
+        const DispatchDetail(sceneDetails: 'Father collapsed'),
+      );
+      expect(find.text('“Father collapsed”'), findsOneWidget);
+
+      await pumpCard(tester, const DispatchDetail(sceneDetails: '  '));
+      expect(find.textContaining('“'), findsNothing);
+    });
+
+    testWidgets('warns when the location is not precise', (tester) async {
+      await pumpCard(
+        tester,
+        const DispatchDetail(
+          sceneLocationAccuracyMetres: 300,
+          callerPhone: '0771234567',
+        ),
+      );
+
+      expect(find.textContaining('approximate (±300 m)'), findsOneWidget);
+      expect(find.textContaining('Call the caller'), findsOneWidget);
+    });
+
+    testWidgets('does not warn about a precise location', (tester) async {
+      await pumpCard(
+        tester,
+        const DispatchDetail(sceneLocationAccuracyMetres: 50),
+      );
+
+      expect(find.textContaining('approximate'), findsNothing);
+    });
+
+    testWidgets('suggests checking on arrival when there is no phone', (
+      tester,
+    ) async {
+      await pumpCard(
+        tester,
+        const DispatchDetail(sceneLocationAccuracyMetres: 120),
+      );
+
+      expect(find.textContaining('when you arrive'), findsOneWidget);
+    });
+  });
+
+  group('caller', () {
+    testWidgets('offers a call button and says who the caller is', (
+      tester,
+    ) async {
+      await pumpCard(
+        tester,
+        const DispatchDetail(
+          callerName: 'Nimal Perera',
+          callerPhone: '0771234567',
+          patientIsCaller: false,
+        ),
+      );
+
+      expect(
+        find.text('Caller: Nimal Perera · for someone else'),
+        findsOneWidget,
+      );
+      expect(find.text('0771234567'), findsOneWidget);
+      expect(find.text('Call caller'), findsOneWidget);
+    });
+
+    testWidgets('says when the caller is the patient', (tester) async {
+      await pumpCard(
+        tester,
+        const DispatchDetail(callerName: 'Nimal', patientIsCaller: true),
+      );
+
+      expect(find.text('Caller: Nimal · the patient'), findsOneWidget);
+    });
+
+    testWidgets('hides the call button when there is no number', (
+      tester,
+    ) async {
+      await pumpCard(tester, const DispatchDetail(callerName: 'Nimal Perera'));
+
+      expect(find.text('Call caller'), findsNothing);
+      expect(find.text('No phone number recorded'), findsOneWidget);
+    });
+
+    testWidgets('says so when nothing is known about the caller', (
+      tester,
+    ) async {
+      await pumpCard(tester, const DispatchDetail());
+
+      expect(find.text('No caller details recorded'), findsOneWidget);
+      expect(find.text('Call caller'), findsNothing);
+    });
   });
 }

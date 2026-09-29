@@ -910,6 +910,13 @@ export type DispatchDetail = {
     handover_notes?: string | null;
     patient_condition?: string | null;
     scene_address_label?: string | null;
+    scene_details?: string | null;
+    scene_latitude?: number;
+    scene_longitude?: number;
+    scene_location_accuracy_metres?: number;
+    caller_name?: string | null;
+    caller_phone?: string | null;
+    patient_is_caller?: boolean;
     crew_staff_ids?: Array<string> | null;
 };
 

@@ -37,6 +37,14 @@ DispatchDetail _$DispatchDetailFromJson(Map<String, dynamic> json) =>
       handoverNotes: json['handover_notes'] as String?,
       patientCondition: json['patient_condition'] as String?,
       sceneAddressLabel: json['scene_address_label'] as String?,
+      sceneDetails: json['scene_details'] as String?,
+      sceneLatitude: (json['scene_latitude'] as num?)?.toDouble(),
+      sceneLongitude: (json['scene_longitude'] as num?)?.toDouble(),
+      sceneLocationAccuracyMetres:
+          (json['scene_location_accuracy_metres'] as num?)?.toDouble(),
+      callerName: json['caller_name'] as String?,
+      callerPhone: json['caller_phone'] as String?,
+      patientIsCaller: json['patient_is_caller'] as bool?,
       crewStaffIds: (json['crew_staff_ids'] as List<dynamic>?)
           ?.map((e) => e as String)
           .toList(),
@@ -63,5 +71,12 @@ Map<String, dynamic> _$DispatchDetailToJson(DispatchDetail instance) =>
       'handover_notes': instance.handoverNotes,
       'patient_condition': instance.patientCondition,
       'scene_address_label': instance.sceneAddressLabel,
+      'scene_details': instance.sceneDetails,
+      'scene_latitude': instance.sceneLatitude,
+      'scene_longitude': instance.sceneLongitude,
+      'scene_location_accuracy_metres': instance.sceneLocationAccuracyMetres,
+      'caller_name': instance.callerName,
+      'caller_phone': instance.callerPhone,
+      'patient_is_caller': instance.patientIsCaller,
       'crew_staff_ids': instance.crewStaffIds,
     };

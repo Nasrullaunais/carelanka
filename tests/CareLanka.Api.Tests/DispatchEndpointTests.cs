@@ -112,6 +112,52 @@ public sealed class DispatchEndpointTests
     }
 
     [Fact]
+    public async Task Crew_sees_the_scene_and_how_to_reach_the_caller_while_the_run_is_live()
+    {
+        var run = await SeedRunAsync();
+        await DispatchAsync(run);
+        using var crew = await ClientAsync(run.CrewEmails[0]);
+
+        var active = await crew.GetFromJsonAsync<JsonElement>("/api/me/dispatches/active");
+
+        Assert.Equal("Man collapsed and is not waking up", active.GetProperty("scene_details").GetString());
+        Assert.Equal(6.9271m, active.GetProperty("scene_latitude").GetDecimal());
+        Assert.Equal(79.8612m, active.GetProperty("scene_longitude").GetDecimal());
+        Assert.Equal(12m, active.GetProperty("scene_location_accuracy_metres").GetDecimal());
+        Assert.Equal("Nimal Perera", active.GetProperty("caller_name").GetString());
+        Assert.Equal("0771234567", active.GetProperty("caller_phone").GetString());
+        Assert.False(active.GetProperty("patient_is_caller").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Crew_gets_no_caller_contact_once_the_run_is_finished_but_the_duty_manager_still_does()
+    {
+        var run = await SeedRunAsync();
+        var dispatchId = await DispatchAsync(run);
+        using var crew = await ClientAsync(run.CrewEmails[0]);
+        await PostStatusAsync(crew, $"/api/me/dispatches/{dispatchId}/acknowledge");
+        await ProgressAsync(crew, dispatchId, "en_route_to_scene");
+        await ProgressAsync(crew, dispatchId, "at_scene");
+        await ProgressAsync(crew, dispatchId, "transporting_to_hospital");
+
+        var handedOver = await ReadAsync(await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/handover", new { }));
+
+        Assert.Equal(JsonValueKind.Null, handedOver.GetProperty("caller_name").ValueKind);
+        Assert.Equal(JsonValueKind.Null, handedOver.GetProperty("caller_phone").ValueKind);
+        Assert.Equal(JsonValueKind.Null, handedOver.GetProperty("scene_details").ValueKind);
+        Assert.Equal(6.9271m, handedOver.GetProperty("scene_latitude").GetDecimal());
+
+        var other = await SeedRunAsync();
+        var otherDispatchId = await DispatchAsync(other);
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+        var cancelled = await ReadAsync(await manager.PostAsJsonAsync(
+            $"/api/dispatches/{otherDispatchId}/cancel", new { reason = "Caller called back" }));
+        Assert.Equal("cancelled", cancelled.GetProperty("status").GetString());
+        Assert.Equal("Nimal Perera", cancelled.GetProperty("caller_name").GetString());
+        Assert.Equal("0771234567", cancelled.GetProperty("caller_phone").GetString());
+    }
+
+    [Fact]
     public async Task A_status_cannot_be_skipped()
     {
         var run = await SeedRunAsync();
@@ -550,6 +596,10 @@ public sealed class DispatchEndpointTests
             Id = Guid.NewGuid(),
             Latitude = 6.9271m,
             Longitude = 79.8612m,
+            LocationAccuracyMetres = 12m,
+            Details = "Man collapsed and is not waking up",
+            CallerName = "Nimal Perera",
+            CallerPhone = "0771234567",
             Priority = CallPriority.High,
             Status = CallStatus.Received
         };

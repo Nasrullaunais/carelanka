@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using CareLanka.Api.Data;
 using CareLanka.Api.Data.Entities.Common;
+using CareLanka.Api.Data.Entities.Patient;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.Services.Emergency;
 using Microsoft.EntityFrameworkCore;
@@ -410,6 +411,48 @@ public sealed class EmergencyCallEndpointTests
         Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("patient_id").ValueKind);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task An_app_call_copies_the_callers_name_and_phone_from_their_patient_record(bool patientIsCaller)
+    {
+        using var patient = await PatientClientAsync();
+        var accountId = (await patient.GetFromJsonAsync<JsonElement>("/api/auth/me")).GetProperty("id").GetGuid();
+        await LinkPatientRecordAsync(accountId, "Nimal Perera", "0771234567");
+
+        using var response = await patient.PostAsJsonAsync("/api/emergency-calls", Request(Guid.NewGuid(), patientIsCaller));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("Nimal Perera", body.RootElement.GetProperty("caller_name").GetString());
+        Assert.Equal("0771234567", body.RootElement.GetProperty("caller_phone").GetString());
+    }
+
+    [Fact]
+    public async Task An_app_call_keeps_the_name_and_phone_the_caller_typed()
+    {
+        using var patient = await PatientClientAsync();
+        var accountId = (await patient.GetFromJsonAsync<JsonElement>("/api/auth/me")).GetProperty("id").GetGuid();
+        await LinkPatientRecordAsync(accountId, "Nimal Perera", "0771234567");
+
+        using var response = await patient.PostAsJsonAsync("/api/emergency-calls", new
+        {
+            patient_is_caller = false,
+            caller_name = "Kamal Silva",
+            caller_phone = "0712345678",
+            latitude = 6.927079,
+            longitude = 79.861244,
+            location_accuracy_metres = 8.0,
+            location_captured_at = DateTimeOffset.UtcNow,
+            idempotency_key = Guid.NewGuid()
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("Kamal Silva", body.RootElement.GetProperty("caller_name").GetString());
+        Assert.Equal("0712345678", body.RootElement.GetProperty("caller_phone").GetString());
+    }
+
     [Fact]
     public async Task Staff_can_log_a_phone_call_but_cannot_use_the_patient_own_call_list()
     {
@@ -569,6 +612,18 @@ public sealed class EmergencyCallEndpointTests
         });
         Assert.Equal(HttpStatusCode.BadRequest, invalidUpdate.StatusCode);
         Assert.Equal("application/problem+json", invalidUpdate.Content.Headers.ContentType?.MediaType);
+    }
+
+    private async Task LinkPatientRecordAsync(Guid accountId, string fullName, string phone)
+    {
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        db.Patients.Add(new Patient
+        {
+            Id = Guid.NewGuid(), PatientCode = $"P{Guid.NewGuid():N}"[..8].ToUpperInvariant(),
+            FullName = fullName, Gender = Gender.Male, Phone = phone, UserAccountId = accountId
+        });
+        await db.SaveChangesAsync();
     }
 
     private async Task<HttpClient> PatientClientAsync()

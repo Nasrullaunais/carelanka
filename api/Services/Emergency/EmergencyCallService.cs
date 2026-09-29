@@ -6,6 +6,7 @@ using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Emergency;
 using CareLanka.Api.Services.Common;
+using CareLanka.Api.Services.Patient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Npgsql;
@@ -25,6 +26,7 @@ public sealed class EmergencyCallService : IEmergencyCallService
     private readonly INotifier _notifier;
     private readonly IDispatchProposalLifecycle _lifecycle;
     private readonly IDispatchProposalService _proposals;
+    private readonly IPatientService _patients;
 
     public EmergencyCallService(
         CareLankaDbContext db,
@@ -35,7 +37,8 @@ public sealed class EmergencyCallService : IEmergencyCallService
         ISceneLookupQueue sceneLookups,
         INotifier notifier,
         IDispatchProposalLifecycle lifecycle,
-        IDispatchProposalService proposals)
+        IDispatchProposalService proposals,
+        IPatientService patients)
     {
         _db = db;
         _currentUser = currentUser;
@@ -46,6 +49,7 @@ public sealed class EmergencyCallService : IEmergencyCallService
         _notifier = notifier;
         _lifecycle = lifecycle;
         _proposals = proposals;
+        _patients = patients;
     }
 
     public async Task<EmergencyCallDetail> CreateAsync(
@@ -73,14 +77,11 @@ public sealed class EmergencyCallService : IEmergencyCallService
 
         await EnsurePatientLinkBelongsToCallerAsync(request, principalType, principalId, cancellationToken);
 
+        var callerRecord = principalType == PrincipalType.Patient
+            ? await _patients.FindByUserAccountIdAsync(principalId, cancellationToken)
+            : null;
         var patientId = request.PatientId;
-        if (principalType == PrincipalType.Patient && request.PatientIsCaller!.Value && patientId is null)
-        {
-            patientId = await _db.Patients.AsNoTracking()
-                .Where(patient => patient.UserAccountId == principalId)
-                .Select(patient => (Guid?)patient.Id)
-                .SingleOrDefaultAsync(cancellationToken);
-        }
+        if (request.PatientIsCaller!.Value && patientId is null) patientId = callerRecord?.Id;
 
         var call = new EmergencyCallEntity
         {
@@ -88,8 +89,8 @@ public sealed class EmergencyCallService : IEmergencyCallService
             PatientId = patientId,
             CallerUserId = callerUserId,
             PatientIsCaller = request.PatientIsCaller!.Value,
-            CallerName = Clean(request.CallerName),
-            CallerPhone = Clean(request.CallerPhone),
+            CallerName = Clean(request.CallerName) ?? Clean(callerRecord?.FullName),
+            CallerPhone = Clean(request.CallerPhone) ?? Clean(callerRecord?.Phone),
             Latitude = request.Latitude!.Value,
             Longitude = request.Longitude!.Value,
             LocationAccuracyMetres = request.LocationAccuracyMetres!.Value,

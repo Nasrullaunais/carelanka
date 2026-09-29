@@ -2485,6 +2485,22 @@ components:
               description: Reverse-geocoded scene address shown to the assigned crew.
             handover_notes: { type: string, nullable: true }
             patient_condition: { type: string, nullable: true }
+            scene_details:
+              type: string
+              nullable: true
+              description: What the caller reported. Null for the crew once the run is no longer live.
+            scene_latitude: { type: number, format: double }
+            scene_longitude: { type: number, format: double }
+            scene_location_accuracy_metres: { type: number, format: double }
+            caller_name:
+              type: string
+              nullable: true
+              description: Null for the crew once the run is no longer live.
+            caller_phone:
+              type: string
+              nullable: true
+              description: Null for the crew once the run is no longer live.
+            patient_is_caller: { type: boolean }
 
     DispatchCrewMember:
       type: object

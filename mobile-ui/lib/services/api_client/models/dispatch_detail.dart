@@ -31,6 +31,13 @@ class DispatchDetail {
     this.handoverNotes,
     this.patientCondition,
     this.sceneAddressLabel,
+    this.sceneDetails,
+    this.sceneLatitude,
+    this.sceneLongitude,
+    this.sceneLocationAccuracyMetres,
+    this.callerName,
+    this.callerPhone,
+    this.patientIsCaller,
     this.crewStaffIds,
   });
   
@@ -72,6 +79,20 @@ class DispatchDetail {
   final String? patientCondition;
   @JsonKey(name: 'scene_address_label')
   final String? sceneAddressLabel;
+  @JsonKey(name: 'scene_details')
+  final String? sceneDetails;
+  @JsonKey(name: 'scene_latitude')
+  final double? sceneLatitude;
+  @JsonKey(name: 'scene_longitude')
+  final double? sceneLongitude;
+  @JsonKey(name: 'scene_location_accuracy_metres')
+  final double? sceneLocationAccuracyMetres;
+  @JsonKey(name: 'caller_name')
+  final String? callerName;
+  @JsonKey(name: 'caller_phone')
+  final String? callerPhone;
+  @JsonKey(name: 'patient_is_caller')
+  final bool? patientIsCaller;
   @JsonKey(name: 'crew_staff_ids')
   final List<String>? crewStaffIds;
 

@@ -67,7 +67,7 @@ Patient (Patient's table, read-only FK) ──< EmergencyCall >── Dispatch �
 | `patient_id` | uuid, FK → Patient, nullable | Often unknown at the scene; set later via the link-patient operation (§8) *(Decision 25)* |
 | `caller_user_id` | uuid, nullable | *(Rev 2.4 addition)* The logged-in app user who placed the call, if any |
 | `patient_is_caller` | boolean | *(Rev 2.4 addition)* Answered once, on the call screen — closes `integration_of_functions.md` §11.4 |
-| `caller_name` / `caller_phone` | text, nullable | Free-text fallback when the caller has no app account |
+| `caller_name` / `caller_phone` | text, nullable | What the desk typed for a phone call. For an app call with none sent, a copy of the caller's Patient name and phone taken at that moment, so the crew can ring them |
 | `latitude` / `longitude` | numeric(9,6) | Required — the scene location |
 | `location_accuracy_metres` | numeric | Device-reported accuracy, required |
 | `location_captured_at` | timestamptz | When the submitted position was captured |

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../services/api_client/models/dispatch_detail.dart';
 import '../models/run_step.dart';
+import 'scene_card.dart';
 
 class RunCard extends StatelessWidget {
   const RunCard({
@@ -45,14 +46,14 @@ class RunCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _Row(label: 'Ambulance', value: run.ambulanceRegistration),
-                if (run.sceneAddressLabel?.trim().isNotEmpty == true)
-                  _Row(label: 'Scene', value: run.sceneAddressLabel),
                 _Row(label: 'Crew on board', value: run.crewCount?.toString()),
                 _Row(label: 'Going to ward', value: run.destinationWardName),
               ],
             ),
           ),
         ),
+        const SizedBox(height: 12),
+        SceneCard(run: run),
         const SizedBox(height: 24),
         if (step != null)
           FilledButton(

@@ -11,5 +11,12 @@ public sealed class DispatchDetail : DispatchSummary
     public string? HandoverNotes { get; set; }
     public string? PatientCondition { get; set; }
     public string? SceneAddressLabel { get; set; }
+    public string? SceneDetails { get; set; }
+    public decimal SceneLatitude { get; set; }
+    public decimal SceneLongitude { get; set; }
+    public decimal SceneLocationAccuracyMetres { get; set; }
+    public string? CallerName { get; set; }
+    public string? CallerPhone { get; set; }
+    public bool PatientIsCaller { get; set; }
     public IReadOnlyList<Guid> CrewStaffIds { get; set; } = [];
 }

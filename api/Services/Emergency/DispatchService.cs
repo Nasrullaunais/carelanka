@@ -443,17 +443,28 @@ public sealed class DispatchService : IDispatchService
         dispatch.Status = target;
     }
 
-    private DispatchDetail ToDetail(Dispatch dispatch) => new()
+    private DispatchDetail ToDetail(Dispatch dispatch)
     {
-        Id = dispatch.Id, EmergencyCallId = dispatch.EmergencyCallId, AmbulanceId = dispatch.AmbulanceId,
-        AmbulanceRegistration = dispatch.Ambulance.RegistrationNumber, CallPriority = dispatch.EmergencyCall.Priority,
-        Status = dispatch.Status, DispatchedAt = dispatch.DispatchedAt, CompletedAt = dispatch.CompletedAt,
-        AcknowledgedAt = dispatch.AcknowledgedAt, AcknowledgedByStaffId = dispatch.AcknowledgedByStaffId,
-        DeclinedReason = dispatch.DeclinedReason, CancellationReason = dispatch.CancellationReason,
-        ReassignmentReason = dispatch.ReassignmentReason, HandoverNotes = dispatch.HandoverNotes,
-        PatientCondition = dispatch.PatientCondition, SceneAddressLabel = dispatch.EmergencyCall.AddressLabel,
-        CrewCount = dispatch.Crew.Count,
-        AcknowledgementOverdue = dispatch.IsAcknowledgementOverdue(_clock.GetUtcNow(), _options.AcknowledgementTimeoutSeconds),
-        CrewStaffIds = dispatch.Crew.Select(x => x.StaffMemberId).ToList()
-    };
+        var call = dispatch.EmergencyCall;
+        var showsCaller = _currentUser.Role != PrincipalRole.AmbulanceCrew || dispatch.Status.IsLive();
+        return new DispatchDetail
+        {
+            Id = dispatch.Id, EmergencyCallId = dispatch.EmergencyCallId, AmbulanceId = dispatch.AmbulanceId,
+            AmbulanceRegistration = dispatch.Ambulance.RegistrationNumber, CallPriority = call.Priority,
+            Status = dispatch.Status, DispatchedAt = dispatch.DispatchedAt, CompletedAt = dispatch.CompletedAt,
+            AcknowledgedAt = dispatch.AcknowledgedAt, AcknowledgedByStaffId = dispatch.AcknowledgedByStaffId,
+            DeclinedReason = dispatch.DeclinedReason, CancellationReason = dispatch.CancellationReason,
+            ReassignmentReason = dispatch.ReassignmentReason, HandoverNotes = dispatch.HandoverNotes,
+            PatientCondition = dispatch.PatientCondition, SceneAddressLabel = call.AddressLabel,
+            SceneDetails = showsCaller ? call.Details : null,
+            SceneLatitude = call.Latitude, SceneLongitude = call.Longitude,
+            SceneLocationAccuracyMetres = call.LocationAccuracyMetres,
+            CallerName = showsCaller ? call.CallerName : null,
+            CallerPhone = showsCaller ? call.CallerPhone : null,
+            PatientIsCaller = call.PatientIsCaller,
+            CrewCount = dispatch.Crew.Count,
+            AcknowledgementOverdue = dispatch.IsAcknowledgementOverdue(_clock.GetUtcNow(), _options.AcknowledgementTimeoutSeconds),
+            CrewStaffIds = dispatch.Crew.Select(x => x.StaffMemberId).ToList()
+        };
+    }
 }

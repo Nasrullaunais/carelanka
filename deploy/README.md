@@ -164,12 +164,58 @@ address, so avoid `down -v`.
 **Saving credit:** in the portal, **Stop** the VM and check it says **Stopped (deallocated)**.
 Everything comes back on **Start**. A deploy while it is stopped fails; re-run it after starting.
 
+## Phone notifications
+
+Notifications appear in the app on their own. Sending them to a phone's lock screen needs a
+Firebase key on the server. Until you add it, the API runs fine and push stays off.
+
+The key is a secret. **Never commit it.** The `secrets/` folder lives only on the server.
+
+1. In the Firebase console: Project settings → Service accounts → **Generate new private key**.
+   You get one JSON file.
+2. Copy it to the server:
+
+   ```sh
+   ssh azureuser@<address> 'mkdir -p ~/carelanka/secrets'
+   scp firebase-key.json azureuser@<address>:carelanka/secrets/firebase.json
+   ssh azureuser@<address> 'chmod 644 ~/carelanka/secrets/firebase.json'
+   ```
+
+   The API does not run as root, so the file must be readable by other users (`644`).
+3. On the server, add this line to `~/carelanka/.env`:
+
+   ```
+   CARELANKA_PUSH_CREDENTIALS_PATH=/run/secrets/firebase.json
+   ```
+4. Restart the API:
+
+   ```sh
+   cd ~/carelanka
+   docker compose up -d api
+   docker compose logs api | grep -i "CredentialsPath"
+   ```
+
+   The line "Push:CredentialsPath is not set" must **not** appear. If the API stops at
+   startup, the path is wrong or the file is missing.
+5. Install a release build of the phone app made with `google-services.json` (see below), sign
+   in, and trigger an event. Then check the push went out:
+
+   ```sh
+   docker compose exec db psql -U carelanka -d carelanka \
+     -c "select status, count(*) from notification_deliveries group by status;"
+   ```
+
+   A row reaching `sent` means the phone was reached.
+
 ## The phone app
 
 ```sh
 cd mobile-ui
 flutter build apk --release --dart-define=API_BASE_URL=https://<address>/api
 ```
+
+Put `google-services.json` in `mobile-ui/android/app/` first (the group shares it privately;
+git ignores it). Without it the app builds with push off.
 
 Share `build/app/outputs/flutter-apk/app-release.apk`.
 

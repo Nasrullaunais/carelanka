@@ -48,6 +48,9 @@ services:
       ConnectionStrings__CareLanka: Host=db;Port=5432;Database=carelanka;Username=carelanka_app;Password=${CARELANKA_DB_APP_PASSWORD}
       Jwt__SigningKey: ${CARELANKA_JWT_SIGNING_KEY:?Set CARELANKA_JWT_SIGNING_KEY in .env}
       LanguageModel__ApiKey: ${CARELANKA_GEMINI_API_KEY:-}
+      Push__CredentialsPath: ${CARELANKA_PUSH_CREDENTIALS_PATH:-}
+    volumes:
+      - ./secrets:/run/secrets:ro
     depends_on:
       db-setup:
         condition: service_completed_successfully

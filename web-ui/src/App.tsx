@@ -22,7 +22,9 @@ import { PatientAppAccountsPage } from './pages/PatientAppAccountsPage';
 import { PharmacyPage } from './pages/PharmacyPage';
 import { StaffLeaveApprovalPage } from './pages/StaffLeaveApprovalPage';
 import { StaffManagementPage } from './pages/StaffManagementPage';
+import { StaffReportsPage } from './pages/staff/StaffReportsPage';
 import { StaffRosterProposalsPage } from './pages/staff/StaffRosterProposalsPage';
+import { StaffShiftsPage } from './pages/staff/StaffShiftsPage';
 import { WardCoveragePage } from './pages/WardCoveragePage';
 import { WardsPage } from './pages/WardsPage';
 import { clearSession } from './services/auth/session';
@@ -84,9 +86,11 @@ export function App() {
           <Route path="/pharmacy" element={<PharmacyPage />} />
           <Route path="/prescriptions" element={<PrescriptionsPage />} />
           <Route path="/staff" element={<StaffManagementPage />} />
+          <Route path="/staff/shifts" element={<StaffShiftsPage />} />
           <Route path="/staff/coverage" element={<WardCoveragePage />} />
           <Route path="/staff/leave-approval" element={<StaffLeaveApprovalPage />} />
           <Route path="/staff/roster-proposals" element={<StaffRosterProposalsPage />} />
+          <Route path="/staff/reports" element={<StaffReportsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

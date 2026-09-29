@@ -211,11 +211,17 @@ export function StaffRosterProposalsPage() {
           <Link to="/staff" className="secondary button" style={{ textDecoration: 'none' }}>
             Staff directory
           </Link>
+          <Link to="/staff/shifts" className="secondary button" style={{ textDecoration: 'none' }}>
+            Shifts & roster
+          </Link>
           <Link to="/staff/coverage" className="secondary button" style={{ textDecoration: 'none' }}>
             Ward coverage
           </Link>
           <Link to="/staff/leave-approval" className="secondary button" style={{ textDecoration: 'none' }}>
             Leave requests
+          </Link>
+          <Link to="/staff/reports" className="secondary button" style={{ textDecoration: 'none' }}>
+            Staff reports
           </Link>
           <button
             type="button"

@@ -8,5 +8,6 @@ public enum StaffRole
     GeneralStaff,
     DutyManager,
     HospitalAdministrator,
-    EquipmentManager
+    EquipmentManager,
+    EquipmentAdministrator
 }

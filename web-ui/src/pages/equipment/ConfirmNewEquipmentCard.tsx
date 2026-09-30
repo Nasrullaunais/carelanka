@@ -9,15 +9,20 @@ import {
   rejectEquipmentItemMutation,
 } from '../../services/api/generated/@tanstack/react-query.gen';
 import type { EquipmentItem } from '../../services/api/generated';
+import { useSession } from '../../services/auth/useSession';
 import { Dialog } from '../EquipmentPage';
 
 const CODE_HEADER = 'X-Confirmation-Code';
 
 // The same queue the hospital administrator works through in the mobile app. The code is kept in
-// this component only - never stored - and the API checks it on every call.
+// this component only - never stored - and the API checks it on every call. The equipment
+// administrator is a role created only for this confirming work, so the API skips the code check
+// for them (EquipmentItemService.EnsureConfirmationCode) - the card skips asking for one too.
 export function ConfirmNewEquipmentCard() {
+  const session = useSession();
+  const skipsCode = session?.principal.role === 'equipment_administrator';
   const queryClient = useQueryClient();
-  const [code, setCode] = useState<string | null>(null);
+  const [code, setCode] = useState<string | null>(skipsCode ? '' : null);
   const [entered, setEntered] = useState('');
   const [unlocking, setUnlocking] = useState(false);
   const [rejecting, setRejecting] = useState<EquipmentItem | null>(null);
@@ -120,9 +125,11 @@ export function ConfirmNewEquipmentCard() {
     <div className="card">
       <div className="dialog-head">
         <h2>Confirm new equipment</h2>
-        <button type="button" className="secondary" onClick={lock}>
-          Lock
-        </button>
+        {!skipsCode && (
+          <button type="button" className="secondary" onClick={lock}>
+            Lock
+          </button>
+        )}
       </div>
 
       {pending.isPending && <p className="empty">Loading…</p>}
@@ -130,8 +137,12 @@ export function ConfirmNewEquipmentCard() {
       {pending.isError && (
         <p className="empty">
           The list could not be loaded.{' '}
-          <button type="button" className="secondary" onClick={lock}>
-            Enter the code again
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => (skipsCode ? pending.refetch() : lock())}
+          >
+            {skipsCode ? 'Try again' : 'Enter the code again'}
           </button>
         </p>
       )}

@@ -9,5 +9,6 @@ public enum PrincipalRole
     DutyManager,
     HospitalAdministrator,
     EquipmentManager,
+    EquipmentAdministrator,
     Patient
 }

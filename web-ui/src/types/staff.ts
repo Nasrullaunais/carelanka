@@ -25,6 +25,7 @@ export const staffRoleLabels: Record<StaffRole, string> = {
   duty_manager: 'Duty manager',
   hospital_administrator: 'Hospital administrator',
   equipment_manager: 'Equipment manager',
+  equipment_administrator: 'Equipment administrator',
 };
 
 export const staffRoles: StaffRole[] = [
@@ -35,6 +36,7 @@ export const staffRoles: StaffRole[] = [
   'duty_manager',
   'hospital_administrator',
   'equipment_manager',
+  'equipment_administrator',
 ];
 
 export const staffRoleHints: Record<StaffRole, string> = {
@@ -45,6 +47,8 @@ export const staffRoleHints: Record<StaffRole, string> = {
   duty_manager: 'Ward oversight, emergency management, bed coordination, and shift rosters.',
   hospital_administrator: 'System administration, staff management, wards, and billing policies.',
   equipment_manager: 'Medical equipment inventory, maintenance scheduling, and pharmacy items.',
+  equipment_administrator:
+    'Confirms newly-registered equipment and confirms maintenance done - no confirmation code needed, the role itself is the authorization.',
 };
 
 export const coverageStatusLabels: Record<CoverageStatus, string> = {

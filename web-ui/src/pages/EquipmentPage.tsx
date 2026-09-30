@@ -27,6 +27,7 @@ import { AppSelect } from '../components/ui/app-select';
 import { useSession } from '../services/auth/useSession';
 import {
   canConfirmEquipment,
+  canConfirmEquipmentOrMaintenance,
   canManageEquipment,
   canReportFault,
   canTrackEquipmentConfirmations,
@@ -165,7 +166,7 @@ export function EquipmentPage() {
         </div>
       </div>
 
-      {canConfirmEquipment(role) && <ConfirmNewEquipmentCard />}
+      {canConfirmEquipmentOrMaintenance(role) && <ConfirmNewEquipmentCard />}
 
       {canConfirmEquipment(role) && <RemoveCategoriesCard />}
 

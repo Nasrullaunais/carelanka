@@ -20,6 +20,8 @@ enum PrincipalRole {
   hospitalAdministrator('hospital_administrator'),
   @JsonValue('equipment_manager')
   equipmentManager('equipment_manager'),
+  @JsonValue('equipment_administrator')
+  equipmentAdministrator('equipment_administrator'),
   @JsonValue('patient')
   patient('patient'),
   /// Default value for all unparsed values, allows backward compatibility when adding new values on the backend.

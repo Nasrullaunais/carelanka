@@ -8,9 +8,13 @@ const mocks = vi.hoisted(() => ({
   confirm: vi.fn(),
   reject: vi.fn(),
   items: [] as unknown[],
+  role: undefined as string | undefined,
 }));
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('../../services/auth/useSession', () => ({
+  useSession: () => (mocks.role ? { principal: { role: mocks.role } } : null),
+}));
 vi.mock('../../services/api/generated/@tanstack/react-query.gen', () => ({
   listEquipmentItemsAwaitingConfirmationOptions: () => ({
     queryKey: ['equipment-pending-confirmation'],
@@ -43,6 +47,7 @@ describe('ConfirmNewEquipmentCard', () => {
     cleanup();
     vi.clearAllMocks();
     mocks.items = [];
+    mocks.role = undefined;
   });
 
   it('keeps the Unlock button disabled until a code is typed', async () => {
@@ -115,6 +120,35 @@ describe('ConfirmNewEquipmentCard', () => {
       expect(mocks.reject.mock.calls[0]?.[0]).toEqual({
         path: { id: 'item-1' },
         headers: { 'X-Confirmation-Code': 'test-confirmation-code' },
+      }),
+    );
+  });
+
+  it('shows the queue immediately for an equipment administrator, with no code-entry form', async () => {
+    // The equipment administrator is a role created only for this confirming work, so the API
+    // skips the confirmation-code check for them (EquipmentItemService.EnsureConfirmationCode).
+    // The card should never show the "enter the confirmation code" form for this role.
+    mocks.role = 'equipment_administrator';
+    mocks.items = [PENDING_ITEM];
+    renderWithProviders(<ConfirmNewEquipmentCard />);
+
+    expect(screen.queryByLabelText('Confirmation code')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Unlock' })).not.toBeInTheDocument();
+    expect(await screen.findByText('Ventilator')).toBeInTheDocument();
+  });
+
+  it('an equipment administrator confirms with an empty confirmation-code header', async () => {
+    mocks.role = 'equipment_administrator';
+    mocks.items = [PENDING_ITEM];
+    mocks.confirm.mockResolvedValue(PENDING_ITEM);
+    renderWithProviders(<ConfirmNewEquipmentCard />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
+
+    await waitFor(() =>
+      expect(mocks.confirm.mock.calls[0]?.[0]).toEqual({
+        path: { id: 'item-1' },
+        headers: { 'X-Confirmation-Code': '' },
       }),
     );
   });

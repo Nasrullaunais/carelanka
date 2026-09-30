@@ -20,6 +20,8 @@ enum StaffRole {
   hospitalAdministrator('hospital_administrator'),
   @JsonValue('equipment_manager')
   equipmentManager('equipment_manager'),
+  @JsonValue('equipment_administrator')
+  equipmentAdministrator('equipment_administrator'),
   /// Default value for all unparsed values, allows backward compatibility when adding new values on the backend.
   $unknown(null);
 

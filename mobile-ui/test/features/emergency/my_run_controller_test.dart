@@ -3,6 +3,7 @@ import 'package:carelanka_mobile/core/widgets/async_data.dart';
 import 'package:carelanka_mobile/features/emergency/models/handover_draft.dart';
 import 'package:carelanka_mobile/features/emergency/models/run_ending.dart';
 import 'package:carelanka_mobile/features/emergency/models/run_step.dart';
+import 'package:carelanka_mobile/features/emergency/services/crew_location_reporter.dart';
 import 'package:carelanka_mobile/features/emergency/services/crew_run_service.dart';
 import 'package:carelanka_mobile/features/emergency/state/my_run_controller.dart';
 import 'package:carelanka_mobile/services/api_client/models/dispatch_detail.dart';
@@ -67,8 +68,14 @@ final class FakeRunService implements CrewRunService {
       _reply('decline:$reason', DispatchStatus.declined);
 
   @override
-  Future<DispatchDetail> advance(String id, DispatchStatus next) =>
-      _reply('advance:${next.json}', next);
+  Future<DispatchDetail> advance(
+    String id,
+    DispatchStatus next, {
+    CrewPosition? position,
+  }) => _reply(
+    'advance:${next.json}${position == null ? '' : '@${position.latitude},${position.longitude}'}',
+    next,
+  );
 
   @override
   Future<DispatchDetail> handOver(
@@ -125,6 +132,30 @@ void main() {
     expect(DispatchStatus.endedAtScene.canWriteHandoverNotes, isFalse);
     expect(DispatchStatus.endedAtScene.isLive, isFalse);
     expect(DispatchStatus.endedAtScene.nextStep, isNull);
+  });
+
+  test('only the two easy-to-hit steps ask to be confirmed', () {
+    expect(RunStep.values.where((step) => step.needsConfirmation), [
+      RunStep.arrivedAtScene,
+      RunStep.leaveForHospital,
+    ]);
+  });
+
+  test('maps opens when driving starts and when the patient is on board', () {
+    expect(
+      DispatchStatus.values.where((status) => status.opensNavigationOnEntry),
+      [DispatchStatus.enRouteToScene, DispatchStatus.transportingToHospital],
+    );
+  });
+
+  test('the navigation button names where it goes', () {
+    expect(DispatchStatus.acknowledged.navigationLabel, 'Navigate to scene');
+    expect(DispatchStatus.enRouteToScene.navigationLabel, 'Navigate to scene');
+    expect(DispatchStatus.atScene.navigationLabel, 'Navigate to scene');
+    expect(
+      DispatchStatus.transportingToHospital.navigationLabel,
+      'Navigate to hospital',
+    );
   });
 
   test(
@@ -251,6 +282,245 @@ void main() {
       expect(controller.state.valueOrNull?.status, DispatchStatus.assigned);
     },
   );
+
+  group('where a step happened', () {
+    Future<(FakeRunService, MyRunController)> acknowledged(
+      CrewPosition? Function() position,
+    ) async {
+      final service = FakeRunService()
+        ..active = _run(DispatchStatus.acknowledged);
+      final controller = MyRunController(service, latestPosition: position);
+      await controller.load();
+      return (service, controller);
+    }
+
+    test('sends the latest fix with the step', () async {
+      final (service, controller) = await acknowledged(
+        () => const CrewPosition(6.9271, 79.8612),
+      );
+
+      await controller.advance();
+
+      expect(service.calls, ['advance:en_route_to_scene@6.9271,79.8612']);
+    });
+
+    test('sends nothing when there is no recent fix', () async {
+      final (service, controller) = await acknowledged(() => null);
+
+      await controller.advance();
+
+      expect(service.calls, ['advance:en_route_to_scene']);
+    });
+
+    test('asks for the fix again when a step is retried', () async {
+      var fix = const CrewPosition(1, 1);
+      final (service, controller) = await acknowledged(() => fix);
+      service.nextError = const ApiException(message: 'offline');
+
+      await controller.advance();
+      fix = const CrewPosition(2, 2);
+      await controller.retry();
+
+      expect(service.calls, [
+        'advance:en_route_to_scene@1.0,1.0',
+        'advance:en_route_to_scene@2.0,2.0',
+      ]);
+    });
+  });
+
+  group('a reply that never arrived', () {
+    const conflict = ApiException(message: 'Not allowed', statusCode: 409);
+
+    test('a step the server already took counts as done', () async {
+      final service = FakeRunService()
+        ..active = _run(DispatchStatus.acknowledged);
+      final controller = MyRunController(service);
+      await controller.load();
+      service.nextError = conflict;
+      service.active = _run(DispatchStatus.enRouteToScene);
+
+      final done = await controller.advance();
+
+      expect(done, isTrue);
+      expect(controller.actionError, isNull);
+      expect(controller.canRetry, isFalse);
+      expect(
+        controller.state.valueOrNull?.status,
+        DispatchStatus.enRouteToScene,
+      );
+    });
+
+    test('accepting a run that was already accepted counts as done', () async {
+      final service = FakeRunService()..active = _run(DispatchStatus.assigned);
+      final controller = MyRunController(service);
+      await controller.load();
+      service.nextError = conflict;
+      service.active = _run(DispatchStatus.acknowledged);
+
+      expect(await controller.acknowledge(), isTrue);
+      expect(controller.actionError, isNull);
+    });
+
+    test('a handover that was already recorded counts as done', () async {
+      final service = FakeRunService()
+        ..active = _run(DispatchStatus.transportingToHospital);
+      final controller = MyRunController(service);
+      await controller.load();
+      service.nextError = conflict;
+      service.active = null;
+      service.ended['run-1'] = _ended(DispatchStatus.handedOver);
+
+      final done = await controller.handOver();
+
+      expect(done, isTrue);
+      expect(controller.actionError, isNull);
+      expect(controller.ending?.kind, RunEndingKind.handedOver);
+      expect(
+        service.calls.where((call) => call.startsWith('getRun')),
+        hasLength(1),
+      );
+    });
+
+    test('a decline that was already recorded counts as done', () async {
+      final service = FakeRunService()..active = _run(DispatchStatus.assigned);
+      final controller = MyRunController(service);
+      await controller.load();
+      service.nextError = conflict;
+      service.active = null;
+      service.ended['run-1'] = _ended(DispatchStatus.declined);
+
+      expect(await controller.decline('Flat tyre'), isTrue);
+      expect(controller.actionError, isNull);
+      expect(controller.ending, isNull);
+    });
+
+    test('a run that ended some other way is not called done', () async {
+      final service = FakeRunService()
+        ..active = _run(DispatchStatus.transportingToHospital);
+      final controller = MyRunController(service);
+      await controller.load();
+      service.nextError = conflict;
+      service.active = null;
+      service.ended['run-1'] = _ended(DispatchStatus.cancelled);
+
+      expect(await controller.handOver(), isFalse);
+      expect(controller.ending?.kind, RunEndingKind.cancelled);
+    });
+
+    test('a run that has not reached the asked state is not done', () async {
+      final service = FakeRunService()
+        ..active = _run(DispatchStatus.enRouteToScene);
+      final controller = MyRunController(service);
+      await controller.load();
+      service.nextError = conflict;
+
+      expect(await controller.advance(), isFalse);
+      expect(controller.actionError?.message, 'Not allowed');
+    });
+  });
+
+  group('when there is no signal', () {
+    const offline = ApiException(message: 'offline');
+
+    Future<(FakeRunService, MyRunController)> enRoute() async {
+      final service = FakeRunService()
+        ..active = _run(DispatchStatus.enRouteToScene);
+      final controller = MyRunController(service);
+      await controller.load();
+      return (service, controller);
+    }
+
+    test('the step is not saved and can be tried again', () async {
+      final (service, controller) = await enRoute();
+      service.nextError = offline;
+
+      expect(await controller.advance(), isFalse);
+      expect(controller.canRetry, isTrue);
+      expect(
+        controller.state.valueOrNull?.status,
+        DispatchStatus.enRouteToScene,
+      );
+
+      expect(await controller.retry(), isTrue);
+      expect(service.calls, ['advance:at_scene', 'advance:at_scene']);
+      expect(controller.state.valueOrNull?.status, DispatchStatus.atScene);
+      expect(controller.canRetry, isFalse);
+      expect(controller.actionError, isNull);
+    });
+
+    test('trying again repeats the same handover details', () async {
+      final service = FakeRunService()
+        ..active = _run(DispatchStatus.transportingToHospital);
+      final controller = MyRunController(service);
+      await controller.load();
+      service.nextError = offline;
+
+      await controller.handOver(notes: 'Stable', patientCondition: 'Awake');
+      await controller.retry();
+
+      expect(service.calls, ['handover:Stable|Awake', 'handover:Stable|Awake']);
+    });
+
+    test('a server refusal cannot be retried', () async {
+      final (service, controller) = await enRoute();
+      service.nextError = const ApiException(
+        message: 'Forbidden',
+        statusCode: 403,
+      );
+
+      await controller.advance();
+
+      expect(controller.canRetry, isFalse);
+      expect(await controller.retry(), isFalse);
+    });
+
+    test('dismissing the message drops the retry', () async {
+      final (service, controller) = await enRoute();
+      service.nextError = offline;
+      await controller.advance();
+
+      controller.clearActionError();
+
+      expect(controller.canRetry, isFalse);
+      expect(await controller.retry(), isFalse);
+      expect(service.calls, ['advance:at_scene']);
+    });
+
+    test(
+      'a retry never takes a further step than the one that failed',
+      () async {
+        final (service, controller) = await enRoute();
+        service.nextError = offline;
+        await controller.advance();
+        service.active = _run(DispatchStatus.atScene);
+        await controller.load(showLoading: false);
+        service.nextError = const ApiException(
+          message: 'Not allowed',
+          statusCode: 409,
+        );
+
+        final done = await controller.retry();
+
+        expect(done, isTrue);
+        expect(service.calls, ['advance:at_scene', 'advance:at_scene']);
+        expect(controller.state.valueOrNull?.status, DispatchStatus.atScene);
+      },
+    );
+
+    test('the retry is dropped once the run has changed', () async {
+      final (service, controller) = await enRoute();
+      service.nextError = offline;
+      await controller.advance();
+      service.active = _run(DispatchStatus.assigned, id: 'run-2');
+      service.ended['run-1'] = _ended(DispatchStatus.cancelled);
+
+      await controller.load(showLoading: false);
+
+      expect(controller.canRetry, isFalse);
+      expect(controller.actionError, isNull);
+      expect(await controller.retry(), isFalse);
+    });
+  });
 
   group('the handover draft', () {
     const draft = HandoverDraft(

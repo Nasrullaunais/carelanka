@@ -91,8 +91,23 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
               ),
             if (error != null)
               MaterialBanner(
-                content: Text(error.message),
+                content: Text(
+                  controller.canRetry
+                      ? 'No connection — this step was not saved.'
+                      : error.message,
+                ),
                 actions: [
+                  if (controller.canRetry)
+                    TextButton(
+                      onPressed: controller.busy
+                          ? null
+                          : () => _afterMove(
+                              context,
+                              controller,
+                              controller.retry(),
+                            ),
+                      child: const Text('Try again'),
+                    ),
                   TextButton(
                     onPressed: controller.clearActionError,
                     child: const Text('Dismiss'),
@@ -162,7 +177,20 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
       case null:
         break;
       default:
-        await controller.advance();
+        await _afterMove(context, controller, controller.advance());
+    }
+  }
+
+  Future<void> _afterMove(
+    BuildContext context,
+    MyRunController controller,
+    Future<bool> move,
+  ) async {
+    final moved = await move;
+    final opensMaps =
+        controller.state.valueOrNull?.status?.opensNavigationOnEntry ?? false;
+    if (moved && opensMaps && context.mounted) {
+      await _navigate(context, controller);
     }
   }
 

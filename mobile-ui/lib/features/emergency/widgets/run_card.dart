@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -62,18 +64,7 @@ class RunCard extends StatelessWidget {
         SceneCard(run: run),
         const SizedBox(height: 24),
         if (step != null)
-          FilledButton(
-            onPressed: busy ? null : onStep,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(56),
-            ),
-            child: busy
-                ? const SizedBox.square(
-                    dimension: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(step.label),
-          ),
+          _StepButton(step: step, busy: busy, onPressed: onStep),
         if (status?.canWriteHandoverNotes ?? false) ...[
           const SizedBox(height: 12),
           OutlinedButton.icon(
@@ -102,7 +93,7 @@ class RunCard extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: busy ? null : onNavigate,
             icon: const Icon(Icons.navigation_outlined),
-            label: const Text('Open in Google Maps'),
+            label: Text(status!.navigationLabel),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
             ),
@@ -116,6 +107,86 @@ class RunCard extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+class _StepButton extends StatefulWidget {
+  const _StepButton({
+    required this.step,
+    required this.busy,
+    required this.onPressed,
+  });
+
+  final RunStep step;
+  final bool busy;
+  final VoidCallback onPressed;
+
+  @override
+  State<_StepButton> createState() => _StepButtonState();
+}
+
+class _StepButtonState extends State<_StepButton> {
+  static const _confirmWindow = Duration(seconds: 4);
+  static const _amber = Color(0xFFF5A524);
+  static const _onAmber = Color(0xFF231600);
+
+  Timer? _reset;
+  bool _armed = false;
+
+  @override
+  void didUpdateWidget(_StepButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.step != widget.step || widget.busy) _disarm();
+  }
+
+  @override
+  void dispose() {
+    _reset?.cancel();
+    super.dispose();
+  }
+
+  void _disarm() {
+    _reset?.cancel();
+    _armed = false;
+  }
+
+  void _press() {
+    if (!widget.step.needsConfirmation || _armed) {
+      setState(_disarm);
+      widget.onPressed();
+      return;
+    }
+    setState(() => _armed = true);
+    _reset = Timer(_confirmWindow, () => setState(_disarm));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final onPressed = widget.busy ? null : _press;
+    return Semantics(
+      button: true,
+      enabled: onPressed != null,
+      liveRegion: _armed,
+      excludeSemantics: true,
+      label: _armed
+          ? 'Tap again to confirm: ${widget.step.label}'
+          : widget.step.label,
+      onTap: onPressed,
+      child: FilledButton(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          minimumSize: const Size.fromHeight(56),
+          backgroundColor: _armed ? _amber : null,
+          foregroundColor: _armed ? _onAmber : null,
+        ),
+        child: widget.busy
+            ? const SizedBox.square(
+                dimension: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Text(_armed ? 'Tap again to confirm' : widget.step.label),
+      ),
     );
   }
 }

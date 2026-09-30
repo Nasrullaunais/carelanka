@@ -1,6 +1,6 @@
 # Emergency crew flow — from "new run" to handover
 
-**Owner:** Emergency (Nasrulla Unais) · **Status:** planned 2026-09-30 · Fixes 1–5 built on `feat/emergency-crew-flow`
+**Owner:** Emergency (Nasrulla Unais) · **Status:** planned 2026-09-30 · Fixes 1–6 built on `feat/emergency-crew-flow`
 
 ## The problem
 
@@ -674,6 +674,13 @@ retry gets a 409.
 - A request with no reply shows "No connection — this step was not saved" with **Try again**.
 - Try again repeats the same step.
 - Never report a step as done unless the server said so.
+
+**How it is built.**
+- Each tap is tied to the run it was made on. A retry, or a later poll, can never move a
+  different run, and can never take a further step than the one that failed.
+- Google Maps opens when the run *reaches* "on the way to the scene" or "taking the patient to
+  hospital", so **Try again** opens it too.
+- The reporter keeps the newest fix (`recentPosition`), and forgets it when reporting stops.
 
 ### Tests
 

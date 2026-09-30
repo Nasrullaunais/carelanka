@@ -76,9 +76,13 @@ final List<RouteBase> emergencyRoutes = [
           ),
         ),
         ChangeNotifierProvider(
-          create: (context) => MyRunController(
-            GeneratedCrewRunService(context.read<CareLankaApi>()),
-          ),
+          create: (context) {
+            final reporter = context.read<CrewLocationReporter>();
+            return MyRunController(
+              GeneratedCrewRunService(context.read<CareLankaApi>()),
+              latestPosition: () => reporter.recentPosition,
+            );
+          },
         ),
       ],
       child: const MyRunScreen(),

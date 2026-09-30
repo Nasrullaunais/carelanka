@@ -17,6 +17,9 @@ enum RunStep {
     RunStep.leaveForHospital => DispatchStatus.transportingToHospital,
     _ => null,
   };
+
+  bool get needsConfirmation =>
+      this == RunStep.arrivedAtScene || this == RunStep.leaveForHospital;
 }
 
 extension DispatchStatusRun on DispatchStatus {
@@ -47,6 +50,14 @@ extension DispatchStatusRun on DispatchStatus {
       this == DispatchStatus.transportingToHospital;
 
   bool get canNavigate => isLive && this != DispatchStatus.assigned;
+
+  bool get opensNavigationOnEntry =>
+      this == DispatchStatus.enRouteToScene ||
+      this == DispatchStatus.transportingToHospital;
+
+  String get navigationLabel => this == DispatchStatus.transportingToHospital
+      ? 'Navigate to hospital'
+      : 'Navigate to scene';
 
   String get crewLabel => switch (this) {
     DispatchStatus.assigned => 'Waiting for you to accept',

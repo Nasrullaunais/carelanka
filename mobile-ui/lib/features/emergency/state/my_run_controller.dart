@@ -5,21 +5,36 @@ import 'package:flutter/foundation.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/widgets/async_data.dart';
 import '../../../services/api_client/models/dispatch_detail.dart';
+import '../../../services/api_client/models/dispatch_status.dart';
 import '../../../services/api_client/models/navigation_target.dart';
 import '../../../services/api_client/models/scene_outcome.dart';
 import '../models/handover_draft.dart';
 import '../models/run_ending.dart';
 import '../models/run_step.dart';
+import '../services/crew_location_reporter.dart';
 import '../services/crew_run_service.dart';
+
+typedef LatestPosition = CrewPosition? Function();
+
+/// One crew tap, tied to the run it was made on so a retry can never land on another run.
+final class _RunAction {
+  const _RunAction(this.runId, this.target, this.send);
+
+  final String runId;
+  final DispatchStatus target;
+  final Future<DispatchDetail> Function() send;
+}
 
 class MyRunController extends ChangeNotifier {
   MyRunController(
     this._service, {
     this.pollInterval = const Duration(seconds: 10),
-  });
+    LatestPosition? latestPosition,
+  }) : _latestPosition = latestPosition;
 
   final CrewRunService _service;
   final Duration pollInterval;
+  final LatestPosition? _latestPosition;
   Timer? _poll;
   bool _disposed = false;
 
@@ -29,12 +44,14 @@ class MyRunController extends ChangeNotifier {
   HandoverDraft _handoverDraft = HandoverDraft.empty;
   bool _busy = false;
   ApiException? _actionError;
+  _RunAction? _unsavedAction;
 
   AsyncData<DispatchDetail?> get state => _state;
   RunEnding? get ending => _ending;
   HandoverDraft get handoverDraft => _handoverDraft;
   bool get busy => _busy;
   ApiException? get actionError => _actionError;
+  bool get canRetry => _unsavedAction != null;
 
   void startPolling() {
     _poll?.cancel();
@@ -70,26 +87,36 @@ class MyRunController extends ChangeNotifier {
     _notify();
   }
 
-  Future<bool> acknowledge() => _act((run) => _service.acknowledge(run.id!));
+  Future<bool> acknowledge() =>
+      _begin(DispatchStatus.acknowledged, _service.acknowledge);
 
   Future<bool> decline(String reason) =>
-      _act((run) => _service.decline(run.id!, reason));
+      _begin(DispatchStatus.declined, (id) => _service.decline(id, reason));
 
-  Future<bool> advance() => _act((run) {
-    final next = run.status?.nextStep?.nextStatus;
-    return next == null ? Future.value(run) : _service.advance(run.id!, next);
-  });
+  Future<bool> advance() {
+    final next = _state.valueOrNull?.status?.nextStep?.nextStatus;
+    if (next == null) return Future.value(false);
+    return _begin(
+      next,
+      (id) => _service.advance(id, next, position: _latestPosition?.call()),
+    );
+  }
 
-  Future<bool> handOver({String? notes, String? patientCondition}) => _act(
-    (run) => _service.handOver(
-      run.id!,
-      notes: notes,
-      patientCondition: patientCondition,
-    ),
+  Future<bool> handOver({String? notes, String? patientCondition}) => _begin(
+    DispatchStatus.handedOver,
+    (id) =>
+        _service.handOver(id, notes: notes, patientCondition: patientCondition),
   );
 
-  Future<bool> endAtScene(SceneOutcome outcome, {String? notes}) =>
-      _act((run) => _service.endAtScene(run.id!, outcome, notes: notes));
+  Future<bool> endAtScene(SceneOutcome outcome, {String? notes}) => _begin(
+    DispatchStatus.endedAtScene,
+    (id) => _service.endAtScene(id, outcome, notes: notes),
+  );
+
+  Future<bool> retry() {
+    final action = _unsavedAction;
+    return action == null ? Future.value(false) : _act(action);
+  }
 
   Future<NavigationTarget?> navigationTarget() async {
     final run = _state.valueOrNull;
@@ -105,50 +132,82 @@ class MyRunController extends ChangeNotifier {
 
   void clearActionError() {
     _actionError = null;
+    _unsavedAction = null;
     _notify();
   }
 
-  Future<bool> _act(
-    Future<DispatchDetail> Function(DispatchDetail run) action,
-  ) async {
-    final run = _state.valueOrNull;
-    if (run == null || _busy) return false;
+  Future<bool> _begin(
+    DispatchStatus target,
+    Future<DispatchDetail> Function(String runId) send,
+  ) {
+    final runId = _state.valueOrNull?.id;
+    if (runId == null) return Future.value(false);
+    return _act(_RunAction(runId, target, () => send(runId)));
+  }
+
+  Future<bool> _act(_RunAction action) async {
+    if (_busy || _liveRunId != action.runId) return false;
     _busy = true;
     _actionError = null;
+    _unsavedAction = null;
     notifyListeners();
     try {
-      await _show(await action(run));
+      await _show(await action.send());
       return true;
     } on ApiException catch (error) {
       _actionError = error;
-      if (await _refreshAfterConflict(error)) _actionError = null;
-      return false;
+      if (error.isNetworkFailure) {
+        _unsavedAction = action;
+        return false;
+      }
+      if (!error.isConflict && !error.isNotFound) return false;
+      final landed = await _reconcile(action);
+      if (landed) _actionError = null;
+      return landed;
     } finally {
       _busy = false;
       _notify();
     }
   }
 
-  // A 409 means the run moved under us. Returns true when the reload found the run ended, since the panel explains it better than the error.
-  Future<bool> _refreshAfterConflict(ApiException error) async {
-    if (!error.isConflict && !error.isNotFound) return false;
+  // A 409 usually means the run moved under us. Returns true when it already reached the state the tap asked for, e.g. the first reply was lost.
+  Future<bool> _reconcile(_RunAction action) async {
     try {
-      final before = _ending;
-      await _show(await _service.activeRun());
-      return _ending != null && !identical(_ending, before);
+      final active = await _service.activeRun();
+      final tracked = active?.id == action.runId
+          ? active
+          : await _fetchRun(action.runId);
+      await _show(active, ended: tracked);
+      return tracked?.status == action.target;
     } on ApiException {
       return false;
     }
   }
 
-  Future<void> _show(DispatchDetail? run) async {
+  Future<DispatchDetail?> _fetchRun(String id) async {
+    try {
+      return await _service.getRun(id);
+    } on ApiException {
+      return null;
+    }
+  }
+
+  Future<void> _show(DispatchDetail? run, {DispatchDetail? ended}) async {
     final live = run != null && (run.status?.isLive ?? false) ? run : null;
     final endedRunId = _liveRunId;
     if (endedRunId != null && endedRunId != live?.id) {
-      final ending = await _endingOf(endedRunId, live?.id, knownEnd: run);
+      final ending = await _endingOf(
+        endedRunId,
+        live?.id,
+        knownEnd: ended ?? run,
+      );
       if (ending != null) _ending = ending;
     }
-    if (_liveRunId != live?.id) _handoverDraft = HandoverDraft.empty;
+    if (_liveRunId != live?.id) {
+      _handoverDraft = HandoverDraft.empty;
+      _actionError = null;
+      _unsavedAction = null;
+    }
     _liveRunId = live?.id;
     _state = AsyncData.ready(live);
   }

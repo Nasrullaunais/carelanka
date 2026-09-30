@@ -81,16 +81,20 @@ final class CrewLocationReporter extends ChangeNotifier {
     this.minUploadGap = const Duration(seconds: 10),
     this.heartbeat = const Duration(seconds: 30),
     this.retryDelay = const Duration(seconds: 30),
+    DateTime Function() now = DateTime.now,
   }) : _dispatches = dispatches,
-       _location = location;
+       _location = location,
+       _now = now;
 
   static const distanceFilterMetres = 25;
+  static const recentFixAge = Duration(seconds: 30);
 
   final CrewDispatchGateway _dispatches;
   final CrewLocationGateway _location;
   final Duration minUploadGap;
   final Duration heartbeat;
   final Duration retryDelay;
+  final DateTime Function() _now;
 
   CrewReportingMode _mode = const CrewReportingMode.foreground();
   CrewLocationReportingState _state = CrewLocationReportingState.stopped;
@@ -99,6 +103,8 @@ final class CrewLocationReporter extends ChangeNotifier {
   Timer? _heartbeat;
   Timer? _retry;
   CrewPosition? _pending;
+  CrewPosition? _lastFix;
+  DateTime? _lastFixAt;
   String? _ambulanceId;
   DateTime? _lastAttemptAt;
   bool _visible = false;
@@ -107,6 +113,13 @@ final class CrewLocationReporter extends ChangeNotifier {
   int _generation = 0;
 
   CrewLocationReportingState get state => _state;
+
+  /// The newest fix, or null when it is too old to say where the crew is now.
+  CrewPosition? get recentPosition {
+    final at = _lastFixAt;
+    if (at == null || _now().difference(at) > recentFixAge) return null;
+    return _lastFix;
+  }
 
   bool get _wanted => _visible || _mode.isRun;
 
@@ -124,6 +137,8 @@ final class CrewLocationReporter extends ChangeNotifier {
   Future<void> stop() async {
     _visible = false;
     _mode = const CrewReportingMode.foreground();
+    _lastFix = null;
+    _lastFixAt = null;
     _stopReporting();
   }
 
@@ -219,11 +234,13 @@ final class CrewLocationReporter extends ChangeNotifier {
 
   void _offer(CrewPosition position) {
     _pending = position;
+    _lastFix = position;
+    _lastFixAt = _now();
     if (_uploading || _throttle != null) return;
     final generation = _generation;
     final gap = _lastAttemptAt == null
         ? Duration.zero
-        : minUploadGap - DateTime.now().difference(_lastAttemptAt!);
+        : minUploadGap - _now().difference(_lastAttemptAt!);
     if (gap <= Duration.zero) {
       unawaited(_upload(generation));
       return;
@@ -239,7 +256,7 @@ final class CrewLocationReporter extends ChangeNotifier {
     if (position == null || generation != _generation) return;
     _pending = null;
     _uploading = true;
-    _lastAttemptAt = DateTime.now();
+    _lastAttemptAt = _now();
     try {
       final ambulanceId = _ambulanceId ??= await _dispatches
           .assignedAmbulanceId();

@@ -11,6 +11,7 @@ import '../../../services/api_client/models/navigation_target.dart';
 import '../../../services/api_client/models/record_handover_request.dart';
 import '../../../services/api_client/models/scene_outcome.dart';
 import '../../../services/api_client/models/update_my_dispatch_status_request.dart';
+import 'crew_location_reporter.dart';
 
 const historyPageSize = 20;
 
@@ -19,7 +20,11 @@ abstract interface class CrewRunService {
   Future<DispatchDetail> getRun(String id);
   Future<DispatchDetail> acknowledge(String id);
   Future<DispatchDetail> decline(String id, String reason);
-  Future<DispatchDetail> advance(String id, DispatchStatus next);
+  Future<DispatchDetail> advance(
+    String id,
+    DispatchStatus next, {
+    CrewPosition? position,
+  });
   Future<DispatchDetail> handOver(
     String id, {
     String? notes,
@@ -66,10 +71,18 @@ final class GeneratedCrewRunService implements CrewRunService {
   );
 
   @override
-  Future<DispatchDetail> advance(String id, DispatchStatus next) => callApi(
+  Future<DispatchDetail> advance(
+    String id,
+    DispatchStatus next, {
+    CrewPosition? position,
+  }) => callApi(
     () => _run.updateMyDispatchStatus(
       id: id,
-      body: UpdateMyDispatchStatusRequest(status: next),
+      body: UpdateMyDispatchStatusRequest(
+        status: next,
+        latitude: position?.latitude,
+        longitude: position?.longitude,
+      ),
     ),
   );
 

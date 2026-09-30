@@ -15,12 +15,14 @@ void main() {
     Duration minUploadGap = const Duration(milliseconds: 1),
     Duration heartbeat = const Duration(seconds: 30),
     Duration retryDelay = const Duration(seconds: 30),
+    DateTime Function() now = DateTime.now,
   }) => CrewLocationReporter(
     dispatches: dispatches,
     location: location,
     minUploadGap: minUploadGap,
     heartbeat: heartbeat,
     retryDelay: retryDelay,
+    now: now,
   );
 
   test('sends the first position straight away', () async {
@@ -33,6 +35,47 @@ void main() {
     expect(dispatches.reports, [_here]);
     expect(reporter.state, CrewLocationReportingState.reporting);
     reporter.dispose();
+  });
+
+  group('the recent position', () {
+    test('is the newest fix while it is under 30 seconds old', () async {
+      var now = DateTime.utc(2026, 9, 30, 8);
+      final location = FakeLocationGateway();
+      final reporter = build(
+        FakeDispatchGateway('ambulance-1'),
+        location,
+        now: () => now,
+      );
+      expect(reporter.recentPosition, isNull);
+
+      await reporter.resume();
+      await settle();
+      expect(reporter.recentPosition, _here);
+
+      location.emit(_there);
+      await settle();
+      now = now.add(const Duration(seconds: 30));
+      expect(reporter.recentPosition, _there);
+
+      now = now.add(const Duration(seconds: 1));
+      expect(reporter.recentPosition, isNull);
+      reporter.dispose();
+    });
+
+    test('is forgotten when reporting is stopped', () async {
+      final reporter = build(
+        FakeDispatchGateway('ambulance-1'),
+        FakeLocationGateway(),
+      );
+      await reporter.resume();
+      await settle();
+      expect(reporter.recentPosition, _here);
+
+      await reporter.stop();
+
+      expect(reporter.recentPosition, isNull);
+      reporter.dispose();
+    });
   });
 
   test('a new point waiting behind an upload replaces older ones', () async {

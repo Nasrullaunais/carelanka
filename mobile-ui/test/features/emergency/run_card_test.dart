@@ -1,4 +1,5 @@
 import 'package:carelanka_mobile/features/emergency/widgets/run_card.dart';
+import 'package:carelanka_mobile/services/api_client/models/call_priority.dart';
 import 'package:carelanka_mobile/services/api_client/models/dispatch_detail.dart';
 import 'package:carelanka_mobile/services/api_client/models/dispatch_status.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ Future<void> pumpCard(
   bool busy = false,
   bool hasHandoverNotes = false,
   VoidCallback? onStep,
+  DateTime Function()? now,
   VoidCallback? onEndAtScene,
   VoidCallback? onWriteHandoverNotes,
 }) => tester.pumpWidget(
@@ -24,6 +26,7 @@ Future<void> pumpCard(
         onEndAtScene: onEndAtScene ?? () {},
         onWriteHandoverNotes: onWriteHandoverNotes ?? () {},
         hasHandoverNotes: hasHandoverNotes,
+        now: now ?? DateTime.now,
       ),
     ),
   ),
@@ -404,6 +407,130 @@ void main() {
       );
 
       expect(find.textContaining('Navigate to'), findsNothing);
+    });
+  });
+
+  group('the header', () {
+    for (final (priority, label) in [
+      (CallPriority.critical, 'Critical'),
+      (CallPriority.high, 'High'),
+      (CallPriority.medium, 'Medium'),
+      (CallPriority.low, 'Low'),
+    ]) {
+      testWidgets('shows a "$label" chip', (tester) async {
+        await pumpCard(tester, DispatchDetail(callPriority: priority));
+
+        expect(find.text(label), findsOneWidget);
+        expect(find.textContaining('Priority:'), findsNothing);
+      });
+    }
+
+    testWidgets('tells a screen reader what the chip means', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await pumpCard(
+        tester,
+        const DispatchDetail(callPriority: CallPriority.critical),
+      );
+
+      expect(find.bySemanticsLabel('Priority: Critical'), findsOneWidget);
+      semantics.dispose();
+    });
+
+    testWidgets('shows no chip when the priority is missing', (tester) async {
+      await pumpCard(tester, const DispatchDetail());
+
+      expect(find.text('Critical'), findsNothing);
+      expect(find.text('Unknown'), findsNothing);
+    });
+
+    testWidgets('only shows the ambulance, not empty or useless rows', (
+      tester,
+    ) async {
+      await pumpCard(
+        tester,
+        const DispatchDetail(
+          ambulanceRegistration: 'AMB-3',
+          crewCount: 2,
+          destinationWardName: 'Ward 4',
+        ),
+      );
+
+      expect(find.text('AMB-3'), findsOneWidget);
+      expect(find.text('Crew on board'), findsNothing);
+      expect(find.text('Going to ward'), findsNothing);
+      expect(find.text('Ward 4'), findsNothing);
+    });
+  });
+
+  group('when the run was sent', () {
+    final sentAt = DateTime.utc(2026, 9, 30, 8);
+
+    testWidgets('says just now for the first minute', (tester) async {
+      await pumpCard(
+        tester,
+        DispatchDetail(dispatchedAt: sentAt),
+        now: () => sentAt.add(const Duration(seconds: 59)),
+      );
+
+      expect(find.text('Sent just now'), findsOneWidget);
+    });
+
+    testWidgets('counts the minutes', (tester) async {
+      await pumpCard(
+        tester,
+        DispatchDetail(dispatchedAt: sentAt),
+        now: () => sentAt.add(const Duration(minutes: 3, seconds: 20)),
+      );
+
+      expect(find.text('Sent 3 minutes ago'), findsOneWidget);
+    });
+
+    testWidgets('counts the hours once a long time has passed', (tester) async {
+      await pumpCard(
+        tester,
+        DispatchDetail(dispatchedAt: sentAt),
+        now: () => sentAt.add(const Duration(hours: 2, minutes: 5)),
+      );
+
+      expect(find.text('Sent 2 hours ago'), findsOneWidget);
+    });
+
+    testWidgets('moves on by itself when the next minute arrives', (
+      tester,
+    ) async {
+      var now = sentAt.add(const Duration(seconds: 30));
+      await pumpCard(
+        tester,
+        DispatchDetail(dispatchedAt: sentAt),
+        now: () => now,
+      );
+      expect(find.text('Sent just now'), findsOneWidget);
+
+      now = sentAt.add(const Duration(seconds: 61));
+      await tester.pump(const Duration(seconds: 31));
+      expect(find.text('Sent 1 minute ago'), findsOneWidget);
+
+      now = sentAt.add(const Duration(seconds: 121));
+      await tester.pump(const Duration(seconds: 60));
+      expect(find.text('Sent 2 minutes ago'), findsOneWidget);
+    });
+
+    testWidgets('treats a phone clock running behind as just now', (
+      tester,
+    ) async {
+      await pumpCard(
+        tester,
+        DispatchDetail(dispatchedAt: sentAt),
+        now: () => sentAt.subtract(const Duration(seconds: 20)),
+      );
+
+      expect(find.text('Sent just now'), findsOneWidget);
+    });
+
+    testWidgets('shows nothing when the time is unknown', (tester) async {
+      await pumpCard(tester, const DispatchDetail());
+
+      expect(find.textContaining('Sent'), findsNothing);
     });
   });
 }

@@ -1,6 +1,6 @@
 # Emergency crew flow — from "new run" to handover
 
-**Owner:** Emergency (Nasrulla Unais) · **Status:** planned 2026-09-30 · Fixes 1–6 built on `feat/emergency-crew-flow`
+**Owner:** Emergency (Nasrulla Unais) · **Status:** planned 2026-09-30 · Fixes 1–7 built on `feat/emergency-crew-flow`
 
 ## The problem
 
@@ -705,7 +705,14 @@ retry gets a 409.
 | Decline asks for typed text | Choices: Vehicle problem · Crew not complete · Already busy · Other. Typing only for Other. Stored as the same `reason` text, so no API change. |
 | Idle: "No run right now" | "You're on **AMB-3**. Ready for the next run." — or "You're not on an ambulance crew right now. Ask the duty manager." when not assigned. Uses the existing `getMyAmbulanceAssignment`. |
 
-Tests: `run_card_test.dart` for each row.
+**How it is built.**
+- "Sent X ago" redraws exactly when the next minute is reached, not on a fixed 60 s timer.
+- The idle screen only says "not on an ambulance crew" when the server answered "none". If the
+  lookup fails it falls back to "No run right now", so a bad signal never tells the crew they
+  have no ambulance.
+- While a run is on screen the ambulance is not looked up again.
+
+Tests: `run_card_test.dart`, `run_prompts_test.dart` and `my_run_controller_test.dart`.
 
 ---
 

@@ -45,6 +45,7 @@ class MyRunController extends ChangeNotifier {
   bool _busy = false;
   ApiException? _actionError;
   _RunAction? _unsavedAction;
+  AsyncData<String?> _ambulance = const AsyncData.loading();
 
   AsyncData<DispatchDetail?> get state => _state;
   RunEnding? get ending => _ending;
@@ -52,6 +53,7 @@ class MyRunController extends ChangeNotifier {
   bool get busy => _busy;
   ApiException? get actionError => _actionError;
   bool get canRetry => _unsavedAction != null;
+  AsyncData<String?> get ambulance => _ambulance;
 
   void startPolling() {
     _poll?.cancel();
@@ -71,6 +73,20 @@ class MyRunController extends ChangeNotifier {
     } on ApiException catch (error) {
       if (showLoading || _state is! AsyncReady<DispatchDetail?>) {
         _state = AsyncData.failed(error);
+      }
+    }
+    _notify();
+    if (_liveRunId == null) await _loadAmbulance();
+  }
+
+  Future<void> _loadAmbulance() async {
+    try {
+      _ambulance = AsyncData.ready(
+        await _service.assignedAmbulanceRegistration(),
+      );
+    } on ApiException catch (error) {
+      if (_ambulance is! AsyncReady<String?>) {
+        _ambulance = AsyncData.failed(error);
       }
     }
     _notify();

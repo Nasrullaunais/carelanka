@@ -9,6 +9,7 @@ import '../models/run_step.dart';
 import '../services/crew_location_reporter.dart';
 import '../state/my_run_controller.dart';
 import '../widgets/crew_location_lifecycle.dart';
+import '../widgets/idle_run_view.dart';
 import '../widgets/maps_launcher.dart';
 import '../widgets/run_card.dart';
 import '../widgets/run_ending_panel.dart';
@@ -126,12 +127,7 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
                 builder: (context, run) => run == null
                     ? RefreshableMessage(
                         onRefresh: () => controller.load(showLoading: false),
-                        child: const EmptyView(
-                          icon: Icons.local_hospital_outlined,
-                          title: 'No run right now',
-                          message:
-                              'When the duty manager sends you to a call it will appear here.',
-                        ),
+                        child: IdleRunView(ambulance: controller.ambulance),
                       )
                     : RunCard(
                         run: run,

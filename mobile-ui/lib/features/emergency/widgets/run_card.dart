@@ -5,7 +5,10 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../services/api_client/models/dispatch_detail.dart';
 import '../models/run_step.dart';
+import 'crew_colors.dart';
+import 'priority_chip.dart';
 import 'scene_card.dart';
+import 'sent_ago.dart';
 
 class RunCard extends StatelessWidget {
   const RunCard({
@@ -18,6 +21,7 @@ class RunCard extends StatelessWidget {
     required this.onEndAtScene,
     required this.onWriteHandoverNotes,
     this.hasHandoverNotes = false,
+    this.now = DateTime.now,
   });
 
   final DispatchDetail run;
@@ -28,6 +32,7 @@ class RunCard extends StatelessWidget {
   final VoidCallback onEndAtScene;
   final VoidCallback onWriteHandoverNotes;
   final bool hasHandoverNotes;
+  final DateTime Function() now;
 
   @override
   Widget build(BuildContext context) {
@@ -39,25 +44,23 @@ class RunCard extends StatelessWidget {
       padding: const EdgeInsets.all(AppTheme.gutter),
       children: [
         Text(status?.crewLabel ?? '', style: theme.textTheme.headlineSmall),
-        const SizedBox(height: 4),
-        Text(
-          'Priority: ${run.callPriority?.name ?? 'unknown'}',
-          style: theme.textTheme.bodyLarge?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 12,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            if (run.callPriority case final priority?)
+              PriorityChip(priority: priority),
+            if (run.dispatchedAt case final sentAt?)
+              SentAgo(sentAt: sentAt, now: now),
+          ],
         ),
         const SizedBox(height: 16),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _Row(label: 'Ambulance', value: run.ambulanceRegistration),
-                _Row(label: 'Crew on board', value: run.crewCount?.toString()),
-                _Row(label: 'Going to ward', value: run.destinationWardName),
-              ],
-            ),
+            child: _Row(label: 'Ambulance', value: run.ambulanceRegistration),
           ),
         ),
         const SizedBox(height: 12),
@@ -128,9 +131,6 @@ class _StepButton extends StatefulWidget {
 
 class _StepButtonState extends State<_StepButton> {
   static const _confirmWindow = Duration(seconds: 4);
-  static const _amber = Color(0xFFF5A524);
-  static const _onAmber = Color(0xFF231600);
-
   Timer? _reset;
   bool _armed = false;
 
@@ -177,8 +177,8 @@ class _StepButtonState extends State<_StepButton> {
         onPressed: onPressed,
         style: FilledButton.styleFrom(
           minimumSize: const Size.fromHeight(56),
-          backgroundColor: _armed ? _amber : null,
-          foregroundColor: _armed ? _onAmber : null,
+          backgroundColor: _armed ? CrewColors.amber : null,
+          foregroundColor: _armed ? CrewColors.onAmber : null,
         ),
         child: widget.busy
             ? const SizedBox.square(

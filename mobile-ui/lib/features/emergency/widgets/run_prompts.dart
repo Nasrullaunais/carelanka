@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../services/api_client/models/scene_outcome.dart';
+import '../models/decline_reason.dart';
 import '../models/handover_draft.dart';
 import '../models/scene_outcome_labels.dart';
 
@@ -52,26 +53,53 @@ class _DeclineDialog extends StatefulWidget {
 }
 
 class _DeclineDialogState extends State<_DeclineDialog> {
-  final _reason = TextEditingController();
+  final _details = TextEditingController();
+  DeclineReason? _reason;
 
   @override
   void dispose() {
-    _reason.dispose();
+    _details.dispose();
     super.dispose();
   }
+
+  String? get _answer => switch (_reason) {
+    null => null,
+    final reason when reason.needsDetails => _blankToNull(_details.text),
+    final reason => reason.label,
+  };
 
   @override
   Widget build(BuildContext context) => AlertDialog(
     title: const Text('Why can you not take this run?'),
-    content: TextField(
-      controller: _reason,
-      maxLength: 500,
-      maxLines: 3,
-      autofocus: true,
-      decoration: const InputDecoration(
-        hintText: 'For example: vehicle problem',
+    content: SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          RadioGroup<DeclineReason>(
+            groupValue: _reason,
+            onChanged: (value) => setState(() => _reason = value),
+            child: Column(
+              children: [
+                for (final reason in DeclineReason.values)
+                  RadioListTile<DeclineReason>(
+                    value: reason,
+                    title: Text(reason.label),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+              ],
+            ),
+          ),
+          if (_reason?.needsDetails ?? false)
+            TextField(
+              controller: _details,
+              maxLength: 500,
+              maxLines: 3,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'What happened?'),
+              onChanged: (_) => setState(() {}),
+            ),
+        ],
       ),
-      onChanged: (_) => setState(() {}),
     ),
     actions: [
       TextButton(
@@ -79,9 +107,9 @@ class _DeclineDialogState extends State<_DeclineDialog> {
         child: const Text('Back'),
       ),
       FilledButton(
-        onPressed: _reason.text.trim().isEmpty
+        onPressed: _answer == null
             ? null
-            : () => Navigator.pop(context, _reason.text.trim()),
+            : () => Navigator.pop(context, _answer),
         child: const Text('Decline run'),
       ),
     ],

@@ -58,6 +58,30 @@ Future<void> openHandoverSheet(
   await tester.pumpAndSettle();
 }
 
+Future<void> openDeclineDialog(
+  WidgetTester tester, {
+  required void Function(String?) onClosed,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: TextButton(
+            onPressed: () async => onClosed(await askDeclineReason(context)),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.tap(find.text('open'));
+  await tester.pumpAndSettle();
+}
+
+VoidCallback? declineAction(WidgetTester tester) => tester
+    .widget<FilledButton>(find.widgetWithText(FilledButton, 'Decline run'))
+    .onPressed;
+
 VoidCallback? finishAction(WidgetTester tester) => tester
     .widget<FilledButton>(find.widgetWithText(FilledButton, 'Finish run'))
     .onPressed;
@@ -125,6 +149,105 @@ void main() {
       );
 
       await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+
+      expect(closed, isTrue);
+      expect(result, isNull);
+    });
+  });
+
+  group('the decline dialog', () {
+    testWidgets(
+      'offers the usual reasons and cannot decline before one is picked',
+      (tester) async {
+        await openDeclineDialog(tester, onClosed: (_) {});
+
+        for (final reason in [
+          'Vehicle problem',
+          'Crew not complete',
+          'Already busy',
+          'Other',
+        ]) {
+          expect(find.text(reason), findsOneWidget);
+        }
+        expect(find.byType(TextField), findsNothing);
+        expect(declineAction(tester), isNull);
+      },
+    );
+
+    for (final reason in [
+      'Vehicle problem',
+      'Crew not complete',
+      'Already busy',
+    ]) {
+      testWidgets('"$reason" is sent as it reads, with no typing', (
+        tester,
+      ) async {
+        String? result;
+        await openDeclineDialog(tester, onClosed: (text) => result = text);
+
+        await tester.tap(find.text(reason));
+        await tester.pump();
+        expect(find.byType(TextField), findsNothing);
+        await tester.tap(find.text('Decline run'));
+        await tester.pumpAndSettle();
+
+        expect(result, reason);
+      });
+    }
+
+    testWidgets('Other asks what happened, and needs an answer', (
+      tester,
+    ) async {
+      String? result;
+      await openDeclineDialog(tester, onClosed: (text) => result = text);
+
+      await tester.tap(find.text('Other'));
+      await tester.pump();
+      expect(find.byType(TextField), findsOneWidget);
+      expect(declineAction(tester), isNull);
+
+      await tester.enterText(find.byType(TextField), '   ');
+      await tester.pump();
+      expect(declineAction(tester), isNull);
+
+      await tester.enterText(find.byType(TextField), '  Crew called in sick ');
+      await tester.pump();
+      await tester.tap(find.text('Decline run'));
+      await tester.pumpAndSettle();
+
+      expect(result, 'Crew called in sick');
+    });
+
+    testWidgets('changing to a listed reason drops what was typed', (
+      tester,
+    ) async {
+      String? result;
+      await openDeclineDialog(tester, onClosed: (text) => result = text);
+      await tester.tap(find.text('Other'));
+      await tester.pump();
+      await tester.enterText(find.byType(TextField), 'Something');
+
+      await tester.tap(find.text('Already busy'));
+      await tester.pump();
+      await tester.tap(find.text('Decline run'));
+      await tester.pumpAndSettle();
+
+      expect(result, 'Already busy');
+    });
+
+    testWidgets('Back declines nothing', (tester) async {
+      var closed = false;
+      String? result = 'not closed';
+      await openDeclineDialog(
+        tester,
+        onClosed: (text) {
+          closed = true;
+          result = text;
+        },
+      );
+
+      await tester.tap(find.text('Back'));
       await tester.pumpAndSettle();
 
       expect(closed, isTrue);

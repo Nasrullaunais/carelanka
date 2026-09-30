@@ -58,6 +58,46 @@ void main() {
     addTearDown(() => tester.pumpWidget(const SizedBox()));
   }
 
+  group('with no run', () {
+    Future<void> openIdle(WidgetTester tester) async {
+      await openScreen(tester, DispatchStatus.assigned);
+      service.active = null;
+      await tester.pump(const Duration(seconds: 10));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('names the ambulance the crew is on', (tester) async {
+      service.ambulance = 'AMB-3';
+      await openIdle(tester);
+
+      expect(find.text("You're on AMB-3"), findsOneWidget);
+      expect(find.textContaining('Ready for the next run'), findsOneWidget);
+    });
+
+    testWidgets('tells a crew member with no ambulance to ask the desk', (
+      tester,
+    ) async {
+      await openIdle(tester);
+
+      expect(
+        find.text(
+          "You're not on an ambulance crew right now. Ask the duty manager.",
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('does not claim "not assigned" when the lookup failed', (
+      tester,
+    ) async {
+      service.ambulanceError = const ApiException(message: 'offline');
+      await openIdle(tester);
+
+      expect(find.text('No run right now'), findsOneWidget);
+      expect(find.textContaining('not on an ambulance crew'), findsNothing);
+    });
+  });
+
   group('Google Maps after a step', () {
     testWidgets('opens to the scene once driving has started', (tester) async {
       await openScreen(tester, DispatchStatus.acknowledged);

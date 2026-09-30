@@ -36,6 +36,9 @@ DispatchDetail _ended(
 final class FakeRunService implements CrewRunService {
   DispatchDetail? active;
   Object? nextError;
+  String? ambulance;
+  Object? ambulanceError;
+  int ambulanceLookups = 0;
   final ended = <String, DispatchDetail>{};
   final calls = <String>[];
 
@@ -91,6 +94,14 @@ final class FakeRunService implements CrewRunService {
     String? notes,
   }) =>
       _reply('endAtScene:${outcome.json}|$notes', DispatchStatus.endedAtScene);
+
+  @override
+  Future<String?> assignedAmbulanceRegistration() async {
+    ambulanceLookups++;
+    final error = ambulanceError;
+    if (error != null) throw error;
+    return ambulance;
+  }
 
   @override
   Future<DispatchSummaryPagedResult> history({required int page}) async {
@@ -519,6 +530,59 @@ void main() {
       expect(controller.canRetry, isFalse);
       expect(controller.actionError, isNull);
       expect(await controller.retry(), isFalse);
+    });
+  });
+
+  group('the ambulance shown while there is no run', () {
+    test('is looked up once the crew has no run', () async {
+      final service = FakeRunService()..ambulance = 'AMB-3';
+      final controller = MyRunController(service);
+
+      await controller.load();
+
+      expect(controller.ambulance.valueOrNull, 'AMB-3');
+    });
+
+    test('is empty for someone who is not on an ambulance crew', () async {
+      final controller = MyRunController(FakeRunService());
+
+      await controller.load();
+
+      expect(controller.ambulance, isA<AsyncReady<String?>>());
+      expect(controller.ambulance.valueOrNull, isNull);
+    });
+
+    test('is not looked up while a run is on screen', () async {
+      final service = FakeRunService()
+        ..ambulance = 'AMB-3'
+        ..active = _run(DispatchStatus.assigned);
+      final controller = MyRunController(service);
+
+      await controller.load();
+      await controller.load(showLoading: false);
+
+      expect(service.ambulanceLookups, 0);
+    });
+
+    test('keeps the last known ambulance when a refresh fails', () async {
+      final service = FakeRunService()..ambulance = 'AMB-3';
+      final controller = MyRunController(service);
+      await controller.load();
+      service.ambulanceError = const ApiException(message: 'offline');
+
+      await controller.load(showLoading: false);
+
+      expect(controller.ambulance.valueOrNull, 'AMB-3');
+    });
+
+    test('is unknown, not "unassigned", when the first lookup fails', () async {
+      final service = FakeRunService()
+        ..ambulanceError = const ApiException(message: 'offline');
+      final controller = MyRunController(service);
+
+      await controller.load();
+
+      expect(controller.ambulance, isA<AsyncFailed<String?>>());
     });
   });
 

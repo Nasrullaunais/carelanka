@@ -1,6 +1,7 @@
 import '../../../core/network/api.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../services/api_client/care_lanka_api.dart';
+import '../../../services/api_client/clients/ambulances_api.dart';
 import '../../../services/api_client/clients/my_run_api.dart';
 import '../../../services/api_client/models/decline_dispatch_request.dart';
 import '../../../services/api_client/models/dispatch_detail.dart';
@@ -37,12 +38,16 @@ abstract interface class CrewRunService {
   });
   Future<NavigationTarget> navigationTarget(String id);
   Future<DispatchSummaryPagedResult> history({required int page});
+  Future<String?> assignedAmbulanceRegistration();
 }
 
 final class GeneratedCrewRunService implements CrewRunService {
-  GeneratedCrewRunService(CareLankaApi api) : _run = api.myRun;
+  GeneratedCrewRunService(CareLankaApi api)
+    : _run = api.myRun,
+      _ambulances = api.ambulances;
 
   final MyRunApi _run;
+  final AmbulancesApi _ambulances;
 
   @override
   Future<DispatchDetail?> activeRun() async {
@@ -121,4 +126,16 @@ final class GeneratedCrewRunService implements CrewRunService {
   @override
   Future<NavigationTarget> navigationTarget(String id) =>
       callApi(() => _run.getMyDispatchNavigationTarget(id: id));
+
+  @override
+  Future<String?> assignedAmbulanceRegistration() async {
+    try {
+      return (await callApi(
+        () => _ambulances.getMyAmbulanceAssignment(),
+      )).registrationNumber;
+    } on ApiException catch (error) {
+      if (error.isNotFound) return null;
+      rethrow;
+    }
+  }
 }

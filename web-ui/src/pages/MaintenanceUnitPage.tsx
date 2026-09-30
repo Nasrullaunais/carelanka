@@ -11,7 +11,7 @@ import {
 } from '../services/api/generated/@tanstack/react-query.gen';
 import type { MaintenanceSchedule, MaintenanceType } from '../services/api/generated';
 import { useSession } from '../services/auth/useSession';
-import { canRunMaintenance } from '../types/permissions';
+import { canConfirmEquipmentOrMaintenance, canRunMaintenance } from '../types/permissions';
 import {
   maintenanceStatusLabels,
   maintenanceTypeLabels,
@@ -28,6 +28,7 @@ export function MaintenanceUnitPage() {
   const session = useSession();
   const role = session?.principal.role;
   const manage = canRunMaintenance(role);
+  const confirmOnly = !manage && canConfirmEquipmentOrMaintenance(role);
 
   const [page, setPage] = useState(1);
   const [scrapping, setScrapping] = useState<MaintenanceSchedule | null>(null);
@@ -42,7 +43,7 @@ export function MaintenanceUnitPage() {
   const rows = queue.data?.items ?? [];
   const totalPages = queue.data?.total_pages ?? 1;
 
-  if (!manage) {
+  if (!manage && !confirmOnly) {
     return (
       <>
         <h1>Maintenance unit</h1>
@@ -50,6 +51,23 @@ export function MaintenanceUnitPage() {
           The maintenance unit is run by the hospital administrator. To send a machine for repair,
           report a fault on it from the Equipment page.
         </p>
+      </>
+    );
+  }
+
+  // The equipment administrator confirms jobs done - a role created only for that - and gets
+  // nothing else here: not booking work, not the open-jobs list, not retiring a machine. Those
+  // stay the hospital administrator's, same as before.
+  if (confirmOnly) {
+    return (
+      <>
+        <h1>Maintenance unit</h1>
+        <p className="muted">
+          Confirm a job done once the work is finished, here or in the mobile app: that puts the
+          item back into service and closes any fault reported against it.
+        </p>
+
+        <ConfirmMaintenanceCard />
       </>
     );
   }

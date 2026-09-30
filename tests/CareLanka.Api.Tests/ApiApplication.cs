@@ -26,6 +26,7 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
     public const string InactiveEmail = "inactive.tests@carelanka.invalid";
     public const string DoctorEmail = "doctor.tests@carelanka.invalid";
     public const string EquipmentEmail = "equipment.tests@carelanka.invalid";
+    public const string EquipmentAdministratorEmail = "equipment-admin.tests@carelanka.invalid";
 
     public const string ReceptionEmail = "reception.tests@carelanka.invalid";
 
@@ -104,6 +105,7 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
             Staff(DoctorEmail, StaffRole.Doctor, true, passwords),
             Staff(AdministratorEmail, StaffRole.HospitalAdministrator, true, passwords),
             Staff(EquipmentEmail, StaffRole.EquipmentManager, true, passwords),
+            Staff(EquipmentAdministratorEmail, StaffRole.EquipmentAdministrator, true, passwords),
             Staff(ReceptionEmail, StaffRole.GeneralStaff, true, passwords),
             Staff(AmbulanceEmail, StaffRole.AmbulanceCrew, true, passwords));
         await db.SaveChangesAsync();

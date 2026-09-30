@@ -96,7 +96,10 @@ public static class Policies
     public const string PatientLocationReader = nameof(PatientLocationReader);
 
     // Somebody other than the equipment manager who registered an item, so nobody approves
-    // their own entry. The confirmation code is checked by the service on top of this.
+    // their own entry. The hospital administrator additionally needs the confirmation code,
+    // checked by the service on top of this policy; the equipment administrator is a narrow
+    // role created only for this confirming work, so their role membership alone is enough -
+    // the service skips the code for them.
     public const string EquipmentConfirmer = nameof(EquipmentConfirmer);
 
     public const string EquipmentConfirmationTracker = nameof(EquipmentConfirmationTracker);

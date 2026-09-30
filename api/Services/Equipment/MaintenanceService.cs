@@ -118,10 +118,20 @@ public sealed class MaintenanceService : IMaintenanceService
         return await ToDtoAsync(schedule, cancellationToken);
     }
 
+    // The equipment administrator is a role created only for this confirming work, so signing
+    // in as it is proof enough; the hospital administrator has much wider reach, so the code
+    // stays required for them on top of the role.
+    private void EnsureConfirmationCode(string? confirmationCode)
+    {
+        if (_currentUser.Role == PrincipalRole.EquipmentAdministrator) return;
+
+        _confirmationCode.Ensure(confirmationCode);
+    }
+
     public async Task<IReadOnlyList<MaintenanceSchedule>> ListOpenAsync(
         string? confirmationCode, CancellationToken cancellationToken = default)
     {
-        _confirmationCode.Ensure(confirmationCode);
+        EnsureConfirmationCode(confirmationCode);
 
         var today = Today();
 
@@ -142,7 +152,7 @@ public sealed class MaintenanceService : IMaintenanceService
     public async Task<MaintenanceSchedule> ConfirmDoneAsync(
         Guid id, string? confirmationCode, CancellationToken cancellationToken = default)
     {
-        _confirmationCode.Ensure(confirmationCode);
+        EnsureConfirmationCode(confirmationCode);
 
         var schedule = await GetByIdAsync(id, cancellationToken);
 

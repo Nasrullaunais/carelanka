@@ -377,11 +377,13 @@ builder.Services.AddAuthorization(options =>
         EnumWire.ToWire(StaffRole.EquipmentManager)));
 
     options.AddPolicy(Policies.EquipmentConfirmer, policy => policy.RequireRole(
-        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+        EnumWire.ToWire(StaffRole.HospitalAdministrator),
+        EnumWire.ToWire(StaffRole.EquipmentAdministrator)));
 
     options.AddPolicy(Policies.EquipmentConfirmationTracker, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.EquipmentManager),
-        EnumWire.ToWire(StaffRole.HospitalAdministrator)));
+        EnumWire.ToWire(StaffRole.HospitalAdministrator),
+        EnumWire.ToWire(StaffRole.EquipmentAdministrator)));
 
     options.AddPolicy(Policies.PharmacyRemover, policy => policy.RequireRole(
         EnumWire.ToWire(StaffRole.EquipmentManager),

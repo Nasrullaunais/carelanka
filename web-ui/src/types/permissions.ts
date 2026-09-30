@@ -8,6 +8,7 @@ export const staffRoles: PrincipalRole[] = [
   'duty_manager',
   'hospital_administrator',
   'equipment_manager',
+  'equipment_administrator',
 ];
 
 export function isStaff(role: PrincipalRole | undefined): boolean {
@@ -31,19 +32,34 @@ export function canManageEquipment(role: PrincipalRole | undefined): boolean {
 }
 
 // The equipment manager registers an item and the hospital administrator confirms it on the
-// mobile app. Both need to know how many are still waiting.
+// mobile app. Both need to know how many are still waiting. So does the equipment administrator,
+// the same as the API's EquipmentConfirmationTracker policy.
 export function canTrackEquipmentConfirmations(role: PrincipalRole | undefined): boolean {
-  return role === 'equipment_manager' || role === 'hospital_administrator';
+  return (
+    role === 'equipment_manager' ||
+    role === 'hospital_administrator' ||
+    role === 'equipment_administrator'
+  );
 }
 
 // Only the hospital administrator, so nobody confirms an item they registered themselves. The API
-// also wants the confirmation code on top of the role.
+// also wants the confirmation code on top of the role. This also drives Retire/Remove on an item
+// and the categories-cleanup card - narrower actions the equipment administrator does not get.
 export function canConfirmEquipment(role: PrincipalRole | undefined): boolean {
   return role === 'hospital_administrator';
 }
 
+// Confirming a newly-registered item, or a maintenance job done: the hospital administrator (with
+// the confirmation code) and the equipment administrator (a role that exists only for this, so no
+// code needed - see EquipmentConfirmer on the API). Deliberately narrower than canConfirmEquipment
+// and canRunMaintenance, which also cover retiring, removing and booking work.
+export function canConfirmEquipmentOrMaintenance(role: PrincipalRole | undefined): boolean {
+  return role === 'hospital_administrator' || role === 'equipment_administrator';
+}
+
 // The maintenance unit is the hospital administrator's: booking work, the open-jobs list, confirming
-// repairs and retiring what cannot be fixed. The equipment manager only reports faults.
+// repairs and retiring what cannot be fixed. The equipment manager only reports faults. The equipment
+// administrator does not run the unit - see canConfirmEquipmentOrMaintenance for their narrower slice.
 export function canRunMaintenance(role: PrincipalRole | undefined): boolean {
   return role === 'hospital_administrator';
 }
@@ -220,5 +236,6 @@ export const roleLabels: Record<PrincipalRole, string> = {
   duty_manager: 'Duty manager',
   hospital_administrator: 'Hospital administrator',
   equipment_manager: 'Equipment manager',
+  equipment_administrator: 'Equipment administrator',
   patient: 'Patient',
 };

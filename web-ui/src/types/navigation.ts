@@ -6,6 +6,7 @@ import {
   canReadCapacity,
   canReadEquipment,
   canRunMaintenance,
+  canConfirmEquipmentOrMaintenance,
   canReadWarnings,
   canReadLabReports,
   canReadWards,
@@ -120,7 +121,9 @@ export const destinations: Destination[] = [
     group: 'Administration',
     label: 'Maintenance unit',
     description: 'Book maintenance, confirm repairs done, and retire machines beyond repair.',
-    canAccess: canRunMaintenance,
+    // The page itself narrows further: the equipment administrator only sees the confirm
+    // card, never booking, the open-jobs list, or retiring - see MaintenanceUnitPage.tsx.
+    canAccess: (role) => canRunMaintenance(role) || canConfirmEquipmentOrMaintenance(role),
   },
   {
     to: '/warnings',

@@ -1,5 +1,6 @@
 import 'package:carelanka_mobile/core/network/api_exception.dart';
 import 'package:carelanka_mobile/core/widgets/async_data.dart';
+import 'package:carelanka_mobile/features/emergency/models/handover_draft.dart';
 import 'package:carelanka_mobile/features/emergency/models/run_ending.dart';
 import 'package:carelanka_mobile/features/emergency/models/run_step.dart';
 import 'package:carelanka_mobile/features/emergency/services/crew_run_service.dart';
@@ -118,6 +119,10 @@ void main() {
     expect(DispatchStatus.atScene.canEndAtScene, isTrue);
     expect(DispatchStatus.enRouteToScene.canEndAtScene, isFalse);
     expect(DispatchStatus.transportingToHospital.canEndAtScene, isFalse);
+    expect(DispatchStatus.atScene.canWriteHandoverNotes, isTrue);
+    expect(DispatchStatus.transportingToHospital.canWriteHandoverNotes, isTrue);
+    expect(DispatchStatus.enRouteToScene.canWriteHandoverNotes, isFalse);
+    expect(DispatchStatus.endedAtScene.canWriteHandoverNotes, isFalse);
     expect(DispatchStatus.endedAtScene.isLive, isFalse);
     expect(DispatchStatus.endedAtScene.nextStep, isNull);
   });
@@ -246,6 +251,95 @@ void main() {
       expect(controller.state.valueOrNull?.status, DispatchStatus.assigned);
     },
   );
+
+  group('the handover draft', () {
+    const draft = HandoverDraft(
+      patientCondition: 'Conscious',
+      notes: 'Left leg splinted',
+    );
+
+    Future<(FakeRunService, MyRunController)> atScene() async {
+      final service = FakeRunService()..active = _run(DispatchStatus.atScene);
+      final controller = MyRunController(service);
+      await controller.load();
+      return (service, controller);
+    }
+
+    test('starts empty', () async {
+      final (_, controller) = await atScene();
+
+      expect(controller.handoverDraft.isEmpty, isTrue);
+    });
+
+    test('is kept while the run goes on, even across reloads', () async {
+      final (_, controller) = await atScene();
+
+      controller.saveHandoverDraft(draft);
+      await controller.load(showLoading: false);
+      await controller.advance();
+
+      expect(controller.handoverDraft.notes, 'Left leg splinted');
+      expect(controller.handoverDraft.patientCondition, 'Conscious');
+    });
+
+    test('is thrown away once the handover is recorded', () async {
+      final (_, controller) = await atScene();
+      controller.saveHandoverDraft(draft);
+
+      await controller.handOver(notes: 'Left leg splinted');
+
+      expect(controller.handoverDraft.isEmpty, isTrue);
+    });
+
+    test('is thrown away when the run ends another way', () async {
+      final (_, controller) = await atScene();
+      controller.saveHandoverDraft(draft);
+
+      await controller.endAtScene(SceneOutcome.treatedAtScene);
+
+      expect(controller.handoverDraft.isEmpty, isTrue);
+    });
+
+    test('does not carry over to the run that replaces it', () async {
+      final (service, controller) = await atScene();
+      controller.saveHandoverDraft(draft);
+      service.active = _run(DispatchStatus.assigned, id: 'run-2');
+      service.ended['run-1'] = _ended(
+        DispatchStatus.reassigned,
+        supersededBy: 'run-2',
+      );
+
+      await controller.load(showLoading: false);
+
+      expect(controller.state.valueOrNull?.id, 'run-2');
+      expect(controller.handoverDraft.isEmpty, isTrue);
+    });
+
+    test(
+      'only redraws the screen when the button label would change',
+      () async {
+        final (_, controller) = await atScene();
+        var redraws = 0;
+        controller.addListener(() => redraws++);
+
+        controller.saveHandoverDraft(const HandoverDraft(notes: 'S'));
+        controller.saveHandoverDraft(const HandoverDraft(notes: 'Sp'));
+        controller.saveHandoverDraft(const HandoverDraft(notes: 'Spl'));
+        controller.saveHandoverDraft(HandoverDraft.empty);
+
+        expect(redraws, 2);
+      },
+    );
+
+    test('counts blank text as nothing written', () {
+      const blank = HandoverDraft(patientCondition: '  ', notes: '\n');
+
+      expect(blank.isEmpty, isTrue);
+      expect(blank.notesOrNull, isNull);
+      expect(blank.patientConditionOrNull, isNull);
+      expect(const HandoverDraft(notes: ' hello ').notesOrNull, 'hello');
+    });
+  });
 
   group('when a run ends', () {
     Future<(FakeRunService, MyRunController)> liveRun() async {

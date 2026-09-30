@@ -2119,8 +2119,8 @@ components:
           properties:
             dispatches:
               type: array
-              description: Every dispatch raised against this call, including superseded ones.
-              items: { $ref: '#/components/schemas/DispatchSummary' }
+              description: Every dispatch raised against this call, including superseded ones, with how each one went.
+              items: { $ref: '#/components/schemas/CallDispatch' }
             latest_proposal:
               allOf:
                 - $ref: '#/components/schemas/DispatchProposalSummary'
@@ -2513,6 +2513,39 @@ components:
         crew_count: { type: integer }
         dispatched_at: { type: string, format: date-time }
         completed_at: { type: string, format: date-time, nullable: true }
+
+    CallDispatch:
+      type: object
+      description: |
+        One run against a call, with how it went: the acknowledgement, the reason it was
+        declined, cancelled or reassigned, and what the crew wrote at handover. The scene and
+        caller belong to the call, so they are not repeated here (`DispatchDetail` adds them
+        for the crew).
+      allOf:
+        - $ref: '#/components/schemas/DispatchSummary'
+        - type: object
+          properties:
+            ambulance_id: { type: string, format: uuid }
+            acknowledged_at: { type: string, format: date-time, nullable: true }
+            acknowledged_by_staff_id: { type: string, format: uuid, nullable: true }
+            declined_reason: { type: string, nullable: true }
+            cancellation_reason: { type: string, nullable: true }
+            reassignment_reason: { type: string, nullable: true }
+            superseded_by_dispatch_id: { type: string, format: uuid, nullable: true }
+            handover_notes: { type: string, nullable: true }
+            patient_condition: { type: string, nullable: true }
+
+    AmbulanceHandover:
+      type: object
+      description: |
+        What the ambulance crew reported when they handed the patient over. Emergency owns
+        it; Patient Management shows it on the emergency admission it belongs to.
+      required: [ambulance_registration, handed_over_at]
+      properties:
+        ambulance_registration: { type: string }
+        handed_over_at: { type: string, format: date-time }
+        patient_condition: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
 
     DispatchDetail:
       allOf:

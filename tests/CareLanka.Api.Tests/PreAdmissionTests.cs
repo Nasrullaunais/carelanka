@@ -4,11 +4,13 @@ using CareLanka.Api.Data.Entities.Patient;
 using CareLanka.Api.Data.Entities.Emergency;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.Services.Emergency;
+using CareLanka.Api.Services.Patient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
+using AdmissionDetail = CareLanka.Api.DTOs.Patient.AdmissionDetail;
 
 namespace CareLanka.Api.Tests;
 
@@ -384,6 +386,24 @@ public sealed class PreAdmissionTests
         Assert.Equal(CancelReason.FalseAlarm, (await AdmissionAsync(cancelled.DispatchId)).CancelReason);
     }
 
+    [Fact]
+    public async Task The_admission_detail_shows_what_the_crew_handed_over()
+    {
+        var seed = await SeedAsync(CallPriority.Critical);
+        await SendWithRealGatewayAsync(DateTimeOffset.UtcNow.AddSeconds(1));
+        var admission = await AdmissionAsync(seed.DispatchId);
+
+        Assert.Null((await AdmissionDetailAsync(admission.Id)).AmbulanceHandover);
+
+        await HandOverAsync(seed.DispatchId, "Fall from a ladder", "Conscious");
+        var handover = (await AdmissionDetailAsync(admission.Id)).AmbulanceHandover;
+
+        Assert.NotNull(handover);
+        Assert.Equal("Fall from a ladder", handover.Notes);
+        Assert.Equal("Conscious", handover.PatientCondition);
+        Assert.False(string.IsNullOrEmpty(handover.AmbulanceRegistration));
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -461,6 +481,24 @@ public sealed class PreAdmissionTests
         var notice = await db.PreAdmissionNotices.SingleAsync(x => x.EmergencyCallId == callId);
         notice.Status = status;
         notice.NextAttemptAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+    }
+
+    private async Task<AdmissionDetail> AdmissionDetailAsync(Guid admissionId)
+    {
+        await using var scope = _application.Services.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<IAdmissionService>().GetDetailAsync(admissionId);
+    }
+
+    private async Task HandOverAsync(Guid dispatchId, string notes, string condition)
+    {
+        await using var scope = _application.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        var dispatch = await db.Dispatches.SingleAsync(x => x.Id == dispatchId);
+        dispatch.Status = DispatchStatus.HandedOver;
+        dispatch.HandoverNotes = notes;
+        dispatch.PatientCondition = condition;
+        dispatch.CompletedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
     }
 

@@ -15,6 +15,7 @@ public interface IDispatchService
     Task<DispatchDetail> DeclineAsync(Guid dispatchId, DeclineDispatchRequest request, CancellationToken cancellationToken = default);
     Task<DispatchDetail> ProgressAsync(Guid dispatchId, UpdateMyDispatchStatusRequest request, CancellationToken cancellationToken = default);
     Task<DispatchDetail> EndAtSceneAsync(Guid dispatchId, EndAtSceneRequest request, CancellationToken cancellationToken = default);
+    Task<AmbulanceHandover?> FindHandoverAsync(string dispatchId, CancellationToken cancellationToken = default);
     Task<DispatchDetail> HandoverAsync(Guid dispatchId, RecordHandoverRequest request, CancellationToken cancellationToken = default);
     Task<DispatchDetail> CancelAsync(Guid dispatchId, CancelDispatchRequest request, CancellationToken cancellationToken = default);
     Task CancelForApprovedCancellationRequestAsync(Guid emergencyCallId, CancellationToken cancellationToken = default);

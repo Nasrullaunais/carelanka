@@ -3761,6 +3761,26 @@ components:
               description: >-
                 What the visit costs, or null when nobody has prepared a bill. Read-only here;
                 the bill is written through /admissions/{admissionId}/bill.
+            ambulance_handover:
+              allOf:
+                - $ref: '#/components/schemas/AmbulanceHandover'
+              nullable: true
+              description: >-
+                What the ambulance crew reported at handover, for an emergency admission whose
+                patient has been handed over. Null otherwise. Read from Emergency's
+                `IDispatchService.FindHandoverAsync`.
+
+    AmbulanceHandover:
+      type: object
+      description: |
+        What the ambulance crew reported when they handed the patient over. Emergency owns
+        it; Patient Management shows it on the emergency admission it belongs to.
+      required: [ambulance_registration, handed_over_at]
+      properties:
+        ambulance_registration: { type: string }
+        handed_over_at: { type: string, format: date-time }
+        patient_condition: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
 
     # ---------- ward and bed ----------
 

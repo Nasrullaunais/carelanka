@@ -229,6 +229,21 @@ it calls `POST /admissions/pre-admit`; Patient Management applies its own capaci
 clinical workflow. A timeout or failure is recorded for retry and never rolls back or delays
 the ambulance.
 
+### 4.4 The crew's handover reaches the ward *(2026-09-30)*
+
+When the crew hand the patient over they write the patient's condition and notes. Emergency
+owns that record; Patient Management shows it on the emergency admission it belongs to.
+
+| Who | What |
+| :--- | :--- |
+| Emergency | `IDispatchService.FindHandoverAsync(string dispatchId)` returns an `AmbulanceHandover` (registration, handed-over time, condition, notes), or null before a handover |
+| Patient | `AdmissionDetail.ambulance_handover` is filled from it for an admission with a `dispatch_id` |
+
+`dispatch_id` on the admission is the **first** dispatch of the call, the one Patient was
+given (one pre-admission per call, §4.2). `FindHandoverAsync` finds whichever run of that call
+was handed over, so a reassignment in between changes nothing. Patient shows the handover; it
+never writes it.
+
 ---
 
 ## 5. Patient Management ↔ Staff Management (Member 2)

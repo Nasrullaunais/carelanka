@@ -7,6 +7,7 @@ import '../../../core/widgets/async_data.dart';
 import '../../../services/api_client/models/dispatch_detail.dart';
 import '../../../services/api_client/models/navigation_target.dart';
 import '../../../services/api_client/models/scene_outcome.dart';
+import '../models/handover_draft.dart';
 import '../models/run_ending.dart';
 import '../models/run_step.dart';
 import '../services/crew_run_service.dart';
@@ -25,11 +26,13 @@ class MyRunController extends ChangeNotifier {
   AsyncData<DispatchDetail?> _state = const AsyncData.loading();
   String? _liveRunId;
   RunEnding? _ending;
+  HandoverDraft _handoverDraft = HandoverDraft.empty;
   bool _busy = false;
   ApiException? _actionError;
 
   AsyncData<DispatchDetail?> get state => _state;
   RunEnding? get ending => _ending;
+  HandoverDraft get handoverDraft => _handoverDraft;
   bool get busy => _busy;
   ApiException? get actionError => _actionError;
 
@@ -54,6 +57,12 @@ class MyRunController extends ChangeNotifier {
       }
     }
     _notify();
+  }
+
+  void saveHandoverDraft(HandoverDraft draft) {
+    final changesButton = draft.isEmpty != _handoverDraft.isEmpty;
+    _handoverDraft = draft;
+    if (changesButton) _notify();
   }
 
   void dismissEnding() {
@@ -139,6 +148,7 @@ class MyRunController extends ChangeNotifier {
       final ending = await _endingOf(endedRunId, live?.id, knownEnd: run);
       if (ending != null) _ending = ending;
     }
+    if (_liveRunId != live?.id) _handoverDraft = HandoverDraft.empty;
     _liveRunId = live?.id;
     _state = AsyncData.ready(live);
   }

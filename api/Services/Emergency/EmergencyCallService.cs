@@ -438,20 +438,10 @@ public sealed class EmergencyCallService : IEmergencyCallService
             .SingleAsync(item => item.Id == id, cancellationToken);
         var response = ToCall(call);
         response.LatestProposal = (await _proposals.LatestByCallAsync([call.Id], cancellationToken)).GetValueOrDefault(call.Id);
+        var now = _timeProvider.GetUtcNow();
         response.Dispatches = call.Dispatches.OrderBy(dispatch => dispatch.DispatchedAt)
-            .Select(dispatch => new DispatchSummary
-            {
-                Id = dispatch.Id,
-                EmergencyCallId = call.Id,
-                AmbulanceRegistration = dispatch.Ambulance.RegistrationNumber,
-                CallPriority = call.Priority,
-                Status = dispatch.Status,
-                CrewCount = dispatch.Crew.Count,
-                AcknowledgementOverdue = dispatch.IsAcknowledgementOverdue(
-                    _timeProvider.GetUtcNow(), _options.AcknowledgementTimeoutSeconds),
-                DispatchedAt = dispatch.DispatchedAt,
-                CompletedAt = dispatch.CompletedAt
-            })
+            .Select(dispatch => DispatchMapping.ToCallDispatch<CallDispatch>(
+                dispatch, call, now, _options.AcknowledgementTimeoutSeconds))
             .ToList();
         return response;
     }

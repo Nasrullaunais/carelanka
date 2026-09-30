@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using CareLanka.Api.DTOs.Emergency;
 
 namespace CareLanka.Api.DTOs.Patient;
 
@@ -10,4 +11,6 @@ public class AdmissionDetail : Admission
     public Discharge? Discharge { get; set; }
 
     public Bill? Bill { get; set; }
+
+    public AmbulanceHandover? AmbulanceHandover { get; set; }
 }

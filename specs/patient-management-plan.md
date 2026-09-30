@@ -1545,7 +1545,7 @@ Patient Care Advisory — the one still running — actually uses today.)*
 | :--- | :--- |
 | **Bed board** | Live grid of every ward and bed, colour-coded free / reserved / occupied / out-of-service. The centrepiece. `PatientsPage` — assign or correct a bed by hand from a row on the board. |
 | **Admissions list** | Search, filter by status/ward/category, sort, paginate |
-| **Admission detail** | Timeline of every status change, every bed assignment, every agent run and human decision |
+| **Admission detail** | Timeline of every status change, every bed assignment, every agent run and human decision. For an emergency admission, also what the ambulance crew reported at handover (`ambulance_handover`, from Emergency — `integration_of_functions.md` §4.4) |
 | **Discharge review** | Flagged candidates, checklist state, confirm |
 | **Ward & bed admin** | Create wards, add beds, mark out of service |
 | **Care recommendation queue** *(Doctor, Ward Nurse)* | Everything in `pending_review`. Patient's own text, the agent's draft, `red_flag`/`urgency_flag`, and **the medical profile and history the agent read**, so the reviewer can see what it was working from. Approve (with optional edit) / Reject with reason. **This is the agent demo screen** — `CareRecommendationsPage`, the human gate for §8.10. |

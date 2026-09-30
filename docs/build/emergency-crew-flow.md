@@ -1,6 +1,6 @@
 # Emergency crew flow — from "new run" to handover
 
-**Owner:** Emergency (Nasrulla Unais) · **Status:** planned 2026-09-30 · Fixes 1–4 built on `feat/emergency-crew-flow`
+**Owner:** Emergency (Nasrulla Unais) · **Status:** planned 2026-09-30 · Fixes 1–5 built on `feat/emergency-crew-flow`
 
 ## The problem
 
@@ -586,17 +586,24 @@ reason.
 
 ### Backend
 
-- `EmergencyCallDetail.dispatches` changes from `DispatchSummary[]` to `DispatchDetail[]`.
-  - `DispatchDetail` already extends `DispatchSummary`, so today's web code keeps compiling.
-  - It adds the reasons, the handover and the scene outcome.
-- **For Patient (Lochana):**
+- `EmergencyCallDetail.dispatches` changes from `DispatchSummary[]` to a new `CallDispatch[]`.
+  - `CallDispatch` extends `DispatchSummary`, so today's web code keeps compiling.
+  - It adds the acknowledgement, the three reasons, the superseded link and the handover.
+  - `DispatchDetail` (the crew's view) now extends `CallDispatch` and adds the scene and caller.
+    Plan change: the first draft put `DispatchDetail` on the desk, which would have repeated the
+    scene and caller once per run on a payload that already carries them.
+  - One mapping (`DispatchMapping`) builds both, so the fields cannot drift apart.
+  - Blank handover text is stored as nothing, so a screen never shows an empty value.
+- **For Patient:**
   - New `IDispatchService.FindHandoverAsync(string dispatchId)` returns an `AmbulanceHandover`:
     registration, handed-over time, condition, notes.
   - It takes the **first** dispatch's id, because that is the one Patient was given (Phase 9:
     one pre-admission per call). It then finds whichever dispatch for that call was handed
     over.
-  - Record it in `integration_of_functions.md` as §4.4.
-  - Their admission detail screen calls it through our service. We do not write that screen.
+  - Recorded in `integration_of_functions.md` as §4.4.
+  - Plan change: nobody else was going to write the consumer, so it was done here.
+    `AdmissionDetail.ambulance_handover` is filled from it, and the visit panel in
+    `PatientsPage` shows condition and notes.
 
 ### Phone app (Flutter)
 
@@ -616,7 +623,8 @@ reason.
 
 ### Tests
 
-- Web: `call-detail` renders each way a run can end.
+- Web: `call-detail` renders each way a run can end. The ward panel in `PatientsPage` has no
+  test setup, so the ward side is covered by the backend test on `AdmissionDetail`.
 - Backend:
   - `FindHandoverAsync` after a reassignment still finds the handed-over dispatch
   - it returns null before a handover

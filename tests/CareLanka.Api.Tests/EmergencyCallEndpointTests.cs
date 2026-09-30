@@ -95,7 +95,7 @@ public sealed class EmergencyCallEndpointTests
             location_accuracy_metres = 12.5,
             location_captured_at = DateTimeOffset.UtcNow,
             idempotency_key = key,
-            details = "Collapsed near the bus stop"
+            details = $"Collapsed near the bus stop {key}"
         });
 
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
@@ -109,7 +109,7 @@ public sealed class EmergencyCallEndpointTests
         Assert.Equal(1, await db.EmergencyCalls.CountAsync(call => call.Id == callId));
 
         using var manager = await StaffClientAsync(ApiApplication.ManagerEmail);
-        using var board = await manager.GetAsync("/api/emergency-calls?pageSize=100");
+        using var board = await manager.GetAsync($"/api/emergency-calls?search={key}");
         Assert.Equal(HttpStatusCode.OK, board.StatusCode);
         using var boardBody = JsonDocument.Parse(await board.Content.ReadAsStringAsync());
         Assert.Contains(boardBody.RootElement.GetProperty("items").EnumerateArray(),

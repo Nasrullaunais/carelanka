@@ -463,7 +463,7 @@ Flutter is where the work gets done, and this component has **two distinct Flutt
 | **My run** | The dispatch that just arrived: patient location, address, priority, and current state |
 | **Navigate** | Launch Google Maps to the scene, then to CareLanka Hospital's configured emergency entrance |
 | **Status buttons** | Acknowledge or decline, then en route to scene → at scene → transporting to hospital → handed over |
-| **Handover** | Condition on arrival, notes, and any identity details a relative gave at the scene |
+| **Handover** | Condition on arrival, notes, and any identity details a relative gave at the scene. The crew can write the notes on the way (a draft kept on the phone) and confirm them at the hospital. The duty manager's call detail and the emergency admission's detail then show them |
 | **Finish at the scene** | From `at_scene`, when nobody is going to hospital: pick a reason (treated, refused, not found, false alarm, patient died) and add optional notes |
 | **My history** | Past runs, paged |
 

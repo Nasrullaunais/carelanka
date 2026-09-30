@@ -8,7 +8,9 @@ Future<void> pumpCard(
   WidgetTester tester,
   DispatchDetail run, {
   bool busy = false,
+  bool hasHandoverNotes = false,
   VoidCallback? onEndAtScene,
+  VoidCallback? onWriteHandoverNotes,
 }) => tester.pumpWidget(
   MaterialApp(
     home: Scaffold(
@@ -19,6 +21,8 @@ Future<void> pumpCard(
         onDecline: () {},
         onNavigate: () {},
         onEndAtScene: onEndAtScene ?? () {},
+        onWriteHandoverNotes: onWriteHandoverNotes ?? () {},
+        hasHandoverNotes: hasHandoverNotes,
       ),
     ),
   ),
@@ -192,6 +196,51 @@ void main() {
       await tester.tap(find.text(finish));
 
       expect(finished, 0);
+    });
+  });
+
+  group('handover notes', () {
+    for (final status in [
+      DispatchStatus.atScene,
+      DispatchStatus.transportingToHospital,
+    ]) {
+      testWidgets('can be written while ${status.name}', (tester) async {
+        var opened = 0;
+        await pumpCard(
+          tester,
+          DispatchDetail(status: status),
+          onWriteHandoverNotes: () => opened++,
+        );
+
+        await tester.tap(find.text('Write handover notes'));
+
+        expect(opened, 1);
+      });
+    }
+
+    for (final status in [
+      DispatchStatus.assigned,
+      DispatchStatus.acknowledged,
+      DispatchStatus.enRouteToScene,
+    ]) {
+      testWidgets('cannot be written before the scene: ${status.name}', (
+        tester,
+      ) async {
+        await pumpCard(tester, DispatchDetail(status: status));
+
+        expect(find.textContaining('handover notes'), findsNothing);
+      });
+    }
+
+    testWidgets('say when something is already written', (tester) async {
+      await pumpCard(
+        tester,
+        const DispatchDetail(status: DispatchStatus.atScene),
+        hasHandoverNotes: true,
+      );
+
+      expect(find.text('Edit handover notes'), findsOneWidget);
+      expect(find.text('Write handover notes'), findsNothing);
     });
   });
 }

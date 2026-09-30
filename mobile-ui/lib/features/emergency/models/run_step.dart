@@ -42,6 +42,10 @@ extension DispatchStatusRun on DispatchStatus {
 
   bool get canEndAtScene => this == DispatchStatus.atScene;
 
+  bool get canWriteHandoverNotes =>
+      this == DispatchStatus.atScene ||
+      this == DispatchStatus.transportingToHospital;
+
   bool get canNavigate => isLive && this != DispatchStatus.assigned;
 
   String get crewLabel => switch (this) {

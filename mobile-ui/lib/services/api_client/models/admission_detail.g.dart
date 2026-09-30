@@ -60,6 +60,11 @@ AdmissionDetail _$AdmissionDetailFromJson(Map<String, dynamic> json) =>
       bill: json['bill'] == null
           ? null
           : Bill.fromJson(json['bill'] as Map<String, dynamic>),
+      ambulanceHandover: json['ambulance_handover'] == null
+          ? null
+          : AmbulanceHandover.fromJson(
+              json['ambulance_handover'] as Map<String, dynamic>,
+            ),
     );
 
 Map<String, dynamic> _$AdmissionDetailToJson(AdmissionDetail instance) =>
@@ -90,4 +95,5 @@ Map<String, dynamic> _$AdmissionDetailToJson(AdmissionDetail instance) =>
       'bed_assignments': instance.bedAssignments,
       'discharge': instance.discharge,
       'bill': instance.bill,
+      'ambulance_handover': instance.ambulanceHandover,
     };

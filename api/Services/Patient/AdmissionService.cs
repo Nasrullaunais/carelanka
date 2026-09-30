@@ -7,6 +7,7 @@ using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Patient;
 using CareLanka.Api.Services.Common;
+using CareLanka.Api.Services.Emergency;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using AdmissionEntity = CareLanka.Api.Data.Entities.Patient.Admission;
@@ -33,6 +34,7 @@ public sealed class AdmissionService : IAdmissionService
     private readonly IBillingService _billing;
     private readonly ICurrentUser _currentUser;
     private readonly INotifier _notifier;
+    private readonly IDispatchService _dispatches;
 
     public AdmissionService(
         CareLankaDbContext db,
@@ -40,7 +42,8 @@ public sealed class AdmissionService : IAdmissionService
         IDischargeService discharges,
         IBillingService billing,
         ICurrentUser currentUser,
-        INotifier notifier)
+        INotifier notifier,
+        IDispatchService dispatches)
     {
         _db = db;
         _beds = beds;
@@ -48,6 +51,7 @@ public sealed class AdmissionService : IAdmissionService
         _billing = billing;
         _currentUser = currentUser;
         _notifier = notifier;
+        _dispatches = dispatches;
     }
 
     public async Task<PagedResult<AdmissionSummary>> ListAsync(
@@ -136,7 +140,10 @@ public sealed class AdmissionService : IAdmissionService
                 .ToList(),
 
             Discharge = await _discharges.FindForAdmissionAsync(id, ct),
-            Bill = await _billing.FindForAdmissionAsync(id, ct)
+            Bill = await _billing.FindForAdmissionAsync(id, ct),
+            AmbulanceHandover = admission.DispatchId is { } dispatchId
+                ? await _dispatches.FindHandoverAsync(dispatchId, ct)
+                : null
         };
 
         return Fill(detail, admission, beds, names);

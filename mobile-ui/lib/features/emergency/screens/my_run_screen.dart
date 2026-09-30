@@ -126,6 +126,9 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
                         onDecline: () => _decline(context, controller),
                         onNavigate: () => _navigate(context, controller),
                         onEndAtScene: () => _endAtScene(context, controller),
+                        hasHandoverNotes: !controller.handoverDraft.isEmpty,
+                        onWriteHandoverNotes: () =>
+                            _writeHandoverNotes(context, controller),
                       ),
               ),
             ),
@@ -144,11 +147,16 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
       case RunStep.acknowledge:
         await controller.acknowledge();
       case RunStep.handOver:
-        final details = await askHandoverDetails(context);
+        final details = await askHandoverDetails(
+          context,
+          mode: HandoverSheetMode.handOver,
+          initial: controller.handoverDraft,
+          onChanged: controller.saveHandoverDraft,
+        );
         if (details != null) {
           await controller.handOver(
-            notes: details.notes,
-            patientCondition: details.patientCondition,
+            notes: details.notesOrNull,
+            patientCondition: details.patientConditionOrNull,
           );
         }
       case null:
@@ -157,6 +165,16 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
         await controller.advance();
     }
   }
+
+  Future<void> _writeHandoverNotes(
+    BuildContext context,
+    MyRunController controller,
+  ) => askHandoverDetails(
+    context,
+    mode: HandoverSheetMode.draft,
+    initial: controller.handoverDraft,
+    onChanged: controller.saveHandoverDraft,
+  );
 
   Future<void> _endAtScene(
     BuildContext context,

@@ -47,7 +47,7 @@ EmergencyCallDetail _$EmergencyCallDetailFromJson(Map<String, dynamic> json) =>
           ? null
           : DateTime.parse(json['updated_at'] as String),
       dispatches: (json['dispatches'] as List<dynamic>?)
-          ?.map((e) => DispatchSummary.fromJson(e as Map<String, dynamic>))
+          ?.map((e) => CallDispatch.fromJson(e as Map<String, dynamic>))
           .toList(),
       latestProposal: json['latest_proposal'] == null
           ? null

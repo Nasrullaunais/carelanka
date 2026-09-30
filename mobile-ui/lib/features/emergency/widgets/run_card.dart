@@ -14,6 +14,8 @@ class RunCard extends StatelessWidget {
     required this.onDecline,
     required this.onNavigate,
     required this.onEndAtScene,
+    required this.onWriteHandoverNotes,
+    this.hasHandoverNotes = false,
   });
 
   final DispatchDetail run;
@@ -22,6 +24,8 @@ class RunCard extends StatelessWidget {
   final VoidCallback onDecline;
   final VoidCallback onNavigate;
   final VoidCallback onEndAtScene;
+  final VoidCallback onWriteHandoverNotes;
+  final bool hasHandoverNotes;
 
   @override
   Widget build(BuildContext context) {
@@ -70,6 +74,19 @@ class RunCard extends StatelessWidget {
                   )
                 : Text(step.label),
           ),
+        if (status?.canWriteHandoverNotes ?? false) ...[
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: busy ? null : onWriteHandoverNotes,
+            icon: const Icon(Icons.edit_note),
+            label: Text(
+              hasHandoverNotes ? 'Edit handover notes' : 'Write handover notes',
+            ),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+            ),
+          ),
+        ],
         if (status?.canEndAtScene ?? false) ...[
           const SizedBox(height: 12),
           OutlinedButton(

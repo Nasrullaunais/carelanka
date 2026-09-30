@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Card, CardContent, CardTitle, Disclosure } from '@heroui/react';
 import { toast } from 'sonner';
-import type { AmbulanceSummaryPagedResult, CallPriority, EmergencyCallDetail, ListAmbulancesError, ProblemDetails } from '../../../services/api/generated';
+import type { AmbulanceSummaryPagedResult, CallDispatch, CallPriority, EmergencyCallDetail, ListAmbulancesError, ProblemDetails } from '../../../services/api/generated';
 import {
   dispatchEmergencyCallMutation,
   updateEmergencyCallMutation,
@@ -77,12 +77,6 @@ export function CallDetail({ callId, query, ambulances, onDispatched, ambulanceP
               <DetailField label="Patient is caller">{call.patient_is_caller ? 'Yes' : 'No'}</DetailField>
             </div>
             <DetailField label="Emergency details">{call.details ?? 'No caller report was recorded.'}</DetailField>
-            {call.scene_outcome && (
-              <DetailField label="How it ended">
-                {sceneOutcomeLabels[call.scene_outcome]}
-                {call.scene_outcome_notes && <span className="block text-muted">{call.scene_outcome_notes}</span>}
-              </DetailField>
-            )}
             {call.latitude != null && call.longitude != null && (
               <section className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-3">
@@ -103,7 +97,7 @@ export function CallDetail({ callId, query, ambulances, onDispatched, ambulanceP
             </div>}
             {canDispatch && <CallRecommendation callId={callId} latest={call.latest_proposal} onSent={() => onDispatched?.()} />}
             {!canDispatch && <p className="workflow-notice">{status === 'completed' || status === 'cancelled' ? 'This call is closed. Its response history is shown below.' : 'A response is already active. Follow its progress below; another ambulance cannot be assigned to this call.'}</p>}
-            <DispatchHistory dispatches={call.dispatches ?? []} />
+            <DispatchHistory call={call} />
             {canDispatch && <Disclosure key={`${callId}-${recommendationReady}`} defaultExpanded={!recommendationReady}>
               <Disclosure.Heading>
                 <Disclosure.Trigger className="font-semibold">
@@ -157,7 +151,8 @@ function PriorityControl({ current, pending, onSave }: { current: CallPriority; 
   );
 }
 
-function DispatchHistory({ dispatches }: { dispatches: NonNullable<EmergencyCallDetail['dispatches']> }) {
+function DispatchHistory({ call }: { call: EmergencyCallDetail }) {
+  const dispatches = call.dispatches ?? [];
   if (dispatches.length === 0) return <p className="muted">No dispatch has been recorded for this call.</p>;
   return (
     <section className="flex flex-col gap-2">
@@ -179,11 +174,56 @@ function DispatchHistory({ dispatches }: { dispatches: NonNullable<EmergencyCall
                     : 'Waiting for crew acknowledgement.'}
                 </p>
               )}
+              <HowItEnded dispatch={dispatch} call={call} />
             </CardContent>
           </Card>
         );
       })}
     </section>
+  );
+}
+
+function HowItEnded({ dispatch, call }: { dispatch: CallDispatch; call: EmergencyCallDetail }) {
+  const endedAt = dispatch.completed_at ? formatTimestamp(dispatch.completed_at) : undefined;
+  switch (dispatch.status) {
+    case 'handed_over':
+      return (
+        <EndingLines lines={[
+          ['Handed over', endedAt],
+          ['Condition on arrival', dispatch.patient_condition ?? 'Not recorded'],
+          ['Notes', dispatch.handover_notes ?? 'No notes were written at handover.'],
+        ]} />
+      );
+    case 'ended_at_scene':
+      return (
+        <EndingLines lines={[
+          ['Finished at the scene', call.scene_outcome ? sceneOutcomeLabels[call.scene_outcome] : 'No reason recorded'],
+          ['Ended', endedAt],
+          ['Crew notes', call.scene_outcome_notes ?? undefined],
+        ]} />
+      );
+    case 'declined':
+      return <EndingLines lines={[['Declined by the crew', dispatch.declined_reason ?? 'No reason recorded']]} />;
+    case 'cancelled':
+      return <EndingLines lines={[['Cancelled', dispatch.cancellation_reason ?? 'No reason recorded']]} />;
+    case 'reassigned':
+      return <EndingLines lines={[['Given to another ambulance', dispatch.reassignment_reason ?? 'No reason recorded']]} />;
+    default:
+      return null;
+  }
+}
+
+function EndingLines({ lines }: { lines: [label: string, value: string | undefined][] }) {
+  const shown = lines.filter((line): line is [string, string] => Boolean(line[1]));
+  return (
+    <dl className="mt-2 flex flex-col gap-0.5 text-sm">
+      {shown.map(([label, value]) => (
+        <div key={label} className="flex flex-wrap gap-x-2">
+          <dt className="text-muted">{label}:</dt>
+          <dd>{value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

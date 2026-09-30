@@ -93,6 +93,7 @@ export type AdmissionDetail = {
     bed_assignments: Array<BedAssignment>;
     discharge?: Discharge;
     bill?: Bill;
+    ambulance_handover?: AmbulanceHandover;
 };
 
 export type AdmissionFee = {
@@ -227,6 +228,13 @@ export type AmbulanceDetail = {
 };
 
 export type AmbulanceEligibilityBlockReason = 'inactive' | 'out_of_service' | 'insufficient_crew' | 'active_dispatch' | 'missing_location' | 'stale_location';
+
+export type AmbulanceHandover = {
+    ambulance_registration?: string | null;
+    handed_over_at?: string;
+    patient_condition?: string | null;
+    notes?: string | null;
+};
 
 export type AmbulanceSortField = 'registration_number' | 'status' | 'distance';
 
@@ -445,6 +453,28 @@ export type BulkShiftResponse = {
     created: number;
     skipped: number;
     shifts: Array<ShiftSummaryDto>;
+};
+
+export type CallDispatch = {
+    id?: string;
+    emergency_call_id?: string;
+    ambulance_registration?: string | null;
+    call_priority?: CallPriority;
+    status?: DispatchStatus;
+    destination_ward_name?: string | null;
+    crew_count?: number;
+    acknowledgement_overdue?: boolean;
+    dispatched_at?: string;
+    completed_at?: string | null;
+    ambulance_id?: string;
+    acknowledged_at?: string | null;
+    acknowledged_by_staff_id?: string | null;
+    declined_reason?: string | null;
+    cancellation_reason?: string | null;
+    reassignment_reason?: string | null;
+    superseded_by_dispatch_id?: string | null;
+    handover_notes?: string | null;
+    patient_condition?: string | null;
 };
 
 export type CallPriority = 'critical' | 'high' | 'medium' | 'low';
@@ -1095,7 +1125,7 @@ export type EmergencyCallDetail = {
     cancellation_request_status?: CancellationRequestStatus;
     created_at?: string;
     updated_at?: string;
-    dispatches?: Array<DispatchSummary>;
+    dispatches?: Array<CallDispatch>;
     latest_proposal?: DispatchProposalSummary;
 };
 

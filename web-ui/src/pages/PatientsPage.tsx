@@ -766,6 +766,26 @@ function DetailsPanel({
                 <Field label="Discharged">
                   {visit.data.discharged_at ? localDateTime(visit.data.discharged_at) : null}
                 </Field>
+                {visit.data.ambulance_handover && (
+                  <>
+                    <Field label="Ambulance handover">
+                      {[
+                        visit.data.ambulance_handover.ambulance_registration,
+                        visit.data.ambulance_handover.handed_over_at
+                          ? localDateTime(visit.data.ambulance_handover.handed_over_at)
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </Field>
+                    <Field label="Condition on arrival" empty="Not recorded">
+                      {visit.data.ambulance_handover.patient_condition}
+                    </Field>
+                    <Field label="Crew notes" empty="None written">
+                      {visit.data.ambulance_handover.notes}
+                    </Field>
+                  </>
+                )}
               </tbody>
             </Table>
           )}

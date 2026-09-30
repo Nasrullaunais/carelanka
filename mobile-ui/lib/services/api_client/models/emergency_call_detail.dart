@@ -4,11 +4,11 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
+import 'call_dispatch.dart';
 import 'call_priority.dart';
 import 'call_status.dart';
 import 'cancellation_request_status.dart';
 import 'dispatch_proposal_summary.dart';
-import 'dispatch_summary.dart';
 import 'scene_outcome.dart';
 
 part 'emergency_call_detail.g.dart';
@@ -78,7 +78,7 @@ class EmergencyCallDetail {
   final DateTime? createdAt;
   @JsonKey(name: 'updated_at')
   final DateTime? updatedAt;
-  final List<DispatchSummary>? dispatches;
+  final List<CallDispatch>? dispatches;
   @JsonKey(name: 'latest_proposal')
   final DispatchProposalSummary? latestProposal;
 

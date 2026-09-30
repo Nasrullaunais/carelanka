@@ -275,14 +275,31 @@ public sealed class DispatchService : IDispatchService
     {
         var dispatch = await OwnedAsync(id, ct);
         Move(dispatch, DispatchStatus.HandedOver);
-        dispatch.HandoverNotes = request.Notes?.Trim();
-        dispatch.PatientCondition = request.PatientCondition?.Trim();
+        dispatch.HandoverNotes = NullIfBlank(request.Notes);
+        dispatch.PatientCondition = NullIfBlank(request.PatientCondition);
         dispatch.CompletedAt = _clock.GetUtcNow();
         dispatch.Ambulance.Status = AmbulanceStatus.Available;
         dispatch.EmergencyCall.Status = CallStatus.Completed;
         dispatch.EmergencyCall.Transported = true;
         await SaveAsync(ct);
         return ToDetail(dispatch);
+    }
+
+    public async Task<AmbulanceHandover?> FindHandoverAsync(string dispatchId, CancellationToken ct = default)
+    {
+        if (!Guid.TryParse(dispatchId, out var id)) return null;
+        return await _db.Dispatches.AsNoTracking()
+            .Where(x => x.Status == DispatchStatus.HandedOver
+                && x.EmergencyCall.Dispatches.Any(sibling => sibling.Id == id))
+            .OrderByDescending(x => x.CompletedAt)
+            .Select(x => new AmbulanceHandover
+            {
+                AmbulanceRegistration = x.Ambulance.RegistrationNumber,
+                HandedOverAt = x.CompletedAt!.Value,
+                PatientCondition = x.PatientCondition,
+                Notes = x.HandoverNotes
+            })
+            .FirstOrDefaultAsync(ct);
     }
 
     public async Task<DispatchDetail> EndAtSceneAsync(Guid id, EndAtSceneRequest request, CancellationToken ct = default)
@@ -296,7 +313,7 @@ public sealed class DispatchService : IDispatchService
         call.Status = CallStatus.Completed;
         call.Transported = false;
         call.SceneOutcome = outcome;
-        call.SceneOutcomeNotes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
+        call.SceneOutcomeNotes = NullIfBlank(request.Notes);
         await _withdrawals.RequestAsync(call.Id, WithdrawalReasonFor(outcome), ct);
         await SaveAsync(ct);
         return ToDetail(dispatch);
@@ -474,6 +491,8 @@ public sealed class DispatchService : IDispatchService
         dispatch.EmergencyCall.Status = CallStatus.Received;
     }
 
+    private static string? NullIfBlank(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+
     private static CancelReason WithdrawalReasonFor(SceneOutcome outcome) => outcome switch
     {
         SceneOutcome.TreatedAtScene => CancelReason.TreatedAtScene,
@@ -503,25 +522,17 @@ public sealed class DispatchService : IDispatchService
     {
         var call = dispatch.EmergencyCall;
         var showsCaller = _currentUser.Role != PrincipalRole.AmbulanceCrew || dispatch.Status.IsLive();
-        return new DispatchDetail
-        {
-            Id = dispatch.Id, EmergencyCallId = dispatch.EmergencyCallId, AmbulanceId = dispatch.AmbulanceId,
-            AmbulanceRegistration = dispatch.Ambulance.RegistrationNumber, CallPriority = call.Priority,
-            Status = dispatch.Status, DispatchedAt = dispatch.DispatchedAt, CompletedAt = dispatch.CompletedAt,
-            AcknowledgedAt = dispatch.AcknowledgedAt, AcknowledgedByStaffId = dispatch.AcknowledgedByStaffId,
-            DeclinedReason = dispatch.DeclinedReason, CancellationReason = dispatch.CancellationReason,
-            ReassignmentReason = dispatch.ReassignmentReason, SupersededByDispatchId = dispatch.SupersededByDispatchId,
-            HandoverNotes = dispatch.HandoverNotes,
-            PatientCondition = dispatch.PatientCondition, SceneAddressLabel = call.AddressLabel,
-            SceneDetails = showsCaller ? call.Details : null,
-            SceneLatitude = call.Latitude, SceneLongitude = call.Longitude,
-            SceneLocationAccuracyMetres = call.LocationAccuracyMetres,
-            CallerName = showsCaller ? call.CallerName : null,
-            CallerPhone = showsCaller ? call.CallerPhone : null,
-            PatientIsCaller = call.PatientIsCaller,
-            CrewCount = dispatch.Crew.Count,
-            AcknowledgementOverdue = dispatch.IsAcknowledgementOverdue(_clock.GetUtcNow(), _options.AcknowledgementTimeoutSeconds),
-            CrewStaffIds = dispatch.Crew.Select(x => x.StaffMemberId).ToList()
-        };
+        var detail = DispatchMapping.ToCallDispatch<DispatchDetail>(
+            dispatch, call, _clock.GetUtcNow(), _options.AcknowledgementTimeoutSeconds);
+        detail.SceneAddressLabel = call.AddressLabel;
+        detail.SceneDetails = showsCaller ? call.Details : null;
+        detail.SceneLatitude = call.Latitude;
+        detail.SceneLongitude = call.Longitude;
+        detail.SceneLocationAccuracyMetres = call.LocationAccuracyMetres;
+        detail.CallerName = showsCaller ? call.CallerName : null;
+        detail.CallerPhone = showsCaller ? call.CallerPhone : null;
+        detail.PatientIsCaller = call.PatientIsCaller;
+        detail.CrewStaffIds = dispatch.Crew.Select(x => x.StaffMemberId).ToList();
+        return detail;
     }
 }

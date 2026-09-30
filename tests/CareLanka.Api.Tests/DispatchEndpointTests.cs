@@ -11,6 +11,7 @@ using CareLanka.Api.Services.Emergency;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using AmbulanceHandover = CareLanka.Api.DTOs.Emergency.AmbulanceHandover;
 
 namespace CareLanka.Api.Tests;
 
@@ -269,6 +270,145 @@ public sealed class DispatchEndpointTests
         await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/end-at-scene", new { outcome = "false_alarm", notes = "   " });
 
         Assert.Null((await CallAsync(run.CallId)).SceneOutcomeNotes);
+    }
+
+    [Fact]
+    public async Task The_handover_is_found_through_the_first_dispatch_even_after_a_reassignment()
+    {
+        var first = await SeedRunAsync();
+        var replacement = await SeedRunAsync();
+        var firstDispatchId = await DispatchAsync(first);
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+        var reassigned = await ReadAsync(await manager.PostAsJsonAsync($"/api/dispatches/{firstDispatchId}/reassign", new
+        {
+            replacement_ambulance_id = replacement.AmbulanceId,
+            reason = "Closer ambulance became free"
+        }));
+        var secondDispatchId = reassigned.GetProperty("id").GetGuid();
+        using var crew = await ClientAsync(replacement.CrewEmails[0]);
+        await PostStatusAsync(crew, $"/api/me/dispatches/{secondDispatchId}/acknowledge");
+        await ProgressAsync(crew, secondDispatchId, "en_route_to_scene");
+        await ProgressAsync(crew, secondDispatchId, "at_scene");
+        await ProgressAsync(crew, secondDispatchId, "transporting_to_hospital");
+        await crew.PostAsJsonAsync($"/api/me/dispatches/{secondDispatchId}/handover", new
+        {
+            notes = "Left leg splinted",
+            patient_condition = "Conscious, blood pressure low"
+        });
+
+        var handover = await FindHandoverAsync(firstDispatchId.ToString());
+
+        Assert.NotNull(handover);
+        Assert.Equal((await AmbulanceAsync(replacement.AmbulanceId)).RegistrationNumber, handover.AmbulanceRegistration);
+        Assert.Equal("Left leg splinted", handover.Notes);
+        Assert.Equal("Conscious, blood pressure low", handover.PatientCondition);
+        Assert.Equal((await LoadDispatchAsync(secondDispatchId)).CompletedAt, handover.HandedOverAt);
+    }
+
+    [Fact]
+    public async Task Blank_handover_fields_are_stored_as_nothing()
+    {
+        var run = await SeedRunAsync();
+        var (dispatchId, crew) = await RunAtSceneAsync(run);
+        using var _ = crew;
+        await ProgressAsync(crew, dispatchId, "transporting_to_hospital");
+
+        await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/handover", new { notes = "  ", patient_condition = "" });
+
+        var dispatch = await LoadDispatchAsync(dispatchId);
+        Assert.Null(dispatch.HandoverNotes);
+        Assert.Null(dispatch.PatientCondition);
+    }
+
+    [Fact]
+    public async Task An_empty_handover_is_still_a_handover()
+    {
+        var run = await SeedRunAsync();
+        var (dispatchId, crew) = await RunAtSceneAsync(run);
+        using var _ = crew;
+        await ProgressAsync(crew, dispatchId, "transporting_to_hospital");
+        await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/handover", new { });
+
+        var handover = await FindHandoverAsync(dispatchId.ToString());
+
+        Assert.NotNull(handover);
+        Assert.Null(handover.Notes);
+        Assert.Null(handover.PatientCondition);
+    }
+
+    [Fact]
+    public async Task There_is_no_handover_until_the_patient_is_handed_over()
+    {
+        var pending = await SeedRunAsync();
+        var pendingDispatchId = await DispatchAsync(pending);
+        var finished = await SeedRunAsync();
+        var (finishedDispatchId, crew) = await RunAtSceneAsync(finished);
+        using var _ = crew;
+        await crew.PostAsJsonAsync($"/api/me/dispatches/{finishedDispatchId}/end-at-scene", new { outcome = "treated_at_scene" });
+
+        Assert.Null(await FindHandoverAsync(pendingDispatchId.ToString()));
+        Assert.Null(await FindHandoverAsync(finishedDispatchId.ToString()));
+        Assert.Null(await FindHandoverAsync(Guid.NewGuid().ToString()));
+        Assert.Null(await FindHandoverAsync("DSP-2026-0142"));
+    }
+
+    [Fact]
+    public async Task The_call_shows_how_each_run_went_without_repeating_the_scene()
+    {
+        var first = await SeedRunAsync();
+        var replacement = await SeedRunAsync();
+        var firstDispatchId = await DispatchAsync(first);
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+        var secondDispatchId = (await ReadAsync(await manager.PostAsJsonAsync($"/api/dispatches/{firstDispatchId}/reassign", new
+        {
+            replacement_ambulance_id = replacement.AmbulanceId,
+            reason = "Closer ambulance became free"
+        }))).GetProperty("id").GetGuid();
+        using var crew = await ClientAsync(replacement.CrewEmails[0]);
+        await PostStatusAsync(crew, $"/api/me/dispatches/{secondDispatchId}/acknowledge");
+        await ProgressAsync(crew, secondDispatchId, "en_route_to_scene");
+        await ProgressAsync(crew, secondDispatchId, "at_scene");
+        await ProgressAsync(crew, secondDispatchId, "transporting_to_hospital");
+        await crew.PostAsJsonAsync($"/api/me/dispatches/{secondDispatchId}/handover", new
+        {
+            notes = "Left leg splinted",
+            patient_condition = "Conscious"
+        });
+
+        var call = await manager.GetFromJsonAsync<JsonElement>($"/api/emergency-calls/{first.CallId}");
+
+        var runs = call.GetProperty("dispatches").EnumerateArray().ToList();
+        Assert.Equal(2, runs.Count);
+        Assert.Equal("reassigned", runs[0].GetProperty("status").GetString());
+        Assert.Equal("Closer ambulance became free", runs[0].GetProperty("reassignment_reason").GetString());
+        Assert.Equal(secondDispatchId, runs[0].GetProperty("superseded_by_dispatch_id").GetGuid());
+        Assert.Equal("handed_over", runs[1].GetProperty("status").GetString());
+        Assert.Equal("Left leg splinted", runs[1].GetProperty("handover_notes").GetString());
+        Assert.Equal("Conscious", runs[1].GetProperty("patient_condition").GetString());
+        Assert.NotEqual(JsonValueKind.Null, runs[1].GetProperty("acknowledged_at").ValueKind);
+        Assert.False(runs[1].TryGetProperty("caller_name", out _));
+        Assert.False(runs[1].TryGetProperty("scene_details", out _));
+    }
+
+    [Fact]
+    public async Task The_call_shows_the_reasons_a_run_was_declined_or_cancelled()
+    {
+        var declined = await SeedRunAsync();
+        var declinedDispatchId = await DispatchAsync(declined);
+        using var crew = await ClientAsync(declined.CrewEmails[0]);
+        await crew.PostAsJsonAsync($"/api/me/dispatches/{declinedDispatchId}/decline", new { reason = "Flat tyre" });
+        var cancelled = await SeedRunAsync();
+        var cancelledDispatchId = await DispatchAsync(cancelled);
+        using var manager = await ClientAsync(ApiApplication.ManagerEmail);
+        await manager.PostAsJsonAsync($"/api/dispatches/{cancelledDispatchId}/cancel", new { reason = "Caller called back" });
+
+        var declinedRun = (await manager.GetFromJsonAsync<JsonElement>($"/api/emergency-calls/{declined.CallId}"))
+            .GetProperty("dispatches")[0];
+        var cancelledRun = (await manager.GetFromJsonAsync<JsonElement>($"/api/emergency-calls/{cancelled.CallId}"))
+            .GetProperty("dispatches")[0];
+
+        Assert.Equal("Flat tyre", declinedRun.GetProperty("declined_reason").GetString());
+        Assert.Equal("Caller called back", cancelledRun.GetProperty("cancellation_reason").GetString());
     }
 
     [Fact]
@@ -864,6 +1004,12 @@ public sealed class DispatchEndpointTests
         using var scope = _application.Services.CreateScope();
         return await scope.ServiceProvider.GetRequiredService<CareLankaDbContext>()
             .PreAdmissionNotices.AsNoTracking().SingleAsync(x => x.EmergencyCallId == callId);
+    }
+
+    private async Task<AmbulanceHandover?> FindHandoverAsync(string dispatchId)
+    {
+        using var scope = _application.Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<IDispatchService>().FindHandoverAsync(dispatchId);
     }
 
     private async Task<Dispatch> LoadDispatchAsync(Guid id)

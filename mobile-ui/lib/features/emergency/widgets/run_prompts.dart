@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../services/api_client/models/scene_outcome.dart';
+import '../models/handover_draft.dart';
 import '../models/scene_outcome_labels.dart';
 
 Future<String?> askDeclineReason(BuildContext context) => showDialog<String>(
@@ -8,14 +9,28 @@ Future<String?> askDeclineReason(BuildContext context) => showDialog<String>(
   builder: (_) => const _DeclineDialog(),
 );
 
-typedef HandoverDetails = ({String? notes, String? patientCondition});
+enum HandoverSheetMode {
+  draft('Handover notes', 'Save notes'),
+  handOver('Hand over the patient', 'Confirm handover');
 
-Future<HandoverDetails?> askHandoverDetails(BuildContext context) =>
-    showModalBottomSheet<HandoverDetails>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => const _HandoverSheet(),
-    );
+  const HandoverSheetMode(this.title, this.confirmLabel);
+
+  final String title;
+  final String confirmLabel;
+}
+
+/// Every keystroke goes to [onChanged], so closing the sheet loses nothing.
+Future<HandoverDraft?> askHandoverDetails(
+  BuildContext context, {
+  required HandoverSheetMode mode,
+  required HandoverDraft initial,
+  required ValueChanged<HandoverDraft> onChanged,
+}) => showModalBottomSheet<HandoverDraft>(
+  context: context,
+  isScrollControlled: true,
+  builder: (_) =>
+      _HandoverSheet(mode: mode, initial: initial, onChanged: onChanged),
+);
 
 typedef SceneFinish = ({SceneOutcome outcome, String? notes});
 
@@ -74,15 +89,31 @@ class _DeclineDialogState extends State<_DeclineDialog> {
 }
 
 class _HandoverSheet extends StatefulWidget {
-  const _HandoverSheet();
+  const _HandoverSheet({
+    required this.mode,
+    required this.initial,
+    required this.onChanged,
+  });
+
+  final HandoverSheetMode mode;
+  final HandoverDraft initial;
+  final ValueChanged<HandoverDraft> onChanged;
 
   @override
   State<_HandoverSheet> createState() => _HandoverSheetState();
 }
 
 class _HandoverSheetState extends State<_HandoverSheet> {
-  final _condition = TextEditingController();
-  final _notes = TextEditingController();
+  late final _condition = TextEditingController(
+    text: widget.initial.patientCondition,
+  )..addListener(_changed);
+  late final _notes = TextEditingController(text: widget.initial.notes)
+    ..addListener(_changed);
+
+  HandoverDraft get _draft =>
+      HandoverDraft(patientCondition: _condition.text, notes: _notes.text);
+
+  void _changed() => widget.onChanged(_draft);
 
   @override
   void dispose() {
@@ -92,7 +123,7 @@ class _HandoverSheetState extends State<_HandoverSheet> {
   }
 
   @override
-  Widget build(BuildContext context) => Padding(
+  Widget build(BuildContext context) => SingleChildScrollView(
     padding: EdgeInsets.fromLTRB(
       20,
       20,
@@ -103,16 +134,13 @@ class _HandoverSheetState extends State<_HandoverSheet> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Hand over the patient',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
+        Text(widget.mode.title, style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 16),
         TextField(
           controller: _condition,
           maxLength: 500,
           decoration: const InputDecoration(
-            labelText: 'Patient condition on arrival (optional)',
+            labelText: 'Patient condition (optional)',
           ),
         ),
         const SizedBox(height: 8),
@@ -128,11 +156,8 @@ class _HandoverSheetState extends State<_HandoverSheet> {
         SizedBox(
           width: double.infinity,
           child: FilledButton(
-            onPressed: () => Navigator.pop(context, (
-              notes: _blankToNull(_notes.text),
-              patientCondition: _blankToNull(_condition.text),
-            )),
-            child: const Text('Confirm handover'),
+            onPressed: () => Navigator.pop(context, _draft),
+            child: Text(widget.mode.confirmLabel),
           ),
         ),
       ],

@@ -1,3 +1,4 @@
+import 'package:carelanka_mobile/features/emergency/models/handover_draft.dart';
 import 'package:carelanka_mobile/features/emergency/widgets/run_prompts.dart';
 import 'package:carelanka_mobile/services/api_client/models/scene_outcome.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +16,37 @@ Future<void> openSheet(
             onPressed: () async {
               final finish = await askSceneOutcome(context);
               onClosed?.call(finish);
+            },
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.tap(find.text('open'));
+  await tester.pumpAndSettle();
+}
+
+Future<void> openHandoverSheet(
+  WidgetTester tester, {
+  required HandoverSheetMode mode,
+  HandoverDraft initial = HandoverDraft.empty,
+  required ValueChanged<HandoverDraft> onChanged,
+  ValueChanged<HandoverDraft?>? onClosed,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: TextButton(
+            onPressed: () async {
+              final result = await askHandoverDetails(
+                context,
+                mode: mode,
+                initial: initial,
+                onChanged: onChanged,
+              );
+              onClosed?.call(result);
             },
             child: const Text('open'),
           ),
@@ -97,6 +129,95 @@ void main() {
 
       expect(closed, isTrue);
       expect(result, isNull);
+    });
+  });
+
+  group('the handover sheet', () {
+    testWidgets('opens with what was already written', (tester) async {
+      await openHandoverSheet(
+        tester,
+        mode: HandoverSheetMode.handOver,
+        initial: const HandoverDraft(
+          patientCondition: 'Conscious',
+          notes: 'Left leg splinted',
+        ),
+        onChanged: (_) {},
+      );
+
+      expect(find.text('Hand over the patient'), findsOneWidget);
+      expect(find.text('Conscious'), findsOneWidget);
+      expect(find.text('Left leg splinted'), findsOneWidget);
+      expect(find.text('Confirm handover'), findsOneWidget);
+    });
+
+    testWidgets('keeps every edit even if the sheet is dismissed', (
+      tester,
+    ) async {
+      final drafts = <HandoverDraft>[];
+      HandoverDraft? closedWith = const HandoverDraft(notes: 'not closed yet');
+      await openHandoverSheet(
+        tester,
+        mode: HandoverSheetMode.draft,
+        onChanged: drafts.add,
+        onClosed: (result) => closedWith = result,
+      );
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Patient condition (optional)'),
+        'Breathing normally',
+      );
+      await tester.enterText(
+        find.widgetWithText(
+          TextField,
+          'Notes for the hospital team (optional)',
+        ),
+        'Fall from a ladder',
+      );
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+
+      expect(closedWith, isNull);
+      expect(drafts.last.patientCondition, 'Breathing normally');
+      expect(drafts.last.notes, 'Fall from a ladder');
+    });
+
+    testWidgets('saving notes closes the sheet with the draft', (tester) async {
+      HandoverDraft? closedWith;
+      await openHandoverSheet(
+        tester,
+        mode: HandoverSheetMode.draft,
+        onChanged: (_) {},
+        onClosed: (result) => closedWith = result,
+      );
+
+      expect(find.text('Handover notes'), findsOneWidget);
+      await tester.enterText(
+        find.widgetWithText(
+          TextField,
+          'Notes for the hospital team (optional)',
+        ),
+        '  Splinted  ',
+      );
+      await tester.tap(find.text('Save notes'));
+      await tester.pumpAndSettle();
+
+      expect(closedWith?.notesOrNull, 'Splinted');
+      expect(closedWith?.patientConditionOrNull, isNull);
+    });
+
+    testWidgets('an empty handover can still be confirmed', (tester) async {
+      HandoverDraft? closedWith;
+      await openHandoverSheet(
+        tester,
+        mode: HandoverSheetMode.handOver,
+        onChanged: (_) {},
+        onClosed: (result) => closedWith = result,
+      );
+
+      await tester.tap(find.text('Confirm handover'));
+      await tester.pumpAndSettle();
+
+      expect(closedWith?.isEmpty, isTrue);
     });
   });
 }

@@ -8,6 +8,7 @@ import 'admission_category.dart';
 import 'admission_source.dart';
 import 'admission_status.dart';
 import 'admission_urgency.dart';
+import 'ambulance_handover.dart';
 import 'bed_assignment.dart';
 import 'bill.dart';
 import 'cancel_reason.dart';
@@ -45,6 +46,7 @@ class AdmissionDetail {
     this.updatedAt,
     this.discharge,
     this.bill,
+    this.ambulanceHandover,
   });
   
   factory AdmissionDetail.fromJson(Map<String, Object?> json) => _$AdmissionDetailFromJson(json);
@@ -94,6 +96,8 @@ class AdmissionDetail {
   final List<BedAssignment> bedAssignments;
   final Discharge? discharge;
   final Bill? bill;
+  @JsonKey(name: 'ambulance_handover')
+  final AmbulanceHandover? ambulanceHandover;
 
   Map<String, Object?> toJson() => _$AdmissionDetailToJson(this);
 }

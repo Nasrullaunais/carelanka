@@ -1,6 +1,6 @@
 # Emergency crew flow — from "new run" to handover
 
-**Owner:** Emergency (Nasrulla Unais) · **Status:** planned 2026-09-30 · Fixes 1–7 built on `feat/emergency-crew-flow`
+**Owner:** Emergency (Nasrulla Unais) · **Status:** planned 2026-09-30 · Fixes 1–7 built on `feat/emergency-crew-flow`; Fix 8 is the phone checklist below, still to be run
 
 ## The problem
 
@@ -730,6 +730,14 @@ real Android phone, with the server's Firebase key in place (`notifications.md` 
 6. **Handover:** the notes show on the desk's call detail.
 7. **Airplane mode on "I have reached the scene":** "not saved" + Try again. Then turn it off
    and retry: success, or a lost reply that is recognised as success.
+8. **Tap twice:** "I have reached the scene" and "Patient on board" turn amber and need a
+   second tap; wait 4 seconds and the button goes back. Accept and Start driving take one tap.
+9. **Maps:** it opens by itself after Start driving (to the scene) and after Patient on board
+   (to the hospital). The manual button says "Navigate to scene" or "Navigate to hospital".
+10. **Position on each step:** after a step, the ambulance dot on the desk's fleet map is where
+    the phone is.
+11. **Card:** the priority chip has the right colour, "Sent X ago" moves on each minute, and
+    declining offers the four choices. With no run it says which ambulance you are on.
 
 Write down what happened in `RESUME.md` and update each fix's status here.
 

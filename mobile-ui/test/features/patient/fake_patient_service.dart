@@ -7,6 +7,7 @@ import 'package:carelanka_mobile/services/api_client/models/my_appointment.dart'
 import 'package:carelanka_mobile/services/api_client/models/my_appointment_paged_result.dart';
 import 'package:carelanka_mobile/services/api_client/models/my_bill.dart';
 import 'package:carelanka_mobile/services/api_client/models/my_care_recommendation_paged_result.dart';
+import 'package:carelanka_mobile/services/api_client/models/my_lab_report_paged_result.dart';
 import 'package:carelanka_mobile/services/api_client/models/my_profile.dart';
 import 'package:carelanka_mobile/services/api_client/models/pre_register_request.dart';
 import 'package:dio/dio.dart';
@@ -39,6 +40,15 @@ class FakePatientService extends PatientService {
   String? lastCareQueryText;
   int careRecommendationLoadCalls = 0;
 
+  // Defaults to an empty page, same reasoning as careRecommendationsResult above.
+  Object? labReportsResult = const MyLabReportPagedResult(
+    items: [],
+    page: 1,
+    pageSize: 20,
+    totalItems: 0,
+    totalPages: 1,
+  );
+
   /// What the details form last sent, so a test can assert the form refused to
   /// submit at all rather than submitting something incomplete.
   PreRegisterRequest? savedDetails;
@@ -64,6 +74,10 @@ class FakePatientService extends PatientService {
 
   @override
   Future<MyBill> loadMyBill(String admissionId) async => _unwrap(billResult);
+
+  @override
+  Future<MyLabReportPagedResult> loadMyLabReports({int page = 1, int pageSize = 20}) async =>
+      _unwrap(labReportsResult);
 
   @override
   Future<MyAppointment> bookAppointment({required DateTime scheduledAt, String? reason}) async {

@@ -8,6 +8,7 @@ import 'core/auth/auth_controller.dart';
 import 'core/auth/session_expiry.dart';
 import 'core/auth/token_store.dart';
 import 'core/network/api.dart';
+import 'core/network/file_opener.dart';
 import 'core/notifications/inbox_controller.dart';
 import 'core/notifications/inbox_screen.dart';
 import 'core/notifications/inbox_service.dart';
@@ -77,7 +78,12 @@ class _CareLankaAppState extends State<CareLankaApp> with WidgetsBindingObserver
       api: _api,
       tokens: _tokens,
       sessionExpiry: _sessionExpiry,
-      beforeSignOut: () async => _pushRegistration?.unregister(),
+      beforeSignOut: () async {
+        await _pushRegistration?.unregister();
+        // Opened lab reports are medical records; they shouldn't outlive the
+        // session on a shared phone.
+        await clearOpenedFiles();
+      },
     );
     _auth.addListener(_onAuthChanged);
 

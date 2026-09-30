@@ -48,6 +48,10 @@ dependencies:
   firebase_core: ^4.2.0
   firebase_messaging: ^16.0.4
 
+  # Opening a downloaded lab report in the phone's own viewer (core/network/file_opener).
+  path_provider: ^2.1.5
+  open_filex: ^4.7.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -3,8 +3,6 @@ import 'dart:typed_data';
 
 import 'package:web/web.dart' as web;
 
-const bool isSupported = true;
-
 /// A blob URL, not a data: URL — a 10 MB base64 string is a bad time for the
 /// browser's address bar, and this never touches it. Left un-revoked on purpose:
 /// the new tab still needs it after this function returns, and there is no
@@ -21,3 +19,6 @@ Future<void> openFileBytes({
   final url = web.URL.createObjectURL(blob);
   web.window.open(url, '_blank');
 }
+
+/// Nothing is ever saved to disk on web — the browser owns the download.
+Future<void> clearOpenedFiles() async {}

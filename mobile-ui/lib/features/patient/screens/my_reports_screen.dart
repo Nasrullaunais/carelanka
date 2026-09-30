@@ -2,9 +2,12 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/network/api.dart';
+import 'dart:typed_data';
+
+import '../../../core/network/api.dart' as network_api;
 import '../../../core/network/api_exception.dart';
-import '../../../core/network/file_opener.dart';
+import '../../../core/network/file_open_exception.dart';
+import '../../../core/network/file_opener.dart' as file_opener;
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/friendly_date.dart';
 import '../../../core/widgets/async_view.dart';
@@ -14,22 +17,62 @@ import '../../../services/api_client/models/my_lab_report.dart';
 import '../services/patient_service.dart';
 import '../state/lab_reports_controller.dart';
 
+/// The signature of [openFileBytes] — a separate typedef so a test can pass
+/// in a fake instead of calling the real plugin.
+typedef OpenReportBytes = Future<void> Function({
+  required Uint8List bytes,
+  required String contentType,
+  required String fileName,
+});
+
+/// The signature of the download step, keyed only on the file's path — a
+/// test can supply one that never touches a real [Dio] client.
+typedef DownloadReportBytes = Future<Uint8List> Function(String path);
+
 class MyReportsScreen extends StatelessWidget {
-  const MyReportsScreen({super.key});
+  const MyReportsScreen({
+    super.key,
+    this.openFileBytes = file_opener.openFileBytes,
+    this.downloadBytes,
+    this.controller,
+  });
+
+  final OpenReportBytes openFileBytes;
+
+  /// Defaults to downloading through the [Dio] client in [context] when null.
+  final DownloadReportBytes? downloadBytes;
+
+  /// Lets a test supply a controller backed by a fake service, instead of the
+  /// real one this screen otherwise builds from [CareLankaApi] in [context].
+  final LabReportsController? controller;
 
   @override
   Widget build(BuildContext context) {
+    final download = downloadBytes ??
+        (path) => network_api.downloadBytes(context.read<Dio>(), path);
+
+    final provided = controller;
+    if (provided != null) {
+      return ChangeNotifierProvider.value(
+        value: provided,
+        child: _MyReportsView(openFileBytes: openFileBytes, downloadBytes: download),
+      );
+    }
+
     return ChangeNotifierProvider(
       create: (context) =>
           LabReportsController(PatientService(context.read<CareLankaApi>()))
             ..load(),
-      child: const _MyReportsView(),
+      child: _MyReportsView(openFileBytes: openFileBytes, downloadBytes: download),
     );
   }
 }
 
 class _MyReportsView extends StatelessWidget {
-  const _MyReportsView();
+  const _MyReportsView({required this.openFileBytes, required this.downloadBytes});
+
+  final OpenReportBytes openFileBytes;
+  final DownloadReportBytes downloadBytes;
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +109,11 @@ class _MyReportsView extends StatelessWidget {
                 ),
                 itemCount: reports.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, index) => _ReportTile(report: reports[index]),
+                itemBuilder: (_, index) => _ReportTile(
+                  report: reports[index],
+                  openFileBytes: openFileBytes,
+                  downloadBytes: downloadBytes,
+                ),
               ),
             );
           },
@@ -77,9 +124,15 @@ class _MyReportsView extends StatelessWidget {
 }
 
 class _ReportTile extends StatefulWidget {
-  const _ReportTile({required this.report});
+  const _ReportTile({
+    required this.report,
+    required this.openFileBytes,
+    required this.downloadBytes,
+  });
 
   final MyLabReport report;
+  final OpenReportBytes openFileBytes;
+  final DownloadReportBytes downloadBytes;
 
   @override
   State<_ReportTile> createState() => _ReportTileState();
@@ -89,30 +142,23 @@ class _ReportTileState extends State<_ReportTile> {
   bool _opening = false;
 
   Future<void> _open() async {
-    if (!isFileOpenerSupported) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Viewing a report is only built for the web app so far.',
-          ),
-        ),
-      );
-      return;
-    }
-
     setState(() => _opening = true);
 
     try {
-      final bytes = await downloadBytes(
-        context.read<Dio>(),
+      final bytes = await widget.downloadBytes(
         PatientService.labReportFilePath(widget.report.id),
       );
-      await openFileBytes(
+      await widget.openFileBytes(
         bytes: bytes,
         contentType: widget.report.contentType,
         fileName: widget.report.fileName,
       );
     } on ApiException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    } on FileOpenException catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,

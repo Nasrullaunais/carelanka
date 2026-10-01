@@ -2,7 +2,7 @@
 
 Raw material for the Word submission: the
 **Test Case Document** and **Defect / Bug Report** sections of the SE3110 brief
-(`SE3110 Assignment.md` §4), laid out in the columns the brief asks for.
+(`AssignmentDocs/QM Specification.md` §4), laid out in the columns the brief asks for.
 
 ## Test environment
 

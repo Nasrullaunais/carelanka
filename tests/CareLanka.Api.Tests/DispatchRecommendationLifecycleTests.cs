@@ -70,6 +70,7 @@ public sealed class DispatchRecommendationLifecycleTests
         var ambulance = await SeedAmbulanceAsync();
         using var manager = await ClientAsync(ApiApplication.ManagerEmail);
         var callId = await CreateCallAsync(manager, Guid.NewGuid());
+        await MakeReadyAsync(callId);
 
         var dispatched = await manager.PostAsJsonAsync($"/api/emergency-calls/{callId}/dispatch", new { ambulance_id = ambulance.Id });
 
@@ -471,15 +472,10 @@ public sealed class DispatchRecommendationLifecycleTests
     // Stands in for the agent having found an ambulance, which the shared fleet cannot promise.
     private async Task MakeReadyAsync(Guid callId)
     {
-        var deadline = DateTime.UtcNow.AddSeconds(30);
+        await _application.WaitForDispatchProposalAsync(callId);
+
         using var scope = _application.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
-        while (await db.DispatchProposals.AnyAsync(x => x.EmergencyCallId == callId && x.Status == DispatchProposalStatus.Pending))
-        {
-            if (DateTime.UtcNow > deadline) Assert.Fail("Dispatch proposal never left pending.");
-            await Task.Delay(50);
-        }
-
         var proposal = await db.DispatchProposals.SingleAsync(x => x.EmergencyCallId == callId);
         proposal.Status = DispatchProposalStatus.PendingConfirmation;
         await db.SaveChangesAsync();

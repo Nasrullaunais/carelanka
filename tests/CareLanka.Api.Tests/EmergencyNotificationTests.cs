@@ -195,12 +195,8 @@ public sealed class EmergencyNotificationTests
             idempotency_key = Guid.NewGuid()
         });
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
-        using var body = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
-        var callId = body.RootElement.GetProperty("id").GetGuid();
-
-        // Taking the call opens a proposal that the background worker is still filling in. Dispatching
-        // while it writes the same row makes the manual dispatch fail with 409.
-        await WaitUntilSettledAsync(manager, body.RootElement.GetProperty("latest_proposal").GetProperty("id").GetGuid());
+        var callId = await IdAsync(created);
+        await _application.WaitForDispatchProposalAsync(callId);
 
         await DispatchAsync(manager, callId, await SeedAmbulanceAsync());
 

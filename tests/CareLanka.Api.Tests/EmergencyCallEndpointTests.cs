@@ -128,6 +128,7 @@ public sealed class EmergencyCallEndpointTests
         var callId = body.RootElement.GetProperty("id").GetGuid();
         Assert.True(queue.TryRead(out var first));
         Assert.Equal(new AddressLookupJob(callId), first);
+        await _application.WaitForDispatchProposalAsync(callId);
 
         using var moved = await manager.PatchAsJsonAsync($"/api/emergency-calls/{callId}", new { latitude = 6.93, longitude = 79.86 });
         Assert.Equal(HttpStatusCode.OK, moved.StatusCode);
@@ -143,6 +144,7 @@ public sealed class EmergencyCallEndpointTests
         using var callResponse = await patient.PostAsJsonAsync("/api/emergency-calls", Request(Guid.NewGuid(), true));
         using var callBody = JsonDocument.Parse(await callResponse.Content.ReadAsStringAsync());
         var callId = callBody.RootElement.GetProperty("id").GetGuid();
+        await _application.WaitForDispatchProposalAsync(callId);
         var ready = await CreateReadyAmbulanceAsync(manager);
         using var crew = await StaffClientAsync(ready.FirstCrewEmail);
         var ambulanceId = ready.AmbulanceId;
@@ -477,6 +479,7 @@ public sealed class EmergencyCallEndpointTests
         using var defaultBody = JsonDocument.Parse(await defaulted.Content.ReadAsStringAsync());
         var id = defaultBody.RootElement.GetProperty("id").GetGuid();
         Assert.Equal("high", defaultBody.RootElement.GetProperty("priority").GetString());
+        await _application.WaitForDispatchProposalAsync(id);
 
         using var patientUpdate = await patient.PatchAsJsonAsync($"/api/emergency-calls/{id}", new
         {
@@ -616,12 +619,14 @@ public sealed class EmergencyCallEndpointTests
         details
     };
 
-    private static async Task<Guid> CreatePatientCallAsync(HttpClient patient)
+    private async Task<Guid> CreatePatientCallAsync(HttpClient patient)
     {
         using var response = await patient.PostAsJsonAsync("/api/emergency-calls", Request(Guid.NewGuid(), true));
         response.EnsureSuccessStatusCode();
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        return body.RootElement.GetProperty("id").GetGuid();
+        var callId = body.RootElement.GetProperty("id").GetGuid();
+        await _application.WaitForDispatchProposalAsync(callId);
+        return callId;
     }
 
     private static async Task<Guid> CreateStaffCallAsync(

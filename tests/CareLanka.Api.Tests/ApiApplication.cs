@@ -111,6 +111,22 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
         await db.SaveChangesAsync();
     }
 
+    // Taking a call opens a proposal that DispatchProposalWorker fills in a moment later. A test that
+    // dispatches, edits or cancels the call before then writes the same row as the worker and gets a 409.
+    public async Task WaitForDispatchProposalAsync(Guid callId)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        while (await db.DispatchProposals.AsNoTracking()
+                   .AnyAsync(x => x.EmergencyCallId == callId && x.Status == DispatchProposalStatus.Pending))
+        {
+            Assert.True(DateTime.UtcNow < deadline, "The dispatch proposal never left pending.");
+            await Task.Delay(50);
+        }
+    }
+
     async Task IAsyncLifetime.DisposeAsync()
     {
         Dispose();

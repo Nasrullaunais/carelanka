@@ -18,6 +18,7 @@ const allowed: Record<PrincipalRole, string[]> = {
   duty_manager: [...shared, '/emergency', '/intake', '/patients', '/appointments', '/discharge', '/care-recommendations', '/laboratory', '/patient-accounts', '/staff', '/staff/coverage', '/staff/leave-approval'],
   hospital_administrator: [...shared, '/patients', '/appointments', '/discharge', '/patient-accounts', '/billing-settings', '/maintenance-unit', '/warnings', '/staff', '/staff/coverage', '/staff/leave-approval'],
   equipment_manager: [...shared, '/patients', '/warnings', '/laboratory'],
+  equipment_administrator: [...shared, '/patients', '/maintenance-unit'],
   ambulance_crew: shared,
   patient: [],
 };

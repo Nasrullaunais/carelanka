@@ -299,10 +299,20 @@ public sealed class EquipmentItemService : IEquipmentItemService
         return await ToItemAsync(item, cancellationToken);
     }
 
+    // The equipment administrator is a role created only for this confirming work, so signing
+    // in as it is proof enough; the hospital administrator has much wider reach, so the code
+    // stays required for them on top of the role.
+    private void EnsureConfirmationCode(string? confirmationCode)
+    {
+        if (_currentUser.Role == PrincipalRole.EquipmentAdministrator) return;
+
+        _confirmationCode.Ensure(confirmationCode);
+    }
+
     public async Task<IReadOnlyList<EquipmentItem>> ListAwaitingConfirmationAsync(
         string? confirmationCode, CancellationToken cancellationToken = default)
     {
-        _confirmationCode.Ensure(confirmationCode);
+        EnsureConfirmationCode(confirmationCode);
 
         var rows = await _db.EquipmentItems.AsNoTracking()
             .Include(i => i.Category)
@@ -331,7 +341,7 @@ public sealed class EquipmentItemService : IEquipmentItemService
     public async Task<EquipmentItem> ConfirmAsync(
         Guid id, string? confirmationCode, CancellationToken cancellationToken = default)
     {
-        _confirmationCode.Ensure(confirmationCode);
+        EnsureConfirmationCode(confirmationCode);
 
         var item = await GetAwaitingConfirmationAsync(id, cancellationToken);
 
@@ -347,7 +357,7 @@ public sealed class EquipmentItemService : IEquipmentItemService
     public async Task RejectAsync(
         Guid id, string? confirmationCode, CancellationToken cancellationToken = default)
     {
-        _confirmationCode.Ensure(confirmationCode);
+        EnsureConfirmationCode(confirmationCode);
 
         var item = await GetAwaitingConfirmationAsync(id, cancellationToken);
 

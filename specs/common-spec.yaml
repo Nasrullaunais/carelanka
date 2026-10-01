@@ -810,7 +810,7 @@ components:
     StaffRole:
       type: string
       description: |
-        The seven internal roles. Group-owned: this is the JWT role list, so it is
+        The eight internal roles. Group-owned: this is the JWT role list, so it is
         byte-identical here and in `staff-spec.yaml` and changes in both at once.
         `patient` is deliberately not here - a patient is not staff. See `PrincipalRole`.
       enum:
@@ -821,6 +821,7 @@ components:
         - duty_manager
         - hospital_administrator
         - equipment_manager
+        - equipment_administrator
 
     # ---------- health ----------
 
@@ -837,7 +838,7 @@ components:
     PrincipalRole:
       type: string
       description: |
-        What goes in the JWT `role` claim: the seven `StaffRole` values plus `patient`.
+        What goes in the JWT `role` claim: the eight `StaffRole` values plus `patient`.
 
         A separate name rather than adding `patient` to `StaffRole`, because `StaffRole`
         is a column on `staff_members` and a patient has no row there. One enum for two
@@ -850,6 +851,7 @@ components:
         - duty_manager
         - hospital_administrator
         - equipment_manager
+        - equipment_administrator
         - patient
 
     StaffLoginRequest:

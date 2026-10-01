@@ -1865,7 +1865,7 @@ export type Prescription = {
 
 export type PrescriptionStatus = 'submitted' | 'ready' | 'delivered' | 'rejected';
 
-export type PrincipalRole = 'ward_nurse' | 'doctor' | 'ambulance_crew' | 'general_staff' | 'duty_manager' | 'hospital_administrator' | 'equipment_manager' | 'patient';
+export type PrincipalRole = 'ward_nurse' | 'doctor' | 'ambulance_crew' | 'general_staff' | 'duty_manager' | 'hospital_administrator' | 'equipment_manager' | 'equipment_administrator' | 'patient';
 
 export type PrincipalType = 'staff' | 'patient';
 
@@ -2266,7 +2266,7 @@ export type StaffMemberDto = {
     updated_at: string;
 };
 
-export type StaffRole = 'ward_nurse' | 'doctor' | 'ambulance_crew' | 'general_staff' | 'duty_manager' | 'hospital_administrator' | 'equipment_manager';
+export type StaffRole = 'ward_nurse' | 'doctor' | 'ambulance_crew' | 'general_staff' | 'duty_manager' | 'hospital_administrator' | 'equipment_manager' | 'equipment_administrator';
 
 export type StaffSkillDto = {
     skill_id: string;

@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory)]
-    [ValidateSet('smoke', 'baseline', 'ramp', 'patient-reads', 'login-flood')]
+    [ValidateSet('smoke', 'baseline', 'ramp', 'stress', 'patient-reads', 'login-flood')]
     [string]$Scenario
 )
 

@@ -65,7 +65,7 @@ export const READ_ENDPOINT_NAMES = STAFF_READS.map((r) => r.ep);
 
 export function staffReadMix(token) {
   const pick = STAFF_READS[Math.floor(Math.random() * STAFF_READS.length)];
-  get(token, pick.path, pick.ep);
+  return get(token, pick.path, pick.ep);
 }
 
 export function readThresholds() {

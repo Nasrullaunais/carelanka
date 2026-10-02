@@ -7,10 +7,13 @@ export function summaryTo(scenario) {
     const base = `results/${scenario}-${stamp}`;
     const text = textSummary(data, { indent: ' ', enableColors: false });
 
+    // setup_data holds the login token returned by setup(), so it must not reach a file.
+    const { setup_data: _token, ...safe } = data;
+
     return {
       stdout: text,
       [`${base}.txt`]: text,
-      [`${base}.json`]: JSON.stringify(data, null, 2),
+      [`${base}.json`]: JSON.stringify(safe, null, 2),
     };
   };
 }

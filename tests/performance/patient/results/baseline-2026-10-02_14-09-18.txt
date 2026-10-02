@@ -1,0 +1,43 @@
+     ✓ care_recommendations is 200
+     ✓ billing_outstanding is 200
+     ✓ patients_list is 200
+     ✓ wards_list is 200
+     ✓ patients_search is 200
+     ✓ appointments_list is 200
+     ✓ bed_availability is 200
+     ✓ worklist is 200
+     ✓ patient_create is 201
+     ✓ appointment_create is 201
+     ✓ ward_capacity is 200
+     ✓ invalid write is 400
+
+     █ setup
+
+       ✓ login returned 200
+
+     checks..........................: 100.00% ✓ 53       ✗ 0  
+     data_received...................: 203 kB  3.3 kB/s
+     data_sent.......................: 8.2 kB  134 B/s
+     http_req_blocked................: avg=11.77ms  min=0s       med=0s       max=361.03ms p(90)=0s       p(95)=0s      
+     http_req_connecting.............: avg=4.8ms    min=0s       med=0s       max=129.32ms p(90)=0s       p(95)=0s      
+   ✓ http_req_duration...............: avg=201.48ms min=127.01ms med=133.26ms max=1.86s    p(90)=286.25ms p(95)=388.07ms
+     ✓ { ep:appointments_list }......: avg=141.03ms min=129.3ms  med=131.42ms max=202.1ms  p(90)=160.21ms p(95)=181.15ms
+     ✓ { ep:bed_availability }.......: avg=319.61ms min=258.79ms med=261.3ms  max=525.94ms p(90)=432.56ms p(95)=479.25ms
+     ✓ { ep:billing_outstanding }....: avg=138.25ms min=135.81ms med=138ms    max=141.63ms p(90)=140.08ms p(95)=140.85ms
+     ✓ { ep:care_recommendations }...: avg=132.34ms min=128.37ms med=131.25ms max=137.41ms p(90)=136.18ms p(95)=136.79ms
+     ✓ { ep:patients_list }..........: avg=130.14ms min=127.01ms med=129.78ms max=133.39ms p(90)=133.03ms p(95)=133.21ms
+     ✓ { ep:patients_search }........: avg=131.65ms min=128.55ms med=131.73ms max=134.58ms p(90)=134.27ms p(95)=134.42ms
+     ✓ { ep:ward_capacity }..........: avg=302.83ms min=130.31ms med=384.03ms max=394.15ms p(90)=392.12ms p(95)=393.13ms
+     ✓ { ep:wards_list }.............: avg=129.96ms min=128.29ms med=129.89ms max=133.26ms p(90)=131.37ms p(95)=132.32ms
+     ✗ { ep:worklist }...............: avg=421.89ms min=131.29ms med=134.42ms max=1.86s    p(90)=951.11ms p(95)=1.4s    
+       { expected_response:true }....: avg=201.48ms min=127.01ms med=133.26ms max=1.86s    p(90)=286.25ms p(95)=388.07ms
+   ✓ http_req_failed.................: 0.00%   ✓ 0        ✗ 53 
+     http_req_receiving..............: avg=15.98ms  min=0s       med=1.53ms   max=215.37ms p(90)=6.03ms   p(95)=130.25ms
+     http_req_sending................: avg=115.42µs min=0s       med=0s       max=1ms      p(90)=446.86µs p(95)=509.56µs
+     http_req_tls_handshaking........: avg=5.11ms   min=0s       med=0s       max=137.32ms p(90)=0s       p(95)=0s      
+     http_req_waiting................: avg=185.37ms min=125.83ms med=130.93ms max=1.86s    p(90)=210.95ms p(95)=356.21ms
+     http_reqs.......................: 53      0.863687/s
+     iteration_duration..............: avg=1.21s    min=1.12s    med=1.13s    max=2.86s    p(90)=1.34s    p(95)=1.39s   
+     iterations......................: 50      0.814799/s
+     vus.............................: 1       min=1      max=1
+     vus_max.........................: 1       min=1      max=1

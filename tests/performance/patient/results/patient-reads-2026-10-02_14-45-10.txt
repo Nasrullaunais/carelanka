@@ -1,0 +1,30 @@
+     ✓ me_profile status ok
+     ✓ me_admission status ok
+     ✓ me_history status ok
+     ✓ me_appointments status ok
+
+     █ setup
+
+       ✓ login returned 200
+
+     checks.........................: 100.00% ✓ 741       ✗ 0  
+     data_received..................: 243 kB  3.9 kB/s
+     data_sent......................: 42 kB   673 B/s
+     http_req_blocked...............: avg=3.23ms   min=0s       med=0s       max=521.54ms p(90)=0s       p(95)=0s      
+     http_req_connecting............: avg=1.32ms   min=0s       med=0s       max=179.46ms p(90)=0s       p(95)=0s      
+   ✓ http_req_duration..............: avg=158.13ms min=117.9ms  med=129.13ms max=2.49s    p(90)=162.74ms p(95)=230.08ms
+     ✓ { ep:me_admission }..........: avg=141.85ms min=118.68ms med=129.91ms max=293.99ms p(90)=170.33ms p(95)=229.17ms
+     ✓ { ep:me_appointments }.......: avg=140.87ms min=118.63ms med=129.02ms max=567.69ms p(90)=153.83ms p(95)=210.63ms
+     ✓ { ep:me_history }............: avg=139ms    min=118.98ms med=130.27ms max=238.32ms p(90)=159.63ms p(95)=200.5ms 
+     ✓ { ep:me_profile }............: avg=210.24ms min=117.9ms  med=128ms    max=2.49s    p(90)=218.7ms  p(95)=419.37ms
+       { expected_response:true }...: avg=158.13ms min=117.9ms  med=129.13ms max=2.49s    p(90)=162.74ms p(95)=230.08ms
+   ✓ http_req_failed................: 0.00%   ✓ 0         ✗ 741
+     http_req_receiving.............: avg=3.32ms   min=0s       med=768.3µs  max=637.66ms p(90)=3.21ms   p(95)=5.9ms   
+     http_req_sending...............: avg=47.89µs  min=0s       med=0s       max=11.43ms  p(90)=0s       p(95)=328.79µs
+     http_req_tls_handshaking.......: avg=1.73ms   min=0s       med=0s       max=218.61ms p(90)=0s       p(95)=0s      
+     http_req_waiting...............: avg=154.76ms min=116.88ms med=127.9ms  max=2.39s    p(90)=159.03ms p(95)=222.06ms
+     http_reqs......................: 741     11.955207/s
+     iteration_duration.............: avg=1.64s    min=1.48s    med=1.52s    max=4.01s    p(90)=1.93s    p(95)=2.19s   
+     iterations.....................: 185     2.984768/s
+     vus............................: 5       min=5       max=5
+     vus_max........................: 5       min=5       max=5

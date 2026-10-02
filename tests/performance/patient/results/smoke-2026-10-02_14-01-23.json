@@ -1,0 +1,450 @@
+{
+  "options": {
+    "summaryTrendStats": [
+      "avg",
+      "min",
+      "med",
+      "max",
+      "p(90)",
+      "p(95)"
+    ],
+    "summaryTimeUnit": "",
+    "noColor": false
+  },
+  "state": {
+    "isStdOutTTY": true,
+    "isStdErrTTY": true,
+    "testRunDurationMs": 31499.9947
+  },
+  "metrics": {
+    "data_sent": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 13936,
+        "rate": 442.4127728504031
+      }
+    },
+    "http_req_blocked": {
+      "values": {
+        "min": 0,
+        "med": 0,
+        "max": 261.5466,
+        "p(90)": 0,
+        "p(95)": 24.560009999998602,
+        "avg": 12.962277215189873
+      },
+      "type": "trend",
+      "contains": "time"
+    },
+    "http_req_duration{ep:billing_outstanding}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 176.87407272727273,
+        "min": 130.1798,
+        "med": 140.857,
+        "max": 360.4873,
+        "p(90)": 258.168,
+        "p(95)": 309.32765
+      },
+      "thresholds": {
+        "p(95)<500": {
+          "ok": true
+        }
+      }
+    },
+    "http_reqs": {
+      "values": {
+        "count": 79,
+        "rate": 2.507936929906849
+      },
+      "type": "counter",
+      "contains": "default"
+    },
+    "http_req_duration{expected_response:true}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 177.45020253164557,
+        "min": 118.6063,
+        "med": 133.6011,
+        "max": 595.512,
+        "p(90)": 269.34948,
+        "p(95)": 360.80994
+      }
+    },
+    "vus_max": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "max": 3,
+        "value": 3,
+        "min": 3
+      }
+    },
+    "http_req_duration{ep:care_recommendations}": {
+      "contains": "time",
+      "values": {
+        "min": 119.853,
+        "med": 128.64875,
+        "max": 202.5674,
+        "p(90)": 166.92309999999998,
+        "p(95)": 184.74525,
+        "avg": 138.67284999999998
+      },
+      "thresholds": {
+        "p(95)<500": {
+          "ok": true
+        }
+      },
+      "type": "trend"
+    },
+    "http_req_duration{ep:appointments_list}": {
+      "values": {
+        "p(90)": 177.83746000000002,
+        "p(95)": 232.46117999999996,
+        "avg": 151.00764444444448,
+        "min": 121.462,
+        "med": 132.883,
+        "max": 287.0849
+      },
+      "thresholds": {
+        "p(95)<500": {
+          "ok": true
+        }
+      },
+      "type": "trend",
+      "contains": "time"
+    },
+    "http_req_waiting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 129.7523,
+        "max": 436.4674,
+        "p(90)": 230.04890000000003,
+        "p(95)": 358.30872999999997,
+        "avg": 157.25214936708863,
+        "min": 117.5001
+      }
+    },
+    "http_req_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 133.6011,
+        "max": 595.512,
+        "p(90)": 269.34948,
+        "p(95)": 360.80994,
+        "avg": 177.45020253164557,
+        "min": 118.6063
+      },
+      "thresholds": {
+        "p(95)<5000": {
+          "ok": true
+        }
+      }
+    },
+    "http_req_duration{ep:ward_capacity}": {
+      "contains": "time",
+      "values": {
+        "max": 162.1717,
+        "p(90)": 151.92759999999998,
+        "p(95)": 157.04964999999999,
+        "avg": 134.89201666666665,
+        "min": 121.0164,
+        "med": 130.5368
+      },
+      "thresholds": {
+        "p(95)<500": {
+          "ok": true
+        }
+      },
+      "type": "trend"
+    },
+    "http_req_tls_handshaking": {
+      "values": {
+        "avg": 6.657417721518987,
+        "min": 0,
+        "med": 0,
+        "max": 135.4941,
+        "p(90)": 0,
+        "p(95)": 12.436669999999292
+      },
+      "type": "trend",
+      "contains": "time"
+    },
+    "http_req_connecting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "max": 125.5201,
+        "p(90)": 0,
+        "p(95)": 12.068019999999313,
+        "avg": 6.271120253164557,
+        "min": 0,
+        "med": 0
+      }
+    },
+    "iteration_duration": {
+      "contains": "time",
+      "values": {
+        "max": 1596.3049,
+        "p(90)": 1360.0805799999998,
+        "p(95)": 1424.30666,
+        "avg": 1187.5174038461544,
+        "min": 1118.7612,
+        "med": 1133.795
+      },
+      "type": "trend"
+    },
+    "iterations": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 78,
+        "rate": 2.47619089281942
+      }
+    },
+    "http_req_duration{ep:patients_list}": {
+      "contains": "time",
+      "values": {
+        "med": 129.922,
+        "max": 363.7137,
+        "p(90)": 220.69547999999998,
+        "p(95)": 281.4990499999999,
+        "avg": 163.1853933333333,
+        "min": 118.6063
+      },
+      "thresholds": {
+        "p(95)<500": {
+          "ok": true
+        }
+      },
+      "type": "trend"
+    },
+    "http_req_duration{ep:patients_search}": {
+      "thresholds": {
+        "p(95)<500": {
+          "ok": true
+        }
+      },
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 132.012125,
+        "avg": 128.19201666666666,
+        "min": 120.6777,
+        "med": 129.13155,
+        "max": 132.7042,
+        "p(90)": 131.32004999999998
+      }
+    },
+    "vus": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "value": 3,
+        "min": 3,
+        "max": 3
+      }
+    },
+    "http_req_duration{ep:wards_list}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "max": 359.1412,
+        "p(90)": 190.36712000000003,
+        "p(95)": 274.75415999999996,
+        "avg": 156.7137,
+        "min": 124.0656,
+        "med": 129.9454
+      },
+      "thresholds": {
+        "p(95)<500": {
+          "ok": true
+        }
+      }
+    },
+    "http_req_duration{ep:worklist}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(90)": 334.1846,
+        "p(95)": 386.83465,
+        "avg": 199.36696666666663,
+        "min": 127.1043,
+        "med": 135.34314999999998,
+        "max": 439.4847
+      },
+      "thresholds": {
+        "p(95)<500": {
+          "ok": true
+        }
+      }
+    },
+    "http_req_failed": {
+      "contains": "default",
+      "values": {
+        "rate": 0,
+        "passes": 0,
+        "fails": 79
+      },
+      "thresholds": {
+        "rate<0.05": {
+          "ok": true
+        }
+      },
+      "type": "rate"
+    },
+    "http_req_duration{ep:bed_availability}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 256.10745000000003,
+        "max": 595.512,
+        "p(90)": 434.50244999999995,
+        "p(95)": 515.0072249999998,
+        "avg": 305.04472000000004,
+        "min": 239.4023
+      },
+      "thresholds": {
+        "p(95)<500": {
+          "ok": false
+        }
+      }
+    },
+    "data_received": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 350311,
+        "rate": 11120.985998134152
+      }
+    },
+    "http_req_sending": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 0,
+        "med": 0,
+        "max": 1.0499,
+        "p(90)": 0.39996000000000026,
+        "p(95)": 0.5561399999999999,
+        "avg": 0.08234177215189874
+      }
+    },
+    "http_req_receiving": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 20.115711392405068,
+        "min": 0,
+        "med": 1.375,
+        "max": 236.2265,
+        "p(90)": 120.96714000000001,
+        "p(95)": 127.02685
+      }
+    },
+    "checks": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 1,
+        "passes": 79,
+        "fails": 0
+      }
+    }
+  },
+  "setup_data": {
+    "token": "<token removed>"
+  },
+  "root_group": {
+    "path": "",
+    "id": "d41d8cd98f00b204e9800998ecf8427e",
+    "groups": [
+      {
+        "groups": [],
+        "checks": [
+            {
+              "name": "login returned 200",
+              "path": "::setup::login returned 200",
+              "id": "ba49420fe054b51246e45376ce9afefd",
+              "passes": 1,
+              "fails": 0
+            }
+          ],
+        "name": "setup",
+        "path": "::setup",
+        "id": "5c0f8025f7e0b6654089e5b00e950f1a"
+      }
+    ],
+    "checks": [
+      {
+        "name": "patients_list is 200",
+        "path": "::patients_list is 200",
+        "id": "41d831f03d99f61d504865ef5499a4da",
+        "passes": 15,
+        "fails": 0
+      },
+      {
+        "id": "5a92fae96e57677f560b0d8164bc3590",
+        "passes": 6,
+        "fails": 0,
+        "name": "care_recommendations is 200",
+        "path": "::care_recommendations is 200"
+      },
+      {
+        "fails": 0,
+        "name": "worklist is 200",
+        "path": "::worklist is 200",
+        "id": "f4d612fb43422812fd49a3f308193760",
+        "passes": 6
+      },
+      {
+        "name": "ward_capacity is 200",
+        "path": "::ward_capacity is 200",
+        "id": "fffb4b916a7437260f02ddd6bba92e5b",
+        "passes": 6,
+        "fails": 0
+      },
+      {
+        "name": "patients_search is 200",
+        "path": "::patients_search is 200",
+        "id": "015affdca594c051a2288ae6ddf42af1",
+        "passes": 6,
+        "fails": 0
+      },
+      {
+        "name": "wards_list is 200",
+        "path": "::wards_list is 200",
+        "id": "987f64080095684d202eba8df52408e8",
+        "passes": 9,
+        "fails": 0
+      },
+      {
+        "passes": 11,
+        "fails": 0,
+        "name": "billing_outstanding is 200",
+        "path": "::billing_outstanding is 200",
+        "id": "5e694d6ab8c4f6e2445443615730a3b4"
+      },
+      {
+        "name": "appointments_list is 200",
+        "path": "::appointments_list is 200",
+        "id": "f74f57f240ac8d2519f6b88793350c63",
+        "passes": 9,
+        "fails": 0
+      },
+      {
+        "fails": 0,
+        "name": "bed_availability is 200",
+        "path": "::bed_availability is 200",
+        "id": "3a187e4599a2a8eaee162d131fcd26c2",
+        "passes": 10
+      }
+    ],
+    "name": ""
+  }
+}

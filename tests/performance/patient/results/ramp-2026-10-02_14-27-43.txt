@@ -1,0 +1,46 @@
+     ✓ worklist is 200
+     ✓ appointments_list is 200
+     ✓ patients_search is 200
+     ✓ bed_availability is 200
+     ✓ ward_capacity is 200
+     ✓ billing_outstanding is 200
+     ✓ patients_list is 200
+     ✓ wards_list is 200
+     ✓ care_recommendations is 200
+     ✓ invalid write is 400
+     ✓ patient_create is 201
+     ✓ appointment_create is 201
+
+     █ setup
+
+       ✓ login returned 200
+
+     checks.........................: 100.00% ✓ 6974      ✗ 0   
+     data_received..................: 31 MB   83 kB/s
+     data_sent......................: 568 kB  1.5 kB/s
+     http_req_blocked...............: avg=3.17ms   min=0s       med=0s       max=2.1s     p(90)=0s       p(95)=0s      
+     http_req_connecting............: avg=1.56ms   min=0s       med=0s       max=1.78s    p(90)=0s       p(95)=0s      
+   ✓ http_req_duration..............: avg=169.37ms min=117.09ms med=131.74ms max=4.96s    p(90)=271.39ms p(95)=370.96ms
+       { expected_response:true }...: avg=169.37ms min=117.09ms med=131.74ms max=4.96s    p(90)=271.39ms p(95)=370.96ms
+     ✓ { stage:vu01 }...............: avg=158.09ms min=120.69ms med=126.03ms max=396.71ms p(90)=247.68ms p(95)=339.94ms
+     ✓ { stage:vu05 }...............: avg=185.98ms min=119.07ms med=129.31ms max=4.96s    p(90)=266.84ms p(95)=368.24ms
+     ✓ { stage:vu10 }...............: avg=167.76ms min=118.49ms med=130.77ms max=1.14s    p(90)=266.31ms p(95)=337.31ms
+     ✓ { stage:vu20 }...............: avg=185.15ms min=118.44ms med=132.89ms max=913.89ms p(90)=332.92ms p(95)=439.31ms
+     ✓ { stage:vu40 }...............: avg=159.18ms min=117.09ms med=130.67ms max=865.64ms p(90)=257.89ms p(95)=300.13ms
+     ✓ { stage:vu60 }...............: avg=170.12ms min=117.74ms med=133.09ms max=796.96ms p(90)=275.53ms p(95)=374.17ms
+   ✓ http_req_failed................: 0.00%   ✓ 0         ✗ 6974
+     ✓ { stage:vu01 }...............: 0.00%   ✓ 0         ✗ 52  
+     ✓ { stage:vu05 }...............: 0.00%   ✓ 0         ✗ 221 
+     ✓ { stage:vu10 }...............: 0.00%   ✓ 0         ✗ 478 
+     ✓ { stage:vu20 }...............: 0.00%   ✓ 0         ✗ 944 
+     ✓ { stage:vu40 }...............: 0.00%   ✓ 0         ✗ 1938
+     ✓ { stage:vu60 }...............: 0.00%   ✓ 0         ✗ 3340
+     http_req_receiving.............: avg=17.68ms  min=0s       med=1.75ms   max=789.37ms p(90)=119.97ms p(95)=129.84ms
+     http_req_sending...............: avg=44.39µs  min=0s       med=0s       max=15.17ms  p(90)=0s       p(95)=362.42µs
+     http_req_tls_handshaking.......: avg=1.53ms   min=0s       med=0s       max=1.81s    p(90)=0s       p(95)=0s      
+     http_req_waiting...............: avg=151.64ms min=115.61ms med=127.9ms  max=4.96s    p(90)=196.91ms p(95)=354.1ms 
+     http_reqs......................: 6974    18.525519/s
+     iteration_duration.............: avg=1.17s    min=1.11s    med=1.13s    max=5.96s    p(90)=1.27s    p(95)=1.38s   
+     iterations.....................: 6965    18.501612/s
+     vus............................: 2       min=1       max=60
+     vus_max........................: 60      min=60      max=60

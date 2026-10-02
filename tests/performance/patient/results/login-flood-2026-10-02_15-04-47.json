@@ -1,0 +1,219 @@
+{
+  "metrics": {
+    "http_req_connecting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 4.76998,
+        "min": 0,
+        "med": 0,
+        "max": 119.2495,
+        "p(90)": 0,
+        "p(95)": 0
+      }
+    },
+    "iteration_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 158.332632,
+        "min": 116.7256,
+        "med": 124.7528,
+        "max": 599.7241,
+        "p(90)": 191.83896000000001,
+        "p(95)": 212.42247999999995
+      }
+    },
+    "vus": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "value": 1,
+        "min": 1,
+        "max": 1
+      }
+    },
+    "data_sent": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 5360,
+        "rate": 1353.9386631431928
+      }
+    },
+    "data_received": {
+      "contains": "data",
+      "values": {
+        "count": 14199,
+        "rate": 3586.6744548451857
+      },
+      "type": "counter"
+    },
+    "vus_max": {
+      "contains": "default",
+      "values": {
+        "max": 1,
+        "value": 1,
+        "min": 1
+      },
+      "type": "gauge"
+    },
+    "checks": {
+      "contains": "default",
+      "values": {
+        "rate": 0.9,
+        "passes": 45,
+        "fails": 5
+      },
+      "type": "rate"
+    },
+    "http_req_failed": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 0,
+        "passes": 0,
+        "fails": 25
+      }
+    },
+    "iterations": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 25,
+        "rate": 6.315012421376832
+      }
+    },
+    "http_reqs": {
+      "contains": "default",
+      "values": {
+        "count": 25,
+        "rate": 6.315012421376832
+      },
+      "type": "counter"
+    },
+    "http_req_waiting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 143.924452,
+        "min": 116.7256,
+        "med": 124.7528,
+        "max": 261.4239,
+        "p(90)": 191.25714000000002,
+        "p(95)": 212.22853999999995
+      }
+    },
+    "http_req_duration": {
+      "contains": "time",
+      "values": {
+        "min": 116.7256,
+        "med": 124.7528,
+        "max": 261.4239,
+        "p(90)": 191.83896000000001,
+        "p(95)": 212.42247999999995,
+        "avg": 144.70668399999997
+      },
+      "type": "trend"
+    },
+    "http_req_blocked": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "max": 336.7974,
+        "p(90)": 0,
+        "p(95)": 0,
+        "avg": 13.471896,
+        "min": 0,
+        "med": 0
+      }
+    },
+    "http_req_duration{expected_response:true}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 116.7256,
+        "med": 124.7528,
+        "max": 261.4239,
+        "p(90)": 191.83896000000001,
+        "p(95)": 212.42247999999995,
+        "avg": 144.70668399999997
+      }
+    },
+    "http_req_receiving": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 0,
+        "med": 0.5035,
+        "max": 4.2885,
+        "p(90)": 1.8058400000000003,
+        "p(95)": 2.3893999999999984,
+        "avg": 0.7621040000000001
+      }
+    },
+    "http_req_tls_handshaking": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 0,
+        "max": 125.6695,
+        "p(90)": 0,
+        "p(95)": 0,
+        "avg": 5.02678,
+        "min": 0
+      }
+    },
+    "http_req_sending": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 0.020128,
+        "min": 0,
+        "med": 0,
+        "max": 0.5032,
+        "p(90)": 0,
+        "p(95)": 0
+      }
+    }
+  },
+  "root_group": {
+    "name": "",
+    "path": "",
+    "id": "d41d8cd98f00b204e9800998ecf8427e",
+    "groups": [],
+    "checks": [
+        {
+          "name": "refused as 401 or limited as 429",
+          "path": "::refused as 401 or limited as 429",
+          "id": "b8beae436b20b7a6273a9bb4648468a0",
+          "passes": 25,
+          "fails": 0
+        },
+        {
+          "name": "limited (429)",
+          "path": "::limited (429)",
+          "id": "99d836eea684f7bb5f96ec6f236744d1",
+          "passes": 20,
+          "fails": 5
+        }
+      ]
+  },
+  "options": {
+    "summaryTrendStats": [
+      "avg",
+      "min",
+      "med",
+      "max",
+      "p(90)",
+      "p(95)"
+    ],
+    "summaryTimeUnit": "",
+    "noColor": false
+  },
+  "state": {
+    "isStdOutTTY": true,
+    "isStdErrTTY": true,
+    "testRunDurationMs": 3958.8204
+  }
+}

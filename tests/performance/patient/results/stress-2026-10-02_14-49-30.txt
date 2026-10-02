@@ -1,0 +1,58 @@
+     ✓ patients_list is 200
+     ✓ ward_capacity is 200
+     ✓ wards_list is 200
+     ✗ worklist is 200
+      ↳  99% — ✓ 3903 / ✗ 1
+     ✓ care_recommendations is 200
+     ✗ billing_outstanding is 200
+      ↳  99% — ✓ 3909 / ✗ 2
+     ✓ appointments_list is 200
+     ✓ patients_search is 200
+     ✓ bed_availability is 200
+
+     █ setup
+
+       ✓ login returned 200
+
+     checks..........................: 99.99% ✓ 35148      ✗ 3    
+     data_received...................: 174 MB 549 kB/s
+     data_sent.......................: 2.7 MB 8.5 kB/s
+   ✓ http_429........................: 0      0/s
+     ✓ { stage:vu100 }...............: 0      0/s
+     ✓ { stage:vu150 }...............: 0      0/s
+     ✓ { stage:vu200 }...............: 0      0/s
+     ✓ { stage:vu250 }...............: 0      0/s
+     ✓ { stage:vu60 }................: 0      0/s
+     http_req_blocked................: avg=4.48ms   min=0s       med=0s       max=6.21s  p(90)=0s       p(95)=0s      
+     http_req_connecting.............: avg=2.72ms   min=0s       med=0s       max=4.65s  p(90)=0s       p(95)=0s      
+   ✓ http_req_duration...............: avg=308.39ms min=0s       med=144.43ms max=16.55s p(90)=483.12ms p(95)=995.8ms 
+     ✗ { ep:appointments_list }......: avg=288.12ms min=120.75ms med=143.29ms max=8.5s   p(90)=462.22ms p(95)=935.88ms
+     ✗ { ep:bed_availability }.......: avg=516.07ms min=124.97ms med=276.54ms max=16.55s p(90)=829.06ms p(95)=1.77s   
+     ✗ { ep:billing_outstanding }....: avg=302.35ms min=0s       med=152.16ms max=8.23s  p(90)=458.44ms p(95)=979.72ms
+     ✗ { ep:care_recommendations }...: avg=284.33ms min=117.73ms med=136.88ms max=8.48s  p(90)=463.55ms p(95)=1.03s   
+     ✗ { ep:patients_list }..........: avg=286.4ms  min=117.73ms med=137.28ms max=8.46s  p(90)=441.14ms p(95)=903.49ms
+     ✗ { ep:patients_search }........: avg=268.72ms min=117.9ms  med=138.35ms max=8.95s  p(90)=409.93ms p(95)=898.18ms
+     ✗ { ep:ward_capacity }..........: avg=263.19ms min=118.62ms med=138.4ms  max=8.45s  p(90)=389.45ms p(95)=715.7ms 
+     ✗ { ep:wards_list }.............: avg=269.48ms min=117.93ms med=137.58ms max=8.53s  p(90)=416.67ms p(95)=848.79ms
+     ✗ { ep:worklist }...............: avg=298.13ms min=0s       med=141.1ms  max=8.46s  p(90)=485.86ms p(95)=979.06ms
+       { expected_response:true }....: avg=308.41ms min=117.73ms med=144.44ms max=16.55s p(90)=483.19ms p(95)=995.85ms
+     ✗ { stage:vu100 }...............: avg=226.88ms min=117.73ms med=136.82ms max=3.04s  p(90)=295.21ms p(95)=620.78ms
+     ✗ { stage:vu150 }...............: avg=334.69ms min=0s       med=139.77ms max=7.64s  p(90)=490.29ms p(95)=1.53s   
+     ✗ { stage:vu200 }...............: avg=270.77ms min=118.04ms med=138.07ms max=5.01s  p(90)=309.28ms p(95)=1.02s   
+     ✗ { stage:vu250 }...............: avg=337.93ms min=117.73ms med=178.29ms max=11.74s p(90)=557.71ms p(95)=928.66ms
+     ✗ { stage:vu60 }................: avg=386.06ms min=118.62ms med=137.71ms max=16.55s p(90)=409.22ms p(95)=627.78ms
+   ✓ http_req_failed.................: 0.00%  ✓ 3          ✗ 35148
+     ✓ { stage:vu100 }...............: 0.00%  ✓ 0          ✗ 4637 
+     ✓ { stage:vu150 }...............: 0.04%  ✓ 3          ✗ 6395 
+     ✓ { stage:vu200 }...............: 0.00%  ✓ 0          ✗ 9347 
+     ✓ { stage:vu250 }...............: 0.00%  ✓ 0          ✗ 12168
+     ✓ { stage:vu60 }................: 0.00%  ✓ 0          ✗ 2600 
+     http_req_receiving..............: avg=35.71ms  min=0s       med=1.5ms    max=16.42s p(90)=125.35ms p(95)=143.62ms
+     http_req_sending................: avg=18.29µs  min=0s       med=0s       max=9.37ms p(90)=0s       p(95)=0s      
+     http_req_tls_handshaking........: avg=2.13ms   min=0s       med=0s       max=4.56s  p(90)=0s       p(95)=0s      
+     http_req_waiting................: avg=272.65ms min=0s       med=138.42ms max=8.65s  p(90)=430.03ms p(95)=881.1ms 
+     http_reqs.......................: 35151  111.089085/s
+     iteration_duration..............: avg=1.31s    min=1.11s    med=1.14s    max=17.55s p(90)=1.49s    p(95)=2.02s   
+     iterations......................: 35150  111.085925/s
+     vus.............................: 5      min=5        max=250
+     vus_max.........................: 250    min=250      max=250

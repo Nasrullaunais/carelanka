@@ -74,7 +74,8 @@ public static partial class CareRecommendationValidator
         "asking", "request"
     }.Select(Normalise));
 
-    [GeneratedRegex(@"\b\d+(\.\d+)?\s?(mg|mcg|ml|g|iu|units?|tablets?|tabs?|capsules?|caps?)\b",
+    [GeneratedRegex(
+        @"\b(\d+(\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|half)(\s?a)?\s?(mg|mcg|ml|g|iu|units?|tablets?|tabs?|capsules?|caps?)\b",
         RegexOptions.IgnoreCase)]
     private static partial Regex DosagePattern();
 

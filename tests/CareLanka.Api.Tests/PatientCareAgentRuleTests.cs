@@ -31,15 +31,28 @@ public sealed class PatientCareAgentRuleTests
         Assert.Contains("CR1", result.FailedRules);
     }
 
-    [Fact]
+    [Theory]
     [Trait("id", "PT-AI-01b")]
-    public void Dose_in_words_currently_slips_through()
+    [InlineData("The usual amount is two tablets every six hours.")]
+    [InlineData("Take one capsule at night.")]
+    [InlineData("Half a tablet should be enough.")]
+    [InlineData("TEN UNITS before meals.")]
+    public void A_dose_written_in_words_fails_CR1(string message)
     {
-        // Known finding, not a fix: the dose check needs digits, so "two tablets" is not caught.
-        var result = Validate("The usual amount is two tablets every six hours.", reportedText: "my head hurts");
+        var result = Validate(message, reportedText: "my head hurts");
 
-        Assert.True(result.Passed);
-        Assert.DoesNotContain("CR1", result.FailedRules);
+        Assert.Contains("CR1", result.FailedRules);
+    }
+
+    [Theory]
+    [Trait("id", "PT-AI-01c")]
+    [InlineData("One of the nurses will come and see you soon.")]
+    [InlineData("Someone from the ward team will check on you in two minutes.")]
+    public void A_number_word_that_is_not_a_dose_still_passes_CR1(string message)
+    {
+        var result = Validate(message, reportedText: "my head hurts");
+
+        Assert.True(result.Passed, string.Join(", ", result.FailedRules));
     }
 
     [Theory]

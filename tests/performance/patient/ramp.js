@@ -2,7 +2,9 @@ import { sleep } from 'k6';
 import exec from 'k6/execution';
 import { loginStaff, SAFETY_THRESHOLDS } from './common.js';
 import { staffIteration } from './mix.js';
+import { summaryTo } from './summary.js';
 
+const CREATE_AT = [150, 600, 1200, 2000, 3000, 4000, 5000, 6000];
 const LEVELS = [1, 5, 10, 20, 40, 60];
 const STEP_SECONDS = 60;
 
@@ -36,6 +38,8 @@ export const options = {
   },
 };
 
+export const handleSummary = summaryTo('ramp');
+
 export function setup() {
   return { token: loginStaff(), startedAt: Date.now() };
 }
@@ -45,6 +49,6 @@ export default function (data) {
   const index = Math.min(Math.floor(elapsed / STEP_SECONDS), stageNames.length - 1);
   exec.vu.metrics.tags.stage = stageNames[index];
 
-  staffIteration(data.token);
+  staffIteration(data.token, 'ramp', CREATE_AT);
   sleep(1);
 }

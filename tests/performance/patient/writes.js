@@ -27,6 +27,7 @@ export function createPatientThenBook(token, tag) {
   if (!created) {
     return;
   }
+  console.log(`QM_CREATED patient ${create.json('id')} "QM Test ${tag}"`);
 
   const scheduledAt = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
   const book = http.post(
@@ -38,7 +39,9 @@ export function createPatientThenBook(token, tag) {
     }),
     { headers: authHeaders(token), tags: { ep: 'appointment_create' } },
   );
-  check(book, { 'appointment_create is 201': (r) => r.status === 201 });
+  if (check(book, { 'appointment_create is 201': (r) => r.status === 201 })) {
+    console.log(`QM_CREATED appointment ${book.json('id')} for patient ${create.json('id')}`);
+  }
 }
 
 export function sendInvalidWrite(token, variant) {

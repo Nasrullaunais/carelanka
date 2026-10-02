@@ -1,6 +1,9 @@
 import { sleep } from 'k6';
 import { loginStaff, readThresholds, SAFETY_THRESHOLDS } from './common.js';
 import { staffIteration } from './mix.js';
+import { summaryTo } from './summary.js';
+
+const CREATE_AT = [10, 40];
 
 export const options = {
   vus: 1,
@@ -12,11 +15,13 @@ export const options = {
   },
 };
 
+export const handleSummary = summaryTo('baseline');
+
 export function setup() {
   return { token: loginStaff() };
 }
 
 export default function (data) {
-  staffIteration(data.token);
+  staffIteration(data.token, 'baseline', CREATE_AT);
   sleep(1);
 }

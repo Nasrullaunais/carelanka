@@ -1,5 +1,6 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
+import { summaryTo } from './summary.js';
 import { BASE_URL, authHeaders, loginPatient, SAFETY_THRESHOLDS } from './common.js';
 
 const READS = [
@@ -23,6 +24,8 @@ export const options = {
     http_req_duration: [{ threshold: 'p(95)<5000', abortOnFail: true, delayAbortEval: '10s' }],
   },
 };
+
+export const handleSummary = summaryTo('patient-reads');
 
 export function setup() {
   return { token: loginPatient() };

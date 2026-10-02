@@ -1,5 +1,6 @@
 import http from 'k6/http';
 import { check } from 'k6';
+import { summaryTo } from './summary.js';
 import { BASE_URL } from './common.js';
 
 const REFUSED_OR_LIMITED = http.expectedStatuses(401, 429);
@@ -14,6 +15,8 @@ export const options = {
     },
   },
 };
+
+export const handleSummary = summaryTo('login-flood');
 
 export default function () {
   const res = http.post(

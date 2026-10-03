@@ -86,6 +86,26 @@ public sealed class EquipmentAdministratorTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Registering_an_equipment_administrator_with_a_too_short_password_is_rejected()
+    {
+        // VALIDATION testing: CreateStaffMemberRequest.TemporaryPassword has [MinLength(12)].
+        // The new role goes through the exact same registration validation as any other -
+        // nothing about EquipmentAdministrator should relax it.
+        using var hospitalAdmin = await ClientAsync(ApiApplication.AdministratorEmail);
+
+        var response = await hospitalAdmin.PostAsJsonAsync("/api/staff", new
+        {
+            first_name = "Test",
+            last_name = "Administrator",
+            email = $"equip-admin-{Guid.NewGuid():N}@carelanka.invalid",
+            temporary_password = "short1!", // 7 characters, under the 12-character minimum
+            role = "equipment_administrator",
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     private async Task<Guid> NewAwaitingItemIdAsync(HttpClient equipmentClient)
     {
         using var category = await ReadJsonAsync(await equipmentClient.PostAsJsonAsync(

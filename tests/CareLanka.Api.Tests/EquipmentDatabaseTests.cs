@@ -67,6 +67,59 @@ public sealed class EquipmentDatabaseTests
             $"DELETE FROM equipment_categories WHERE id = {category.Id}"));
     }
 
+    [Fact]
+    public async Task A_failed_save_rolls_back_every_entity_in_it_not_just_the_one_that_failed()
+    {
+        // TRANSACTION testing: a single SaveChangesAsync() wraps every pending change in
+        // one atomic transaction. Here a brand-new, perfectly valid category is queued
+        // alongside an item that will fail the asset-tag uniqueness constraint. If the
+        // save were not atomic, the valid category could be left behind even though the
+        // whole call threw. We re-read through a SEPARATE DbContext afterwards, so
+        // nothing left in the first context's local change tracker can hide the answer.
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        var sharedTag = $"DB-TEST-{Guid.NewGuid():N}"[..14];
+        var existingCategory = NewCategory();
+        db.EquipmentCategories.Add(existingCategory);
+        db.EquipmentItems.Add(NewItem(existingCategory.Id, sharedTag));
+        await db.SaveChangesAsync();
+
+        var newCategoryInTheSameSave = NewCategory();
+        db.EquipmentCategories.Add(newCategoryInTheSameSave);
+        db.EquipmentItems.Add(NewItem(existingCategory.Id, sharedTag)); // duplicate tag - will fail
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+
+        using var freshScope = _application.Services.CreateScope();
+        var freshDb = freshScope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        var survived = await freshDb.EquipmentCategories.AsNoTracking()
+            .AnyAsync(c => c.Id == newCategoryInTheSameSave.Id);
+
+        Assert.False(survived);
+    }
+
+    [Fact]
+    public async Task The_staff_members_role_constraint_in_the_real_database_lists_equipment_administrator()
+    {
+        // MIGRATION testing: every other test here only proves migrations run without
+        // throwing (ApiApplication.InitializeAsync calls MigrateAsync for every test).
+        // This checks the actual, specific effect our migration
+        // (20260930202957_Common_AddEquipmentAdministratorRole) was meant to have: the
+        // ck_staff_members_role check constraint in the REAL Postgres catalog, not the
+        // C# model, must list the new role. Read with pg_get_constraintdef, bypassing
+        // EF entirely, so this can't pass just because the C# enum looks right.
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        var definition = await db.Database
+            .SqlQueryRaw<string>(
+                "SELECT pg_get_constraintdef(oid) AS \"Value\" FROM pg_constraint WHERE conname = 'ck_staff_members_role'")
+            .SingleAsync();
+
+        Assert.Contains("equipment_administrator", definition);
+    }
+
     private static EquipmentCategory NewCategory() => new()
     {
         Id = Guid.NewGuid(),

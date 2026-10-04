@@ -43,6 +43,7 @@ DispatchDetail _$DispatchDetailFromJson(Map<String, dynamic> json) =>
       callOutcome: json['call_outcome'] == null
           ? null
           : EmergencyCallOutcome.fromJson(json['call_outcome'] as String),
+      callOutcomeNotes: json['call_outcome_notes'] as String?,
       callDetails: json['call_details'] as String?,
       callerName: json['caller_name'] as String?,
       callerPhone: json['caller_phone'] as String?,
@@ -75,6 +76,7 @@ Map<String, dynamic> _$DispatchDetailToJson(DispatchDetail instance) =>
       'destination_label': instance.destinationLabel,
       'call_status': instance.callStatus,
       'call_outcome': instance.callOutcome,
+      'call_outcome_notes': instance.callOutcomeNotes,
       'call_details': instance.callDetails,
       'caller_name': instance.callerName,
       'caller_phone': instance.callerPhone,

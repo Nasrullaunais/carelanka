@@ -32,12 +32,13 @@ Future<bool> confirmRunStep(
   BuildContext context, {
   required String title,
   required String confirmLabel,
+  String message = 'This cannot be undone.',
 }) async =>
     await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(title),
-        content: const Text('This cannot be undone.'),
+        content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../services/api_client/models/dispatch_detail.dart';
 import '../models/run_step.dart';
+import 'label_value_row.dart';
 
 class RunCard extends StatelessWidget {
   const RunCard({
@@ -57,9 +58,9 @@ class RunCard extends StatelessWidget {
                       : 'No details were given by the caller.',
                 ),
                 if (run.patientName?.trim().isNotEmpty == true)
-                  _Row(label: 'Patient', value: run.patientName),
+                  LabelValueRow(label: 'Patient', value: run.patientName),
                 if (run.callerName?.trim().isNotEmpty == true)
-                  _Row(label: 'Caller', value: run.callerName),
+                  LabelValueRow(label: 'Caller', value: run.callerName),
                 if (phone != null && phone.isNotEmpty && onCallCaller != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -79,12 +80,19 @@ class RunCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _Row(label: 'Ambulance', value: run.ambulanceRegistration),
+                LabelValueRow(
+                  label: 'Ambulance',
+                  value: run.ambulanceRegistration,
+                ),
                 if (run.sceneAddressLabel?.trim().isNotEmpty == true)
-                  _Row(label: 'Scene', value: run.sceneAddressLabel),
-                if (run.destinationLabel?.trim().isNotEmpty == true)
-                  _Row(label: 'Going to', value: run.destinationLabel),
-                _Row(label: 'Crew on board', value: run.crewCount?.toString()),
+                  LabelValueRow(label: 'Scene', value: run.sceneAddressLabel),
+                if (run.destinationLabel?.trim().isNotEmpty == true &&
+                    run.destinationLabel != run.sceneAddressLabel)
+                  LabelValueRow(label: 'Going to', value: run.destinationLabel),
+                LabelValueRow(
+                  label: 'Crew on board',
+                  value: run.crewCount?.toString(),
+                ),
               ],
             ),
           ),
@@ -134,24 +142,4 @@ class RunCard extends StatelessWidget {
       ],
     );
   }
-}
-
-class _Row extends StatelessWidget {
-  const _Row({required this.label, required this.value});
-
-  final String label;
-  final String? value;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 4),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label),
-        const SizedBox(width: 16),
-        Flexible(child: Text(value ?? 'Not set', textAlign: TextAlign.end)),
-      ],
-    ),
-  );
 }

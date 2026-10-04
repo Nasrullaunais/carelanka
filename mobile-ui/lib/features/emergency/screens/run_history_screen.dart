@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/utils/friendly_date.dart';
 import '../../../core/widgets/async_view.dart';
 import '../../../services/api_client/models/dispatch_summary.dart';
+import '../emergency_routes.dart';
 import '../models/run_step.dart';
 import '../state/run_history_controller.dart';
 
@@ -66,7 +68,13 @@ class _RunTile extends StatelessWidget {
     final dispatchedAt = run.dispatchedAt;
     final crew = run.crewCount;
 
+    final id = run.id;
+
     return ListTile(
+      trailing: const Icon(Icons.chevron_right),
+      onTap: id == null
+          ? null
+          : () => context.push('${EmergencyPaths.history}/$id'),
       title: Text(
         '${run.ambulanceRegistration ?? 'Ambulance'} · ${run.status?.crewLabel ?? ''}',
       ),

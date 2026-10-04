@@ -16,6 +16,7 @@ public sealed class DispatchDetail : DispatchSummary
     public string? DestinationLabel { get; set; }
     public CallStatus CallStatus { get; set; }
     public EmergencyCallOutcome? CallOutcome { get; set; }
+    public string? CallOutcomeNotes { get; set; }
     public string? CallDetails { get; set; }
     public string? CallerName { get; set; }
     public string? CallerPhone { get; set; }

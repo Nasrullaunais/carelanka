@@ -68,28 +68,30 @@ export function EmergencyDesk({ selectedCallId, onSelectCall, onCloseCall }: {
   }
 
   return (
-    <div className={selectedCallId ? 'emergency-desk emergency-desk-open' : 'emergency-desk'}>
-      <section className="emergency-desk-list flex flex-col gap-4" aria-labelledby="live-call-heading">
-        <div className="flex items-center justify-between gap-3">
-          <h2 id="live-call-heading" className="m-0">Live calls</h2>
-          <Button onPress={() => setLogCallOpen(true)}>Log emergency call</Button>
-        </div>
-        <CallBoard filter={filter} onFilterChange={(value) => { setFilter(value); setPage(1); }} calls={calls.data?.items} selectedId={selectedCallId} isLoading={calls.isPending} error={calls.error} onRetry={() => void calls.refetch()} onSelect={selectCall} page={page} totalPages={calls.data?.total_pages ?? 1} onPageChange={setPage} />
-      </section>
-      {selectedCallId
-        ? (
-          <section className="emergency-desk-call card" aria-label="Open call">
-            <Button className="emergency-desk-back" size="sm" variant="ghost" onPress={onCloseCall}>Back to calls</Button>
-            <CallDetail key={selectedCallId} callId={selectedCallId} query={selectedCall} ambulances={ambulances} onDispatched={openNextCall} ambulancePage={ambulancePage} onAmbulancePageChange={setAmbulancePage} />
-          </section>
-        )
-        : (
-          <section className="emergency-desk-call emergency-desk-placeholder workflow-empty" aria-label="Open call">
-            <h2>Select a call</h2>
-            <p className="muted">Its details, map and ambulance recommendation open here.</p>
-          </section>
-        )}
-      <LogCallDialog isOpen={logCallOpen} isPending={createCall.isPending} onOpenChange={setLogCallOpen} onSubmit={(body: CreateEmergencyCallRequest) => createCall.mutate({ body })} />
+    <div className="emergency-desk-frame">
+      <div className={selectedCallId ? 'emergency-desk emergency-desk-open' : 'emergency-desk'}>
+        <section className="emergency-desk-list flex flex-col gap-4" aria-labelledby="live-call-heading">
+          <div className="flex items-center justify-between gap-3">
+            <h2 id="live-call-heading" className="m-0">Live calls</h2>
+            <Button onPress={() => setLogCallOpen(true)}>Log emergency call</Button>
+          </div>
+          <CallBoard filter={filter} onFilterChange={(value) => { setFilter(value); setPage(1); }} calls={calls.data?.items} selectedId={selectedCallId} isLoading={calls.isPending} error={calls.error} onRetry={() => void calls.refetch()} onSelect={selectCall} page={page} totalPages={calls.data?.total_pages ?? 1} onPageChange={setPage} />
+        </section>
+        {selectedCallId
+          ? (
+            <section className="emergency-desk-call card" aria-label="Open call">
+              <Button className="emergency-desk-back" size="sm" variant="ghost" onPress={onCloseCall}>Back to calls</Button>
+              <CallDetail key={selectedCallId} callId={selectedCallId} query={selectedCall} ambulances={ambulances} onDispatched={openNextCall} ambulancePage={ambulancePage} onAmbulancePageChange={setAmbulancePage} />
+            </section>
+          )
+          : (
+            <section className="emergency-desk-call emergency-desk-placeholder workflow-empty" aria-label="Open call">
+              <h2>Select a call</h2>
+              <p className="muted">Its details, map and ambulance recommendation open here.</p>
+            </section>
+          )}
+        <LogCallDialog isOpen={logCallOpen} isPending={createCall.isPending} onOpenChange={setLogCallOpen} onSubmit={(body: CreateEmergencyCallRequest) => createCall.mutate({ body })} />
+      </div>
     </div>
   );
 }

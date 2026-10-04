@@ -41,6 +41,7 @@ public sealed class EmergencyCallClosingTests
         Assert.Equal("closed_at_scene", body.GetProperty("status").GetString());
         Assert.Equal("completed", body.GetProperty("call_status").GetString());
         Assert.Equal("treated_at_scene", body.GetProperty("call_outcome").GetString());
+        Assert.Equal("Dressed a cut; no transport needed.", body.GetProperty("call_outcome_notes").GetString());
         var call = await CallAsync(run.CallId);
         Assert.Equal(EmergencyCallOutcome.TreatedAtScene, call.Outcome);
         Assert.Equal("Dressed a cut; no transport needed.", call.OutcomeNotes);

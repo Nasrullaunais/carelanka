@@ -63,6 +63,31 @@ void main() {
     expect(rang, '0771234567');
   });
 
+  testWidgets('does not repeat the scene as where the crew is going', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: RunCard(
+            run: const DispatchDetail(
+              status: DispatchStatus.enRouteToScene,
+              sceneAddressLabel: 'Galle Face, Colombo',
+              destinationLabel: 'Galle Face, Colombo',
+            ),
+            busy: false,
+            onStep: () {},
+            onDecline: () {},
+            onNavigate: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Going to'), findsNothing);
+    expect(find.text('Galle Face, Colombo'), findsOneWidget);
+  });
+
   testWidgets('offers to end without transport only at the scene', (
     tester,
   ) async {

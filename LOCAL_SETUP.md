@@ -14,6 +14,13 @@ curl http://localhost:5231/api/health
 
 Compose starts PostgreSQL, applies EF migrations, loads the demo SQL on the first run, and starts the .NET 8 API. Swagger is at http://localhost:5231/swagger. Later starts only need `docker compose up -d`. Use `docker compose logs -f api` to watch the server and `docker compose down` to stop it. `docker compose down -v` deletes the local demo database.
 
+If the API keeps restarting and `docker compose logs api` shows an error such as `relation "skills" already exists`, your local database was built by an older set of migrations. Delete it and let Compose build a fresh one; this only wipes the local demo data:
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
+
 ## Web UI
 
 In a second terminal:

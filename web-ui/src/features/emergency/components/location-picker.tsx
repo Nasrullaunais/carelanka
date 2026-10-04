@@ -1,6 +1,7 @@
 import 'leaflet/dist/leaflet.css';
 import { useEffect } from 'react';
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import { FollowContainerSize } from './follow-container-size';
 import { circleMarker } from './map-marker';
 
 const COLOMBO: [number, number] = [6.9271, 79.8612];
@@ -15,6 +16,7 @@ export function LocationPicker({ value, onChange, readOnly = false }: { value?: 
   return (
     <div className="h-64 overflow-hidden rounded-xl border border-default-200" aria-label="Emergency location picker">
       <MapContainer center={position} zoom={13} className="h-full w-full">
+        <FollowContainerSize />
         <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <PickerMarker position={position} onChange={onChange} readOnly={readOnly} />
         <KeepInView latitude={position[0]} longitude={position[1]} />

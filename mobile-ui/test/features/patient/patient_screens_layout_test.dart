@@ -3,6 +3,7 @@ import 'package:carelanka_mobile/core/auth/session_expiry.dart';
 import 'package:carelanka_mobile/core/auth/token_store.dart';
 import 'package:carelanka_mobile/core/network/api_exception.dart';
 import 'package:carelanka_mobile/core/theme/app_theme.dart';
+import 'package:carelanka_mobile/features/emergency/services/patient_emergency_service.dart';
 import 'package:carelanka_mobile/features/equipment/services/prescription_service.dart';
 import 'package:carelanka_mobile/features/patient/screens/home_screen.dart';
 import 'package:carelanka_mobile/features/patient/screens/my_stay_screen.dart';
@@ -24,6 +25,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import '../../fake_inbox.dart';
+import '../emergency/fake_patient_emergency_service.dart';
 import '../equipment/fake_prescriptions.dart';
 import 'fake_patient_service.dart';
 
@@ -129,6 +131,7 @@ void main() {
           ChangeNotifierProvider.value(value: appointmentsController),
           ChangeNotifierProvider.value(value: auth),
           Provider<PrescriptionService>.value(value: FakePrescriptionService()),
+          Provider<PatientEmergencyService>.value(value: FakePatientEmergencyService()),
           fakeInboxProvider(),
         ],
         child: MaterialApp(theme: theme, home: screen),

@@ -2621,6 +2621,10 @@ components:
               allOf:
                 - $ref: '#/components/schemas/EmergencyCallOutcome'
               nullable: true
+            call_outcome_notes:
+              type: string
+              nullable: true
+              description: The note written by whoever closed the call, such as the crew ending the run at the scene.
             call_details:
               type: string
               nullable: true

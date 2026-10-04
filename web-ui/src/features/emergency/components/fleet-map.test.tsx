@@ -9,7 +9,7 @@ vi.mock('react-leaflet', () => ({
   Tooltip: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
   Polyline: ({ positions }: { positions: number[][] }) => <div data-testid="route-line">{positions.map((point) => point.join(',')).join(' → ')}</div>,
   Marker: ({ children, eventHandlers }: { children: React.ReactNode; eventHandlers?: { click?: () => void } }) => <button type="button" onClick={eventHandlers?.click}>{children}</button>,
-  useMap: () => ({ setView: vi.fn(), fitBounds: vi.fn() }),
+  useMap: () => ({ setView: vi.fn(), fitBounds: vi.fn(), invalidateSize: vi.fn(), getContainer: () => document.createElement('div') }),
 }));
 
 const fleet: FleetMapData = {

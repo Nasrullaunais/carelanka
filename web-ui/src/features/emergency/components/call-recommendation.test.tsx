@@ -114,6 +114,14 @@ describe('CallRecommendation', () => {
     await waitFor(() => expect(mocks.recheck.mock.calls[0]?.[0]).toEqual({ body: { emergency_call_id: 'call-1', allow_diversion: true } }));
   });
 
+  it('stops saying no ambulance is free once one is', () => {
+    renderWithProviders(<CallRecommendation callId="call-1" latest={summary('failed')} ambulanceFree onSent={vi.fn()} />);
+
+    expect(screen.getByText('An ambulance has come free since then. Re-check for a recommendation.')).toBeInTheDocument();
+    expect(screen.queryByText('No ambulance available')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Re-check' })).toBeInTheDocument();
+  });
+
   it('says why there is no recommendation after a rejection', async () => {
     renderWithProviders(<CallRecommendation callId="call-1" latest={summary('rejected')} onSent={vi.fn()} />);
     expect(await screen.findByText('Last one rejected: Handled another way.')).toBeInTheDocument();

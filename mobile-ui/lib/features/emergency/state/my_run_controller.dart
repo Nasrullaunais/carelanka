@@ -26,6 +26,7 @@ class MyRunController extends ChangeNotifier {
   ApiException? _actionError;
   String? _liveRunId;
   DispatchDetail? _endedRun;
+  bool _onAmbulance = true;
 
   AsyncData<DispatchDetail?> get state => _state;
   bool get busy => _busy;
@@ -34,6 +35,10 @@ class MyRunController extends ChangeNotifier {
   /// The run that just stopped being live, so the screen can say how it ended
   /// instead of going blank.
   DispatchDetail? get endedRun => _endedRun;
+
+  /// False when nobody has put this crew member on an ambulance, so waiting
+  /// for a run would be waiting forever.
+  bool get onAmbulance => _onAmbulance;
 
   void startPolling() {
     _poll?.cancel();
@@ -55,7 +60,16 @@ class MyRunController extends ChangeNotifier {
         _state = AsyncData.failed(error);
       }
     }
+    if (_state case AsyncReady(value: null)) await _checkOnAmbulance();
     _notify();
+  }
+
+  Future<void> _checkOnAmbulance() async {
+    try {
+      _onAmbulance = await _service.onAmbulanceCrew();
+    } on ApiException {
+      return;
+    }
   }
 
   Future<bool> acknowledge() => _act((run) => _service.acknowledge(run.id!));

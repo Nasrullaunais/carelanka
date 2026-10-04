@@ -930,6 +930,7 @@ export type DispatchDetail = {
     destination_label?: string | null;
     call_status?: CallStatus;
     call_outcome?: EmergencyCallOutcome;
+    call_outcome_notes?: string | null;
     call_details?: string | null;
     caller_name?: string | null;
     caller_phone?: string | null;

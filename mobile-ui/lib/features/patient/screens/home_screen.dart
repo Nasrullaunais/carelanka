@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/notifications/notification_bell.dart';
@@ -12,7 +11,7 @@ import '../../../core/widgets/notice_banner.dart';
 import '../../../services/api_client/models/my_admission.dart';
 import '../../../services/api_client/models/my_appointment.dart';
 import '../../../services/api_client/models/my_profile.dart';
-import '../../emergency/emergency_routes.dart';
+import '../../emergency/widgets/ambulance_request_card.dart';
 import '../state/appointments_controller.dart';
 import '../state/my_stay_controller.dart';
 import '../state/profile_controller.dart';
@@ -86,7 +85,7 @@ class HomeScreen extends StatelessWidget {
                       onBookVisit: onBookVisit,
                     ),
                     const SizedBox(height: 24),
-                    const _AmbulanceAction(),
+                    const AmbulanceRequestCard(),
                     const SizedBox(height: 28),
                     Padding(
                       padding: const EdgeInsets.only(left: 2, bottom: 12),
@@ -658,57 +657,6 @@ class _ShortcutTile extends StatelessWidget {
                   style: theme.textTheme.labelLarge?.copyWith(fontSize: 13),
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AmbulanceAction extends StatelessWidget {
-  const _AmbulanceAction();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-
-    return Material(
-      color: scheme.errorContainer,
-      borderRadius: BorderRadius.circular(22),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => context.push(EmergencyPaths.patientReport),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(color: scheme.error, shape: BoxShape.circle),
-                child: Icon(Icons.emergency_outlined, color: scheme.onError),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Request ambulance',
-                      style: theme.textTheme.titleMedium?.copyWith(color: scheme.onErrorContainer),
-                    ),
-                    Text(
-                      'Share your location',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: scheme.onErrorContainer.withValues(alpha: 0.8),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right_rounded, color: scheme.onErrorContainer),
             ],
           ),
         ),

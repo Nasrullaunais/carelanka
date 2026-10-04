@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../services/api_client/models/cancellation_request_status.dart';
 import '../../../services/api_client/models/my_call_tracking.dart';
+import '../../patient/patient_routes.dart';
+import '../emergency_routes.dart';
 import '../models/patient_call_text.dart';
 import '../state/patient_emergency_controller.dart';
 import '../widgets/maps_launcher.dart';
@@ -63,7 +66,17 @@ class _EmergencyTrackingScreenState extends State<EmergencyTrackingScreen>
     final cancellation = cancellationText(tracking?.cancellationRequestStatus);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Ambulance request')),
+      appBar: AppBar(
+        title: const Text('Ambulance request'),
+        // A notification tap opens this screen on its own, with nothing under it.
+        leading: context.canPop()
+            ? null
+            : IconButton(
+                tooltip: 'Home',
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.go(PatientPaths.home),
+              ),
+      ),
       body: RefreshIndicator(
         onRefresh: () => controller.refreshTracking(widget.callId),
         child: ListView(
@@ -132,6 +145,15 @@ class _EmergencyTrackingScreenState extends State<EmergencyTrackingScreen>
                   controller.cancelNeedsReview
                       ? 'Ask to cancel'
                       : 'Cancel request',
+                ),
+              ),
+            ],
+            if (tracking != null && isOpenCall(tracking.callStatus)) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => context.push(EmergencyPaths.patientReport),
+                child: const Text(
+                  'A different emergency? Request another ambulance',
                 ),
               ),
             ],

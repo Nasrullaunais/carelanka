@@ -35,6 +35,7 @@ class DispatchDetail {
     this.destinationLabel,
     this.callStatus,
     this.callOutcome,
+    this.callOutcomeNotes,
     this.callDetails,
     this.callerName,
     this.callerPhone,
@@ -84,6 +85,8 @@ class DispatchDetail {
   final CallStatus? callStatus;
   @JsonKey(name: 'call_outcome')
   final EmergencyCallOutcome? callOutcome;
+  @JsonKey(name: 'call_outcome_notes')
+  final String? callOutcomeNotes;
   @JsonKey(name: 'call_details')
   final String? callDetails;
   @JsonKey(name: 'caller_name')

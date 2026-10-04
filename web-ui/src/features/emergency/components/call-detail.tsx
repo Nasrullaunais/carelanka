@@ -135,8 +135,8 @@ export function CallDetail({ callId, query, ambulances, onDispatched, ambulanceP
               <StatusChip tone={callStatusTones[status]}>{callStatusLabels[status]}</StatusChip>
             </div>
             {closed && <ClosedCallSummary call={call} />}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <DetailField label="Scene">{call.address_label ?? coordinateLabel(call)}</DetailField>
+            <DetailField label="Scene">{call.address_label ?? coordinateLabel(call)}</DetailField>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <DetailField label="Reported">{formatTimestamp(call.created_at)}</DetailField>
               <DetailField label="Location accuracy">{call.location_accuracy_metres == null ? 'Unknown' : `${call.location_accuracy_metres} m`}</DetailField>
               <DetailField label="Patient is caller">{call.patient_is_caller ? 'Yes' : 'No'}</DetailField>
@@ -162,7 +162,12 @@ export function CallDetail({ callId, query, ambulances, onDispatched, ambulanceP
               <Button size="sm" variant="outline" isDisabled={busy} onPress={() => setEditOpen(true)}>Edit call</Button>
               {canClose && <Button size="sm" variant="danger" isDisabled={busy} onPress={() => setCloseOpen(true)}>Close call</Button>}
             </div>}
-            {canDispatch && <CallRecommendation callId={callId} latest={call.latest_proposal} onSent={() => onDispatched?.()} />}
+            {canDispatch && <CallRecommendation
+              callId={callId}
+              latest={call.latest_proposal}
+              ambulanceFree={ambulances.data?.items?.some((ambulance) => ambulance.is_eligible) ?? false}
+              onSent={() => onDispatched?.()}
+            />}
             {!canDispatch && !closed && <p className="workflow-notice">{liveRun && isPrePickup(liveRun.status)
               ? 'An ambulance is on its way. You can call it off or send a different one until the crew reaches the patient.'
               : 'The crew is with the patient. The run can only be ended by the crew now.'}</p>}

@@ -178,6 +178,11 @@ export const blockReasonLabels: Record<AmbulanceEligibilityBlockReason, string> 
   stale_location: 'Location is stale',
 };
 
+/** The place and its road, the first two parts of a geocoded address, which is what a dispatcher scans a list for. */
+export function shortAddress(label: string): string {
+  return label.split(',').map((part) => part.trim()).filter(Boolean).slice(0, 2).join(', ');
+}
+
 export function formatWaiting(minutes?: number | null): string {
   return minutes == null ? '—' : `${minutes} min`;
 }

@@ -18,6 +18,7 @@ DispatchDetail _run(DispatchStatus status) =>
 final class FakeRunService implements CrewRunService {
   DispatchDetail? active;
   DispatchDetail? finished;
+  bool onAmbulance = true;
   Object? nextError;
   final calls = <String>[];
 
@@ -83,6 +84,9 @@ final class FakeRunService implements CrewRunService {
   @override
   Future<NavigationTarget> navigationTarget(String id) async =>
       const NavigationTarget(googleMapsUrl: 'https://maps');
+
+  @override
+  Future<bool> onAmbulanceCrew() async => onAmbulance;
 }
 
 void main() {
@@ -167,8 +171,21 @@ void main() {
       await controller.load();
 
       expect((controller.state as AsyncReady<DispatchDetail?>).value, isNull);
+      expect(controller.onAmbulance, isTrue);
     },
   );
+
+  test('a crew member on no ambulance is told so instead of waiting', () async {
+    final service = FakeRunService()..onAmbulance = false;
+    final controller = MyRunController(service);
+
+    await controller.load();
+    expect(controller.onAmbulance, isFalse);
+
+    service.onAmbulance = true;
+    await controller.load(showLoading: false);
+    expect(controller.onAmbulance, isTrue);
+  });
 
   test('advancing walks the run forward one legal step at a time', () async {
     final service = FakeRunService()

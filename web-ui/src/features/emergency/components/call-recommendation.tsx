@@ -28,9 +28,10 @@ import { invalidateEmergencyQueries } from '../query-invalidation';
 
 const rejectionOptions = Object.entries(rejectionReasonLabels).map(([value, label]) => ({ value, label }));
 
-export function CallRecommendation({ callId, latest, onSent }: {
+export function CallRecommendation({ callId, latest, ambulanceFree = false, onSent }: {
   callId: string;
   latest: DispatchProposalSummary | null | undefined;
+  ambulanceFree?: boolean;
   onSent: () => void;
 }) {
   const status = latest?.status;
@@ -45,10 +46,14 @@ export function CallRecommendation({ callId, latest, onSent }: {
   if (latest?.id && (status === 'pending_confirmation' || status === 'pending_approval')) {
     return <ReadyRecommendation key={latest.id} proposalId={latest.id} onSent={onSent} />;
   }
-  return <NoRecommendation callId={callId} latest={latest} />;
+  return <NoRecommendation callId={callId} latest={latest} ambulanceFree={ambulanceFree} />;
 }
 
-function NoRecommendation({ callId, latest }: { callId: string; latest: DispatchProposalSummary | null | undefined }) {
+function NoRecommendation({ callId, latest, ambulanceFree }: {
+  callId: string;
+  latest: DispatchProposalSummary | null | undefined;
+  ambulanceFree: boolean;
+}) {
   const queryClient = useQueryClient();
   const detail = useQuery({ ...getDispatchProposalOptions({ path: { id: latest?.id ?? '' } }), enabled: Boolean(latest?.id) });
   const recheck = useMutation({
@@ -59,12 +64,17 @@ function NoRecommendation({ callId, latest }: { callId: string; latest: Dispatch
     },
   });
 
+  // The agent looked when every ambulance was busy; that stops being true once one is free.
+  const freedSince = ambulanceFree && latest?.status === 'failed' && latest.outcome === 'no_ambulance_available';
+
   return (
     <section className="call-recommendation call-recommendation-empty" aria-label="Recommendation" role="status">
       <div>
         <p className="m-0 font-medium">No recommendation — pick an ambulance below.</p>
-        <p className="m-0 text-sm text-muted">{whyNone(latest, detail.data)}</p>
-        {latest?.status === 'failed' && (detail.data?.errors ?? []).map((error) => (
+        <p className="m-0 text-sm text-muted">
+          {freedSince ? 'An ambulance has come free since then. Re-check for a recommendation.' : whyNone(latest, detail.data)}
+        </p>
+        {!freedSince && latest?.status === 'failed' && (detail.data?.errors ?? []).map((error) => (
           <p key={`${error.step}-${error.message}`} className="m-0 text-sm text-danger">{error.message}</p>
         ))}
       </div>

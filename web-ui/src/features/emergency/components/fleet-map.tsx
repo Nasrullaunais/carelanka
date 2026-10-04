@@ -1,6 +1,7 @@
 import 'leaflet/dist/leaflet.css';
 import { useEffect, useRef } from 'react';
 import { MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet';
+import { FollowContainerSize } from './follow-container-size';
 import type { FleetMap as FleetMapData, FleetMapAmbulance, FleetMapCall } from '../../../services/api/generated';
 import { ambulanceStatusLabels, formatAge, priorityLabels } from '../domain';
 import { ambulanceMarker, ambulanceMarkerColors, callMarker, callMarkerColors } from './map-marker';
@@ -27,6 +28,7 @@ export function FleetMap({ map, selectedAmbulanceId, onSelectAmbulance, onOpenCa
     <div className="flex flex-col gap-2">
       <div className="h-[32rem] overflow-hidden rounded-xl border border-default-200" aria-label="Fleet and open-call map">
         <MapContainer center={COLOMBO} zoom={12} className="h-full w-full">
+          <FollowContainerSize />
           <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           <FitOnFirstLoad points={points} />
           {located.map((ambulance) => {

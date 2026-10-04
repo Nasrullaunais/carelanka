@@ -76,7 +76,9 @@ public sealed class OsrmAmbulanceDistanceService : IAmbulanceDistanceService
                 throw new InvalidDataException("Routing service found no road between an ambulance and the scene.");
             }
 
-            byAmbulance[located[index].Id] = new AmbulanceTravel(meters.Value / 1000, (int)Math.Round(seconds.Value));
+            // When both points snap to the same spot on a road, OSRM can answer a fraction of a metre below zero.
+            byAmbulance[located[index].Id] = new AmbulanceTravel(
+                Math.Max(0, meters.Value) / 1000, (int)Math.Round(Math.Max(0, seconds.Value)));
         }
 
         return new DistanceMeasurement(byAmbulance, IsStraightLine: false);

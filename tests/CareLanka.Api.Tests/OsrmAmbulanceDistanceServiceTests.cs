@@ -38,6 +38,16 @@ public sealed class OsrmAmbulanceDistanceServiceTests
     }
 
     [Fact]
+    public async Task An_ambulance_parked_at_the_scene_is_zero_away_not_a_little_below()
+    {
+        var handler = new FakeHandler(_ => Reply("""{"code":"Ok","durations":[[900],[-0.1]],"distances":[[8200],[-0.2]]}"""));
+
+        var result = await Service(handler).MeasureAsync(Fleet, 6.92m, 79.87m);
+
+        Assert.Equal(new AmbulanceTravel(0, 0), result.ByAmbulance[Near]);
+    }
+
+    [Fact]
     public async Task Nothing_is_sent_when_no_ambulance_has_a_position()
     {
         var handler = new FakeHandler(_ => throw new InvalidOperationException("must not be called"));

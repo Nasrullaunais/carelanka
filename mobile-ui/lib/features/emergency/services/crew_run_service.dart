@@ -1,6 +1,7 @@
 import '../../../core/network/api.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../services/api_client/care_lanka_api.dart';
+import '../../../services/api_client/clients/ambulances_api.dart';
 import '../../../services/api_client/clients/dispatches_api.dart';
 import '../../../services/api_client/clients/my_run_api.dart';
 import '../../../services/api_client/models/close_run_at_scene_request.dart';
@@ -35,15 +36,21 @@ abstract interface class CrewRunService {
   Future<DispatchDetail> run(String id);
   Future<NavigationTarget> navigationTarget(String id);
   Future<DispatchSummaryPagedResult> history({required int page});
+
+  /// Whether the duty manager has put this crew member on an ambulance, the
+  /// only way a run can ever reach them.
+  Future<bool> onAmbulanceCrew();
 }
 
 final class GeneratedCrewRunService implements CrewRunService {
   GeneratedCrewRunService(CareLankaApi api)
     : _run = api.myRun,
-      _dispatches = api.dispatches;
+      _dispatches = api.dispatches,
+      _ambulances = api.ambulances;
 
   final MyRunApi _run;
   final DispatchesApi _dispatches;
+  final AmbulancesApi _ambulances;
 
   @override
   Future<DispatchDetail?> activeRun() async {
@@ -114,4 +121,15 @@ final class GeneratedCrewRunService implements CrewRunService {
   @override
   Future<NavigationTarget> navigationTarget(String id) =>
       callApi(() => _run.getMyDispatchNavigationTarget(id: id));
+
+  @override
+  Future<bool> onAmbulanceCrew() async {
+    try {
+      await callApi(() => _ambulances.getMyAmbulanceAssignment());
+      return true;
+    } on ApiException catch (error) {
+      if (error.isNotFound) return false;
+      rethrow;
+    }
+  }
 }

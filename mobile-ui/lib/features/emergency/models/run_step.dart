@@ -62,7 +62,7 @@ extension DispatchStatusRun on DispatchStatus {
     DispatchStatus.handedOver => 'Handed over',
     DispatchStatus.closedAtScene => 'Ended at the scene',
     DispatchStatus.declined => 'Declined',
-    DispatchStatus.cancelled => 'Cancelled',
+    DispatchStatus.cancelled => 'Called off',
     DispatchStatus.reassigned => 'Given to another ambulance',
     DispatchStatus.$unknown => 'Unknown',
   };

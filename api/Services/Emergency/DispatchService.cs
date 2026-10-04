@@ -511,6 +511,7 @@ public sealed class DispatchService : IDispatchService
             ? _options.HospitalEntrance.Label
             : dispatch.EmergencyCall.AddressLabel,
         CallStatus = dispatch.EmergencyCall.Status, CallOutcome = dispatch.EmergencyCall.Outcome,
+        CallOutcomeNotes = dispatch.EmergencyCall.OutcomeNotes,
         CallDetails = dispatch.EmergencyCall.Details, CallerName = dispatch.EmergencyCall.CallerName,
         CallerPhone = dispatch.EmergencyCall.CallerPhone, PatientName = patientName,
         CrewCount = dispatch.Crew.Count,

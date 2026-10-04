@@ -8,6 +8,7 @@ import '../models/patient_call_text.dart';
 import '../state/caller_location_controller.dart';
 import '../state/patient_emergency_controller.dart';
 import '../widgets/caller_location_card.dart';
+import '../widgets/phone_call.dart';
 
 class ReportEmergencyScreen extends StatefulWidget {
   const ReportEmergencyScreen({super.key});
@@ -67,7 +68,7 @@ class _ReportEmergencyScreenState extends State<ReportEmergencyScreen>
       details: _details.text,
     );
     if (mounted && id != null) {
-      context.go('${EmergencyPaths.patientTracking}/$id');
+      context.pushReplacement('${EmergencyPaths.patientTracking}/$id');
     }
   }
 
@@ -105,6 +106,16 @@ class _ReportEmergencyScreenState extends State<ReportEmergencyScreen>
     final controller = context.watch<PatientEmergencyController>();
     final location = context.watch<CallerLocationController>();
     final open = controller.openCall;
+    final stuck =
+        controller.error != null ||
+        switch (location.status) {
+          CallerLocationStatus.needsPermission ||
+          CallerLocationStatus.blocked ||
+          CallerLocationStatus.serviceOff ||
+          CallerLocationStatus.slow ||
+          CallerLocationStatus.unavailable => true,
+          _ => false,
+        };
     return Scaffold(
       appBar: AppBar(title: const Text('Request an ambulance')),
       body: ListView(
@@ -118,8 +129,9 @@ class _ReportEmergencyScreenState extends State<ReportEmergencyScreen>
                 title: const Text('You have a request open'),
                 subtitle: Text(callStatusLabel(open!.status)),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () =>
-                    context.go('${EmergencyPaths.patientTracking}/${open.id}'),
+                onTap: () => context.push(
+                  '${EmergencyPaths.patientTracking}/${open.id}',
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -165,6 +177,23 @@ class _ReportEmergencyScreenState extends State<ReportEmergencyScreen>
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ],
+          if (stuck) ...[
+            const SizedBox(height: 12),
+            const NationalAmbulanceLine(),
+          ],
+          const SizedBox(height: 20),
+          FilledButton.icon(
+            onPressed: controller.acting || !location.canSend ? null : _submit,
+            icon: const Icon(Icons.emergency_outlined),
+            label: Text(switch ((controller.acting, location.canSend)) {
+              (true, _) => 'Sending…',
+              (false, false) => 'Waiting for your location…',
+              (false, true) => 'Request ambulance',
+            }),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(56),
+            ),
+          ),
           if (controller.calls.isNotEmpty) ...[
             const SizedBox(height: 20),
             Text(
@@ -182,26 +211,13 @@ class _ReportEmergencyScreenState extends State<ReportEmergencyScreen>
                   trailing: const Icon(Icons.chevron_right),
                   onTap: call.id == null
                       ? null
-                      : () => context.go(
+                      : () => context.push(
                           '${EmergencyPaths.patientTracking}/${call.id}',
                         ),
                 ),
               ),
             ),
           ],
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: controller.acting || !location.canSend ? null : _submit,
-            icon: const Icon(Icons.emergency_outlined),
-            label: Text(switch ((controller.acting, location.canSend)) {
-              (true, _) => 'Sending…',
-              (false, false) => 'Waiting for your location…',
-              (false, true) => 'Request ambulance',
-            }),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(56),
-            ),
-          ),
         ],
       ),
     );

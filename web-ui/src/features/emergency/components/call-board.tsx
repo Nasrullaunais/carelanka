@@ -3,7 +3,7 @@ import { Button } from '@heroui/react';
 import type { EmergencyCallSummary, ListEmergencyCallsError } from '../../../services/api/generated';
 import { DataTable, type DataTableColumn } from '../../../components/ui/data-table';
 import { StatusChip } from '../../../components/ui/status-chip';
-import { callStatusLabels, callStatusTones, compareByUrgency, formatWaiting, priorityLabels, priorityTones, recommendationLine } from '../domain';
+import { callStatusLabels, callStatusTones, compareByUrgency, formatWaiting, priorityLabels, priorityTones, recommendationLine, shortAddress } from '../domain';
 
 export function CallBoard({ calls, selectedId, isLoading, error, onRetry, onSelect, page, totalPages, onPageChange, filter, onFilterChange }: {
   filter: 'received' | 'all';
@@ -31,11 +31,16 @@ export function CallBoard({ calls, selectedId, isLoading, error, onRetry, onSele
     },
     {
       key: 'caller',
-      header: 'Caller',
+      header: 'Caller and location',
       cell: (call) => (
-        <span className={selectedId === call.id ? 'font-semibold' : undefined}>
-          {call.caller_name ?? 'Unnamed caller'}
-        </span>
+        <div className="flex min-w-36 flex-col">
+          <span className={selectedId === call.id ? 'font-semibold' : undefined}>
+            {call.caller_name ?? 'Unnamed caller'}
+          </span>
+          <span className="line-clamp-2 text-xs text-muted" title={call.address_label ?? undefined}>
+            {call.address_label ? shortAddress(call.address_label) : 'Address resolving'}
+          </span>
+        </div>
       ),
     },
     {
@@ -43,7 +48,12 @@ export function CallBoard({ calls, selectedId, isLoading, error, onRetry, onSele
       header: 'Status',
       cell: (call) => {
         const status = call.status ?? 'received';
-        return <StatusChip tone={callStatusTones[status]}>{callStatusLabels[status]}</StatusChip>;
+        return (
+          <div className="flex flex-col items-start gap-1">
+            <StatusChip tone={callStatusTones[status]}>{callStatusLabels[status]}</StatusChip>
+            {call.waiting_minutes != null && <span className="whitespace-nowrap text-xs text-muted">Waiting {formatWaiting(call.waiting_minutes)}</span>}
+          </div>
+        );
       },
     },
     {
@@ -54,8 +64,6 @@ export function CallBoard({ calls, selectedId, isLoading, error, onRetry, onSele
         return line ? <StatusChip tone={line.tone}>{line.label}</StatusChip> : null;
       },
     },
-    { key: 'location', header: 'Location', cell: (call) => call.address_label ?? 'Address resolving' },
-    { key: 'waiting', header: 'Waiting', cell: (call) => formatWaiting(call.waiting_minutes) },
   ];
 
   return (

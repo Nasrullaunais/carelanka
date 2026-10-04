@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/auth/auth_controller.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/notifications/notification_bell.dart';
 import '../../../core/widgets/async_view.dart';
@@ -12,6 +12,7 @@ import '../services/crew_location_reporter.dart';
 import '../state/my_run_controller.dart';
 import '../widgets/crew_location_lifecycle.dart';
 import '../widgets/maps_launcher.dart';
+import '../widgets/phone_call.dart';
 import '../widgets/run_card.dart';
 import '../widgets/run_ended_view.dart';
 import '../widgets/run_prompts.dart';
@@ -65,6 +66,15 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
               icon: const Icon(Icons.history),
               onPressed: () => context.push(EmergencyPaths.history),
             ),
+            PopupMenuButton<void>(
+              tooltip: 'More',
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  onTap: () => _signOut(context, controller),
+                  child: const Text('Sign out'),
+                ),
+              ],
+            ),
           ],
         ),
         body: Column(
@@ -105,7 +115,7 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
                     onDecline: () => _decline(context, controller),
                     onNavigate: () => _navigate(context, controller),
                     onEndAtScene: () => _endAtScene(context, controller),
-                    onCallCaller: (phone) => _callCaller(context, phone),
+                    onCallCaller: (phone) => callPhone(context, phone),
                   ),
                   (null, final ended?) => RunEndedView(
                     run: ended,
@@ -113,12 +123,19 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
                   ),
                   (null, null) => RefreshableMessage(
                     onRefresh: () => controller.load(showLoading: false),
-                    child: const EmptyView(
-                      icon: Icons.local_hospital_outlined,
-                      title: 'No run right now',
-                      message:
-                          'When the duty manager sends you to a call it will appear here.',
-                    ),
+                    child: controller.onAmbulance
+                        ? const EmptyView(
+                            icon: Icons.local_hospital_outlined,
+                            title: 'No run right now',
+                            message:
+                                'When the duty manager sends you to a call it will appear here.',
+                          )
+                        : const EmptyView(
+                            icon: Icons.person_off_outlined,
+                            title: 'You are not on an ambulance',
+                            message:
+                                'Runs only reach crew on an ambulance. Ask the duty manager to add you to one.',
+                          ),
                   ),
                 },
               ),
@@ -163,6 +180,24 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _signOut(
+    BuildContext context,
+    MyRunController controller,
+  ) async {
+    final auth = context.read<AuthController>();
+    if (controller.state.valueOrNull != null) {
+      final confirmed = await confirmRunStep(
+        context,
+        title: 'Sign out during a run?',
+        message:
+            'This phone will stop sharing the ambulance location. Your crew mate can carry on from their phone.',
+        confirmLabel: 'Sign out',
+      );
+      if (!confirmed) return;
+    }
+    await auth.signOut();
+  }
+
   Future<void> _endAtScene(
     BuildContext context,
     MyRunController controller,
@@ -170,18 +205,6 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
     final result = await askSceneOutcome(context);
     if (result != null) {
       await controller.closeAtScene(result.outcome, notes: result.notes);
-    }
-  }
-
-  Future<void> _callCaller(BuildContext context, String phone) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final launched = await launchUrl(
-      Uri(scheme: 'tel', path: phone),
-    ).catchError((_) => false);
-    if (!launched) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('This phone cannot make calls.')),
-      );
     }
   }
 

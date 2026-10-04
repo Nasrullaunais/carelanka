@@ -68,4 +68,13 @@ public sealed class MyDispatchesController(IDispatchService dispatches) : Contro
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
     public async Task<ActionResult<DispatchDetail>> Handover(Guid id, RecordHandoverRequest request, CancellationToken ct) => Ok(await dispatches.HandoverAsync(id, request, ct));
+
+    [HttpPost("{id:guid}/close-at-scene", Name = "closeMyDispatchAtScene")]
+    [ProducesResponseType(typeof(DispatchDetail), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<DispatchDetail>> CloseAtScene(Guid id, CloseRunAtSceneRequest request, CancellationToken ct) => Ok(await dispatches.CloseAtSceneAsync(id, request, ct));
 }

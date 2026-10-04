@@ -191,7 +191,8 @@ function DiversionImpact({ detail }: { detail: DispatchProposalDetail }) {
         <div><dt className="text-muted">Already waiting</dt><dd>{impact.source_call_waiting_minutes_so_far ?? 0} min</dd></div>
         <div><dt className="text-muted">Extra wait imposed</dt><dd>{impact.source_call_additional_wait_minutes == null ? 'Unknown — no replacement assigned' : `${impact.source_call_additional_wait_minutes} min`}</dd></div>
         <div><dt className="text-muted">Replacement</dt><dd>{impact.replacement_ambulance_registration ?? 'None free'}</dd></div>
-        <div><dt className="text-muted">Time saved for this call</dt><dd>{impact.minutes_saved_for_this_call == null ? 'Not estimated' : `${impact.minutes_saved_for_this_call} min`}</dd></div>
+        <div><dt className="text-muted">Its drive to this call</dt><dd>{detail.estimated_minutes_to_scene == null ? 'Road time unavailable' : `${detail.estimated_minutes_to_scene} min`}</dd></div>
+        {impact.minutes_saved_for_this_call != null && <div><dt className="text-muted">Time saved for this call</dt><dd>{impact.minutes_saved_for_this_call} min</dd></div>}
       </dl>
     </div>
   );

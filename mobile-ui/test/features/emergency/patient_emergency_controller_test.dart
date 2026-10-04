@@ -2,6 +2,8 @@ import 'package:carelanka_mobile/core/network/api_exception.dart';
 import 'package:carelanka_mobile/features/emergency/services/patient_emergency_service.dart';
 import 'package:carelanka_mobile/features/emergency/state/patient_emergency_controller.dart';
 import 'package:carelanka_mobile/services/api_client/models/call_status.dart';
+import 'package:carelanka_mobile/services/api_client/models/cancellation_request_status.dart';
+import 'package:carelanka_mobile/services/api_client/models/dispatch_status.dart';
 import 'package:carelanka_mobile/services/api_client/models/create_emergency_call_request.dart';
 import 'package:carelanka_mobile/services/api_client/models/emergency_call_detail.dart';
 import 'package:carelanka_mobile/services/api_client/models/emergency_cancellation_request.dart';
@@ -40,29 +42,113 @@ void main() {
   });
 
   test(
-    'cancellation uses direct and reviewed operations at the right boundary',
+    'before any ambulance is sent, cancelling happens straight away',
     () async {
       final service = _FakeService();
       final controller = PatientEmergencyController(service);
+      await controller.refreshTracking('call-1');
 
-      expect(
-        await controller.cancel(
-          'call-1',
-          'Created by mistake',
-          dispatched: false,
-        ),
-        isTrue,
-      );
-      expect(
-        await controller.cancel('call-1', 'No longer needed', dispatched: true),
-        isTrue,
-      );
+      expect(controller.cancelNeedsReview, isFalse);
+      expect(await controller.cancel('call-1', 'Created by mistake'), isTrue);
 
       expect(service.directCancellations, 1);
-      expect(service.reviewedCancellations, 1);
+      expect(service.reviewedCancellations, 0);
       controller.dispose();
     },
   );
+
+  test(
+    'with an ambulance on the way, cancelling asks the duty manager',
+    () async {
+      final service = _FakeService()
+        ..tracking = const MyCallTracking(
+          callStatus: CallStatus.dispatched,
+          dispatchStatus: DispatchStatus.enRouteToScene,
+        );
+      final controller = PatientEmergencyController(service);
+      await controller.refreshTracking('call-1');
+
+      expect(controller.cancelNeedsReview, isTrue);
+      expect(await controller.cancel('call-1', 'Found a taxi'), isTrue);
+
+      expect(service.reviewedCancellations, 1);
+      expect(service.directCancellations, 0);
+      controller.dispose();
+    },
+  );
+
+  test('after a crew declines, the caller can still cancel directly', () async {
+    final service = _FakeService()
+      ..tracking = const MyCallTracking(
+        callStatus: CallStatus.received,
+        lookingForAnotherAmbulance: true,
+      );
+    final controller = PatientEmergencyController(service);
+    await controller.refreshTracking('call-1');
+
+    expect(controller.canCancel, isTrue);
+    expect(await controller.cancel('call-1', 'Not needed'), isTrue);
+    expect(service.directCancellations, 1);
+    controller.dispose();
+  });
+
+  test(
+    'no cancel is offered while a request is pending or the crew has arrived',
+    () async {
+      final service = _FakeService()
+        ..tracking = const MyCallTracking(
+          callStatus: CallStatus.dispatched,
+          dispatchStatus: DispatchStatus.enRouteToScene,
+          cancellationRequestStatus: CancellationRequestStatus.pending,
+        );
+      final controller = PatientEmergencyController(service);
+      await controller.refreshTracking('call-1');
+      expect(controller.canCancel, isFalse);
+
+      service.tracking = const MyCallTracking(
+        callStatus: CallStatus.enRoute,
+        dispatchStatus: DispatchStatus.atScene,
+      );
+      await controller.refreshTracking('call-1');
+      expect(controller.canCancel, isFalse);
+      expect(await controller.cancel('call-1', 'Too late'), isFalse);
+      expect(service.reviewedCancellations + service.directCancellations, 0);
+      controller.dispose();
+    },
+  );
+
+  test(
+    'a pending request does not block cancelling once no ambulance is coming',
+    () async {
+      final service = _FakeService()
+        ..tracking = const MyCallTracking(
+          callStatus: CallStatus.received,
+          lookingForAnotherAmbulance: true,
+          cancellationRequestStatus: CancellationRequestStatus.pending,
+        );
+      final controller = PatientEmergencyController(service);
+      await controller.refreshTracking('call-1');
+
+      expect(controller.canCancel, isTrue);
+      expect(controller.cancelNeedsReview, isFalse);
+      expect(await controller.cancel('call-1', 'Got a lift'), isTrue);
+      expect(service.directCancellations, 1);
+      controller.dispose();
+    },
+  );
+
+  test('points the caller to a request that is still open', () async {
+    final service = _FakeService()
+      ..summaries = const [
+        MyEmergencyCallSummary(id: 'old', status: CallStatus.completed),
+        MyEmergencyCallSummary(id: 'open', status: CallStatus.dispatched),
+      ];
+    final controller = PatientEmergencyController(service);
+    await controller.load();
+
+    expect(controller.openCall?.id, 'open');
+    controller.dispose();
+  });
 }
 
 Future<String?> _report(PatientEmergencyController controller) =>
@@ -80,6 +166,11 @@ class _FakeService implements PatientEmergencyService {
   int directCancellations = 0;
   int reviewedCancellations = 0;
   final requests = <CreateEmergencyCallRequest>[];
+  List<MyEmergencyCallSummary> summaries = const [];
+  MyCallTracking tracking = const MyCallTracking(
+    emergencyCallId: 'call-1',
+    callStatus: CallStatus.received,
+  );
 
   @override
   Future<EmergencyCallDetail> report(CreateEmergencyCallRequest request) async {
@@ -91,13 +182,10 @@ class _FakeService implements PatientEmergencyService {
   }
 
   @override
-  Future<List<MyEmergencyCallSummary>> calls() async => const [];
+  Future<List<MyEmergencyCallSummary>> calls() async => summaries;
 
   @override
-  Future<MyCallTracking> track(String id) async => const MyCallTracking(
-    emergencyCallId: 'call-1',
-    callStatus: CallStatus.received,
-  );
+  Future<MyCallTracking> track(String id) async => tracking;
 
   @override
   Future<MyEmergencyCallSummary> cancel(String id, String reason) async {

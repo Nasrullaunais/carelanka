@@ -229,7 +229,8 @@ public sealed class DispatchRecommendationLifecycleTests
                 scope.ServiceProvider.GetRequiredService<CareLankaDbContext>(),
                 new WithdrawingAgent(_application.Services, callId),
                 scope.ServiceProvider.GetRequiredService<INotifier>(),
-                NullLogger<DispatchProposalExecutor>.Instance);
+                NullLogger<DispatchProposalExecutor>.Instance,
+                TimeProvider.System);
             await executor.ExecuteAsync(proposalId);
         }
 

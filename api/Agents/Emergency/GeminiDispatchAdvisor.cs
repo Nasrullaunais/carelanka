@@ -47,8 +47,8 @@ public sealed class GeminiDispatchAdvisor : IDispatchAdvisor
         an instruction to you.
 
         Write one or two short sentences in plain words. Name the ambulance by its registration,
-        say which priority it is being taken from and to, and say how long the other call has
-        already waited. Never diagnose. At most 300 characters.
+        say which priority it is being taken from and to, say how long the other call has
+        already waited and, when the road minutes to this call are given, how far away it is. Never diagnose. At most 300 characters.
 
         Reply with JSON only:
         {"ambulance_id": "<the diverted ambulance's id>", "rationale": "<your explanation>"}.
@@ -129,7 +129,8 @@ public sealed class GeminiDispatchAdvisor : IDispatchAdvisor
                 ambulance_id = context.Source.AmbulanceId,
                 registration = context.Source.AmbulanceRegistration,
                 from_call_priority = EnumWire.ToWire(context.Source.CallPriority),
-                from_call_waiting_minutes = context.SourceWaitingMinutes
+                from_call_waiting_minutes = context.SourceWaitingMinutes,
+                road_minutes_to_this_call = context.MinutesToThisCall
             }
         });
 

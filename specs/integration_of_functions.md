@@ -1314,6 +1314,20 @@ Mirrors §10's and §16's format, from Staff's side — read from `staff-spec.ya
 - **Open item 11.3 is now practically resolved** (see the updated §11.3 above): the agent's plan calls Patient's `POST /admissions/pre-admit` directly once a dispatch is created, matching what `patient-spec.yaml` already documented as the expected caller.
 - **Patient Management failure is non-blocking.** Pre-admission happens after dispatch
   commits and is retried without stopping manual response or handover.
+- **Emergency reads three things through `IPatientService`, and writes none** *(added
+  2026-10-03)*. `FindByUserAccountIdAsync` fills the caller's name and phone on a patient's own
+  report and finds the record to notify; `FindByIdAsync` shows the casualty's name to the Duty
+  Manager and the crew. Nothing is copied into Emergency's tables.
+- **The app caller is told how their request ends** *(added 2026-10-03)*. Updates go to the
+  caller's own patient record (`caller_user_id` → `Patient.user_account_id`), whether they
+  reported for themselves or someone else. A call logged by staff has no app caller and sends
+  nothing. New types: `emergency_call_cancelled` to the caller, `dispatch_cancelled` to the
+  crew when a run is called off.
+- **A call can now end without anyone being taken to hospital** *(added 2026-10-03)*. The crew
+  can close a run at the scene (`closed_at_scene`, with a fixed outcome such as
+  `treated_at_scene` or `refused_transport`), and the Duty Manager can close a call with an
+  outcome. In both cases no pre-admission is sent if one has not gone yet. One that has
+  already gone is open item 11.24.
 
 ## 23. Emergency ↔ Staff Management (Member 2)
 
@@ -1373,8 +1387,12 @@ Mirrors §9's, §15's and §20's format, from Emergency's side. All JWT-protecte
 | `POST /me/dispatches/{id}/acknowledge`; `POST /me/dispatches/{id}/decline` | Responding crew | One crew member's decision for the response unit |
 | `GET /dispatches/{id}` | Patient Management / a future orchestrator | Authoritative dispatch status, ambulance, responding crew, route and ETA |
 | `GET /me/emergency-calls/{id}/tracking` | The patient's own Flutter screen | Ambulance position and ETA for a call **they** raised. Deliberately narrow — no crew names, no notes, no other calls. Emergency's own endpoint, not a filtered staff response |
-| `POST /me/emergency-calls/{id}/cancel` | Patient Management's patient screen | Direct cancellation only before dispatch |
-| `POST /me/emergency-calls/{id}/cancellation-request` and Duty Manager review operations | Patient screen / Duty Manager queue | A request that does not move or recall an ambulance until reviewed |
+| `POST /me/emergency-calls/{id}/cancel` | Patient Management's patient screen | Direct cancellation while no ambulance is on its way (before dispatch, or after a crew declined) |
+| `POST /me/emergency-calls/{id}/cancellation-request` and Duty Manager review operations | Patient screen / Duty Manager queue | A request that does not move or recall an ambulance until reviewed. Refused once the crew has reached the patient |
+| `POST /emergency-calls/{id}/cancel` | Duty Manager | Closes a call with an outcome and calls off a run that has not reached the patient |
+| `POST /me/dispatches/{id}/close-at-scene` | Responding crew | Ends a run at the scene with an outcome; frees the ambulance and closes the call |
+| `GET /fleet-map` | Duty Manager fleet board | Every ambulance and every open call, with which ambulance is on which call |
+| `GET /emergency-calls/address-search` | Duty Manager call intake | Up to five Sri Lankan address matches with a point and accuracy |
 
 ## 26. What Emergency needs from others
 
@@ -1420,3 +1438,12 @@ and confirms maintenance). If the alert goes to equipment managers, they are tol
 they cannot open. Three ways out: send it to hospital administrators instead, send it to both,
 or reopen §11.19. **Not decided here.** Needs M3 and the group. Until then the job sends it to
 equipment managers as the plan says.
+
+**11.24 (OPEN — raised by M1 on 2026-10-03) — a pre-admission for a patient who never comes.**
+A run can now end without a trip to hospital: the crew closes it at the scene, or the call is
+cancelled. If Emergency has not sent the pre-admission yet, it no longer sends it. But if it
+already has, Patient Management holds a pre-admission (and maybe a held bed) for a patient who
+is not coming, and Emergency has no way to say so. Two ways out: Emergency calls
+`POST /admissions/{id}/cancel` (today Emergency does not keep the admission id), or Patient
+Management adds a small "emergency withdrawn" route Emergency can call with the call id.
+**Not decided here.** Needs M4. Until then staff cancel that admission by hand.

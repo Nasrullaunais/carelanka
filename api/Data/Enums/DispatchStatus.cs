@@ -8,6 +8,7 @@ public enum DispatchStatus
     AtScene,
     TransportingToHospital,
     HandedOver,
+    ClosedAtScene,
     Declined,
     Cancelled,
     Reassigned

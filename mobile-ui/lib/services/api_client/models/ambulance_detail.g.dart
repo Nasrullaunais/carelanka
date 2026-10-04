@@ -25,6 +25,7 @@ AmbulanceDetail _$AmbulanceDetailFromJson(Map<String, dynamic> json) =>
           : DispatchSummary.fromJson(
               json['active_dispatch'] as Map<String, dynamic>,
             ),
+      activeDispatchId: json['active_dispatch_id'] as String?,
       isDivertible: json['is_divertible'] as bool?,
       runsToday: (json['runs_today'] as num?)?.toInt(),
       currentCrew: (json['current_crew'] as List<dynamic>?)
@@ -47,6 +48,7 @@ Map<String, dynamic> _$AmbulanceDetailToJson(AmbulanceDetail instance) =>
       'created_at': instance.createdAt.toIso8601String(),
       'updated_at': instance.updatedAt.toIso8601String(),
       'active_dispatch': instance.activeDispatch,
+      'active_dispatch_id': instance.activeDispatchId,
       'is_divertible': instance.isDivertible,
       'runs_today': instance.runsToday,
       'current_crew': instance.currentCrew,

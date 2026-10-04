@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../emergency_routes.dart';
+import '../models/patient_call_text.dart';
 import '../state/caller_location_controller.dart';
 import '../state/patient_emergency_controller.dart';
 import '../widgets/caller_location_card.dart';
@@ -55,6 +56,8 @@ class _ReportEmergencyScreenState extends State<ReportEmergencyScreen>
     final fix = context.read<CallerLocationController>().fix;
     if (fix == null) return;
     final controller = context.read<PatientEmergencyController>();
+    if (controller.openCall != null && !await _confirmSecondRequest()) return;
+    if (!mounted) return;
     final id = await controller.report(
       patientIsCaller: _forMe,
       latitude: fix.latitude,
@@ -68,15 +71,59 @@ class _ReportEmergencyScreenState extends State<ReportEmergencyScreen>
     }
   }
 
+  Future<bool> _confirmSecondRequest() async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('You already have a request open'),
+          content: const Text(
+            'Only send another if this is a different emergency. For the same one, open your current request to follow the ambulance.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Go back'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Send another'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+
+  String _when(BuildContext context, DateTime at) {
+    final local = at.toLocal();
+    final localizations = MaterialLocalizations.of(context);
+    return '${localizations.formatMediumDate(local)}, '
+        '${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(local))}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<PatientEmergencyController>();
     final location = context.watch<CallerLocationController>();
+    final open = controller.openCall;
     return Scaffold(
       appBar: AppBar(title: const Text('Request an ambulance')),
       body: ListView(
         padding: const EdgeInsets.all(AppTheme.gutter),
         children: [
+          if (open?.id != null) ...[
+            Card(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              child: ListTile(
+                leading: const Icon(Icons.local_hospital_outlined),
+                title: const Text('You have a request open'),
+                subtitle: Text(callStatusLabel(open!.status)),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () =>
+                    context.go('${EmergencyPaths.patientTracking}/${open.id}'),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
           Text(
             'Is the ambulance for you?',
             style: Theme.of(context).textTheme.titleMedium,
@@ -128,14 +175,10 @@ class _ReportEmergencyScreenState extends State<ReportEmergencyScreen>
             ...controller.calls.map(
               (call) => Card(
                 child: ListTile(
-                  title: Text(
-                    call.status == null
-                        ? 'Ambulance request'
-                        : call.status!.name.replaceAll('_', ' '),
-                  ),
+                  title: Text(callStatusLabel(call.status)),
                   subtitle: call.createdAt == null
                       ? null
-                      : Text(call.createdAt!.toLocal().toString()),
+                      : Text(_when(context, call.createdAt!)),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: call.id == null
                       ? null

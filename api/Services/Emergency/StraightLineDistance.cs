@@ -14,13 +14,13 @@ public static class StraightLineDistance
             .ToDictionary(
                 ambulance => ambulance.Id,
                 ambulance => new AmbulanceTravel(
-                    Between(ambulance.Latitude!.Value, ambulance.Longitude!.Value, destinationLatitude, destinationLongitude),
+                    Kilometres(ambulance.Latitude!.Value, ambulance.Longitude!.Value, destinationLatitude, destinationLongitude),
                     null));
 
         return new DistanceMeasurement(byAmbulance, IsStraightLine: true);
     }
 
-    private static double Between(decimal fromLatitude, decimal fromLongitude, decimal toLatitude, decimal toLongitude)
+    public static double Kilometres(decimal fromLatitude, decimal fromLongitude, decimal toLatitude, decimal toLongitude)
     {
         var latitudeDelta = ToRadians((double)(fromLatitude - toLatitude));
         var longitudeDelta = ToRadians((double)(fromLongitude - toLongitude));

@@ -12,6 +12,7 @@ import {
   updateAmbulanceMutation,
 } from '../../../services/api/generated/@tanstack/react-query.gen';
 import { ConfirmDialog } from '../../../components/ui/confirm-dialog';
+import { ReasonDialog } from '../../../components/ui/reason-dialog';
 import { DataTable, type DataTableColumn } from '../../../components/ui/data-table';
 import { QueryState } from '../../../components/ui/query-state';
 import { StatusChip } from '../../../components/ui/status-chip';
@@ -24,7 +25,6 @@ import { ActionDialog } from '../../../components/ui/action-dialog';
 import { AppSelect } from '../../../components/ui/app-select';
 
 type DialogState = { kind: 'create' } | { kind: 'edit'; ambulance: AmbulanceDetail };
-type ConfirmAction = { kind: 'retire' | 'reinstate'; ambulance: AmbulanceSummary };
 
 export function AmbulanceRegister() {
   const queryClient = useQueryClient();
@@ -33,11 +33,12 @@ export function AmbulanceRegister() {
   const [dialog, setDialog] = useState<DialogState>();
   const [loadingEditId, setLoadingEditId] = useState<string>();
   const [crewAmbulance, setCrewAmbulance] = useState<AmbulanceSummary>();
-  const [confirm, setConfirm] = useState<ConfirmAction>();
+  const [retiring, setRetiring] = useState<AmbulanceSummary>();
+  const [reinstating, setReinstating] = useState<AmbulanceSummary>();
   const list = useQuery(listAmbulancesOptions({ query: { page, pageSize: 25, includeRetired: true, status: status || undefined } }));
   const refresh = () => invalidateEmergencyQueries(queryClient);
   const mutationHandlers = (success: string) => ({
-    onSuccess: () => { setDialog(undefined); setConfirm(undefined); toast.success(success); void refresh(); },
+    onSuccess: () => { setDialog(undefined); setRetiring(undefined); setReinstating(undefined); toast.success(success); void refresh(); },
     onError: (error: Parameters<typeof isConflict>[0]) => {
       if (isConflict(error)) void refresh();
     },
@@ -52,7 +53,9 @@ export function AmbulanceRegister() {
     { key: 'actions', header: 'Actions', cell: (item) => <div className="flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
       <Button size="sm" variant="outline" isDisabled={loadingEditId != null} onPress={() => void openEdit(item.id)}>Edit</Button>
       <Button size="sm" variant="outline" onPress={() => setCrewAmbulance(item)}>Crew</Button>
-      <Button size="sm" variant={isRetired(item) ? 'outline' : 'danger'} onPress={() => setConfirm({ kind: isRetired(item) ? 'reinstate' : 'retire', ambulance: item })}>{isRetired(item) ? 'Reinstate' : 'Retire'}</Button>
+      {isRetired(item)
+        ? <Button size="sm" variant="outline" onPress={() => setReinstating(item)}>Reinstate</Button>
+        : item.active_dispatch_id == null && <Button size="sm" variant="danger" onPress={() => setRetiring(item)}>Retire</Button>}
     </div> },
   ];
 
@@ -95,11 +98,28 @@ export function AmbulanceRegister() {
         onCreate={(body) => create.mutate({ body })}
         onUpdate={(body) => dialog?.kind === 'edit' && update.mutate({ path: { id: dialog.ambulance.id }, body })}
       />
-      <ConfirmDialog isOpen={confirm != null} onOpenChange={(open) => !open && setConfirm(undefined)} title={`${confirm?.kind === 'retire' ? 'Retire' : 'Reinstate'} ${confirm?.ambulance.registration_number ?? 'ambulance'}?`} description={confirm?.kind === 'retire' ? 'The ambulance will no longer be available for dispatch.' : 'The ambulance will return to active fleet management.'} confirmLabel={confirm?.kind === 'retire' ? 'Retire ambulance' : 'Reinstate ambulance'} tone={confirm?.kind === 'retire' ? 'danger' : 'accent'} isPending={retire.isPending || reinstate.isPending} onConfirm={() => {
-        if (!confirm) return;
-        if (confirm.kind === 'retire') retire.mutate({ path: { id: confirm.ambulance.id }, body: { reason: null } });
-        else reinstate.mutate({ path: { id: confirm.ambulance.id } });
-      }} />
+      <ReasonDialog
+        isOpen={retiring != null}
+        onOpenChange={(open) => !open && setRetiring(undefined)}
+        title={`Retire ${retiring?.registration_number ?? 'ambulance'}?`}
+        description="The ambulance leaves the fleet and can no longer be dispatched. Its current crew are unassigned so they can join another ambulance."
+        notesLabel="Reason"
+        notesPlaceholder="For example: written off after an accident"
+        notesRequired
+        confirmLabel={retire.isPending ? 'Retiring…' : 'Retire ambulance'}
+        isPending={retire.isPending}
+        onConfirm={({ notes }) => retiring && notes && retire.mutate({ path: { id: retiring.id }, body: { reason: notes.trim() } })}
+      />
+      <ConfirmDialog
+        isOpen={reinstating != null}
+        onOpenChange={(open) => !open && setReinstating(undefined)}
+        title={`Reinstate ${reinstating?.registration_number ?? 'ambulance'}?`}
+        description="The ambulance returns to the fleet as available. Assign a crew before it can be dispatched."
+        confirmLabel="Reinstate ambulance"
+        tone="accent"
+        isPending={reinstate.isPending}
+        onConfirm={() => reinstating && reinstate.mutate({ path: { id: reinstating.id } })}
+      />
     </div>
   );
 }

@@ -60,7 +60,7 @@ public sealed class AmbulancesController : ControllerBase
         CancellationToken cancellationToken)
         => Created((string?)null, await _ambulances.CreateAsync(request, cancellationToken));
 
-    [Authorize(Policy = Policies.EmergencyResponder)]
+    [Authorize(Policy = Policies.DutyManager)]
     [HttpPatch("{id:guid}", Name = "updateAmbulance")]
     [ProducesResponseType(typeof(Ambulance), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]

@@ -69,15 +69,17 @@ Patient (Patient's table, read-only FK) ──< EmergencyCall >── Dispatch �
 | `patient_is_caller` | boolean | *(Rev 2.4 addition)* Answered once, on the call screen — closes `integration_of_functions.md` §11.4 |
 | `caller_name` / `caller_phone` | text, nullable | Free-text fallback when the caller has no app account |
 | `latitude` / `longitude` | numeric(9,6) | Required — the scene location |
-| `location_accuracy_metres` | numeric | Device-reported accuracy, required |
+| `location_accuracy_metres` | numeric | Device-reported accuracy, required. When the Duty Manager moves the scene they may send a new one with it |
 | `location_captured_at` | timestamptz | When the submitted position was captured |
 | `idempotency_key` | uuid | Unique per caller submission; retries return the original call |
 | `address_label` | text, nullable | *Addition* — human-readable address from the maps API's reverse geocode, so the crew reads a street name rather than coordinates |
 | `details` | text, nullable | Free-text description of the emergency |
 | `priority` | `CallPriority` | `critical` `high` `medium` `low` — **set by the dispatcher, never the agent** |
 | `status` | `CallStatus` | `received` `dispatched` `en_route` `completed` `cancelled` |
-| `outcome` | text, nullable | Set once the crew hands over — see §8 |
-| `transported` | boolean, nullable | *Addition* — not every call ends in a hospital trip |
+| `outcome` | `EmergencyCallOutcome`, nullable | How the call ended. Written only by the step that closes it — handover (`transported`), closing the run at the scene, or cancelling — so it cannot contradict the run. See §4.1 |
+| `outcome_notes` | text, nullable | The crew's notes when closing at the scene, the Duty Manager's notes when closing the call, or the caller's reason when they cancelled |
+| `closed_at` | timestamptz, nullable | When the call reached `completed` or `cancelled` |
+| `transported` | boolean, nullable | *Addition* — not every call ends in a hospital trip. True only for `transported` |
 | `cancellation_request_status` | `CancellationRequestStatus`, nullable | `pending`, `approved`, or `rejected`; null until a post-assignment request exists |
 | `cancellation_request_reason` | text, nullable | Patient's reason, visible to the Duty Manager |
 | `cancellation_requested_at` | timestamptz, nullable | When the caller requested review |
@@ -119,7 +121,7 @@ The ready-crew minimum starts at two and is read from configuration.
 | `id` | uuid, PK | |
 | `emergency_call_id` | uuid, FK → EmergencyCall | |
 | `ambulance_id` | uuid, FK → Ambulance | |
-| `status` | `DispatchStatus` | `assigned` `acknowledged` `en_route_to_scene` `at_scene` `transporting_to_hospital` `handed_over`, plus terminal `declined` `cancelled` `reassigned` |
+| `status` | `DispatchStatus` | `assigned` `acknowledged` `en_route_to_scene` `at_scene` `transporting_to_hospital` `handed_over`, plus terminal `closed_at_scene` `declined` `cancelled` `reassigned` |
 | `superseded_by_dispatch_id` | uuid, FK → Dispatch, nullable | *Addition* — on a diverted run, points at the dispatch that replaced it, so the chain is followable |
 | `dispatched_at` | timestamptz | |
 | `completed_at` | timestamptz, nullable | |
@@ -203,22 +205,44 @@ ambulance.
 
 ```
 received ──► dispatched ──► en_route ──► completed
-    │              │             │
-    └──────────────┴─────────────┴──► cancelled
+    ▲              │             │
+    └──────────────┘             │        (declined, called off or reassigned: back to received)
+    │                            │
+    └──────────────┴─────────────┴──► cancelled   (only before the crew reaches the patient)
 ```
+
+Every closed call carries an `outcome`, written by the step that closed it:
+
+| How it closed | Who | `status` | `outcome` |
+| :--- | :--- | :--- | :--- |
+| Handover at the hospital | Crew | `completed` | `transported` |
+| Run closed at the scene | Crew | `completed` | `treated_at_scene`, `refused_transport`, `patient_not_found`, `deceased_at_scene` |
+| Call closed by the desk | Duty Manager | `cancelled` | `false_alarm`, `duplicate_call`, `caller_cancelled`, `no_longer_needed` |
+| Cancelled by the caller, directly or by an approved request | Patient | `cancelled` | `caller_cancelled` |
+
+A caller can cancel directly whenever no ambulance is live — including after an earlier one
+declined or was called off — and must ask the Duty Manager while one is on its way. Once the
+crew has reached the patient, nobody can cancel; the crew ends the run. A cancellation request
+still waiting when the call closes becomes `expired`.
 
 ### 4.2 `DispatchStatus`
 
 ```
 assigned ──► acknowledged ──► en_route_to_scene ──► at_scene
     │                                      │                 │
-    └──► declined                         └──► reassigned      └──► transporting_to_hospital ──► handed_over
-    └──► cancelled
+    └──► declined                         └──► reassigned      ├──► transporting_to_hospital ──► handed_over
+    └──► cancelled                                             └──► closed_at_scene
 ```
 
 `declined` is legal only from `assigned`. `cancelled` and `reassigned` are legal only
-before `at_scene`. A diverted run keeps its own row and gains
-`superseded_by_dispatch_id`; the replacement gets a new row.
+before `at_scene`. `closed_at_scene` is legal only from `at_scene` — the patient refused,
+was treated, could not be found, or had died — and frees the ambulance without a hospital
+trip. A diverted run keeps its own row and gains `superseded_by_dispatch_id`; the
+replacement gets a new row.
+
+Whenever a run ends because someone other than its crew decided — cancelled, reassigned,
+diverted, or its call closed — the crew is told at once (`dispatch_cancelled`), and their
+app shows why instead of the run silently disappearing.
 
 ### 4.3 `AmbulanceStatus` — and the line that matters
 
@@ -226,8 +250,14 @@ Mirrors the crew's Flutter buttons one-to-one:
 
 ```
 available ──► dispatched ──► en_route ──► at_scene ──► transporting ──► available
-                                                                             (on handover)
+                                              │                         (on handover)
+                                              └──────────────────────► available
+                                                                  (run closed at the scene)
 ```
+
+While a run is live, only the crew's steps change this status. The Duty Manager's edit
+form cannot overwrite it, reinstating works only on a retired ambulance, and retiring an
+ambulance unassigns its crew.
 
 **`at_scene` is the point of no return.** It is an authoritative dispatch state as well
 as a fleet projection. From that moment the ambulance cannot be diverted by the agent,
@@ -412,12 +442,12 @@ provisional implementation suggestions.
 
 | Area | Endpoints |
 | :--- | :--- |
-| **Calls** | `POST /emergency-calls`, `GET /emergency-calls`, `GET/PATCH /emergency-calls/{id}`, `POST /emergency-calls/{id}/link-patient`, `POST /emergency-calls/{id}/outcome`, `POST /emergency-calls/{id}/cancel`, `POST /emergency-calls/{id}/dispatch` |
-| **Ambulances** | `GET/POST /ambulances`, `GET/PATCH /ambulances/{id}`, retire/reinstate/location/history operations, plus `GET/POST /ambulances/{id}/crew` and `DELETE /ambulances/{ambulanceId}/crew/{staffMemberId}` for current crew |
+| **Calls** | `POST /emergency-calls`, `GET /emergency-calls`, `GET/PATCH /emergency-calls/{id}`, `POST /emergency-calls/{id}/link-patient`, `POST /emergency-calls/{id}/cancel`, `POST /emergency-calls/{id}/dispatch`, `GET /emergency-calls/address-search` |
+| **Ambulances** | `GET/POST /ambulances`, `GET/PATCH /ambulances/{id}`, retire/reinstate/location/history operations, plus `GET/POST /ambulances/{id}/crew` and `DELETE /ambulances/{ambulanceId}/crew/{staffMemberId}` for current crew, and `GET /fleet-map` — every active ambulance and open call in one unpaged read for the map |
 | **Dispatch Agent** | `GET /dispatch-proposals`, `POST /dispatch-proposals`, `GET /dispatch-proposals/{id}`, `POST /dispatch-proposals/{id}/confirm`, `POST /dispatch-proposals/{id}/approve`, `POST /dispatch-proposals/{id}/reject` |
 | **Dispatches** | `GET /dispatches`, `GET /dispatches/{id}`, divert/cancel/route operations, and read-only `GET /dispatches/{id}/crew` snapshot |
-| **My Run** (Flutter, crew) | active/history, `POST /me/dispatches/{id}/acknowledge`, `POST /me/dispatches/{id}/decline`, status progress, Google Maps navigation target, and handover |
-| **My Calls** (patient APIs; screen owned by M4) | own-call list/tracking, direct pre-dispatch cancel, post-assignment cancellation request |
+| **My Run** (Flutter, crew) | active/history, `POST /me/dispatches/{id}/acknowledge`, `POST /me/dispatches/{id}/decline`, status progress, Google Maps navigation target, handover, and `POST /me/dispatches/{id}/close-at-scene` |
+| **My Calls** (patient APIs; screen owned by M4) | own-call list/tracking, direct cancel while no ambulance is on the way, cancellation request while one is |
 | **Cancellation review** | Duty Manager list plus approve/reject operations under `/emergency-cancellation-requests` |
 | **Reports** | `GET /reports/emergency/response-times`, `GET /reports/emergency/fleet-utilisation`, `GET /reports/emergency/agent-performance` |
 
@@ -441,7 +471,8 @@ React is where the decisions get made (`docs/CareLanka_Component_Plan.md` §2.1,
 | :--- | :--- |
 | **Dispatch desk** | Call list and the open call side by side. Each row shows its recommendation ("Checking…", "AMB-03 · 6 min", "Diversion — needs approval", "Pick by hand"). The open call shows the scene, the caller's report, the map and the recommendation with one-tap **Send** — both gates on one screen, with the manual ambulance list underneath. After Send, the next waiting call opens |
 | **Diversion review** | Inside the open call: the full `DiversionImpact` — who loses their ambulance, extra wait, replacement — with approve / reject and a required rejection reason |
-| **Fleet map & board** | Live ambulance positions, active routes, status per vehicle, `is_divertible` at a glance |
+| **Dispatch desk — after sending** | On each live run before pickup: **Call off this ambulance** and **Send a different ambulance**, both with a reason. On every open call: **Close call** (false alarm, duplicate, caller cancelled, no longer needed) and **Edit call** (scene, caller, details, priority). The run history shows every reason and note the run ended with |
+| **Fleet map & board** | One unpaged map of every ambulance and open call: vehicles coloured by status, calls coloured by priority, a line from each ambulance to its call, old positions faded, click a call to open it. The board lists the same vehicles with their run stage |
 | **Ambulance register** | Full CRUD: add, edit, retire, reinstate, plus per-vehicle dispatch history |
 | **Crew assignment** | Manage current ambulance crew; changes are blocked during a live run |
 | **Cancellation review** | Review post-assignment patient requests and approve or reject with an explanation |
@@ -459,7 +490,8 @@ Flutter is where the work gets done, and this component has **two distinct Flutt
 | :--- | :--- |
 | **My run** | The dispatch that just arrived: patient location, address, priority, and current state |
 | **Navigate** | Launch Google Maps to the scene, then to CareLanka Hospital's configured emergency entrance |
-| **Status buttons** | Acknowledge or decline, then en route to scene → at scene → transporting to hospital → handed over |
+| **Status buttons** | Acknowledge or decline, then en route to scene → at scene → transporting to hospital → handed over. At the scene, **End without transport** closes the run with an outcome instead. The two steps that cannot be undone ask for confirmation |
+| **Called off** | A run the duty manager cancelled, reassigned or closed does not just vanish: the crew is alerted and the screen says what happened and why |
 | **Handover** | Condition on arrival, notes, and any identity details a relative gave at the scene |
 | **My history** | Past runs, paged |
 
@@ -468,7 +500,7 @@ Flutter is where the work gets done, and this component has **two distinct Flutt
 | Screen | What it does |
 | :--- | :--- |
 | **I need an ambulance** | The one-question call screen. Screen built by Patient Management, posts to our endpoint (`integration_of_functions.md` §4.1) |
-| **Track my ambulance** | Where it is and how many minutes away. Deliberately tiny — no crew names, no notes, no other calls |
+| **Track my ambulance** | Where it is and how many minutes away, which stage the run is at ("waiting for the crew to accept"), and what happens if a crew declines. Deliberately tiny — no crew names, no notes, no other calls |
 | **My calls** | Calls this person raised, including ones raised for somebody else |
 | **Cancel / request cancellation** | Cancel directly before assignment; after assignment ask a Duty Manager to review |
 
@@ -518,8 +550,8 @@ the Google Maps launch target.
 
 ## 12. Testing
 
-- **Unit:** eligibility and configured crew minimum; ETA ranking; Gemini's pick against recorded answers (never the live API), each of the three pick checks, and the fallback for no key, a spent quota and an unreadable answer; the diversion cost calculation; every legal and illegal `DispatchStatus` move; the safe-failure path when nothing is available
-- **Integration:** the partial unique index actually rejects a second confirm against the same ambulance under concurrent requests; a diversion approved after the crew reached the scene is refused; approving a diversion re-queues the original call in the same transaction; the pre-admission call fires once per dispatch, not once per retry
+- **Unit:** eligibility and configured crew minimum; ETA ranking; diversions ranked by road time; Gemini's pick against recorded answers (never the live API), each of the three pick checks, and the fallback for no key, a spent quota and an unreadable answer; the diversion cost calculation; every legal and illegal `DispatchStatus` move; the safe-failure path when nothing is available
+- **Integration:** the partial unique index actually rejects a second confirm against the same ambulance under concurrent requests; a run closed at the scene frees its ambulance and records the outcome; a call closed by the desk stands down its crew and is refused once the crew is at the scene; a patient can cancel after a crew declines; a diversion approved after the crew reached the scene is refused; approving a diversion re-queues the original call in the same transaction; the pre-admission call fires once per dispatch, not once per retry
 - **Contract:** `openapi-spec-validator` against `emergency-spec.yaml`, plus the cross-spec route/operationId/schema uniqueness check CI runs for all four
 
 ---
@@ -540,6 +572,10 @@ the Google Maps launch target.
 | Current crew in `AmbulanceCrewAssignment`; responders in `DispatchCrew` | Current responsibility can change; dispatch history must not |
 | Ready crew minimum starts at two and is configurable | The safety threshold is explicit without burying a permanent constant in query code |
 | Patient cancellation becomes review after assignment | A caller may withdraw an unassigned request directly but cannot recall a moving response unit |
+| A run can end at the scene (`closed_at_scene`) *(2026-10-03)* | Without it, "patient refused", "nobody there" and "treated at the scene" had no way out except pretending to drive to hospital, and the ambulance stayed busy |
+| `outcome` is a fixed list, written only by the step that closes the call *(2026-10-03)* | A free-text outcome set by a separate endpoint could contradict the run it describes, and could not be counted in reports. `POST /emergency-calls/{id}/outcome` was dropped for the same reason |
+| A Send that fails its last check opens a fresh recommendation *(2026-10-03)* | A recommendation for an ambulance that is no longer free is worse than none: it sat on the board as "ready to send" until someone rejected it by hand |
+| Diversions are ranked by road time to the new call *(2026-10-03)* | The point of a diversion is to reach the more urgent patient sooner; the least urgent run can be on the far side of the city |
 
 ---
 

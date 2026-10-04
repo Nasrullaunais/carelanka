@@ -16,6 +16,11 @@ part 'dispatches_api.g.dart';
 abstract class DispatchesApi {
   factory DispatchesApi(Dio dio, {String? baseUrl}) = _DispatchesApi;
 
+  @GET('/dispatches/{id}')
+  Future<DispatchDetail> getDispatch({
+    @Path('id') required String id,
+  });
+
   @GET('/dispatches/{id}/route')
   Future<RouteLog> getDispatchRoute({
     @Path('id') required String id,

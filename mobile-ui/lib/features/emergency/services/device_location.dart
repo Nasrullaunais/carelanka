@@ -29,6 +29,11 @@ abstract interface class DeviceLocation {
   Future<LocationFix?> recentFix(Duration maxAge);
   Future<LocationFix> currentFix(Duration timeLimit);
   Stream<LocationFix> fixes();
+
+  /// Keeps delivering fixes while the phone is locked or another app is open.
+  /// Android shows a permanent notification while this runs.
+  Stream<LocationFix> trackingFixes();
+
   Future<bool> openLocationSettings();
   Future<bool> openAppSettings();
 }
@@ -88,6 +93,11 @@ final class GeolocatorDeviceLocation implements DeviceLocation {
       Geolocator.getPositionStream(locationSettings: _settings()).map(_fix);
 
   @override
+  Stream<LocationFix> trackingFixes() => Geolocator.getPositionStream(
+    locationSettings: _trackingSettings(),
+  ).map(_fix);
+
+  @override
   Future<bool> openLocationSettings() => Geolocator.openLocationSettings();
 
   @override
@@ -123,6 +133,35 @@ final class GeolocatorDeviceLocation implements DeviceLocation {
           timeLimit: timeLimit,
         ),
       };
+
+  static LocationSettings
+  _trackingSettings() => switch (defaultTargetPlatform) {
+    TargetPlatform.android => AndroidSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: _trackingDistanceMetres,
+      intervalDuration: const Duration(seconds: 5),
+      foregroundNotificationConfig: const ForegroundNotificationConfig(
+        notificationTitle: 'CareLanka is sharing your ambulance location',
+        notificationText:
+            'The duty manager can see where your ambulance is. It stops when you leave My run.',
+        notificationChannelName: 'Ambulance location',
+        enableWakeLock: true,
+        setOngoing: true,
+      ),
+    ),
+    TargetPlatform.iOS => AppleSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: _trackingDistanceMetres,
+      activityType: ActivityType.automotiveNavigation,
+      showBackgroundLocationIndicator: true,
+    ),
+    _ => const LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: _trackingDistanceMetres,
+    ),
+  };
+
+  static const _trackingDistanceMetres = 10;
 
   static LocationFix _fix(Position position) => LocationFix(
     latitude: position.latitude,

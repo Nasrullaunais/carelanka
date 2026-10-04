@@ -65,6 +65,12 @@
   <data name="dispatch_assigned_body" xml:space="preserve">
     <value>Open CareLanka to see your run.</value>
   </data>
+  <data name="dispatch_cancelled_title" xml:space="preserve">
+    <value>Run called off</value>
+  </data>
+  <data name="dispatch_cancelled_body" xml:space="preserve">
+    <value>Your run has been called off. Open CareLanka to see why.</value>
+  </data>
 
   <data name="appointment_booked_title" xml:space="preserve">
     <value>Appointment booked</value>
@@ -161,6 +167,12 @@
   </data>
   <data name="cancellation_answered_body" xml:space="preserve">
     <value>Your request to cancel the ambulance has been {0}.</value>
+  </data>
+  <data name="emergency_call_cancelled_title" xml:space="preserve">
+    <value>Ambulance request closed</value>
+  </data>
+  <data name="emergency_call_cancelled_body" xml:space="preserve">
+    <value>The hospital has closed your ambulance request. Open CareLanka for details.</value>
   </data>
 
   <data name="emergency_call_received_title" xml:space="preserve">

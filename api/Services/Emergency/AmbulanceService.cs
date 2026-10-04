@@ -60,8 +60,8 @@ public sealed class AmbulanceService : IAmbulanceService
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            var term = request.Search.Trim();
-            query = query.Where(ambulance => EF.Functions.ILike(ambulance.RegistrationNumber, $"%{term}%"));
+            var pattern = SearchPattern.Contains(request.Search.Trim());
+            query = query.Where(ambulance => EF.Functions.ILike(ambulance.RegistrationNumber, pattern, SearchPattern.Escape));
         }
 
         var rows = await query.ToListAsync(cancellationToken);
@@ -177,10 +177,31 @@ public sealed class AmbulanceService : IAmbulanceService
     {
         var ambulance = await FindByIdAsync(id, cancellationToken)
             ?? throw new NotFoundException("Ambulance", id);
-        var startOfDay = new DateTimeOffset(DateTime.UtcNow.Date, TimeSpan.Zero);
+        var now = _timeProvider.GetUtcNow();
+        var startOfDay = HospitalDays.StartOfToday(now);
         var runsToday = await _db.Dispatches.CountAsync(
             dispatch => dispatch.AmbulanceId == id && dispatch.DispatchedAt >= startOfDay,
             cancellationToken);
+        var activeDispatch = await _db.Dispatches.AsNoTracking()
+            .Where(dispatch => dispatch.AmbulanceId == id
+                && DispatchStatusExtensions.LiveStatuses.Contains(dispatch.Status))
+            .Select(dispatch => new DispatchSummary
+            {
+                Id = dispatch.Id,
+                EmergencyCallId = dispatch.EmergencyCallId,
+                AmbulanceRegistration = dispatch.Ambulance.RegistrationNumber,
+                CallPriority = dispatch.EmergencyCall.Priority,
+                Status = dispatch.Status,
+                CrewCount = dispatch.Crew.Count,
+                DispatchedAt = dispatch.DispatchedAt,
+                CompletedAt = dispatch.CompletedAt
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (activeDispatch is not null)
+        {
+            activeDispatch.AcknowledgementOverdue = activeDispatch.Status == DispatchStatus.Assigned
+                && now - activeDispatch.DispatchedAt >= TimeSpan.FromSeconds(_options.AcknowledgementTimeoutSeconds);
+        }
 
         return new AmbulanceDetail
         {
@@ -195,6 +216,8 @@ public sealed class AmbulanceService : IAmbulanceService
             CreatedAt = ambulance.CreatedAt,
             UpdatedAt = ambulance.UpdatedAt,
             IsDivertible = IsDivertible(ambulance.Status),
+            ActiveDispatch = activeDispatch,
+            ActiveDispatchId = activeDispatch?.Id,
             RunsToday = runsToday,
             CurrentCrew = await _crew.ListCurrentForFleetAsync(id, cancellationToken)
         };
@@ -234,10 +257,15 @@ public sealed class AmbulanceService : IAmbulanceService
         CancellationToken cancellationToken = default)
     {
         var ambulance = await GetEntityAsync(id, cancellationToken);
-        await EnsureMayUpdateAsync(ambulance.Id, cancellationToken);
 
-        if (request.Status == AmbulanceStatus.OutOfService)
+        // During a run the crew's steps own the status; anyone else changing it would show a false picture.
+        if (request.Status is { } requested && requested != ambulance.Status)
         {
+            if (!ambulance.IsActive)
+            {
+                throw new ConflictException(MessageCode.AmbulanceRetired, ambulance.RegistrationNumber);
+            }
+
             await EnsureNoActiveDispatchAsync(ambulance.Id, cancellationToken);
         }
 
@@ -261,7 +289,7 @@ public sealed class AmbulanceService : IAmbulanceService
             }
         }
 
-        if (request.OutOfServiceReason is not null)
+        if (request.OutOfServiceReason is not null && ambulance.Status == AmbulanceStatus.OutOfService)
         {
             ambulance.OutOfServiceReason = request.OutOfServiceReason.Trim();
         }
@@ -277,17 +305,23 @@ public sealed class AmbulanceService : IAmbulanceService
     {
         var ambulance = await GetEntityAsync(id, cancellationToken);
         await EnsureNoActiveDispatchAsync(id, cancellationToken);
-        var reason = request.Reason.Trim();
-
-        if (reason.Length == 0)
-        {
-            throw new BadRequestException(MessageCode.ValidationFailed);
-        }
+        var now = _timeProvider.GetUtcNow();
 
         ambulance.Status = AmbulanceStatus.OutOfService;
-        ambulance.OutOfServiceReason = reason;
+        ambulance.OutOfServiceReason = request.Reason.Trim();
         ambulance.IsActive = false;
-        ambulance.DeletedAt = DateTimeOffset.UtcNow;
+        ambulance.DeletedAt = now;
+
+        // A retired vehicle keeps no crew, so they are free to be put on another one.
+        var currentCrew = await _db.AmbulanceCrewAssignments
+            .Where(assignment => assignment.AmbulanceId == id && assignment.UnassignedAt == null)
+            .ToListAsync(cancellationToken);
+        foreach (var assignment in currentCrew)
+        {
+            assignment.UnassignedAt = now;
+            assignment.UnassignedByStaffId = _currentUser.Id;
+        }
+
         await _db.SaveChangesAsync(cancellationToken);
     }
 
@@ -296,6 +330,11 @@ public sealed class AmbulanceService : IAmbulanceService
         CancellationToken cancellationToken = default)
     {
         var ambulance = await GetEntityAsync(id, cancellationToken);
+        if (ambulance.IsActive)
+        {
+            throw new ConflictException(MessageCode.AmbulanceNotRetired, ambulance.RegistrationNumber);
+        }
+
         ambulance.Status = AmbulanceStatus.Available;
         ambulance.OutOfServiceReason = null;
         ambulance.IsActive = true;
@@ -361,24 +400,6 @@ public sealed class AmbulanceService : IAmbulanceService
 
     private async Task<AmbulanceEntity> GetEntityAsync(Guid id, CancellationToken cancellationToken)
         => await FindByIdAsync(id, cancellationToken) ?? throw new NotFoundException("Ambulance", id);
-
-    private async Task EnsureMayUpdateAsync(Guid ambulanceId, CancellationToken cancellationToken)
-    {
-        if (_currentUser.Role == PrincipalRole.DutyManager)
-        {
-            return;
-        }
-
-        var assigned = await _db.DispatchCrew.AnyAsync(crew =>
-            crew.StaffMemberId == _currentUser.Id
-            && crew.Dispatch.AmbulanceId == ambulanceId
-            && DispatchStatusExtensions.LiveStatuses.Contains(crew.Dispatch.Status), cancellationToken);
-
-        if (!assigned)
-        {
-            throw new ForbiddenException(MessageCode.Forbidden);
-        }
-    }
 
     private async Task EnsureNoActiveDispatchAsync(Guid ambulanceId, CancellationToken cancellationToken)
     {

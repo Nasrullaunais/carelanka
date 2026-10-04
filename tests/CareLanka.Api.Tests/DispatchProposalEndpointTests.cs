@@ -100,6 +100,17 @@ public sealed class DispatchProposalEndpointTests
         Assert.Equal(HttpStatusCode.Conflict, confirm.StatusCode);
         var body = await ReadAsync(confirm);
         Assert.Contains("ambulance_still_eligible", body.GetProperty("failed_checks").EnumerateArray().Select(x => x.GetString()));
+        Assert.Contains("A new recommendation is being prepared.", body.GetProperty("detail").GetString());
+
+        var stale = await ReadAsync(await manager.GetAsync($"/api/dispatch-proposals/{proposalId}"));
+        Assert.Equal("withdrawn", stale.GetProperty("status").GetString());
+        Assert.Equal("ambulance_no_longer_available", stale.GetProperty("withdrawal_reason").GetString());
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+        var replacement = await db.DispatchProposals.AsNoTracking()
+            .SingleAsync(x => x.EmergencyCallId == callId && x.Id != proposalId);
+        Assert.Equal(others.Order(), (CareLanka.Api.Services.Emergency.DispatchWorkflowJson.Read<List<Guid>>(replacement.ExcludeAmbulanceIdsJson) ?? []).Order());
+        await _application.WaitForDispatchProposalAsync(callId);
     }
 
     [Fact]
@@ -188,6 +199,9 @@ public sealed class DispatchProposalEndpointTests
         Assert.Equal(CallStatus.Dispatched, (await db.EmergencyCalls.FindAsync(urgentCallId))!.Status);
         Assert.Equal(DispatchStatus.Reassigned, (await db.Dispatches.SingleAsync(x => x.EmergencyCallId == sourceCallId)).Status);
         Assert.Equal(ambulanceId, (await db.Dispatches.SingleAsync(x => x.EmergencyCallId == urgentCallId)).AmbulanceId);
+        var sourceDispatchId = (await db.Dispatches.SingleAsync(x => x.EmergencyCallId == sourceCallId)).Id;
+        Assert.False(await db.Notifications.AnyAsync(n => n.Type == NotificationType.DispatchCancelled && n.EntityId == sourceDispatchId),
+            "The diverted crew drives on to the new call, so it must not be told its run was called off.");
     }
 
     [Fact]

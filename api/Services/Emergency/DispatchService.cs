@@ -8,6 +8,7 @@ using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Common;
 using CareLanka.Api.DTOs.Emergency;
 using CareLanka.Api.Services.Common;
+using CareLanka.Api.Services.Patient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Npgsql;
@@ -25,11 +26,24 @@ public sealed class DispatchService : IDispatchService
     private readonly ISceneLookupQueue _sceneLookups;
     private readonly INotifier _notifier;
     private readonly IDispatchProposalLifecycle _proposals;
+    private readonly IEmergencyAlerts _alerts;
+    private readonly IPatientService _patients;
 
     public DispatchService(CareLankaDbContext db, IAmbulanceEligibilityService eligibility,
         ICurrentUser currentUser, TimeProvider clock, IOptions<EmergencyOptions> options, ISceneLookupQueue sceneLookups,
-        INotifier notifier, IDispatchProposalLifecycle proposals)
-        => (_db, _eligibility, _currentUser, _clock, _options, _sceneLookups, _notifier, _proposals) = (db, eligibility, currentUser, clock, options.Value, sceneLookups, notifier, proposals);
+        INotifier notifier, IDispatchProposalLifecycle proposals, IEmergencyAlerts alerts, IPatientService patients)
+    {
+        _db = db;
+        _eligibility = eligibility;
+        _currentUser = currentUser;
+        _clock = clock;
+        _options = options.Value;
+        _sceneLookups = sceneLookups;
+        _notifier = notifier;
+        _proposals = proposals;
+        _alerts = alerts;
+        _patients = patients;
+    }
 
     private static readonly Dictionary<DispatchStatus, AmbulanceStatus> ProgressProjection = new()
     {
@@ -46,7 +60,7 @@ public sealed class DispatchService : IDispatchService
         await SaveAsync(ct);
         await transaction.CommitAsync(ct);
         QueueRoutePlan(dispatch);
-        return ToDetail(dispatch);
+        return await ToDetailAsync(dispatch, ct);
     }
 
     public async Task<DispatchDetail> DispatchFromProposalAsync(
@@ -59,7 +73,7 @@ public sealed class DispatchService : IDispatchService
         await SaveAsync(ct);
         await transaction.CommitAsync(ct);
         QueueRoutePlan(dispatch);
-        return ToDetail(dispatch);
+        return await ToDetailAsync(dispatch, ct);
     }
 
     public async Task<DispatchDetail> ApplyDiversionAsync(
@@ -84,11 +98,30 @@ public sealed class DispatchService : IDispatchService
         source.SupersededByDispatchId = replacement.Id;
         await _proposals.MarkExecutedAsync(proposalId, replacement.Id, reason, ct);
         var sourceRecommendation = await ReopenAsync(source, excludeOwnAmbulance: false, ct);
+        await _alerts.CrewStoodDownAsync(source, replacement, ct);
         await SaveAsync(ct);
         await transaction.CommitAsync(ct);
         _proposals.Wake(sourceRecommendation);
         QueueRoutePlan(replacement);
-        return ToDetail(replacement);
+        return await ToDetailAsync(replacement, ct);
+    }
+
+    public async Task<DispatchDetail> GetByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        var dispatch = await LoadAsync(id, ct, tracked: false);
+        if (_currentUser.Role == PrincipalRole.AmbulanceCrew && !dispatch.Crew.Any(x => x.StaffMemberId == _currentUser.Id))
+            throw new ForbiddenException();
+        return await ToDetailAsync(dispatch, ct);
+    }
+
+    public async Task<IReadOnlyList<DispatchDetail>> ListForCallAsync(Guid emergencyCallId, CancellationToken ct = default)
+    {
+        var dispatches = await Loaded(tracked: false)
+            .Where(x => x.EmergencyCallId == emergencyCallId)
+            .OrderBy(x => x.DispatchedAt)
+            .ToListAsync(ct);
+        var patientName = dispatches.Count == 0 ? null : await PatientNameAsync(dispatches[0].EmergencyCall, ct);
+        return dispatches.Select(dispatch => ToDetail(dispatch, patientName)).ToList();
     }
 
     public async Task<RouteLogView> GetRouteAsync(Guid id, CancellationToken ct = default)
@@ -124,15 +157,12 @@ public sealed class DispatchService : IDispatchService
 
     public async Task<DispatchDetail> GetMyActiveAsync(CancellationToken ct = default)
     {
-        var dispatch = await _db.Dispatches
-            .Include(x => x.Crew)
-            .Include(x => x.Ambulance)
-            .Include(x => x.EmergencyCall)
+        var dispatch = await Loaded(tracked: false)
             .Where(x => DispatchStatusExtensions.LiveStatuses.Contains(x.Status)
                 && x.Crew.Any(crew => crew.StaffMemberId == _currentUser.Id))
             .OrderByDescending(x => x.DispatchedAt)
             .FirstOrDefaultAsync(ct);
-        return dispatch is null ? throw new NotFoundException("Live dispatch", _currentUser.Id) : ToDetail(dispatch);
+        return dispatch is null ? throw new NotFoundException("Live dispatch", _currentUser.Id) : await ToDetailAsync(dispatch, ct);
     }
 
     public async Task<PagedResult<DispatchSummary>> ListMyHistoryAsync(MyDispatchHistoryRequest request, CancellationToken ct = default)
@@ -143,13 +173,13 @@ public sealed class DispatchService : IDispatchService
 
         if (request.From is { } from)
         {
-            var start = new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            var start = HospitalDays.StartOf(from);
             query = query.Where(x => x.DispatchedAt >= start);
         }
 
         if (request.To is { } to)
         {
-            var end = new DateTimeOffset(to.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            var end = HospitalDays.EndOf(to);
             query = query.Where(x => x.DispatchedAt < end);
         }
 
@@ -202,7 +232,7 @@ public sealed class DispatchService : IDispatchService
         dispatch.AcknowledgedByStaffId = _currentUser.Id;
         dispatch.Ambulance.Status = AmbulanceStatus.Dispatched;
         await SaveAsync(ct);
-        return ToDetail(dispatch);
+        return await ToDetailAsync(dispatch, ct);
     }
 
     public async Task<DispatchDetail> DeclineAsync(Guid id, DeclineDispatchRequest request, CancellationToken ct = default)
@@ -212,13 +242,14 @@ public sealed class DispatchService : IDispatchService
         await _proposals.LockCallAsync(dispatch.EmergencyCallId, ct);
         Move(dispatch, DispatchStatus.Declined);
         dispatch.DeclinedReason = request.Reason!.Trim();
+        dispatch.CompletedAt = _clock.GetUtcNow();
         dispatch.Ambulance.Status = AmbulanceStatus.Available;
         dispatch.EmergencyCall.Status = CallStatus.Received;
         var recommendation = await ReopenAsync(dispatch, excludeOwnAmbulance: true, ct);
         await SaveAsync(ct);
         await transaction.CommitAsync(ct);
         _proposals.Wake(recommendation);
-        return ToDetail(dispatch);
+        return await ToDetailAsync(dispatch, ct);
     }
 
     public async Task<DispatchDetail> ProgressAsync(Guid id, UpdateMyDispatchStatusRequest request, CancellationToken ct = default)
@@ -244,35 +275,43 @@ public sealed class DispatchService : IDispatchService
             dispatch.Ambulance.LocationUpdatedAt = _clock.GetUtcNow();
         }
 
-        if (dispatch.EmergencyCall.PatientId is { } patientId)
+        var callerUpdate = target switch
         {
-            if (target == DispatchStatus.EnRouteToScene)
-            {
-                await _notifier.NotifyAsync(NotificationType.AmbulanceOnTheWay, Recipients.Patient(patientId),
-                    new NotificationSubject("dispatch", dispatch.Id), ct);
-            }
-            else if (target == DispatchStatus.AtScene)
-            {
-                await _notifier.NotifyAsync(NotificationType.AmbulanceArrived, Recipients.Patient(patientId),
-                    new NotificationSubject("dispatch", dispatch.Id), ct);
-            }
-        }
+            DispatchStatus.EnRouteToScene => NotificationType.AmbulanceOnTheWay,
+            DispatchStatus.AtScene => NotificationType.AmbulanceArrived,
+            _ => (NotificationType?)null
+        };
+        if (callerUpdate is { } type)
+            await _alerts.CallerAsync(dispatch.EmergencyCall, type, "emergency_call", dispatch.EmergencyCallId, ct);
 
         await SaveAsync(ct);
-        return ToDetail(dispatch);
+        return await ToDetailAsync(dispatch, ct);
     }
 
     public async Task<DispatchDetail> HandoverAsync(Guid id, RecordHandoverRequest request, CancellationToken ct = default)
     {
         var dispatch = await OwnedAsync(id, ct);
         Move(dispatch, DispatchStatus.HandedOver);
-        dispatch.HandoverNotes = request.Notes?.Trim();
-        dispatch.PatientCondition = request.PatientCondition?.Trim();
-        dispatch.CompletedAt = _clock.GetUtcNow();
+        var now = _clock.GetUtcNow();
+        dispatch.HandoverNotes = Clean(request.Notes);
+        dispatch.PatientCondition = Clean(request.PatientCondition);
+        dispatch.CompletedAt = now;
         dispatch.Ambulance.Status = AmbulanceStatus.Available;
-        dispatch.EmergencyCall.Status = CallStatus.Completed;
+        dispatch.EmergencyCall.Close(CallStatus.Completed, EmergencyCallOutcome.Transported, null, now);
         await SaveAsync(ct);
-        return ToDetail(dispatch);
+        return await ToDetailAsync(dispatch, ct);
+    }
+
+    public async Task<DispatchDetail> CloseAtSceneAsync(Guid id, CloseRunAtSceneRequest request, CancellationToken ct = default)
+    {
+        var dispatch = await OwnedAsync(id, ct);
+        Move(dispatch, DispatchStatus.ClosedAtScene);
+        var now = _clock.GetUtcNow();
+        dispatch.CompletedAt = now;
+        dispatch.Ambulance.Status = AmbulanceStatus.Available;
+        dispatch.EmergencyCall.Close(CallStatus.Completed, request.Outcome!.Value, Clean(request.Notes), now);
+        await SaveAsync(ct);
+        return await ToDetailAsync(dispatch, ct);
     }
 
     public async Task<DispatchDetail> CancelAsync(Guid id, CancelDispatchRequest request, CancellationToken ct = default)
@@ -280,30 +319,32 @@ public sealed class DispatchService : IDispatchService
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
         var dispatch = await LoadAsync(id, ct);
         await _proposals.LockCallAsync(dispatch.EmergencyCallId, ct);
-        CancelCore(dispatch);
-        dispatch.CancellationReason = request.Reason!.Trim();
+        CancelCore(dispatch, request.Reason!.Trim());
         var recommendation = await ReopenAsync(dispatch, excludeOwnAmbulance: true, ct);
+        await _alerts.CrewStoodDownAsync(dispatch, cancellationToken: ct);
         await SaveAsync(ct);
         await transaction.CommitAsync(ct);
         _proposals.Wake(recommendation);
-        return ToDetail(dispatch);
+        return await ToDetailAsync(dispatch, ct);
     }
 
-    public async Task CancelForApprovedCancellationRequestAsync(Guid emergencyCallId, CancellationToken ct = default)
+    public async Task<bool> StandDownForClosedCallAsync(Guid emergencyCallId, string? reason, CancellationToken ct = default)
     {
-        var dispatch = await _db.Dispatches
-            .Include(x => x.Ambulance)
-            .Include(x => x.EmergencyCall)
-            .SingleOrDefaultAsync(x => x.EmergencyCallId == emergencyCallId && DispatchStatusExtensions.LiveStatuses.Contains(x.Status), ct)
-            ?? throw new ConflictException(MessageCode.CallHasNoLiveDispatch);
-        CancelCore(dispatch);
+        var dispatch = await Loaded(tracked: true)
+            .SingleOrDefaultAsync(x => x.EmergencyCallId == emergencyCallId && DispatchStatusExtensions.LiveStatuses.Contains(x.Status), ct);
+        if (dispatch is null) return false;
+        if (!dispatch.Status.IsPrePickup()) throw new ConflictException(MessageCode.RunPastPickup);
+        CancelCore(dispatch, reason);
+        await _alerts.CrewStoodDownAsync(dispatch, cancellationToken: ct);
         await SaveAsync(ct);
+        return true;
     }
 
     public async Task<DispatchDetail> ReassignAsync(Guid id, ReassignDispatchRequest request, CancellationToken ct = default)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
         var old = await LoadAsync(id, ct);
+        await _proposals.LockCallAsync(old.EmergencyCallId, ct);
         RequirePrePickup(old, DispatchStatus.Reassigned);
         old.Status = DispatchStatus.Reassigned;
         old.ReassignmentReason = request.Reason!.Trim();
@@ -313,10 +354,11 @@ public sealed class DispatchService : IDispatchService
         await SaveAsync(ct);
         var replacement = await CreateCoreAsync(old.EmergencyCallId, request.ReplacementAmbulanceId!.Value, ct);
         old.SupersededByDispatchId = replacement.Id;
+        await _alerts.CrewStoodDownAsync(old, replacement, ct);
         await SaveAsync(ct);
         await transaction.CommitAsync(ct);
         QueueRoutePlan(replacement);
-        return ToDetail(replacement);
+        return await ToDetailAsync(replacement, ct);
     }
 
     private async Task<Dispatch> CreateCoreAsync(Guid callId, Guid ambulanceId, CancellationToken ct)
@@ -410,19 +452,26 @@ public sealed class DispatchService : IDispatchService
         return dispatch;
     }
 
-    private async Task<Dispatch> LoadAsync(Guid id, CancellationToken ct) => await _db.Dispatches
-        .Include(x => x.Crew).Include(x => x.Ambulance).Include(x => x.EmergencyCall).Include(x => x.RouteLog)
-        .SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw new NotFoundException("Dispatch", id);
+    private IQueryable<Dispatch> Loaded(bool tracked)
+    {
+        var query = _db.Dispatches
+            .Include(x => x.Crew).Include(x => x.Ambulance).Include(x => x.EmergencyCall).Include(x => x.RouteLog);
+        return tracked ? query : query.AsNoTracking();
+    }
+
+    private async Task<Dispatch> LoadAsync(Guid id, CancellationToken ct, bool tracked = true)
+        => await Loaded(tracked).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw new NotFoundException("Dispatch", id);
 
     private static void RequirePrePickup(Dispatch dispatch, DispatchStatus target)
     {
         if (!dispatch.Status.IsPrePickup()) throw new IllegalTransitionException("Dispatch", dispatch.Status.ToString(), target.ToString());
     }
 
-    private void CancelCore(Dispatch dispatch)
+    private void CancelCore(Dispatch dispatch, string? reason)
     {
         RequirePrePickup(dispatch, DispatchStatus.Cancelled);
         dispatch.Status = DispatchStatus.Cancelled;
+        dispatch.CancellationReason = reason;
         dispatch.CompletedAt = _clock.GetUtcNow();
         dispatch.Ambulance.Status = AmbulanceStatus.Available;
         dispatch.EmergencyCall.Status = CallStatus.Received;
@@ -435,7 +484,7 @@ public sealed class DispatchService : IDispatchService
             (DispatchStatus.Assigned, DispatchStatus.Acknowledged) or (DispatchStatus.Assigned, DispatchStatus.Declined) => true,
             (DispatchStatus.Acknowledged, DispatchStatus.EnRouteToScene) => true,
             (DispatchStatus.EnRouteToScene, DispatchStatus.AtScene) => true,
-            (DispatchStatus.AtScene, DispatchStatus.TransportingToHospital) => true,
+            (DispatchStatus.AtScene, DispatchStatus.TransportingToHospital) or (DispatchStatus.AtScene, DispatchStatus.ClosedAtScene) => true,
             (DispatchStatus.TransportingToHospital, DispatchStatus.HandedOver) => true,
             _ => false
         };
@@ -443,7 +492,13 @@ public sealed class DispatchService : IDispatchService
         dispatch.Status = target;
     }
 
-    private DispatchDetail ToDetail(Dispatch dispatch) => new()
+    private async Task<string?> PatientNameAsync(Data.Entities.Emergency.EmergencyCall call, CancellationToken ct)
+        => call.PatientId is { } patientId ? (await _patients.FindByIdAsync(patientId, ct))?.FullName : null;
+
+    private async Task<DispatchDetail> ToDetailAsync(Dispatch dispatch, CancellationToken ct)
+        => ToDetail(dispatch, await PatientNameAsync(dispatch.EmergencyCall, ct));
+
+    private DispatchDetail ToDetail(Dispatch dispatch, string? patientName) => new()
     {
         Id = dispatch.Id, EmergencyCallId = dispatch.EmergencyCallId, AmbulanceId = dispatch.AmbulanceId,
         AmbulanceRegistration = dispatch.Ambulance.RegistrationNumber, CallPriority = dispatch.EmergencyCall.Priority,
@@ -452,8 +507,16 @@ public sealed class DispatchService : IDispatchService
         DeclinedReason = dispatch.DeclinedReason, CancellationReason = dispatch.CancellationReason,
         ReassignmentReason = dispatch.ReassignmentReason, HandoverNotes = dispatch.HandoverNotes,
         PatientCondition = dispatch.PatientCondition, SceneAddressLabel = dispatch.EmergencyCall.AddressLabel,
+        DestinationLabel = dispatch.Status == DispatchStatus.TransportingToHospital
+            ? _options.HospitalEntrance.Label
+            : dispatch.EmergencyCall.AddressLabel,
+        CallStatus = dispatch.EmergencyCall.Status, CallOutcome = dispatch.EmergencyCall.Outcome,
+        CallDetails = dispatch.EmergencyCall.Details, CallerName = dispatch.EmergencyCall.CallerName,
+        CallerPhone = dispatch.EmergencyCall.CallerPhone, PatientName = patientName,
         CrewCount = dispatch.Crew.Count,
         AcknowledgementOverdue = dispatch.IsAcknowledgementOverdue(_clock.GetUtcNow(), _options.AcknowledgementTimeoutSeconds),
         CrewStaffIds = dispatch.Crew.Select(x => x.StaffMemberId).ToList()
     };
+
+    private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

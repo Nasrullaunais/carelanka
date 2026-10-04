@@ -987,6 +987,7 @@ components:
         One value per row in the event catalogue (`docs/build/notifications.md` §5).
       enum:
         - dispatch_assigned
+        - dispatch_cancelled
         - appointment_booked
         - appointment_rescheduled
         - appointment_cancelled
@@ -1003,6 +1004,7 @@ components:
         - ambulance_on_the_way
         - ambulance_arrived
         - cancellation_answered
+        - emergency_call_cancelled
         - emergency_call_received
         - cancellation_request_waiting
         - dispatch_proposal_waiting

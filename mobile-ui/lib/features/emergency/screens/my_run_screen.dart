@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/notifications/notification_bell.dart';
 import '../../../core/widgets/async_view.dart';
 import '../emergency_routes.dart';
@@ -11,6 +13,7 @@ import '../state/my_run_controller.dart';
 import '../widgets/crew_location_lifecycle.dart';
 import '../widgets/maps_launcher.dart';
 import '../widgets/run_card.dart';
+import '../widgets/run_ended_view.dart';
 import '../widgets/run_prompts.dart';
 
 class MyRunScreen extends StatefulWidget {
@@ -81,7 +84,7 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
               ),
             if (error != null)
               MaterialBanner(
-                content: Text(error.message),
+                content: Text(_errorText(error)),
                 actions: [
                   TextButton(
                     onPressed: controller.clearActionError,
@@ -93,24 +96,31 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
               child: AsyncView(
                 state: controller.state,
                 onRetry: controller.load,
-                builder: (context, run) => run == null
-                    ? RefreshableMessage(
-                        onRefresh: () => controller.load(showLoading: false),
-                        child: const EmptyView(
-                          icon: Icons.local_hospital_outlined,
-                          title: 'No run right now',
-                          message:
-                              'When the duty manager sends you to a call it will appear here.',
-                        ),
-                      )
-                    : RunCard(
-                        run: run,
-                        busy: controller.busy,
-                        onStep: () =>
-                            _step(context, controller, run.status?.nextStep),
-                        onDecline: () => _decline(context, controller),
-                        onNavigate: () => _navigate(context, controller),
-                      ),
+                builder: (context, run) => switch ((run, controller.endedRun)) {
+                  (final run?, _) => RunCard(
+                    run: run,
+                    busy: controller.busy,
+                    onStep: () =>
+                        _step(context, controller, run.status?.nextStep),
+                    onDecline: () => _decline(context, controller),
+                    onNavigate: () => _navigate(context, controller),
+                    onEndAtScene: () => _endAtScene(context, controller),
+                    onCallCaller: (phone) => _callCaller(context, phone),
+                  ),
+                  (null, final ended?) => RunEndedView(
+                    run: ended,
+                    onDismiss: controller.dismissEndedRun,
+                  ),
+                  (null, null) => RefreshableMessage(
+                    onRefresh: () => controller.load(showLoading: false),
+                    child: const EmptyView(
+                      icon: Icons.local_hospital_outlined,
+                      title: 'No run right now',
+                      message:
+                          'When the duty manager sends you to a call it will appear here.',
+                    ),
+                  ),
+                },
               ),
             ),
           ],
@@ -135,12 +145,51 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
             patientCondition: details.patientCondition,
           );
         }
+      case RunStep.arrivedAtScene || RunStep.leaveForHospital:
+        final confirmed = await confirmRunStep(
+          context,
+          title: step == RunStep.arrivedAtScene
+              ? 'Have you reached the patient?'
+              : 'Is the patient on board?',
+          confirmLabel: step == RunStep.arrivedAtScene
+              ? 'Yes, at the scene'
+              : 'Yes, going to hospital',
+        );
+        if (confirmed) await controller.advance();
+      case RunStep.startDriving:
+        await controller.advance();
       case null:
         break;
-      default:
-        await controller.advance();
     }
   }
+
+  Future<void> _endAtScene(
+    BuildContext context,
+    MyRunController controller,
+  ) async {
+    final result = await askSceneOutcome(context);
+    if (result != null) {
+      await controller.closeAtScene(result.outcome, notes: result.notes);
+    }
+  }
+
+  Future<void> _callCaller(BuildContext context, String phone) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final launched = await launchUrl(
+      Uri(scheme: 'tel', path: phone),
+    ).catchError((_) => false);
+    if (!launched) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('This phone cannot make calls.')),
+      );
+    }
+  }
+
+  // A 409 here means someone else changed the run first, often a crew mate
+  // tapping the same button; the screen has already re-read the run.
+  String _errorText(ApiException error) => error.isConflict
+      ? 'Someone else changed this run first, so your tap was not saved. The screen now shows the latest.'
+      : error.message;
 
   Future<void> _decline(
     BuildContext context,
@@ -161,7 +210,7 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
 
   String? _locationNotice(CrewLocationReportingState state) => switch (state) {
     CrewLocationReportingState.reporting =>
-      'Sharing your assigned ambulance location while this screen is open.',
+      'Sharing your ambulance location, also while the phone is locked or Google Maps is open.',
     CrewLocationReportingState.stopped => null,
     CrewLocationReportingState.approximateOnly =>
       'Only approximate location is allowed. Dispatch needs precise location to send the nearest ambulance.',

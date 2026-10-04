@@ -41,6 +41,7 @@ public sealed class EmergencyOpenApiContractTests
             "at_scene",
             "transporting_to_hospital",
             "handed_over",
+            "closed_at_scene",
             "declined",
             "cancelled",
             "reassigned"
@@ -71,7 +72,7 @@ public sealed class EmergencyOpenApiContractTests
         var contract = LoadContract();
         var ambulance = Map(contract, "components", "schemas", "AmbulanceSummary", "properties");
         var tracking = Map(contract, "components", "schemas", "MyCallTracking", "properties");
-        var dispatch = Map(contract, "components", "schemas", "Dispatch", "properties");
+        var dispatch = ContractProperties(contract, "DispatchDetail");
 
         Assert.True(ambulance.Children.ContainsKey(new YamlScalarNode("current_crew_count")));
         Assert.True(ambulance.Children.ContainsKey(new YamlScalarNode("required_crew_count")));
@@ -80,7 +81,7 @@ public sealed class EmergencyOpenApiContractTests
         Assert.False(tracking.Children.ContainsKey(new YamlScalarNode("crew")));
         Assert.False(tracking.Children.ContainsKey(new YamlScalarNode("details")));
         Assert.False(tracking.Children.ContainsKey(new YamlScalarNode("rationale")));
-        Assert.False(dispatch.Children.ContainsKey(new YamlScalarNode("destination_ward_id")));
+        Assert.DoesNotContain("destination_ward_id", dispatch);
     }
 
     [Theory]
@@ -296,6 +297,108 @@ public sealed class EmergencyOpenApiContractTests
         var properties = document.RootElement.GetProperty("components").GetProperty("schemas").GetProperty("DiversionImpact").GetProperty("properties");
         Assert.True(properties.GetProperty("source_call_additional_wait_minutes").GetProperty("nullable").GetBoolean());
         Assert.True(properties.GetProperty("minutes_saved_for_this_call").GetProperty("nullable").GetBoolean());
+    }
+
+    [Theory]
+    [InlineData("/emergency-calls/{id}/cancel", "post", "cancelEmergencyCall")]
+    [InlineData("/emergency-calls/address-search", "get", "searchSceneAddresses")]
+    [InlineData("/me/dispatches/{id}/close-at-scene", "post", "closeMyDispatchAtScene")]
+    [InlineData("/dispatches/{id}", "get", "getDispatch")]
+    [InlineData("/fleet-map", "get", "getFleetMap")]
+    public async Task Call_closing_and_fleet_map_operations_match_the_contract(string path, string method, string operationId)
+    {
+        using var document = await GeneratedOpenApi.ParseAsync();
+        var contract = LoadContract();
+        var generated = document.RootElement.GetProperty("paths").GetProperty(path).GetProperty(method);
+
+        Assert.Equal(operationId, Scalar(contract, "paths", path, method, "operationId"));
+        Assert.Equal(operationId, generated.GetProperty("operationId").GetString());
+        var expected = Keys(Map(contract, "paths", path, method, "responses"));
+        var statuses = generated.GetProperty("responses").EnumerateObject().Select(property => property.Name).ToHashSet();
+        Assert.True(expected.SetEquals(statuses),
+            $"{method.ToUpperInvariant()} {path}: contract [{string.Join(", ", expected)}], generated [{string.Join(", ", statuses)}]");
+    }
+
+    [Fact]
+    public async Task The_old_outcome_route_is_gone()
+    {
+        using var document = await GeneratedOpenApi.ParseAsync();
+
+        Assert.False(document.RootElement.GetProperty("paths").TryGetProperty("/emergency-calls/{id}/outcome", out _));
+        Assert.False(Map(LoadContract(), "paths").Children.ContainsKey(new YamlScalarNode("/emergency-calls/{id}/outcome")));
+    }
+
+    [Theory]
+    [InlineData("EmergencyCallOutcome")]
+    [InlineData("CancellationRequestStatus")]
+    [InlineData("DispatchStatus")]
+    public async Task Call_closing_enum_values_match_the_contract(string schema)
+    {
+        using var document = await GeneratedOpenApi.ParseAsync();
+        var expected = Sequence(LoadContract(), "components", "schemas", schema, "enum")
+            .Children.Cast<YamlScalarNode>().Select(value => value.Value!).ToHashSet();
+        var generated = document.RootElement
+            .GetProperty("components").GetProperty("schemas").GetProperty(schema)
+            .GetProperty("enum").EnumerateArray().Select(value => value.GetString()!).ToHashSet();
+
+        Assert.True(expected.SetEquals(generated), $"{schema}: generated [{string.Join(", ", generated)}]");
+    }
+
+    [Theory]
+    [InlineData("CancelEmergencyCallRequest")]
+    [InlineData("CloseRunAtSceneRequest")]
+    [InlineData("AddressSuggestion")]
+    [InlineData("FleetMap")]
+    [InlineData("FleetMapAmbulance")]
+    [InlineData("FleetMapCall")]
+    [InlineData("EmergencyCallDetail")]
+    [InlineData("DispatchDetail")]
+    [InlineData("MyCallTracking")]
+    [InlineData("EmergencyCancellationRequest")]
+    [InlineData("AmbulanceDetail")]
+    [InlineData("UpdateEmergencyCallRequest")]
+    public async Task Call_closing_and_fleet_map_shapes_match_the_contract(string schema)
+    {
+        using var document = await GeneratedOpenApi.ParseAsync();
+        var generated = Keys(document.RootElement, "components", "schemas", schema, "properties");
+        var expected = ContractProperties(LoadContract(), schema);
+
+        Assert.True(expected.SetEquals(generated),
+            $"{schema}: contract only [{string.Join(", ", expected.Except(generated))}], generated only [{string.Join(", ", generated.Except(expected))}]");
+    }
+
+    [Theory]
+    [InlineData("/emergency-calls/address-search", "query")]
+    [InlineData("/emergency-cancellation-requests", "status", "page", "pageSize")]
+    public async Task Query_names_are_camel_case_as_published(string path, params string[] names)
+    {
+        using var document = await GeneratedOpenApi.ParseAsync();
+        var generated = document.RootElement.GetProperty("paths").GetProperty(path)
+            .GetProperty("get").GetProperty("parameters").EnumerateArray()
+            .Select(parameter => parameter.GetProperty("name").GetString()!).ToHashSet();
+
+        Assert.True(names.ToHashSet().SetEquals(generated), $"{path}: generated [{string.Join(", ", generated)}]");
+    }
+
+    // A schema built with allOf takes its fields from each part, so the comparison has to as well.
+    private static HashSet<string> ContractProperties(YamlMappingNode contract, string schema)
+    {
+        var node = Map(contract, "components", "schemas", schema);
+        var names = new HashSet<string>();
+        if (node.Children.TryGetValue(new YamlScalarNode("properties"), out var properties))
+            names.UnionWith(Keys((YamlMappingNode)properties));
+        if (node.Children.TryGetValue(new YamlScalarNode("allOf"), out var parts))
+        {
+            foreach (var part in ((YamlSequenceNode)parts).Children.Cast<YamlMappingNode>())
+            {
+                if (part.Children.TryGetValue(new YamlScalarNode("$ref"), out var reference))
+                    names.UnionWith(ContractProperties(contract, ((YamlScalarNode)reference).Value!.Split('/')[^1]));
+                else if (part.Children.TryGetValue(new YamlScalarNode("properties"), out var inline))
+                    names.UnionWith(Keys((YamlMappingNode)inline));
+            }
+        }
+
+        return names;
     }
 
     private static YamlMappingNode LoadContract()

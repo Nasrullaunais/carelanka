@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../../services/api_client/models/call_status.dart';
+import '../../../services/api_client/models/cancellation_request_status.dart';
+import '../../../services/api_client/models/my_call_tracking.dart';
+import '../models/patient_call_text.dart';
 import '../state/patient_emergency_controller.dart';
+import '../widgets/maps_launcher.dart';
 
 class EmergencyTrackingScreen extends StatefulWidget {
   const EmergencyTrackingScreen({super.key, required this.callId});
@@ -22,7 +25,9 @@ class _EmergencyTrackingScreenState extends State<EmergencyTrackingScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<PatientEmergencyController>().watch(widget.callId);
+      if (mounted) {
+        context.read<PatientEmergencyController>().watch(widget.callId);
+      }
     });
   }
 
@@ -40,48 +45,23 @@ class _EmergencyTrackingScreenState extends State<EmergencyTrackingScreen>
   }
 
   Future<void> _cancel() async {
-    final reason = TextEditingController();
-    final value = await showDialog<String>(
+    final controller = context.read<PatientEmergencyController>();
+    final reason = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cancel ambulance request?'),
-        content: TextField(
-          controller: reason,
-          maxLength: 500,
-          decoration: const InputDecoration(labelText: 'Reason'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Keep request'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, reason.text),
-            child: const Text('Continue'),
-          ),
-        ],
-      ),
+      builder: (_) => _CancelDialog(needsReview: controller.cancelNeedsReview),
     );
-    reason.dispose();
-    if (!mounted || value == null || value.trim().isEmpty) return;
-    final status = context
-        .read<PatientEmergencyController>()
-        .tracking
-        ?.callStatus;
-    await context.read<PatientEmergencyController>().cancel(
-      widget.callId,
-      value,
-      dispatched: status != null && status != CallStatus.received,
-    );
+    if (!mounted || reason == null) return;
+    await controller.cancel(widget.callId, reason);
   }
 
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<PatientEmergencyController>();
     final tracking = controller.tracking;
-    final terminal =
-        tracking?.callStatus == CallStatus.completed ||
-        tracking?.callStatus == CallStatus.cancelled;
+    final theme = Theme.of(context);
+    final stage = tracking == null ? null : trackingStage(tracking);
+    final cancellation = cancellationText(tracking?.cancellationRequestStatus);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Ambulance request')),
       body: RefreshIndicator(
@@ -91,36 +71,68 @@ class _EmergencyTrackingScreenState extends State<EmergencyTrackingScreen>
           padding: const EdgeInsets.all(AppTheme.gutter),
           children: [
             Text(
-              _statusLabel(tracking?.callStatus),
-              style: Theme.of(context).textTheme.headlineSmall,
+              stage?.title ?? 'Checking your request…',
+              style: theme.textTheme.headlineSmall,
             ),
-            const SizedBox(height: 12),
-            if (tracking?.estimatedMinutesToArrival != null)
-              Text(
-                'Estimated arrival: ${tracking!.estimatedMinutesToArrival} minutes',
-              ),
-            if (tracking?.ambulanceLocationIsStale == true)
-              const Text('The ambulance location has not updated recently.'),
-            if (tracking?.updatedAt != null)
+            if (stage != null && stage.message.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(stage.message, style: theme.textTheme.bodyLarge),
+            ],
+            if (tracking != null && tracking.ambulanceRegistration != null) ...[
+              const SizedBox(height: 16),
+              _AmbulanceCard(tracking: tracking),
+            ],
+            if (tracking?.updatedAt != null) ...[
+              const SizedBox(height: 8),
               Text(
                 'Updated ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(tracking!.updatedAt!.toLocal()))}',
+                style: theme.textTheme.bodySmall,
               ),
-            if (tracking?.cancellationRequestStatus != null) ...[
-              const SizedBox(height: 12),
-              Text('Cancellation: ${tracking!.cancellationRequestStatus}'),
+            ],
+            if (cancellation != null) ...[
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(cancellation),
+                      if (tracking?.cancellationRequestStatus ==
+                              CancellationRequestStatus.rejected &&
+                          tracking?.cancellationReviewNotes
+                                  ?.trim()
+                                  .isNotEmpty ==
+                              true) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'Their note: ${tracking!.cancellationReviewNotes}',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
             ],
             if (controller.error != null) ...[
               const SizedBox(height: 12),
               Text(
                 controller.error!.message,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+                style: TextStyle(color: theme.colorScheme.error),
               ),
             ],
-            if (!terminal) ...[
+            if (controller.canCancel) ...[
               const SizedBox(height: 24),
               OutlinedButton(
                 onPressed: controller.acting ? null : _cancel,
-                child: const Text('Cancel request'),
+                child: Text(
+                  controller.cancelNeedsReview
+                      ? 'Ask to cancel'
+                      : 'Cancel request',
+                ),
               ),
             ],
           ],
@@ -128,13 +140,125 @@ class _EmergencyTrackingScreenState extends State<EmergencyTrackingScreen>
       ),
     );
   }
+}
 
-  static String _statusLabel(CallStatus? status) => switch (status) {
-    CallStatus.received => 'Request received',
-    CallStatus.dispatched => 'An ambulance is on the way',
-    CallStatus.enRoute => 'Ambulance response in progress',
-    CallStatus.completed => 'Response completed',
-    CallStatus.cancelled => 'Request cancelled',
-    _ => 'Checking your request…',
-  };
+class _AmbulanceCard extends StatelessWidget {
+  const _AmbulanceCard({required this.tracking});
+
+  final MyCallTracking tracking;
+
+  @override
+  Widget build(BuildContext context) {
+    final minutes = tracking.estimatedMinutesToArrival;
+    final distance = tracking.ambulanceDistanceKm;
+    final latitude = tracking.ambulanceLatitude;
+    final longitude = tracking.ambulanceLongitude;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Ambulance ${tracking.ambulanceRegistration}',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            if (minutes != null) ...[
+              const SizedBox(height: 4),
+              Text('About $minutes min away'),
+            ],
+            if (distance != null)
+              Text('${distance.toStringAsFixed(1)} km away'),
+            if (tracking.ambulanceLocationIsStale == true)
+              Text(
+                'Its position has not updated for a few minutes, so this may be out of date.',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            if (latitude != null && longitude != null) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () => openInMaps(
+                  context,
+                  'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude',
+                ),
+                icon: const Icon(Icons.map_outlined),
+                label: const Text('See the ambulance on a map'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CancelDialog extends StatefulWidget {
+  const _CancelDialog({required this.needsReview});
+
+  final bool needsReview;
+
+  @override
+  State<_CancelDialog> createState() => _CancelDialogState();
+}
+
+class _CancelDialogState extends State<_CancelDialog> {
+  final _reason = TextEditingController();
+  bool _triedEmpty = false;
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final reason = _reason.text.trim();
+    if (reason.isEmpty) {
+      setState(() => _triedEmpty = true);
+      return;
+    }
+    Navigator.pop(context, reason);
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(
+      widget.needsReview ? 'Ask to cancel?' : 'Cancel ambulance request?',
+    ),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.needsReview)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Text(
+              'An ambulance is already on its way. The duty manager decides, and it keeps coming until they agree.',
+            ),
+          ),
+        TextField(
+          controller: _reason,
+          maxLength: 500,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: 'Why do you want to cancel?',
+            errorText: _triedEmpty ? 'Please give a reason.' : null,
+          ),
+          onChanged: (_) {
+            if (_triedEmpty) setState(() => _triedEmpty = false);
+          },
+        ),
+      ],
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Keep request'),
+      ),
+      FilledButton(
+        onPressed: _submit,
+        child: Text(widget.needsReview ? 'Send request' : 'Cancel request'),
+      ),
+    ],
+  );
 }

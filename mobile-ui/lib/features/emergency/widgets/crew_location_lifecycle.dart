@@ -27,16 +27,22 @@ final class _CrewLocationLifecycleState extends State<CrewLocationLifecycle>
     });
   }
 
+  // Reporting carries on in the background, because the crew drives with
+  // Google Maps open. Coming back re-checks access the crew may have changed.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // A system permission popup makes the app `inactive`; pausing then would
-    // cancel the request the popup is answering.
-    if (state == AppLifecycleState.inactive) return;
-    if (state == AppLifecycleState.resumed) {
-      widget.reporter.resume();
-      return;
+    switch (state) {
+      case AppLifecycleState.resumed:
+        if (widget.reporter.state != CrewLocationReportingState.reporting) {
+          widget.reporter.resume();
+        }
+      case AppLifecycleState.detached:
+        widget.reporter.stop();
+      case AppLifecycleState.inactive ||
+          AppLifecycleState.hidden ||
+          AppLifecycleState.paused:
+        break;
     }
-    widget.reporter.pause();
   }
 
   @override

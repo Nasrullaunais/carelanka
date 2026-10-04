@@ -8,6 +8,8 @@ import 'package:json_annotation/json_annotation.dart';
 enum NotificationType {
   @JsonValue('dispatch_assigned')
   dispatchAssigned('dispatch_assigned'),
+  @JsonValue('dispatch_cancelled')
+  dispatchCancelled('dispatch_cancelled'),
   @JsonValue('appointment_booked')
   appointmentBooked('appointment_booked'),
   @JsonValue('appointment_rescheduled')
@@ -40,6 +42,8 @@ enum NotificationType {
   ambulanceArrived('ambulance_arrived'),
   @JsonValue('cancellation_answered')
   cancellationAnswered('cancellation_answered'),
+  @JsonValue('emergency_call_cancelled')
+  emergencyCallCancelled('emergency_call_cancelled'),
   @JsonValue('emergency_call_received')
   emergencyCallReceived('emergency_call_received'),
   @JsonValue('cancellation_request_waiting')

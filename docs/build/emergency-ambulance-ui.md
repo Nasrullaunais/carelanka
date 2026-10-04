@@ -129,10 +129,10 @@ manual:   seeded demo steps listed per phase (login: duty.rajapaksa@carelanka.lk
 ## Phase 4 — Ambulance register + crew management
 
 1. `FleetBoard` + `AmbulanceRegister` (`/emergency/register`, `/emergency/fleet`):
-   - Register: DataTable with status filter; `Add ambulance` / `Edit` dialog (`createAmbulanceMutation`, `updateAmbulanceMutation` — registration number required, `out_of_service_reason` required when status is `out_of_service`); `Retire` / `Reinstate` behind `ConfirmDialog` (`retireAmbulanceMutation`, `reinstateAmbulanceMutation`).
+   - Register: DataTable with status filter; `Add ambulance` / `Edit` dialog (`createAmbulanceMutation`, `updateAmbulanceMutation` — registration number required, `out_of_service_reason` required when status is `out_of_service`); `Retire` behind a `ReasonDialog` (reason required, hidden during a run) and `Reinstate` behind a `ConfirmDialog` (`retireAmbulanceMutation`, `reinstateAmbulanceMutation`).
    - Fleet board: status `StatusChip`, crew `n/required`, `location_updated_at` (rendered "stale" when old — honest timestamps, existing spec language), active dispatch inline (`AmbulanceSummary.active_dispatch`), `is_divertible` indicator.
 2. `CrewManagement` panel (per ambulance, both fleet and register link to it):
-   - Current crew list; assign via `ReasonDialog`-style form. **Keep UUID input** — Staff Management's `/staff/lookup` is still a documented stub (`StubStaffLookupService.cs`), so build the seam, not the picker: a `StaffPickerField` component that takes an optional `lookup` hook; when M2 ships, only the hook body changes.
+   - Current crew list; assign via `ReasonDialog`-style form. Pick the crew member by name from `GET /staff/crew-candidates` (`searchAvailableCrewOptions`), which lists only active, unassigned ambulance crew.
    - Unassign (`unassignCurrentAmbulanceCrewMutation`); blocked-during-live-run `409` → conflict toast explaining crew is locked (invariant §2.6).
 
 **Verify:** gates green; add + edit + retire + reinstate an ambulance; assign/unassign crew; attempt crew change on a seeded live-run ambulance → clear blocked message, no UI dead-end.
@@ -211,9 +211,9 @@ separate calls and preserves that privacy boundary.
 ## Flagged for later (useful, not in this plan)
 
 - **`GET /dispatches` board** (spec has it, backend doesn't): live-runs board for all active dispatches. The fleet board's inline `active_dispatch` covers the demo; worth building in the next backend slice.
-- **`link-patient` + call `outcome` + call `cancel`** (spec'd, backend missing): lets the desk link an unidentified patient after the scene and close out a false alarm pre-dispatch. Small backend slices; strong demo value with the seeded unidentified-patient call.
+- **`link-patient`** (spec'd, backend missing): lets the desk link an unidentified patient after the scene. Call `cancel` and the call outcome are built (`emergency.md` Phase 12); the separate `outcome` route was dropped because every ending now records it.
 - **Pre-admission failure visibility**: Phase 9 notes "nothing shows the dispatcher that a pre-admission failed except the row and the log" — a small badge on call detail once M4's real endpoint lands.
-- **Staff picker upgrade**: when Staff Management ships `/staff/lookup`, swap the `StaffPickerField` hook body (seam built in Phase 4) — a one-file change.
+- ~~**Staff picker upgrade**~~ — done: the crew panel searches `GET /staff/crew-candidates` by name.
 
 ## Key files
 

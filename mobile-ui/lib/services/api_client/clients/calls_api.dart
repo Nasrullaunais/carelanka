@@ -5,8 +5,10 @@
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
+import '../models/address_suggestion.dart';
 import '../models/call_priority.dart';
 import '../models/call_status.dart';
+import '../models/cancel_emergency_call_request.dart';
 import '../models/create_emergency_call_request.dart';
 import '../models/dispatch_detail.dart';
 import '../models/emergency_call_detail.dart';
@@ -41,6 +43,11 @@ abstract class CallsApi {
     @Query('sortBy') EmergencyCallSortField? sortBy,
   });
 
+  @GET('/emergency-calls/address-search')
+  Future<List<AddressSuggestion>> searchSceneAddresses({
+    @Query('query') String? query,
+  });
+
   @GET('/emergency-calls/{id}')
   Future<EmergencyCallDetail> getEmergencyCall({
     @Path('id') required String id,
@@ -50,6 +57,12 @@ abstract class CallsApi {
   Future<EmergencyCallDetail> updateEmergencyCall({
     @Path('id') required String id,
     @Body() required UpdateEmergencyCallRequest body,
+  });
+
+  @POST('/emergency-calls/{id}/cancel')
+  Future<EmergencyCallDetail> cancelEmergencyCall({
+    @Path('id') required String id,
+    @Body() CancelEmergencyCallRequest? body,
   });
 
   @POST('/emergency-calls/{id}/dispatch')

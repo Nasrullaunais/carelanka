@@ -32,6 +32,7 @@ export function AmbulanceDialog({ isOpen, ambulance, isPending, onOpenChange, on
   const [registrationNumber, setRegistrationNumber] = useState('');
   const [status, setStatus] = useState<AmbulanceStatus>('available');
   const [reason, setReason] = useState('');
+  const onRun = ambulance?.active_dispatch_id != null;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -43,13 +44,15 @@ export function AmbulanceDialog({ isOpen, ambulance, isPending, onOpenChange, on
   function submit(event: FormEvent) {
     event.preventDefault();
     const registration = registrationNumber.trim();
-    if (!registration || (status === 'out_of_service' && !reason.trim())) return;
+    if (!registration || (!onRun && status === 'out_of_service' && !reason.trim())) return;
     if (ambulance) {
-      onUpdate({
-        registration_number: registration,
-        status: status === ambulance.status ? undefined : status,
-        out_of_service_reason: status === 'out_of_service' ? reason.trim() : null,
-      });
+      onUpdate(onRun
+        ? { registration_number: registration }
+        : {
+          registration_number: registration,
+          status: status === ambulance.status ? undefined : status,
+          out_of_service_reason: status === 'out_of_service' ? reason.trim() : null,
+        });
     } else {
       onCreate({ registration_number: registration });
     }
@@ -64,7 +67,10 @@ export function AmbulanceDialog({ isOpen, ambulance, isPending, onOpenChange, on
             <Label>Registration number</Label>
             <InputGroup><InputGroupInput required /></InputGroup>
           </TextField>
-          {ambulance && (
+          {ambulance && onRun && (
+            <p className="muted">This ambulance is on a run. Its status follows the run and can be changed once the run ends.</p>
+          )}
+          {ambulance && !onRun && (
             <AppSelect
               label="Status"
               value={status}
@@ -77,7 +83,7 @@ export function AmbulanceDialog({ isOpen, ambulance, isPending, onOpenChange, on
               ]}
             />
           )}
-          {ambulance && status === 'out_of_service' && (
+          {ambulance && !onRun && status === 'out_of_service' && (
             <TextField value={reason} onChange={setReason}>
               <Label>Out-of-service reason</Label>
               <InputGroup><InputGroupTextArea required rows={3} /></InputGroup>

@@ -7,8 +7,9 @@ import 'package:json_annotation/json_annotation.dart';
 import 'call_priority.dart';
 import 'call_status.dart';
 import 'cancellation_request_status.dart';
+import 'dispatch_detail.dart';
 import 'dispatch_proposal_summary.dart';
-import 'dispatch_summary.dart';
+import 'emergency_call_outcome.dart';
 
 part 'emergency_call_detail.g.dart';
 
@@ -31,10 +32,13 @@ class EmergencyCallDetail {
     this.priority,
     this.status,
     this.outcome,
+    this.outcomeNotes,
+    this.closedAt,
     this.transported,
     this.cancellationRequestStatus,
     this.createdAt,
     this.updatedAt,
+    this.patientName,
     this.dispatches,
     this.latestProposal,
   });
@@ -65,7 +69,11 @@ class EmergencyCallDetail {
   final String? details;
   final CallPriority? priority;
   final CallStatus? status;
-  final String? outcome;
+  final EmergencyCallOutcome? outcome;
+  @JsonKey(name: 'outcome_notes')
+  final String? outcomeNotes;
+  @JsonKey(name: 'closed_at')
+  final DateTime? closedAt;
   final bool? transported;
   @JsonKey(name: 'cancellation_request_status')
   final CancellationRequestStatus? cancellationRequestStatus;
@@ -73,7 +81,9 @@ class EmergencyCallDetail {
   final DateTime? createdAt;
   @JsonKey(name: 'updated_at')
   final DateTime? updatedAt;
-  final List<DispatchSummary>? dispatches;
+  @JsonKey(name: 'patient_name')
+  final String? patientName;
+  final List<DispatchDetail>? dispatches;
   @JsonKey(name: 'latest_proposal')
   final DispatchProposalSummary? latestProposal;
 

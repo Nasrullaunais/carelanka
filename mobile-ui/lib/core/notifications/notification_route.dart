@@ -9,6 +9,7 @@ import '../../services/api_client/models/notification_type.dart';
 /// same as an unknown type.
 const Map<NotificationType, String? Function(InboxNotification)> _routes = {
   NotificationType.dispatchAssigned: _myRun,
+  NotificationType.dispatchCancelled: _myRun,
   NotificationType.appointmentBooked: _patientHome,
   NotificationType.appointmentRescheduled: _patientHome,
   NotificationType.appointmentCancelled: _patientHome,
@@ -25,6 +26,7 @@ const Map<NotificationType, String? Function(InboxNotification)> _routes = {
   NotificationType.ambulanceOnTheWay: _patientTracking,
   NotificationType.ambulanceArrived: _patientTracking,
   NotificationType.cancellationAnswered: _patientTracking,
+  NotificationType.emergencyCallCancelled: _patientTracking,
   NotificationType.emergencyCallReceived: _noMobileScreen,
   NotificationType.cancellationRequestWaiting: _noMobileScreen,
   NotificationType.dispatchProposalWaiting: _noMobileScreen,

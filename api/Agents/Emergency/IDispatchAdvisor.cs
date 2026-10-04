@@ -24,7 +24,8 @@ public sealed record DispatchChoiceContext(DispatchCallFacts Call, IReadOnlyList
 public sealed record DiversionContext(
     DispatchCallFacts Call,
     DivertibleDispatchCandidate Source,
-    int SourceWaitingMinutes);
+    int SourceWaitingMinutes,
+    int? MinutesToThisCall);
 
 public sealed record DispatchAdvice(
     Guid AmbulanceId,

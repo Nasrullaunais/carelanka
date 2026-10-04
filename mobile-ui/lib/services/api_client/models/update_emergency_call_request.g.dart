@@ -17,6 +17,8 @@ UpdateEmergencyCallRequest _$UpdateEmergencyCallRequestFromJson(
   callerPhone: json['caller_phone'] as String?,
   latitude: (json['latitude'] as num?)?.toDouble(),
   longitude: (json['longitude'] as num?)?.toDouble(),
+  locationAccuracyMetres: (json['location_accuracy_metres'] as num?)
+      ?.toDouble(),
 );
 
 Map<String, dynamic> _$UpdateEmergencyCallRequestToJson(
@@ -28,4 +30,5 @@ Map<String, dynamic> _$UpdateEmergencyCallRequestToJson(
   'caller_phone': instance.callerPhone,
   'latitude': instance.latitude,
   'longitude': instance.longitude,
+  'location_accuracy_metres': instance.locationAccuracyMetres,
 };

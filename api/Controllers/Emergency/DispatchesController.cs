@@ -12,6 +12,15 @@ namespace CareLanka.Api.Controllers.Emergency;
 public sealed class DispatchesController(IDispatchService dispatches) : ControllerBase
 {
     [Authorize(Policy = Policies.EmergencyResponder)]
+    [HttpGet("{id:guid}", Name = "getDispatch")]
+    [ProducesResponseType(typeof(DispatchDetail), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<ActionResult<DispatchDetail>> Get(Guid id, CancellationToken ct)
+        => Ok(await dispatches.GetByIdAsync(id, ct));
+
+    [Authorize(Policy = Policies.EmergencyResponder)]
     [HttpGet("{id:guid}/route", Name = "getDispatchRoute")]
     [ProducesResponseType(typeof(RouteLog), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]

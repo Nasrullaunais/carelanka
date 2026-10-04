@@ -111,7 +111,7 @@ public sealed class DispatchProposalService : IDispatchProposalService
 
         if (proposal.Status != DispatchProposalStatus.PendingConfirmation || proposal.ProposedAmbulanceId is not { } ambulanceId)
         {
-            throw new ConflictException(MessageCode.DispatchProposalNotConfirmable, "not pending confirmation");
+            throw new ConflictException(MessageCode.DispatchProposalNotConfirmable, "It is no longer waiting to be sent.");
         }
 
         var eligible = await IsEligibleAsync(ambulanceId, ct);
@@ -120,9 +120,9 @@ public sealed class DispatchProposalService : IDispatchProposalService
 
         if (!eligible)
         {
-            await SaveAsync(ct);
+            var renewed = await ReplaceStaleAsync(proposal, ct);
             throw new DispatchProposalRejectedException(
-                MessageCode.DispatchProposalNotConfirmable, null, [check.Check], check.Detail);
+                MessageCode.DispatchProposalNotConfirmable, null, [check.Check], StaleDetail(check.Detail, renewed));
         }
 
         await _dispatches.DispatchFromProposalAsync(proposal.EmergencyCallId, ambulanceId, proposal.Id, ct);
@@ -137,15 +137,17 @@ public sealed class DispatchProposalService : IDispatchProposalService
             || proposal.ProposedAmbulanceId is not { } ambulanceId
             || proposal.SourceDispatchId is not { } sourceDispatchId)
         {
-            throw new ConflictException(MessageCode.DispatchProposalNotApprovable, "not pending approval");
+            throw new ConflictException(MessageCode.DispatchProposalNotApprovable, "It is no longer waiting for approval.");
         }
 
         var source = await _db.Dispatches.AsNoTracking().Include(x => x.EmergencyCall).SingleOrDefaultAsync(x => x.Id == sourceDispatchId, ct);
         var targetPriority = await _db.EmergencyCalls.Where(x => x.Id == proposal.EmergencyCallId).Select(x => x.Priority).SingleAsync(ct);
         if (source is not null && source.EmergencyCall.Priority <= targetPriority)
         {
+            var renewed = await ReplaceStaleAsync(proposal, ct);
             throw new DispatchProposalRejectedException(MessageCode.DispatchProposalNotApprovable, null,
-                ["call_priority_still_higher"], "The destination call is no longer more urgent than the source call. Request a new recommendation.");
+                ["call_priority_still_higher"],
+                StaleDetail("The destination call is no longer more urgent than the source call.", renewed));
         }
         var sourceStillPrePickup = source is not null && source.Status.IsPrePickup();
         var prePickupCheck = DispatchProposalValidator.SourcePrePickup(source?.Status ?? DispatchStatus.HandedOver, _clock.GetUtcNow());
@@ -157,7 +159,7 @@ public sealed class DispatchProposalService : IDispatchProposalService
 
         if (!sourceStillPrePickup || !eligible)
         {
-            await SaveAsync(ct);
+            var renewed = await ReplaceStaleAsync(proposal, ct);
             var failedChecks = new List<string>();
             if (!sourceStillPrePickup) failedChecks.Add(prePickupCheck.Check);
             if (!eligible) failedChecks.Add(eligibleCheck.Check);
@@ -166,7 +168,7 @@ public sealed class DispatchProposalService : IDispatchProposalService
                 MessageCode.DispatchProposalNotApprovable,
                 sourceStillPrePickup ? DiversionBlockReason.AmbulanceNotAvailable : DiversionBlockReason.PatientAlreadyReached,
                 failedChecks,
-                string.Join(", ", failedChecks));
+                StaleDetail(string.Join(" ", new[] { prePickupCheck, eligibleCheck }.Where(c => !c.Passed).Select(c => c.Detail)), renewed));
         }
 
         await _dispatches.ApplyDiversionAsync(
@@ -240,6 +242,44 @@ public sealed class DispatchProposalService : IDispatchProposalService
 
         return _lifecycle.Open(rejected.EmergencyCallId, call.Priority, allowDiversion, exclusions);
     }
+
+    // A recommendation that failed its last check is withdrawn and asked again, instead of sitting on the
+    // board as "ready to send" until someone rejects it by hand.
+    private async Task<bool> ReplaceStaleAsync(DispatchProposal stale, CancellationToken ct)
+    {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        await _lifecycle.LockCallAsync(stale.EmergencyCallId, ct);
+        var withdrawn = await _lifecycle.WithdrawOpenAsync(
+            stale.EmergencyCallId, DispatchWithdrawalReason.AmbulanceNoLongerAvailable, ct);
+        await SaveAsync(ct);
+
+        DispatchProposal? next = null;
+        if (withdrawn?.Id == stale.Id)
+        {
+            var call = await _db.EmergencyCalls.AsNoTracking()
+                .Where(x => x.Id == stale.EmergencyCallId)
+                .Select(x => new
+                {
+                    x.Priority,
+                    x.Status,
+                    HasLiveDispatch = x.Dispatches.Any(d => DispatchStatusExtensions.LiveStatuses.Contains(d.Status))
+                })
+                .SingleAsync(ct);
+            if (call.Status == CallStatus.Received && !call.HasLiveDispatch)
+            {
+                var exclusions = DispatchWorkflowJson.Read<List<Guid>>(stale.ExcludeAmbulanceIdsJson) ?? [];
+                next = _lifecycle.Open(stale.EmergencyCallId, call.Priority, stale.AllowDiversion, exclusions);
+                await SaveAsync(ct);
+            }
+        }
+
+        await transaction.CommitAsync(ct);
+        if (next is not null) _lifecycle.Wake(next);
+        return next is not null;
+    }
+
+    private static string StaleDetail(string? reason, bool renewed)
+        => renewed ? $"{reason} A new recommendation is being prepared." : reason ?? string.Empty;
 
     private async Task SaveAsync(CancellationToken ct)
     {

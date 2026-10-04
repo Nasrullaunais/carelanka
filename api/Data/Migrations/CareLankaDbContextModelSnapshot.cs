@@ -419,7 +419,7 @@ namespace CareLanka.Api.Data.Migrations
                         {
                             t.HasCheckConstraint("ck_notifications_one_recipient", "num_nonnulls(recipient_staff_member_id, recipient_patient_account_id) = 1");
 
-                            t.HasCheckConstraint("ck_notifications_type", "type IN ('dispatch_assigned', 'appointment_booked', 'appointment_rescheduled', 'appointment_cancelled', 'appointment_reminder', 'admission_approved', 'bed_assigned', 'discharge_ready', 'bill_raised', 'bill_settled', 'care_reply_ready', 'prescription_ready', 'prescription_delivered', 'lab_report_ready', 'ambulance_on_the_way', 'ambulance_arrived', 'cancellation_answered', 'emergency_call_received', 'cancellation_request_waiting', 'dispatch_proposal_waiting', 'dispatch_proposal_failed', 'admission_awaiting_approval', 'care_query_flagged', 'care_reply_waiting', 'equipment_warning_raised', 'maintenance_due', 'pharmacy_stock_low', 'lab_test_requested', 'leave_requested', 'leave_approved', 'leave_rejected', 'shift_changed', 'roster_proposal_waiting')");
+                            t.HasCheckConstraint("ck_notifications_type", "type IN ('dispatch_assigned', 'dispatch_cancelled', 'appointment_booked', 'appointment_rescheduled', 'appointment_cancelled', 'appointment_reminder', 'admission_approved', 'bed_assigned', 'discharge_ready', 'bill_raised', 'bill_settled', 'care_reply_ready', 'prescription_ready', 'prescription_delivered', 'lab_report_ready', 'ambulance_on_the_way', 'ambulance_arrived', 'cancellation_answered', 'emergency_call_cancelled', 'emergency_call_received', 'cancellation_request_waiting', 'dispatch_proposal_waiting', 'dispatch_proposal_failed', 'admission_awaiting_approval', 'care_query_flagged', 'care_reply_waiting', 'equipment_warning_raised', 'maintenance_due', 'pharmacy_stock_low', 'lab_test_requested', 'leave_requested', 'leave_approved', 'leave_rejected', 'shift_changed', 'roster_proposal_waiting')");
                         });
                 });
 
@@ -1000,7 +1000,7 @@ namespace CareLanka.Api.Data.Migrations
 
                     b.ToTable("dispatches", null, t =>
                         {
-                            t.HasCheckConstraint("ck_dispatches_status", "status IN ('assigned', 'acknowledged', 'en_route_to_scene', 'at_scene', 'transporting_to_hospital', 'handed_over', 'declined', 'cancelled', 'reassigned')");
+                            t.HasCheckConstraint("ck_dispatches_status", "status IN ('assigned', 'acknowledged', 'en_route_to_scene', 'at_scene', 'transporting_to_hospital', 'handed_over', 'closed_at_scene', 'declined', 'cancelled', 'reassigned')");
                         });
                 });
 
@@ -1218,7 +1218,7 @@ namespace CareLanka.Api.Data.Migrations
 
                             t.HasCheckConstraint("ck_dispatch_proposals_status", "status IN ('pending', 'pending_confirmation', 'pending_approval', 'approved', 'executed', 'rejected', 'failed', 'withdrawn')");
 
-                            t.HasCheckConstraint("ck_dispatch_proposals_withdrawal_reason", "withdrawal_reason IN ('call_changed', 'dispatched_manually', 'call_closed')");
+                            t.HasCheckConstraint("ck_dispatch_proposals_withdrawal_reason", "withdrawal_reason IN ('call_changed', 'dispatched_manually', 'call_closed', 'ambulance_no_longer_available')");
                         });
                 });
 
@@ -1275,6 +1275,10 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("cancellation_reviewed_by_staff_id");
 
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("closed_at");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -1308,9 +1312,14 @@ namespace CareLanka.Api.Data.Migrations
                         .HasColumnName("longitude");
 
                     b.Property<string>("Outcome")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("outcome");
+
+                    b.Property<string>("OutcomeNotes")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
-                        .HasColumnName("outcome");
+                        .HasColumnName("outcome_notes");
 
                     b.Property<Guid?>("PatientId")
                         .HasColumnType("uuid")
@@ -1367,6 +1376,8 @@ namespace CareLanka.Api.Data.Migrations
                             t.HasCheckConstraint("ck_emergency_calls_latitude", "latitude BETWEEN -90 AND 90");
 
                             t.HasCheckConstraint("ck_emergency_calls_longitude", "longitude BETWEEN -180 AND 180");
+
+                            t.HasCheckConstraint("ck_emergency_calls_outcome", "outcome IN ('transported', 'treated_at_scene', 'refused_transport', 'patient_not_found', 'deceased_at_scene', 'false_alarm', 'duplicate_call', 'caller_cancelled', 'no_longer_needed')");
 
                             t.HasCheckConstraint("ck_emergency_calls_priority", "priority IN ('critical', 'high', 'medium', 'low')");
 

@@ -66,20 +66,15 @@ actually published.
 
 ## Open stubs
 
-**Two open.** Common auth was never stubbed: it was built and merged in PR #11. Row 2 is
-Equipment waiting on Patient Management, and row 5 is an Emergency dependency.
-**Rows 1, 3, 4, 6 and 7 are gone** — see Replaced below.
+**One open.** Common auth was never stubbed: it was built and merged in PR #11. Row 2 is
+Equipment waiting on Patient Management.
+**Rows 1, 3, 4, 5, 6 and 7 are gone** — see Replaced below.
 
 | # | What is faked | Where it lives | Standing in for | Owner of the real thing | Added |
 | :-- | :--- | :--- | :--- | :--- | :--- |
 | 2 | Ward names on a bed — every ward is called `Stub ward <id fragment>` | `api/Services/Equipment/Stubs/StubWardDirectory.cs` | `GET /wards` — `patient-spec.yaml` | **M4 Lochana** | 2026-09-09 |
-| 5 | Staff name, active state and role lookup from the existing auth staff records | `api/Services/Emergency/Stubs/StubStaffLookupService.cs` | `POST /staff/lookup` — `staff-spec.yaml` | **M2 Kaveesha** | 2026-09-13 |
 
 **Row 7 was opened and closed on the same day** — see Replaced below. `ILanguageModel` is built.
-
-**Row 5** matches Staff Management's published batch lookup shape and fails closed for unknown
-or inactive staff. Replace its DI registration when `POST /staff/lookup` is built; Emergency
-stores only staff IDs and does not copy staff-owned profile data.
 
 **Row 2 — why the name looks broken on purpose.** `Bed.ward_name` is Patient Management's
 to answer, and a plausible invented name like "Intensive Care" would be indistinguishable
@@ -110,9 +105,9 @@ each says so in the spec:
 
 | What | Why | Arrives with |
 | :--- | :--- | :--- |
-| `AdmissionDetail.discharge` | No discharge row is written yet | Step 7 |
+| ~~`AdmissionDetail.discharge`~~ | **Served since step 7** — `AdmissionDetail.Discharge` is filled once a discharge is recorded | — |
 | `wardId` filter on `GET /admissions` | **No longer blocked** — a live `BedAssignment` now says which ward an admission is in. Still unpublished: this step did not need it, and adding an untested filter was not worth it | Next commit on this track |
-| **Nurses scoped to their own ward** on `GET /admissions` and `GET /admissions/{id}` | Half unblocked: an admission's ward is now knowable. Still waiting on **M2** to publish which ward a nurse works in | M2 |
+| **Nurses scoped to their own ward** on `GET /admissions` and `GET /admissions/{id}` | **Both halves now exist**: a live `BedAssignment` gives an admission's ward, and Staff Management's `Shift.WardId` + `Allocation` give the ward a nurse is rostered on. Still open: **M4** has to decide which shift counts (today's? the current one?) and enforce it | M4 |
 
 The key is **omitted, not returned empty, and the parameter is unpublished rather than
 accepted and ignored.** A missing key is visible to whoever generates a client; a key that
@@ -135,6 +130,7 @@ against" is answerable later.
 
 | # | What it was | Replaced by | Commit | Date |
 | :-- | :--- | :--- | :--- | :--- |
+| 5 | Staff name, active state and role lookup, read straight from the auth staff records | Staff Management's real `IStaffLookupService` (`api/Services/Staff/StaffLookupService.cs`, behind `POST /staff/lookup`), called directly by `AmbulanceCrewService`. Emergency's own copy of the interface was deleted | `fix/emergency-real-staff-lookup` | 2026-10-01 |
 | 6 | Pre-admission from a dispatch — logs a warning and reports success; no admission is created | `api/Services/Emergency/PreAdmissionGateway.cs`, an in-process call into Patient's `IAdmissionService.PreAdmitAsync`, plus the real `POST /admissions/pre-admit` and `POST /admissions/{id}/classify` on Patient's side | `feat/emergency-phase-3-dispatch` | 2026-09-22 |
 | 4 | Ambulance distance — straight-line distance instead of road distance | `api/Services/Emergency/OsrmAmbulanceDistanceService.cs` (road times from OSRM, no key needed; falls back to `StraightLineDistance`) | `feat/emergency-road-ranking` | 2026-09-20 |
 | 1 | Bed counts per ward — every ward reported exactly 6 beds | `api/Services/Patient/BedRegistryService.cs`, a delegating adapter over `IBedService.CountBedsByWardAsync` | `feat/patient-real-bed-counts` | 2026-09-10 |
@@ -183,7 +179,7 @@ needs from others" sections of `integration_of_functions.md` (§10, §16, §21,
 | :--- | :--- | :--- | :--- |
 | ~~M4 Patient~~ | ~~Bed register — id, ward, number, condition, isolation, distance~~ | ~~**M3**~~ | **BUILT 2026-09-10 — not a stub any more.** Read through `IBedRegistryService`, the one file in Patient Management that knows Equipment's bed table exists |
 | ~~M4 Patient~~ | ~~`AgentWorkflow` / `AgentProposedChange` — the record of what an agent did~~ | ~~**Common (the group)**~~ | **BUILT 2026-09-20 — not a stub any more.** PR #80 added both tables, their configurations and the `Common_AddAgentWorkflows` migration. Patient Management wired `BedAssignment.WorkflowId` to `agent_workflows.id` in `Patient_LinkBedAssignmentWorkflow`, but that was the bed agent's own link — `Patient_RemoveBedAgentWorkflowLink` (2026-09-22) dropped the column along with the agent. The care advisory agent still writes `CareRecommendation.WorkflowId` onto the same common tables. **Only the tables landed**: the common `/api/workflows` endpoints in `common-spec.yaml` are still unbuilt, and the care advisory agent does not need them, because `patient-spec.yaml` publishes its own `GET /care-workflows/{workflowId}` |
-| M1, M3, M4 | Staff name and role by ID | **M2** | `POST /staff/lookup`. Needed by three people to render "Approved by …" — small, high value, worth building early |
+| ~~M1, M3, M4~~ | ~~Staff name and role by ID~~ | ~~**M2**~~ | **BUILT — not a stub any more.** `POST /staff/lookup` and `IStaffLookupService` are live. Emergency moved onto it on 2026-10-01 (row 5) |
 | ~~M1 Emergency~~ | ~~Free bed counts per ward~~ | ~~**M4**~~ | **BUILT 2026-09-11 — not a stub any more.** `GET /api/capacity/wards` is live and every staff role may read it. Shape: `WardCapacitySummary` in `specs/patient-spec.yaml`. `free_beds` is usable, unoccupied and not under a live hold; **a hold past its `reserved_until` counts as free**, and that expiry rule lives in `CapacityService` so nobody re-implements it |
 | ~~M1 Emergency~~ | ~~Create a pre-admission from a dispatch~~ | ~~**M4**~~ | **BUILT 2026-09-23 — not a stub any more.** Emergency calls Patient Management's real `IAdmissionService.PreAdmitAsync` through `PreAdmissionGateway`; dispatch-id uniqueness makes retries idempotent |
 | M1 Emergency | Maps / routing | *third party* | Not a teammate, but stub it anyway so you can develop offline and test the provider-down path |

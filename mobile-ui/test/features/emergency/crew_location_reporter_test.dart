@@ -19,22 +19,76 @@ void main() {
     reporter.dispose();
   });
 
+  test('stopping before the first GPS fix prevents a late upload', () async {
+    final gateway = FakeDispatchGateway('ambulance-1');
+    final location = StreamLocationGateway();
+    final reporter = CrewLocationReporter(
+      dispatches: gateway,
+      location: location,
+    );
+    await reporter.resume();
+    await reporter.stop();
+    expect(location.listening, isFalse);
+    location.emit(const CrewPosition(6.927079, 79.861244));
+    await Future<void>.delayed(Duration.zero);
+    expect(gateway.reports, isEmpty);
+    expect(reporter.state, CrewLocationReportingState.stopped);
+    reporter.dispose();
+  });
+
   test(
-    'pausing while GPS is pending prevents a late location upload',
+    'reports a new fix straight away, then keeps re-sending the latest',
     () async {
       final gateway = FakeDispatchGateway('ambulance-1');
-      final location = PendingLocationGateway();
+      final location = StreamLocationGateway();
       final reporter = CrewLocationReporter(
         dispatches: gateway,
         location: location,
+        interval: const Duration(milliseconds: 5),
       );
-      final resumed = reporter.resume();
-      await location.requested.future;
-      await reporter.pause();
-      location.position.complete(const CrewPosition(6.927079, 79.861244));
-      await resumed;
+      await reporter.resume();
       expect(gateway.reports, isEmpty);
-      expect(reporter.state, CrewLocationReportingState.stopped);
+
+      location.emit(const CrewPosition(6.9, 79.8));
+      await Future<void>.delayed(Duration.zero);
+      expect(gateway.reports, [const CrewPosition(6.9, 79.8)]);
+
+      location.emit(const CrewPosition(6.95, 79.85));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(gateway.reports.last, const CrewPosition(6.95, 79.85));
+      expect(reporter.state, CrewLocationReportingState.reporting);
+      reporter.dispose();
+      expect(location.listening, isFalse);
+    },
+  );
+
+  test(
+    'a GPS error stops re-sending the old position until a new fix arrives',
+    () async {
+      final gateway = FakeDispatchGateway('ambulance-1');
+      final location = StreamLocationGateway();
+      final reporter = CrewLocationReporter(
+        dispatches: gateway,
+        location: location,
+        interval: const Duration(milliseconds: 5),
+      );
+      await reporter.resume();
+      location.emit(const CrewPosition(6.8, 79.7));
+      await Future<void>.delayed(Duration.zero);
+      location.fail();
+      await Future<void>.delayed(Duration.zero);
+      expect(reporter.state, CrewLocationReportingState.failed);
+      final sentBeforeFailure = gateway.reports.length;
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(
+        gateway.reports,
+        hasLength(sentBeforeFailure),
+        reason: 'an old position must not be re-sent as if it were new',
+      );
+
+      location.emit(const CrewPosition(6.9, 79.8));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(reporter.state, CrewLocationReportingState.reporting);
       reporter.dispose();
     },
   );
@@ -49,7 +103,7 @@ void main() {
 
     await reporter.resume();
     await Future<void>.delayed(const Duration(milliseconds: 5));
-    await reporter.pause();
+    await reporter.stop();
 
     expect(gateway.reports, isNotEmpty);
     expect(
@@ -146,7 +200,7 @@ final class FakeLocationGateway implements CrewLocationGateway {
   Future<CrewLocationPermission> requestPermission() async => permission;
 
   @override
-  Future<CrewPosition> currentPosition() async => position;
+  Stream<CrewPosition> positions() => Stream.value(position);
 
   @override
   Future<bool> openAppSettings() async => true;
@@ -155,19 +209,21 @@ final class FakeLocationGateway implements CrewLocationGateway {
   Future<bool> openLocationSettings() async => true;
 }
 
-final class PendingLocationGateway implements CrewLocationGateway {
-  final requested = Completer<void>();
-  final position = Completer<CrewPosition>();
+final class StreamLocationGateway implements CrewLocationGateway {
+  final _fixes = StreamController<CrewPosition>.broadcast();
+
+  bool get listening => _fixes.hasListener;
+
+  void emit(CrewPosition position) => _fixes.add(position);
+
+  void fail() => _fixes.addError(StateError('GPS lost'));
 
   @override
   Future<CrewLocationPermission> requestPermission() async =>
       CrewLocationPermission.granted;
 
   @override
-  Future<CrewPosition> currentPosition() {
-    requested.complete();
-    return position.future;
-  }
+  Stream<CrewPosition> positions() => _fixes.stream;
 
   @override
   Future<bool> openAppSettings() async => true;

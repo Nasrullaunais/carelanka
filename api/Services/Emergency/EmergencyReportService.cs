@@ -157,8 +157,7 @@ public sealed class EmergencyReportService(CareLankaDbContext db) : IEmergencyRe
     private static (DateTimeOffset Start, DateTimeOffset End) Range(DateOnly from, DateOnly to)
     {
         if (to < from) throw new BadRequestException(MessageCode.ValidationFailed);
-        return (new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero),
-            new DateTimeOffset(to.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero));
+        return (HospitalDays.StartOf(from), HospitalDays.EndOf(to));
     }
 
     private static double Median(IEnumerable<double> values)

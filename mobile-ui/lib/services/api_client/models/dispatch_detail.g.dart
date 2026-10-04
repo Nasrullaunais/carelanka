@@ -17,7 +17,6 @@ DispatchDetail _$DispatchDetailFromJson(Map<String, dynamic> json) =>
       status: json['status'] == null
           ? null
           : DispatchStatus.fromJson(json['status'] as String),
-      destinationWardName: json['destination_ward_name'] as String?,
       crewCount: (json['crew_count'] as num?)?.toInt(),
       acknowledgementOverdue: json['acknowledgement_overdue'] as bool?,
       dispatchedAt: json['dispatched_at'] == null
@@ -37,6 +36,17 @@ DispatchDetail _$DispatchDetailFromJson(Map<String, dynamic> json) =>
       handoverNotes: json['handover_notes'] as String?,
       patientCondition: json['patient_condition'] as String?,
       sceneAddressLabel: json['scene_address_label'] as String?,
+      destinationLabel: json['destination_label'] as String?,
+      callStatus: json['call_status'] == null
+          ? null
+          : CallStatus.fromJson(json['call_status'] as String),
+      callOutcome: json['call_outcome'] == null
+          ? null
+          : EmergencyCallOutcome.fromJson(json['call_outcome'] as String),
+      callDetails: json['call_details'] as String?,
+      callerName: json['caller_name'] as String?,
+      callerPhone: json['caller_phone'] as String?,
+      patientName: json['patient_name'] as String?,
       crewStaffIds: (json['crew_staff_ids'] as List<dynamic>?)
           ?.map((e) => e as String)
           .toList(),
@@ -49,7 +59,6 @@ Map<String, dynamic> _$DispatchDetailToJson(DispatchDetail instance) =>
       'ambulance_registration': instance.ambulanceRegistration,
       'call_priority': instance.callPriority,
       'status': instance.status,
-      'destination_ward_name': instance.destinationWardName,
       'crew_count': instance.crewCount,
       'acknowledgement_overdue': instance.acknowledgementOverdue,
       'dispatched_at': instance.dispatchedAt?.toIso8601String(),
@@ -63,5 +72,12 @@ Map<String, dynamic> _$DispatchDetailToJson(DispatchDetail instance) =>
       'handover_notes': instance.handoverNotes,
       'patient_condition': instance.patientCondition,
       'scene_address_label': instance.sceneAddressLabel,
+      'destination_label': instance.destinationLabel,
+      'call_status': instance.callStatus,
+      'call_outcome': instance.callOutcome,
+      'call_details': instance.callDetails,
+      'caller_name': instance.callerName,
+      'caller_phone': instance.callerPhone,
+      'patient_name': instance.patientName,
       'crew_staff_ids': instance.crewStaffIds,
     };

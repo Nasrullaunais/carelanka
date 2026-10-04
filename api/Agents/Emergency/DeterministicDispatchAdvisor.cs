@@ -17,5 +17,6 @@ public sealed class DeterministicDispatchAdvisor : IDispatchAdvisor
         => Task.FromResult(new DispatchAdvice(
             context.Source.AmbulanceId,
             $"Every ambulance is committed. {context.Source.AmbulanceRegistration} is pre-pickup on a "
-            + "lower-priority call and can be turned around; that call returns to the queue."));
+            + "lower-priority call and can be turned around; that call returns to the queue."
+            + (context.MinutesToThisCall is { } minutes ? $" It is about {minutes} minute(s) from this call by road." : "")));
 }

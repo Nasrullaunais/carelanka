@@ -19,6 +19,7 @@ public sealed class DispatchAgent : IDispatchAgent
     private const string ReadCall = "read_call";
     private const string ListCandidates = "list_eligible_ambulances";
     private const string RankByEta = "rank_by_eta";
+    private const string RankDiversionsByEta = "rank_diversions_by_eta";
     private const string DraftRecommendation = "draft_recommendation";
     private const string RecommendationWithinRules = "recommendation_within_rules";
     private const int ShortlistSize = 5;
@@ -54,7 +55,9 @@ public sealed class DispatchAgent : IDispatchAgent
 
             var routeMinutes = await CallToolAsync(
                 toolCalls, RankByEta, new { destination = new { lat = request.Latitude, lon = request.Longitude } },
-                () => _tools.GetRouteMinutesAsync(eligible, request.Latitude, request.Longitude, ct));
+                () => _tools.GetRouteMinutesAsync(
+                    eligible.Select(candidate => new AmbulanceLocation(candidate.Id, candidate.Latitude, candidate.Longitude)).ToList(),
+                    request.Latitude, request.Longitude, ct));
             Step(plan, RankByEta);
 
             var now = _clock.GetUtcNow();
@@ -112,11 +115,24 @@ public sealed class DispatchAgent : IDispatchAgent
             var active = await CallToolAsync(
                 toolCalls, "get_active_dispatches", new { }, () => _tools.GetActiveDispatchesAsync(ct));
 
-            var divertible = active
+            var candidates = active
                 .Where(dispatch => dispatch.CallPriority > request.CallPriority
                     && !request.ExcludeAmbulanceIds.Contains(dispatch.AmbulanceId)
                     && dispatch.Status.IsPrePickup())
-                .OrderByDescending(dispatch => dispatch.CallPriority)
+                .ToList();
+            var diversionMinutes = candidates.Count == 0
+                ? new Dictionary<Guid, int?>()
+                : await CallToolAsync(
+                    toolCalls, RankDiversionsByEta, new { candidates = candidates.Count },
+                    () => _tools.GetRouteMinutesAsync(
+                        candidates.Select(dispatch => new AmbulanceLocation(
+                            dispatch.AmbulanceId, dispatch.AmbulanceLatitude, dispatch.AmbulanceLongitude)).ToList(),
+                        request.Latitude, request.Longitude, ct));
+
+            // The quickest ambulance to reach this patient; among equals, take it from the least urgent call.
+            var divertible = candidates
+                .OrderBy(dispatch => diversionMinutes.GetValueOrDefault(dispatch.AmbulanceId) ?? int.MaxValue)
+                .ThenByDescending(dispatch => dispatch.CallPriority)
                 .ThenBy(dispatch => dispatch.DispatchedAt)
                 .FirstOrDefault();
 
@@ -132,9 +148,10 @@ public sealed class DispatchAgent : IDispatchAgent
                     null, null, errors);
             }
 
-            var waitingMinutes = Math.Max(0, (int)(now - divertible.DispatchedAt).TotalMinutes);
+            var waitingMinutes = Math.Max(0, (int)(now - divertible.CallCreatedAt).TotalMinutes);
+            var minutesToThisCall = diversionMinutes.GetValueOrDefault(divertible.AmbulanceId);
 
-            var diversion = new DiversionContext(call, divertible, waitingMinutes);
+            var diversion = new DiversionContext(call, divertible, waitingMinutes, minutesToThisCall);
             var explained = await DraftAsync(
                 toolCalls, new { diverted = divertible.AmbulanceRegistration },
                 () => _advisor.ExplainDiversionAsync(diversion, ct));
@@ -169,7 +186,7 @@ public sealed class DispatchAgent : IDispatchAgent
 
             return new DispatchAgentRun(
                 plan, toolCalls, diversionValidation, DispatchOutcome.DiversionProposed,
-                IsDiversion: true, divertible.AmbulanceId, divertible.AmbulanceRegistration, null,
+                IsDiversion: true, divertible.AmbulanceId, divertible.AmbulanceRegistration, minutesToThisCall,
                 diversionAdvice.Rationale, impact, divertible.DispatchId, errors,
                 diversionAdvice.Source, diversionAdvice.SourceNote);
         }
@@ -186,10 +203,10 @@ public sealed class DispatchAgent : IDispatchAgent
         }
     }
 
-    private static async Task<DispatchAdvice> DraftAsync(
+    private async Task<DispatchAdvice> DraftAsync(
         List<DispatchToolCall> calls, object arguments, Func<Task<DispatchAdvice>> draft)
     {
-        var startedAt = DateTimeOffset.UtcNow;
+        var startedAt = _clock.GetUtcNow();
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var advice = await draft();
 
@@ -225,17 +242,20 @@ public sealed class DispatchAgent : IDispatchAgent
     private static DispatchValidationResult RecommendationCheck(string detail, DateTimeOffset now)
         => new() { Check = RecommendationWithinRules, Passed = true, Detail = detail, CheckedAt = now };
 
-    private static void Step(List<DispatchPlanStep> plan, string description)
-        => plan.Add(new DispatchPlanStep
+    private void Step(List<DispatchPlanStep> plan, string description)
+    {
+        var now = _clock.GetUtcNow();
+        plan.Add(new DispatchPlanStep
         {
             Sequence = plan.Count + 1, Description = description, Status = "completed",
-            StartedAt = DateTimeOffset.UtcNow, CompletedAt = DateTimeOffset.UtcNow
+            StartedAt = now, CompletedAt = now
         });
+    }
 
     private async Task<TResult> CallToolAsync<TResult>(
         List<DispatchToolCall> calls, string toolName, object arguments, Func<Task<TResult>> call)
     {
-        var startedAt = DateTimeOffset.UtcNow;
+        var startedAt = _clock.GetUtcNow();
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         try

@@ -26,6 +26,7 @@ public interface IEmergencyCallService
         UpdateEmergencyCallRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<EmergencyCallDetail> CancelAsync(Guid id, CancelEmergencyCallRequest request, CancellationToken cancellationToken = default);
     Task<MyCallTracking> TrackMineAsync(Guid id, CancellationToken cancellationToken = default);
     Task<MyEmergencyCallSummary> CancelMineAsync(Guid id, RequestCancellationRequest request, CancellationToken cancellationToken = default);
     Task<EmergencyCancellationRequest> RequestCancellationAsync(Guid id, RequestCancellationRequest request, CancellationToken cancellationToken = default);

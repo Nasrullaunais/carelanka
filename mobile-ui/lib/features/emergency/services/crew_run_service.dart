@@ -1,11 +1,14 @@
 import '../../../core/network/api.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../services/api_client/care_lanka_api.dart';
+import '../../../services/api_client/clients/dispatches_api.dart';
 import '../../../services/api_client/clients/my_run_api.dart';
+import '../../../services/api_client/models/close_run_at_scene_request.dart';
 import '../../../services/api_client/models/decline_dispatch_request.dart';
 import '../../../services/api_client/models/dispatch_detail.dart';
 import '../../../services/api_client/models/dispatch_status.dart';
 import '../../../services/api_client/models/dispatch_summary_paged_result.dart';
+import '../../../services/api_client/models/emergency_call_outcome.dart';
 import '../../../services/api_client/models/navigation_target.dart';
 import '../../../services/api_client/models/record_handover_request.dart';
 import '../../../services/api_client/models/update_my_dispatch_status_request.dart';
@@ -22,14 +25,25 @@ abstract interface class CrewRunService {
     String? notes,
     String? patientCondition,
   });
+  Future<DispatchDetail> closeAtScene(
+    String id,
+    EmergencyCallOutcome outcome, {
+    String? notes,
+  });
+
+  /// One of this crew member's runs, live or finished.
+  Future<DispatchDetail> run(String id);
   Future<NavigationTarget> navigationTarget(String id);
   Future<DispatchSummaryPagedResult> history({required int page});
 }
 
 final class GeneratedCrewRunService implements CrewRunService {
-  GeneratedCrewRunService(CareLankaApi api) : _run = api.myRun;
+  GeneratedCrewRunService(CareLankaApi api)
+    : _run = api.myRun,
+      _dispatches = api.dispatches;
 
   final MyRunApi _run;
+  final DispatchesApi _dispatches;
 
   @override
   Future<DispatchDetail?> activeRun() async {
@@ -75,6 +89,22 @@ final class GeneratedCrewRunService implements CrewRunService {
       ),
     ),
   );
+
+  @override
+  Future<DispatchDetail> closeAtScene(
+    String id,
+    EmergencyCallOutcome outcome, {
+    String? notes,
+  }) => callApi(
+    () => _run.closeMyDispatchAtScene(
+      id: id,
+      body: CloseRunAtSceneRequest(outcome: outcome, notes: notes),
+    ),
+  );
+
+  @override
+  Future<DispatchDetail> run(String id) =>
+      callApi(() => _dispatches.getDispatch(id: id));
 
   @override
   Future<DispatchSummaryPagedResult> history({required int page}) => callApi(

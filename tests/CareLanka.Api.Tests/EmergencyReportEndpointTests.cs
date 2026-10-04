@@ -20,7 +20,7 @@ public sealed class EmergencyReportEndpointTests(ApiApplication application)
     public async Task Response_time_and_fleet_reports_match_dispatch_history()
     {
         var day = new DateOnly(2026, 9, 20);
-        var received = new DateTimeOffset(2026, 9, 20, 8, 0, 0, TimeSpan.Zero);
+        var received = new DateTimeOffset(2026, 9, 20, 8, 0, 0, TimeSpan.FromHours(5.5)).ToUniversalTime();
         var ambulanceId = Guid.NewGuid();
         await using (var scope = application.Services.CreateAsyncScope())
         {

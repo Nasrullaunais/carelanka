@@ -12,6 +12,8 @@ class RunCard extends StatelessWidget {
     required this.onStep,
     required this.onDecline,
     required this.onNavigate,
+    this.onEndAtScene,
+    this.onCallCaller,
   });
 
   final DispatchDetail run;
@@ -19,12 +21,15 @@ class RunCard extends StatelessWidget {
   final VoidCallback onStep;
   final VoidCallback onDecline;
   final VoidCallback onNavigate;
+  final VoidCallback? onEndAtScene;
+  final ValueChanged<String>? onCallCaller;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final status = run.status;
     final step = status?.nextStep;
+    final phone = run.callerPhone?.trim();
 
     return ListView(
       padding: const EdgeInsets.all(AppTheme.gutter),
@@ -32,7 +37,7 @@ class RunCard extends StatelessWidget {
         Text(status?.crewLabel ?? '', style: theme.textTheme.headlineSmall),
         const SizedBox(height: 4),
         Text(
-          'Priority: ${run.callPriority?.name ?? 'unknown'}',
+          '${run.callPriority?.label ?? 'Unknown'} priority',
           style: theme.textTheme.bodyLarge?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -44,11 +49,42 @@ class RunCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text('The emergency', style: theme.textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Text(
+                  run.callDetails?.trim().isNotEmpty == true
+                      ? run.callDetails!
+                      : 'No details were given by the caller.',
+                ),
+                if (run.patientName?.trim().isNotEmpty == true)
+                  _Row(label: 'Patient', value: run.patientName),
+                if (run.callerName?.trim().isNotEmpty == true)
+                  _Row(label: 'Caller', value: run.callerName),
+                if (phone != null && phone.isNotEmpty && onCallCaller != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: OutlinedButton.icon(
+                      onPressed: () => onCallCaller!(phone),
+                      icon: const Icon(Icons.phone_outlined),
+                      label: Text('Call the caller · $phone'),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 _Row(label: 'Ambulance', value: run.ambulanceRegistration),
                 if (run.sceneAddressLabel?.trim().isNotEmpty == true)
                   _Row(label: 'Scene', value: run.sceneAddressLabel),
+                if (run.destinationLabel?.trim().isNotEmpty == true)
+                  _Row(label: 'Going to', value: run.destinationLabel),
                 _Row(label: 'Crew on board', value: run.crewCount?.toString()),
-                _Row(label: 'Going to ward', value: run.destinationWardName),
               ],
             ),
           ),
@@ -67,6 +103,16 @@ class RunCard extends StatelessWidget {
                   )
                 : Text(step.label),
           ),
+        if ((status?.canEndAtScene ?? false) && onEndAtScene != null) ...[
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: busy ? null : onEndAtScene,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+            ),
+            child: const Text('End without going to hospital'),
+          ),
+        ],
         if (status?.canNavigate ?? false) ...[
           const SizedBox(height: 12),
           OutlinedButton.icon(
@@ -103,6 +149,7 @@ class _Row extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label),
+        const SizedBox(width: 16),
         Flexible(child: Text(value ?? 'Not set', textAlign: TextAlign.end)),
       ],
     ),

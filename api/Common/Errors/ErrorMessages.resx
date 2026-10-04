@@ -250,10 +250,10 @@
     <value>This call already has an open proposal or a live dispatch.</value>
   </data>
   <data name="cl_emg_008" xml:space="preserve">
-    <value>This proposal cannot be confirmed: {0}.</value>
+    <value>This recommendation cannot be sent. {0}</value>
   </data>
   <data name="cl_emg_009" xml:space="preserve">
-    <value>This diversion cannot be approved: {0}.</value>
+    <value>This diversion cannot be approved. {0}</value>
   </data>
   <data name="cl_emg_010" xml:space="preserve">
     <value>An ambulance has already been sent to this call. Request a cancellation instead, and staff will review it.</value>
@@ -269,6 +269,21 @@
   </data>
   <data name="cl_emg_014" xml:space="preserve">
     <value>This cancellation request has already been reviewed.</value>
+  </data>
+  <data name="cl_emg_015" xml:space="preserve">
+    <value>Ambulance {0} is not retired, so there is nothing to reinstate.</value>
+  </data>
+  <data name="cl_emg_016" xml:space="preserve">
+    <value>Ambulance {0} is retired. Reinstate it before assigning crew.</value>
+  </data>
+  <data name="cl_emg_017" xml:space="preserve">
+    <value>The crew has already reached the patient, so this run can no longer be called off. The crew must hand over or close the run at the scene.</value>
+  </data>
+  <data name="cl_emg_018" xml:space="preserve">
+    <value>Address search is not available right now. Pick the spot on the map or type the coordinates instead.</value>
+  </data>
+  <data name="cl_emg_019" xml:space="preserve">
+    <value>This call is closed, so it can no longer be changed.</value>
   </data>
   <data name="cl_pat_002" xml:space="preserve">
     <value>A patient with NIC {0} is already registered, as record {1}.</value>

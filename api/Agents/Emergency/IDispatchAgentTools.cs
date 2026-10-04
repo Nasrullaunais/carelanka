@@ -1,3 +1,5 @@
+using CareLanka.Api.Services.Emergency;
+
 namespace CareLanka.Api.Agents.Emergency;
 
 public sealed record EligibleAmbulanceCandidate(
@@ -16,7 +18,10 @@ public sealed record DivertibleDispatchCandidate(
     Data.Enums.CallPriority CallPriority,
     string? CallAddressLabel,
     Data.Enums.DispatchStatus Status,
-    DateTimeOffset DispatchedAt);
+    DateTimeOffset DispatchedAt,
+    DateTimeOffset CallCreatedAt,
+    decimal? AmbulanceLatitude,
+    decimal? AmbulanceLongitude);
 
 /// <summary>
 /// Allow-listed, read-only. No tool here writes to any table - a dispatch only exists after a
@@ -31,7 +36,7 @@ public interface IDispatchAgentTools
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyDictionary<Guid, int?>> GetRouteMinutesAsync(
-        IReadOnlyCollection<EligibleAmbulanceCandidate> ambulances,
+        IReadOnlyCollection<AmbulanceLocation> ambulances,
         decimal destinationLatitude,
         decimal destinationLongitude,
         CancellationToken cancellationToken = default);

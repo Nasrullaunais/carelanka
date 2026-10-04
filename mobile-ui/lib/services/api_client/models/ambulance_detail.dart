@@ -24,6 +24,7 @@ class AmbulanceDetail {
     this.locationUpdatedAt,
     this.outOfServiceReason,
     this.activeDispatch,
+    this.activeDispatchId,
     this.isDivertible,
     this.runsToday,
     this.currentCrew,
@@ -51,6 +52,8 @@ class AmbulanceDetail {
   final DateTime updatedAt;
   @JsonKey(name: 'active_dispatch')
   final DispatchSummary? activeDispatch;
+  @JsonKey(name: 'active_dispatch_id')
+  final String? activeDispatchId;
   @JsonKey(name: 'is_divertible')
   final bool? isDivertible;
   @JsonKey(name: 'runs_today')

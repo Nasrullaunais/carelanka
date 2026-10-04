@@ -18,9 +18,9 @@ abstract class CancellationReviewApi {
 
   @GET('/emergency-cancellation-requests')
   Future<EmergencyCancellationRequestPagedResult> listEmergencyCancellationRequests({
-    @Query('Status') CancellationRequestStatus? status,
-    @Query('Page') int? page,
-    @Query('PageSize') int? pageSize,
+    @Query('status') CancellationRequestStatus? status,
+    @Query('page') int? page,
+    @Query('pageSize') int? pageSize,
   });
 
   @POST('/emergency-calls/{id}/cancellation-request/approve')

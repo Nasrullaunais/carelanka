@@ -74,7 +74,7 @@ class _RunTile extends StatelessWidget {
         [
           if (dispatchedAt != null) FriendlyDate.full(dispatchedAt),
           if (crew != null) '$crew crew on board',
-          if (run.callPriority != null) 'Priority ${run.callPriority!.name}',
+          if (run.callPriority != null) '${run.callPriority!.label} priority',
         ].join(' · '),
       ),
     );

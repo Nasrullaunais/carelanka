@@ -21,11 +21,11 @@ abstract class DispatchAgentApi {
 
   @GET('/dispatch-proposals')
   Future<DispatchProposalSummaryPagedResult> listDispatchProposals({
-    @Query('Status') DispatchProposalStatus? status,
-    @Query('EmergencyCallId') String? emergencyCallId,
-    @Query('IsDiversion') bool? isDiversion,
-    @Query('Page') int? page,
-    @Query('PageSize') int? pageSize,
+    @Query('status') DispatchProposalStatus? status,
+    @Query('emergencyCallId') String? emergencyCallId,
+    @Query('isDiversion') bool? isDiversion,
+    @Query('page') int? page,
+    @Query('pageSize') int? pageSize,
   });
 
   @POST('/dispatch-proposals')

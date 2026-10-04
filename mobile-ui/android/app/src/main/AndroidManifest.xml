@@ -5,6 +5,11 @@
     <!-- Android 12+ only offers "Precise" when both are requested together. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- Crew location keeps reporting while Google Maps is open or the phone is
+         locked, through a visible foreground service. No background permission needed. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <!-- open_filex declares these for saving into shared storage; we only ever
          write to our own private cache folder, so Google Play would reject the
          app for requesting media access it doesn't use. -->

@@ -37,6 +37,19 @@ public sealed class EmergencyCallsController : ControllerBase
         CancellationToken cancellationToken)
         => Ok(await _calls.ListAsync(request, cancellationToken));
 
+    [Authorize(Policy = Policies.DutyManager)]
+    [HttpGet("address-search", Name = "searchSceneAddresses")]
+    [ProducesResponseType(typeof(IReadOnlyList<AddressSuggestion>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable, "application/problem+json")]
+    public async Task<ActionResult<IReadOnlyList<AddressSuggestion>>> SearchAddresses(
+        [FromQuery] AddressSearchRequest request,
+        [FromServices] IAddressSearch addresses,
+        CancellationToken cancellationToken)
+        => Ok(await addresses.SearchAsync(request.Query, cancellationToken));
+
     [Authorize]
     [HttpGet("{id:guid}", Name = "getEmergencyCall")]
     [ProducesResponseType(typeof(EmergencyCallDetail), StatusCodes.Status200OK)]
@@ -61,6 +74,20 @@ public sealed class EmergencyCallsController : ControllerBase
         [FromBody] UpdateEmergencyCallRequest request,
         CancellationToken cancellationToken)
         => Ok(await _calls.UpdateAsync(id, request, cancellationToken));
+
+    [Authorize(Policy = Policies.DutyManager)]
+    [HttpPost("{id:guid}/cancel", Name = "cancelEmergencyCall")]
+    [ProducesResponseType(typeof(EmergencyCallDetail), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<ActionResult<EmergencyCallDetail>> Cancel(
+        Guid id,
+        [FromBody] CancelEmergencyCallRequest request,
+        CancellationToken cancellationToken)
+        => Ok(await _calls.CancelAsync(id, request, cancellationToken));
 
     [Authorize(Policy = Policies.DutyManager)]
     [HttpPost("{id:guid}/dispatch", Name = "dispatchEmergencyCall")]

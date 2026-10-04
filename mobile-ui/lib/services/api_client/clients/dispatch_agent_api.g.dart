@@ -30,11 +30,11 @@ class _DispatchAgentApi implements DispatchAgentApi {
   }) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{
-      r'Status': status?.toJson(),
-      r'EmergencyCallId': emergencyCallId,
-      r'IsDiversion': isDiversion,
-      r'Page': page,
-      r'PageSize': pageSize,
+      r'status': status?.toJson(),
+      r'emergencyCallId': emergencyCallId,
+      r'isDiversion': isDiversion,
+      r'page': page,
+      r'pageSize': pageSize,
     };
     queryParameters.removeWhere((k, v) => v == null);
     final _headers = <String, dynamic>{};

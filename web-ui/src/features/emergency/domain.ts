@@ -5,13 +5,12 @@ import type {
   CallPriority,
   CallStatus,
   CancellationRequestStatus,
-  CancelReason,
   DispatchOutcome,
-  DispatchProposalStatus,
   DispatchRecommendationSource,
   DispatchRejectionReason,
   DispatchStatus,
   DispatchWithdrawalReason,
+  EmergencyCallOutcome,
   EmergencyCallSummary,
 } from '../../services/api/generated';
 
@@ -72,6 +71,7 @@ export const dispatchStatusLabels: Record<DispatchStatus, string> = {
   at_scene: 'At scene',
   transporting_to_hospital: 'Transporting to hospital',
   handed_over: 'Handed over',
+  closed_at_scene: 'Ended at the scene',
   declined: 'Declined',
   cancelled: 'Cancelled',
   reassigned: 'Reassigned',
@@ -84,37 +84,17 @@ export const dispatchStatusTones: Record<DispatchStatus, StatusTone> = {
   at_scene: 'accent',
   transporting_to_hospital: 'accent',
   handed_over: 'success',
+  closed_at_scene: 'success',
   declined: 'danger',
   cancelled: 'danger',
   reassigned: 'danger',
-};
-
-export const proposalStatusLabels: Record<DispatchProposalStatus, string> = {
-  pending: 'Pending',
-  pending_confirmation: 'Awaiting confirmation',
-  pending_approval: 'Awaiting approval',
-  approved: 'Approved',
-  executed: 'Executed',
-  rejected: 'Rejected',
-  failed: 'Failed',
-  withdrawn: 'Withdrawn',
-};
-
-export const proposalStatusTones: Record<DispatchProposalStatus, StatusTone> = {
-  pending: 'default',
-  pending_confirmation: 'warning',
-  pending_approval: 'danger',
-  approved: 'success',
-  executed: 'success',
-  rejected: 'danger',
-  failed: 'danger',
-  withdrawn: 'default',
 };
 
 export const withdrawalReasonLabels: Record<DispatchWithdrawalReason, string> = {
   call_changed: 'The call changed',
   dispatched_manually: 'Dispatched by hand',
   call_closed: 'The call was closed',
+  ambulance_no_longer_available: 'The ambulance is no longer available',
 };
 
 export const proposalOutcomeLabels: Record<DispatchOutcome, string> = {
@@ -149,15 +129,45 @@ export const cancellationStatusLabels: Record<CancellationRequestStatus, string>
   pending: 'Pending review',
   approved: 'Approved',
   rejected: 'Rejected',
+  expired: 'Closed without a decision',
 };
 
-export const cancelReasonLabels: Record<CancelReason, string> = {
-  diverted_to_other_hospital: 'Diverted to another hospital',
-  false_alarm: 'False alarm',
-  died_en_route: 'Patient died en route',
-  patient_refused: 'Patient refused transport',
-  no_show: 'No show',
+export const cancellationStatusTones: Record<CancellationRequestStatus, StatusTone> = {
+  pending: 'warning',
+  approved: 'success',
+  rejected: 'danger',
+  expired: 'default',
 };
+
+export const callOutcomeLabels: Record<EmergencyCallOutcome, string> = {
+  transported: 'Taken to hospital',
+  treated_at_scene: 'Treated at the scene',
+  refused_transport: 'Patient refused transport',
+  patient_not_found: 'Patient not found',
+  deceased_at_scene: 'Patient died at the scene',
+  false_alarm: 'False alarm',
+  duplicate_call: 'Duplicate call',
+  caller_cancelled: 'Caller cancelled',
+  no_longer_needed: 'No longer needed',
+};
+
+// The four outcomes POST /emergency-calls/{id}/cancel accepts; the others belong to the crew.
+export const callCloseOutcomes: EmergencyCallOutcome[] = ['false_alarm', 'duplicate_call', 'caller_cancelled', 'no_longer_needed'];
+
+const prePickupStatuses: ReadonlySet<DispatchStatus> = new Set(['assigned', 'acknowledged', 'en_route_to_scene']);
+const liveStatuses: ReadonlySet<DispatchStatus> = new Set([...prePickupStatuses, 'at_scene', 'transporting_to_hospital']);
+
+export function isLiveDispatch(status?: DispatchStatus): boolean {
+  return status !== undefined && liveStatuses.has(status);
+}
+
+export function isPrePickup(status?: DispatchStatus): boolean {
+  return status !== undefined && prePickupStatuses.has(status);
+}
+
+export function isClosedCall(status?: CallStatus): boolean {
+  return status === 'completed' || status === 'cancelled';
+}
 
 export const blockReasonLabels: Record<AmbulanceEligibilityBlockReason, string> = {
   inactive: 'Retired',
@@ -182,6 +192,15 @@ export function formatDriveMinutes(minutes?: number | null): string {
 
 export function formatTimestamp(iso?: string | null): string {
   return iso ? new Date(iso).toLocaleString() : 'Unknown';
+}
+
+export function formatAge(iso?: string | null, now: number = Date.now()): string {
+  const then = iso ? Date.parse(iso) : Number.NaN;
+  if (Number.isNaN(then)) return 'never';
+  const minutes = Math.max(0, Math.floor((now - then) / 60_000));
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  return `${Math.floor(minutes / 60)} hr ${minutes % 60} min ago`;
 }
 
 export interface RecommendationLine {

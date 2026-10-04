@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@heroui/react';
 import { toast } from 'sonner';
-import type { CancellationRequestStatus, EmergencyCancellationRequest } from '../../../services/api/generated';
+import type { EmergencyCancellationRequest } from '../../../services/api/generated';
 import {
   approveEmergencyCancellationRequestMutation,
   listEmergencyCancellationRequestsOptions,
@@ -18,6 +18,9 @@ import {
   callStatusLabels,
   callStatusTones,
   cancellationStatusLabels,
+  cancellationStatusTones,
+  dispatchStatusLabels,
+  dispatchStatusTones,
   formatTimestamp,
   priorityLabels,
   priorityTones,
@@ -25,11 +28,11 @@ import {
 import { invalidateEmergencyQueries } from '../query-invalidation';
 import './cancellation-queue.css';
 
-const cancellationStatusTones = {
-  pending: 'warning',
-  approved: 'success',
-  rejected: 'danger',
-} as const satisfies Record<CancellationRequestStatus, 'warning' | 'success' | 'danger'>;
+const reviewResults = {
+  approved: { title: 'Response cancelled', text: 'The cancellation was approved and any assigned ambulance was recalled.' },
+  rejected: { title: 'Response continued', text: 'The cancellation was rejected and the emergency response stayed active.' },
+  expired: { title: 'Closed without a decision', text: 'The run ended before anyone reviewed this request, so there was nothing left to cancel.' },
+} as const;
 
 function elapsedMinutes(iso?: string | null): string {
   if (!iso) return 'Unknown';
@@ -44,7 +47,7 @@ export function CancellationQueue() {
   const [page, setPage] = useState(1);
   const [showReviewed, setShowReviewed] = useState(false);
   const query = useQuery({
-    ...listEmergencyCancellationRequestsOptions({ query: { ...(showReviewed ? {} : { Status: 'pending' as const }), Page: page, PageSize: 25 } }),
+    ...listEmergencyCancellationRequestsOptions({ query: { ...(showReviewed ? {} : { status: 'pending' as const }), page, pageSize: 25 } }),
     refetchInterval: 5_000,
   });
 
@@ -122,6 +125,7 @@ function CancellationCard({ request }: { request: EmergencyCancellationRequest }
   const status = request.status ?? 'pending';
   const priority = request.call_priority ?? 'high';
   const callStatus = request.call_status ?? 'received';
+  const runStatus = request.active_dispatch_status;
   const pending = approve.isPending || reject.isPending;
   const isPending = status === 'pending';
   const caller = request.caller_name?.trim() || 'Caller name unavailable';
@@ -138,6 +142,7 @@ function CancellationCard({ request }: { request: EmergencyCancellationRequest }
         <div className="cancellation-statuses" aria-label="Request, call, and priority statuses">
           <div><span>Request</span><StatusChip tone={cancellationStatusTones[status]}>{cancellationStatusLabels[status]}</StatusChip></div>
           <div><span>Response</span><StatusChip tone={callStatusTones[callStatus]}>{callStatusLabels[callStatus]}</StatusChip></div>
+          {runStatus && <div><span>Ambulance</span><StatusChip tone={dispatchStatusTones[runStatus]}>{dispatchStatusLabels[runStatus]}</StatusChip></div>}
           <div><span>Priority</span><StatusChip tone={priorityTones[priority]}>{priorityLabels[priority]}</StatusChip></div>
         </div>
       </div>
@@ -158,14 +163,16 @@ function CancellationCard({ request }: { request: EmergencyCancellationRequest }
         <div className="cancellation-actions">
           <div className="cancellation-actions-copy"><strong>Choose what happens next</strong><span>The decision is confirmed before it takes effect.</span></div>
           <div className="cancellation-action-buttons">
-            <div><Button variant="danger" isDisabled={pending} onPress={() => setApproveOpen(true)}>Approve cancellation</Button><span>End response and recall ambulance</span></div>
+            {request.can_approve
+              ? <div><Button variant="danger" isDisabled={pending} onPress={() => setApproveOpen(true)}>Approve cancellation</Button><span>End response and recall ambulance</span></div>
+              : <p className="cancellation-blocked" role="note">The crew is already with the patient, so the ambulance can't be recalled. If nothing is done, this request closes by itself when the run ends. You can still reject it with a note for the caller.</p>}
             <div><Button variant="outline" isDisabled={pending} onPress={() => setRejectOpen(true)}>Reject request</Button><span>Keep emergency response active</span></div>
           </div>
         </div>
       ) : (
         <div className="cancellation-review-result">
-          <strong>{status === 'approved' ? 'Response cancelled' : 'Response continued'}</strong>
-          <span>{status === 'approved' ? 'The cancellation was approved and any assigned ambulance was recalled.' : 'The cancellation was rejected and the emergency response stayed active.'}</span>
+          <strong>{reviewResults[status].title}</strong>
+          <span>{reviewResults[status].text}</span>
           {request.review_notes && <p><span className="cancellation-field-label">Review notes</span>{request.review_notes}</p>}
         </div>
       )}

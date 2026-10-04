@@ -85,6 +85,7 @@ public sealed class EmergencyCallEndpointTests
     {
         using var patient = await PatientClientAsync();
         var key = Guid.NewGuid();
+        var details = $"Collapsed near the bus stop {key:N}";
 
         using var created = await patient.PostAsJsonAsync("/api/emergency-calls", new
         {
@@ -94,7 +95,7 @@ public sealed class EmergencyCallEndpointTests
             location_accuracy_metres = 12.5,
             location_captured_at = DateTimeOffset.UtcNow,
             idempotency_key = key,
-            details = "Collapsed near the bus stop"
+            details
         });
 
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
@@ -108,7 +109,7 @@ public sealed class EmergencyCallEndpointTests
         Assert.Equal(1, await db.EmergencyCalls.CountAsync(call => call.Id == callId));
 
         using var manager = await StaffClientAsync(ApiApplication.ManagerEmail);
-        using var board = await manager.GetAsync("/api/emergency-calls?pageSize=100");
+        using var board = await manager.GetAsync($"/api/emergency-calls?search={key:N}");
         Assert.Equal(HttpStatusCode.OK, board.StatusCode);
         using var boardBody = JsonDocument.Parse(await board.Content.ReadAsStringAsync());
         Assert.Contains(boardBody.RootElement.GetProperty("items").EnumerateArray(),
@@ -317,11 +318,41 @@ public sealed class EmergencyCallEndpointTests
         var dispatchId = dispatchBody.RootElement.GetProperty("id").GetGuid();
         Assert.Equal(HttpStatusCode.OK, (await crew.PostAsync($"/api/me/dispatches/{dispatchId}/acknowledge", null)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status = "en_route_to_scene" })).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status = "at_scene" })).StatusCode);
         Assert.Equal(HttpStatusCode.Created, (await patient.PostAsJsonAsync($"/api/me/emergency-calls/{callId}/cancellation-request", new { reason = "No longer needed" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status = "at_scene" })).StatusCode);
+
+        using var queue = JsonDocument.Parse(await manager.GetStringAsync("/api/emergency-cancellation-requests?status=pending&pageSize=100"));
+        var card = queue.RootElement.GetProperty("items").EnumerateArray()
+            .Single(item => item.GetProperty("emergency_call_id").GetGuid() == callId);
+        Assert.False(card.GetProperty("can_approve").GetBoolean());
+        Assert.Equal("at_scene", card.GetProperty("active_dispatch_status").GetString());
 
         using var approved = await manager.PostAsJsonAsync($"/api/emergency-calls/{callId}/cancellation-request/approve", new { });
         Assert.Equal(HttpStatusCode.Conflict, approved.StatusCode);
+        using var problem = JsonDocument.Parse(await approved.Content.ReadAsStringAsync());
+        Assert.Equal("cl_emg_017", problem.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task A_patient_cannot_ask_to_cancel_once_the_crew_has_reached_them()
+    {
+        using var patient = await PatientClientAsync();
+        using var manager = await StaffClientAsync(ApiApplication.ManagerEmail);
+        var callId = await CreatePatientCallAsync(patient);
+        var ready = await CreateReadyAmbulanceAsync(manager);
+        using var crew = await StaffClientAsync(ready.FirstCrewEmail);
+        using var dispatched = await manager.PostAsJsonAsync($"/api/emergency-calls/{callId}/dispatch", new { ambulance_id = ready.AmbulanceId });
+        using var dispatchBody = JsonDocument.Parse(await dispatched.Content.ReadAsStringAsync());
+        var dispatchId = dispatchBody.RootElement.GetProperty("id").GetGuid();
+        await crew.PostAsync($"/api/me/dispatches/{dispatchId}/acknowledge", null);
+        await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status = "en_route_to_scene" });
+        await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status = "at_scene" });
+
+        using var requested = await patient.PostAsJsonAsync($"/api/me/emergency-calls/{callId}/cancellation-request", new { reason = "Feeling better" });
+
+        Assert.Equal(HttpStatusCode.Conflict, requested.StatusCode);
+        using var problem = JsonDocument.Parse(await requested.Content.ReadAsStringAsync());
+        Assert.Equal("cl_emg_017", problem.RootElement.GetProperty("code").GetString());
     }
 
     [Theory]
@@ -493,13 +524,15 @@ public sealed class EmergencyCallEndpointTests
             priority = "critical",
             details = "Manager-confirmed urgent report",
             latitude = 6.91,
-            longitude = 79.87
+            longitude = 79.87,
+            location_accuracy_metres = 75
         });
         Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
         using var updatedBody = JsonDocument.Parse(await updated.Content.ReadAsStringAsync());
         Assert.Equal("critical", updatedBody.RootElement.GetProperty("priority").GetString());
         Assert.Equal("Manager-confirmed urgent report", updatedBody.RootElement.GetProperty("details").GetString());
         Assert.Equal(6.91m, updatedBody.RootElement.GetProperty("latitude").GetDecimal());
+        Assert.Equal(75m, updatedBody.RootElement.GetProperty("location_accuracy_metres").GetDecimal());
     }
 
     [Fact]
@@ -570,6 +603,12 @@ public sealed class EmergencyCallEndpointTests
         });
         Assert.Equal(HttpStatusCode.BadRequest, invalidUpdate.StatusCode);
         Assert.Equal("application/problem+json", invalidUpdate.Content.Headers.ContentType?.MediaType);
+
+        using var accuracyWithoutPoint = await manager.PatchAsJsonAsync($"/api/emergency-calls/{id}", new
+        {
+            location_accuracy_metres = 20
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, accuracyWithoutPoint.StatusCode);
     }
 
     private async Task<HttpClient> PatientClientAsync()

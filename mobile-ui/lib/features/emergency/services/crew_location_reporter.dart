@@ -44,7 +44,9 @@ final class CrewPosition {
 
 abstract interface class CrewLocationGateway {
   Future<CrewLocationPermission> requestPermission();
-  Future<CrewPosition> currentPosition();
+
+  /// Fixes that keep arriving when the phone is locked or Google Maps is open.
+  Stream<CrewPosition> positions();
   Future<bool> openAppSettings();
   Future<bool> openLocationSettings();
 }
@@ -66,6 +68,8 @@ final class CrewLocationReporter extends ChangeNotifier {
   final CrewLocationGateway _location;
   final Duration interval;
   Timer? _timer;
+  StreamSubscription<CrewPosition>? _positions;
+  CrewPosition? _latest;
   bool _reporting = false;
   CrewLocationReportingState _state = CrewLocationReportingState.stopped;
 
@@ -93,9 +97,22 @@ final class CrewLocationReporter extends ChangeNotifier {
         });
         return;
       }
-      await _reportCurrent(generation);
-      if (generation != _generation) return;
-      _timer = Timer.periodic(interval, (_) => _reportCurrent(generation));
+      _positions = _location.positions().listen(
+        (position) {
+          if (generation != _generation) return;
+          final first = _latest == null;
+          _latest = position;
+          if (first) _reportLatest(generation);
+        },
+        onError: (Object _) {
+          if (generation != _generation) return;
+          // Without a live fix the last one is no longer true, so stop re-sending it.
+          _latest = null;
+          _setState(CrewLocationReportingState.failed);
+        },
+      );
+      // Re-sends the last fix while parked, so the position never looks stale.
+      _timer = Timer.periodic(interval, (_) => _reportLatest(generation));
     } catch (_) {
       if (generation == _generation) {
         _setState(CrewLocationReportingState.failed);
@@ -119,21 +136,23 @@ final class CrewLocationReporter extends ChangeNotifier {
     }
   }
 
-  Future<void> pause() => stop();
-
   Future<void> stop() async => _stop();
 
   void _stop() {
     _generation++;
     _timer?.cancel();
     _timer = null;
+    _positions?.cancel();
+    _positions = null;
+    _latest = null;
     if (_state == CrewLocationReportingState.reporting) {
       _setState(CrewLocationReportingState.stopped);
     }
   }
 
-  Future<void> _reportCurrent(int generation) async {
-    if (_reporting || generation != _generation) return;
+  Future<void> _reportLatest(int generation) async {
+    final position = _latest;
+    if (position == null || _reporting || generation != _generation) return;
     _reporting = true;
     try {
       final ambulanceId = await _dispatches.assignedAmbulanceId();
@@ -142,8 +161,6 @@ final class CrewLocationReporter extends ChangeNotifier {
         _setState(CrewLocationReportingState.stopped);
         return;
       }
-      final position = await _location.currentPosition();
-      if (generation != _generation) return;
       await _dispatches.report(ambulanceId, position);
       if (generation == _generation) {
         _setState(CrewLocationReportingState.reporting);
@@ -161,6 +178,7 @@ final class CrewLocationReporter extends ChangeNotifier {
   void dispose() {
     _generation++;
     _timer?.cancel();
+    _positions?.cancel();
     super.dispose();
   }
 
@@ -173,8 +191,6 @@ final class CrewLocationReporter extends ChangeNotifier {
 
 final class GeolocatorCrewLocationGateway implements CrewLocationGateway {
   const GeolocatorCrewLocationGateway(this._location);
-
-  static const _fixTimeLimit = Duration(seconds: 10);
 
   final DeviceLocation _location;
 
@@ -190,10 +206,9 @@ final class GeolocatorCrewLocationGateway implements CrewLocationGateway {
       };
 
   @override
-  Future<CrewPosition> currentPosition() async {
-    final fix = await _location.currentFix(_fixTimeLimit);
-    return CrewPosition(fix.latitude, fix.longitude);
-  }
+  Stream<CrewPosition> positions() => _location.trackingFixes().map(
+    (fix) => CrewPosition(fix.latitude, fix.longitude),
+  );
 
   @override
   Future<bool> openAppSettings() => _location.openAppSettings();

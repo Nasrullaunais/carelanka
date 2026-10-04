@@ -29,9 +29,9 @@ class _CancellationReviewApi implements CancellationReviewApi {
   }) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{
-      r'Status': status?.toJson(),
-      r'Page': page,
-      r'PageSize': pageSize,
+      r'status': status?.toJson(),
+      r'page': page,
+      r'pageSize': pageSize,
     };
     queryParameters.removeWhere((k, v) => v == null);
     final _headers = <String, dynamic>{};

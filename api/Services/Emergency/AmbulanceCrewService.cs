@@ -5,6 +5,7 @@ using CareLanka.Api.Data.Configurations.Emergency;
 using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Emergency;
 using CareLanka.Api.Services.Common;
+using CareLanka.Api.Services.Staff;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using CrewAssignmentEntity = CareLanka.Api.Data.Entities.Emergency.AmbulanceCrewAssignment;
@@ -70,7 +71,16 @@ public sealed class AmbulanceCrewService : IAmbulanceCrewService
         AssignAmbulanceCrewRequest request,
         CancellationToken cancellationToken = default)
     {
-        await EnsureAmbulanceExistsAsync(ambulanceId, cancellationToken);
+        var ambulance = await _db.Ambulances.AsNoTracking()
+            .Where(item => item.Id == ambulanceId)
+            .Select(item => new { item.RegistrationNumber, item.IsActive })
+            .SingleOrDefaultAsync(cancellationToken)
+            ?? throw new NotFoundException("Ambulance", ambulanceId);
+        if (!ambulance.IsActive)
+        {
+            throw new ConflictException(MessageCode.AmbulanceRetired, ambulance.RegistrationNumber);
+        }
+
         await EnsureNoLiveDispatchAsync(ambulanceId, cancellationToken);
 
         var staff = (await _staffLookup.LookupAsync([request.StaffMemberId], cancellationToken))[0];

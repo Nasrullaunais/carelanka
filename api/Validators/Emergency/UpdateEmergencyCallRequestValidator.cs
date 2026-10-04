@@ -19,5 +19,11 @@ public sealed class UpdateEmergencyCallRequestValidator : AbstractValidator<Upda
         RuleFor(request => request)
             .Must(request => request.Latitude.HasValue == request.Longitude.HasValue)
             .WithMessage("Latitude and longitude must be supplied together.");
+        RuleFor(request => request.LocationAccuracyMetres)
+            .GreaterThanOrEqualTo(0)
+            .When(request => request.LocationAccuracyMetres.HasValue);
+        RuleFor(request => request)
+            .Must(request => !request.LocationAccuracyMetres.HasValue || request.Latitude.HasValue)
+            .WithMessage("Location accuracy can only be given together with a new latitude and longitude.");
     }
 }

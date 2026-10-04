@@ -18,14 +18,17 @@ public sealed class DispatchProposalExecutor
     private readonly IDispatchAgent _agent;
     private readonly INotifier _notifier;
     private readonly ILogger<DispatchProposalExecutor> _log;
+    private readonly TimeProvider _clock;
 
     public DispatchProposalExecutor(
-        CareLankaDbContext db, IDispatchAgent agent, INotifier notifier, ILogger<DispatchProposalExecutor> log)
+        CareLankaDbContext db, IDispatchAgent agent, INotifier notifier, ILogger<DispatchProposalExecutor> log,
+        TimeProvider clock)
     {
         _db = db;
         _agent = agent;
         _notifier = notifier;
         _log = log;
+        _clock = clock;
     }
 
     public async Task ExecuteAsync(Guid proposalId, CancellationToken ct = default)
@@ -92,7 +95,7 @@ public sealed class DispatchProposalExecutor
                 workflow.ValidationResults = DispatchWorkflowJson.Write(run.Validation);
                 workflow.Errors = run.Errors.Count == 0 ? null : DispatchWorkflowJson.Write(run.Errors);
                 workflow.FinalOutcome = CareLanka.Api.Common.Persistence.EnumWire.ToWire(run.Outcome);
-                workflow.CompletedAt = DateTimeOffset.UtcNow;
+                workflow.CompletedAt = _clock.GetUtcNow();
                 workflow.RequiredApproverRole = StaffRole.DutyManager;
                 workflow.Status = proposal.Status switch
                 {
@@ -116,7 +119,7 @@ public sealed class DispatchProposalExecutor
             {
                 workflow.Status = AgentWorkflowStatus.Failed;
                 workflow.Errors = DispatchWorkflowJson.Write(new[] { failure.Message });
-                workflow.CompletedAt = DateTimeOffset.UtcNow;
+                workflow.CompletedAt = _clock.GetUtcNow();
             }
 
             await NotifyIfNeedsAttentionAsync(proposal, ct);

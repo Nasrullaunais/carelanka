@@ -5,7 +5,9 @@
 import 'package:json_annotation/json_annotation.dart';
 
 import 'call_priority.dart';
+import 'call_status.dart';
 import 'dispatch_status.dart';
+import 'emergency_call_outcome.dart';
 
 part 'dispatch_detail.g.dart';
 
@@ -17,7 +19,6 @@ class DispatchDetail {
     this.ambulanceRegistration,
     this.callPriority,
     this.status,
-    this.destinationWardName,
     this.crewCount,
     this.acknowledgementOverdue,
     this.dispatchedAt,
@@ -31,6 +32,13 @@ class DispatchDetail {
     this.handoverNotes,
     this.patientCondition,
     this.sceneAddressLabel,
+    this.destinationLabel,
+    this.callStatus,
+    this.callOutcome,
+    this.callDetails,
+    this.callerName,
+    this.callerPhone,
+    this.patientName,
     this.crewStaffIds,
   });
   
@@ -44,8 +52,6 @@ class DispatchDetail {
   @JsonKey(name: 'call_priority')
   final CallPriority? callPriority;
   final DispatchStatus? status;
-  @JsonKey(name: 'destination_ward_name')
-  final String? destinationWardName;
   @JsonKey(name: 'crew_count')
   final int? crewCount;
   @JsonKey(name: 'acknowledgement_overdue')
@@ -72,6 +78,20 @@ class DispatchDetail {
   final String? patientCondition;
   @JsonKey(name: 'scene_address_label')
   final String? sceneAddressLabel;
+  @JsonKey(name: 'destination_label')
+  final String? destinationLabel;
+  @JsonKey(name: 'call_status')
+  final CallStatus? callStatus;
+  @JsonKey(name: 'call_outcome')
+  final EmergencyCallOutcome? callOutcome;
+  @JsonKey(name: 'call_details')
+  final String? callDetails;
+  @JsonKey(name: 'caller_name')
+  final String? callerName;
+  @JsonKey(name: 'caller_phone')
+  final String? callerPhone;
+  @JsonKey(name: 'patient_name')
+  final String? patientName;
   @JsonKey(name: 'crew_staff_ids')
   final List<String>? crewStaffIds;
 

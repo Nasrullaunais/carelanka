@@ -5,9 +5,12 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../services/api_client/models/call_status.dart';
+import '../../../services/api_client/models/cancellation_request_status.dart';
 import '../../../services/api_client/models/create_emergency_call_request.dart';
 import '../../../services/api_client/models/my_call_tracking.dart';
 import '../../../services/api_client/models/my_emergency_call_summary.dart';
+import '../models/patient_call_text.dart';
+import '../models/run_step.dart';
 import '../services/patient_emergency_service.dart';
 
 class PatientEmergencyController extends ChangeNotifier {
@@ -27,6 +30,30 @@ class PatientEmergencyController extends ChangeNotifier {
   bool loading = false;
   bool acting = false;
   ApiException? error;
+
+  /// The newest request that is still open, so a worried caller is pointed
+  /// back to it instead of sending a second one by accident.
+  MyEmergencyCallSummary? get openCall {
+    for (final call in calls) {
+      if (isOpenCall(call.status)) return call;
+    }
+    return null;
+  }
+
+  /// Cancelling is possible until the crew reaches the patient. With no
+  /// ambulance on its way it is direct, even if an earlier request is pending.
+  bool get canCancel {
+    final current = tracking;
+    if (current == null || !isOpenCall(current.callStatus)) return false;
+    final run = current.dispatchStatus;
+    if (run == null) return true;
+    return run.isPrePickup &&
+        current.cancellationRequestStatus != CancellationRequestStatus.pending;
+  }
+
+  /// With an ambulance already sent, cancelling is a request the duty manager
+  /// reviews; before that it happens straight away.
+  bool get cancelNeedsReview => tracking?.dispatchStatus != null;
 
   Future<void> load() async {
     loading = true;
@@ -96,17 +123,13 @@ class PatientEmergencyController extends ChangeNotifier {
     _notify();
   }
 
-  Future<bool> cancel(
-    String id,
-    String reason, {
-    required bool dispatched,
-  }) async {
-    if (acting || reason.trim().isEmpty) return false;
+  Future<bool> cancel(String id, String reason) async {
+    if (acting || reason.trim().isEmpty || !canCancel) return false;
     acting = true;
     error = null;
     _notify();
     try {
-      if (dispatched) {
+      if (cancelNeedsReview) {
         await _service.requestCancellation(id, reason.trim());
       } else {
         await _service.cancel(id, reason.trim());
@@ -115,6 +138,7 @@ class PatientEmergencyController extends ChangeNotifier {
       return true;
     } on ApiException catch (value) {
       error = value;
+      await refreshTracking(id);
       return false;
     } finally {
       acting = false;

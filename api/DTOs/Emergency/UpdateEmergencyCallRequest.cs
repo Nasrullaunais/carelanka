@@ -10,4 +10,5 @@ public sealed class UpdateEmergencyCallRequest
     public string? CallerPhone { get; set; }
     public decimal? Latitude { get; set; }
     public decimal? Longitude { get; set; }
+    public decimal? LocationAccuracyMetres { get; set; }
 }

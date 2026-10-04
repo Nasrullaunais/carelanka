@@ -17,7 +17,6 @@ class DispatchSummary {
     this.ambulanceRegistration,
     this.callPriority,
     this.status,
-    this.destinationWardName,
     this.crewCount,
     this.acknowledgementOverdue,
     this.dispatchedAt,
@@ -34,8 +33,6 @@ class DispatchSummary {
   @JsonKey(name: 'call_priority')
   final CallPriority? callPriority;
   final DispatchStatus? status;
-  @JsonKey(name: 'destination_ward_name')
-  final String? destinationWardName;
   @JsonKey(name: 'crew_count')
   final int? crewCount;
   @JsonKey(name: 'acknowledgement_overdue')

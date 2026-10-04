@@ -9,7 +9,6 @@ public class DispatchSummary
     public string AmbulanceRegistration { get; set; } = string.Empty;
     public CallPriority CallPriority { get; set; }
     public DispatchStatus Status { get; set; }
-    public string? DestinationWardName { get; set; }
     public int CrewCount { get; set; }
     public bool AcknowledgementOverdue { get; set; }
     public DateTimeOffset DispatchedAt { get; set; }

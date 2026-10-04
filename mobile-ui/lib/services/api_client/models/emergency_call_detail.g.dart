@@ -30,7 +30,13 @@ EmergencyCallDetail _$EmergencyCallDetailFromJson(Map<String, dynamic> json) =>
       status: json['status'] == null
           ? null
           : CallStatus.fromJson(json['status'] as String),
-      outcome: json['outcome'] as String?,
+      outcome: json['outcome'] == null
+          ? null
+          : EmergencyCallOutcome.fromJson(json['outcome'] as String),
+      outcomeNotes: json['outcome_notes'] as String?,
+      closedAt: json['closed_at'] == null
+          ? null
+          : DateTime.parse(json['closed_at'] as String),
       transported: json['transported'] as bool?,
       cancellationRequestStatus: json['cancellation_request_status'] == null
           ? null
@@ -43,8 +49,9 @@ EmergencyCallDetail _$EmergencyCallDetailFromJson(Map<String, dynamic> json) =>
       updatedAt: json['updated_at'] == null
           ? null
           : DateTime.parse(json['updated_at'] as String),
+      patientName: json['patient_name'] as String?,
       dispatches: (json['dispatches'] as List<dynamic>?)
-          ?.map((e) => DispatchSummary.fromJson(e as Map<String, dynamic>))
+          ?.map((e) => DispatchDetail.fromJson(e as Map<String, dynamic>))
           .toList(),
       latestProposal: json['latest_proposal'] == null
           ? null
@@ -72,10 +79,13 @@ Map<String, dynamic> _$EmergencyCallDetailToJson(
   'priority': instance.priority,
   'status': instance.status,
   'outcome': instance.outcome,
+  'outcome_notes': instance.outcomeNotes,
+  'closed_at': instance.closedAt?.toIso8601String(),
   'transported': instance.transported,
   'cancellation_request_status': instance.cancellationRequestStatus,
   'created_at': instance.createdAt?.toIso8601String(),
   'updated_at': instance.updatedAt?.toIso8601String(),
+  'patient_name': instance.patientName,
   'dispatches': instance.dispatches,
   'latest_proposal': instance.latestProposal,
 };

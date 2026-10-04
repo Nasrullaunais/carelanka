@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import {
   Button,
   Checkbox,
@@ -16,16 +16,18 @@ import {
   ModalHeading,
   TextField,
 } from '@heroui/react';
-import type { CreateEmergencyCallRequest } from '../../../services/api/generated';
+import type { CallPriority, CreateEmergencyCallRequest } from '../../../services/api/generated';
+import { AppSelect } from '../../../components/ui/app-select';
+import { priorityLabels } from '../domain';
+import { emptySceneLocation, sceneAccuracy, sceneCoordinates, SceneLocationFields, type SceneLocation } from './scene-location-fields';
 
 interface CallForm {
   callerName: string;
   callerPhone: string;
   patientIsCaller: boolean;
   details: string;
-  latitude: string;
-  longitude: string;
-  accuracy: string;
+  priority: CallPriority;
+  scene: SceneLocation;
 }
 
 const emptyForm: CallForm = {
@@ -33,12 +35,9 @@ const emptyForm: CallForm = {
   callerPhone: '',
   patientIsCaller: true,
   details: '',
-  latitude: '',
-  longitude: '',
-  accuracy: '',
+  priority: 'high',
+  scene: emptySceneLocation,
 };
-
-const LocationPicker = lazy(() => import('./location-picker').then((module) => ({ default: module.LocationPicker })));
 
 export function LogCallDialog({ isOpen, isPending, onOpenChange, onSubmit }: {
   isOpen: boolean;
@@ -58,20 +57,18 @@ export function LogCallDialog({ isOpen, isPending, onOpenChange, onSubmit }: {
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    const latitude = Number(form.latitude);
-    const longitude = Number(form.longitude);
-    const accuracy = Number(form.accuracy);
-    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90
-      || !Number.isFinite(longitude) || longitude < -180 || longitude > 180
-      || !Number.isFinite(accuracy) || accuracy < 0) return;
+    const point = sceneCoordinates(form.scene);
+    const accuracy = sceneAccuracy(form.scene);
+    if (!point || accuracy === undefined) return;
 
     onSubmit({
       caller_name: optional(form.callerName),
       caller_phone: optional(form.callerPhone),
       patient_is_caller: form.patientIsCaller,
       details: optional(form.details),
-      latitude,
-      longitude,
+      priority: form.priority,
+      latitude: point.latitude,
+      longitude: point.longitude,
       location_accuracy_metres: accuracy,
       location_captured_at: new Date().toISOString(),
       idempotency_key: idempotencyKey,
@@ -96,18 +93,13 @@ export function LogCallDialog({ isOpen, isPending, onOpenChange, onSubmit }: {
                   <Label>Emergency details</Label>
                   <InputGroup><InputGroupTextArea rows={3} required /></InputGroup>
                 </TextField>
-                <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-default-100" aria-label="Loading location map" />}>
-                  <LocationPicker
-                    value={coordinates(form)}
-                    onChange={({ latitude, longitude }) => setForm({ ...form, latitude: String(latitude), longitude: String(longitude) })}
-                  />
-                </Suspense>
-                <p className="text-sm text-muted">Choose the scene on the map, or enter coordinates below when map tiles are unavailable.</p>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <FormField label="Latitude" type="number" min={-90} max={90} value={form.latitude} onChange={(latitude) => setForm({ ...form, latitude })} required />
-                  <FormField label="Longitude" type="number" min={-180} max={180} value={form.longitude} onChange={(longitude) => setForm({ ...form, longitude })} required />
-                  <FormField label="Accuracy (m)" type="number" min={0} value={form.accuracy} onChange={(accuracy) => setForm({ ...form, accuracy })} required />
-                </div>
+                <AppSelect
+                  label="Priority"
+                  value={form.priority}
+                  onValueChange={(priority) => setForm({ ...form, priority: priority as CallPriority })}
+                  options={Object.entries(priorityLabels).map(([value, label]) => ({ value, label }))}
+                />
+                <SceneLocationFields value={form.scene} onChange={(scene) => setForm((current) => ({ ...current, scene }))} />
               </ModalBody>
               <ModalFooter>
                 <Button type="button" variant="outline" isDisabled={isPending} onPress={() => onOpenChange(false)}>Cancel</Button>
@@ -121,19 +113,11 @@ export function LogCallDialog({ isOpen, isPending, onOpenChange, onSubmit }: {
   );
 }
 
-function FormField({ label, value, type = 'text', min, max, required, onChange }: {
-  label: string;
-  value: string;
-  type?: 'text' | 'number';
-  min?: number;
-  max?: number;
-  required?: boolean;
-  onChange: (value: string) => void;
-}) {
+function FormField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return (
     <TextField value={value} onChange={onChange}>
       <Label>{label}</Label>
-      <InputGroup><InputGroupInput type={type} step={type === 'number' ? 'any' : undefined} min={min} max={max} required={required} /></InputGroup>
+      <InputGroup><InputGroupInput /></InputGroup>
     </TextField>
   );
 }
@@ -141,12 +125,4 @@ function FormField({ label, value, type = 'text', min, max, required, onChange }
 function optional(value: string): string | null {
   const trimmed = value.trim();
   return trimmed === '' ? null : trimmed;
-}
-
-function coordinates(form: CallForm) {
-  const latitude = Number(form.latitude);
-  const longitude = Number(form.longitude);
-  return Number.isFinite(latitude) && Number.isFinite(longitude) && form.latitude !== '' && form.longitude !== ''
-    ? { latitude, longitude }
-    : undefined;
 }

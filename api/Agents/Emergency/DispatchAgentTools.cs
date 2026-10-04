@@ -78,11 +78,12 @@ public sealed class DispatchAgentTools : IDispatchAgentTools
             .Select(dispatch => new DivertibleDispatchCandidate(
                 dispatch.Id, dispatch.AmbulanceId, dispatch.Ambulance.RegistrationNumber,
                 dispatch.EmergencyCallId, dispatch.EmergencyCall.Priority, dispatch.EmergencyCall.AddressLabel,
-                dispatch.Status, dispatch.DispatchedAt))
+                dispatch.Status, dispatch.DispatchedAt, dispatch.EmergencyCall.CreatedAt,
+                dispatch.Ambulance.CurrentLatitude, dispatch.Ambulance.CurrentLongitude))
             .ToListAsync(ct);
 
     public async Task<IReadOnlyDictionary<Guid, int?>> GetRouteMinutesAsync(
-        IReadOnlyCollection<EligibleAmbulanceCandidate> ambulances,
+        IReadOnlyCollection<AmbulanceLocation> ambulances,
         decimal destinationLatitude,
         decimal destinationLongitude,
         CancellationToken ct = default)
@@ -92,9 +93,7 @@ public sealed class DispatchAgentTools : IDispatchAgentTools
             return new Dictionary<Guid, int?>();
         }
 
-        var measurement = await _distance.MeasureAsync(
-            ambulances.Select(ambulance => new AmbulanceLocation(ambulance.Id, ambulance.Latitude, ambulance.Longitude)).ToList(),
-            destinationLatitude, destinationLongitude, ct);
+        var measurement = await _distance.MeasureAsync(ambulances, destinationLatitude, destinationLongitude, ct);
 
         return ambulances.ToDictionary(
             ambulance => ambulance.Id,

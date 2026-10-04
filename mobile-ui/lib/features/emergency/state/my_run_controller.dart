@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/widgets/async_data.dart';
 import '../../../services/api_client/models/dispatch_detail.dart';
+import '../../../services/api_client/models/emergency_call_outcome.dart';
 import '../../../services/api_client/models/navigation_target.dart';
 import '../models/run_step.dart';
 import '../services/crew_run_service.dart';
@@ -23,10 +24,16 @@ class MyRunController extends ChangeNotifier {
   AsyncData<DispatchDetail?> _state = const AsyncData.loading();
   bool _busy = false;
   ApiException? _actionError;
+  String? _liveRunId;
+  DispatchDetail? _endedRun;
 
   AsyncData<DispatchDetail?> get state => _state;
   bool get busy => _busy;
   ApiException? get actionError => _actionError;
+
+  /// The run that just stopped being live, so the screen can say how it ended
+  /// instead of going blank.
+  DispatchDetail? get endedRun => _endedRun;
 
   void startPolling() {
     _poll?.cancel();
@@ -42,7 +49,7 @@ class MyRunController extends ChangeNotifier {
       notifyListeners();
     }
     try {
-      _show(await _service.activeRun());
+      await _show(await _service.activeRun());
     } on ApiException catch (error) {
       if (showLoading || _state is! AsyncReady<DispatchDetail?>) {
         _state = AsyncData.failed(error);
@@ -68,6 +75,14 @@ class MyRunController extends ChangeNotifier {
       patientCondition: patientCondition,
     ),
   );
+
+  Future<bool> closeAtScene(EmergencyCallOutcome outcome, {String? notes}) =>
+      _act((run) => _service.closeAtScene(run.id!, outcome, notes: notes));
+
+  void dismissEndedRun() {
+    _endedRun = null;
+    _notify();
+  }
 
   Future<NavigationTarget?> navigationTarget() async {
     final run = _state.valueOrNull;
@@ -95,7 +110,7 @@ class MyRunController extends ChangeNotifier {
     _actionError = null;
     notifyListeners();
     try {
-      _show(await action(run));
+      await _show(await action(run));
       return true;
     } on ApiException catch (error) {
       _actionError = error;
@@ -111,15 +126,35 @@ class MyRunController extends ChangeNotifier {
   Future<void> _refreshAfterConflict(ApiException error) async {
     if (!error.isConflict && !error.isNotFound) return;
     try {
-      _show(await _service.activeRun());
+      await _show(await _service.activeRun());
     } on ApiException {
       return;
     }
   }
 
-  void _show(DispatchDetail? run) {
-    final live = run != null && (run.status?.isLive ?? false);
-    _state = AsyncData.ready(live ? run : null);
+  Future<void> _show(DispatchDetail? run) async {
+    if (run != null && (run.status?.isLive ?? false)) {
+      _liveRunId = run.id;
+      _endedRun = null;
+      _state = AsyncData.ready(run);
+      return;
+    }
+    final endedId = _liveRunId;
+    _liveRunId = null;
+    _state = const AsyncData.ready(null);
+    if (run != null) {
+      _endedRun = run;
+    } else if (endedId != null) {
+      _endedRun = await _finalState(endedId);
+    }
+  }
+
+  Future<DispatchDetail?> _finalState(String id) async {
+    try {
+      return await _service.run(id);
+    } on ApiException {
+      return null;
+    }
   }
 
   void _notify() {

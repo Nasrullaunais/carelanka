@@ -13,7 +13,6 @@ using CareLanka.Api.Services.Common;
 using CareLanka.Api.Services.Equipment;
 using CareLanka.Api.Services.Equipment.Stubs;
 using CareLanka.Api.Services.Emergency;
-using CareLanka.Api.Services.Emergency.Stubs;
 using CareLanka.Api.Agents;
 using CareLanka.Api.Agents.Emergency;
 using CareLanka.Api.Agents.Equipment;
@@ -462,6 +461,8 @@ builder.Services.AddScoped<IAmbulanceService, AmbulanceService>();
 builder.Services.AddScoped<IAmbulanceCrewService, AmbulanceCrewService>();
 builder.Services.AddScoped<IEmergencyCallService, EmergencyCallService>();
 builder.Services.AddScoped<IDispatchService, DispatchService>();
+builder.Services.AddScoped<IEmergencyAlerts, EmergencyAlerts>();
+builder.Services.AddScoped<IFleetMapService, FleetMapService>();
 builder.Services.AddScoped<IEmergencyReportService, EmergencyReportService>();
 builder.Services.AddScoped<IDeviceTokenService, DeviceTokenService>();
 builder.Services.AddScoped<IRecipientResolver, RecipientResolver>();
@@ -477,9 +478,9 @@ builder.Services.AddScoped<IAppointmentReminderService, AppointmentReminderServi
 builder.Services.AddScoped<IMaintenanceDueService, MaintenanceDueService>();
 builder.Services.AddScoped<IInboxCleanupService, InboxCleanupService>();
 builder.Services.AddHostedService<NotificationScheduleWorker>();
-builder.Services.AddScoped<CareLanka.Api.Services.Emergency.IStaffLookupService, StubStaffLookupService>();
 builder.Services.AddHttpClient<IAmbulanceDistanceService, OsrmAmbulanceDistanceService>();
 builder.Services.AddHttpClient<IReverseGeocoder, NominatimReverseGeocoder>();
+builder.Services.AddHttpClient<IAddressSearch, NominatimAddressSearch>();
 builder.Services.AddSingleton<SceneLookupQueue>();
 builder.Services.AddSingleton<ISceneLookupQueue>(services => services.GetRequiredService<SceneLookupQueue>());
 builder.Services.AddScoped<SceneLookupProcessor>();
@@ -541,7 +542,7 @@ builder.Services.AddScoped<IRosterProposalService, RosterProposalService>();
 
 builder.Services.AddScoped<IBedRegistryService, BedRegistryService>();
 
-builder.Services.AddScoped<CareLanka.Api.Services.Staff.IStaffLookupService, StaffLookupService>();
+builder.Services.AddScoped<IStaffLookupService, StaffLookupService>();
 
 // The Patient Care Advisory Agent. Three read tools, no write tool of its own - the draft it
 // produces is written by CareAgentExecutor once the model (or its deterministic fallback)

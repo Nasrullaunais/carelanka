@@ -22,6 +22,10 @@ EmergencyCancellationRequest _$EmergencyCancellationRequestFromJson(
       ? null
       : DateTime.parse(json['call_created_at'] as String),
   activeAmbulanceRegistration: json['active_ambulance_registration'] as String?,
+  activeDispatchStatus: json['active_dispatch_status'] == null
+      ? null
+      : DispatchStatus.fromJson(json['active_dispatch_status'] as String),
+  canApprove: json['can_approve'] as bool?,
   status: json['status'] == null
       ? null
       : CancellationRequestStatus.fromJson(json['status'] as String),
@@ -46,6 +50,8 @@ Map<String, dynamic> _$EmergencyCancellationRequestToJson(
   'address_label': instance.addressLabel,
   'call_created_at': instance.callCreatedAt?.toIso8601String(),
   'active_ambulance_registration': instance.activeAmbulanceRegistration,
+  'active_dispatch_status': instance.activeDispatchStatus,
+  'can_approve': instance.canApprove,
   'status': instance.status,
   'reason': instance.reason,
   'requested_at': instance.requestedAt?.toIso8601String(),

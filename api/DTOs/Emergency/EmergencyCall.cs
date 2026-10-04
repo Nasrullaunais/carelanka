@@ -19,7 +19,9 @@ public class EmergencyCall
     public string? Details { get; set; }
     public CallPriority Priority { get; set; }
     public CallStatus Status { get; set; }
-    public string? Outcome { get; set; }
+    public EmergencyCallOutcome? Outcome { get; set; }
+    public string? OutcomeNotes { get; set; }
+    public DateTimeOffset? ClosedAt { get; set; }
     public bool? Transported { get; set; }
     public CancellationRequestStatus? CancellationRequestStatus { get; set; }
     public DateTimeOffset CreatedAt { get; set; }

@@ -166,6 +166,9 @@ final class FakeDeviceLocation implements DeviceLocation {
   }
 
   @override
+  Stream<LocationFix> trackingFixes() => throw UnimplementedError();
+
+  @override
   Future<bool> openAppSettings() async => true;
 
   @override

@@ -1,3 +1,5 @@
+using CareLanka.Api.Data.Enums;
+
 namespace CareLanka.Api.DTOs.Emergency;
 
 public sealed class DispatchDetail : DispatchSummary
@@ -11,5 +13,12 @@ public sealed class DispatchDetail : DispatchSummary
     public string? HandoverNotes { get; set; }
     public string? PatientCondition { get; set; }
     public string? SceneAddressLabel { get; set; }
+    public string? DestinationLabel { get; set; }
+    public CallStatus CallStatus { get; set; }
+    public EmergencyCallOutcome? CallOutcome { get; set; }
+    public string? CallDetails { get; set; }
+    public string? CallerName { get; set; }
+    public string? CallerPhone { get; set; }
+    public string? PatientName { get; set; }
     public IReadOnlyList<Guid> CrewStaffIds { get; set; } = [];
 }

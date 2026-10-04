@@ -18,5 +18,9 @@ public sealed class UpdateAmbulanceRequestValidator : AbstractValidator<UpdateAm
         RuleFor(request => request.OutOfServiceReason)
             .MaximumLength(500)
             .When(request => request.OutOfServiceReason is not null);
+        RuleFor(request => request.OutOfServiceReason)
+            .NotEmpty()
+            .When(request => request.Status == AmbulanceStatus.OutOfService)
+            .WithMessage("Say why the ambulance is out of service.");
     }
 }

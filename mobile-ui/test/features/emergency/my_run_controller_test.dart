@@ -8,6 +8,7 @@ import 'package:carelanka_mobile/features/emergency/state/run_history_controller
 import 'package:carelanka_mobile/services/api_client/models/dispatch_status.dart';
 import 'package:carelanka_mobile/services/api_client/models/dispatch_summary.dart';
 import 'package:carelanka_mobile/services/api_client/models/dispatch_summary_paged_result.dart';
+import 'package:carelanka_mobile/services/api_client/models/emergency_call_outcome.dart';
 import 'package:carelanka_mobile/services/api_client/models/navigation_target.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -16,6 +17,7 @@ DispatchDetail _run(DispatchStatus status) =>
 
 final class FakeRunService implements CrewRunService {
   DispatchDetail? active;
+  DispatchDetail? finished;
   Object? nextError;
   final calls = <String>[];
 
@@ -52,6 +54,19 @@ final class FakeRunService implements CrewRunService {
   }) => _reply('handover:$notes|$patientCondition', DispatchStatus.handedOver);
 
   @override
+  Future<DispatchDetail> closeAtScene(
+    String id,
+    EmergencyCallOutcome outcome, {
+    String? notes,
+  }) => _reply('close:${outcome.json}|$notes', DispatchStatus.closedAtScene);
+
+  @override
+  Future<DispatchDetail> run(String id) async {
+    calls.add('run:$id');
+    return finished ?? _run(DispatchStatus.handedOver);
+  }
+
+  @override
   Future<DispatchSummaryPagedResult> history({required int page}) async {
     calls.add('history:$page');
     return DispatchSummaryPagedResult(
@@ -82,6 +97,66 @@ void main() {
     expect(DispatchStatus.acknowledged.canDecline, isFalse);
     expect(DispatchStatus.assigned.canNavigate, isFalse);
     expect(DispatchStatus.atScene.canNavigate, isTrue);
+    expect(DispatchStatus.atScene.canEndAtScene, isTrue);
+    expect(DispatchStatus.enRouteToScene.canEndAtScene, isFalse);
+  });
+
+  test(
+    'ending at the scene records the outcome and says the run is over',
+    () async {
+      final service = FakeRunService()..active = _run(DispatchStatus.atScene);
+      final controller = MyRunController(service);
+      await controller.load();
+
+      final done = await controller.closeAtScene(
+        EmergencyCallOutcome.refusedTransport,
+        notes: 'Signed refusal',
+      );
+
+      expect(done, isTrue);
+      expect(service.calls, ['close:refused_transport|Signed refusal']);
+      expect(controller.state.valueOrNull, isNull);
+      expect(controller.endedRun?.status, DispatchStatus.closedAtScene);
+    },
+  );
+
+  test('a run called off elsewhere is explained, not just removed', () async {
+    final service = FakeRunService()
+      ..active = _run(DispatchStatus.enRouteToScene);
+    final controller = MyRunController(service);
+    await controller.load();
+    service
+      ..active = null
+      ..finished = const DispatchDetail(
+        id: 'run-1',
+        status: DispatchStatus.cancelled,
+        cancellationReason: 'Caller found a taxi',
+      );
+
+    await controller.load(showLoading: false);
+
+    expect(service.calls, ['run:run-1']);
+    expect(controller.state.valueOrNull, isNull);
+    expect(controller.endedRun?.cancellationReason, 'Caller found a taxi');
+
+    controller.dismissEndedRun();
+    expect(controller.endedRun, isNull);
+  });
+
+  test('a new run replaces the message about the last one', () async {
+    final service = FakeRunService()..active = _run(DispatchStatus.atScene);
+    final controller = MyRunController(service);
+    await controller.load();
+    await controller.closeAtScene(EmergencyCallOutcome.treatedAtScene);
+    service.active = const DispatchDetail(
+      id: 'run-2',
+      status: DispatchStatus.assigned,
+    );
+
+    await controller.load(showLoading: false);
+
+    expect(controller.endedRun, isNull);
+    expect(controller.state.valueOrNull?.id, 'run-2');
   });
 
   test(

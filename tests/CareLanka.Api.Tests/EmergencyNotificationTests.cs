@@ -67,12 +67,12 @@ public sealed class EmergencyNotificationTests
     [Fact]
     public async Task The_crew_setting_off_tells_the_patient_the_ambulance_is_on_the_way()
     {
-        var (patient, dispatchId, crew) = await AcknowledgedRunAsync();
+        var (patient, dispatchId, crew, callId) = await AcknowledgedRunAsync();
 
         var moved = await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status = "en_route_to_scene" });
         Assert.Equal(HttpStatusCode.OK, moved.StatusCode);
 
-        await _kit.AssertSentAsync(NotificationType.AmbulanceOnTheWay, dispatchId,
+        await _kit.AssertSentAsync(NotificationType.AmbulanceOnTheWay, callId,
             staff: [], patientAccounts: [patient.AccountId]);
         crew.Dispose();
     }
@@ -80,15 +80,92 @@ public sealed class EmergencyNotificationTests
     [Fact]
     public async Task The_crew_reaching_the_scene_tells_the_patient_the_ambulance_has_arrived()
     {
-        var (patient, dispatchId, crew) = await AcknowledgedRunAsync();
+        var (patient, dispatchId, crew, callId) = await AcknowledgedRunAsync();
         await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status = "en_route_to_scene" });
 
         var moved = await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status = "at_scene" });
         Assert.Equal(HttpStatusCode.OK, moved.StatusCode);
 
-        await _kit.AssertSentAsync(NotificationType.AmbulanceArrived, dispatchId,
+        await _kit.AssertSentAsync(NotificationType.AmbulanceArrived, callId,
             staff: [], patientAccounts: [patient.AccountId]);
         crew.Dispose();
+    }
+
+    [Fact]
+    public async Task Someone_calling_for_another_person_still_hears_the_ambulance_is_on_the_way()
+    {
+        var (caller, dispatchId, crew, callId) = await AcknowledgedRunAsync(forSomeoneElse: true);
+
+        var moved = await crew.PostAsJsonAsync($"/api/me/dispatches/{dispatchId}/status", new { status = "en_route_to_scene" });
+        Assert.Equal(HttpStatusCode.OK, moved.StatusCode);
+
+        await _kit.AssertSentAsync(NotificationType.AmbulanceOnTheWay, callId,
+            staff: [], patientAccounts: [caller.AccountId]);
+        crew.Dispose();
+    }
+
+    [Fact]
+    public async Task Calling_off_a_run_tells_its_crew_to_stand_down()
+    {
+        using var manager = await _kit.StaffAsync(ApiApplication.ManagerEmail);
+        var ambulance = await SeedAmbulanceAsync();
+        var dispatchId = await DispatchAsync(manager, await SeedCallAsync(patientId: null), ambulance);
+
+        var cancelled = await manager.PostAsJsonAsync($"/api/dispatches/{dispatchId}/cancel", new { reason = "Wrong ambulance" });
+        Assert.Equal(HttpStatusCode.OK, cancelled.StatusCode);
+
+        await _kit.AssertSentAsync(NotificationType.DispatchCancelled, dispatchId,
+            staff: ambulance.Crew.Select(member => member.Id), patientAccounts: [],
+            actorStaffId: await _kit.StaffIdAsync(ApiApplication.ManagerEmail));
+    }
+
+    [Fact]
+    public async Task Sending_a_different_ambulance_tells_the_first_crew_to_stand_down()
+    {
+        using var manager = await _kit.StaffAsync(ApiApplication.ManagerEmail);
+        var first = await SeedAmbulanceAsync();
+        var second = await SeedAmbulanceAsync();
+        var dispatchId = await DispatchAsync(manager, await SeedCallAsync(patientId: null), first);
+
+        var reassigned = await manager.PostAsJsonAsync($"/api/dispatches/{dispatchId}/reassign",
+            new { replacement_ambulance_id = second.Id, reason = "Closer unit free" });
+        Assert.Equal(HttpStatusCode.OK, reassigned.StatusCode);
+
+        await _kit.AssertSentAsync(NotificationType.DispatchCancelled, dispatchId,
+            staff: first.Crew.Select(member => member.Id), patientAccounts: [],
+            actorStaffId: await _kit.StaffIdAsync(ApiApplication.ManagerEmail));
+    }
+
+    [Fact]
+    public async Task Approving_a_cancellation_tells_the_crew_to_stand_down()
+    {
+        var (patient, callId, dispatchId, crew) = await DispatchedPatientCallWithCrewAsync();
+        using var manager = await _kit.StaffAsync(ApiApplication.ManagerEmail);
+        await patient.Client.PostAsJsonAsync(
+            $"/api/me/emergency-calls/{callId}/cancellation-request", new { reason = "No longer needed" });
+
+        var approved = await manager.PostAsJsonAsync(
+            $"/api/emergency-calls/{callId}/cancellation-request/approve", new { notes = "Confirmed" });
+        Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
+
+        await _kit.AssertSentAsync(NotificationType.DispatchCancelled, dispatchId,
+            staff: crew, patientAccounts: [],
+            actorStaffId: await _kit.StaffIdAsync(ApiApplication.ManagerEmail));
+    }
+
+    [Fact]
+    public async Task Closing_a_call_tells_the_app_caller()
+    {
+        var patient = await _kit.NewPatientAsync();
+        using var manager = await _kit.StaffAsync(ApiApplication.ManagerEmail);
+        var callId = await SeedCallAsync(patient.PatientId, callerAccountId: patient.AccountId);
+
+        var closed = await manager.PostAsJsonAsync($"/api/emergency-calls/{callId}/cancel", new { outcome = "duplicate_call" });
+        Assert.Equal(HttpStatusCode.OK, closed.StatusCode);
+
+        await _kit.AssertSentAsync(NotificationType.EmergencyCallCancelled, callId,
+            staff: [], patientAccounts: [patient.AccountId],
+            actorStaffId: await _kit.StaffIdAsync(ApiApplication.ManagerEmail));
     }
 
     [Fact]
@@ -165,19 +242,20 @@ public sealed class EmergencyNotificationTests
             actorStaffId: managerId);
     }
 
-    private async Task<(NotificationTestKit.LinkedPatient Patient, Guid DispatchId, HttpClient Crew)> AcknowledgedRunAsync()
+    private async Task<(NotificationTestKit.LinkedPatient Patient, Guid DispatchId, HttpClient Crew, Guid CallId)> AcknowledgedRunAsync(
+        bool forSomeoneElse = false)
     {
         using var manager = await _kit.StaffAsync(ApiApplication.ManagerEmail);
         var patient = await _kit.NewPatientAsync();
         var ambulance = await SeedAmbulanceAsync();
-        var callId = await SeedCallAsync(patient.PatientId);
+        var callId = await SeedCallAsync(forSomeoneElse ? null : patient.PatientId, callerAccountId: patient.AccountId);
         var dispatchId = await DispatchAsync(manager, callId, ambulance);
 
         var crew = await _kit.StaffAsync(ambulance.Crew[0].Email);
         var acknowledged = await crew.PostAsync($"/api/me/dispatches/{dispatchId}/acknowledge", null);
         Assert.Equal(HttpStatusCode.OK, acknowledged.StatusCode);
 
-        return (patient, dispatchId, crew);
+        return (patient, dispatchId, crew, callId);
     }
 
     private async Task<(NotificationTestKit.LinkedPatient Patient, Guid CallId)> DispatchedPatientCallAsync()
@@ -201,6 +279,16 @@ public sealed class EmergencyNotificationTests
         await DispatchAsync(manager, callId, await SeedAmbulanceAsync());
 
         return (patient, callId);
+    }
+
+    private async Task<(NotificationTestKit.LinkedPatient Patient, Guid CallId, Guid DispatchId, Guid[] Crew)> DispatchedPatientCallWithCrewAsync()
+    {
+        using var manager = await _kit.StaffAsync(ApiApplication.ManagerEmail);
+        var patient = await _kit.NewPatientAsync();
+        var ambulance = await SeedAmbulanceAsync();
+        var callId = await SeedCallAsync(patient.PatientId, callerAccountId: patient.AccountId);
+        var dispatchId = await DispatchAsync(manager, callId, ambulance);
+        return (patient, callId, dispatchId, ambulance.Crew.Select(member => member.Id).ToArray());
     }
 
     private static async Task<Guid> DispatchAsync(HttpClient manager, Guid callId, Ambulance ambulance)
@@ -292,7 +380,8 @@ public sealed class EmergencyNotificationTests
         return new Ambulance(ambulance.Id, crew.ToArray());
     }
 
-    private async Task<Guid> SeedCallAsync(Guid? patientId, CallPriority priority = CallPriority.High)
+    private async Task<Guid> SeedCallAsync(
+        Guid? patientId, CallPriority priority = CallPriority.High, Guid? callerAccountId = null)
     {
         using var scope = _application.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
@@ -300,6 +389,8 @@ public sealed class EmergencyNotificationTests
         {
             Id = Guid.NewGuid(),
             PatientId = patientId,
+            CallerUserId = callerAccountId,
+            PatientIsCaller = patientId is not null && callerAccountId is not null,
             Latitude = 6.9271m,
             Longitude = 79.8612m,
             Priority = priority,

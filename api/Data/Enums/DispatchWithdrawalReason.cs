@@ -4,5 +4,6 @@ public enum DispatchWithdrawalReason
 {
     CallChanged,
     DispatchedManually,
-    CallClosed
+    CallClosed,
+    AmbulanceNoLongerAvailable
 }

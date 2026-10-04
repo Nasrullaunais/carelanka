@@ -12,6 +12,8 @@ enum CancellationRequestStatus {
   approved('approved'),
   @JsonValue('rejected')
   rejected('rejected'),
+  @JsonValue('expired')
+  expired('expired'),
   /// Default value for all unparsed values, allows backward compatibility when adding new values on the backend.
   $unknown(null);
 

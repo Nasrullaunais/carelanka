@@ -6,13 +6,20 @@ namespace CareLanka.Api.Common.OpenApi;
 
 public sealed class EmergencyQueryBindingMetadataProvider : IBindingMetadataProvider
 {
+    private static readonly HashSet<Type?> QueryModels =
+    [
+        typeof(EmergencyCallListRequest),
+        typeof(MyEmergencyCallListRequest),
+        typeof(MyDispatchHistoryRequest),
+        typeof(CancellationRequestListRequest),
+        typeof(ListDispatchProposalsRequest),
+        typeof(AddressSearchRequest)
+    ];
+
     public void CreateBindingMetadata(BindingMetadataProviderContext context)
     {
         var containerType = context.Key.ContainerType;
-        if ((containerType != typeof(EmergencyCallListRequest)
-                && containerType != typeof(MyEmergencyCallListRequest)
-                && containerType != typeof(MyDispatchHistoryRequest))
-            || context.Key.Name is null)
+        if (!QueryModels.Contains(containerType) || context.Key.Name is null)
         {
             return;
         }

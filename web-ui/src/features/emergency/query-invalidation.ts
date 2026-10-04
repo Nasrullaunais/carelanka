@@ -8,6 +8,7 @@ const operationalQueryIds = new Set([
   'listDispatchProposals',
   'getDispatchProposal',
   'listEmergencyCancellationRequests',
+  'getFleetMap',
 ]);
 
 export function invalidateEmergencyQueries(queryClient: QueryClient) {

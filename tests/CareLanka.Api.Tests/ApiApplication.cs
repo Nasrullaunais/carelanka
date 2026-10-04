@@ -68,6 +68,9 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
             services.Remove(services.Single(service =>
                 service.ServiceType == typeof(IHostedService) && service.ImplementationType == typeof(SceneLookupWorker)));
             services.Replace(ServiceDescriptor.Singleton<IReverseGeocoder, NoAddressGeocoder>());
+            services.Replace(ServiceDescriptor.Singleton<IAddressSearch, FakeAddressSearch>());
+            // Road times would come from a public server; the straight-line fallback keeps tests offline.
+            services.Replace(ServiceDescriptor.Singleton<IAmbulanceDistanceService, StraightLineRoads>());
             // Tests run the delivery pass themselves and never talk to Firebase.
             services.Remove(services.Single(service =>
                 service.ServiceType == typeof(IHostedService) && service.ImplementationType == typeof(PushDeliveryWorker)));
@@ -179,6 +182,16 @@ public sealed class ApiApplication : WebApplicationFactory<Program>, IAsyncLifet
             Func<TState, Exception?, string> formatter)
             => _logs.Enqueue(formatter(state, exception));
     }
+}
+
+public sealed class StraightLineRoads : IAmbulanceDistanceService
+{
+    public Task<DistanceMeasurement> MeasureAsync(
+        IReadOnlyCollection<AmbulanceLocation> ambulances,
+        decimal destinationLatitude,
+        decimal destinationLongitude,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(StraightLineDistance.Measure(ambulances, destinationLatitude, destinationLongitude));
 }
 
 [CollectionDefinition(Name)]

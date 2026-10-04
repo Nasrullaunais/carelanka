@@ -253,8 +253,9 @@ makes the change, **inside the same save**. Wording is final in the resource fil
 | `care_reply_ready` | `CareRecommendationService` (on approve) | general |
 | `prescription_ready` / `_delivered` | `PrescriptionService` | general |
 | `lab_report_ready` | `LabReportService` | general |
-| `ambulance_on_the_way` / `_arrived` | `DispatchService` | urgent |
-| `cancellation_answered` | `EmergencyCallService` | general |
+| `ambulance_on_the_way` / `_arrived` | `DispatchService` — to whoever made the call from the app, which for "someone else" is not the patient. The subject is the call, so a tap opens its tracking | urgent |
+| `cancellation_answered` | `EmergencyCallService` — to the app caller | general |
+| `emergency_call_cancelled` | `EmergencyCallService`, when a duty manager closes the call — to the app caller | general |
 
 ### 5.2 To staff
 
@@ -262,6 +263,7 @@ makes the change, **inside the same save**. Wording is final in the resource fil
 | :--- | :--- | :--- | :--- |
 | `emergency_call_received` | `EmergencyCallService` | Duty managers | urgent |
 | `dispatch_assigned` *(exists)* | `DispatchService` | The crew | urgent |
+| `dispatch_cancelled` | `DispatchService` — run called off, sent to another ambulance, diverted, or its call closed | That run's crew | urgent |
 | `cancellation_request_waiting` | `EmergencyCallService` | Duty managers | general |
 | `dispatch_proposal_waiting` | `DispatchProposalExecutor`, diversion needing approval only | Duty managers | urgent |
 | `dispatch_proposal_failed` | `DispatchProposalExecutor`, no ambulance recommended | Duty managers | urgent |

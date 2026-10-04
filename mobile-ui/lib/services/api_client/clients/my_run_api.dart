@@ -5,6 +5,7 @@
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
+import '../models/close_run_at_scene_request.dart';
 import '../models/decline_dispatch_request.dart';
 import '../models/dispatch_detail.dart';
 import '../models/dispatch_summary_paged_result.dart';
@@ -55,5 +56,11 @@ abstract class MyRunApi {
   Future<DispatchDetail> recordHandover({
     @Path('id') required String id,
     @Body() RecordHandoverRequest? body,
+  });
+
+  @POST('/me/dispatches/{id}/close-at-scene')
+  Future<DispatchDetail> closeMyDispatchAtScene({
+    @Path('id') required String id,
+    @Body() CloseRunAtSceneRequest? body,
   });
 }

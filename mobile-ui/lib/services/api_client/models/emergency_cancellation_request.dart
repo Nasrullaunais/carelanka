@@ -7,6 +7,7 @@ import 'package:json_annotation/json_annotation.dart';
 import 'call_priority.dart';
 import 'call_status.dart';
 import 'cancellation_request_status.dart';
+import 'dispatch_status.dart';
 
 part 'emergency_cancellation_request.g.dart';
 
@@ -20,6 +21,8 @@ class EmergencyCancellationRequest {
     this.addressLabel,
     this.callCreatedAt,
     this.activeAmbulanceRegistration,
+    this.activeDispatchStatus,
+    this.canApprove,
     this.status,
     this.reason,
     this.requestedAt,
@@ -44,6 +47,10 @@ class EmergencyCancellationRequest {
   final DateTime? callCreatedAt;
   @JsonKey(name: 'active_ambulance_registration')
   final String? activeAmbulanceRegistration;
+  @JsonKey(name: 'active_dispatch_status')
+  final DispatchStatus? activeDispatchStatus;
+  @JsonKey(name: 'can_approve')
+  final bool? canApprove;
   final CancellationRequestStatus? status;
   final String? reason;
   @JsonKey(name: 'requested_at')

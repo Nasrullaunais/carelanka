@@ -11,6 +11,8 @@ public sealed class EmergencyCancellationRequest
     public string? AddressLabel { get; set; }
     public DateTimeOffset CallCreatedAt { get; set; }
     public string? ActiveAmbulanceRegistration { get; set; }
+    public DispatchStatus? ActiveDispatchStatus { get; set; }
+    public bool CanApprove { get; set; }
     public CancellationRequestStatus Status { get; set; }
     public string Reason { get; set; } = string.Empty;
     public DateTimeOffset RequestedAt { get; set; }

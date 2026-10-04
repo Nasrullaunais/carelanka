@@ -4,5 +4,6 @@ public enum CancellationRequestStatus
 {
     Pending,
     Approved,
-    Rejected
+    Rejected,
+    Expired
 }

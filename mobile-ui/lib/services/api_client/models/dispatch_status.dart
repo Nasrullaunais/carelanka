@@ -18,6 +18,8 @@ enum DispatchStatus {
   transportingToHospital('transporting_to_hospital'),
   @JsonValue('handed_over')
   handedOver('handed_over'),
+  @JsonValue('closed_at_scene')
+  closedAtScene('closed_at_scene'),
   @JsonValue('declined')
   declined('declined'),
   @JsonValue('cancelled')

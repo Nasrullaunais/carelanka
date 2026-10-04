@@ -17,6 +17,13 @@ export type AddPharmacyBatchRequest = {
     note?: string | null;
 };
 
+export type AddressSuggestion = {
+    label?: string | null;
+    latitude?: number;
+    longitude?: number;
+    approximate_accuracy_metres?: number;
+};
+
 export type Admission = {
     id: string;
     patient?: PatientSummary;
@@ -221,6 +228,7 @@ export type AmbulanceDetail = {
     created_at: string;
     updated_at: string;
     active_dispatch?: DispatchSummary;
+    active_dispatch_id?: string | null;
     is_divertible?: boolean;
     runs_today?: number;
     current_crew?: Array<AmbulanceCrewAssignment> | null;
@@ -464,9 +472,14 @@ export type CancelDispatchRequest = {
     reason?: string | null;
 };
 
+export type CancelEmergencyCallRequest = {
+    outcome?: EmergencyCallOutcome;
+    notes?: string | null;
+};
+
 export type CancelReason = 'diverted_to_other_hospital' | 'false_alarm' | 'died_en_route' | 'patient_refused' | 'no_show';
 
-export type CancellationRequestStatus = 'pending' | 'approved' | 'rejected';
+export type CancellationRequestStatus = 'pending' | 'approved' | 'rejected' | 'expired';
 
 export type CareAgentOutcome = 'drafted' | 'escalated' | 'failed';
 
@@ -588,6 +601,11 @@ export type ClaimByPatientCodeRequest = {
 
 export type ClassifyAdmissionRequest = {
     admission_category?: AdmissionCategory;
+};
+
+export type CloseRunAtSceneRequest = {
+    outcome?: EmergencyCallOutcome;
+    notes?: string | null;
 };
 
 export type CompleteDetailsRequest = {
@@ -896,7 +914,6 @@ export type DispatchDetail = {
     ambulance_registration?: string | null;
     call_priority?: CallPriority;
     status?: DispatchStatus;
-    destination_ward_name?: string | null;
     crew_count?: number;
     acknowledgement_overdue?: boolean;
     dispatched_at?: string;
@@ -910,6 +927,13 @@ export type DispatchDetail = {
     handover_notes?: string | null;
     patient_condition?: string | null;
     scene_address_label?: string | null;
+    destination_label?: string | null;
+    call_status?: CallStatus;
+    call_outcome?: EmergencyCallOutcome;
+    call_details?: string | null;
+    caller_name?: string | null;
+    caller_phone?: string | null;
+    patient_name?: string | null;
     crew_staff_ids?: Array<string> | null;
 };
 
@@ -991,7 +1015,7 @@ export type DispatchRecommendationSource = 'model' | 'model_unavailable' | 'mode
 
 export type DispatchRejectionReason = 'unsafe_diversion' | 'source_call_too_urgent_to_divert' | 'ambulance_unsuitable' | 'handled_another_way' | 'no_longer_needed' | 'other';
 
-export type DispatchStatus = 'assigned' | 'acknowledged' | 'en_route_to_scene' | 'at_scene' | 'transporting_to_hospital' | 'handed_over' | 'declined' | 'cancelled' | 'reassigned';
+export type DispatchStatus = 'assigned' | 'acknowledged' | 'en_route_to_scene' | 'at_scene' | 'transporting_to_hospital' | 'handed_over' | 'closed_at_scene' | 'declined' | 'cancelled' | 'reassigned';
 
 export type DispatchSummary = {
     id?: string;
@@ -999,7 +1023,6 @@ export type DispatchSummary = {
     ambulance_registration?: string | null;
     call_priority?: CallPriority;
     status?: DispatchStatus;
-    destination_ward_name?: string | null;
     crew_count?: number;
     acknowledgement_overdue?: boolean;
     dispatched_at?: string;
@@ -1032,7 +1055,7 @@ export type DispatchValidationResult = {
     checked_at?: string;
 };
 
-export type DispatchWithdrawalReason = 'call_changed' | 'dispatched_manually' | 'call_closed';
+export type DispatchWithdrawalReason = 'call_changed' | 'dispatched_manually' | 'call_closed' | 'ambulance_no_longer_available';
 
 export type DiversionImpact = {
     source_dispatch_id?: string;
@@ -1081,14 +1104,19 @@ export type EmergencyCallDetail = {
     details?: string | null;
     priority?: CallPriority;
     status?: CallStatus;
-    outcome?: string | null;
+    outcome?: EmergencyCallOutcome;
+    outcome_notes?: string | null;
+    closed_at?: string | null;
     transported?: boolean | null;
     cancellation_request_status?: CancellationRequestStatus;
     created_at?: string;
     updated_at?: string;
-    dispatches?: Array<DispatchSummary>;
+    patient_name?: string | null;
+    dispatches?: Array<DispatchDetail>;
     latest_proposal?: DispatchProposalSummary;
 };
+
+export type EmergencyCallOutcome = 'transported' | 'treated_at_scene' | 'refused_transport' | 'patient_not_found' | 'deceased_at_scene' | 'false_alarm' | 'duplicate_call' | 'caller_cancelled' | 'no_longer_needed';
 
 export type EmergencyCallSortField = 'priority' | 'created_at' | 'status';
 
@@ -1122,6 +1150,8 @@ export type EmergencyCancellationRequest = {
     address_label?: string | null;
     call_created_at?: string;
     active_ambulance_registration?: string | null;
+    active_dispatch_status?: DispatchStatus;
+    can_approve?: boolean;
     status?: CancellationRequestStatus;
     reason?: string | null;
     requested_at?: string;
@@ -1236,6 +1266,43 @@ export type EquipmentStatus = 'available' | 'assigned' | 'maintenance' | 'retire
 export type ExpenseRate = {
     expense_key: string;
     amount: number;
+};
+
+export type FleetMap = {
+    ambulances?: Array<FleetMapAmbulance> | null;
+    calls?: Array<FleetMapCall> | null;
+    location_max_age_minutes?: number;
+    generated_at?: string;
+};
+
+export type FleetMapAmbulance = {
+    id?: string;
+    registration_number?: string | null;
+    status?: AmbulanceStatus;
+    out_of_service_reason?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    location_updated_at?: string | null;
+    location_is_stale?: boolean;
+    current_crew_count?: number;
+    required_crew_count?: number;
+    is_eligible?: boolean;
+    eligibility_block_reasons?: Array<AmbulanceEligibilityBlockReason> | null;
+    active_dispatch_id?: string | null;
+    active_dispatch_status?: DispatchStatus;
+    active_call_id?: string | null;
+};
+
+export type FleetMapCall = {
+    id?: string;
+    priority?: CallPriority;
+    status?: CallStatus;
+    address_label?: string | null;
+    latitude?: number;
+    longitude?: number;
+    waiting_minutes?: number;
+    assigned_ambulance_id?: string | null;
+    created_at?: string;
 };
 
 export type FleetUtilisationReport = {
@@ -1478,12 +1545,18 @@ export type MyBillLine = {
 export type MyCallTracking = {
     emergency_call_id?: string;
     call_status?: CallStatus;
+    dispatch_status?: DispatchStatus;
     ambulance_is_on_the_way?: boolean;
+    looking_for_another_ambulance?: boolean;
+    ambulance_registration?: string | null;
     ambulance_latitude?: number | null;
     ambulance_longitude?: number | null;
     ambulance_location_is_stale?: boolean;
     estimated_minutes_to_arrival?: number | null;
+    ambulance_distance_km?: number | null;
     cancellation_request_status?: CancellationRequestStatus;
+    cancellation_review_notes?: string | null;
+    outcome?: EmergencyCallOutcome;
     updated_at?: string;
 };
 
@@ -1597,7 +1670,7 @@ export type NavigationTarget = {
 
 export type NavigationWaypoint = 'scene' | 'hospital_emergency_entrance';
 
-export type NotificationType = 'dispatch_assigned' | 'appointment_booked' | 'appointment_rescheduled' | 'appointment_cancelled' | 'appointment_reminder' | 'admission_approved' | 'bed_assigned' | 'discharge_ready' | 'bill_raised' | 'bill_settled' | 'care_reply_ready' | 'prescription_ready' | 'prescription_delivered' | 'lab_report_ready' | 'ambulance_on_the_way' | 'ambulance_arrived' | 'cancellation_answered' | 'emergency_call_received' | 'cancellation_request_waiting' | 'dispatch_proposal_waiting' | 'dispatch_proposal_failed' | 'admission_awaiting_approval' | 'care_query_flagged' | 'care_reply_waiting' | 'equipment_warning_raised' | 'maintenance_due' | 'pharmacy_stock_low' | 'lab_test_requested' | 'leave_requested' | 'leave_approved' | 'leave_rejected' | 'shift_changed' | 'roster_proposal_waiting';
+export type NotificationType = 'dispatch_assigned' | 'dispatch_cancelled' | 'appointment_booked' | 'appointment_rescheduled' | 'appointment_cancelled' | 'appointment_reminder' | 'admission_approved' | 'bed_assigned' | 'discharge_ready' | 'bill_raised' | 'bill_settled' | 'care_reply_ready' | 'prescription_ready' | 'prescription_delivered' | 'lab_report_ready' | 'ambulance_on_the_way' | 'ambulance_arrived' | 'cancellation_answered' | 'emergency_call_cancelled' | 'emergency_call_received' | 'cancellation_request_waiting' | 'dispatch_proposal_waiting' | 'dispatch_proposal_failed' | 'admission_awaiting_approval' | 'care_query_flagged' | 'care_reply_waiting' | 'equipment_warning_raised' | 'maintenance_due' | 'pharmacy_stock_low' | 'lab_test_requested' | 'leave_requested' | 'leave_approved' | 'leave_rejected' | 'shift_changed' | 'roster_proposal_waiting';
 
 export type OutstandingBill = {
     admission_id: string;
@@ -2337,6 +2410,7 @@ export type UpdateEmergencyCallRequest = {
     caller_phone?: string;
     latitude?: number;
     longitude?: number;
+    location_accuracy_metres?: number;
 };
 
 export type UpdateEquipmentItemRequest = {
@@ -3898,6 +3972,35 @@ export type ReportAmbulanceLocationResponses = {
 
 export type ReportAmbulanceLocationResponse = ReportAmbulanceLocationResponses[keyof ReportAmbulanceLocationResponses];
 
+export type GetFleetMapData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/fleet-map';
+};
+
+export type GetFleetMapErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type GetFleetMapError = GetFleetMapErrors[keyof GetFleetMapErrors];
+
+export type GetFleetMapResponses = {
+    /**
+     * OK
+     */
+    200: FleetMap;
+};
+
+export type GetFleetMapResponse = GetFleetMapResponses[keyof GetFleetMapResponses];
+
 export type LoginData = {
     body?: StaffLoginRequest;
     path?: never;
@@ -4843,6 +4946,45 @@ export type CreateEmergencyCallResponses = {
 
 export type CreateEmergencyCallResponse = CreateEmergencyCallResponses[keyof CreateEmergencyCallResponses];
 
+export type SearchSceneAddressesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        query?: string;
+    };
+    url: '/emergency-calls/address-search';
+};
+
+export type SearchSceneAddressesErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Service Unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type SearchSceneAddressesError = SearchSceneAddressesErrors[keyof SearchSceneAddressesErrors];
+
+export type SearchSceneAddressesResponses = {
+    /**
+     * OK
+     */
+    200: Array<AddressSuggestion>;
+};
+
+export type SearchSceneAddressesResponse = SearchSceneAddressesResponses[keyof SearchSceneAddressesResponses];
+
 export type GetEmergencyCallData = {
     body?: never;
     path: {
@@ -4921,6 +5063,49 @@ export type UpdateEmergencyCallResponses = {
 
 export type UpdateEmergencyCallResponse = UpdateEmergencyCallResponses[keyof UpdateEmergencyCallResponses];
 
+export type CancelEmergencyCallData = {
+    body?: CancelEmergencyCallRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/emergency-calls/{id}/cancel';
+};
+
+export type CancelEmergencyCallErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CancelEmergencyCallError = CancelEmergencyCallErrors[keyof CancelEmergencyCallErrors];
+
+export type CancelEmergencyCallResponses = {
+    /**
+     * OK
+     */
+    200: EmergencyCallDetail;
+};
+
+export type CancelEmergencyCallResponse = CancelEmergencyCallResponses[keyof CancelEmergencyCallResponses];
+
 export type DispatchEmergencyCallData = {
     body?: ManualDispatchRequest;
     path: {
@@ -4968,9 +5153,9 @@ export type ListEmergencyCancellationRequestsData = {
     body?: never;
     path?: never;
     query?: {
-        Status?: CancellationRequestStatus;
-        Page?: number;
-        PageSize?: number;
+        status?: CancellationRequestStatus;
+        page?: number;
+        pageSize?: number;
     };
     url: '/emergency-cancellation-requests';
 };
@@ -5512,11 +5697,11 @@ export type ListDispatchProposalsData = {
     body?: never;
     path?: never;
     query?: {
-        Status?: DispatchProposalStatus;
-        EmergencyCallId?: string;
-        IsDiversion?: boolean;
-        Page?: number;
-        PageSize?: number;
+        status?: DispatchProposalStatus;
+        emergencyCallId?: string;
+        isDiversion?: boolean;
+        page?: number;
+        pageSize?: number;
     };
     url: '/dispatch-proposals';
 };
@@ -5739,6 +5924,41 @@ export type RejectDispatchProposalResponses = {
 };
 
 export type RejectDispatchProposalResponse = RejectDispatchProposalResponses[keyof RejectDispatchProposalResponses];
+
+export type GetDispatchData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/dispatches/{id}';
+};
+
+export type GetDispatchErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetDispatchError = GetDispatchErrors[keyof GetDispatchErrors];
+
+export type GetDispatchResponses = {
+    /**
+     * OK
+     */
+    200: DispatchDetail;
+};
+
+export type GetDispatchResponse = GetDispatchResponses[keyof GetDispatchResponses];
 
 export type GetDispatchRouteData = {
     body?: never;
@@ -7837,6 +8057,49 @@ export type RecordHandoverResponses = {
 };
 
 export type RecordHandoverResponse = RecordHandoverResponses[keyof RecordHandoverResponses];
+
+export type CloseMyDispatchAtSceneData = {
+    body?: CloseRunAtSceneRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/me/dispatches/{id}/close-at-scene';
+};
+
+export type CloseMyDispatchAtSceneErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CloseMyDispatchAtSceneError = CloseMyDispatchAtSceneErrors[keyof CloseMyDispatchAtSceneErrors];
+
+export type CloseMyDispatchAtSceneResponses = {
+    /**
+     * OK
+     */
+    200: DispatchDetail;
+};
+
+export type CloseMyDispatchAtSceneResponse = CloseMyDispatchAtSceneResponses[keyof CloseMyDispatchAtSceneResponses];
 
 export type ListMyNotificationsData = {
     body?: never;

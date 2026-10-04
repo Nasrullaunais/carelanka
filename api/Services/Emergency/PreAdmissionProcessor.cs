@@ -35,10 +35,10 @@ public sealed class PreAdmissionProcessor(
     private async Task SendAsync(Data.Entities.Emergency.PreAdmissionNotice notice, CancellationToken ct)
     {
         var call = notice.EmergencyCall;
-        if (call.Status == CallStatus.Cancelled)
+        if (call.Status == CallStatus.Cancelled || call.Transported == false)
         {
             notice.Status = PreAdmissionStatus.Failed;
-            notice.FailureReason = "call_cancelled";
+            notice.FailureReason = call.Status == CallStatus.Cancelled ? "call_cancelled" : "not_transported";
             return;
         }
 

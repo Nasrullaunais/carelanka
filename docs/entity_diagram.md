@@ -5,6 +5,12 @@ single hospital / multiple wards, unified staff identity, generic agent-workflow
 audit-log schemas). PKs are `Guid` (PostgreSQL `uuid`, `default: gen_random_uuid()`)
 throughout.
 
+**Revision 3.4** *(2026-10-03)* — an emergency call and a run can now end the way they do in real
+life, in the `Emergency_CloseCallsAndRuns` migration. `EmergencyCall.Outcome` becomes a fixed list
+(`EmergencyCallOutcome`) and gains `OutcomeNotes` and `ClosedAt`; `DispatchStatus` gains
+`ClosedAtScene`; `CancellationRequestStatus` gains `Expired`; two notification types are added.
+Changes marked *(Rev 3.4)*.
+
 **Revision 3.3** *(2026-09-30)* — notifications are split in two, in the
 `Common_SplitNotificationDeliveries` and `Common_ExpandNotificationTypeCatalogue` migrations.
 `notifications` is now only the inbox (what a person was told). The push attempts moved into a new
@@ -505,7 +511,9 @@ more often than a hospital would like.
 + Details: string (nullable)
 + Priority: CallPriority (non-null)
 + Status: CallStatus (non-null)
-+ Outcome: string (nullable)
++ Outcome: EmergencyCallOutcome (nullable)                  -- (Rev 3.4: was free text)
++ OutcomeNotes: string (max 1000, nullable)                 -- (Rev 3.4 — new)
++ ClosedAt: DateTimeOffset (nullable)                       -- (Rev 3.4 — new)
 + Transported: bool (nullable)                              -- (Rev 2.4 — new)
 + CancellationRequestStatus: CancellationRequestStatus (nullable) -- (Rev 3.1 — new)
 + CancellationRequestReason: string (nullable)              -- (Rev 3.1 — new)
@@ -515,6 +523,9 @@ more often than a hospital would like.
 + CancellationReviewNotes: string (nullable)                -- (Rev 3.1 — new)
 ```
 **Table:** `emergency_calls`
+**Note:** *(Rev 3.4)* `Outcome`, `OutcomeNotes`, `ClosedAt` and `Transported` are written together,
+only by the step that closes the call — handover, closing the run at the scene, or cancelling — so
+the outcome can never contradict the run. Null while the call is open.
 **Note:** `PatientId` nullable — identity is often unknown at the scene, settable
 later once intake matches the call to a registered `Patient`. *(Decision 25)*
 
@@ -1696,7 +1707,7 @@ invalid plan can be returned for revision instead of rejected wholesale.
 - `ck_notifications_one_recipient`: `num_nonnulls(recipient_staff_member_id, recipient_patient_account_id) = 1`.
   Two real foreign keys instead of one loose id, so the database refuses a notification for
   someone who does not exist.
-- `ck_notifications_type`: `type` must be one of the **31** `NotificationType` values (widened from
+- `ck_notifications_type`: `type` must be one of the **35** `NotificationType` values (widened from
   the single `dispatch_assigned` by `Common_ExpandNotificationTypeCatalogue`).
 - Both recipient keys cascade on delete.
 
@@ -1830,20 +1841,31 @@ Available, Dispatched, EnRoute, AtScene, Transporting, OutOfService
 ### DispatchStatus
 ```
 Assigned, Acknowledged, EnRouteToScene, AtScene, TransportingToHospital,
-HandedOver, Declined, Cancelled, Reassigned
+HandedOver, ClosedAtScene, Declined, Cancelled, Reassigned
 ```
 Serialized as `assigned`, `acknowledged`, `en_route_to_scene`, `at_scene`,
-`transporting_to_hospital`, `handed_over`, `declined`, `cancelled`, `reassigned`.
+`transporting_to_hospital`, `handed_over`, `closed_at_scene`, `declined`, `cancelled`, `reassigned`.
+*(Rev 3.4)* `ClosedAtScene` is terminal and legal only from `AtScene`: the crew reached the
+patient but took nobody to hospital. The reason is the call's `Outcome`.
 The normal path follows the first six in order. `Declined` is terminal from `Assigned`;
 `Cancelled` and `Reassigned` are terminal pre-arrival alternatives. No diversion or
 reassignment is legal from `AtScene` onward.
 
 ### CancellationRequestStatus *(Rev 3.1 — new)*
 ```
-Pending, Approved, Rejected
+Pending, Approved, Rejected, Expired
 ```
-Serialized as `pending`, `approved`, `rejected`. Null on `EmergencyCall` means no
-post-assignment request exists.
+Serialized as `pending`, `approved`, `rejected`, `expired`. Null on `EmergencyCall` means no
+post-assignment request exists. *(Rev 3.4)* `Expired` is set by the system when the run ends or
+the call closes before anyone reviewed the request.
+
+### EmergencyCallOutcome *(Rev 3.4 — new)*
+```
+Transported, TreatedAtScene, RefusedTransport, PatientNotFound, DeceasedAtScene,
+FalseAlarm, DuplicateCall, CallerCancelled, NoLongerNeeded
+```
+How a call ended, stored snake_case (ADR 5). The first five end a completed call (handover, or a
+run closed at the scene); the last four end a cancelled one.
 
 ### AllocationStatus *(Rev 2 — new)*
 ```
@@ -2297,17 +2319,17 @@ Pending, Passed, Failed
 
 ### NotificationType *(Rev 3.3 — new)*
 ```
-DispatchAssigned,
+DispatchAssigned, DispatchCancelled,
 AppointmentBooked, AppointmentRescheduled, AppointmentCancelled, AppointmentReminder,
 AdmissionApproved, BedAssigned, DischargeReady, BillRaised, BillSettled, CareReplyReady,
 PrescriptionReady, PrescriptionDelivered, LabReportReady, AmbulanceOnTheWay, AmbulanceArrived,
-CancellationAnswered,
-EmergencyCallReceived, CancellationRequestWaiting, DispatchProposalWaiting,
+CancellationAnswered, EmergencyCallCancelled,
+EmergencyCallReceived, CancellationRequestWaiting, DispatchProposalWaiting, DispatchProposalFailed,
 AdmissionAwaitingApproval, CareQueryFlagged, CareReplyWaiting, EquipmentWarningRaised,
 MaintenanceDue, PharmacyStockLow, LabTestRequested, LeaveRequested, LeaveApproved,
 LeaveRejected, ShiftChanged, RosterProposalWaiting
 ```
-31 values, stored snake_case (ADR 5). The list of who is told about which is
+35 values *(Rev 3.4: `DispatchCancelled`, `EmergencyCallCancelled` added)*, stored snake_case (ADR 5). The list of who is told about which is
 `docs/build/notifications.md` §5.
 
 ### NotificationChannel *(Rev 2 — new)*

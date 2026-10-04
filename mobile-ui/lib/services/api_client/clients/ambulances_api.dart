@@ -13,6 +13,7 @@ import '../models/ambulance_status.dart';
 import '../models/ambulance_summary_paged_result.dart';
 import '../models/assign_ambulance_crew_request.dart';
 import '../models/create_ambulance_request.dart';
+import '../models/fleet_map.dart';
 import '../models/report_ambulance_location_request.dart';
 import '../models/retire_ambulance_request.dart';
 import '../models/update_ambulance_request.dart';
@@ -89,4 +90,7 @@ abstract class AmbulancesApi {
     @Path('id') required String id,
     @Body() ReportAmbulanceLocationRequest? body,
   });
+
+  @GET('/fleet-map')
+  Future<FleetMap> getFleetMap();
 }

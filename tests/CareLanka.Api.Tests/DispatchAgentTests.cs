@@ -1,5 +1,6 @@
 using CareLanka.Api.Agents.Emergency;
 using CareLanka.Api.Data.Enums;
+using CareLanka.Api.Services.Emergency;
 using Xunit;
 
 namespace CareLanka.Api.Tests;
@@ -22,6 +23,46 @@ public sealed class DispatchAgentTests
         Assert.Null(result.DiversionImpact!.SourceCallAdditionalWaitMinutes);
         Assert.Null(result.DiversionImpact.MinutesSavedForThisCall);
         Assert.Contains(result.Validation, check => check.Check == "source_call_has_replacement" && !check.Passed);
+    }
+
+    [Fact]
+    public async Task A_diversion_takes_the_ambulance_that_reaches_this_call_soonest()
+    {
+        var far = Divertible("FAR-01", CallPriority.Low);
+        var near = Divertible("NEAR-02", CallPriority.Medium);
+        var tools = new FakeTools { Running = [far, near], Minutes = { [far.AmbulanceId] = 40, [near.AmbulanceId] = 7 } };
+
+        var result = await Agent(tools).RunAsync(Request([]));
+
+        Assert.Equal(DispatchOutcome.DiversionProposed, result.Outcome);
+        Assert.Equal(near.AmbulanceId, result.ProposedAmbulanceId);
+        Assert.Equal(7, result.EstimatedMinutesToScene);
+        Assert.Contains(result.ToolCalls, call => call.ToolName == "rank_diversions_by_eta" && call.Succeeded);
+    }
+
+    [Fact]
+    public async Task Without_road_times_a_diversion_falls_back_to_the_least_urgent_call()
+    {
+        var medium = Divertible("MED-01", CallPriority.Medium);
+        var low = Divertible("LOW-02", CallPriority.Low);
+        var tools = new FakeTools { Running = [medium, low] };
+
+        var result = await Agent(tools).RunAsync(Request([]));
+
+        Assert.Equal(low.AmbulanceId, result.ProposedAmbulanceId);
+        Assert.Null(result.EstimatedMinutesToScene);
+    }
+
+    [Fact]
+    public async Task The_other_call_has_waited_since_it_came_in_not_since_its_ambulance_was_sent()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var source = Divertible("WAIT-01", CallPriority.Low, callCreatedAt: now.AddMinutes(-30), dispatchedAt: now.AddMinutes(-4));
+        var tools = new FakeTools { Running = [source] };
+
+        var result = await Agent(tools).RunAsync(Request([]));
+
+        Assert.InRange(result.DiversionImpact!.SourceCallWaitingMinutesSoFar, 29, 31);
     }
 
     [Fact]
@@ -84,6 +125,11 @@ public sealed class DispatchAgentTests
     private static DispatchAgentRequest Request(IReadOnlyList<Guid> excluded) =>
         new(Guid.NewGuid(), CallPriority.Critical, 6.9m, 79.8m, true, excluded);
 
+    private static DivertibleDispatchCandidate Divertible(
+        string registration, CallPriority priority, DateTimeOffset? callCreatedAt = null, DateTimeOffset? dispatchedAt = null) =>
+        new(Guid.NewGuid(), Guid.NewGuid(), registration, Guid.NewGuid(), priority, "Test scene", DispatchStatus.Assigned,
+            dispatchedAt ?? DateTimeOffset.UtcNow.AddMinutes(-5), callCreatedAt ?? DateTimeOffset.UtcNow.AddMinutes(-9), 6.9m, 79.8m);
+
     private static EligibleAmbulanceCandidate Candidate(string registration) =>
         new(Guid.NewGuid(), registration, 6.9m, 79.8m, 2, DateTimeOffset.UtcNow);
 
@@ -105,11 +151,13 @@ public sealed class DispatchAgentTests
     {
         public IReadOnlyList<EligibleAmbulanceCandidate> Free { get; init; } = [];
         public Dictionary<Guid, int?> Minutes { get; } = [];
-        public DivertibleDispatchCandidate Active { get; } = new(Guid.NewGuid(), Guid.NewGuid(), "TEST-01", Guid.NewGuid(), CallPriority.Low, "Test scene", DispatchStatus.Assigned, DateTimeOffset.UtcNow.AddMinutes(-5));
+        public DivertibleDispatchCandidate Active { get; } = Divertible("TEST-01", CallPriority.Low);
+        public IReadOnlyList<DivertibleDispatchCandidate>? Running { get; init; }
         public Task<IReadOnlyList<EligibleAmbulanceCandidate>> ListEligibleAmbulancesAsync(IReadOnlyCollection<Guid> excludeAmbulanceIds, CancellationToken cancellationToken = default) =>
             Task.FromResult(Free);
-        public Task<IReadOnlyList<DivertibleDispatchCandidate>> GetActiveDispatchesAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DivertibleDispatchCandidate>>([Active]);
-        public Task<IReadOnlyDictionary<Guid, int?>> GetRouteMinutesAsync(IReadOnlyCollection<EligibleAmbulanceCandidate> ambulances, decimal destinationLatitude, decimal destinationLongitude, CancellationToken cancellationToken = default) =>
+        public Task<IReadOnlyList<DivertibleDispatchCandidate>> GetActiveDispatchesAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(Running ?? [Active]);
+        public Task<IReadOnlyDictionary<Guid, int?>> GetRouteMinutesAsync(IReadOnlyCollection<AmbulanceLocation> ambulances, decimal destinationLatitude, decimal destinationLongitude, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyDictionary<Guid, int?>>(Minutes);
     }
 }

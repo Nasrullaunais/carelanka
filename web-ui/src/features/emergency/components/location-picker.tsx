@@ -1,5 +1,6 @@
 import 'leaflet/dist/leaflet.css';
-import { MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet';
+import { useEffect } from 'react';
+import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import { circleMarker } from './map-marker';
 
 const COLOMBO: [number, number] = [6.9271, 79.8612];
@@ -16,6 +17,7 @@ export function LocationPicker({ value, onChange, readOnly = false }: { value?: 
       <MapContainer center={position} zoom={13} className="h-full w-full">
         <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <PickerMarker position={position} onChange={onChange} readOnly={readOnly} />
+        <KeepInView latitude={position[0]} longitude={position[1]} />
       </MapContainer>
     </div>
   );
@@ -34,4 +36,12 @@ function PickerMarker({ position, onChange, readOnly }: { position: [number, num
       } }}
     />
   );
+}
+
+function KeepInView({ latitude, longitude }: { latitude: number; longitude: number }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!map.getBounds().contains([latitude, longitude])) map.setView([latitude, longitude], Math.max(map.getZoom(), 15));
+  }, [map, latitude, longitude]);
+  return null;
 }

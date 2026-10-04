@@ -2,9 +2,9 @@
 
 **Owner:** Nasrulla Unais (Member 1)
 
-**Status:** Phases 0–10 complete; the Phase 11 report slice, Duty Manager UI and Emergency demo fixtures are complete. History, reconciliation, audit and broader resilience work remain.
+**Status:** Phases 0–10 complete; the Phase 11 report slice, Duty Manager UI and Emergency demo fixtures are complete. Phase 12 (fixes from `emergency-flow-review.md`) is built. History, reconciliation, audit and broader resilience work remain.
 
-**Notifications raised:** `emergency_call_received`, `cancellation_request_waiting`, `dispatch_proposal_waiting` (duty managers); `dispatch_assigned` (the crew); `ambulance_on_the_way`, `ambulance_arrived`, `cancellation_answered` (the patient). See `notifications.md` §5.
+**Notifications raised:** `emergency_call_received`, `cancellation_request_waiting`, `dispatch_proposal_waiting` (duty managers); `dispatch_assigned`, `dispatch_cancelled` (the crew); `ambulance_on_the_way`, `ambulance_arrived`, `cancellation_answered`, `emergency_call_cancelled` (whoever made the call). See `notifications.md` §5.
 
 **Contract:** `specs/emergency-spec.yaml`
 
@@ -552,6 +552,75 @@ Work:
 **Exit criteria:** reports agree with dispatch history and the complete demo survives Maps,
 AI, notification and Patient Management failures.
 
+### Phase 12 — Fixes from the 2026-10-03 flow review — **BUILT 2026-10-03**
+
+**Why:** the happy path worked, but real-life paths left people stuck.
+`emergency-flow-review.md` lists every problem with its label (P1–P8, D1–D11, C1–C6, A1–A3,
+X1–X4). All of them are addressed.
+
+**Ending a call or a run without going to hospital (C1, D2).**
+
+- New dispatch state `closed_at_scene`. From `at_scene` the crew can now go to hospital
+  *or* end the run: `POST /me/dispatches/{id}/close-at-scene` with an outcome
+  (treated at scene, refused transport, patient not found, deceased at scene).
+- New `POST /emergency-calls/{id}/cancel` lets the Duty Manager close a hoax, duplicate or
+  "no longer needed" call. If an ambulance is still on its way it is called off; once the
+  crew is with the patient only the crew can end the run (`cl_emg_017`).
+- `EmergencyCall.Outcome`, `OutcomeNotes`, `ClosedAt` and `Transported` are now written by
+  every way a call ends. The old unused `POST /emergency-calls/{id}/outcome` route is gone.
+- A call that ends without transport sends no pre-admission. One already sent stays open
+  item 11.24 in `integration_of_functions.md` (needs Patient Management).
+
+**Nobody is left guessing (C2, P1, P5, P8, D9).**
+
+- Calling off, swapping or approving a cancellation tells the crew (`dispatch_cancelled`).
+  The crew app shows how the run ended instead of going blank.
+- When the Duty Manager closes a call, the caller is told (`emergency_call_cancelled`).
+  Hand-over and ending at the scene send nothing, because the crew is with the patient.
+  Every caller alert goes to whoever made the call, including "for someone else" calls,
+  and opens that call's tracking.
+- A closed call is a record: edits are refused (`cl_emg_019`), and a patient reading their
+  own call sees each run's progress but not crew ids or clinical notes.
+- After a decline the patient can still cancel, and tracking says "finding another
+  ambulance". Tracking shows each stage, the ambulance, its distance and arrival time.
+- A cancellation request still waiting when the run ends becomes `expired`. The queue shows
+  the run stage and offers Approve only when it can work (`can_approve`).
+
+**The Duty Manager's desk (D1, D3, D4, D6, D7, D8, D10, D11, X1, X3).**
+
+- Call page: call off or swap the ambulance before pickup, close the call, edit caller,
+  details and scene (with a new accuracy), and read every reason and note the crew wrote.
+- Log-call form: priority choice and an address search (`GET /emergency-calls/address-search`,
+  OpenStreetMap Nominatim, Sri Lanka only, `503 cl_emg_018` when down).
+- Retire asks for a reason and frees the crew. An ambulance's status can't be changed during
+  a run, Reinstate works only on a retired one, and only the Duty Manager may edit.
+- "Runs today" and every report count Colombo days, not UTC days.
+
+**The fleet map (section 7 of the review).** `GET /fleet-map` returns every active ambulance
+and open call in one read. The map draws vehicles and call pins in distinct colours, fades
+old positions, links each ambulance to its call, fits all dots on load, opens a call on click,
+and shows an ambulance's details in a side panel. It only refreshes while the map is visible.
+
+**Crew phone (C3–C6).** Location keeps reporting while Google Maps is open or the phone is
+locked (an Android foreground service; iOS background location). The run screen shows the
+emergency details, patient name, a button to ring the caller, where to go, readable labels,
+and a confirm step before "at the scene" and "patient on board".
+
+**AI recommender (A1–A3).** Diversions are ranked by drive time to the new call, a
+recommendation that fails on Send is replaced automatically, and "already waiting" is time
+since the call came in.
+
+**Privacy and clean-up (X2, X4).** Crew can read only calls and runs they were sent to.
+Search escapes `%` and `_`. The clock comes from the injected `TimeProvider` everywhere.
+
+**Needs group sign-off (shared files):** `AddressSearchUnavailableException` in
+`Common/Exceptions`, the two new `NotificationType` values in `common-spec.yaml`, the mobile
+notification routes in `core/notifications/`, and the location permissions in
+`AndroidManifest.xml` and `Info.plist`.
+
+**Not yet tried on a real phone:** background location. Test on Android 14 and iOS that
+reporting carries on with the screen locked, and that the notification appears.
+
 ---
 
 ## 5. Delivery checkpoints
@@ -630,7 +699,7 @@ Already present:
 - Repository-wide FluentValidation MVC integration; Emergency ambulance requests and query
   validation use separate validators.
 - Real OSRM road-distance ranking with a straight-line fallback when routing is unavailable.
-- A documented `IStaffLookupService` stub until Staff Management publishes its implementation.
+- Crew checks read Staff Management's real `IStaffLookupService` (the stub it replaced is STUBS.md row 5).
 - Emergency OpenAPI and ambulance endpoint tests.
 - Emergency-call create, caller-scoped list, Duty Manager board/detail/update endpoints,
   generated web client, and Patient Management's intake handoff example.
@@ -650,6 +719,9 @@ Already present:
   pre-pickup diversion, ranked by real driving ETA; deterministic validation re-run at
   confirm/approve time; `pending_confirmation` / `pending_approval` human gates; `DutyManager`
   confirm, approve, reject endpoints on `/dispatch-proposals`.
+
+- Phase 12: calls and runs can end without transport, every ending is announced, the fleet
+  map has its own endpoint, and crew location keeps reporting in the background.
 
 Still outstanding from Phase 11: dispatch and crew histories, retry reconciliation, expanded
 audit coverage, patient-call rate limits, resilience/accessibility verification, and complete

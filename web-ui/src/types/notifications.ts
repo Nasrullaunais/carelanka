@@ -3,6 +3,7 @@ import { emergencyCallPath } from '../features/emergency/domain';
 
 export const notificationTypeLabels: Record<NotificationType, string> = {
   dispatch_assigned: 'Dispatch assigned',
+  dispatch_cancelled: 'Run called off',
   appointment_booked: 'Appointment booked',
   appointment_rescheduled: 'Appointment rescheduled',
   appointment_cancelled: 'Appointment cancelled',
@@ -19,6 +20,7 @@ export const notificationTypeLabels: Record<NotificationType, string> = {
   ambulance_on_the_way: 'Ambulance on the way',
   ambulance_arrived: 'Ambulance arrived',
   cancellation_answered: 'Cancellation answered',
+  emergency_call_cancelled: 'Emergency request closed',
   emergency_call_received: 'Emergency call received',
   cancellation_request_waiting: 'Cancellation request waiting',
   dispatch_proposal_waiting: 'Diversion needs approval',
@@ -40,6 +42,7 @@ export const notificationTypeLabels: Record<NotificationType, string> = {
 // One route per NotificationType so a new type with no route is a compile error, not a dead click.
 const notificationRoutes: Record<NotificationType, (notification: InboxNotification) => string> = {
   dispatch_assigned: () => '/emergency',
+  dispatch_cancelled: () => '/emergency',
   appointment_booked: () => '/appointments',
   appointment_rescheduled: () => '/appointments',
   appointment_cancelled: () => '/appointments',
@@ -56,6 +59,7 @@ const notificationRoutes: Record<NotificationType, (notification: InboxNotificat
   ambulance_on_the_way: () => '/emergency',
   ambulance_arrived: () => '/emergency',
   cancellation_answered: () => '/emergency',
+  emergency_call_cancelled: emergencyCall,
   emergency_call_received: emergencyCall,
   cancellation_request_waiting: () => '/emergency/cancellations',
   dispatch_proposal_waiting: emergencyCall,

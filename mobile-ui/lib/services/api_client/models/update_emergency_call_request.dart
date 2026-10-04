@@ -17,6 +17,7 @@ class UpdateEmergencyCallRequest {
     this.callerPhone,
     this.latitude,
     this.longitude,
+    this.locationAccuracyMetres,
   });
   
   factory UpdateEmergencyCallRequest.fromJson(Map<String, Object?> json) => _$UpdateEmergencyCallRequestFromJson(json);
@@ -29,6 +30,8 @@ class UpdateEmergencyCallRequest {
   final String? callerPhone;
   final double? latitude;
   final double? longitude;
+  @JsonKey(name: 'location_accuracy_metres')
+  final double? locationAccuracyMetres;
 
   Map<String, Object?> toJson() => _$UpdateEmergencyCallRequestToJson(this);
 }

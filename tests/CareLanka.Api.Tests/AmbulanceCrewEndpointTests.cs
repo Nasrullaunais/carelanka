@@ -100,6 +100,23 @@ public sealed class AmbulanceCrewEndpointTests
     }
 
     [Fact]
+    public async Task Deactivated_crew_cannot_be_assigned()
+    {
+        using var client = await AuthenticatedClientAsync(ApiApplication.ManagerEmail);
+        var ambulanceId = await CreateAmbulanceAsync(client);
+        var crewId = await CreateStaffAsync(StaffRole.AmbulanceCrew, isActive: false);
+
+        var response = await client.PostAsJsonAsync($"/api/ambulances/{ambulanceId}/crew", new
+        {
+            staff_member_id = crewId
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("cl_emg_003", body.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
     public async Task Crew_changes_require_a_duty_manager()
     {
         using var manager = await AuthenticatedClientAsync(ApiApplication.ManagerEmail);
@@ -222,6 +239,106 @@ public sealed class AmbulanceCrewEndpointTests
             Assert.Contains("UNIQUE", definition, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("WHERE (unassigned_at IS NULL)", definition, StringComparison.OrdinalIgnoreCase);
         });
+    }
+
+    [Fact]
+    public async Task An_ambulance_on_a_run_keeps_the_status_its_crew_set()
+    {
+        using var client = await AuthenticatedClientAsync(ApiApplication.ManagerEmail);
+        var ambulanceId = await CreateAmbulanceAsync(client);
+        await AddLiveDispatchAsync(ambulanceId);
+
+        var statusChange = await client.PatchAsJsonAsync($"/api/ambulances/{ambulanceId}", new
+        {
+            status = "out_of_service", out_of_service_reason = "Brakes"
+        });
+        var renamed = await client.PatchAsJsonAsync($"/api/ambulances/{ambulanceId}", new
+        {
+            registration_number = $"WP-REN-{Guid.NewGuid():N}"[..20]
+        });
+
+        Assert.Equal(HttpStatusCode.Conflict, statusChange.StatusCode);
+        using var problem = JsonDocument.Parse(await statusChange.Content.ReadAsStringAsync());
+        Assert.Equal("cl_emg_002", problem.RootElement.GetProperty("code").GetString());
+        Assert.Equal(HttpStatusCode.OK, renamed.StatusCode);
+    }
+
+    [Fact]
+    public async Task Ambulance_detail_shows_the_run_it_is_on()
+    {
+        using var client = await AuthenticatedClientAsync(ApiApplication.ManagerEmail);
+        var ambulanceId = await CreateAmbulanceAsync(client);
+        await AddLiveDispatchAsync(ambulanceId);
+
+        var detail = await client.GetFromJsonAsync<JsonElement>($"/api/ambulances/{ambulanceId}");
+
+        Assert.Equal(JsonValueKind.String, detail.GetProperty("active_dispatch_id").ValueKind);
+        Assert.Equal(detail.GetProperty("active_dispatch_id").GetGuid(), detail.GetProperty("active_dispatch").GetProperty("id").GetGuid());
+        Assert.Equal("assigned", detail.GetProperty("active_dispatch").GetProperty("status").GetString());
+        Assert.Equal(1, detail.GetProperty("runs_today").GetInt32());
+    }
+
+    [Fact]
+    public async Task Taking_an_ambulance_out_of_service_needs_a_reason()
+    {
+        using var client = await AuthenticatedClientAsync(ApiApplication.ManagerEmail);
+        var ambulanceId = await CreateAmbulanceAsync(client);
+
+        var response = await client.PatchAsJsonAsync($"/api/ambulances/{ambulanceId}", new { status = "out_of_service" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Crew_cannot_edit_an_ambulance()
+    {
+        using var manager = await AuthenticatedClientAsync(ApiApplication.ManagerEmail);
+        var ambulanceId = await CreateAmbulanceAsync(manager);
+        using var crew = await AuthenticatedClientAsync(ApiApplication.AmbulanceEmail);
+
+        var response = await crew.PatchAsJsonAsync($"/api/ambulances/{ambulanceId}", new
+        {
+            status = "out_of_service", out_of_service_reason = "Tyre"
+        });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task An_ambulance_in_service_cannot_be_reinstated()
+    {
+        using var client = await AuthenticatedClientAsync(ApiApplication.ManagerEmail);
+        var ambulanceId = await CreateAmbulanceAsync(client);
+
+        var response = await client.PostAsync($"/api/ambulances/{ambulanceId}/reinstate", null);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("cl_emg_015", problem.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Retiring_an_ambulance_frees_its_crew_and_it_takes_no_new_crew_or_status()
+    {
+        using var client = await AuthenticatedClientAsync(ApiApplication.ManagerEmail);
+        var ambulanceId = await CreateAmbulanceAsync(client);
+        var crewId = await CreateStaffAsync(StaffRole.AmbulanceCrew);
+        var laterCrewId = await CreateStaffAsync(StaffRole.AmbulanceCrew);
+        Assert.Equal(HttpStatusCode.Created,
+            (await client.PostAsJsonAsync($"/api/ambulances/{ambulanceId}/crew", new { staff_member_id = crewId })).StatusCode);
+
+        var retired = await client.PostAsJsonAsync($"/api/ambulances/{ambulanceId}/retire", new { reason = "Written off" });
+        var assign = await client.PostAsJsonAsync($"/api/ambulances/{ambulanceId}/crew", new { staff_member_id = laterCrewId });
+        var statusChange = await client.PatchAsJsonAsync($"/api/ambulances/{ambulanceId}", new { status = "available" });
+
+        Assert.Equal(HttpStatusCode.NoContent, retired.StatusCode);
+        Assert.Equal(1, await EndedAssignmentCountAsync(ambulanceId, crewId));
+        Assert.Equal(HttpStatusCode.Conflict, assign.StatusCode);
+        using var assignProblem = JsonDocument.Parse(await assign.Content.ReadAsStringAsync());
+        Assert.Equal("cl_emg_016", assignProblem.RootElement.GetProperty("code").GetString());
+        Assert.Equal(HttpStatusCode.Conflict, statusChange.StatusCode);
+        using var statusProblem = JsonDocument.Parse(await statusChange.Content.ReadAsStringAsync());
+        Assert.Equal("cl_emg_016", statusProblem.RootElement.GetProperty("code").GetString());
     }
 
     private async Task<HttpClient> AuthenticatedClientAsync(string email)

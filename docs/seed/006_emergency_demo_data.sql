@@ -75,19 +75,21 @@ BEGIN
         (id, patient_id, caller_user_id, patient_is_caller, caller_name,
          latitude, longitude, location_accuracy_metres, location_captured_at,
          idempotency_key, address_label, details, priority, status, outcome,
-         transported, created_at, updated_at)
+         outcome_notes, transported, closed_at, created_at, updated_at)
     VALUES
         (v_call_one, v_patient, v_patient_account, true, 'Emergency demo patient',
          6.927100, 79.861200, 8, now() - interval '8 days',
          '10000000-0000-4000-8000-000000000061', 'Galle Face, Colombo',
          'Completed high-priority demo response', 'high', 'completed',
-         'Handed over at CareLanka Hospital', true,
+         'transported', 'Handed over at CareLanka Hospital', true,
+         now() - interval '8 days' + interval '42 minutes',
          now() - interval '8 days', now() - interval '8 days' + interval '42 minutes'),
         (v_call_two, v_patient, v_patient_account, true, 'Emergency demo patient',
          6.902200, 79.860700, 12, now() - interval '4 days',
          '10000000-0000-4000-8000-000000000062', 'Bambalapitiya, Colombo',
          'Completed medium-priority demo response', 'medium', 'completed',
-         'Handed over at CareLanka Hospital', true,
+         'transported', 'Handed over at CareLanka Hospital', true,
+         now() - interval '4 days' + interval '51 minutes',
          now() - interval '4 days', now() - interval '4 days' + interval '51 minutes')
     ON CONFLICT (id) DO NOTHING;
 

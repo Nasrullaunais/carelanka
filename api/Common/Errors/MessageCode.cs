@@ -168,6 +168,16 @@ public enum MessageCode
 
     CancellationNotPending,
 
+    AmbulanceNotRetired,
+
+    AmbulanceRetired,
+
+    RunPastPickup,
+
+    AddressSearchUnavailable,
+
+    CallClosed,
+
     NicLinkedToAnotherAccount,
 
     NicDoesNotMatchYourRecord,

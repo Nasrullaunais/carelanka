@@ -12,6 +12,8 @@ enum DispatchWithdrawalReason {
   dispatchedManually('dispatched_manually'),
   @JsonValue('call_closed')
   callClosed('call_closed'),
+  @JsonValue('ambulance_no_longer_available')
+  ambulanceNoLongerAvailable('ambulance_no_longer_available'),
   /// Default value for all unparsed values, allows backward compatibility when adding new values on the backend.
   $unknown(null);
 

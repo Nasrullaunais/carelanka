@@ -120,6 +120,93 @@ public sealed class EquipmentDatabaseTests
         Assert.Contains("equipment_administrator", definition);
     }
 
+    [Fact]
+    public async Task The_database_refuses_negative_stock_or_a_negative_reorder_threshold()
+    {
+        // PharmacyItemConfiguration.cs defines two CHECK constraints -
+        // ck_pharmacy_items_quantity and ck_pharmacy_items_reorder_threshold - so a
+        // negative number can never reach the table, whatever the service layer checks
+        // first.
+        using (var scope = _application.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+            var category = NewPharmacyCategory();
+            db.PharmacyCategories.Add(category);
+            db.PharmacyItems.Add(NewPharmacyItem(category.Id, quantityOnHand: -1, reorderThreshold: 5));
+
+            await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        }
+
+        using (var scope = _application.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+            var category = NewPharmacyCategory();
+            db.PharmacyCategories.Add(category);
+            db.PharmacyItems.Add(NewPharmacyItem(category.Id, quantityOnHand: 5, reorderThreshold: -1));
+
+            await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        }
+    }
+
+    [Fact]
+    public async Task The_database_refuses_a_second_live_system_warning_for_the_same_problem()
+    {
+        // WarningConfiguration.cs defines ux_warnings_sweep_live, a unique index filtered to
+        // raised_by = 'system' AND status IN ('open', 'acknowledged') - so however often the
+        // sweep runs, the same problem can only ever have one live warning open at once.
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        var relatedEntityId = Guid.NewGuid();
+        db.Warnings.Add(NewSystemWarning(relatedEntityId));
+        await db.SaveChangesAsync();
+
+        db.Warnings.Add(NewSystemWarning(relatedEntityId));
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+    }
+
+    [Fact]
+    public async Task The_database_refuses_two_prescriptions_sharing_the_same_days_collection_token()
+    {
+        // PrescriptionConfiguration.cs defines ux_prescriptions_token, a unique index on
+        // (TokenDate, TokenNumber) filtered to rows that have been given a token at all - so
+        // two prescriptions can never be handed the same token on the same day.
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        var tokenDate = DateOnly.FromDateTime(DateTime.UtcNow);
+        db.Prescriptions.Add(NewPrescription(tokenDate, tokenNumber: 1));
+        await db.SaveChangesAsync();
+
+        db.Prescriptions.Add(NewPrescription(tokenDate, tokenNumber: 1));
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+    }
+
+    [Fact]
+    public async Task The_database_refuses_two_batches_sharing_the_same_number_for_one_medicine()
+    {
+        // PharmacyBatchConfiguration.cs defines ux_pharmacy_batches_item_number, unique on
+        // (PharmacyItemId, BatchNumber) - two deliveries of the same medicine cannot both be
+        // "batch 1".
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        var category = NewPharmacyCategory();
+        db.PharmacyCategories.Add(category);
+        var item = NewPharmacyItem(category.Id, quantityOnHand: 50, reorderThreshold: 10);
+        db.PharmacyItems.Add(item);
+        await db.SaveChangesAsync();
+
+        db.PharmacyBatches.Add(NewPharmacyBatch(item.Id, batchNumber: 1));
+        await db.SaveChangesAsync();
+
+        db.PharmacyBatches.Add(NewPharmacyBatch(item.Id, batchNumber: 1));
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+    }
+
     private static EquipmentCategory NewCategory() => new()
     {
         Id = Guid.NewGuid(),
@@ -138,6 +225,62 @@ public sealed class EquipmentDatabaseTests
         PurchaseDate = new DateOnly(2026, 1, 5),
         Status = EquipmentStatus.Available,
         AssetTag = assetTag,
+        CreatedAt = DateTimeOffset.UtcNow,
+        UpdatedAt = DateTimeOffset.UtcNow
+    };
+
+    private static PharmacyCategory NewPharmacyCategory() => new()
+    {
+        Id = Guid.NewGuid(),
+        Name = $"DB Test Pharmacy Category {Guid.NewGuid():N}"[..30],
+        CreatedAt = DateTimeOffset.UtcNow,
+        UpdatedAt = DateTimeOffset.UtcNow
+    };
+
+    private static PharmacyItem NewPharmacyItem(Guid categoryId, int quantityOnHand, int reorderThreshold) => new()
+    {
+        Id = Guid.NewGuid(),
+        Name = $"DB Test Medicine {Guid.NewGuid():N}"[..30],
+        CategoryId = categoryId,
+        Unit = "tablet",
+        QuantityOnHand = quantityOnHand,
+        ReorderThreshold = reorderThreshold,
+        CreatedAt = DateTimeOffset.UtcNow,
+        UpdatedAt = DateTimeOffset.UtcNow
+    };
+
+    private static Warning NewSystemWarning(Guid relatedEntityId) => new()
+    {
+        Id = Guid.NewGuid(),
+        Type = WarningType.LowStock,
+        Severity = WarningSeverity.Medium,
+        RelatedEntityType = RelatedEntityType.PharmacyItem,
+        RelatedEntityId = relatedEntityId,
+        RecommendedAction = "Reorder now.",
+        Status = WarningStatus.Open,
+        RaisedBy = RaisedBy.System,
+        CreatedAt = DateTimeOffset.UtcNow,
+        UpdatedAt = DateTimeOffset.UtcNow
+    };
+
+    private static Prescription NewPrescription(DateOnly tokenDate, int tokenNumber) => new()
+    {
+        Id = Guid.NewGuid(),
+        PatientId = Guid.NewGuid(),
+        Body = "DB test prescription body.",
+        Status = PrescriptionStatus.Ready,
+        TokenDate = tokenDate,
+        TokenNumber = tokenNumber,
+        CreatedAt = DateTimeOffset.UtcNow,
+        UpdatedAt = DateTimeOffset.UtcNow
+    };
+
+    private static PharmacyBatch NewPharmacyBatch(Guid pharmacyItemId, int batchNumber) => new()
+    {
+        Id = Guid.NewGuid(),
+        PharmacyItemId = pharmacyItemId,
+        BatchNumber = batchNumber,
+        QuantityOnHand = 10,
         CreatedAt = DateTimeOffset.UtcNow,
         UpdatedAt = DateTimeOffset.UtcNow
     };

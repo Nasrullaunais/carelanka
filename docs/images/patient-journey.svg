@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="694" viewBox="0 0 960 694" font-family="Liberation Sans, Arial, Helvetica, sans-serif" role="img" aria-labelledby="t d"><title id="t">A patient&#x27;s journey through CareLanka</title><desc id="d">From an emergency report to discharge: AI suggests ambulances, and a person decides at every important step.</desc>
+<rect x="0.0" y="0.0" width="960.0" height="694.0" rx="22" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+<rect x="20.0" y="48.0" width="212.0" height="177.0" rx="14" fill="#FDF0E6" stroke="#C8641E" stroke-width="2"/>
+<circle cx="48.0" cy="78.0" r="15" fill="#C8641E"/>
+<text x="48.0" y="84.0" font-size="16" fill="#ffffff" font-weight="700" text-anchor="middle">1</text>
+<text x="72.0" y="74.0" font-size="16" fill="#1F2937" font-weight="700">Emergency</text>
+<text x="72.0" y="94.0" font-size="16" fill="#1F2937" font-weight="700">reported</text>
+<text x="34.0" y="130.0" font-size="14" fill="#1F2937">A patient reports it on the</text>
+<text x="34.0" y="149.0" font-size="14" fill="#1F2937">phone, or staff log the call.</text>
+<rect x="34.0" y="187.0" width="99.1" height="24.0" rx="12" fill="#ffffff" stroke="#C8641E" stroke-width="1.5"/>
+<text x="83.5" y="203.0" font-size="12" fill="#C8641E" font-weight="700" text-anchor="middle">Phone or web</text>
+<rect x="357.0" y="24.0" width="97.0" height="28.0" rx="13" fill="#6B4FBB"/>
+<text x="405.5" y="42.0" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">AI suggests</text>
+<rect x="256.0" y="48.0" width="212.0" height="177.0" rx="14" fill="#FDF0E6" stroke="#C8641E" stroke-width="2"/>
+<circle cx="284.0" cy="78.0" r="15" fill="#C8641E"/>
+<text x="284.0" y="84.0" font-size="16" fill="#ffffff" font-weight="700" text-anchor="middle">2</text>
+<text x="308.0" y="74.0" font-size="16" fill="#1F2937" font-weight="700">AI ranks</text>
+<text x="308.0" y="94.0" font-size="16" fill="#1F2937" font-weight="700">ambulances</text>
+<text x="270.0" y="130.0" font-size="14" fill="#1F2937">Free ambulances, fastest</text>
+<text x="270.0" y="149.0" font-size="14" fill="#1F2937">road trip first.</text>
+<rect x="270.0" y="187.0" width="57.6" height="24.0" rx="12" fill="#ffffff" stroke="#C8641E" stroke-width="1.5"/>
+<text x="298.8" y="203.0" font-size="12" fill="#C8641E" font-weight="700" text-anchor="middle">Server</text>
+<rect x="560.1" y="24.0" width="129.9" height="28.0" rx="13" fill="#9A6B00"/>
+<text x="625.1" y="42.0" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">A person decides</text>
+<rect x="492.0" y="48.0" width="212.0" height="177.0" rx="14" fill="#FDF0E6" stroke="#C8641E" stroke-width="2"/>
+<circle cx="520.0" cy="78.0" r="15" fill="#C8641E"/>
+<text x="520.0" y="84.0" font-size="16" fill="#ffffff" font-weight="700" text-anchor="middle">3</text>
+<text x="544.0" y="74.0" font-size="16" fill="#1F2937" font-weight="700">Duty manager</text>
+<text x="544.0" y="94.0" font-size="16" fill="#1F2937" font-weight="700">confirms</text>
+<text x="506.0" y="130.0" font-size="14" fill="#1F2937">One tap sends the</text>
+<text x="506.0" y="149.0" font-size="14" fill="#1F2937">ambulance.</text>
+<rect x="506.0" y="187.0" width="45.3" height="24.0" rx="12" fill="#ffffff" stroke="#C8641E" stroke-width="1.5"/>
+<text x="528.7" y="203.0" font-size="12" fill="#C8641E" font-weight="700" text-anchor="middle">Web</text>
+<rect x="728.0" y="48.0" width="212.0" height="177.0" rx="14" fill="#FDF0E6" stroke="#C8641E" stroke-width="2"/>
+<circle cx="756.0" cy="78.0" r="15" fill="#C8641E"/>
+<text x="756.0" y="84.0" font-size="16" fill="#ffffff" font-weight="700" text-anchor="middle">4</text>
+<text x="780.0" y="84.0" font-size="16" fill="#1F2937" font-weight="700">Crew drives out</text>
+<text x="742.0" y="130.0" font-size="14" fill="#1F2937">The crew sees the route on</text>
+<text x="742.0" y="149.0" font-size="14" fill="#1F2937">their phone. The hospital</text>
+<text x="742.0" y="168.0" font-size="14" fill="#1F2937">starts preparing a bed.</text>
+<rect x="742.0" y="187.0" width="56.8" height="24.0" rx="12" fill="#ffffff" stroke="#C8641E" stroke-width="1.5"/>
+<text x="770.4" y="203.0" font-size="12" fill="#C8641E" font-weight="700" text-anchor="middle">Phone</text>
+<rect x="138.0" y="291.0" width="212.0" height="177.0" rx="14" fill="#FDF0E6" stroke="#C8641E" stroke-width="2"/>
+<circle cx="166.0" cy="321.0" r="15" fill="#C8641E"/>
+<text x="166.0" y="327.0" font-size="16" fill="#ffffff" font-weight="700" text-anchor="middle">5</text>
+<text x="190.0" y="327.0" font-size="16" fill="#1F2937" font-weight="700">Handover</text>
+<text x="152.0" y="373.0" font-size="14" fill="#1F2937">The crew hands the patient</text>
+<text x="152.0" y="392.0" font-size="14" fill="#1F2937">over at the emergency</text>
+<text x="152.0" y="411.0" font-size="14" fill="#1F2937">entrance.</text>
+<rect x="152.0" y="430.0" width="56.8" height="24.0" rx="12" fill="#ffffff" stroke="#C8641E" stroke-width="1.5"/>
+<text x="180.4" y="446.0" font-size="12" fill="#C8641E" font-weight="700" text-anchor="middle">Phone</text>
+<rect x="442.1" y="267.0" width="129.9" height="28.0" rx="13" fill="#9A6B00"/>
+<text x="507.1" y="285.0" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">A person decides</text>
+<rect x="374.0" y="291.0" width="212.0" height="177.0" rx="14" fill="#FBE9F0" stroke="#B83266" stroke-width="2"/>
+<circle cx="402.0" cy="321.0" r="15" fill="#B83266"/>
+<text x="402.0" y="327.0" font-size="16" fill="#ffffff" font-weight="700" text-anchor="middle">6</text>
+<text x="426.0" y="327.0" font-size="16" fill="#1F2937" font-weight="700">Bed assigned</text>
+<text x="388.0" y="373.0" font-size="14" fill="#1F2937">A nurse or reception picks a</text>
+<text x="388.0" y="392.0" font-size="14" fill="#1F2937">bed that fits the care needed.</text>
+<rect x="388.0" y="430.0" width="45.3" height="24.0" rx="12" fill="#ffffff" stroke="#B83266" stroke-width="1.5"/>
+<text x="410.7" y="446.0" font-size="12" fill="#B83266" font-weight="700" text-anchor="middle">Web</text>
+<rect x="678.1" y="267.0" width="129.9" height="28.0" rx="13" fill="#9A6B00"/>
+<text x="743.1" y="285.0" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">A person decides</text>
+<rect x="610.0" y="291.0" width="212.0" height="177.0" rx="14" fill="#FBE9F0" stroke="#B83266" stroke-width="2"/>
+<circle cx="638.0" cy="321.0" r="15" fill="#B83266"/>
+<text x="638.0" y="327.0" font-size="16" fill="#ffffff" font-weight="700" text-anchor="middle">7</text>
+<text x="662.0" y="327.0" font-size="16" fill="#1F2937" font-weight="700">Cleared and home</text>
+<text x="624.0" y="373.0" font-size="14" fill="#1F2937">A doctor clears the patient,</text>
+<text x="624.0" y="392.0" font-size="14" fill="#1F2937">the bill is settled and</text>
+<text x="624.0" y="411.0" font-size="14" fill="#1F2937">discharge is confirmed.</text>
+<rect x="624.0" y="430.0" width="45.3" height="24.0" rx="12" fill="#ffffff" stroke="#B83266" stroke-width="1.5"/>
+<text x="646.7" y="446.0" font-size="12" fill="#B83266" font-weight="700" text-anchor="middle">Web</text>
+<line x1="234.0" y1="136.5" x2="249.0" y2="136.5" stroke="#5B6472" stroke-width="2.5"/><polygon points="254.0,136.5 246.0,131.5 246.0,141.5" fill="#5B6472"/>
+<line x1="470.0" y1="136.5" x2="485.0" y2="136.5" stroke="#5B6472" stroke-width="2.5"/><polygon points="490.0,136.5 482.0,131.5 482.0,141.5" fill="#5B6472"/>
+<line x1="706.0" y1="136.5" x2="721.0" y2="136.5" stroke="#5B6472" stroke-width="2.5"/><polygon points="726.0,136.5 718.0,131.5 718.0,141.5" fill="#5B6472"/>
+<line x1="352.0" y1="379.5" x2="367.0" y2="379.5" stroke="#5B6472" stroke-width="2.5"/><polygon points="372.0,379.5 364.0,374.5 364.0,384.5" fill="#5B6472"/>
+<line x1="588.0" y1="379.5" x2="603.0" y2="379.5" stroke="#5B6472" stroke-width="2.5"/><polygon points="608.0,379.5 600.0,374.5 600.0,384.5" fill="#5B6472"/>
+<polyline points="834.0,225.0 834.0,251.0 244.0,251.0 244.0,286.0" fill="none" stroke="#5B6472" stroke-width="2.5" stroke-linejoin="round"/>
+<polygon points="244.0,291.0 239.0,283.0 249.0,283.0" fill="#5B6472"/>
+<rect x="20.0" y="506.0" width="920.0" height="130.0" rx="14" fill="#ffffff" stroke="#5B6472" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="36.0" y="532.0" font-size="15" fill="#1F2937" font-weight="700">Meanwhile, behind the scenes</text>
+<circle cx="42.0" cy="553.5" r="5.5" fill="#2271B3"/>
+<text x="54.0" y="558.0" font-size="14" fill="#2271B3" font-weight="700">Staff</text>
+<text x="54.0" y="578.0" font-size="13.5" fill="#1F2937">Shifts and leave keep every ward covered.</text>
+<circle cx="344.7" cy="553.5" r="5.5" fill="#2E8B57"/>
+<text x="356.7" y="558.0" font-size="14" fill="#2E8B57" font-weight="700">Equipment</text>
+<text x="356.7" y="578.0" font-size="13.5" fill="#1F2937">Beds, medicines and machines stay ready.</text>
+<circle cx="647.3" cy="553.5" r="5.5" fill="#B83266"/>
+<text x="659.3" y="558.0" font-size="14" fill="#B83266" font-weight="700">Patient</text>
+<text x="659.3" y="578.0" font-size="13.5" fill="#1F2937">While admitted, a patient can ask how they</text>
+<text x="659.3" y="596.0" font-size="13.5" fill="#1F2937">feel. The AI drafts a reply and a nurse or</text>
+<text x="659.3" y="614.0" font-size="13.5" fill="#1F2937">doctor approves it.</text>
+<circle cx="30.0" cy="667.5" r="6" fill="#C8641E"/>
+<text x="42.0" y="672.0" font-size="13.5" fill="#5B6472">Emergency</text>
+<circle cx="142.4" cy="667.5" r="6" fill="#B83266"/>
+<text x="154.4" y="672.0" font-size="13.5" fill="#5B6472">Patient</text>
+<rect x="222.7" y="654.0" width="97.0" height="26.0" rx="13" fill="#6B4FBB"/>
+<text x="271.2" y="671.5" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">AI suggests</text>
+<rect x="333.7" y="654.0" width="129.9" height="26.0" rx="13" fill="#9A6B00"/>
+<text x="398.6" y="671.5" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">A person decides</text>
+<text x="936.0" y="672.0" font-size="13.5" fill="#5B6472" text-anchor="end">Nothing the AI suggests takes effect until a person approves it.</text>
+</svg>

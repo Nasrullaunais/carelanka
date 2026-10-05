@@ -98,7 +98,7 @@ public sealed class DispatchAgentTools : IDispatchAgentTools
         return ambulances.ToDictionary(
             ambulance => ambulance.Id,
             ambulance => measurement.ByAmbulance.TryGetValue(ambulance.Id, out var travel)
-                ? travel.DriveSeconds.HasValue ? travel.DriveSeconds.Value / 60 : (int?)null
+                ? travel.DriveMinutes
                 : null);
     }
 }

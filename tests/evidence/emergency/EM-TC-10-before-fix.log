@@ -1,0 +1,743 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  CareLanka.Api -> /home/nasrulla/Files/Projects/carelanka-qm/api/bin/Debug/net8.0/CareLanka.Api.dll
+  CareLanka.Api.Tests -> /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/bin/Debug/net8.0/CareLanka.Api.Tests.dll
+Test run for /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/bin/Debug/net8.0/CareLanka.Api.Tests.dll (.NETCoreApp,Version=v8.0)
+VSTest version 17.11.1 (x64)
+
+Starting test execution, please wait...
+A total of 1 test files matched the specified pattern.
+[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.2+699d445a1a (64-bit .NET 8.0.29)
+[xUnit.net 00:00:00.08]   Discovering: CareLanka.Api.Tests
+[xUnit.net 00:00:00.23]   Discovered:  CareLanka.Api.Tests
+[xUnit.net 00:00:00.24]   Starting:    CareLanka.Api.Tests
+[testcontainers.org 00:00:00.08] Connected to Docker:
+  Host: unix:///var/run/docker.sock
+  Server Version: 29.8.1
+  Kernel Version: 7.2.8-1-cachyos
+  API Version: 1.56
+  Operating System: CachyOS
+  Total Memory: 30.77 GB
+[testcontainers.org 00:00:00.26] Docker container 529dd7fc867a created
+[testcontainers.org 00:00:00.28] Start Docker container 529dd7fc867a
+[testcontainers.org 00:00:00.40] Wait for Docker container 529dd7fc867a to complete readiness checks
+[testcontainers.org 00:00:01.42] Docker container 529dd7fc867a ready
+[testcontainers.org 00:00:01.52] Docker container 2bdffc481c8a created
+[testcontainers.org 00:00:01.52] Start Docker container 2bdffc481c8a
+[testcontainers.org 00:00:01.62] Wait for Docker container 2bdffc481c8a to complete readiness checks
+[testcontainers.org 00:00:01.62] Execute "pg_isready --host localhost --dbname carelanka_tests --username carelanka_tests" at Docker container 2bdffc481c8a
+[testcontainers.org 00:00:02.67] Execute "pg_isready --host localhost --dbname carelanka_tests --username carelanka_tests" at Docker container 2bdffc481c8a
+[testcontainers.org 00:00:03.70] Execute "pg_isready --host localhost --dbname carelanka_tests --username carelanka_tests" at Docker container 2bdffc481c8a
+[testcontainers.org 00:00:03.73] Docker container 2bdffc481c8a ready
+warn: Microsoft.EntityFrameworkCore.Model.Validation[10622]
+      Entity 'PharmacyItem' has a global query filter defined and is the required end of a relationship with the entity 'PharmacyBatch'. This may lead to unexpected results when the required entity is filtered out. Either configure the navigation as optional, or define matching query filters for both entities in the navigation. See https://go.microsoft.com/fwlink/?linkid=2131316 for more information.
+warn: Microsoft.EntityFrameworkCore.Model.Validation[10622]
+      Entity 'Skill' has a global query filter defined and is the required end of a relationship with the entity 'StaffMemberSkill'. This may lead to unexpected results when the required entity is filtered out. Either configure the navigation as optional, or define matching query filters for both entities in the navigation. See https://go.microsoft.com/fwlink/?linkid=2131316 for more information.
+info: CareLanka.Api.Services.Equipment.WarningSweepWorker[0]
+      The warning sweep timer is off; only Run check will sweep
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]
+      SELECT a.id, a.admission_id, a.booked_by_staff_member_id, a.cancellation_reason, a.cancelled_by_staff_member_id, a.confirmed_at, a.confirmed_by_staff_member_id, a.created_at, a.patient_id, a.reason, a.scheduled_at, a.status, a.updated_at
+      FROM appointments AS a
+      INNER JOIN (
+          SELECT p.id, p.is_active
+          FROM patients AS p
+          WHERE p.is_active
+      ) AS t ON a.patient_id = t.id
+      WHERE t.is_active AND a.status IN ('scheduled', 'confirmed') AND a.scheduled_at >= @__from_0 AND a.scheduled_at <= @__to_1
+      ORDER BY a.scheduled_at
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]
+      DELETE FROM notifications AS n
+      WHERE n.created_at < @__cutoff_0
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]
+      SELECT m.id, m.asset_id, m.asset_type, m.completed_at, m.created_at, m.created_by, m.notes, m.performed_by_staff_id, m.schedule_type, m.scheduled_date, m.status, m.updated_at
+      FROM maintenance_schedules AS m
+      WHERE m.scheduled_date = @__date_0 AND m.status = 'scheduled'
+      ORDER BY m.created_at
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]
+      SELECT d.id
+      FROM dispatch_proposals AS d
+      WHERE d.status = 'pending'
+      ORDER BY d.created_at
+      LIMIT @__p_0
+warn: CareLanka.Api.Services.Common.NotificationScheduleWorker[0]
+      Inbox clean-up failed; it will run again on schedule.
+      Npgsql.PostgresException (0x80004005): 42P01: relation "notifications" does not exist
+      POSITION: 13
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteNonQuery(Boolean async, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteNonQueryAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteNonQueryAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteNonQueryAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at CareLanka.Api.Services.Common.NotificationScheduleWorker.RunEveryAsync(String job, TimeSpan interval, Func`3 run, CancellationToken stoppingToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Common/NotificationScheduleWorker.cs:line 38
+        Exception data:
+          Severity: ERROR
+          SqlState: 42P01
+          MessageText: relation "notifications" does not exist
+          Position: 13
+          File: parse_relation.c
+          Line: 1449
+          Routine: parserOpenTable
+fail: Microsoft.EntityFrameworkCore.Query[10100]
+      An exception occurred while iterating over the results of a query for context type 'CareLanka.Api.Data.CareLankaDbContext'.
+      Npgsql.PostgresException (0x80004005): 42P01: relation "maintenance_schedules" does not exist
+      POSITION: 181
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+        Exception data:
+          Severity: ERROR
+          SqlState: 42P01
+          MessageText: relation "maintenance_schedules" does not exist
+          Position: 181
+          File: parse_relation.c
+          Line: 1449
+          Routine: parserOpenTable
+      Npgsql.PostgresException (0x80004005): 42P01: relation "maintenance_schedules" does not exist
+      POSITION: 181
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+        Exception data:
+          Severity: ERROR
+          SqlState: 42P01
+          MessageText: relation "maintenance_schedules" does not exist
+          Position: 181
+          File: parse_relation.c
+          Line: 1449
+          Routine: parserOpenTable
+fail: Microsoft.EntityFrameworkCore.Query[10100]
+      An exception occurred while iterating over the results of a query for context type 'CareLanka.Api.Data.CareLankaDbContext'.
+      Npgsql.PostgresException (0x80004005): 42P01: relation "appointments" does not exist
+      POSITION: 244
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+        Exception data:
+          Severity: ERROR
+          SqlState: 42P01
+          MessageText: relation "appointments" does not exist
+          Position: 244
+          File: parse_relation.c
+          Line: 1449
+          Routine: parserOpenTable
+      Npgsql.PostgresException (0x80004005): 42P01: relation "appointments" does not exist
+      POSITION: 244
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+        Exception data:
+          Severity: ERROR
+          SqlState: 42P01
+          MessageText: relation "appointments" does not exist
+          Position: 244
+          File: parse_relation.c
+          Line: 1449
+          Routine: parserOpenTable
+fail: Microsoft.EntityFrameworkCore.Query[10100]
+      An exception occurred while iterating over the results of a query for context type 'CareLanka.Api.Data.CareLankaDbContext'.
+      Npgsql.PostgresException (0x80004005): 42P01: relation "dispatch_proposals" does not exist
+      POSITION: 18
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+        Exception data:
+          Severity: ERROR
+          SqlState: 42P01
+          MessageText: relation "dispatch_proposals" does not exist
+          Position: 18
+          File: parse_relation.c
+          Line: 1449
+          Routine: parserOpenTable
+      Npgsql.PostgresException (0x80004005): 42P01: relation "dispatch_proposals" does not exist
+      POSITION: 18
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+        Exception data:
+          Severity: ERROR
+          SqlState: 42P01
+          MessageText: relation "dispatch_proposals" does not exist
+          Position: 18
+          File: parse_relation.c
+          Line: 1449
+          Routine: parserOpenTable
+warn: CareLanka.Api.Services.Common.NotificationScheduleWorker[0]
+      Maintenance due alerts failed; it will run again on schedule.
+      Npgsql.PostgresException (0x80004005): 42P01: relation "maintenance_schedules" does not exist
+      POSITION: 181
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+         at Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync[TSource](IQueryable`1 source, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync[TSource](IQueryable`1 source, CancellationToken cancellationToken)
+         at CareLanka.Api.Services.Equipment.MaintenanceService.ListScheduledOnAsync(DateOnly date, CancellationToken cancellationToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Equipment/MaintenanceService.cs:line 185
+         at CareLanka.Api.Services.Common.MaintenanceDueService.SendDueAsync(CancellationToken cancellationToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Common/MaintenanceDueService.cs:line 22
+         at CareLanka.Api.Services.Common.NotificationScheduleWorker.RunEveryAsync(String job, TimeSpan interval, Func`3 run, CancellationToken stoppingToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Common/NotificationScheduleWorker.cs:line 38
+        Exception data:
+          Severity: ERROR
+          SqlState: 42P01
+          MessageText: relation "maintenance_schedules" does not exist
+          Position: 181
+          File: parse_relation.c
+          Line: 1449
+          Routine: parserOpenTable
+warn: CareLanka.Api.Services.Common.NotificationScheduleWorker[0]
+      Appointment reminders failed; it will run again on schedule.
+      Npgsql.PostgresException (0x80004005): 42P01: relation "appointments" does not exist
+      POSITION: 244
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+         at Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync[TSource](IQueryable`1 source, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync[TSource](IQueryable`1 source, CancellationToken cancellationToken)
+         at CareLanka.Api.Services.Patient.AppointmentService.ListOpenStartingBetweenAsync(DateTimeOffset from, DateTimeOffset to, CancellationToken ct) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Patient/AppointmentService.cs:line 373
+         at CareLanka.Api.Services.Common.AppointmentReminderService.SendDueAsync(CancellationToken cancellationToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Common/AppointmentReminderService.cs:line 28
+         at CareLanka.Api.Services.Common.NotificationScheduleWorker.RunEveryAsync(String job, TimeSpan interval, Func`3 run, CancellationToken stoppingToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Common/NotificationScheduleWorker.cs:line 38
+        Exception data:
+          Severity: ERROR
+          SqlState: 42P01
+          MessageText: relation "appointments" does not exist
+          Position: 244
+          File: parse_relation.c
+          Line: 1449
+          Routine: parserOpenTable
+fail: CareLanka.Api.Agents.Emergency.DispatchProposalWorker[0]
+      Pending dispatch proposals could not be recovered; retrying shortly.
+      Npgsql.PostgresException (0x80004005): 42P01: relation "dispatch_proposals" does not exist
+      POSITION: 18
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+         at Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync[TSource](IQueryable`1 source, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync[TSource](IQueryable`1 source, CancellationToken cancellationToken)
+         at CareLanka.Api.Agents.Emergency.DispatchProposalWorker.RecoverAsync(CancellationToken stoppingToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Agents/Emergency/DispatchProposalWorker.cs:line 38
+         at CareLanka.Api.Agents.Emergency.DispatchProposalWorker.RecoverAsync(CancellationToken stoppingToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Agents/Emergency/DispatchProposalWorker.cs:line 42
+        Exception data:
+          Severity: ERROR
+          SqlState: 42P01
+          MessageText: relation "dispatch_proposals" does not exist
+          Position: 18
+          File: parse_relation.c
+          Line: 1449
+          Routine: parserOpenTable
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260907165731_Common_AddIdentity'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260908171445_Patient_AddWard'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260909014609_Equipment_AddBed'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260909034637_Equipment_AddItems'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260909171906_Patient_AddAdmission'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260910062958_Equipment_AddPharmacy'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260910081123_Patient_AddOpenAdmissionIndex'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260910082607_Patient_AddCancelNote'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260911065243_Patient_AddPatientCode'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260911084650_Patient_AddBilling'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260911145450_Patient_SimplifyDischargeChecklist'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260911172907_Patient_AddBillingRates'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260911191929_Patient_AddBillRaisedBy'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260912071707_Emergency_AddFoundation'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260913035038_Equipment_AddLabReports'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260913181004_Emergency_AddCrewEligibility'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260914003100_Emergency_AddCallIntake'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260914021853_Emergency_AddDispatchStateMachine'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260914022217_Emergency_CompleteDispatchIndexes'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260914083551_Common_PatientUsernameLogin'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260914142642_Emergency_AddTrackingCancellation'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260914165535_Emergency_AddCancellationReview'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260914190658_Patient_AddAppointmentBilling'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260915155841_Patient_AddAppointmentConfirmed'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260916141101_Equipment_AddItemConfirmation'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260917045958_Equipment_AddPrescriptions'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260918123350_Patient_AddMedicalProfile'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260918152625_Equipment_AddPharmacyBatches'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260919045326_Equipment_AddWarningSweep'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260919053327_Equipment_AddWarningClear'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260919112441_Emergency_AddDispatchOutcomeDetails'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260920092719_Common_AddDeviceTokensAndNotifications'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260920095530_Emergency_AddPreAdmissionNotices'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260920102312_Common_AddAgentWorkflows'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260920161305_Patient_LinkBedAssignmentWorkflow'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260921092223_Patient_AddCareRecommendation'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260922132520_Patient_RemoveBedAgentWorkflowLink'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260922140219_Emergency_AddDispatchProposals'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260922140410_Equipment_AddReorderSuggestion'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260922142627_Patient_MakeAdmissionCategoryNullable'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260923074735_Emergency_AddAmbulanceStatusHistory'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260923075954_Patient_ReplaceAdmissionCategories'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260925103228_Patient_RemoveMedicalProfileRecentSituation'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260926163210_Emergency_AddDispatchRecommendationSource'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260927104803_Common_SplitNotificationDeliveries'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260927131611_Staff_AddStaffTables'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260927210752_Common_AddPatientAccountMustChangePassword'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260927211652_Common_ExpandNotificationTypeCatalogue'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260928033132_Common_AddStaffDoctorProfile'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260928041418_Equipment_AddDoctorWrittenPrescriptions'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260928173116_Emergency_WithdrawDispatchProposals'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260929202113_Emergency_AddDispatchProposalRequestedBy'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260930202957_Common_AddEquipmentAdministratorRole'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20261003092518_Emergency_CloseCallsAndRuns'.
+warn: Microsoft.AspNetCore.HttpsPolicy.HttpsRedirectionMiddleware[3]
+      Failed to determine the https port for redirect.
+fail: CareLanka.Api.Common.Errors.ApiExceptionHandler[0]
+      Unhandled exception on GET /api/reports/emergency/response-times
+      System.ArgumentOutOfRangeException: The UTC time represented when the offset is applied must be between year 0 and 10,000. (Parameter 'offset')
+         at System.DateTimeOffset.ValidateDate(DateTime dateTime, TimeSpan offset)
+         at System.DateTimeOffset..ctor(DateTime dateTime, TimeSpan offset)
+         at CareLanka.Api.Services.Emergency.HospitalDays.StartOf(DateOnly day) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/HospitalDays.cs:line 11
+         at CareLanka.Api.Services.Emergency.EmergencyReportService.Range(DateOnly from, DateOnly to) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/EmergencyReportService.cs:line 160
+         at CareLanka.Api.Services.Emergency.EmergencyReportService.GetResponseTimesAsync(DateOnly from, DateOnly to, Nullable`1 priority, CancellationToken cancellationToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/EmergencyReportService.cs:line 16
+         at CareLanka.Api.Controllers.Emergency.EmergencyReportsController.ResponseTimes(DateOnly from, DateOnly to, Nullable`1 priority, CancellationToken ct) in /home/nasrulla/Files/Projects/carelanka-qm/api/Controllers/Emergency/EmergencyReportsController.cs:line 22
+         at lambda_method445(Closure, Object)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.AwaitableObjectResultExecutor.Execute(ActionContext actionContext, IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeActionMethodAsync>g__Awaited|12_0(ControllerActionInvoker invoker, ValueTask`1 actionResultValueTask)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeNextActionFilterAsync>g__Awaited|10_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Rethrow(ActionExecutedContextSealed context)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+      --- End of stack trace from previous location ---
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+[xUnit.net 00:00:08.91]     CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(report: "response-times", query: "?to=2026-10-05") [FAIL]
+[xUnit.net 00:00:08.91]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:08.91]       Expected: BadRequest
+[xUnit.net 00:00:08.91]       Actual:   InternalServerError
+[xUnit.net 00:00:08.91]       Stack Trace:
+[xUnit.net 00:00:08.91]         /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs(281,0): at CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(String report, String query)
+[xUnit.net 00:00:08.91]         --- End of stack trace from previous location ---
+fail: CareLanka.Api.Common.Errors.ApiExceptionHandler[0]
+      Unhandled exception on GET /api/reports/emergency/fleet-utilisation
+      System.ArgumentOutOfRangeException: The UTC time represented when the offset is applied must be between year 0 and 10,000. (Parameter 'offset')
+         at System.DateTimeOffset.ValidateDate(DateTime dateTime, TimeSpan offset)
+         at System.DateTimeOffset..ctor(DateTime dateTime, TimeSpan offset)
+         at CareLanka.Api.Services.Emergency.HospitalDays.StartOf(DateOnly day) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/HospitalDays.cs:line 11
+         at CareLanka.Api.Services.Emergency.EmergencyReportService.Range(DateOnly from, DateOnly to) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/EmergencyReportService.cs:line 160
+         at CareLanka.Api.Services.Emergency.EmergencyReportService.GetFleetUtilisationAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/EmergencyReportService.cs:line 59
+         at CareLanka.Api.Controllers.Emergency.EmergencyReportsController.FleetUtilisation(DateOnly from, DateOnly to, CancellationToken ct) in /home/nasrulla/Files/Projects/carelanka-qm/api/Controllers/Emergency/EmergencyReportsController.cs:line 30
+         at lambda_method453(Closure, Object)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.AwaitableObjectResultExecutor.Execute(ActionContext actionContext, IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeActionMethodAsync>g__Awaited|12_0(ControllerActionInvoker invoker, ValueTask`1 actionResultValueTask)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeNextActionFilterAsync>g__Awaited|10_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Rethrow(ActionExecutedContextSealed context)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+      --- End of stack trace from previous location ---
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+[xUnit.net 00:00:08.96]     CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(report: "fleet-utilisation", query: "?from=0001-01-01&to=2026-10-05") [FAIL]
+[xUnit.net 00:00:08.96]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:08.96]       Expected: BadRequest
+[xUnit.net 00:00:08.96]       Actual:   InternalServerError
+[xUnit.net 00:00:08.96]       Stack Trace:
+[xUnit.net 00:00:08.96]         /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs(281,0): at CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(String report, String query)
+[xUnit.net 00:00:08.96]         --- End of stack trace from previous location ---
+fail: CareLanka.Api.Common.Errors.ApiExceptionHandler[0]
+      Unhandled exception on GET /api/reports/emergency/response-times
+      System.ArgumentOutOfRangeException: The UTC time represented when the offset is applied must be between year 0 and 10,000. (Parameter 'offset')
+         at System.DateTimeOffset.ValidateDate(DateTime dateTime, TimeSpan offset)
+         at System.DateTimeOffset..ctor(DateTime dateTime, TimeSpan offset)
+         at CareLanka.Api.Services.Emergency.HospitalDays.StartOf(DateOnly day) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/HospitalDays.cs:line 11
+         at CareLanka.Api.Services.Emergency.EmergencyReportService.Range(DateOnly from, DateOnly to) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/EmergencyReportService.cs:line 160
+         at CareLanka.Api.Services.Emergency.EmergencyReportService.GetResponseTimesAsync(DateOnly from, DateOnly to, Nullable`1 priority, CancellationToken cancellationToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/EmergencyReportService.cs:line 16
+         at CareLanka.Api.Controllers.Emergency.EmergencyReportsController.ResponseTimes(DateOnly from, DateOnly to, Nullable`1 priority, CancellationToken ct) in /home/nasrulla/Files/Projects/carelanka-qm/api/Controllers/Emergency/EmergencyReportsController.cs:line 22
+         at lambda_method445(Closure, Object)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.AwaitableObjectResultExecutor.Execute(ActionContext actionContext, IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeActionMethodAsync>g__Awaited|12_0(ControllerActionInvoker invoker, ValueTask`1 actionResultValueTask)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeNextActionFilterAsync>g__Awaited|10_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Rethrow(ActionExecutedContextSealed context)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+      --- End of stack trace from previous location ---
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+[xUnit.net 00:00:09.01]     CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(report: "response-times", query: "") [FAIL]
+[xUnit.net 00:00:09.01]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:09.01]       Expected: BadRequest
+[xUnit.net 00:00:09.01]       Actual:   InternalServerError
+[xUnit.net 00:00:09.01]       Stack Trace:
+[xUnit.net 00:00:09.01]         /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs(281,0): at CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(String report, String query)
+[xUnit.net 00:00:09.01]         --- End of stack trace from previous location ---
+info: CareLanka.Api.Common.Errors.ApiExceptionHandler[0]
+      400 cl_err_400 on GET /api/reports/emergency/response-times: One or more fields are not valid.
+fail: CareLanka.Api.Common.Errors.ApiExceptionHandler[0]
+      Unhandled exception on GET /api/reports/emergency/response-times
+      System.ArgumentOutOfRangeException: The UTC time represented when the offset is applied must be between year 0 and 10,000. (Parameter 'offset')
+         at System.DateTimeOffset.ValidateDate(DateTime dateTime, TimeSpan offset)
+         at System.DateTimeOffset..ctor(DateTime dateTime, TimeSpan offset)
+         at CareLanka.Api.Services.Emergency.HospitalDays.StartOf(DateOnly day) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/HospitalDays.cs:line 11
+         at CareLanka.Api.Services.Emergency.EmergencyReportService.Range(DateOnly from, DateOnly to) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/EmergencyReportService.cs:line 160
+         at CareLanka.Api.Services.Emergency.EmergencyReportService.GetResponseTimesAsync(DateOnly from, DateOnly to, Nullable`1 priority, CancellationToken cancellationToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/EmergencyReportService.cs:line 16
+         at CareLanka.Api.Controllers.Emergency.EmergencyReportsController.ResponseTimes(DateOnly from, DateOnly to, Nullable`1 priority, CancellationToken ct) in /home/nasrulla/Files/Projects/carelanka-qm/api/Controllers/Emergency/EmergencyReportsController.cs:line 22
+         at lambda_method445(Closure, Object)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.AwaitableObjectResultExecutor.Execute(ActionContext actionContext, IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeActionMethodAsync>g__Awaited|12_0(ControllerActionInvoker invoker, ValueTask`1 actionResultValueTask)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeNextActionFilterAsync>g__Awaited|10_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Rethrow(ActionExecutedContextSealed context)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+      --- End of stack trace from previous location ---
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+[xUnit.net 00:00:09.11]     CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(report: "response-times", query: "?from=0001-01-01&to=2026-10-05") [FAIL]
+[xUnit.net 00:00:09.11]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:09.11]       Expected: BadRequest
+[xUnit.net 00:00:09.11]       Actual:   InternalServerError
+[xUnit.net 00:00:09.11]       Stack Trace:
+[xUnit.net 00:00:09.11]         /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs(281,0): at CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(String report, String query)
+[xUnit.net 00:00:09.11]         --- End of stack trace from previous location ---
+fail: CareLanka.Api.Common.Errors.ApiExceptionHandler[0]
+      Unhandled exception on GET /api/reports/emergency/response-times
+      System.ArgumentOutOfRangeException: Value to add was out of range. (Parameter 'value')
+         at System.DateOnly.<AddDays>g__ThrowOutOfRange|25_0()
+         at System.DateOnly.AddDays(Int32 value)
+         at CareLanka.Api.Services.Emergency.HospitalDays.EndOf(DateOnly day) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/HospitalDays.cs:line 14
+         at CareLanka.Api.Services.Emergency.EmergencyReportService.Range(DateOnly from, DateOnly to) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/EmergencyReportService.cs:line 160
+         at CareLanka.Api.Services.Emergency.EmergencyReportService.GetResponseTimesAsync(DateOnly from, DateOnly to, Nullable`1 priority, CancellationToken cancellationToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/EmergencyReportService.cs:line 16
+         at CareLanka.Api.Controllers.Emergency.EmergencyReportsController.ResponseTimes(DateOnly from, DateOnly to, Nullable`1 priority, CancellationToken ct) in /home/nasrulla/Files/Projects/carelanka-qm/api/Controllers/Emergency/EmergencyReportsController.cs:line 22
+         at lambda_method445(Closure, Object)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.AwaitableObjectResultExecutor.Execute(ActionContext actionContext, IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeActionMethodAsync>g__Awaited|12_0(ControllerActionInvoker invoker, ValueTask`1 actionResultValueTask)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeNextActionFilterAsync>g__Awaited|10_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Rethrow(ActionExecutedContextSealed context)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+      --- End of stack trace from previous location ---
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+[xUnit.net 00:00:09.16]     CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(report: "response-times", query: "?from=2026-10-01&to=9999-12-31") [FAIL]
+[xUnit.net 00:00:09.16]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:09.16]       Expected: BadRequest
+[xUnit.net 00:00:09.16]       Actual:   InternalServerError
+[xUnit.net 00:00:09.16]       Stack Trace:
+[xUnit.net 00:00:09.16]         /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs(281,0): at CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(String report, String query)
+[xUnit.net 00:00:09.16]         --- End of stack trace from previous location ---
+fail: CareLanka.Api.Common.Errors.ApiExceptionHandler[0]
+      Unhandled exception on GET /api/reports/emergency/agent-performance
+      System.ArgumentOutOfRangeException: The UTC time represented when the offset is applied must be between year 0 and 10,000. (Parameter 'offset')
+         at System.DateTimeOffset.ValidateDate(DateTime dateTime, TimeSpan offset)
+         at System.DateTimeOffset..ctor(DateTime dateTime, TimeSpan offset)
+         at CareLanka.Api.Services.Emergency.HospitalDays.StartOf(DateOnly day) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/HospitalDays.cs:line 11
+         at CareLanka.Api.Services.Emergency.EmergencyReportService.Range(DateOnly from, DateOnly to) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/EmergencyReportService.cs:line 160
+         at CareLanka.Api.Services.Emergency.EmergencyReportService.GetAgentPerformanceAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/EmergencyReportService.cs:line 100
+         at CareLanka.Api.Controllers.Emergency.EmergencyReportsController.AgentPerformance(DateOnly from, DateOnly to, CancellationToken ct) in /home/nasrulla/Files/Projects/carelanka-qm/api/Controllers/Emergency/EmergencyReportsController.cs:line 38
+         at lambda_method461(Closure, Object)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.AwaitableObjectResultExecutor.Execute(ActionContext actionContext, IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeActionMethodAsync>g__Awaited|12_0(ControllerActionInvoker invoker, ValueTask`1 actionResultValueTask)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeNextActionFilterAsync>g__Awaited|10_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Rethrow(ActionExecutedContextSealed context)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+      --- End of stack trace from previous location ---
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+[xUnit.net 00:00:09.22]     CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(report: "agent-performance", query: "") [FAIL]
+[xUnit.net 00:00:09.22]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:09.22]       Expected: BadRequest
+[xUnit.net 00:00:09.22]       Actual:   InternalServerError
+[xUnit.net 00:00:09.22]       Stack Trace:
+[xUnit.net 00:00:09.22]         /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs(281,0): at CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(String report, String query)
+[xUnit.net 00:00:09.22]         --- End of stack trace from previous location ---
+fail: CareLanka.Api.Common.Errors.ApiExceptionHandler[0]
+      Unhandled exception on GET /api/reports/emergency/agent-performance
+      System.ArgumentOutOfRangeException: Value to add was out of range. (Parameter 'value')
+         at System.DateOnly.<AddDays>g__ThrowOutOfRange|25_0()
+         at System.DateOnly.AddDays(Int32 value)
+         at CareLanka.Api.Services.Emergency.HospitalDays.EndOf(DateOnly day) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/HospitalDays.cs:line 14
+         at CareLanka.Api.Services.Emergency.EmergencyReportService.Range(DateOnly from, DateOnly to) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/EmergencyReportService.cs:line 160
+         at CareLanka.Api.Services.Emergency.EmergencyReportService.GetAgentPerformanceAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/EmergencyReportService.cs:line 100
+         at CareLanka.Api.Controllers.Emergency.EmergencyReportsController.AgentPerformance(DateOnly from, DateOnly to, CancellationToken ct) in /home/nasrulla/Files/Projects/carelanka-qm/api/Controllers/Emergency/EmergencyReportsController.cs:line 38
+         at lambda_method461(Closure, Object)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.AwaitableObjectResultExecutor.Execute(ActionContext actionContext, IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeActionMethodAsync>g__Awaited|12_0(ControllerActionInvoker invoker, ValueTask`1 actionResultValueTask)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeNextActionFilterAsync>g__Awaited|10_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Rethrow(ActionExecutedContextSealed context)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+      --- End of stack trace from previous location ---
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+[xUnit.net 00:00:09.27]     CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(report: "agent-performance", query: "?from=2026-10-01&to=9999-12-31") [FAIL]
+[xUnit.net 00:00:09.27]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:09.27]       Expected: BadRequest
+[xUnit.net 00:00:09.27]       Actual:   InternalServerError
+[xUnit.net 00:00:09.27]       Stack Trace:
+[xUnit.net 00:00:09.27]         /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs(281,0): at CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(String report, String query)
+[xUnit.net 00:00:09.27]         --- End of stack trace from previous location ---
+info: CareLanka.Api.Common.Errors.ApiExceptionHandler[0]
+      400 cl_err_400 on GET /api/reports/emergency/response-times: One or more fields are not valid.
+  Failed CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(report: "response-times", query: "?to=2026-10-05") [249 ms]
+  Error Message:
+   Assert.Equal() Failure: Values differ
+Expected: BadRequest
+Actual:   InternalServerError
+  Stack Trace:
+     at CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(String report, String query) in /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs:line 281
+--- End of stack trace from previous location ---
+  Failed CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(report: "fleet-utilisation", query: "?from=0001-01-01&to=2026-10-05") [58 ms]
+  Error Message:
+   Assert.Equal() Failure: Values differ
+Expected: BadRequest
+Actual:   InternalServerError
+  Stack Trace:
+     at CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(String report, String query) in /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs:line 281
+--- End of stack trace from previous location ---
+  Failed CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(report: "response-times", query: "") [47 ms]
+  Error Message:
+   Assert.Equal() Failure: Values differ
+Expected: BadRequest
+Actual:   InternalServerError
+  Stack Trace:
+     at CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(String report, String query) in /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs:line 281
+--- End of stack trace from previous location ---
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(report: "response-times", query: "?from=2026-10-01") [49 ms]
+  Failed CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(report: "response-times", query: "?from=0001-01-01&to=2026-10-05") [45 ms]
+  Error Message:
+   Assert.Equal() Failure: Values differ
+Expected: BadRequest
+Actual:   InternalServerError
+  Stack Trace:
+     at CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(String report, String query) in /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs:line 281
+--- End of stack trace from previous location ---
+  Failed CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(report: "response-times", query: "?from=2026-10-01&to=9999-12-31") [50 ms]
+  Error Message:
+   Assert.Equal() Failure: Values differ
+Expected: BadRequest
+Actual:   InternalServerError
+  Stack Trace:
+     at CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(String report, String query) in /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs:line 281
+--- End of stack trace from previous location ---
+  Failed CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(report: "agent-performance", query: "") [54 ms]
+  Error Message:
+   Assert.Equal() Failure: Values differ
+Expected: BadRequest
+Actual:   InternalServerError
+  Stack Trace:
+     at CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(String report, String query) in /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs:line 281
+--- End of stack trace from previous location ---
+  Failed CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(report: "agent-performance", query: "?from=2026-10-01&to=9999-12-31") [49 ms]
+  Error Message:
+   Assert.Equal() Failure: Values differ
+Expected: BadRequest
+Actual:   InternalServerError
+  Stack Trace:
+     at CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(String report, String query) in /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs:line 281
+--- End of stack trace from previous location ---
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(report: "response-times", query: "?from=2026-10-05&to=2026-10-01") [47 ms]
+fail: CareLanka.Api.Common.Errors.ApiExceptionHandler[0]
+      Unhandled exception on GET /api/reports/emergency/fleet-utilisation
+      System.ArgumentOutOfRangeException: The UTC time represented when the offset is applied must be between year 0 and 10,000. (Parameter 'offset')
+         at System.DateTimeOffset.ValidateDate(DateTime dateTime, TimeSpan offset)
+         at System.DateTimeOffset..ctor(DateTime dateTime, TimeSpan offset)
+         at CareLanka.Api.Services.Emergency.HospitalDays.StartOf(DateOnly day) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/HospitalDays.cs:line 11
+         at CareLanka.Api.Services.Emergency.EmergencyReportService.Range(DateOnly from, DateOnly to) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/EmergencyReportService.cs:line 160
+         at CareLanka.Api.Services.Emergency.EmergencyReportService.GetFleetUtilisationAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/EmergencyReportService.cs:line 59
+         at CareLanka.Api.Controllers.Emergency.EmergencyReportsController.FleetUtilisation(DateOnly from, DateOnly to, CancellationToken ct) in /home/nasrulla/Files/Projects/carelanka-qm/api/Controllers/Emergency/EmergencyReportsController.cs:line 30
+         at lambda_method453(Closure, Object)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.AwaitableObjectResultExecutor.Execute(ActionContext actionContext, IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeActionMethodAsync>g__Awaited|12_0(ControllerActionInvoker invoker, ValueTask`1 actionResultValueTask)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeNextActionFilterAsync>g__Awaited|10_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Rethrow(ActionExecutedContextSealed context)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+      --- End of stack trace from previous location ---
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+[xUnit.net 00:00:09.37]     CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(report: "fleet-utilisation", query: "") [FAIL]
+[xUnit.net 00:00:09.37]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:09.37]       Expected: BadRequest
+[xUnit.net 00:00:09.37]       Actual:   InternalServerError
+[xUnit.net 00:00:09.37]       Stack Trace:
+[xUnit.net 00:00:09.37]         /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs(281,0): at CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(String report, String query)
+[xUnit.net 00:00:09.37]         --- End of stack trace from previous location ---
+warn: Microsoft.EntityFrameworkCore.Query[20504]
+      Compiling a query which loads related collections for more than one collection navigation, either via 'Include' or through projection, but no 'QuerySplittingBehavior' has been configured. By default, Entity Framework will use 'QuerySplittingBehavior.SingleQuery', which can potentially result in slow query performance. See https://go.microsoft.com/fwlink/?linkid=2134277 for more information. To identify the query that's triggering this warning call 'ConfigureWarnings(w => w.Throw(RelationalEventId.MultipleCollectionIncludeWarning))'.
+[testcontainers.org 00:00:09.39] Delete Docker container 2bdffc481c8a
+[xUnit.net 00:00:10.00]   Finished:    CareLanka.Api.Tests
+  Failed CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(report: "fleet-utilisation", query: "") [54 ms]
+  Error Message:
+   Assert.Equal() Failure: Values differ
+Expected: BadRequest
+Actual:   InternalServerError
+  Stack Trace:
+     at CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_missing_or_impossible_date_range_is_refused(String report, String query) in /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs:line 281
+--- End of stack trace from previous location ---
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_real_date_range_is_returned(report: "response-times", query: "?from=2026-10-01&to=2026-10-05&priority=critical") [82 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_real_date_range_is_returned(report: "fleet-utilisation", query: "?from=2026-10-01&to=2026-10-05") [69 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_real_date_range_is_returned(report: "response-times", query: "?from=2026-10-05&to=2026-10-05") [58 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.A_report_with_a_real_date_range_is_returned(report: "agent-performance", query: "?from=2026-10-01&to=2026-10-05") [95 ms]
+
+Test Run Failed.
+Total tests: 14
+     Passed: 6
+     Failed: 8
+ Total time: 10.2725 Seconds

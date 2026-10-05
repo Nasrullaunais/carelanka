@@ -145,7 +145,7 @@ public sealed class AmbulanceService : IAmbulanceService
                 ActiveDispatch = activeDispatch,
                 IsDivertible = activeDispatchId is null || IsDivertible(ambulance.Status),
                 DistanceKm = travel?.DistanceKm,
-                DriveMinutes = travel?.DriveSeconds is { } seconds ? (int)Math.Ceiling(seconds / 60.0) : null,
+                DriveMinutes = travel?.DriveMinutes,
                 IsStraightLineDistance = measurement?.IsStraightLine
             };
         });

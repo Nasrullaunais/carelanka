@@ -3718,9 +3718,9 @@ export const getStaffAgentPerformanceReportOptions = (options?: Options<GetStaff
     queryKey: getStaffAgentPerformanceReportQueryKey(options)
 });
 
-export const getEmergencyResponseTimeReportQueryKey = (options?: Options<GetEmergencyResponseTimeReportData>) => createQueryKey('getEmergencyResponseTimeReport', options);
+export const getEmergencyResponseTimeReportQueryKey = (options: Options<GetEmergencyResponseTimeReportData>) => createQueryKey('getEmergencyResponseTimeReport', options);
 
-export const getEmergencyResponseTimeReportOptions = (options?: Options<GetEmergencyResponseTimeReportData>) => queryOptions<GetEmergencyResponseTimeReportResponse, GetEmergencyResponseTimeReportError, GetEmergencyResponseTimeReportResponse, ReturnType<typeof getEmergencyResponseTimeReportQueryKey>>({
+export const getEmergencyResponseTimeReportOptions = (options: Options<GetEmergencyResponseTimeReportData>) => queryOptions<GetEmergencyResponseTimeReportResponse, GetEmergencyResponseTimeReportError, GetEmergencyResponseTimeReportResponse, ReturnType<typeof getEmergencyResponseTimeReportQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await getEmergencyResponseTimeReport({
             ...options,
@@ -3733,9 +3733,9 @@ export const getEmergencyResponseTimeReportOptions = (options?: Options<GetEmerg
     queryKey: getEmergencyResponseTimeReportQueryKey(options)
 });
 
-export const getFleetUtilisationReportQueryKey = (options?: Options<GetFleetUtilisationReportData>) => createQueryKey('getFleetUtilisationReport', options);
+export const getFleetUtilisationReportQueryKey = (options: Options<GetFleetUtilisationReportData>) => createQueryKey('getFleetUtilisationReport', options);
 
-export const getFleetUtilisationReportOptions = (options?: Options<GetFleetUtilisationReportData>) => queryOptions<GetFleetUtilisationReportResponse, GetFleetUtilisationReportError, GetFleetUtilisationReportResponse, ReturnType<typeof getFleetUtilisationReportQueryKey>>({
+export const getFleetUtilisationReportOptions = (options: Options<GetFleetUtilisationReportData>) => queryOptions<GetFleetUtilisationReportResponse, GetFleetUtilisationReportError, GetFleetUtilisationReportResponse, ReturnType<typeof getFleetUtilisationReportQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await getFleetUtilisationReport({
             ...options,
@@ -3748,9 +3748,9 @@ export const getFleetUtilisationReportOptions = (options?: Options<GetFleetUtili
     queryKey: getFleetUtilisationReportQueryKey(options)
 });
 
-export const getEmergencyAgentPerformanceReportQueryKey = (options?: Options<GetEmergencyAgentPerformanceReportData>) => createQueryKey('getEmergencyAgentPerformanceReport', options);
+export const getEmergencyAgentPerformanceReportQueryKey = (options: Options<GetEmergencyAgentPerformanceReportData>) => createQueryKey('getEmergencyAgentPerformanceReport', options);
 
-export const getEmergencyAgentPerformanceReportOptions = (options?: Options<GetEmergencyAgentPerformanceReportData>) => queryOptions<GetEmergencyAgentPerformanceReportResponse, GetEmergencyAgentPerformanceReportError, GetEmergencyAgentPerformanceReportResponse, ReturnType<typeof getEmergencyAgentPerformanceReportQueryKey>>({
+export const getEmergencyAgentPerformanceReportOptions = (options: Options<GetEmergencyAgentPerformanceReportData>) => queryOptions<GetEmergencyAgentPerformanceReportResponse, GetEmergencyAgentPerformanceReportError, GetEmergencyAgentPerformanceReportResponse, ReturnType<typeof getEmergencyAgentPerformanceReportQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
         const { data } = await getEmergencyAgentPerformanceReport({
             ...options,

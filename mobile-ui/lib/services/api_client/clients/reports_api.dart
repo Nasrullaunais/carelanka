@@ -41,20 +41,20 @@ abstract class ReportsApi {
 
   @GET('/reports/emergency/response-times')
   Future<ResponseTimeReport> getEmergencyResponseTimeReport({
-    @Query('from') DateTime? from,
-    @Query('to') DateTime? to,
+    @Query('from') required DateTime from,
+    @Query('to') required DateTime to,
     @Query('priority') CallPriority? priority,
   });
 
   @GET('/reports/emergency/fleet-utilisation')
   Future<FleetUtilisationReport> getFleetUtilisationReport({
-    @Query('from') DateTime? from,
-    @Query('to') DateTime? to,
+    @Query('from') required DateTime from,
+    @Query('to') required DateTime to,
   });
 
   @GET('/reports/emergency/agent-performance')
   Future<EmergencyAgentPerformanceReport> getEmergencyAgentPerformanceReport({
-    @Query('from') DateTime? from,
-    @Query('to') DateTime? to,
+    @Query('from') required DateTime from,
+    @Query('to') required DateTime to,
   });
 }

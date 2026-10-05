@@ -56,7 +56,7 @@ public sealed class SceneLookupProcessor(
             call.Latitude,
             call.Longitude,
             cancellationToken);
-        if (measurement.IsStraightLine || !measurement.ByAmbulance.TryGetValue(dispatch.Id, out var travel) || travel.DriveSeconds is not { } seconds)
+        if (measurement.IsStraightLine || !measurement.ByAmbulance.TryGetValue(dispatch.Id, out var travel) || travel.DriveMinutes is not { } minutes)
         {
             logger.LogInformation("No road route for dispatch {DispatchId}; nothing stored.", dispatch.Id);
             return;
@@ -71,7 +71,7 @@ public sealed class SceneLookupProcessor(
             DestinationLatitude = call.Latitude,
             DestinationLongitude = call.Longitude,
             PlannedDistanceKm = Math.Round((decimal)travel.DistanceKm, 2),
-            PlannedDurationMinutes = (int)Math.Ceiling(seconds / 60.0),
+            PlannedDurationMinutes = minutes,
             DepartedAt = dispatch.Status is DispatchStatus.EnRouteToScene or DispatchStatus.AtScene or DispatchStatus.TransportingToHospital
                 ? dispatch.UpdatedAt : null,
             ArrivedAt = dispatch.Status is DispatchStatus.AtScene or DispatchStatus.TransportingToHospital

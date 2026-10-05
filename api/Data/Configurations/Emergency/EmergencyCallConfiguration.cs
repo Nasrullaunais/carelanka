@@ -12,6 +12,9 @@ public sealed class EmergencyCallConfiguration : IEntityTypeConfiguration<Emerge
 {
     public const string IdempotencyKeyUniqueIndex = "ux_emergency_calls_idempotency_key";
 
+    // The largest value the numeric(10, 2) column below can hold.
+    public const decimal MaxLocationAccuracyMetres = 99_999_999.99m;
+
     public void Configure(EntityTypeBuilder<EmergencyCall> builder)
     {
         builder.ToTable("emergency_calls", table =>

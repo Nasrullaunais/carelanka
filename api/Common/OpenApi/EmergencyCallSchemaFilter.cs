@@ -1,3 +1,4 @@
+using CareLanka.Api.Data.Configurations.Emergency;
 using CareLanka.Api.DTOs.Emergency;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
@@ -33,6 +34,7 @@ public sealed class EmergencyCallSchemaFilter : ISchemaFilter
             schema.Properties["longitude"].Minimum = -180;
             schema.Properties["longitude"].Maximum = 180;
             schema.Properties["location_accuracy_metres"].Minimum = 0;
+            schema.Properties["location_accuracy_metres"].Maximum = EmergencyCallConfiguration.MaxLocationAccuracyMetres;
             schema.Properties["details"].MaxLength = 1000;
         }
 
@@ -50,6 +52,8 @@ public sealed class EmergencyCallSchemaFilter : ISchemaFilter
             schema.Properties["latitude"].Maximum = 90;
             schema.Properties["longitude"].Minimum = -180;
             schema.Properties["longitude"].Maximum = 180;
+            schema.Properties["location_accuracy_metres"].Minimum = 0;
+            schema.Properties["location_accuracy_metres"].Maximum = EmergencyCallConfiguration.MaxLocationAccuracyMetres;
         }
 
         if (context.Type == typeof(EmergencyCallDetail))

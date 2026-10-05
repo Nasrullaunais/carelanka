@@ -1,0 +1,4 @@
+# Rebuilt on every run from the live server.
+reports/live-swagger.json
+reports/emergency-*.json
+reports/examples-*.json

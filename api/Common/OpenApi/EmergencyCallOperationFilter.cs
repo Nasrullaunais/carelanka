@@ -22,6 +22,13 @@ public sealed class EmergencyCallOperationFilter : IOperationFilter
             Parameter(operation, "unassignedOnly").Schema.Default = new OpenApiBoolean(false);
         }
 
+        if (operation.OperationId is "getEmergencyResponseTimeReport" or "getFleetUtilisationReport"
+            or "getEmergencyAgentPerformanceReport")
+        {
+            Parameter(operation, "from").Required = true;
+            Parameter(operation, "to").Required = true;
+        }
+
         if (operation.OperationId == "getMyEmergencyCalls")
         {
             ConfigurePage(Parameter(operation, "page"), 1);

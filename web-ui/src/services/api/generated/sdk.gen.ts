@@ -1535,19 +1535,19 @@ export const getStaffAgentPerformanceReport = <ThrowOnError extends boolean = fa
     ...options
 });
 
-export const getEmergencyResponseTimeReport = <ThrowOnError extends boolean = false>(options?: Options<GetEmergencyResponseTimeReportData, ThrowOnError>): RequestResult<GetEmergencyResponseTimeReportResponses, GetEmergencyResponseTimeReportErrors, ThrowOnError> => (options?.client ?? client).get<GetEmergencyResponseTimeReportResponses, GetEmergencyResponseTimeReportErrors, ThrowOnError>({
+export const getEmergencyResponseTimeReport = <ThrowOnError extends boolean = false>(options: Options<GetEmergencyResponseTimeReportData, ThrowOnError>): RequestResult<GetEmergencyResponseTimeReportResponses, GetEmergencyResponseTimeReportErrors, ThrowOnError> => (options.client ?? client).get<GetEmergencyResponseTimeReportResponses, GetEmergencyResponseTimeReportErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/reports/emergency/response-times',
     ...options
 });
 
-export const getFleetUtilisationReport = <ThrowOnError extends boolean = false>(options?: Options<GetFleetUtilisationReportData, ThrowOnError>): RequestResult<GetFleetUtilisationReportResponses, GetFleetUtilisationReportErrors, ThrowOnError> => (options?.client ?? client).get<GetFleetUtilisationReportResponses, GetFleetUtilisationReportErrors, ThrowOnError>({
+export const getFleetUtilisationReport = <ThrowOnError extends boolean = false>(options: Options<GetFleetUtilisationReportData, ThrowOnError>): RequestResult<GetFleetUtilisationReportResponses, GetFleetUtilisationReportErrors, ThrowOnError> => (options.client ?? client).get<GetFleetUtilisationReportResponses, GetFleetUtilisationReportErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/reports/emergency/fleet-utilisation',
     ...options
 });
 
-export const getEmergencyAgentPerformanceReport = <ThrowOnError extends boolean = false>(options?: Options<GetEmergencyAgentPerformanceReportData, ThrowOnError>): RequestResult<GetEmergencyAgentPerformanceReportResponses, GetEmergencyAgentPerformanceReportErrors, ThrowOnError> => (options?.client ?? client).get<GetEmergencyAgentPerformanceReportResponses, GetEmergencyAgentPerformanceReportErrors, ThrowOnError>({
+export const getEmergencyAgentPerformanceReport = <ThrowOnError extends boolean = false>(options: Options<GetEmergencyAgentPerformanceReportData, ThrowOnError>): RequestResult<GetEmergencyAgentPerformanceReportResponses, GetEmergencyAgentPerformanceReportErrors, ThrowOnError> => (options.client ?? client).get<GetEmergencyAgentPerformanceReportResponses, GetEmergencyAgentPerformanceReportErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/reports/emergency/agent-performance',
     ...options

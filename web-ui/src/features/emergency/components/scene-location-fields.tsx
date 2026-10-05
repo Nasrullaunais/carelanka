@@ -4,6 +4,8 @@ import { SceneAddressSearch } from './scene-address-search';
 
 // A pin dropped from a caller's description is close, not exact.
 const MAP_PICK_ACCURACY_METRES = 50;
+// The API refuses anything larger: the database column cannot store it.
+const MAX_ACCURACY_METRES = 99_999_999.99;
 
 const LocationPicker = lazy(() => import('./location-picker').then((module) => ({ default: module.LocationPicker })));
 
@@ -39,7 +41,7 @@ export function SceneLocationFields({ value, onChange }: { value: SceneLocation;
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <NumberField label="Latitude" min={-90} max={90} value={value.latitude} onChange={(latitude) => onChange({ ...value, latitude })} />
         <NumberField label="Longitude" min={-180} max={180} value={value.longitude} onChange={(longitude) => onChange({ ...value, longitude })} />
-        <NumberField label="Accuracy (m)" min={0} value={value.accuracy} onChange={(accuracy) => onChange({ ...value, accuracy })} />
+        <NumberField label="Accuracy (m)" min={0} max={MAX_ACCURACY_METRES} value={value.accuracy} onChange={(accuracy) => onChange({ ...value, accuracy })} />
       </div>
     </div>
   );
@@ -57,7 +59,9 @@ export function sceneCoordinates(value: SceneLocation): { latitude: number; long
 
 export function sceneAccuracy(value: SceneLocation): number | undefined {
   const accuracy = Number(value.accuracy);
-  return value.accuracy !== '' && Number.isFinite(accuracy) && accuracy >= 0 ? accuracy : undefined;
+  return value.accuracy !== '' && Number.isFinite(accuracy) && accuracy >= 0 && accuracy <= MAX_ACCURACY_METRES
+    ? accuracy
+    : undefined;
 }
 
 function NumberField({ label, value, min, max, onChange }: {

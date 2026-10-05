@@ -3,7 +3,8 @@ openapi: 3.0.3
 info:
   title: CareLanka - Patient Management API
   description: |
-    Owned by Member 4. Covers Patient, Admission, Ward, Bed, BedAssignment, Discharge.
+    Owned by Patient Management. Covers Ward, Patient, Admission, Appointment, BedAssignment,
+    Discharge, Bill, BillingRate, AdmissionFeeRate, PatientMedicalProfile and CareRecommendation.
 
     Manages a patient's stay from arrival to discharge: who they are, whether they are
     currently in the hospital, which bed they are in, and whether they can go home.
@@ -22,12 +23,15 @@ info:
     `BedAssignment` - who is in a bed, the hold on a proposed bed, and approvals. This works
     because occupancy is not a column on the bed: it is the presence or absence of a live
     assignment row. Neither component writes the other's table. See
-    `integration_of_functions.md` section 6.1.
+    `integration_of_functions.md` section 6.1. `Ward` sits here, with Patient Management.
 
-    Open: whether `Ward` sits here or with Equipment. Written as ours.
-  version: 0.2.0
+    Checked against the running API on 2026-10-05: every operation below is built, and nothing
+    the API publishes for this component is missing here. The occupancy and length-of-stay
+    reports were designed but never built, so they are no longer published
+    (`patient-management-plan.md` section 7.8).
+  version: 0.3.0
   contact:
-    name: Member 4 - Patient Management
+    name: Patient Management
 
 servers:
   - url: /api
@@ -68,8 +72,6 @@ tags:
       the patient ever sees it. Never a diagnosis - see patient-management-plan.md 8.10.
   - name: Patient Self-Service
     description: What a logged-in patient may see about themselves. Deliberately narrow.
-  - name: Reports
-    description: Occupancy and length of stay.
   - name: Integration
     description: Read-only surfaces other components depend on.
 
@@ -115,7 +117,7 @@ paths:
         '409':
           description: A patient with this NIC already exists. The response carries the existing id.
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
     get:
@@ -158,6 +160,7 @@ paths:
                       items:
                         type: array
                         items: { $ref: '#/components/schemas/PatientSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
@@ -198,6 +201,13 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: >-
+            Another patient already has this NIC (`cl_pat_002`), or the new gender does not fit
+            the single-sex ward the patient is in now (`cl_pat_017`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /patients/lookup:
     post:
@@ -218,32 +228,16 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [nic]
-              properties:
-                nic:
-                  type: string
-                  example: '199534501V'
+            schema: { $ref: '#/components/schemas/PatientLookupRequest' }
       responses:
         '200':
           description: Lookup result
           content:
             application/json:
-              schema:
-                type: object
-                required: [found]
-                properties:
-                  found: { type: boolean }
-                  patient:
-                    allOf:
-                      - $ref: '#/components/schemas/PatientSummary'
-                    nullable: true
-                  has_open_admission:
-                    type: boolean
-                    description: True when this patient is already in the hospital. Registering a second concurrent admission is almost always a mistake.
+              schema: { $ref: '#/components/schemas/PatientLookupResult' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /patients/{id}/link-account:
     parameters:
@@ -267,11 +261,7 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [user_account_id]
-              properties:
-                user_account_id: { type: string, format: uuid }
+            schema: { $ref: '#/components/schemas/LinkPatientAccountRequest' }
       responses:
         '204': { description: Linked }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -281,7 +271,7 @@ paths:
         '409':
           description: This record or this account is already linked to another.
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /patient-accounts:
@@ -471,16 +461,16 @@ paths:
             This patient already has an open admission (`cl_pat_006`), or `maternity` was chosen
             for a patient recorded as male (`cl_pat_048`).
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
     get:
       tags: [Admissions]
       summary: List admissions
       description: >-
-        Roles: GeneralStaff, WardNurse, DutyManager, HospitalAdministrator, Doctor, EquipmentManager. Nurses are scoped to their own ward - NOT ENFORCED YET,
-        see STUBS.md. It needs both which ward a nurse works in (Staff Management, unbuilt)
-        and which ward an admission is in (a live BedAssignment, step 6).
+        Roles: GeneralStaff, WardNurse, DutyManager, HospitalAdministrator, Doctor, EquipmentManager.
+        A ward nurse sees every ward. Limiting a nurse to the ward they are rostered on is not
+        enforced (STUBS.md), so there is no ward filter here either.
       operationId: listAdmissions
       parameters:
         - name: status
@@ -491,13 +481,6 @@ paths:
             items: { $ref: '#/components/schemas/AdmissionStatus' }
           style: form
           explode: true
-        - name: wardId
-          in: query
-          description: >-
-            NOT SERVED YET - the API does not publish this parameter. A ward is reached through
-            the live BedAssignment and Equipment's bed register, and nothing holds a bed until
-            step 6 of docs/build/patient.md. Left unpublished rather than accepted and ignored.
-          schema: { type: string, format: uuid }
         - name: category
           in: query
           schema: { $ref: '#/components/schemas/AdmissionCategory' }
@@ -534,6 +517,7 @@ paths:
                       items:
                         type: array
                         items: { $ref: '#/components/schemas/AdmissionSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
@@ -595,6 +579,11 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Another patient already has this NIC (`cl_pat_002`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /admissions/{id}/arrive:
     parameters:
@@ -707,10 +696,11 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '409':
           description: A pre-admission already exists for this `dispatch_id`.
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /admissions/{id}/classify:
@@ -751,7 +741,7 @@ paths:
             This admission already has a care category (`cl_pat_042`), or `maternity` was chosen
             for a patient recorded as male (`cl_pat_048`).
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   # ------------------------------------------------------------------
@@ -779,7 +769,9 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/Ward' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
     post:
       tags: [Wards and Beds]
       summary: Create a ward
@@ -808,7 +800,7 @@ paths:
         '409':
           description: A ward with this name already exists.
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /wards/{id}/occupancy:
@@ -1010,7 +1002,7 @@ paths:
         '409':
           description: The bed is taken, out of service, or breaks a hard rule.
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /admissions/{id}/correct-bed:
@@ -1063,7 +1055,7 @@ paths:
             The patient holds no bed (`cl_pat_028`), is already in the bed asked for
             (`cl_pat_029`), or the replacement is taken or breaks a hard rule.
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   # ------------------------------------------------------------------
@@ -1109,6 +1101,7 @@ paths:
                       items:
                         type: array
                         items: { $ref: '#/components/schemas/DischargeCandidate' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
@@ -1159,7 +1152,7 @@ paths:
         '403':
           description: This role may not tick this item.
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
@@ -1167,7 +1160,7 @@ paths:
             `billing_settled` was sent (`cl_pat_025`), or the patient is not on the ward
             (`cl_pat_046`).
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /discharges/{admissionId}/confirm:
@@ -1201,13 +1194,14 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Discharge' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
           description: Checklist incomplete, or the admission is not `ready_for_discharge`.
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   # ------------------------------------------------------------------
@@ -1274,7 +1268,7 @@ paths:
             The bill is settled and frozen (`cl_pat_026`), or the patient is not on the ward
             (`cl_pat_044`).
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /admissions/{admissionId}/bill/charges:
@@ -1313,7 +1307,7 @@ paths:
             The bill is settled and frozen (`cl_pat_026`), or the patient is not on the ward
             (`cl_pat_044`).
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /admissions/{admissionId}/bill/charges/{lineId}:
@@ -1350,7 +1344,7 @@ paths:
             cannot be billed - the patient is not on the ward (`cl_pat_044`), or the booking
             is not finished (`cl_pat_045`).
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /admissions/{admissionId}/bill/settle:
@@ -1395,7 +1389,7 @@ paths:
         '409':
           description: Already settled (`cl_pat_026`).
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /billing/rates:
@@ -1558,7 +1552,7 @@ paths:
             your record is registered under a different NIC (`cl_pat_032`). All three are desk
             work - the app may not decide which human a login belongs to.
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /me/claim/preview:
@@ -1719,6 +1713,7 @@ paths:
                       items:
                         type: array
                         items: { $ref: '#/components/schemas/MyAdmission' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
@@ -1867,7 +1862,7 @@ paths:
             (`cl_pat_006`), or your login has no medical record yet (`cl_pat_033`) - fill in
             your details first.
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
     get:
       tags: [Patient Self-Service]
@@ -1895,6 +1890,7 @@ paths:
                       items:
                         type: array
                         items: { $ref: '#/components/schemas/MyAppointment' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
@@ -1924,7 +1920,7 @@ paths:
         '409':
           description: Already checked in, completed or cancelled.
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /me/appointments/{appointmentId}/bill:
@@ -2074,6 +2070,7 @@ paths:
                       items:
                         type: array
                         items: { $ref: '#/components/schemas/Appointment' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
     post:
@@ -2104,7 +2101,7 @@ paths:
         '409':
           description: That patient already has an open appointment or admission.
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /appointments/walk-in:
@@ -2140,7 +2137,7 @@ paths:
         '409':
           description: That patient already has an open appointment or admission.
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /appointments/{id}/confirm:
@@ -2330,7 +2327,7 @@ paths:
             The bill is already settled (`cl_pat_026`), the visit ended in an admission
             (`cl_pat_035`), or the booking is not finished (`cl_pat_045`).
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /appointments/{appointmentId}/bill/charges:
@@ -2365,7 +2362,7 @@ paths:
             The bill is already settled (`cl_pat_026`), the visit ended in an admission
             (`cl_pat_035`), or the booking is not finished (`cl_pat_045`).
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /appointments/{appointmentId}/bill/charges/{lineId}:
@@ -2400,7 +2397,7 @@ paths:
             The bill is already settled (`cl_pat_026`), the visit ended in an admission
             (`cl_pat_035`), or the booking is not finished (`cl_pat_045`).
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /appointments/{appointmentId}/bill/settle:
@@ -2439,7 +2436,7 @@ paths:
             The bill is already settled (`cl_pat_026`), the visit ended in an admission
             (`cl_pat_035`), or the booking is not finished (`cl_pat_045`).
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /appointments/{id}/check-in:
@@ -2503,69 +2500,8 @@ paths:
             Already checked in, cancelled, the patient has an open admission, or `maternity`
             for a patient recorded as male (`cl_pat_048`).
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
-
-  # ------------------------------------------------------------------
-  # Reports
-  # ------------------------------------------------------------------
-
-  /reports/occupancy:
-    get:
-      tags: [Reports]
-      summary: Bed occupancy over a date range
-      description: 'Roles: DutyManager, HospitalAdministrator.'
-      operationId: getOccupancyReport
-      parameters:
-        - name: from
-          in: query
-          required: true
-          schema: { type: string, format: date }
-        - name: to
-          in: query
-          required: true
-          schema: { type: string, format: date }
-        - name: wardId
-          in: query
-          schema: { type: string, format: uuid }
-      responses:
-        '200':
-          description: Occupancy per ward per day
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: '#/components/schemas/OccupancyReportRow' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-
-  /reports/length-of-stay:
-    get:
-      tags: [Reports]
-      summary: Average length of stay by category and ward
-      description: 'Roles: DutyManager, HospitalAdministrator.'
-      operationId: getLengthOfStayReport
-      parameters:
-        - name: from
-          in: query
-          required: true
-          schema: { type: string, format: date }
-        - name: to
-          in: query
-          required: true
-          schema: { type: string, format: date }
-      responses:
-        '200':
-          description: Length of stay statistics
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: '#/components/schemas/LengthOfStayRow' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
 
   /me/care-queries:
     post:
@@ -2625,14 +2561,14 @@ paths:
             cl_pat_038 - you are not currently admitted. Nothing runs: no workflow row is
             created, the model is never called, and no quota is spent.
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
         '429':
           description: >-
             cl_pat_050 - three reports in the last minute already. Nothing is saved and no
             workflow starts.
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /care-workflows/{workflowId}:
@@ -2691,6 +2627,7 @@ paths:
                       items:
                         type: array
                         items: { $ref: '#/components/schemas/CareRecommendationSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
@@ -2755,7 +2692,7 @@ paths:
         '403':
           description: Only a Doctor or a WardNurse may approve a care recommendation.
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
@@ -2764,7 +2701,7 @@ paths:
             (`cl_pat_049`). A run that has not finished within ten minutes is treated as dead,
             so a restart mid-run never leaves a report stuck.
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /care-recommendations/{id}/reject:
@@ -2796,7 +2733,7 @@ paths:
         '403':
           description: Only a Doctor or a WardNurse may reject a care recommendation.
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
@@ -2804,7 +2741,7 @@ paths:
             Not pending review (`cl_pat_040`), or the agent is still writing its draft
             (`cl_pat_049`).
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /care-recommendations/{id}/redraft:
@@ -2835,7 +2772,7 @@ paths:
         '403':
           description: Only a Doctor or a WardNurse may redraft a care recommendation.
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
@@ -2844,7 +2781,7 @@ paths:
             (`cl_pat_049`). A run that has not finished within ten minutes is treated as dead,
             so a restart mid-run never leaves a report stuck.
           content:
-            application/json:
+            application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
   /me/care-recommendations:
@@ -3247,6 +3184,9 @@ components:
           allOf:
             - $ref: '#/components/schemas/AdmissionUrgency'
           nullable: true
+        is_infectious:
+          type: boolean
+          description: True when the patient needs an isolation bed.
         ward_name:
           type: string
           nullable: true
@@ -3519,6 +3459,34 @@ components:
             has_account:
               type: boolean
               description: Whether an optional patient login is linked. Most records never have one.
+
+    PatientLookupRequest:
+      type: object
+      required: [nic]
+      properties:
+        nic:
+          type: string
+          maxLength: 20
+          example: '199534501V'
+
+    PatientLookupResult:
+      type: object
+      required: [found, has_open_admission]
+      properties:
+        found: { type: boolean }
+        patient:
+          allOf:
+            - $ref: '#/components/schemas/PatientSummary'
+          nullable: true
+        has_open_admission:
+          type: boolean
+          description: True when this patient is already in the hospital. Registering a second concurrent admission is almost always a mistake.
+
+    LinkPatientAccountRequest:
+      type: object
+      required: [user_account_id]
+      properties:
+        user_account_id: { type: string, format: uuid }
 
     PatientDetail:
       allOf:
@@ -4502,27 +4470,6 @@ components:
           nullable: true
           description: Last three digits only. Null when the record holds no phone number.
           example: "•••••••567"
-
-    # ---------- reports ----------
-
-    OccupancyReportRow:
-      type: object
-      properties:
-        date: { type: string, format: date }
-        ward_id: { type: string, format: uuid }
-        ward_name: { type: string }
-        total_beds: { type: integer }
-        occupied_beds: { type: integer }
-        occupancy_rate: { type: number, format: float }
-
-    LengthOfStayRow:
-      type: object
-      properties:
-        ward_name: { type: string }
-        admission_category: { $ref: '#/components/schemas/AdmissionCategory' }
-        admissions_count: { type: integer }
-        average_days: { type: number, format: float }
-        median_days: { type: number, format: float }
 
     # ---------- care recommendations ----------
 

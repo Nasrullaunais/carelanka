@@ -1,7 +1,7 @@
 # Patient Management - Component Design
 
 **CareLanka Hospital Management System · SE3090 Assignment 1**
-**Owner:** Member 4 · **Status:** fully built (steps 1–16 of `docs/build/patient.md`); the bed suggestion agent (§8.1–§8.9) was built, then removed 2026-09-22 in favour of the Patient Care Advisory agent (§8.10 onward), which is live · **Version:** 0.4 (2026-09-25 — review fixes: bill refreshed on settle, bill/checklist status rules, ward fit (H7), one Check in action with a No bed needed choice, care-query limit and early red flag, review gated on the draft; H0 and the no-bed admission path retired)
+**Owner:** Member 4 · **Status:** fully built (steps 1–20 of `docs/build/patient.md`), except the reports in §7.8, which were not built; the bed suggestion agent (§8.1–§8.9) was built, then removed 2026-09-22 in favour of the Patient Care Advisory agent (§8.10 onward), which is live · **Version:** 0.4 (2026-09-25 — review fixes: bill refreshed on settle, bill/checklist status rules, ward fit (H7), one Check in action with a No bed needed choice, care-query limit and early red flag, review gated on the draft; H0 and the no-bed admission path retired) · **0.5** (2026-10-05 — brought in line with the code as submitted: the hospital password reset (§7.6d), the NIC checked against the year of birth (§3.1), the care agent's one revision of a failed draft (§8.18), the kind of message it is answering (§8.15b), CR5 narrowed to a sentence that directs the patient at a medicine, CR1 also catching a dose written in words, and the reports in §7.8 taken out of `patient-spec.yaml`)
 
 This is the design document for the Patient Management component. It explains what the component does, what data it owns, how it talks to the other three components, and how its AI agent works.
 
@@ -81,7 +81,7 @@ Patient  1 ──────< Admission  1 ──────< BedAssignment >�
 | Field | Type | Notes |
 | :--- | :--- | :--- |
 | `id` | uuid, PK | |
-| `nic` | text, unique, nullable | Sri Lankan NIC. Natural key when we have it. |
+| `nic` | text, unique, nullable | Sri Lankan NIC. Natural key when we have it. *(2026-09-30)* It must agree with the year of birth: an old nine-digit NIC ending in V or X belongs to someone born before 2000, and a new twelve-digit NIC starts with the full birth year. |
 | `temp_reference` | text, unique, nullable | For unidentified arrivals: `UNKNOWN-2026-0142` |
 | `full_name` | text | May be partial for emergency arrivals |
 | `date_of_birth` | date, nullable | |
@@ -910,9 +910,10 @@ Approve and reject are open to **a Doctor or a Ward Nurse** — checked from the
 
 ### 7.8 Reports — designed, **not yet built**
 
-**None of the three routes below exist in `api/Controllers/Patient/` today.** This section is
-the plan, not the contract — `patient-spec.yaml` does not publish them either. `docs/build/patient.md`
-and `CLAUDE.md`'s Patient row both list "the reports" under what's left.
+**None of the three routes below exist in `api/Controllers/Patient/`, and they were not built for
+the submission.** This section is the plan, not the contract. `patient-spec.yaml` used to publish
+the first two anyway; they were taken out on 2026-10-05 so the contract only lists what the API
+really serves.
 
 | Method | Route | Role | Notes |
 | :--- | :--- | :--- | :--- |
@@ -1431,11 +1432,13 @@ A match forces `red_flag = true` and `urgency_flag = high`, unconditionally. The
 | `get_medical_profile(patient_id)` | read | Known conditions, allergies, current symptoms. *(New 2026-09-16.)* |
 | `get_patient_history(patient_id)` | read | Demographics, past admissions (category/urgency only), past `CareRecommendation` rows |
 | `get_current_admission(patient_id)` | read | The open admission — category, urgency, ward, when they came in |
-| `draft_recommendation(recommendation_id, urgency_flag, message)` | **write — draft only** | Creates a `CareRecommendation` row with `status = pending_review`. Cannot set `status = approved`. |
-
-Four tools. Three read, one write, and the write can only ever create a draft awaiting a human. There is no tool that messages a patient, sets an admission category, prescribes anything, or touches another patient's record.
-
-*(Unlike the bed agent, this one does keep its write tool. The reason they differ: a draft note takes nothing away from anybody. A bed hold takes a bed away from the whole hospital.)*
+Three tools, all read-only. *(Changed as built: the design had a fourth, `draft_recommendation`,
+a write tool the model would call. In the code the model is never given a tool at all.)* The
+`CareRecommendation` row is created by `POST /me/care-queries` with `status = pending_review`
+before the run starts, the model only returns JSON text, and the worker, not the model, saves that
+text as the draft once CR1–CR5 pass. `draft_recommendation` survives only as the name of the
+drafting step in the saved plan. There is no tool that messages a patient, sets an admission
+category, prescribes anything, approves a draft, or touches another patient's record.
 
 ### 8.15 The rules the agent works with
 
@@ -1443,25 +1446,48 @@ Four tools. Three read, one write, and the write can only ever create a draft aw
 
 | | Rule |
 | :--- | :--- |
-| CR1 | `agent_message` may never contain a dosage pattern (a simple dosage-unit regex — `mg`, `ml`, `tablets`, etc. adjacent to a number), and may name a medicine from the fixed denylist **only if the patient named it themselves or it is on their own allergy record**. The agent may discuss a medicine the patient raised; it may never introduce one. This agent drafts replies, never prescriptions. *(Widened 2026-09-21 — see below.)* |
+| CR1 | `agent_message` may never contain a dosage pattern (a simple dosage-unit regex — `mg`, `ml`, `tablets`, etc. after a number, or after a number written as a word such as "two tablets" or "half a tablet", added 2026-10-03), and may name a medicine from the fixed denylist **only if the patient named it themselves or it is on their own allergy record**. The agent may discuss a medicine the patient raised; it may never introduce one. This agent drafts replies, never prescriptions. *(Widened 2026-09-21 — see below.)* |
 | CR2 | `urgency_flag` must be exactly one of `low` / `medium` / `high` — a closed enum, never free text |
 | CR3 | A `CareRecommendation` is invisible to the patient (`doctor_message IS NULL`) until `status = approved` |
 | CR4 | If the red-flag screen (§8.13) matched, `urgency_flag` must be `high`. The validator overwrites a lower value rather than trusting the model to have already applied it. |
-| CR5 | `agent_message` may not contradict the recorded `allergies`. **Every sentence that names a medicine — one the patient raised, or one on their allergy record — must be negative about it** (a fixed marker list: `not`, `never`, `avoid`, `allergic`, `unsafe`, `stop`, …). Sentence by sentence, so one "do not take" cannot license a recommendation three sentences later. *(New 2026-09-16; rewritten 2026-09-21 from "may not name an allergen at all" — see below. The deterministic check is only possible because the allergy is a stored field rather than a sentence in a note.)* |
+| CR5 | `agent_message` may never point the patient towards a medicine, including one on their allergy record. **A sentence fails when it names a medicine (one the patient raised, or one on their allergy record), uses a directing verb (`take`, `use`, `try`, `start`, `ask`, `request`, …) and has no negative marker** (`not`, `never`, `avoid`, `allergic`, `unsafe`, `stop`, …). Sentence by sentence, so one "do not take" cannot license a recommendation three sentences later. *(New 2026-09-16; rewritten 2026-09-21 from "may not name an allergen at all", then narrowed the same day from "every sentence naming a medicine must be negative" — see below. The deterministic check is only possible because the allergy is a stored field rather than a sentence in a note.)* |
 
 **Why CR1 and CR5 were widened on 2026-09-21.** They used to ban naming any medicine at all, allergen included. Tested against a patient with `allergies: Penicillin` asking *"my headache is worse today. should i take some penicilin"*, the agent answered: *"Your record lists something you react badly to, so that medicine will not be given."* The rule written to keep the patient safe from their allergen had made the one genuinely useful sentence — *"do not take penicillin, your record lists it as an allergy"* — the only thing the agent could not say, and left the patient free to take it, since they were never told it was the thing.
 
 The line is no longer **whether** a medicine is named. It is **how**:
 
 - It must be one the patient raised themselves, or one already on their own record. The agent can never introduce a medicine — that is the dangerous direction, and CR1 still throws the draft away.
-- Every sentence naming it must be negative about it. The agent can tell a patient not to take something; it has no way to tell them to.
+- A sentence naming it may not direct the patient at it. The agent can tell a patient not to take something, and can say what a medicine is normally used for; it has no way to tell them to take it.
 - No dose, strength or tablet count, ever, for anything. Unchanged.
+
+**CR5 was narrowed again later on 2026-09-21.** Requiring a negative word in every sentence that named a medicine threw away *"Panadol is normally used for pain and fever."*, which points the patient nowhere and is exactly what the prompt asks for. In practice any question about a medicine came back as the fallback note. CR5 now fails only a sentence that directs the patient at the substance; CR1 still carries the weight. Both narrowings passed their own unit tests before a real model reply showed they were wrong, so `CareRecommendationValidatorTests` keeps the sentences each version must still catch (*"You could ask the nurse for penicillin."* must still fail).
 
 **Spelling does not decide whether a safety rule fires.** The patient typed `penicilin`; the record says `Penicillin`. Matching is done on a normalised form — lower-cased, punctuation stripped, runs of one repeated letter collapsed — so both arrive as the same word. Without it, a typo silently disables the check.
 
 **What the model is still trusted for, and is not verified:** whether a medicine treats what the patient described, and what it is normally used for. That is general drug knowledge, it can be wrong, and only the reviewer stands behind it. The deterministic side guarantees the *shape* of the sentence, never the pharmacology.
 
 **Soft guidance — the prompt asks for this, but nothing enforces it beyond CR1–CR5:** keep `agent_message` short and in plain words, address the patient as "you", answer what they actually asked, say what they can do now and what would mean calling a nurse, and never tell them to start, stop or change any treatment.
+
+### 8.15b What kind of message it is
+
+*(Added 2026-09-28, PR #133, after the shared model moved to `gemini-3.5-flash-lite`.)*
+
+Two problems showed up on the live model. Drafts for health messages became generic (a diabetic
+patient reporting thirst and blurred vision got a reply that never mentioned diabetes), and a
+question like *"How many doctors work here?"* got the patient's symptoms and the call bell added to
+it. The prompt now asks the model to sort the message first, and the JSON it returns names the
+kind before the reply:
+
+| Kind | What the reply does |
+| :--- | :--- |
+| `health` | How they feel, a symptom, a worry about their body, or a question about a medicine. The reply must go through every condition and allergy on the record and link the message to the ones that matter. |
+| `unclear` | Too short or vague to tell. One or two sentences asking what they mean, with nothing from the record. |
+| `hospital` | Visiting, costs or their stay, not their health. A short direct answer, with nothing from the record. |
+| `other` | A greeting, thanks, a test message, or a request about another patient. A short answer; about another patient, it says it can only talk about their own care. |
+
+The kind only changes how the reply is written. Every kind still goes through CR1–CR5 and still
+waits for a nurse or doctor, and `hospital` and `other` replies are `low` urgency unless the
+red-flag screen matched.
 
 ### 8.16 Who approves — a nurse or a doctor
 
@@ -1492,6 +1518,10 @@ made in the meantime always wins over a late draft.
 
 Everything in §8.9 applies unchanged, except the model-call budget. Three additions:
 
+**The model is `gemini-3.5-flash-lite`** *(since 2026-09-26, shared by every agent)*, with
+`ThinkingBudget` left unset because flash-lite refuses the setting with a 400. On 2026-10-02 seven
+live runs took 1.3 to 1.6 seconds each.
+
 **A busy provider is waited out, not given up on** *(changed 2026-09-21)*. Still three attempts — a provider refusing on the third try is having a bad minute, and a fourth call spends quota to learn that again — but each one now gets **60 seconds instead of 20**, with a doubling backoff between them and a 190-second total budget. *(First raised to 45/150, then to 60/190 the same day after real calls kept landing just past 45 — `LanguageModelOptions.cs` has the measurements.)*
 
 The 20 was the real defect, and it was ours. Timed against the free tier on 2026-09-21, a call that *succeeds* takes **12–41 seconds**. Every attempt was being cancelled at 20, so answers that were on their way were thrown away and the reviewer got the fixed backup reply. Two in three calls also came back 503 after 30–60 seconds of waiting — that part is the provider being genuinely overloaded, and no amount of retrying fixes it.
@@ -1510,7 +1540,10 @@ Nobody is waiting on this: the draft goes into a queue a nurse reads when they h
 3. SCREEN    <- deterministic keyword check (§8.13), before the model runs at all
 4. GATHER    get_medical_profile + get_patient_history + get_current_admission
 5. DRAFT     call the model; it calls draft_recommendation
-6. VALIDATE  <- deterministic C#, not the model. Re-check CR1..CR5.
+6. VALIDATE  <- deterministic C#, not the model. Check CR1..CR5.
+                A model draft that fails is sent back once with the list of
+                problems (added 2026-09-28), and the new draft is checked
+                again. If it still fails, the fixed backup note is used.
                 A draft failing here never reaches a reviewer.
 7. PAUSE     recommendation -> pending_review. Stop and wait.
 8. HUMAN     a Nurse or Doctor approves (optionally editing the message), or
@@ -1714,7 +1747,7 @@ This matches the group plan, which already states that Emergency and Staff read 
 
 | Layer | Tests |
 | :--- | :--- |
-| **Unit** | The state machine — every legal transition passes, every illegal one throws. The hard-rule validator — one test per rule H0–H6. The care-advisory validator — one test per rule CR1–CR5, plus the red-flag keyword screen. *(There used to be a row here for the bed agent's blocker-sentence builder, one test per `blocker.code` in §8.6 — removed with `BedBlockers`/`BedSuggestionValidator` on 2026-09-22.)* |
+| **Unit** | The state machine — every legal transition passes, every illegal one throws. The hard-rule validator — one test per rule H1–H7 (H0 was retired 2026-09-25). The care-advisory validator — tests per rule CR1–CR5 with the exact sentences each rule must catch or let through, plus the red-flag keyword screen and the one revision of a failed draft. *(There used to be a row here for the bed agent's blocker-sentence builder, one test per `blocker.code` in §8.6 — removed with `BedBlockers`/`BedSuggestionValidator` on 2026-09-22.)* |
 | **Service** | Hold expiry, downgrade ladder, duplicate NIC prevention, `details_complete` recalculation, medical-profile create-or-replace (writing twice makes one row, not two) |
 | **Controller** | Auth on every endpoint; a nurse gets 403 assigning an ICU bed; a patient gets 403 reading someone else's admission; reception gets 403 writing a medical profile; a patient with no open admission gets 409 `cl_pat_038` on `/me/care-queries`. `BedAssignmentEndpointTests`/`BedEndpointTests` cover the manual assign/correct/availability/occupancy routes end to end |
 | **Database** | Migrations run clean; `UNIQUE(ward_id, bed_number)` holds; `UNIQUE(patient_id)` on the profile holds under two concurrent writes; **the concurrent-assignment test** — two nurses assigning the same bed at once, one wins, one gets 409 *(used to be phrased as "two confirmations of the same suggested bed" — same index, same test, just no agent suggesting it any more)* |
@@ -1756,7 +1789,11 @@ looks like, same reason §8.1–§8.9 stayed in place. None of this runs against
 | Patient is not admitted | **Nothing runs.** 409 `cl_pat_038` before the workflow is created — no row, no model call, no quota spent |
 | "I have a headache and it's worse lying down" | Drafted, `red_flag = false`, some `urgency_flag`, awaiting a Nurse or Doctor |
 | Profile records a penicillin allergy, patient asks about penicillin, model drafts "do not take penicillin — your record lists it as an allergy" | Passes. This is the answer the rules exist to make possible |
-| Same profile, model drafts "you could ask the nurse for penicillin" | CR5 rejects it — a sentence naming it that is not negative about it — failure recorded, no draft published |
+| Same profile, model drafts "you could ask the nurse for penicillin" | CR5 rejects it — a sentence directing the patient at it, with no negative — failure recorded, no draft published |
+| Patient asks about Panadol, model drafts "Panadol is normally used for pain and fever." | Passes. It names the medicine the patient raised but does not direct them to take it |
+| Model drafts "take two tablets" | CR1 rejects it — a dose written in words counts as a dose |
+| First draft fails CR1, the revised draft passes | The revised draft is the one the reviewer sees; both attempts are in the log |
+| "How many doctors work here?" | `kind = hospital`. A short direct answer with nothing from the record, `low` urgency, still waits for review |
 | Patient never mentioned ibuprofen, model drafts "ibuprofen is not right for this" | CR1 rejects it — the agent may not introduce a medicine, in any context |
 | Profile is completely empty | Drafts anyway, from the patient's words alone, and says it had no history to work from. Not an error |
 | "I have severe chest pain and can't breathe" | Keyword screen matches before the model runs. `red_flag = true`, `urgency_flag = high` forced, `outcome = escalated` |

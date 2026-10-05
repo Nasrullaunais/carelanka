@@ -1,5 +1,4 @@
 using CareLanka.Api.Common.Auth;
-using CareLanka.Api.Data.Enums;
 using CareLanka.Api.DTOs.Emergency;
 using CareLanka.Api.Services.Emergency;
 using Microsoft.AspNetCore.Authorization;
@@ -18,22 +17,25 @@ public sealed class EmergencyReportsController(IEmergencyReportService reports) 
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
-    public async Task<ActionResult<ResponseTimeReport>> ResponseTimes(DateOnly from, DateOnly to,
-        CallPriority? priority, CancellationToken ct) => Ok(await reports.GetResponseTimesAsync(from, to, priority, ct));
+    public async Task<ActionResult<ResponseTimeReport>> ResponseTimes(
+        [FromQuery] ResponseTimeReportRequest request, CancellationToken ct)
+        => Ok(await reports.GetResponseTimesAsync(request.From!.Value, request.To!.Value, request.Priority, ct));
 
     [HttpGet("fleet-utilisation", Name = "getFleetUtilisationReport")]
     [ProducesResponseType(typeof(FleetUtilisationReport), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
-    public async Task<ActionResult<FleetUtilisationReport>> FleetUtilisation(DateOnly from, DateOnly to,
-        CancellationToken ct) => Ok(await reports.GetFleetUtilisationAsync(from, to, ct));
+    public async Task<ActionResult<FleetUtilisationReport>> FleetUtilisation(
+        [FromQuery] EmergencyReportRequest request, CancellationToken ct)
+        => Ok(await reports.GetFleetUtilisationAsync(request.From!.Value, request.To!.Value, ct));
 
     [HttpGet("agent-performance", Name = "getEmergencyAgentPerformanceReport")]
     [ProducesResponseType(typeof(EmergencyAgentPerformanceReport), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized, "application/problem+json")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden, "application/problem+json")]
-    public async Task<ActionResult<EmergencyAgentPerformanceReport>> AgentPerformance(DateOnly from, DateOnly to,
-        CancellationToken ct) => Ok(await reports.GetAgentPerformanceAsync(from, to, ct));
+    public async Task<ActionResult<EmergencyAgentPerformanceReport>> AgentPerformance(
+        [FromQuery] EmergencyReportRequest request, CancellationToken ct)
+        => Ok(await reports.GetAgentPerformanceAsync(request.From!.Value, request.To!.Value, ct));
 }

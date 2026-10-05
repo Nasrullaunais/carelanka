@@ -10106,10 +10106,10 @@ export type GetStaffAgentPerformanceReportResponse = GetStaffAgentPerformanceRep
 export type GetEmergencyResponseTimeReportData = {
     body?: never;
     path?: never;
-    query?: {
-        from?: string;
-        to?: string;
+    query: {
         priority?: CallPriority;
+        from: string;
+        to: string;
     };
     url: '/reports/emergency/response-times';
 };
@@ -10143,9 +10143,9 @@ export type GetEmergencyResponseTimeReportResponse = GetEmergencyResponseTimeRep
 export type GetFleetUtilisationReportData = {
     body?: never;
     path?: never;
-    query?: {
-        from?: string;
-        to?: string;
+    query: {
+        from: string;
+        to: string;
     };
     url: '/reports/emergency/fleet-utilisation';
 };
@@ -10179,9 +10179,9 @@ export type GetFleetUtilisationReportResponse = GetFleetUtilisationReportRespons
 export type GetEmergencyAgentPerformanceReportData = {
     body?: never;
     path?: never;
-    query?: {
-        from?: string;
-        to?: string;
+    query: {
+        from: string;
+        to: string;
     };
     url: '/reports/emergency/agent-performance';
 };

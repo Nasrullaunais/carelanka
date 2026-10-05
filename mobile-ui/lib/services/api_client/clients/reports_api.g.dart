@@ -128,14 +128,14 @@ class _ReportsApi implements ReportsApi {
 
   @override
   Future<ResponseTimeReport> getEmergencyResponseTimeReport({
-    DateTime? from,
-    DateTime? to,
+    required DateTime from,
+    required DateTime to,
     CallPriority? priority,
   }) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{
-      r'from': from?.toIso8601String(),
-      r'to': to?.toIso8601String(),
+      r'from': from.toIso8601String(),
+      r'to': to.toIso8601String(),
       r'priority': priority?.toJson(),
     };
     queryParameters.removeWhere((k, v) => v == null);
@@ -164,15 +164,14 @@ class _ReportsApi implements ReportsApi {
 
   @override
   Future<FleetUtilisationReport> getFleetUtilisationReport({
-    DateTime? from,
-    DateTime? to,
+    required DateTime from,
+    required DateTime to,
   }) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{
-      r'from': from?.toIso8601String(),
-      r'to': to?.toIso8601String(),
+      r'from': from.toIso8601String(),
+      r'to': to.toIso8601String(),
     };
-    queryParameters.removeWhere((k, v) => v == null);
     final _headers = <String, dynamic>{};
     const Map<String, dynamic>? _data = null;
     final _options = _setStreamType<FleetUtilisationReport>(
@@ -198,15 +197,14 @@ class _ReportsApi implements ReportsApi {
 
   @override
   Future<EmergencyAgentPerformanceReport> getEmergencyAgentPerformanceReport({
-    DateTime? from,
-    DateTime? to,
+    required DateTime from,
+    required DateTime to,
   }) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{
-      r'from': from?.toIso8601String(),
-      r'to': to?.toIso8601String(),
+      r'from': from.toIso8601String(),
+      r'to': to.toIso8601String(),
     };
-    queryParameters.removeWhere((k, v) => v == null);
     final _headers = <String, dynamic>{};
     const Map<String, dynamic>? _data = null;
     final _options = _setStreamType<EmergencyAgentPerformanceReport>(

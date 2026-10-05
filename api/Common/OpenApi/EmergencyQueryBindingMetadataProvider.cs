@@ -13,7 +13,9 @@ public sealed class EmergencyQueryBindingMetadataProvider : IBindingMetadataProv
         typeof(MyDispatchHistoryRequest),
         typeof(CancellationRequestListRequest),
         typeof(ListDispatchProposalsRequest),
-        typeof(AddressSearchRequest)
+        typeof(AddressSearchRequest),
+        typeof(EmergencyReportRequest),
+        typeof(ResponseTimeReportRequest)
     ];
 
     public void CreateBindingMetadata(BindingMetadataProviderContext context)

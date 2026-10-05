@@ -421,7 +421,7 @@ public sealed class EmergencyCallService : IEmergencyCallService
             AmbulanceLatitude = dispatch?.CurrentLatitude,
             AmbulanceLongitude = dispatch?.CurrentLongitude,
             AmbulanceLocationIsStale = stale,
-            EstimatedMinutesToArrival = travel?.DriveSeconds is { } seconds ? (int)Math.Ceiling(seconds / 60.0) : null,
+            EstimatedMinutesToArrival = travel?.DriveMinutes,
             AmbulanceDistanceKm = travel is null ? null : Math.Round(travel.DistanceKm, 1),
             CancellationRequestStatus = call.CancellationRequestStatus,
             CancellationReviewNotes = call.CancellationReviewNotes,

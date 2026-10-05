@@ -1,0 +1,55 @@
+npm notice run npx
+npm notice run 'vitest' run src/features/emergency/components/log-call-dialog.test.tsx
+
+ RUN  v5.0.0 /home/nasrulla/Files/Projects/carelanka-qm/web-ui
+
+stderr | src/features/emergency/components/log-call-dialog.test.tsx > LogCallDialog > sends nothing when the scene has accuracy too large to store
+A PressResponder was rendered without a pressable child. Either call the usePress hook, or wrap your DOM node with <Pressable> component.
+
+ ❯ src/features/emergency/components/log-call-dialog.test.tsx (9 tests | 1 failed) 2889ms
+   ❯ LogCallDialog (9)
+     × sends nothing when the scene has accuracy too large to store 334ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/features/emergency/components/log-call-dialog.test.tsx > LogCallDialog > sends nothing when the scene has accuracy too large to store
+AssertionError: expected "vi.fn()" to not be called at all, but actually been called 1 times
+
+Received:
+
+  1st vi.fn() call:
+
+    Array [
+      Object {
+        "caller_name": null,
+        "caller_phone": null,
+        "details": "Fall at home",
+        "idempotency_key": "f0f8f319-e68c-402c-98dc-6b57e28194e6",
+        "latitude": 6.9271,
+        "location_accuracy_metres": 100000000,
+        "location_captured_at": "2026-10-05T07:54:25.614Z",
+        "longitude": 79.8612,
+        "patient_is_caller": true,
+        "priority": "high",
+      },
+    ]
+
+
+Number of calls: 1
+
+ ❯ src/features/emergency/components/log-call-dialog.test.tsx:51:26
+     49|     await userEvent.click(screen.getByRole('button', { name: 'Log call…
+     50|
+     51|     expect(onSubmit).not.toHaveBeenCalled();
+       |                          ^
+     52|   });
+     53|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 8 passed (9)
+   Start at  13:24:23
+   Duration  3.73s (tests 79%, import 9%, environment 8%, transform 2%, setup 1%)
+

@@ -1,0 +1,882 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  CareLanka.Api -> /home/nasrulla/Files/Projects/carelanka-qm/api/bin/Debug/net8.0/CareLanka.Api.dll
+  CareLanka.Api.Tests -> /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/bin/Debug/net8.0/CareLanka.Api.Tests.dll
+Test run for /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/bin/Debug/net8.0/CareLanka.Api.Tests.dll (.NETCoreApp,Version=v8.0)
+VSTest version 17.11.1 (x64)
+
+Starting test execution, please wait...
+A total of 1 test files matched the specified pattern.
+[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.2+699d445a1a (64-bit .NET 8.0.29)
+[xUnit.net 00:00:00.10]   Discovering: CareLanka.Api.Tests
+[xUnit.net 00:00:00.27]   Discovered:  CareLanka.Api.Tests
+[xUnit.net 00:00:00.28]   Starting:    CareLanka.Api.Tests
+[testcontainers.org 00:00:00.08] Connected to Docker:
+  Host: unix:///var/run/docker.sock
+  Server Version: 29.8.1
+  Kernel Version: 7.2.8-1-cachyos
+  API Version: 1.56
+  Operating System: CachyOS
+  Total Memory: 30.77 GB
+[testcontainers.org 00:00:00.32] Docker container 53f0cae6f04a created
+[testcontainers.org 00:00:00.34] Start Docker container 53f0cae6f04a
+[testcontainers.org 00:00:00.45] Wait for Docker container 53f0cae6f04a to complete readiness checks
+[testcontainers.org 00:00:01.47] Docker container 53f0cae6f04a ready
+[testcontainers.org 00:00:01.59] Docker container 398125b28a06 created
+[testcontainers.org 00:00:01.59] Start Docker container 398125b28a06
+[testcontainers.org 00:00:01.69] Wait for Docker container 398125b28a06 to complete readiness checks
+[testcontainers.org 00:00:01.69] Execute "pg_isready --host localhost --dbname carelanka_tests --username carelanka_tests" at Docker container 398125b28a06
+[testcontainers.org 00:00:02.73] Execute "pg_isready --host localhost --dbname carelanka_tests --username carelanka_tests" at Docker container 398125b28a06
+[testcontainers.org 00:00:03.76] Execute "pg_isready --host localhost --dbname carelanka_tests --username carelanka_tests" at Docker container 398125b28a06
+[testcontainers.org 00:00:03.80] Docker container 398125b28a06 ready
+warn: Microsoft.EntityFrameworkCore.Model.Validation[10622]
+      Entity 'PharmacyItem' has a global query filter defined and is the required end of a relationship with the entity 'PharmacyBatch'. This may lead to unexpected results when the required entity is filtered out. Either configure the navigation as optional, or define matching query filters for both entities in the navigation. See https://go.microsoft.com/fwlink/?linkid=2131316 for more information.
+warn: Microsoft.EntityFrameworkCore.Model.Validation[10622]
+      Entity 'Skill' has a global query filter defined and is the required end of a relationship with the entity 'StaffMemberSkill'. This may lead to unexpected results when the required entity is filtered out. Either configure the navigation as optional, or define matching query filters for both entities in the navigation. See https://go.microsoft.com/fwlink/?linkid=2131316 for more information.
+info: CareLanka.Api.Services.Equipment.WarningSweepWorker[0]
+      The warning sweep timer is off; only Run check will sweep
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]
+      Failed executing DbCommand (3ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT d.id
+      FROM dispatch_proposals AS d
+      WHERE d.status = 'pending'
+      ORDER BY d.created_at
+      LIMIT @__p_0
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]
+      Failed executing DbCommand (30ms) [Parameters=[@__date_0='?' (DbType = Date)], CommandType='Text', CommandTimeout='30']
+      SELECT m.id, m.asset_id, m.asset_type, m.completed_at, m.created_at, m.created_by, m.notes, m.performed_by_staff_id, m.schedule_type, m.scheduled_date, m.status, m.updated_at
+      FROM maintenance_schedules AS m
+      WHERE m.scheduled_date = @__date_0 AND m.status = 'scheduled'
+      ORDER BY m.created_at
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]
+      Failed executing DbCommand (32ms) [Parameters=[@__from_0='?' (DbType = DateTime), @__to_1='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      SELECT a.id, a.admission_id, a.booked_by_staff_member_id, a.cancellation_reason, a.cancelled_by_staff_member_id, a.confirmed_at, a.confirmed_by_staff_member_id, a.created_at, a.patient_id, a.reason, a.scheduled_at, a.status, a.updated_at
+      FROM appointments AS a
+      INNER JOIN (
+          SELECT p.id, p.is_active
+          FROM patients AS p
+          WHERE p.is_active
+      ) AS t ON a.patient_id = t.id
+      WHERE t.is_active AND a.status IN ('scheduled', 'confirmed') AND a.scheduled_at >= @__from_0 AND a.scheduled_at <= @__to_1
+      ORDER BY a.scheduled_at
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]
+      Failed executing DbCommand (15ms) [Parameters=[@__cutoff_0='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      DELETE FROM notifications AS n
+      WHERE n.created_at < @__cutoff_0
+warn: CareLanka.Api.Services.Common.NotificationScheduleWorker[0]
+      Inbox clean-up failed; it will run again on schedule.
+      Npgsql.PostgresException (0x80004005): 42P01: relation "notifications" does not exist
+      POSITION: 13
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteNonQuery(Boolean async, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteNonQueryAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteNonQueryAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteNonQueryAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at CareLanka.Api.Services.Common.NotificationScheduleWorker.RunEveryAsync(String job, TimeSpan interval, Func`3 run, CancellationToken stoppingToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Common/NotificationScheduleWorker.cs:line 38
+        Exception data:
+          Severity: ERROR
+          SqlState: 42P01
+          MessageText: relation "notifications" does not exist
+          Position: 13
+          File: parse_relation.c
+          Line: 1449
+          Routine: parserOpenTable
+fail: Microsoft.EntityFrameworkCore.Query[10100]
+      An exception occurred while iterating over the results of a query for context type 'CareLanka.Api.Data.CareLankaDbContext'.
+      Npgsql.PostgresException (0x80004005): 42P01: relation "dispatch_proposals" does not exist
+      POSITION: 18
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+        Exception data:
+          Severity: ERROR
+          SqlState: 42P01
+          MessageText: relation "dispatch_proposals" does not exist
+          Position: 18
+          File: parse_relation.c
+          Line: 1449
+          Routine: parserOpenTable
+      Npgsql.PostgresException (0x80004005): 42P01: relation "dispatch_proposals" does not exist
+      POSITION: 18
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+        Exception data:
+          Severity: ERROR
+          SqlState: 42P01
+          MessageText: relation "dispatch_proposals" does not exist
+          Position: 18
+          File: parse_relation.c
+          Line: 1449
+          Routine: parserOpenTable
+fail: Microsoft.EntityFrameworkCore.Query[10100]
+      An exception occurred while iterating over the results of a query for context type 'CareLanka.Api.Data.CareLankaDbContext'.
+      Npgsql.PostgresException (0x80004005): 42P01: relation "appointments" does not exist
+      POSITION: 244
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+        Exception data:
+          Severity: ERROR
+          SqlState: 42P01
+          MessageText: relation "appointments" does not exist
+          Position: 244
+          File: parse_relation.c
+          Line: 1449
+          Routine: parserOpenTable
+      Npgsql.PostgresException (0x80004005): 42P01: relation "appointments" does not exist
+      POSITION: 244
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+        Exception data:
+          Severity: ERROR
+          SqlState: 42P01
+          MessageText: relation "appointments" does not exist
+          Position: 244
+          File: parse_relation.c
+          Line: 1449
+          Routine: parserOpenTable
+fail: Microsoft.EntityFrameworkCore.Query[10100]
+      An exception occurred while iterating over the results of a query for context type 'CareLanka.Api.Data.CareLankaDbContext'.
+      Npgsql.PostgresException (0x80004005): 42P01: relation "maintenance_schedules" does not exist
+      POSITION: 181
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+        Exception data:
+          Severity: ERROR
+          SqlState: 42P01
+          MessageText: relation "maintenance_schedules" does not exist
+          Position: 181
+          File: parse_relation.c
+          Line: 1449
+          Routine: parserOpenTable
+      Npgsql.PostgresException (0x80004005): 42P01: relation "maintenance_schedules" does not exist
+      POSITION: 181
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+        Exception data:
+          Severity: ERROR
+          SqlState: 42P01
+          MessageText: relation "maintenance_schedules" does not exist
+          Position: 181
+          File: parse_relation.c
+          Line: 1449
+          Routine: parserOpenTable
+fail: CareLanka.Api.Agents.Emergency.DispatchProposalWorker[0]
+      Pending dispatch proposals could not be recovered; retrying shortly.
+      Npgsql.PostgresException (0x80004005): 42P01: relation "dispatch_proposals" does not exist
+      POSITION: 18
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+         at Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync[TSource](IQueryable`1 source, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync[TSource](IQueryable`1 source, CancellationToken cancellationToken)
+         at CareLanka.Api.Agents.Emergency.DispatchProposalWorker.RecoverAsync(CancellationToken stoppingToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Agents/Emergency/DispatchProposalWorker.cs:line 38
+         at CareLanka.Api.Agents.Emergency.DispatchProposalWorker.RecoverAsync(CancellationToken stoppingToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Agents/Emergency/DispatchProposalWorker.cs:line 42
+        Exception data:
+          Severity: ERROR
+          SqlState: 42P01
+          MessageText: relation "dispatch_proposals" does not exist
+          Position: 18
+          File: parse_relation.c
+          Line: 1449
+          Routine: parserOpenTable
+warn: CareLanka.Api.Services.Common.NotificationScheduleWorker[0]
+      Maintenance due alerts failed; it will run again on schedule.
+      Npgsql.PostgresException (0x80004005): 42P01: relation "maintenance_schedules" does not exist
+      POSITION: 181
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+         at Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync[TSource](IQueryable`1 source, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync[TSource](IQueryable`1 source, CancellationToken cancellationToken)
+         at CareLanka.Api.Services.Equipment.MaintenanceService.ListScheduledOnAsync(DateOnly date, CancellationToken cancellationToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Equipment/MaintenanceService.cs:line 185
+         at CareLanka.Api.Services.Common.MaintenanceDueService.SendDueAsync(CancellationToken cancellationToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Common/MaintenanceDueService.cs:line 22
+         at CareLanka.Api.Services.Common.NotificationScheduleWorker.RunEveryAsync(String job, TimeSpan interval, Func`3 run, CancellationToken stoppingToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Common/NotificationScheduleWorker.cs:line 38
+        Exception data:
+          Severity: ERROR
+          SqlState: 42P01
+          MessageText: relation "maintenance_schedules" does not exist
+          Position: 181
+          File: parse_relation.c
+          Line: 1449
+          Routine: parserOpenTable
+warn: CareLanka.Api.Services.Common.NotificationScheduleWorker[0]
+      Appointment reminders failed; it will run again on schedule.
+      Npgsql.PostgresException (0x80004005): 42P01: relation "appointments" does not exist
+      POSITION: 244
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+         at Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync[TSource](IQueryable`1 source, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync[TSource](IQueryable`1 source, CancellationToken cancellationToken)
+         at CareLanka.Api.Services.Patient.AppointmentService.ListOpenStartingBetweenAsync(DateTimeOffset from, DateTimeOffset to, CancellationToken ct) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Patient/AppointmentService.cs:line 373
+         at CareLanka.Api.Services.Common.AppointmentReminderService.SendDueAsync(CancellationToken cancellationToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Common/AppointmentReminderService.cs:line 28
+         at CareLanka.Api.Services.Common.NotificationScheduleWorker.RunEveryAsync(String job, TimeSpan interval, Func`3 run, CancellationToken stoppingToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Common/NotificationScheduleWorker.cs:line 38
+        Exception data:
+          Severity: ERROR
+          SqlState: 42P01
+          MessageText: relation "appointments" does not exist
+          Position: 244
+          File: parse_relation.c
+          Line: 1449
+          Routine: parserOpenTable
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260907165731_Common_AddIdentity'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260908171445_Patient_AddWard'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260909014609_Equipment_AddBed'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260909034637_Equipment_AddItems'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260909171906_Patient_AddAdmission'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260910062958_Equipment_AddPharmacy'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260910081123_Patient_AddOpenAdmissionIndex'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260910082607_Patient_AddCancelNote'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260911065243_Patient_AddPatientCode'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260911084650_Patient_AddBilling'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260911145450_Patient_SimplifyDischargeChecklist'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260911172907_Patient_AddBillingRates'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260911191929_Patient_AddBillRaisedBy'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260912071707_Emergency_AddFoundation'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260913035038_Equipment_AddLabReports'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260913181004_Emergency_AddCrewEligibility'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260914003100_Emergency_AddCallIntake'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260914021853_Emergency_AddDispatchStateMachine'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260914022217_Emergency_CompleteDispatchIndexes'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260914083551_Common_PatientUsernameLogin'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260914142642_Emergency_AddTrackingCancellation'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260914165535_Emergency_AddCancellationReview'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260914190658_Patient_AddAppointmentBilling'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260915155841_Patient_AddAppointmentConfirmed'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260916141101_Equipment_AddItemConfirmation'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260917045958_Equipment_AddPrescriptions'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260918123350_Patient_AddMedicalProfile'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260918152625_Equipment_AddPharmacyBatches'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260919045326_Equipment_AddWarningSweep'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260919053327_Equipment_AddWarningClear'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260919112441_Emergency_AddDispatchOutcomeDetails'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260920092719_Common_AddDeviceTokensAndNotifications'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260920095530_Emergency_AddPreAdmissionNotices'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260920102312_Common_AddAgentWorkflows'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260920161305_Patient_LinkBedAssignmentWorkflow'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260921092223_Patient_AddCareRecommendation'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260922132520_Patient_RemoveBedAgentWorkflowLink'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260922140219_Emergency_AddDispatchProposals'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260922140410_Equipment_AddReorderSuggestion'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260922142627_Patient_MakeAdmissionCategoryNullable'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260923074735_Emergency_AddAmbulanceStatusHistory'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260923075954_Patient_ReplaceAdmissionCategories'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260925103228_Patient_RemoveMedicalProfileRecentSituation'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260926163210_Emergency_AddDispatchRecommendationSource'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260927104803_Common_SplitNotificationDeliveries'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260927131611_Staff_AddStaffTables'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260927210752_Common_AddPatientAccountMustChangePassword'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260927211652_Common_ExpandNotificationTypeCatalogue'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260928033132_Common_AddStaffDoctorProfile'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260928041418_Equipment_AddDoctorWrittenPrescriptions'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260928173116_Emergency_WithdrawDispatchProposals'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260929202113_Emergency_AddDispatchProposalRequestedBy'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20260930202957_Common_AddEquipmentAdministratorRole'.
+info: Microsoft.EntityFrameworkCore.Migrations[20402]
+      Applying migration '20261003092518_Emergency_CloseCallsAndRuns'.
+warn: Microsoft.AspNetCore.HttpsPolicy.HttpsRedirectionMiddleware[3]
+      Failed to determine the https port for redirect.
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.A_call_exactly_on_the_coordinate_limits_is_taken(latitude: 0, longitude: 0) [691 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.A_call_exactly_on_the_coordinate_limits_is_taken(latitude: 90, longitude: 180) [126 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.A_call_exactly_on_the_coordinate_limits_is_taken(latitude: -90, longitude: -180) [138 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.Only_the_duty_manager_sees_the_call_board_and_fleet_map(email: "equipment.tests@carelanka.invalid") [72 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.Only_the_duty_manager_sees_the_call_board_and_fleet_map(email: "doctor.tests@carelanka.invalid") [52 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.Only_the_duty_manager_sees_the_call_board_and_fleet_map(email: "reception.tests@carelanka.invalid") [50 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.Only_the_duty_manager_sees_the_call_board_and_fleet_map(email: "ambulance.tests@carelanka.invalid") [45 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.Only_the_duty_manager_sees_the_call_board_and_fleet_map(email: "nurse.tests@carelanka.invalid") [51 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.Only_the_duty_manager_sees_the_call_board_and_fleet_map(email: "equipment-admin.tests@carelanka.invalid") [47 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.Only_the_duty_manager_sees_the_call_board_and_fleet_map(email: "administrator.tests@carelanka.invalid") [49 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.Text_fields_are_taken_up_to_their_limit_and_refused_one_past_it(field: "caller_phone", length: 21, accepted: False) [74 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.Text_fields_are_taken_up_to_their_limit_and_refused_one_past_it(field: "caller_phone", length: 20, accepted: True) [116 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.Text_fields_are_taken_up_to_their_limit_and_refused_one_past_it(field: "caller_name", length: 200, accepted: True) [117 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.Text_fields_are_taken_up_to_their_limit_and_refused_one_past_it(field: "details", length: 1000, accepted: True) [114 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.Text_fields_are_taken_up_to_their_limit_and_refused_one_past_it(field: "details", length: 1001, accepted: False) [51 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.Text_fields_are_taken_up_to_their_limit_and_refused_one_past_it(field: "caller_name", length: 201, accepted: False) [51 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.Location_accuracy_is_checked_at_both_ends(accuracy: 99999999.989999995, accepted: True) [113 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.Location_accuracy_is_checked_at_both_ends(accuracy: -0.01, accepted: False) [48 ms]
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]
+      Failed executing DbCommand (1ms) [Parameters=[@p0='?' (DbType = Guid), @p1='?', @p2='?' (DbType = Int32), @p3='?' (DbType = DateTime), @p4='?' (DbType = Object), @p5='?' (DbType = Guid), @p6='?' (DbType = DateTime), @p7='?' (DbType = Guid), @p8='?', @p9='?' (DbType = Object), @p10='?', @p11='?', @p12='?' (DbType = Guid), @p13='?' (DbType = Object), @p14='?', @p15='?', @p16='?' (DbType = DateTime), @p17='?' (DbType = Guid), @p18='?' (DbType = DateTime), @p19='?', @p20='?' (DbType = Object), @p21='?' (DbType = DateTime), @p22='?' (DbType = Object), @p23='?' (DbType = Guid), @p24='?', @p25='?', @p26='?', @p27='?' (DbType = Guid), @p28='?', @p29='?', @p30='?' (DbType = DateTime), @p31='?', @p32='?' (DbType = DateTime), @p33='?' (DbType = Guid), @p34='?' (DbType = DateTime), @p35='?' (DbType = DateTime), @p36='?', @p37='?' (DbType = Guid), @p38='?' (DbType = Decimal), @p39='?' (DbType = Decimal), @p40='?' (DbType = DateTime), @p41='?' (DbType = Decimal), @p42='?', @p43='?', @p44='?' (DbType = Guid), @p45='?' (DbType = Boolean), @p46='?', @p47='?', @p48='?' (DbType = Boolean), @p49='?' (DbType = DateTime), @p50='?' (DbType = Guid), @p51='?', @p52='?' (DbType = DateTime), @p53='?', @p54='?' (DbType = Guid), @p55='?', @p56='?' (DbType = DateTime), @p57='?' (DbType = Guid), @p58='?' (DbType = Guid), @p59='?', @p60='?', @p61='?' (DbType = DateTime), @p62='?' (DbType = Guid), @p63='?' (DbType = Boolean), @p64='?', @p65='?' (DbType = DateTime), @p66='?' (DbType = Guid), @p67='?' (DbType = Int32), @p68='?', @p69='?' (DbType = Boolean), @p70='?' (DbType = Int32), @p71='?', @p72='?', @p73='?' (DbType = Guid), @p74='?', @p75='?', @p76='?', @p77='?', @p78='?' (DbType = Guid), @p79='?' (DbType = Guid), @p80='?' (DbType = Guid), @p81='?', @p82='?' (DbType = DateTime), @p83='?' (DbType = Guid), @p84='?' (DbType = Int32), @p85='?', @p86='?' (DbType = Guid), @p87='?', @p88='?' (DbType = Int32), @p89='?' (DbType = Guid), @p90='?', @p91='?', @p92='?' (DbType = DateTime), @p93='?', @p94='?' (DbType = DateTime), @p95='?' (DbType = Guid), @p96='?' (DbType = Guid), @p97='?' (DbType = Int32), @p98='?', @p99='?' (DbType = DateTime), @p100='?', @p101='?' (DbType = DateTime), @p102='?' (DbType = Guid), @p103='?' (DbType = DateTime), @p104='?', @p105='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      INSERT INTO agent_workflows (id, agent_type, attempt_count, completed_at, completed_steps, correlation_id, created_at, entity_id, entity_type, errors, final_outcome, objective, parent_workflow_id, plan, required_approver_role, review_notes, reviewed_at, reviewed_by_staff_member_id, started_at, status, tool_results, updated_at, validation_results)
+      VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19, @p20, @p21, @p22);
+      INSERT INTO emergency_calls (id, address_label, caller_name, caller_phone, caller_user_id, cancellation_request_reason, cancellation_request_status, cancellation_requested_at, cancellation_review_notes, cancellation_reviewed_at, cancellation_reviewed_by_staff_id, closed_at, created_at, details, idempotency_key, latitude, location_accuracy_metres, location_captured_at, longitude, outcome, outcome_notes, patient_id, patient_is_caller, priority, status, transported, updated_at)
+      VALUES (@p23, @p24, @p25, @p26, @p27, @p28, @p29, @p30, @p31, @p32, @p33, @p34, @p35, @p36, @p37, @p38, @p39, @p40, @p41, @p42, @p43, @p44, @p45, @p46, @p47, @p48, @p49);
+      INSERT INTO notifications (id, body, created_at, dedupe_key, entity_id, entity_type, read_at, recipient_patient_account_id, recipient_staff_member_id, title, type, updated_at)
+      VALUES (@p50, @p51, @p52, @p53, @p54, @p55, @p56, @p57, @p58, @p59, @p60, @p61);
+      INSERT INTO dispatch_proposals (id, allow_diversion, call_priority, created_at, emergency_call_id, estimated_minutes_to_scene, exclude_ambulance_ids_json, is_diversion, minutes_saved_for_this_call, outcome, pre_admission_sent_json, proposed_ambulance_id, rationale, recommendation_note, recommendation_source, rejection_reason, replacement_ambulance_id, requested_by_staff_member_id, resulting_dispatch_id, review_notes, reviewed_at, reviewed_by_staff_member_id, source_call_additional_wait_minutes, source_call_address_label, source_call_id, source_call_priority, source_call_waiting_minutes_so_far, source_dispatch_id, source_dispatch_status, status, updated_at, withdrawal_reason, withdrawn_at, workflow_id)
+      VALUES (@p62, @p63, @p64, @p65, @p66, @p67, @p68, @p69, @p70, @p71, @p72, @p73, @p74, @p75, @p76, @p77, @p78, @p79, @p80, @p81, @p82, @p83, @p84, @p85, @p86, @p87, @p88, @p89, @p90, @p91, @p92, @p93, @p94, @p95)
+      RETURNING xmin;
+      INSERT INTO notification_deliveries (id, attempt_count, channel, created_at, failure_reason, next_attempt_at, notification_id, sent_at, status, updated_at)
+      VALUES (@p96, @p97, @p98, @p99, @p100, @p101, @p102, @p103, @p104, @p105);
+fail: Microsoft.EntityFrameworkCore.Update[10000]
+      An exception occurred in the database while saving changes for context type 'CareLanka.Api.Data.CareLankaDbContext'.
+      Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+       ---> Npgsql.PostgresException (0x80004005): 22003: numeric field overflow
+      DETAIL: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information.
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+        Exception data:
+          Severity: ERROR
+          SqlState: 22003
+          MessageText: numeric field overflow
+          Detail: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information.
+          File: numeric.c
+          Line: 7910
+          Routine: apply_typmod
+         --- End of inner exception stack trace ---
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+      Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+       ---> Npgsql.PostgresException (0x80004005): 22003: numeric field overflow
+      DETAIL: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information.
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+        Exception data:
+          Severity: ERROR
+          SqlState: 22003
+          MessageText: numeric field overflow
+          Detail: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information.
+          File: numeric.c
+          Line: 7910
+          Routine: apply_typmod
+         --- End of inner exception stack trace ---
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+fail: CareLanka.Api.Common.Errors.ApiExceptionHandler[0]
+      Unhandled exception on POST /api/emergency-calls
+      Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+       ---> Npgsql.PostgresException (0x80004005): 22003: numeric field overflow
+      DETAIL: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information.
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+        Exception data:
+          Severity: ERROR
+          SqlState: 22003
+          MessageText: numeric field overflow
+          Detail: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information.
+          File: numeric.c
+          Line: 7910
+          Routine: apply_typmod
+         --- End of inner exception stack trace ---
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at CareLanka.Api.Services.Emergency.EmergencyCallService.CreateAsync(CreateEmergencyCallRequest request, CancellationToken cancellationToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/EmergencyCallService.cs:line 132
+         at CareLanka.Api.Controllers.Emergency.EmergencyCallsController.Create(CreateEmergencyCallRequest request, CancellationToken cancellationToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Controllers/Emergency/EmergencyCallsController.cs:line 27
+         at lambda_method570(Closure, Object)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.AwaitableObjectResultExecutor.Execute(ActionContext actionContext, IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeActionMethodAsync>g__Awaited|12_0(ControllerActionInvoker invoker, ValueTask`1 actionResultValueTask)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeNextActionFilterAsync>g__Awaited|10_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Rethrow(ActionExecutedContextSealed context)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeInnerFilterAsync>g__Awaited|13_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+[xUnit.net 00:00:10.97]     CareLanka.Api.Tests.EmergencyApiQualityTests.Location_accuracy_is_checked_at_both_ends(accuracy: 1000000000000, accepted: False) [FAIL]
+[xUnit.net 00:00:10.97]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:10.97]       Expected: BadRequest
+[xUnit.net 00:00:10.97]       Actual:   InternalServerError
+[xUnit.net 00:00:10.97]       Stack Trace:
+[xUnit.net 00:00:10.97]         /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs(367,0): at CareLanka.Api.Tests.EmergencyApiQualityTests.AssertValidationProblemAsync(HttpResponseMessage response, String field)
+[xUnit.net 00:00:10.97]         /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs(121,0): at CareLanka.Api.Tests.EmergencyApiQualityTests.Location_accuracy_is_checked_at_both_ends(Double accuracy, Boolean accepted)
+[xUnit.net 00:00:10.97]         --- End of stack trace from previous location ---
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]
+      Failed executing DbCommand (1ms) [Parameters=[@p0='?' (DbType = Guid), @p1='?', @p2='?' (DbType = Int32), @p3='?' (DbType = DateTime), @p4='?' (DbType = Object), @p5='?' (DbType = Guid), @p6='?' (DbType = DateTime), @p7='?' (DbType = Guid), @p8='?', @p9='?' (DbType = Object), @p10='?', @p11='?', @p12='?' (DbType = Guid), @p13='?' (DbType = Object), @p14='?', @p15='?', @p16='?' (DbType = DateTime), @p17='?' (DbType = Guid), @p18='?' (DbType = DateTime), @p19='?', @p20='?' (DbType = Object), @p21='?' (DbType = DateTime), @p22='?' (DbType = Object), @p23='?' (DbType = Guid), @p24='?', @p25='?', @p26='?', @p27='?' (DbType = Guid), @p28='?', @p29='?', @p30='?' (DbType = DateTime), @p31='?', @p32='?' (DbType = DateTime), @p33='?' (DbType = Guid), @p34='?' (DbType = DateTime), @p35='?' (DbType = DateTime), @p36='?', @p37='?' (DbType = Guid), @p38='?' (DbType = Decimal), @p39='?' (DbType = Decimal), @p40='?' (DbType = DateTime), @p41='?' (DbType = Decimal), @p42='?', @p43='?', @p44='?' (DbType = Guid), @p45='?' (DbType = Boolean), @p46='?', @p47='?', @p48='?' (DbType = Boolean), @p49='?' (DbType = DateTime), @p50='?' (DbType = Guid), @p51='?', @p52='?' (DbType = DateTime), @p53='?', @p54='?' (DbType = Guid), @p55='?', @p56='?' (DbType = DateTime), @p57='?' (DbType = Guid), @p58='?' (DbType = Guid), @p59='?', @p60='?', @p61='?' (DbType = DateTime), @p62='?' (DbType = Guid), @p63='?' (DbType = Boolean), @p64='?', @p65='?' (DbType = DateTime), @p66='?' (DbType = Guid), @p67='?' (DbType = Int32), @p68='?', @p69='?' (DbType = Boolean), @p70='?' (DbType = Int32), @p71='?', @p72='?', @p73='?' (DbType = Guid), @p74='?', @p75='?', @p76='?', @p77='?', @p78='?' (DbType = Guid), @p79='?' (DbType = Guid), @p80='?' (DbType = Guid), @p81='?', @p82='?' (DbType = DateTime), @p83='?' (DbType = Guid), @p84='?' (DbType = Int32), @p85='?', @p86='?' (DbType = Guid), @p87='?', @p88='?' (DbType = Int32), @p89='?' (DbType = Guid), @p90='?', @p91='?', @p92='?' (DbType = DateTime), @p93='?', @p94='?' (DbType = DateTime), @p95='?' (DbType = Guid), @p96='?' (DbType = Guid), @p97='?' (DbType = Int32), @p98='?', @p99='?' (DbType = DateTime), @p100='?', @p101='?' (DbType = DateTime), @p102='?' (DbType = Guid), @p103='?' (DbType = DateTime), @p104='?', @p105='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      INSERT INTO agent_workflows (id, agent_type, attempt_count, completed_at, completed_steps, correlation_id, created_at, entity_id, entity_type, errors, final_outcome, objective, parent_workflow_id, plan, required_approver_role, review_notes, reviewed_at, reviewed_by_staff_member_id, started_at, status, tool_results, updated_at, validation_results)
+      VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19, @p20, @p21, @p22);
+      INSERT INTO emergency_calls (id, address_label, caller_name, caller_phone, caller_user_id, cancellation_request_reason, cancellation_request_status, cancellation_requested_at, cancellation_review_notes, cancellation_reviewed_at, cancellation_reviewed_by_staff_id, closed_at, created_at, details, idempotency_key, latitude, location_accuracy_metres, location_captured_at, longitude, outcome, outcome_notes, patient_id, patient_is_caller, priority, status, transported, updated_at)
+      VALUES (@p23, @p24, @p25, @p26, @p27, @p28, @p29, @p30, @p31, @p32, @p33, @p34, @p35, @p36, @p37, @p38, @p39, @p40, @p41, @p42, @p43, @p44, @p45, @p46, @p47, @p48, @p49);
+      INSERT INTO notifications (id, body, created_at, dedupe_key, entity_id, entity_type, read_at, recipient_patient_account_id, recipient_staff_member_id, title, type, updated_at)
+      VALUES (@p50, @p51, @p52, @p53, @p54, @p55, @p56, @p57, @p58, @p59, @p60, @p61);
+      INSERT INTO dispatch_proposals (id, allow_diversion, call_priority, created_at, emergency_call_id, estimated_minutes_to_scene, exclude_ambulance_ids_json, is_diversion, minutes_saved_for_this_call, outcome, pre_admission_sent_json, proposed_ambulance_id, rationale, recommendation_note, recommendation_source, rejection_reason, replacement_ambulance_id, requested_by_staff_member_id, resulting_dispatch_id, review_notes, reviewed_at, reviewed_by_staff_member_id, source_call_additional_wait_minutes, source_call_address_label, source_call_id, source_call_priority, source_call_waiting_minutes_so_far, source_dispatch_id, source_dispatch_status, status, updated_at, withdrawal_reason, withdrawn_at, workflow_id)
+      VALUES (@p62, @p63, @p64, @p65, @p66, @p67, @p68, @p69, @p70, @p71, @p72, @p73, @p74, @p75, @p76, @p77, @p78, @p79, @p80, @p81, @p82, @p83, @p84, @p85, @p86, @p87, @p88, @p89, @p90, @p91, @p92, @p93, @p94, @p95)
+      RETURNING xmin;
+      INSERT INTO notification_deliveries (id, attempt_count, channel, created_at, failure_reason, next_attempt_at, notification_id, sent_at, status, updated_at)
+      VALUES (@p96, @p97, @p98, @p99, @p100, @p101, @p102, @p103, @p104, @p105);
+fail: Microsoft.EntityFrameworkCore.Update[10000]
+      An exception occurred in the database while saving changes for context type 'CareLanka.Api.Data.CareLankaDbContext'.
+      Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+       ---> Npgsql.PostgresException (0x80004005): 22003: numeric field overflow
+      DETAIL: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information.
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+        Exception data:
+          Severity: ERROR
+          SqlState: 22003
+          MessageText: numeric field overflow
+          Detail: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information.
+          File: numeric.c
+          Line: 7910
+          Routine: apply_typmod
+         --- End of inner exception stack trace ---
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+      Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+       ---> Npgsql.PostgresException (0x80004005): 22003: numeric field overflow
+      DETAIL: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information.
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+        Exception data:
+          Severity: ERROR
+          SqlState: 22003
+          MessageText: numeric field overflow
+          Detail: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information.
+          File: numeric.c
+          Line: 7910
+          Routine: apply_typmod
+         --- End of inner exception stack trace ---
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+fail: CareLanka.Api.Common.Errors.ApiExceptionHandler[0]
+      Unhandled exception on POST /api/emergency-calls
+      Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+       ---> Npgsql.PostgresException (0x80004005): 22003: numeric field overflow
+      DETAIL: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information.
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+        Exception data:
+          Severity: ERROR
+          SqlState: 22003
+          MessageText: numeric field overflow
+          Detail: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information.
+          File: numeric.c
+          Line: 7910
+          Routine: apply_typmod
+         --- End of inner exception stack trace ---
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at CareLanka.Api.Services.Emergency.EmergencyCallService.CreateAsync(CreateEmergencyCallRequest request, CancellationToken cancellationToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/EmergencyCallService.cs:line 132
+         at CareLanka.Api.Controllers.Emergency.EmergencyCallsController.Create(CreateEmergencyCallRequest request, CancellationToken cancellationToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Controllers/Emergency/EmergencyCallsController.cs:line 27
+         at lambda_method570(Closure, Object)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.AwaitableObjectResultExecutor.Execute(ActionContext actionContext, IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeActionMethodAsync>g__Awaited|12_0(ControllerActionInvoker invoker, ValueTask`1 actionResultValueTask)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeNextActionFilterAsync>g__Awaited|10_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Rethrow(ActionExecutedContextSealed context)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeInnerFilterAsync>g__Awaited|13_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+[xUnit.net 00:00:11.25]     CareLanka.Api.Tests.EmergencyApiQualityTests.Location_accuracy_is_checked_at_both_ends(accuracy: 100000000, accepted: False) [FAIL]
+[xUnit.net 00:00:11.25]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:11.26]       Expected: BadRequest
+[xUnit.net 00:00:11.26]       Actual:   InternalServerError
+[xUnit.net 00:00:11.26]       Stack Trace:
+[xUnit.net 00:00:11.26]         /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs(367,0): at CareLanka.Api.Tests.EmergencyApiQualityTests.AssertValidationProblemAsync(HttpResponseMessage response, String field)
+[xUnit.net 00:00:11.26]         /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs(121,0): at CareLanka.Api.Tests.EmergencyApiQualityTests.Location_accuracy_is_checked_at_both_ends(Double accuracy, Boolean accepted)
+[xUnit.net 00:00:11.26]         --- End of stack trace from previous location ---
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]
+      Failed executing DbCommand (0ms) [Parameters=[@p5='?' (DbType = Guid), @p0='?' (DbType = Decimal), @p1='?' (DbType = Decimal), @p2='?' (DbType = DateTime), @p3='?' (DbType = Decimal), @p4='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      UPDATE emergency_calls SET latitude = @p0, location_accuracy_metres = @p1, location_captured_at = @p2, longitude = @p3, updated_at = @p4
+      WHERE id = @p5;
+fail: Microsoft.EntityFrameworkCore.Update[10000]
+      An exception occurred in the database while saving changes for context type 'CareLanka.Api.Data.CareLankaDbContext'.
+      Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+       ---> Npgsql.PostgresException (0x80004005): 22003: numeric field overflow
+      DETAIL: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information.
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+        Exception data:
+          Severity: ERROR
+          SqlState: 22003
+          MessageText: numeric field overflow
+          Detail: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information.
+          File: numeric.c
+          Line: 7910
+          Routine: apply_typmod
+         --- End of inner exception stack trace ---
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+      Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+       ---> Npgsql.PostgresException (0x80004005): 22003: numeric field overflow
+      DETAIL: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information.
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+        Exception data:
+          Severity: ERROR
+          SqlState: 22003
+          MessageText: numeric field overflow
+          Detail: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information.
+          File: numeric.c
+          Line: 7910
+          Routine: apply_typmod
+         --- End of inner exception stack trace ---
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+fail: CareLanka.Api.Common.Errors.ApiExceptionHandler[0]
+      Unhandled exception on PATCH /api/emergency-calls/f35d9e7f-0434-4ff9-ab13-cd1f287f3269
+      Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+       ---> Npgsql.PostgresException (0x80004005): 22003: numeric field overflow
+      DETAIL: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information.
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+        Exception data:
+          Severity: ERROR
+          SqlState: 22003
+          MessageText: numeric field overflow
+          Detail: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information.
+          File: numeric.c
+          Line: 7910
+          Routine: apply_typmod
+         --- End of inner exception stack trace ---
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at CareLanka.Api.Services.Emergency.EmergencyCallService.SaveAsync(CancellationToken cancellationToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/EmergencyCallService.cs:line 725
+         at CareLanka.Api.Services.Emergency.EmergencyCallService.UpdateAsync(Guid id, UpdateEmergencyCallRequest request, CancellationToken cancellationToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/EmergencyCallService.cs:line 332
+         at CareLanka.Api.Services.Emergency.EmergencyCallService.UpdateAsync(Guid id, UpdateEmergencyCallRequest request, CancellationToken cancellationToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Services/Emergency/EmergencyCallService.cs:line 345
+         at CareLanka.Api.Controllers.Emergency.EmergencyCallsController.Update(Guid id, UpdateEmergencyCallRequest request, CancellationToken cancellationToken) in /home/nasrulla/Files/Projects/carelanka-qm/api/Controllers/Emergency/EmergencyCallsController.cs:line 76
+         at lambda_method1754(Closure, Object)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.AwaitableObjectResultExecutor.Execute(ActionContext actionContext, IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeActionMethodAsync>g__Awaited|12_0(ControllerActionInvoker invoker, ValueTask`1 actionResultValueTask)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeNextActionFilterAsync>g__Awaited|10_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Rethrow(ActionExecutedContextSealed context)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeInnerFilterAsync>g__Awaited|13_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+[xUnit.net 00:00:11.60]     CareLanka.Api.Tests.EmergencyApiQualityTests.Moving_a_call_checks_the_new_location_accuracy_too(accuracy: 100000000, accepted: False) [FAIL]
+[xUnit.net 00:00:11.60]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:11.60]       Expected: BadRequest
+[xUnit.net 00:00:11.60]       Actual:   InternalServerError
+[xUnit.net 00:00:11.60]       Stack Trace:
+[xUnit.net 00:00:11.60]         /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs(367,0): at CareLanka.Api.Tests.EmergencyApiQualityTests.AssertValidationProblemAsync(HttpResponseMessage response, String field)
+[xUnit.net 00:00:11.60]         /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs(150,0): at CareLanka.Api.Tests.EmergencyApiQualityTests.Moving_a_call_checks_the_new_location_accuracy_too(Double accuracy, Boolean accepted)
+[xUnit.net 00:00:11.60]         --- End of stack trace from previous location ---
+info: CareLanka.Api.Common.Errors.ApiExceptionHandler[0]
+      403 cl_err_403 on POST /api/emergency-calls: Your role does not allow this.
+  Failed CareLanka.Api.Tests.EmergencyApiQualityTests.Location_accuracy_is_checked_at_both_ends(accuracy: 1000000000000, accepted: False) [76 ms]
+  Error Message:
+   Assert.Equal() Failure: Values differ
+Expected: BadRequest
+Actual:   InternalServerError
+  Stack Trace:
+     at CareLanka.Api.Tests.EmergencyApiQualityTests.AssertValidationProblemAsync(HttpResponseMessage response, String field) in /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs:line 367
+   at CareLanka.Api.Tests.EmergencyApiQualityTests.Location_accuracy_is_checked_at_both_ends(Double accuracy, Boolean accepted) in /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs:line 121
+--- End of stack trace from previous location ---
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.Location_accuracy_is_checked_at_both_ends(accuracy: 50000, accepted: True) [114 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.Location_accuracy_is_checked_at_both_ends(accuracy: 0, accepted: True) [113 ms]
+  Failed CareLanka.Api.Tests.EmergencyApiQualityTests.Location_accuracy_is_checked_at_both_ends(accuracy: 100000000, accepted: False) [57 ms]
+  Error Message:
+   Assert.Equal() Failure: Values differ
+Expected: BadRequest
+Actual:   InternalServerError
+  Stack Trace:
+     at CareLanka.Api.Tests.EmergencyApiQualityTests.AssertValidationProblemAsync(HttpResponseMessage response, String field) in /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs:line 367
+   at CareLanka.Api.Tests.EmergencyApiQualityTests.Location_accuracy_is_checked_at_both_ends(Double accuracy, Boolean accepted) in /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs:line 121
+--- End of stack trace from previous location ---
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.Moving_a_call_checks_the_new_location_accuracy_too(accuracy: 99999999.989999995, accepted: True) [209 ms]
+  Failed CareLanka.Api.Tests.EmergencyApiQualityTests.Moving_a_call_checks_the_new_location_accuracy_too(accuracy: 100000000, accepted: False) [132 ms]
+  Error Message:
+   Assert.Equal() Failure: Values differ
+Expected: BadRequest
+Actual:   InternalServerError
+  Stack Trace:
+     at CareLanka.Api.Tests.EmergencyApiQualityTests.AssertValidationProblemAsync(HttpResponseMessage response, String field) in /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs:line 367
+   at CareLanka.Api.Tests.EmergencyApiQualityTests.Moving_a_call_checks_the_new_location_accuracy_too(Double accuracy, Boolean accepted) in /home/nasrulla/Files/Projects/carelanka-qm/tests/CareLanka.Api.Tests/EmergencyApiQualityTests.cs:line 150
+--- End of stack trace from previous location ---
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.An_empty_idempotency_key_is_refused [51 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.A_patient_cannot_set_the_priority_of_their_own_call [61 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.A_call_just_outside_the_coordinate_limits_is_refused(latitude: 6.927079, longitude: -180.000001, field: "longitude") [46 ms]
+info: CareLanka.Api.Common.Errors.ApiExceptionHandler[0]
+      403 cl_err_403 on GET /api/me/emergency-calls/89637c35-b92c-485d-85e5-b707da9d08e9/tracking: Your role does not allow this.
+info: CareLanka.Api.Common.Errors.ApiExceptionHandler[0]
+      403 cl_err_403 on POST /api/me/emergency-calls/89637c35-b92c-485d-85e5-b707da9d08e9/cancel: Your role does not allow this.
+info: CareLanka.Api.Common.Errors.ApiExceptionHandler[0]
+      403 cl_err_403 on POST /api/me/emergency-calls/89637c35-b92c-485d-85e5-b707da9d08e9/cancellation-request: Your role does not allow this.
+[testcontainers.org 00:00:12.61] Delete Docker container 398125b28a06
+[xUnit.net 00:00:13.26]   Finished:    CareLanka.Api.Tests
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.A_call_just_outside_the_coordinate_limits_is_refused(latitude: 90.000000999999997, longitude: 79.861243999999999, field: "latitude") [51 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.A_call_just_outside_the_coordinate_limits_is_refused(latitude: 6.927079, longitude: 180.000001, field: "longitude") [47 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.A_call_just_outside_the_coordinate_limits_is_refused(latitude: -90.000000999999997, longitude: 79.861243999999999, field: "latitude") [45 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.Without_a_login_every_emergency_route_answers_401 [8 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.Nobody_but_the_duty_manager_can_send_the_agents_recommendation [805 ms]
+  Passed CareLanka.Api.Tests.EmergencyApiQualityTests.A_patient_cannot_track_or_cancel_another_patients_call [226 ms]
+
+Test Run Failed.
+Total tests: 33
+     Passed: 30
+     Failed: 3
+ Total time: 13.5664 Seconds

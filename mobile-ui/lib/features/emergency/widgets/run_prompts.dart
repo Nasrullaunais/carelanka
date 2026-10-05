@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../services/api_client/models/emergency_call_outcome.dart';
 import '../models/run_step.dart';
+import 'dialog_actions.dart';
 
 Future<String?> askDeclineReason(BuildContext context) => showDialog<String>(
   context: context,
@@ -39,16 +40,16 @@ Future<bool> confirmRunStep(
       builder: (dialogContext) => AlertDialog(
         title: Text(title),
         content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Back'),
-          ),
-          FilledButton(
+        actions: stackedDialogActions(
+          confirm: FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             child: Text(confirmLabel),
           ),
-        ],
+          back: TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Back'),
+          ),
+        ),
       ),
     ) ??
     false;
@@ -84,18 +85,18 @@ class _DeclineDialogState extends State<_DeclineDialog> {
       ),
       onChanged: (_) => setState(() {}),
     ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Back'),
-      ),
-      FilledButton(
+    actions: stackedDialogActions(
+      confirm: FilledButton(
         onPressed: _reason.text.trim().isEmpty
             ? null
             : () => Navigator.pop(context, _reason.text.trim()),
         child: const Text('Decline run'),
       ),
-    ],
+      back: TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Back'),
+      ),
+    ),
   );
 }
 

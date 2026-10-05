@@ -8,6 +8,7 @@ import '../models/patient_call_text.dart';
 import '../state/caller_location_controller.dart';
 import '../state/patient_emergency_controller.dart';
 import '../widgets/caller_location_card.dart';
+import '../widgets/dialog_actions.dart';
 import '../widgets/phone_call.dart';
 
 class ReportEmergencyScreen extends StatefulWidget {
@@ -80,16 +81,16 @@ class _ReportEmergencyScreenState extends State<ReportEmergencyScreen>
           content: const Text(
             'Only send another if this is a different emergency. For the same one, open your current request to follow the ambulance.',
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Go back'),
-            ),
-            FilledButton(
+          actions: stackedDialogActions(
+            confirm: FilledButton(
               onPressed: () => Navigator.pop(dialogContext, true),
               child: const Text('Send another'),
             ),
-          ],
+            back: TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Go back'),
+            ),
+          ),
         ),
       ) ??
       false;

@@ -9,6 +9,7 @@ import '../../patient/patient_routes.dart';
 import '../emergency_routes.dart';
 import '../models/patient_call_text.dart';
 import '../state/patient_emergency_controller.dart';
+import '../widgets/dialog_actions.dart';
 import '../widgets/maps_launcher.dart';
 
 class EmergencyTrackingScreen extends StatefulWidget {
@@ -272,15 +273,15 @@ class _CancelDialogState extends State<_CancelDialog> {
         ),
       ],
     ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Keep request'),
-      ),
-      FilledButton(
+    actions: stackedDialogActions(
+      confirm: FilledButton(
         onPressed: _submit,
         child: Text(widget.needsReview ? 'Send request' : 'Cancel request'),
       ),
-    ],
+      back: TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Keep request'),
+      ),
+    ),
   );
 }

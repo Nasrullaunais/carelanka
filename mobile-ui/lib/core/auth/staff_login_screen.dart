@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'auth_controller.dart';
@@ -31,11 +32,9 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
 
     setState(() => _busy = true);
     final auth = context.read<AuthController>();
-    final signedIn = await auth.signInAsStaff(
-      email: _email.text.trim(),
-      password: _password.text,
-    );
+    final signedIn = await auth.signInAsStaff(email: _email.text.trim(), password: _password.text);
 
+    if (signedIn) TextInput.finishAutofillContext();
     if (!mounted) return;
     setState(() => _busy = false);
 
@@ -51,40 +50,46 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
       title: 'Staff sign in',
       subtitle: 'Use your hospital email address.',
       children: [
-        Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              AuthTextField(
-                controller: _email,
-                label: 'Email',
-                enabled: !_busy,
-                keyboardType: TextInputType.emailAddress,
-                validator: (value) {
-                  final text = value?.trim() ?? '';
-                  if (text.isEmpty) return 'Enter your email';
-                  if (!text.contains('@')) return 'That does not look like an email address';
-                  return null;
-                },
-              ),
-              AuthTextField(
-                controller: _password,
-                label: 'Password',
-                enabled: !_busy,
-                obscure: _obscure,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _busy ? null : _submit(),
-                suffix: IconButton(
-                  icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                  onPressed: () => setState(() => _obscure = !_obscure),
+        AuthAutofillGroup(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AuthTextField(
+                  controller: _email,
+                  label: 'Email',
+                  enabled: !_busy,
+                  keyboardType: TextInputType.emailAddress,
+                  autofillHints: const [AutofillHints.username, AutofillHints.email],
+                  validator: (value) {
+                    final text = value?.trim() ?? '';
+                    if (text.isEmpty) return 'Enter your email';
+                    if (!text.contains('@')) return 'That does not look like an email address';
+                    return null;
+                  },
                 ),
-                validator: (value) =>
-                    (value == null || value.isEmpty) ? 'Enter your password' : null,
-              ),
-              const SizedBox(height: 8),
-              AuthSubmitButton(label: 'Sign in', busy: _busy, onPressed: _submit),
-            ],
+                AuthTextField(
+                  controller: _password,
+                  label: 'Password',
+                  enabled: !_busy,
+                  obscure: _obscure,
+                  autofillHints: const [AutofillHints.password],
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _busy ? null : _submit(),
+                  suffix: IconButton(
+                    icon: Icon(
+                      _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                    ),
+                    onPressed: () => setState(() => _obscure = !_obscure),
+                  ),
+                  validator: (value) =>
+                      (value == null || value.isEmpty) ? 'Enter your password' : null,
+                ),
+                const SizedBox(height: 8),
+                AuthSubmitButton(label: 'Sign in', busy: _busy, onPressed: _submit),
+              ],
+            ),
           ),
         ),
       ],

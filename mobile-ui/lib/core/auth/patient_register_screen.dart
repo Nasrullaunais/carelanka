@@ -40,6 +40,7 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
       password: _password.text,
     );
 
+    if (created) TextInput.finishAutofillContext();
     if (!mounted) return;
     setState(() => _busy = false);
 
@@ -55,42 +56,47 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
 
     return AuthScaffold(
       title: 'Create an account',
-      subtitle: 'Pick a username and a password. Your name and the rest of '
+      subtitle:
+          'Pick a username and a password. Your name and the rest of '
           'your details come next.',
       children: [
-        Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              AuthTextField(
-                controller: _username,
-                label: 'Username',
-                enabled: !_busy,
-                keyboardType: TextInputType.text,
-                serverErrors: fieldErrors['username'],
-                inputFormatters: [FilteringTextInputFormatter.deny(RegExp(r'\s'))],
-                validator: validateUsername,
-              ),
-              AuthPasswordField(
-                controller: _password,
-                label: 'Password',
-                enabled: !_busy,
-                serverErrors: fieldErrors['password'],
-                validator: validatePassword,
-              ),
-              AuthPasswordField(
-                controller: _confirm,
-                label: 'Confirm password',
-                enabled: !_busy,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _busy ? null : _submit(),
-                validator: (value) =>
-                    (value != _password.text) ? 'Passwords do not match' : null,
-              ),
-              const SizedBox(height: 8),
-              AuthSubmitButton(label: 'Create account', busy: _busy, onPressed: _submit),
-            ],
+        AuthAutofillGroup(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AuthTextField(
+                  controller: _username,
+                  label: 'Username',
+                  enabled: !_busy,
+                  keyboardType: TextInputType.text,
+                  autofillHints: const [AutofillHints.newUsername],
+                  serverErrors: fieldErrors['username'],
+                  inputFormatters: [FilteringTextInputFormatter.deny(RegExp(r'\s'))],
+                  validator: validateUsername,
+                ),
+                AuthPasswordField(
+                  controller: _password,
+                  label: 'Password',
+                  enabled: !_busy,
+                  serverErrors: fieldErrors['password'],
+                  autofillHints: const [AutofillHints.newPassword],
+                  validator: validatePassword,
+                ),
+                AuthPasswordField(
+                  controller: _confirm,
+                  label: 'Confirm password',
+                  enabled: !_busy,
+                  autofillHints: const [AutofillHints.newPassword],
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _busy ? null : _submit(),
+                  validator: (value) => (value != _password.text) ? 'Passwords do not match' : null,
+                ),
+                const SizedBox(height: 8),
+                AuthSubmitButton(label: 'Create account', busy: _busy, onPressed: _submit),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 16),

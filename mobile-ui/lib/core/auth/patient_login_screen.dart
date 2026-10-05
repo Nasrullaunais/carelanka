@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -38,6 +39,7 @@ class _PatientLoginScreenState extends State<PatientLoginScreen> {
       password: _password.text,
     );
 
+    if (signedIn) TextInput.finishAutofillContext();
     if (!mounted) return;
     setState(() => _busy = false);
 
@@ -53,40 +55,43 @@ class _PatientLoginScreenState extends State<PatientLoginScreen> {
       title: 'Sign in',
       subtitle: 'Use the username you registered with.',
       children: [
-        Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              AuthTextField(
-                controller: _username,
-                label: 'Username',
-                enabled: !_busy,
-                keyboardType: TextInputType.text,
-                // Only checked for emptiness — anything more tells a stranger what a valid username looks like.
-                validator: (value) => (value == null || value.trim().isEmpty)
-                    ? 'Enter your username'
-                    : null,
-              ),
-              AuthPasswordField(
-                controller: _password,
-                label: 'Password',
-                enabled: !_busy,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _busy ? null : _submit(),
-                validator: (value) =>
-                    (value == null || value.isEmpty) ? 'Enter your password' : null,
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: _busy ? null : () => showResetPasswordHelp(context),
-                  child: const Text('Forgot password?'),
+        AuthAutofillGroup(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AuthTextField(
+                  controller: _username,
+                  label: 'Username',
+                  enabled: !_busy,
+                  keyboardType: TextInputType.text,
+                  autofillHints: const [AutofillHints.username],
+                  // Only checked for emptiness — anything more tells a stranger what a valid username looks like.
+                  validator: (value) =>
+                      (value == null || value.trim().isEmpty) ? 'Enter your username' : null,
                 ),
-              ),
-              const SizedBox(height: 8),
-              AuthSubmitButton(label: 'Sign in', busy: _busy, onPressed: _submit),
-            ],
+                AuthPasswordField(
+                  controller: _password,
+                  label: 'Password',
+                  enabled: !_busy,
+                  autofillHints: const [AutofillHints.password],
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _busy ? null : _submit(),
+                  validator: (value) =>
+                      (value == null || value.isEmpty) ? 'Enter your password' : null,
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _busy ? null : () => showResetPasswordHelp(context),
+                    child: const Text('Forgot password?'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                AuthSubmitButton(label: 'Sign in', busy: _busy, onPressed: _submit),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 16),

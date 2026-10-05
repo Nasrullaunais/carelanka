@@ -67,6 +67,7 @@ class AuthTextField extends StatelessWidget {
     this.serverErrors,
     this.inputFormatters,
     this.focusNode,
+    this.autofillHints,
   });
 
   final TextEditingController controller;
@@ -81,6 +82,7 @@ class AuthTextField extends StatelessWidget {
   final List<String>? serverErrors;
   final List<TextInputFormatter>? inputFormatters;
   final FocusNode? focusNode;
+  final Iterable<String>? autofillHints;
 
   @override
   Widget build(BuildContext context) {
@@ -95,6 +97,7 @@ class AuthTextField extends StatelessWidget {
         textInputAction: textInputAction,
         onFieldSubmitted: onSubmitted,
         inputFormatters: inputFormatters,
+        autofillHints: autofillHints,
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),
@@ -119,6 +122,7 @@ class AuthPasswordField extends StatefulWidget {
     this.textInputAction = TextInputAction.next,
     this.onSubmitted,
     this.serverErrors,
+    this.autofillHints,
   });
 
   final TextEditingController controller;
@@ -128,6 +132,7 @@ class AuthPasswordField extends StatefulWidget {
   final TextInputAction textInputAction;
   final void Function(String)? onSubmitted;
   final List<String>? serverErrors;
+  final Iterable<String>? autofillHints;
 
   @override
   State<AuthPasswordField> createState() => _AuthPasswordFieldState();
@@ -169,6 +174,7 @@ class _AuthPasswordFieldState extends State<AuthPasswordField> {
       onSubmitted: widget.onSubmitted,
       serverErrors: widget.serverErrors,
       validator: widget.validator,
+      autofillHints: widget.autofillHints,
       suffix: _focus.hasFocus
           ? IconButton(
               tooltip: _obscure ? 'Show password' : 'Hide password',
@@ -178,6 +184,19 @@ class _AuthPasswordFieldState extends State<AuthPasswordField> {
           : null,
     );
   }
+}
+
+/// Lets the phone's password manager fill these fields and offer to save them.
+/// Call [TextInput.finishAutofillContext] only after the server accepts the login.
+class AuthAutofillGroup extends StatelessWidget {
+  const AuthAutofillGroup({super.key, required this.child});
+
+  final Widget child;
+
+  // Leaving the screen must not save: the default would also save a password the server rejected.
+  @override
+  Widget build(BuildContext context) =>
+      AutofillGroup(onDisposeAction: AutofillContextAction.cancel, child: child);
 }
 
 class AuthSubmitButton extends StatelessWidget {

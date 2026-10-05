@@ -106,7 +106,7 @@ describe('EmergencyDesk', () => {
     mocks.latest = { id: 'p-1', status: 'pending_confirmation', proposed_ambulance_registration: 'WP-CA-1234', estimated_minutes_to_scene: 6 };
     renderWithProviders(<Desk />);
 
-    expect(await screen.findByText('WP-CA-1234 · 6 min')).toBeInTheDocument();
+    expect(await screen.findByText('WP-CA-1234')).toBeInTheDocument();
     expect(screen.getByText('Checking…')).toBeInTheDocument();
     expect(screen.getByText('Pick by hand')).toBeInTheDocument();
   });

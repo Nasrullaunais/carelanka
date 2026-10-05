@@ -61,7 +61,7 @@ export function CallBoard({ calls, selectedId, isLoading, error, onRetry, onSele
       header: 'Recommendation',
       cell: (call) => {
         const line = recommendationLine(call);
-        return line ? <StatusChip tone={line.tone}>{line.label}</StatusChip> : null;
+        return line ? <span className="inline-flex [&_*]:whitespace-nowrap"><StatusChip tone={line.tone}>{line.label}</StatusChip></span> : null;
       },
     },
   ];

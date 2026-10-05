@@ -225,8 +225,7 @@ export function recommendationLine(call: EmergencyCallSummary): RecommendationLi
       return { label: 'Checking…', tone: 'default' };
     case 'pending_confirmation':
       return {
-        label: [proposal.proposed_ambulance_registration, proposal.estimated_minutes_to_scene != null && `${proposal.estimated_minutes_to_scene} min`]
-          .filter(Boolean).join(' · ') || 'Ready to send',
+        label: proposal.proposed_ambulance_registration || 'Ready to send',
         tone: 'success',
       };
     case 'pending_approval':

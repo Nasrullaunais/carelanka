@@ -48,6 +48,46 @@ public sealed class NotificationsHubTests
         Assert.Equal(1, otherReceived);
     }
 
+    [Fact]
+    public async Task A_notification_saved_inside_a_transaction_is_announced_only_once_committed()
+    {
+        var (token, accountId) = await NewPatientAsync();
+        await using var connection = await ConnectAsync(token);
+
+        var received = 0;
+        var announced = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        connection.On("inboxChanged", () =>
+        {
+            Interlocked.Increment(ref received);
+            announced.TrySetResult(true);
+        });
+
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        await using (var rolledBack = await db.Database.BeginTransactionAsync())
+        {
+            db.Notifications.Add(NewNotification(accountId));
+            await db.SaveChangesAsync();
+            await rolledBack.RollbackAsync();
+        }
+        db.ChangeTracker.Clear();
+
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        db.Notifications.Add(NewNotification(accountId));
+        await db.SaveChangesAsync();
+
+        // Saved but not committed: a client re-reading its inbox now would not see the row yet.
+        await Task.Delay(TimeSpan.FromSeconds(1));
+        Assert.Equal(0, received);
+
+        await transaction.CommitAsync();
+        var completed = await Task.WhenAny(announced.Task, Task.Delay(TimeSpan.FromSeconds(10)));
+        Assert.Same(announced.Task, completed);
+        await Task.Delay(TimeSpan.FromSeconds(1));
+        Assert.Equal(1, received);
+    }
+
     private async Task<HubConnection> ConnectAsync(string accessToken)
     {
         var connection = new HubConnectionBuilder()
@@ -90,15 +130,17 @@ public sealed class NotificationsHubTests
         using var scope = _application.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
 
-        db.Notifications.Add(new Notification
-        {
-            Id = Guid.NewGuid(),
-            RecipientPatientAccountId = patientAccountId,
-            Type = NotificationType.DispatchAssigned,
-            Title = "Hub test",
-            Body = "body",
-            DedupeKey = $"hub-test:{Guid.NewGuid()}"
-        });
+        db.Notifications.Add(NewNotification(patientAccountId));
         await db.SaveChangesAsync();
     }
+
+    private static Notification NewNotification(Guid patientAccountId) => new()
+    {
+        Id = Guid.NewGuid(),
+        RecipientPatientAccountId = patientAccountId,
+        Type = NotificationType.DispatchAssigned,
+        Title = "Hub test",
+        Body = "body",
+        DedupeKey = $"hub-test:{Guid.NewGuid()}"
+    };
 }

@@ -55,7 +55,7 @@ export function AmbulanceRegister() {
       <Button size="sm" variant="outline" onPress={() => setCrewAmbulance(item)}>Crew</Button>
       {isRetired(item)
         ? <Button size="sm" variant="outline" onPress={() => setReinstating(item)}>Reinstate</Button>
-        : item.active_dispatch_id == null && <Button size="sm" variant="danger" onPress={() => setRetiring(item)}>Retire</Button>}
+        : item.active_dispatch_id == null && <Button size="sm" variant="danger-soft" onPress={() => setRetiring(item)}>Retire</Button>}
     </div> },
   ];
 

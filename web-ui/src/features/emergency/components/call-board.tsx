@@ -34,9 +34,7 @@ export function CallBoard({ calls, selectedId, isLoading, error, onRetry, onSele
       header: 'Caller and location',
       cell: (call) => (
         <div className="flex min-w-36 flex-col">
-          <span className={selectedId === call.id ? 'font-semibold' : undefined}>
-            {call.caller_name ?? 'Unnamed caller'}
-          </span>
+          <span>{call.caller_name ?? 'Unnamed caller'}</span>
           <span className="line-clamp-2 text-xs text-muted" title={call.address_label ?? undefined}>
             {call.address_label ? shortAddress(call.address_label) : 'Address resolving'}
           </span>
@@ -83,6 +81,7 @@ export function CallBoard({ calls, selectedId, isLoading, error, onRetry, onSele
         onRetry={onRetry}
         emptyMessage={filter === 'received' ? 'No calls are awaiting dispatch.' : 'No emergency calls were found.'}
         onRowAction={onSelect}
+        currentRowKey={selectedId}
         pagination={{ page, totalPages, onPageChange }}
       />
     </div>

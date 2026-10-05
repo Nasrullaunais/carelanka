@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Table } from '../components/Table';
+import { Bell } from 'lucide-react';
+import { NotificationIcon } from '../components/NotificationIcon';
 import { PaginationControls } from '../components/ui/pagination-controls';
 import {
   getMyUnreadNotificationCountQueryKey,
@@ -12,8 +13,8 @@ import {
   markNotificationReadMutation,
 } from '../services/api/generated/@tanstack/react-query.gen';
 import type { InboxNotification } from '../services/api/generated';
-import { localDateTime } from '../types/datetime';
-import { notificationTypeLabels, routeForNotification } from '../types/notifications';
+import { localDateTime, timeAgo } from '../types/datetime';
+import { routeForNotification } from '../types/notifications';
 
 const PAGE_SIZE = 20;
 
@@ -60,8 +61,8 @@ export function NotificationsPage() {
       <p className="muted">Things that concern you, across the whole hospital.</p>
 
       <div className="table-section">
-        <div className="row">
-          <div className="tabs">
+        <div className="notifications-toolbar">
+          <div className="tabs notifications-filter">
             <button
               type="button"
               aria-pressed={!unreadOnly}
@@ -77,16 +78,14 @@ export function NotificationsPage() {
               Unread
             </button>
           </div>
-          <div className="actions">
-            <button
-              type="button"
-              className="secondary"
-              disabled={markAllRead.isPending}
-              onClick={() => markAllRead.mutate({})}
-            >
-              {markAllRead.isPending ? 'Marking…' : 'Mark all read'}
-            </button>
-          </div>
+          <button
+            type="button"
+            className="secondary"
+            disabled={markAllRead.isPending}
+            onClick={() => markAllRead.mutate({})}
+          >
+            {markAllRead.isPending ? 'Marking…' : 'Mark all read'}
+          </button>
         </div>
 
         {notifications.isPending && <p className="empty">Loading notifications…</p>}
@@ -101,46 +100,46 @@ export function NotificationsPage() {
         )}
 
         {notifications.isSuccess && rows.length === 0 && (
-          <p className="empty">{unreadOnly ? 'Nothing unread.' : 'Nothing here yet.'}</p>
+          <div className="notification-popover-empty">
+            <Bell size={24} aria-hidden="true" />
+            <p>{unreadOnly ? 'Nothing unread. You are all caught up.' : 'Nothing here yet.'}</p>
+          </div>
         )}
 
         {rows.length > 0 && (
-          <Table footer={<PaginationControls label="Notifications" page={page} totalPages={totalPages} onPageChange={setPage} />}>
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Message</th>
-                <th>When</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
+          <div className="notifications-card">
+            <ul className="notifications-feed">
               {rows.map((notification) => (
-                <tr key={notification.id} className={notification.read_at ? undefined : 'notification-row--unread'}>
-                  <td>{notification.type && notificationTypeLabels[notification.type]}</td>
-                  <td>
-                    <button type="button" className="link-button" onClick={() => openItem(notification)}>
+                <li key={notification.id} className={notification.read_at ? undefined : 'notifications-feed-item--unread'}>
+                  <NotificationIcon notification={notification} />
+                  <div className="notifications-feed-text">
+                    <button type="button" className="linklike notifications-feed-title" onClick={() => openItem(notification)}>
                       {notification.title}
                     </button>
-                    {notification.body && <div className="muted">{notification.body}</div>}
-                  </td>
-                  <td>{notification.created_at && localDateTime(notification.created_at)}</td>
-                  <td>
-                    {!notification.read_at && (
-                      <button
-                        type="button"
-                        className="secondary"
-                        disabled={markRead.isPending}
-                        onClick={() => notification.id && markRead.mutate({ path: { id: notification.id } })}
-                      >
-                        Mark read
-                      </button>
+                    {notification.body && <p className="notifications-feed-body">{notification.body}</p>}
+                    {notification.created_at && (
+                      <time className="notifications-feed-meta" dateTime={notification.created_at} title={localDateTime(notification.created_at)}>
+                        {timeAgo(notification.created_at)}
+                      </time>
                     )}
-                  </td>
-                </tr>
+                  </div>
+                  {!notification.read_at && (
+                    <button
+                      type="button"
+                      className="linklike notifications-feed-mark"
+                      disabled={markRead.isPending}
+                      onClick={() => notification.id && markRead.mutate({ path: { id: notification.id } })}
+                    >
+                      Mark read
+                    </button>
+                  )}
+                </li>
               ))}
-            </tbody>
-          </Table>
+            </ul>
+            <div className="table-footer">
+              <PaginationControls label="Notifications" page={page} totalPages={totalPages} onPageChange={setPage} />
+            </div>
+          </div>
         )}
       </div>
     </>

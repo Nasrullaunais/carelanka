@@ -6,7 +6,10 @@ import { EmergencyReports } from './emergency-reports';
 
 vi.mock('../../../services/api/generated/@tanstack/react-query.gen', () => ({
   getEmergencyResponseTimeReportOptions: () => ({ queryKey: ['response-report'], queryFn: () => Promise.resolve({
-    rows: [{ priority: 'high', call_count: 2, median_minutes_to_dispatch: 4, median_minutes_to_arrival: 12, slowest_minutes_to_arrival: 18 }],
+    rows: [
+      { priority: 'high', call_count: 2, median_minutes_to_dispatch: 4, median_minutes_to_arrival: 12, slowest_minutes_to_arrival: 18 },
+      { priority: 'low', call_count: 0, median_minutes_to_dispatch: 0, median_minutes_to_arrival: 0, slowest_minutes_to_arrival: 0 },
+    ],
     totals: { call_count: 2, median_minutes_to_dispatch: 4, median_minutes_to_arrival: 12 },
   }) }),
   getFleetUtilisationReportOptions: () => ({ queryKey: ['fleet-report'], queryFn: () => Promise.resolve({
@@ -26,6 +29,7 @@ describe('EmergencyReports', () => {
     expect((await screen.findAllByText('4.0 min')).length).toBeGreaterThan(0);
     expect(screen.getByText('75.0%')).toBeInTheDocument();
     expect(screen.getByRole('grid', { name: 'Response times by priority' })).toBeInTheDocument();
+    expect(screen.queryByText('0.0 min')).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('tab', { name: 'Fleet utilisation' }));
     expect(screen.getByRole('grid', { name: 'Fleet utilisation per vehicle' })).toBeInTheDocument();

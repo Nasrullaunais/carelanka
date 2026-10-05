@@ -24,6 +24,14 @@ export const emergencyTabs: EmergencyTabDefinition[] = [
   { id: 'reports', path: 'reports', label: 'Reports' },
 ];
 
+const tabDescriptions: Record<string, string> = {
+  calls: 'Live calls, ready ambulances, and current response crews.',
+  fleet: 'Where every ambulance is and who is on board.',
+  register: 'Add, edit, or retire the ambulances the hospital runs.',
+  cancellations: 'Review requests to stop an emergency response.',
+  reports: 'How quickly calls are answered and how the fleet is used.',
+};
+
 export function EmergencyRoutes() {
   const session = useSession();
   const navigate = useNavigate();
@@ -37,9 +45,7 @@ export function EmergencyRoutes() {
   const activeTab = location.pathname === '/emergency'
     ? 'calls'
     : location.pathname.split('/')[2] ?? 'calls';
-  const pageDescription = activeTab === 'cancellations'
-    ? 'Review requests to stop an emergency response.'
-    : 'Live calls, ready ambulances, and current response crews.';
+  const pageDescription = tabDescriptions[activeTab] ?? tabDescriptions.calls;
 
   return (
     <div className="flex flex-col gap-4">

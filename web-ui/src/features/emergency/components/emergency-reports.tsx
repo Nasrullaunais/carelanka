@@ -81,9 +81,9 @@ function ResponseTimesTable({ rows }: { rows: ResponseTimeReportRow[] }) {
   const columns: Array<DataTableColumn<ResponseTimeReportRow>> = [
     { key: 'priority', header: 'Priority', cell: (row) => priorityLabels[row.priority ?? 'high'] },
     { key: 'calls', header: 'Calls', cell: (row) => row.call_count ?? 0 },
-    { key: 'decision', header: 'Median to dispatch', cell: (row) => minutes(row.median_minutes_to_dispatch) },
-    { key: 'arrival', header: 'Median to arrival', cell: (row) => minutes(row.median_minutes_to_arrival) },
-    { key: 'slowest', header: 'Slowest arrival', cell: (row) => minutes(row.slowest_minutes_to_arrival) },
+    { key: 'decision', header: 'Median to dispatch', cell: (row) => (row.call_count ? minutes(row.median_minutes_to_dispatch) : '—') },
+    { key: 'arrival', header: 'Median to arrival', cell: (row) => (row.call_count ? minutes(row.median_minutes_to_arrival) : '—') },
+    { key: 'slowest', header: 'Slowest arrival', cell: (row) => (row.call_count ? minutes(row.slowest_minutes_to_arrival) : '—') },
   ];
   return <DataTable ariaLabel="Response times by priority" rows={rows} columns={columns} rowKey={(row) => row.priority ?? 'unknown'} rowText={(row) => priorityLabels[row.priority ?? 'high']} emptyMessage="No completed response times in this range." />;
 }

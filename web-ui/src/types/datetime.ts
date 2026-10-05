@@ -17,6 +17,14 @@ export function localDateTime(iso: string): string {
   });
 }
 
+export function timeAgo(iso: string, now: number = Date.now()): string {
+  const minutes = Math.floor((now - new Date(iso).getTime()) / 60_000);
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 24 * 60) return `${Math.floor(minutes / 60)} hr ago`;
+  return localDateTime(iso);
+}
+
 export function hasPassed(iso: string): boolean {
   return new Date(iso).getTime() <= Date.now();
 }

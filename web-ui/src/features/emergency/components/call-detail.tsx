@@ -130,7 +130,7 @@ export function CallDetail({ callId, query, ambulances, onDispatched, ambulanceP
               <div>
                 <h2 className="text-xl font-semibold">{call.caller_name ?? 'Caller details unavailable'}</h2>
                 <p className="text-sm text-muted">{call.caller_phone ?? 'No phone number recorded'}</p>
-                {call.patient_name && <p className="text-sm">Patient: <strong>{call.patient_name}</strong></p>}
+                {call.patient_name && call.patient_name !== call.caller_name && <p className="text-sm">Patient: <strong>{call.patient_name}</strong></p>}
               </div>
               <StatusChip tone={callStatusTones[status]}>{callStatusLabels[status]}</StatusChip>
             </div>
@@ -159,8 +159,10 @@ export function CallDetail({ callId, query, ambulances, onDispatched, ambulanceP
                 pending={busy}
                 onSave={(priority) => update.mutate({ path: { id: callId }, body: { priority } })}
               />
-              <Button size="sm" variant="outline" isDisabled={busy} onPress={() => setEditOpen(true)}>Edit call</Button>
-              {canClose && <Button size="sm" variant="danger" isDisabled={busy} onPress={() => setCloseOpen(true)}>Close call</Button>}
+              <div className="ml-auto flex gap-2">
+                <Button size="sm" variant="outline" isDisabled={busy} onPress={() => setEditOpen(true)}>Edit call</Button>
+                {canClose && <Button size="sm" variant="danger" isDisabled={busy} onPress={() => setCloseOpen(true)}>Close call</Button>}
+              </div>
             </div>}
             {canDispatch && <CallRecommendation
               callId={callId}
@@ -179,7 +181,7 @@ export function CallDetail({ callId, query, ambulances, onDispatched, ambulanceP
             />
             {canDispatch && <Disclosure key={`${callId}-${recommendationReady}`} defaultExpanded={!recommendationReady}>
               <Disclosure.Heading>
-                <Disclosure.Trigger className="font-semibold">
+                <Disclosure.Trigger className="call-disclosure-trigger">
                   {recommendationReady ? 'Other ambulances' : 'Ambulance choices'}
                   <Disclosure.Indicator />
                 </Disclosure.Trigger>
@@ -280,19 +282,17 @@ function PriorityControl({ current, pending, onSave }: { current: CallPriority; 
   const [priority, setPriority] = useState(current);
   useEffect(() => setPriority(current), [current]);
   return (
-    <div className="flex flex-col gap-1 text-sm">
-      <span className="flex gap-2">
-        <AppSelect
-          className="min-w-40"
-          label="Priority"
-          value={priority}
-          onValueChange={(value) => setPriority(value as CallPriority)}
-          options={Object.entries(priorityLabels).map(([value, label]) => ({ value, label }))}
-        />
-        <Button size="sm" isDisabled={pending || priority === current} onPress={() => onSave(priority)}>
-          {pending ? 'Saving…' : 'Update'}
-        </Button>
-      </span>
+    <div className="flex items-end gap-2 text-sm">
+      <AppSelect
+        className="min-w-40"
+        label="Priority"
+        value={priority}
+        onValueChange={(value) => setPriority(value as CallPriority)}
+        options={Object.entries(priorityLabels).map(([value, label]) => ({ value, label }))}
+      />
+      <Button size="sm" isDisabled={pending || priority === current} onPress={() => onSave(priority)}>
+        {pending ? 'Saving…' : 'Update'}
+      </Button>
     </div>
   );
 }

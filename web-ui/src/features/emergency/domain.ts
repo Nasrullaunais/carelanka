@@ -196,7 +196,16 @@ export function formatDriveMinutes(minutes?: number | null): string {
 }
 
 export function formatTimestamp(iso?: string | null): string {
-  return iso ? new Date(iso).toLocaleString() : 'Unknown';
+  return iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'Unknown';
+}
+
+/** Just the time for today, so a busy board stays short; the date too for anything older. */
+export function formatClock(iso?: string | null, now: Date = new Date()): string {
+  if (!iso) return 'Unknown';
+  const when = new Date(iso);
+  return when.toDateString() === now.toDateString()
+    ? when.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    : formatTimestamp(iso);
 }
 
 export function formatAge(iso?: string | null, now: number = Date.now()): string {

@@ -16,7 +16,7 @@ export interface DataTablePagination {
   onPageChange: (page: number) => void;
 }
 
-export function DataTable<Row extends object>({ ariaLabel, rows, columns, rowKey, rowText, isLoading, error, onRetry, emptyMessage = 'Nothing to show yet.', onRowAction, pagination }: {
+export function DataTable<Row extends object>({ ariaLabel, rows, columns, rowKey, rowText, isLoading, error, onRetry, emptyMessage = 'Nothing to show yet.', onRowAction, currentRowKey, pagination }: {
   ariaLabel: string;
   rows: Row[] | undefined;
   columns: Array<DataTableColumn<Row>>;
@@ -27,6 +27,8 @@ export function DataTable<Row extends object>({ ariaLabel, rows, columns, rowKey
   onRetry?: () => void;
   emptyMessage?: string;
   onRowAction?: (key: string) => void;
+  /** The row whose details are open beside the table. */
+  currentRowKey?: string;
   pagination?: DataTablePagination;
 }) {
   const data = rows ?? [];
@@ -48,9 +50,14 @@ export function DataTable<Row extends object>({ ariaLabel, rows, columns, rowKey
             <TableHeader columns={columns}>
               {(column) => <TableColumn id={column.key} isRowHeader={column.key === columns[0]?.key}>{column.header}</TableColumn>}
             </TableHeader>
-            <TableBody items={data}>
+            <TableBody items={data} dependencies={[currentRowKey]}>
               {(row) => (
-                <TableRow id={rowKey(row)} columns={columns} textValue={rowText(row)}>
+                <TableRow
+                  id={rowKey(row)}
+                  columns={columns}
+                  textValue={rowText(row)}
+                  className={currentRowKey !== undefined && rowKey(row) === currentRowKey ? 'gx-table-row--current' : undefined}
+                >
                   {(column) => <TableCell>{column.cell(row)}</TableCell>}
                 </TableRow>
               )}

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../core/auth/auth_controller.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/notifications/notification_bell.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/async_view.dart';
 import '../emergency_routes.dart';
 import '../models/run_step.dart';
@@ -53,6 +54,7 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
     final controller = context.watch<MyRunController>();
     final locationNotice = _locationNotice(reporter.state);
     final error = controller.actionError;
+    final scheme = Theme.of(context).colorScheme;
 
     return CrewLocationLifecycle(
       reporter: reporter,
@@ -80,27 +82,31 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
         body: Column(
           children: [
             if (locationNotice != null)
-              MaterialBanner(
-                content: Text(locationNotice),
-                actions: [
-                  if (_locationFixLabel(reporter.state) case final label?)
-                    TextButton(
-                      onPressed: reporter.fixAccess,
-                      child: Text(label),
-                    )
-                  else
-                    const SizedBox.shrink(),
-                ],
+              _RunNotice(
+                icon: reporter.state == CrewLocationReportingState.reporting
+                    ? Icons.my_location
+                    : Icons.location_off_outlined,
+                color: reporter.state == CrewLocationReportingState.reporting
+                    ? scheme.primary
+                    : scheme.warning,
+                text: locationNotice,
+                action: switch (_locationFixLabel(reporter.state)) {
+                  final label? => TextButton(
+                    onPressed: reporter.fixAccess,
+                    child: Text(label),
+                  ),
+                  null => null,
+                },
               ),
             if (error != null)
-              MaterialBanner(
-                content: Text(_errorText(error)),
-                actions: [
-                  TextButton(
-                    onPressed: controller.clearActionError,
-                    child: const Text('Dismiss'),
-                  ),
-                ],
+              _RunNotice(
+                icon: Icons.error_outline,
+                color: scheme.error,
+                text: _errorText(error),
+                action: TextButton(
+                  onPressed: controller.clearActionError,
+                  child: const Text('Dismiss'),
+                ),
               ),
             Expanded(
               child: AsyncView(
@@ -233,7 +239,7 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
 
   String? _locationNotice(CrewLocationReportingState state) => switch (state) {
     CrewLocationReportingState.reporting =>
-      'Sharing your ambulance location, also while the phone is locked or Google Maps is open.',
+      'Sharing your location, even when the phone is locked or Google Maps is open.',
     CrewLocationReportingState.stopped => null,
     CrewLocationReportingState.approximateOnly =>
       'Only approximate location is allowed. Dispatch needs precise location to send the nearest ambulance.',
@@ -256,4 +262,50 @@ class _MyRunScreenState extends State<MyRunScreen> with WidgetsBindingObserver {
         CrewLocationReportingState.unavailable => 'Turn on location',
         _ => null,
       };
+}
+
+class _RunNotice extends StatelessWidget {
+  const _RunNotice({
+    required this.icon,
+    required this.color,
+    required this.text,
+    this.action,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String text;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(AppTheme.gutter, 4, AppTheme.gutter, 8),
+      padding: EdgeInsets.fromLTRB(14, 10, action == null ? 14 : 4, 10),
+      decoration: BoxDecoration(
+        color: Color.alphaBlend(
+          color.withValues(alpha: 0.08),
+          theme.colorScheme.surface,
+        ),
+        borderRadius: BorderRadius.circular(AppTheme.radiusM),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: color),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+          ),
+          if (action != null) ...[const SizedBox(width: 4), action!],
+        ],
+      ),
+    );
+  }
 }

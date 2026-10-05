@@ -9,6 +9,8 @@ import '../../../services/api_client/models/dispatch_status.dart';
 import '../models/run_step.dart';
 import '../state/run_detail_controller.dart';
 import '../widgets/label_value_row.dart';
+import '../widgets/priority_pill.dart';
+import '../widgets/run_section.dart';
 
 class RunDetailScreen extends StatefulWidget {
   const RunDetailScreen({super.key});
@@ -62,119 +64,124 @@ class _RunDetail extends StatelessWidget {
         run.status == DispatchStatus.closedAtScene;
 
     return ListView(
-      padding: const EdgeInsets.all(AppTheme.gutter),
+      padding: EdgeInsets.fromLTRB(
+        AppTheme.gutter,
+        8,
+        AppTheme.gutter,
+        AppTheme.gutter + MediaQuery.paddingOf(context).bottom,
+      ),
       children: [
         Text(run.status?.crewLabel ?? '', style: theme.textTheme.headlineSmall),
-        const SizedBox(height: 4),
-        Text(
-          [
-            if (dispatchedAt != null) FriendlyDate.full(dispatchedAt),
-            '${run.callPriority?.label ?? 'Unknown'} priority',
-          ].join(' · '),
-          style: theme.textTheme.bodyLarge?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 16),
-        _Section(
-          title: 'The emergency',
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Text(
-              run.callDetails?.trim().isNotEmpty == true
-                  ? run.callDetails!
-                  : 'No details were given by the caller.',
-            ),
-            if (run.patientName?.trim().isNotEmpty == true)
-              LabelValueRow(label: 'Patient', value: run.patientName),
-            if (run.callerName?.trim().isNotEmpty == true)
-              LabelValueRow(label: 'Caller', value: run.callerName),
-          ],
-        ),
-        _Section(
-          children: [
-            LabelValueRow(label: 'Ambulance', value: run.ambulanceRegistration),
-            if (run.sceneAddressLabel?.trim().isNotEmpty == true)
-              LabelValueRow(label: 'Scene', value: run.sceneAddressLabel),
-            LabelValueRow(
-              label: 'Crew on board',
-              value: run.crewCount?.toString(),
-            ),
-          ],
-        ),
-        _Section(
-          title: 'Times',
-          children: [
+            PriorityPill(priority: run.callPriority),
             if (dispatchedAt != null)
-              LabelValueRow(
-                label: 'Sent',
-                value: FriendlyDate.time(dispatchedAt),
+              Text(
+                FriendlyDate.full(dispatchedAt),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
-            if (run.acknowledgedAt case final at?)
-              LabelValueRow(label: 'Accepted', value: FriendlyDate.time(at)),
-            if (run.completedAt case final at?)
-              LabelValueRow(label: 'Finished', value: FriendlyDate.time(at)),
           ],
         ),
-        _Section(
-          title: 'How it ended',
-          children: [
-            if (endedTheCall)
-              if (run.callOutcome?.label case final outcome?)
-                LabelValueRow(label: 'Outcome', value: outcome),
-            if (run.patientCondition?.trim().isNotEmpty == true)
-              LabelValueRow(
-                label: 'Patient condition',
-                value: run.patientCondition,
+        const SizedBox(height: 20),
+        for (final section in [
+          RunSection(
+            title: 'The emergency',
+            children: [
+              Text(
+                run.callDetails?.trim().isNotEmpty == true
+                    ? run.callDetails!
+                    : 'No details were given by the caller.',
+                style: theme.textTheme.bodyLarge,
               ),
-            if (run.handoverNotes?.trim().isNotEmpty == true) ...[
-              const SizedBox(height: 8),
-              Text('Handover notes', style: theme.textTheme.labelLarge),
-              const SizedBox(height: 4),
-              Text(run.handoverNotes!),
+              if (run.patientName?.trim().isNotEmpty == true ||
+                  run.callerName?.trim().isNotEmpty == true) ...[
+                const SizedBox(height: 10),
+                const Divider(),
+                const SizedBox(height: 6),
+              ],
+              if (run.patientName?.trim().isNotEmpty == true)
+                LabelValueRow(label: 'Patient', value: run.patientName),
+              if (run.callerName?.trim().isNotEmpty == true)
+                LabelValueRow(label: 'Caller', value: run.callerName),
             ],
-            if (endedTheCall &&
-                run.callOutcomeNotes?.trim().isNotEmpty == true) ...[
-              const SizedBox(height: 8),
-              Text('Notes', style: theme.textTheme.labelLarge),
-              const SizedBox(height: 4),
-              Text(run.callOutcomeNotes!),
+          ),
+          RunSection(
+            title: 'The run',
+            children: [
+              LabelValueRow(
+                label: 'Ambulance',
+                value: run.ambulanceRegistration,
+              ),
+              if (run.sceneAddressLabel?.trim().isNotEmpty == true)
+                LabelValueRow(
+                  label: 'Scene',
+                  value: run.sceneAddressLabel,
+                  stacked: true,
+                ),
+              LabelValueRow(
+                label: 'Crew on board',
+                value: run.crewCount?.toString(),
+              ),
             ],
-            if (reason?.trim().isNotEmpty == true) ...[
-              const SizedBox(height: 8),
-              Text('Reason given', style: theme.textTheme.labelLarge),
-              const SizedBox(height: 4),
-              Text(reason!),
+          ),
+          RunSection(
+            title: 'Times',
+            children: [
+              if (dispatchedAt != null)
+                LabelValueRow(
+                  label: 'Sent',
+                  value: FriendlyDate.time(dispatchedAt),
+                ),
+              if (run.acknowledgedAt case final at?)
+                LabelValueRow(label: 'Accepted', value: FriendlyDate.time(at)),
+              if (run.completedAt case final at?)
+                LabelValueRow(label: 'Finished', value: FriendlyDate.time(at)),
             ],
+          ),
+          RunSection(
+            title: 'How it ended',
+            children: [
+              if (endedTheCall)
+                if (run.callOutcome?.label case final outcome?)
+                  LabelValueRow(label: 'Outcome', value: outcome),
+              if (run.patientCondition?.trim().isNotEmpty == true)
+                LabelValueRow(
+                  label: 'Patient condition',
+                  value: run.patientCondition,
+                ),
+              if (run.handoverNotes?.trim().isNotEmpty == true) ...[
+                const SizedBox(height: 8),
+                Text('Handover notes', style: theme.textTheme.labelLarge),
+                const SizedBox(height: 4),
+                Text(run.handoverNotes!),
+              ],
+              if (endedTheCall &&
+                  run.callOutcomeNotes?.trim().isNotEmpty == true) ...[
+                const SizedBox(height: 8),
+                Text('Notes', style: theme.textTheme.labelLarge),
+                const SizedBox(height: 4),
+                Text(run.callOutcomeNotes!),
+              ],
+              if (reason?.trim().isNotEmpty == true) ...[
+                const SizedBox(height: 8),
+                Text('Reason given', style: theme.textTheme.labelLarge),
+                const SizedBox(height: 4),
+                Text(reason!),
+              ],
+            ],
+          ),
+        ])
+          if (section.children.isNotEmpty) ...[
+            section,
+            const SizedBox(height: 12),
           ],
-        ),
       ],
-    );
-  }
-}
-
-class _Section extends StatelessWidget {
-  const _Section({this.title, required this.children});
-
-  final String? title;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    if (children.isEmpty) return const SizedBox.shrink();
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (title != null) ...[
-              Text(title!, style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-            ],
-            ...children,
-          ],
-        ),
-      ),
     );
   }
 }

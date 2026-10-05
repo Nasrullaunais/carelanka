@@ -167,6 +167,28 @@ flutter test test_screens --update-goldens
 It renders the screens with fake data to `test_screens/shots/` (gitignored). It is not part
 of the normal `flutter test` run.
 
+### Building a release APK
+
+A release build talks to the hosted server on its own; no `API_BASE_URL` flag is needed.
+
+1. Raise `version:` in `pubspec.yaml`. The part after `+` must go up on every release, or
+   Android refuses to install the new APK over the old one.
+2. Put the release key details in `android/key.properties` (gitignored):
+
+   ```properties
+   storeFile=/absolute/path/to/carelanka-upload.jks
+   storePassword=...
+   keyAlias=carelanka
+   keyPassword=...
+   ```
+
+   Every release must be signed with **the same key**. A phone refuses to update an app
+   signed with a different one, so the key holder keeps the keystore and its passwords
+   backed up. Without `key.properties` the build falls back to the debug key, which is fine
+   for trying a release build but not for handing out.
+3. Build: `flutter build apk --release`. The APK lands in
+   `build/app/outputs/flutter-apk/app-release.apk`.
+
 ---
 
 ## 6. Still to be decided by the group

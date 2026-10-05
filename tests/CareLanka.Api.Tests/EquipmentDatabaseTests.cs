@@ -207,6 +207,46 @@ public sealed class EquipmentDatabaseTests
         await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
     }
 
+    [Fact]
+    public async Task The_database_rejects_two_active_items_sharing_a_serial_number()
+    {
+        // EquipmentItemConfiguration.cs defines a SECOND unique filtered index,
+        // ux_equipment_items_serial_number, separate from the asset-tag one above - the
+        // serial number the manufacturer stamped on the machine, not the sticker the
+        // hospital puts on it. Same proof as the asset-tag test: two active items are
+        // inserted straight through the database with the same serial number, so this
+        // checks the constraint itself holds, not a service-layer pre-check.
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        var sharedSerial = $"SN-{Guid.NewGuid():N}"[..14];
+        var category = NewCategory();
+        db.EquipmentCategories.Add(category);
+        db.EquipmentItems.Add(NewItem(
+            category.Id, $"DB-TEST-{Guid.NewGuid():N}"[..14], serialNumber: sharedSerial));
+        await db.SaveChangesAsync();
+
+        db.EquipmentItems.Add(NewItem(
+            category.Id, $"DB-TEST-{Guid.NewGuid():N}"[..14], serialNumber: sharedSerial));
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+    }
+
+    [Fact]
+    public async Task The_database_refuses_a_lab_report_with_a_byte_size_of_zero_or_less()
+    {
+        // LabReportConfiguration.cs defines ck_lab_reports_byte_size: byte_size > 0. The API's
+        // own upload check (LabReportService) already refuses an empty file before it ever
+        // reaches the database - this test is the database-level proof that the constraint
+        // itself exists too, independent of that service-layer check ever running at all.
+        using var scope = _application.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLankaDbContext>();
+
+        db.LabReports.Add(NewLabReport(byteSize: 0));
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+    }
+
     private static EquipmentCategory NewCategory() => new()
     {
         Id = Guid.NewGuid(),
@@ -215,7 +255,7 @@ public sealed class EquipmentDatabaseTests
         UpdatedAt = DateTimeOffset.UtcNow
     };
 
-    private static EquipmentItem NewItem(Guid categoryId, string assetTag) => new()
+    private static EquipmentItem NewItem(Guid categoryId, string assetTag, string? serialNumber = null) => new()
     {
         Id = Guid.NewGuid(),
         Name = "DB Test Ventilator",
@@ -225,8 +265,22 @@ public sealed class EquipmentDatabaseTests
         PurchaseDate = new DateOnly(2026, 1, 5),
         Status = EquipmentStatus.Available,
         AssetTag = assetTag,
+        SerialNumber = serialNumber,
         CreatedAt = DateTimeOffset.UtcNow,
         UpdatedAt = DateTimeOffset.UtcNow
+    };
+
+    private static LabReport NewLabReport(int byteSize) => new()
+    {
+        Id = Guid.NewGuid(),
+        PatientId = Guid.NewGuid(),
+        TestName = "DB Test Full Blood Count",
+        FileName = "report.pdf",
+        ContentType = "application/pdf",
+        Content = [0x25, 0x50, 0x44, 0x46],
+        ByteSize = byteSize,
+        UploadedByStaffId = Guid.NewGuid(),
+        CreatedAt = DateTimeOffset.UtcNow
     };
 
     private static PharmacyCategory NewPharmacyCategory() => new()

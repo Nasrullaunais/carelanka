@@ -16,6 +16,7 @@ import {
   dispatchStatusLabels,
   emergencyCallPath,
   formatAge,
+  formatClock,
   formatTimestamp,
   priorityLabels,
 } from '../domain';
@@ -36,17 +37,30 @@ export function FleetBoard() {
   const fleet = useQuery({ ...listAmbulancesOptions({ query: { page, pageSize: 25 } }), refetchInterval: REFRESH_MS, enabled: view === 'board' });
   const live = useQuery({ ...getFleetMapOptions(), refetchInterval: REFRESH_MS, enabled: view === 'map' });
   const columns: Array<DataTableColumn<AmbulanceSummary>> = [
-    { key: 'registration', header: 'Ambulance', cell: (ambulance) => ambulance.registration_number },
+    { key: 'registration', header: 'Ambulance', cell: (ambulance) => <span className="whitespace-nowrap font-semibold">{ambulance.registration_number}</span> },
     { key: 'status', header: 'Status', cell: (ambulance) => <StatusChip tone={ambulanceStatusTones[ambulance.status]}>{ambulanceStatusLabels[ambulance.status]}</StatusChip> },
-    { key: 'crew', header: 'Crew', cell: (ambulance) => `${ambulance.current_crew_count ?? 0}/${ambulance.required_crew_count ?? 2}` },
-    { key: 'location', header: 'Location updated', cell: (ambulance) => <span>{formatTimestamp(ambulance.location_updated_at)}{ambulance.eligibility_block_reasons?.includes('stale_location') ? ' · stale' : ''}{ambulance.current_latitude != null && ambulance.current_longitude != null && <> · <a className="text-accent underline" href={`https://www.google.com/maps?q=${ambulance.current_latitude},${ambulance.current_longitude}`} target="_blank" rel="noreferrer">Map</a></>}</span> },
-    { key: 'dispatch', header: 'Active dispatch', cell: (ambulance) => ambulance.active_dispatch
-      ? [
-        ambulance.active_dispatch.call_priority && `${priorityLabels[ambulance.active_dispatch.call_priority]} call`,
-        ambulance.active_dispatch.status && dispatchStatusLabels[ambulance.active_dispatch.status],
-        `since ${formatTimestamp(ambulance.active_dispatch.dispatched_at)}`,
-      ].filter(Boolean).join(' · ')
-      : 'None' },
+    { key: 'crew', header: 'Crew', cell: (ambulance) => <CrewCount current={ambulance.current_crew_count} required={ambulance.required_crew_count} /> },
+    { key: 'location', header: 'Last position', cell: (ambulance) => (
+      <div className="flex flex-col">
+        <span className="whitespace-nowrap" title={formatTimestamp(ambulance.location_updated_at)}>{formatClock(ambulance.location_updated_at)}</span>
+        {ambulance.eligibility_block_reasons?.includes('stale_location') && <span className="text-xs text-danger">May be out of date</span>}
+        {ambulance.current_latitude != null && ambulance.current_longitude != null && <a className="text-xs text-accent underline" href={`https://www.google.com/maps?q=${ambulance.current_latitude},${ambulance.current_longitude}`} target="_blank" rel="noreferrer">Show on map</a>}
+      </div>
+    ) },
+    { key: 'dispatch', header: 'Active dispatch', cell: (ambulance) => {
+      const run = ambulance.active_dispatch;
+      if (!run) return <span className="text-muted">None</span>;
+      const label = [run.call_priority && `${priorityLabels[run.call_priority]} call`, run.status && dispatchStatusLabels[run.status]].filter(Boolean).join(' · ');
+      return (
+        <div className="flex flex-col items-start">
+          {run.emergency_call_id
+            ? <button type="button" className="linklike" onClick={() => navigate(emergencyCallPath(run.emergency_call_id!))}>{label}</button>
+            : <span>{label}</span>}
+          <span className="text-xs text-muted">Sent at {formatClock(run.dispatched_at)}</span>
+          {run.acknowledgement_overdue && <span className="text-xs text-danger">Crew has not accepted yet</span>}
+        </div>
+      );
+    } },
     { key: 'divertible', header: 'Divertible', cell: (ambulance) => ambulance.is_divertible ? 'Yes' : 'No' },
     { key: 'action', header: 'Crew actions', cell: (ambulance) => <Button size="sm" variant="outline" onPress={() => setCrewTarget(ambulance)}>Manage crew</Button> },
   ];
@@ -62,7 +76,7 @@ export function FleetBoard() {
         ) : (
           <QueryState query={live} errorContext="Could not load the fleet map.">
             {(data) => (
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_20rem]">
+              <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[1fr_20rem]">
                 <Suspense fallback={<div className="h-[32rem] animate-pulse rounded-xl bg-default-100" aria-label="Loading fleet map" />}>
                   <FleetMapView map={data} selectedAmbulanceId={selectedId} onSelectAmbulance={setSelectedId} onOpenCall={(id) => navigate(emergencyCallPath(id))} />
                 </Suspense>
@@ -118,7 +132,7 @@ function FleetSidePanel({ map, selectedId, onSelect, onOpenCall, onManageCrew }:
           <CardTitle>{selected.registration_number}</CardTitle>
           <StatusChip tone={ambulanceStatusTones[status]}>{ambulanceStatusLabels[status]}</StatusChip>
         </div>
-        <DetailField label="Crew">{selected.current_crew_count ?? 0} of {selected.required_crew_count ?? 2} needed</DetailField>
+        <DetailField label="Crew"><CrewCount current={selected.current_crew_count} required={selected.required_crew_count} /></DetailField>
         <DetailField label="Position updated">
           {formatAge(selected.location_updated_at)}
           {selected.location_is_stale && <span className="text-danger"> · may be out of date</span>}
@@ -136,4 +150,10 @@ function FleetSidePanel({ map, selectedId, onSelect, onOpenCall, onManageCrew }:
       </CardContent>
     </Card>
   );
+}
+
+function CrewCount({ current = 0, required = 2 }: { current?: number; required?: number }) {
+  return current < required
+    ? <span className="whitespace-nowrap text-danger">{current} · needs {required}</span>
+    : <span className="whitespace-nowrap">{current} on board</span>;
 }

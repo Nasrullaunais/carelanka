@@ -39,6 +39,23 @@ export const notificationTypeLabels: Record<NotificationType, string> = {
   roster_proposal_waiting: 'Roster proposal waiting',
 };
 
+// Mirrors NotificationTypeExtensions.AndroidChannel on the API: whatever buzzes a phone loudly
+// also stays on screen here until someone deals with it.
+export const urgentNotificationTypes: ReadonlySet<NotificationType> = new Set<NotificationType>([
+  'dispatch_assigned',
+  'dispatch_cancelled',
+  'ambulance_on_the_way',
+  'ambulance_arrived',
+  'emergency_call_received',
+  'dispatch_proposal_waiting',
+  'dispatch_proposal_failed',
+  'care_query_flagged',
+]);
+
+export function isUrgentNotification({ type }: InboxNotification): boolean {
+  return type !== undefined && urgentNotificationTypes.has(type);
+}
+
 // One route per NotificationType so a new type with no route is a compile error, not a dead click.
 const notificationRoutes: Record<NotificationType, (notification: InboxNotification) => string> = {
   dispatch_assigned: () => '/emergency',

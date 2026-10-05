@@ -10,6 +10,7 @@ import { roleLabels } from '../types/permissions';
 import { destinationsFor } from '../types/navigation';
 import { Brand } from './Brand';
 import { NotificationBell } from './NotificationBell';
+import { NotificationPopups } from './NotificationPopups';
 import { ProfileAvatar } from './ProfileAvatar';
 
 export function AppShell() {
@@ -91,5 +92,6 @@ export function AppShell() {
       <div className="workspace-topbar"><NotificationBell /></div>
       <Outlet />
     </main>
+    <NotificationPopups />
   </div>;
 }

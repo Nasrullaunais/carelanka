@@ -1,0 +1,196 @@
+Started spike: 2026-10-05 13:48:20 +0530
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+
+     execution: local
+        script: spike.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 120 max VUs, 2m40s max duration (incl. graceful stop):
+              * spike: Up to 120 looping VUs for 2m10s over 5 stages (gracefulRampDown: 10s, gracefulStop: 30s)
+
+
+
+
+
+time="2026-10-05T08:18:25Z" level=warning msg="Request Failed" error="Get \"https://carelanka.uaenorth.cloudapp.azure.com/api/emergency-calls?page=1&pageSize=20\": read tcp 172.17.0.3:33544->74.162.156.147:443: read: connection reset by peer"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+spike ↓ [ 100% ] 010/120 VUs  2m10s
+     ✓ cancellation_requests is 200
+     ✓ crew_my_ambulance is 200
+     ✓ call_board_waiting is 200
+     ✓ dispatch_proposals is 200
+     ✓ fleet_map is 200
+     ✗ call_board is 200
+      ↳  99% — ✓ 464 / ✗ 1
+     ✓ crew_active_run is 200
+     ✓ report_fleet_utilisation is 200
+     ✓ call_board_search is 200
+     ✓ patient_my_calls is 200
+     ✓ report_response_times is 200
+     ✓ ambulances_nearest is 200
+     ✓ crew_run_history is 200
+
+     checks..............................: 99.98% ✓ 6008      ✗ 1    
+     data_received.......................: 9.5 MB 72 kB/s
+     data_sent...........................: 657 kB 5.0 kB/s
+     http_req_blocked....................: avg=5.41ms   min=121ns    med=428ns    max=386.32ms p(90)=606ns    p(95)=740ns   
+     http_req_connecting.................: avg=2.62ms   min=0s       med=0s       max=253.19ms p(90)=0s       p(95)=0s      
+     http_req_duration...................: avg=136.69ms min=7.09ms   med=129.77ms max=574.87ms p(90)=143.98ms p(95)=217.1ms 
+     ✓ { ep:ambulances_nearest }.........: avg=221.25ms min=207.79ms med=219.17ms max=574.87ms p(90)=227.22ms p(95)=230.32ms
+     ✓ { ep:call_board_search }..........: avg=128.83ms min=118.11ms med=128.87ms max=168.51ms p(90)=136.56ms p(95)=138.94ms
+     ✓ { ep:call_board_waiting }.........: avg=131.35ms min=119.92ms med=131.29ms max=196.03ms p(90)=138.65ms p(95)=141.33ms
+     ✓ { ep:call_board }.................: avg=130.12ms min=7.09ms   med=130.78ms max=160.84ms p(90)=137.38ms p(95)=139.81ms
+     ✓ { ep:cancellation_requests }......: avg=128.82ms min=118.97ms med=129.11ms max=161.07ms p(90)=135.44ms p(95)=138.31ms
+     ✓ { ep:crew_active_run }............: avg=131.19ms min=120.21ms med=130.66ms max=292.88ms p(90)=138.76ms p(95)=143.06ms
+     ✓ { ep:crew_my_ambulance }..........: avg=128.6ms  min=118.26ms med=128.46ms max=222.93ms p(90)=135.2ms  p(95)=138.53ms
+     ✓ { ep:crew_run_history }...........: avg=129.5ms  min=118.49ms med=129.5ms  max=175.13ms p(90)=136.45ms p(95)=138.82ms
+     ✓ { ep:dispatch_proposals }.........: avg=130.08ms min=118.94ms med=129.02ms max=452.35ms p(90)=135.95ms p(95)=139.48ms
+     ✓ { ep:fleet_map }..................: avg=129.49ms min=119.02ms med=129.27ms max=173.4ms  p(90)=137.47ms p(95)=140.87ms
+     ✓ { ep:login_setup }................: avg=207.05ms min=201.72ms med=204.79ms max=214.64ms p(90)=212.67ms p(95)=213.66ms
+     ✓ { ep:patient_my_calls }...........: avg=128.26ms min=117.9ms  med=128.28ms max=267.18ms p(90)=135.75ms p(95)=138.19ms
+     ✓ { ep:report_fleet_utilisation }...: avg=129.55ms min=117.47ms med=128.76ms max=294.22ms p(90)=136.65ms p(95)=139.19ms
+     ✓ { ep:report_response_times }......: avg=128.89ms min=118.31ms med=128.99ms max=223.48ms p(90)=135.95ms p(95)=137.9ms 
+       { expected_response:true }........: avg=136.71ms min=117.47ms med=129.78ms max=574.87ms p(90)=143.98ms p(95)=217.1ms 
+   ✓ http_req_failed.....................: 0.01%  ✓ 1         ✗ 6011 
+     http_req_receiving..................: avg=262.99µs min=0s       med=81.77µs  max=131.35ms p(90)=354.77µs p(95)=1.17ms  
+     http_req_sending....................: avg=66.53µs  min=13.26µs  med=62.24µs  max=359.81µs p(90)=100.18µs p(95)=113.37µs
+     http_req_tls_handshaking............: avg=2.77ms   min=0s       med=0s       max=153.9ms  p(90)=0s       p(95)=0s      
+     http_req_waiting....................: avg=136.36ms min=7.02ms   med=129.49ms max=574.59ms p(90)=143.33ms p(95)=216.81ms
+     http_reqs...........................: 6012   45.592485/s
+     iteration_duration..................: avg=1.14s    min=1s       med=1.13s    max=1.57s    p(90)=1.16s    p(95)=1.22s   
+     iterations..........................: 6009   45.569734/s
+     vus.................................: 9      min=9       max=120
+     vus_max.............................: 120    min=120     max=120
+spike ✓ [ 100% ] 000/120 VUs  2m10s

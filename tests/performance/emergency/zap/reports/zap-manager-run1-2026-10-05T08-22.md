@@ -1,0 +1,610 @@
+# ZAP Scanning Report
+
+ZAP by [Checkmarx](https://checkmarx.com/).
+
+
+## Summary of Alerts
+
+| Risk Level | Number of Alerts |
+| --- | --- |
+| High | 0 |
+| Medium | 0 |
+| Low | 4 |
+| Informational | 3 |
+
+
+
+
+## Insights
+
+| Level | Reason | Site | Description | Statistic |
+| --- | --- | --- | --- | --- |
+| Low | Exceeded High | https://carelanka.uaenorth.cloudapp.azure.com | Percentage of responses with status code 4xx | 98 % |
+| Low | Exceeded High | https://carelanka.uaenorth.cloudapp.azure.com | Percentage of slow responses | 99 % |
+| Info | Informational | https://carelanka.uaenorth.cloudapp.azure.com | Percentage of responses with status code 2xx | 1 % |
+| Info | Informational | https://carelanka.uaenorth.cloudapp.azure.com | Percentage of endpoints with content type application/json | 6 % |
+| Info | Informational | https://carelanka.uaenorth.cloudapp.azure.com | Percentage of endpoints with content type application/problem+json | 20 % |
+| Info | Informational | https://carelanka.uaenorth.cloudapp.azure.com | Percentage of endpoints with content type text/html | 10 % |
+| Info | Informational | https://carelanka.uaenorth.cloudapp.azure.com | Percentage of endpoints with method GET | 100 % |
+| Info | Informational | https://carelanka.uaenorth.cloudapp.azure.com | Count of total endpoints | 29    |
+
+
+
+
+
+
+
+## Alerts
+
+| Name | Risk Level | Number of Instances |
+| --- | --- | --- |
+| Cross-Origin-Resource-Policy Header Missing or Invalid | Low | 2 |
+| Strict-Transport-Security Header Not Set | Low | Systemic |
+| Unexpected Content-Type was returned | Low | 4 |
+| X-Content-Type-Options Header Missing | Low | 2 |
+| A Client Error response code was returned by the server | Informational | 25 |
+| Non-Storable Content | Informational | Systemic |
+| Re-examine Cache-control Directives | Informational | 2 |
+
+
+
+
+## Alert Detail
+
+
+
+### [ Cross-Origin-Resource-Policy Header Missing or Invalid ](https://www.zaproxy.org/docs/alerts/90004/)
+
+
+
+##### Low (Medium)
+
+### Description
+
+Cross-Origin-Resource-Policy header is an opt-in header designed to counter side-channels attacks like Spectre. Resource should be specifically set as shareable amongst different origins.
+
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/emergency-cancellation-requests%3Fstatus=pending&page=10&pageSize=10
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/emergency-cancellation-requests (page,pageSize,status)`
+  * Method: `GET`
+  * Parameter: `Cross-Origin-Resource-Policy`
+  * Attack: ``
+  * Evidence: ``
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/fleet-map
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/fleet-map`
+  * Method: `GET`
+  * Parameter: `Cross-Origin-Resource-Policy`
+  * Attack: ``
+  * Evidence: ``
+  * Other Info: ``
+
+
+Instances: 2
+
+### Solution
+
+Ensure that the application/web server sets the Cross-Origin-Resource-Policy header appropriately, and that it sets the Cross-Origin-Resource-Policy header to 'same-origin' for all web pages.
+'same-site' is considered as less secured and should be avoided.
+If resources must be shared, set the header to 'cross-origin'.
+If possible, ensure that the end user uses a standards-compliant and modern web browser that supports the Cross-Origin-Resource-Policy header (https://caniuse.com/mdn-http_headers_cross-origin-resource-policy).
+
+### Reference
+
+
+* [ https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cross-Origin-Embedder-Policy ](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cross-Origin-Embedder-Policy)
+
+
+#### CWE Id: [ 693 ](https://cwe.mitre.org/data/definitions/693.html)
+
+
+#### WASC Id: 14
+
+#### Source ID: 3
+
+### [ Strict-Transport-Security Header Not Set ](https://www.zaproxy.org/docs/alerts/10035/)
+
+
+
+##### Low (High)
+
+### Description
+
+HTTP Strict Transport Security (HSTS) is a web security policy mechanism whereby a web server declares that complying user agents (such as a web browser) are to interact with it using only secure HTTPS connections (i.e. HTTP layered over TLS/SSL). HSTS is an IETF standards track protocol and is specified in RFC 6797.
+
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/ambulances%3Fstatus=available&search=ZAP&nearToLatitude=1.2&nearToLongitude=1.2&includeRetired=true&eligibleOnly=true&page=10&pageSize=10&sortBy=registration_number&sortDir=sortDir
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/ambulances (eligibleOnly,includeRetired,nearToLatitude,nearToLongitude,page,pageSize,search,sortBy,sortDir,status)`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: ``
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/ambulances/id
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/ambulances/id`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: ``
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/ambulances/id/crew
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/ambulances/id/crew`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: ``
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/emergency-calls%3Fstatus=received&priority=critical&search=ZAP&from=from&to=to&unassignedOnly=false&page=1&pageSize=20&sortBy=priority&sortDir=desc
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/emergency-calls (from,page,pageSize,priority,search,sortBy,sortDir,status,to,unassignedOnly)`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: ``
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/fleet-map
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/fleet-map`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: ``
+  * Other Info: ``
+
+Instances: Systemic
+
+
+### Solution
+
+Ensure that your web server, application server, load balancer, etc. is configured to enforce Strict-Transport-Security.
+
+### Reference
+
+
+* [ https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Strict_Transport_Security_Cheat_Sheet.html ](https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Strict_Transport_Security_Cheat_Sheet.html)
+* [ https://owasp.org/www-community/Security_Headers ](https://owasp.org/www-community/Security_Headers)
+* [ https://en.wikipedia.org/wiki/HTTP_Strict_Transport_Security ](https://en.wikipedia.org/wiki/HTTP_Strict_Transport_Security)
+* [ https://caniuse.com/stricttransportsecurity ](https://caniuse.com/stricttransportsecurity)
+* [ https://datatracker.ietf.org/doc/html/rfc6797 ](https://datatracker.ietf.org/doc/html/rfc6797)
+
+
+#### CWE Id: [ 319 ](https://cwe.mitre.org/data/definitions/319.html)
+
+
+#### WASC Id: 15
+
+#### Source ID: 3
+
+### [ Unexpected Content-Type was returned ](https://www.zaproxy.org/docs/alerts/100001/)
+
+
+
+##### Low (High)
+
+### Description
+
+A Content-Type of text/html was returned by the server.
+This is not one of the types expected to be returned by an API.
+Raised by the 'Alert on Unexpected Content Types' script
+
+* URL: https://carelanka.uaenorth.cloudapp.azure.com
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `text/html`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/3437357451197172460
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/3437357451197172460`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `text/html`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/7985669256502986787
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/7985669256502986787`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `text/html`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `text/html`
+  * Other Info: ``
+
+
+Instances: 4
+
+### Solution
+
+
+
+### Reference
+
+
+
+
+#### Source ID: 4
+
+### [ X-Content-Type-Options Header Missing ](https://www.zaproxy.org/docs/alerts/10021/)
+
+
+
+##### Low (Medium)
+
+### Description
+
+The Anti-MIME-Sniffing header X-Content-Type-Options was not set to 'nosniff'. This allows older versions of Internet Explorer and Chrome to perform MIME-sniffing on the response body, potentially causing the response body to be interpreted and displayed as a content type other than the declared content type. Current (early 2014) and legacy versions of Firefox will use the declared content type (if one is set), rather than performing MIME-sniffing.
+
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/emergency-cancellation-requests%3Fstatus=pending&page=10&pageSize=10
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/emergency-cancellation-requests (page,pageSize,status)`
+  * Method: `GET`
+  * Parameter: `x-content-type-options`
+  * Attack: ``
+  * Evidence: ``
+  * Other Info: `This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.
+At "High" threshold this scan rule will not alert on client or server error responses.`
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/fleet-map
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/fleet-map`
+  * Method: `GET`
+  * Parameter: `x-content-type-options`
+  * Attack: ``
+  * Evidence: ``
+  * Other Info: `This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.
+At "High" threshold this scan rule will not alert on client or server error responses.`
+
+
+Instances: 2
+
+### Solution
+
+Ensure that the application/web server sets the Content-Type header appropriately, and that it sets the X-Content-Type-Options header to 'nosniff' for all web pages.
+If possible, ensure that the end user uses a standards-compliant and modern web browser that does not perform MIME-sniffing at all, or that can be directed by the web application/web server to not perform MIME-sniffing.
+
+### Reference
+
+
+* [ https://learn.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/compatibility/gg622941(v=vs.85) ](https://learn.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/compatibility/gg622941(v=vs.85))
+* [ https://owasp.org/www-community/Security_Headers ](https://owasp.org/www-community/Security_Headers)
+
+
+#### CWE Id: [ 693 ](https://cwe.mitre.org/data/definitions/693.html)
+
+
+#### WASC Id: 15
+
+#### Source ID: 3
+
+### [ A Client Error response code was returned by the server ](https://www.zaproxy.org/docs/alerts/100000/)
+
+
+
+##### Informational (High)
+
+### Description
+
+A response code of 404 was returned by the server.
+This may indicate that the application is failing to handle unexpected input correctly.
+Raised by the 'Alert on HTTP Response Code Error' script
+
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/3713083518643986651
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/3713083518643986651`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/ambulances%3Fstatus=available&search=ZAP&nearToLatitude=1.2&nearToLongitude=1.2&includeRetired=true&eligibleOnly=true&page=10&pageSize=10&sortBy=registration_number&sortDir=sortDir
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/ambulances (eligibleOnly,includeRetired,nearToLatitude,nearToLongitude,page,pageSize,search,sortBy,sortDir,status)`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `400`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/ambulances/8308643237310134580
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/ambulances/8308643237310134580`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/ambulances/id
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/ambulances/id`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/ambulances/id/5080654644632181549
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/ambulances/id/5080654644632181549`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/ambulances/id/crew
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/ambulances/id/crew`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/dispatch-proposals%3Fstatus=pending&emergencyCallId=emergencyCallId&isDiversion=true&page=10&pageSize=10
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/dispatch-proposals (emergencyCallId,isDiversion,page,pageSize,status)`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `400`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/dispatch-proposals/4615237310599756365
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/dispatch-proposals/4615237310599756365`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/dispatch-proposals/id
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/dispatch-proposals/id`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/dispatches
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/dispatches`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/dispatches/3976504796974502154
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/dispatches/3976504796974502154`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/dispatches/id
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/dispatches/id`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/dispatches/id/5662821346302520964
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/dispatches/id/5662821346302520964`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/dispatches/id/route
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/dispatches/id/route`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/emergency-calls%3Fstatus=received&priority=critical&search=ZAP&from=from&to=to&unassignedOnly=false&page=1&pageSize=20&sortBy=priority&sortDir=desc
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/emergency-calls (from,page,pageSize,priority,search,sortBy,sortDir,status,to,unassignedOnly)`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `400`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/emergency-calls/4021759482180502468
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/emergency-calls/4021759482180502468`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/emergency-calls/id
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/emergency-calls/id`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/emergency-cancellation-requests%3Fstatus=http%253A%252F%252Fwww.google.com%252F&page=10&pageSize=10
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/emergency-cancellation-requests (page,pageSize,status)`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `400`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/reports
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/reports`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/reports/511781713585332276
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/reports/511781713585332276`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/reports/emergency
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/reports/emergency`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/reports/emergency/6543892243145551664
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/reports/emergency/6543892243145551664`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/reports/emergency/agent-performance%3Ffrom=from&to=to
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/reports/emergency/agent-performance (from,to)`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `400`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/reports/emergency/fleet-utilisation%3Ffrom=from&to=to
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/reports/emergency/fleet-utilisation (from,to)`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `400`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/reports/emergency/response-times%3Ffrom=from&to=to&priority=critical
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/reports/emergency/response-times (from,priority,to)`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `400`
+  * Other Info: ``
+
+
+Instances: 25
+
+### Solution
+
+
+
+### Reference
+
+
+
+#### CWE Id: [ 388 ](https://cwe.mitre.org/data/definitions/388.html)
+
+
+#### WASC Id: 20
+
+#### Source ID: 4
+
+### [ Non-Storable Content ](https://www.zaproxy.org/docs/alerts/10049/)
+
+
+
+##### Informational (Medium)
+
+### Description
+
+The response contents are not storable by caching components such as proxy servers. If the response does not contain sensitive, personal or user-specific information, it may benefit from being stored and cached, to improve performance.
+
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/ambulances%3Fstatus=available&search=ZAP&nearToLatitude=1.2&nearToLongitude=1.2&includeRetired=true&eligibleOnly=true&page=10&pageSize=10&sortBy=registration_number&sortDir=sortDir
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/ambulances (eligibleOnly,includeRetired,nearToLatitude,nearToLongitude,page,pageSize,search,sortBy,sortDir,status)`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `authorization:`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/ambulances/id
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/ambulances/id`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `authorization:`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/ambulances/id/crew
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/ambulances/id/crew`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `authorization:`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/emergency-calls%3Fstatus=received&priority=critical&search=ZAP&from=from&to=to&unassignedOnly=false&page=1&pageSize=20&sortBy=priority&sortDir=desc
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/emergency-calls (from,page,pageSize,priority,search,sortBy,sortDir,status,to,unassignedOnly)`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `authorization:`
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/fleet-map
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/fleet-map`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `authorization:`
+  * Other Info: ``
+
+Instances: Systemic
+
+
+### Solution
+
+The content may be marked as storable by ensuring that the following conditions are satisfied:
+The request method must be understood by the cache and defined as being cacheable ("GET", "HEAD", and "POST" are currently defined as cacheable)
+The response status code must be understood by the cache (one of the 1XX, 2XX, 3XX, 4XX, or 5XX response classes are generally understood)
+The "no-store" cache directive must not appear in the request or response header fields
+For caching by "shared" caches such as "proxy" caches, the "private" response directive must not appear in the response
+For caching by "shared" caches such as "proxy" caches, the "Authorization" header field must not appear in the request, unless the response explicitly allows it (using one of the "must-revalidate", "public", or "s-maxage" Cache-Control response directives)
+In addition to the conditions above, at least one of the following conditions must also be satisfied by the response:
+It must contain an "Expires" header field
+It must contain a "max-age" response directive
+For "shared" caches such as "proxy" caches, it must contain a "s-maxage" response directive
+It must contain a "Cache Control Extension" that allows it to be cached
+It must have a status code that is defined as cacheable by default (200, 203, 204, 206, 300, 301, 404, 405, 410, 414, 501).
+
+### Reference
+
+
+* [ https://datatracker.ietf.org/doc/html/rfc7234 ](https://datatracker.ietf.org/doc/html/rfc7234)
+* [ https://datatracker.ietf.org/doc/html/rfc7231 ](https://datatracker.ietf.org/doc/html/rfc7231)
+* [ https://www.w3.org/Protocols/rfc2616/rfc2616-sec13.html ](https://www.w3.org/Protocols/rfc2616/rfc2616-sec13.html)
+
+
+#### CWE Id: [ 524 ](https://cwe.mitre.org/data/definitions/524.html)
+
+
+#### WASC Id: 13
+
+#### Source ID: 3
+
+### [ Re-examine Cache-control Directives ](https://www.zaproxy.org/docs/alerts/10015/)
+
+
+
+##### Informational (Low)
+
+### Description
+
+The cache-control header has not been set properly or is missing, allowing the browser and proxies to cache content. For static assets like css, js, or image files this might be intended, however, the resources should be reviewed to ensure that no sensitive content will be cached.
+
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/emergency-cancellation-requests%3Fstatus=pending&page=10&pageSize=10
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/emergency-cancellation-requests (page,pageSize,status)`
+  * Method: `GET`
+  * Parameter: `cache-control`
+  * Attack: ``
+  * Evidence: ``
+  * Other Info: ``
+* URL: https://carelanka.uaenorth.cloudapp.azure.com/api/fleet-map
+  * Node Name: `https://carelanka.uaenorth.cloudapp.azure.com/api/fleet-map`
+  * Method: `GET`
+  * Parameter: `cache-control`
+  * Attack: ``
+  * Evidence: ``
+  * Other Info: ``
+
+
+Instances: 2
+
+### Solution
+
+For secure content, ensure the cache-control HTTP header is set with "no-cache, no-store, must-revalidate". If an asset should be cached consider setting the directives "public, max-age, immutable".
+
+### Reference
+
+
+* [ https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html#web-content-caching ](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html#web-content-caching)
+* [ https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control ](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control)
+* [ https://grayduck.mn/2021/09/13/cache-control-recommendations/ ](https://grayduck.mn/2021/09/13/cache-control-recommendations/)
+
+
+#### CWE Id: [ 525 ](https://cwe.mitre.org/data/definitions/525.html)
+
+
+#### WASC Id: 13
+
+#### Source ID: 3
+
+

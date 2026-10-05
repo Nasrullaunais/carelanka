@@ -1,0 +1,45 @@
+     ✓ patient_my_calls is 200
+     ✓ crew_my_ambulance is 200
+     ✓ dispatch_proposals is 200
+     ✓ ambulances_nearest is 200
+     ✓ call_board_search is 200
+     ✓ call_board_waiting is 200
+     ✓ report_response_times is 200
+     ✓ crew_active_run is 200
+     ✓ cancellation_requests is 200
+     ✓ fleet_map is 200
+     ✓ report_fleet_utilisation is 200
+     ✓ crew_run_history is 200
+     ✓ call_board is 200
+
+     checks..............................: 100.00% ✓ 80       ✗ 0  
+     data_received.......................: 142 kB  4.4 kB/s
+     data_sent...........................: 15 kB   466 B/s
+     http_req_blocked....................: avg=12.86ms  min=202ns    med=569ns    max=285.64ms p(90)=798ns    p(95)=1.09µs  
+     http_req_connecting.................: avg=6.18ms   min=0s       med=0s       max=139.33ms p(90)=0s       p(95)=0s      
+     http_req_duration...................: avg=146.88ms min=120.61ms med=131.58ms max=411.57ms p(90)=216.09ms p(95)=231.8ms 
+     ✓ { ep:ambulances_nearest }.........: avg=255.42ms min=215.69ms med=225.67ms max=411.57ms p(90)=324.67ms p(95)=368.12ms
+     ✓ { ep:call_board_search }..........: avg=150.98ms min=121.99ms med=131ms    max=216.53ms p(90)=216.52ms p(95)=216.52ms
+     ✓ { ep:call_board_waiting }.........: avg=136.6ms  min=125.65ms med=140.89ms max=147.09ms p(90)=145.2ms  p(95)=146.14ms
+     ✓ { ep:call_board }.................: avg=137.1ms  min=127.22ms med=136.25ms max=154.62ms p(90)=146.31ms p(95)=150.47ms
+     ✓ { ep:cancellation_requests }......: avg=137.75ms min=127.54ms med=140.2ms  max=153.63ms p(90)=146.03ms p(95)=149.83ms
+     ✓ { ep:crew_active_run }............: avg=134.37ms min=125.08ms med=132.47ms max=143.44ms p(90)=143.31ms p(95)=143.37ms
+     ✓ { ep:crew_my_ambulance }..........: avg=132.31ms min=121.1ms  med=131.58ms max=146.52ms p(90)=141.97ms p(95)=144.24ms
+     ✓ { ep:crew_run_history }...........: avg=128.44ms min=122ms    med=124.32ms max=151.19ms p(90)=138.06ms p(95)=144.62ms
+     ✓ { ep:dispatch_proposals }.........: avg=135.92ms min=124.52ms med=131.74ms max=148.36ms p(90)=147.66ms p(95)=148.01ms
+     ✓ { ep:fleet_map }..................: avg=137.43ms min=122.16ms med=140.31ms max=145.25ms p(90)=143.54ms p(95)=144.39ms
+     ✓ { ep:login_setup }................: avg=234.75ms min=202.16ms med=239.2ms  max=262.89ms p(90)=258.15ms p(95)=260.52ms
+     ✓ { ep:patient_my_calls }...........: avg=124.57ms min=122.17ms med=124.47ms max=127.09ms p(90)=126.8ms  p(95)=126.95ms
+     ✓ { ep:report_fleet_utilisation }...: avg=125.22ms min=120.61ms med=123.18ms max=133.91ms p(90)=130.98ms p(95)=132.45ms
+     ✓ { ep:report_response_times }......: avg=123.57ms min=121.45ms med=123.69ms max=125.34ms p(90)=125.03ms p(95)=125.18ms
+       { expected_response:true }........: avg=146.88ms min=120.61ms med=131.58ms max=411.57ms p(90)=216.09ms p(95)=231.8ms 
+   ✓ http_req_failed.....................: 0.00%   ✓ 0        ✗ 83 
+     http_req_receiving..................: avg=283.2µs  min=20.44µs  med=90.05µs  max=8.13ms   p(90)=401µs    p(95)=917.15µs
+     http_req_sending....................: avg=118.25µs min=22.97µs  med=118.83µs max=347.03µs p(90)=146.82µs p(95)=169.2µs 
+     http_req_tls_handshaking............: avg=6.57ms   min=0s       med=0s       max=146.18ms p(90)=0s       p(95)=0s      
+     http_req_waiting....................: avg=146.48ms min=120.44ms med=131.33ms max=411.32ms p(90)=215.89ms p(95)=231.43ms
+     http_reqs...........................: 83      2.598552/s
+     iteration_duration..................: avg=1.15s    min=1.12s    med=1.13s    max=1.43s    p(90)=1.21s    p(95)=1.24s   
+     iterations..........................: 80      2.504629/s
+     vus.................................: 3       min=3      max=3
+     vus_max.............................: 3       min=3      max=3

@@ -1,0 +1,539 @@
+{
+  "root_group": {
+    "name": "",
+    "path": "",
+    "id": "d41d8cd98f00b204e9800998ecf8427e",
+    "groups": [],
+    "checks": [
+      {
+        "fails": 0,
+        "name": "cancellation_requests is 200",
+        "path": "::cancellation_requests is 200",
+        "id": "36e37832a1c71b08aee884f55a15ed6d",
+        "passes": 467
+      },
+      {
+        "passes": 377,
+        "fails": 0,
+        "name": "crew_my_ambulance is 200",
+        "path": "::crew_my_ambulance is 200",
+        "id": "25c388047bcf23c6902a631fb13e5ae9"
+      },
+      {
+        "id": "380a667071c9ecab6b5bc433f2588983",
+        "passes": 444,
+        "fails": 0,
+        "name": "call_board_waiting is 200",
+        "path": "::call_board_waiting is 200"
+      },
+      {
+        "name": "dispatch_proposals is 200",
+        "path": "::dispatch_proposals is 200",
+        "id": "917ac9207c14b8f2ffdf6426344758a4",
+        "passes": 471,
+        "fails": 0
+      },
+      {
+        "name": "fleet_map is 200",
+        "path": "::fleet_map is 200",
+        "id": "37c6456ad555228d6307ec4fd43680ab",
+        "passes": 444,
+        "fails": 0
+      },
+      {
+        "name": "call_board is 200",
+        "path": "::call_board is 200",
+        "id": "667daffe95f4b53e7d0ebcc9822398f7",
+        "passes": 464,
+        "fails": 1
+      },
+      {
+        "passes": 402,
+        "fails": 0,
+        "name": "crew_active_run is 200",
+        "path": "::crew_active_run is 200",
+        "id": "f5398733b39666cf8fe75d6cd1ac9dc8"
+      },
+      {
+        "passes": 459,
+        "fails": 0,
+        "name": "report_fleet_utilisation is 200",
+        "path": "::report_fleet_utilisation is 200",
+        "id": "3db975992a084bee780538906904d4c7"
+      },
+      {
+        "name": "call_board_search is 200",
+        "path": "::call_board_search is 200",
+        "id": "65ccd0526fa2e4b2a7e412ac91f33906",
+        "passes": 485,
+        "fails": 0
+      },
+      {
+        "name": "patient_my_calls is 200",
+        "path": "::patient_my_calls is 200",
+        "id": "f5bebf940b0a71fcc204181e8ca6011d",
+        "passes": 647,
+        "fails": 0
+      },
+      {
+        "name": "report_response_times is 200",
+        "path": "::report_response_times is 200",
+        "id": "91fef3d1835e178cbc150e19eafb7695",
+        "passes": 430,
+        "fails": 0
+      },
+      {
+        "passes": 468,
+        "fails": 0,
+        "name": "ambulances_nearest is 200",
+        "path": "::ambulances_nearest is 200",
+        "id": "288743b0cef383ca854a9323ec4c4a73"
+      },
+      {
+        "name": "crew_run_history is 200",
+        "path": "::crew_run_history is 200",
+        "id": "73dd593736e5f088f4b594bb514b2cd4",
+        "passes": 450,
+        "fails": 0
+      }
+    ]
+  },
+  "options": {
+    "summaryTimeUnit": "",
+    "noColor": false,
+    "summaryTrendStats": [
+      "avg",
+      "min",
+      "med",
+      "max",
+      "p(90)",
+      "p(95)"
+    ]
+  },
+  "state": {
+    "isStdOutTTY": false,
+    "isStdErrTTY": false,
+    "testRunDurationMs": 131863.836774
+  },
+  "metrics": {
+    "iteration_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(90)": 1167.0598204,
+        "p(95)": 1221.63776,
+        "avg": 1142.762914292228,
+        "min": 1007.589318,
+        "med": 1130.617861,
+        "max": 1575.714657
+      }
+    },
+    "iterations": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 6009,
+        "rate": 45.56973425776136
+      }
+    },
+    "http_req_duration{ep:cancellation_requests}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 138.3128209,
+        "avg": 128.82961554817987,
+        "min": 118.978265,
+        "med": 129.114836,
+        "max": 161.0742,
+        "p(90)": 135.4400564
+      },
+      "thresholds": {
+        "p(95)<500": {
+          "ok": true
+        }
+      }
+    },
+    "http_req_duration{ep:crew_my_ambulance}": {
+      "contains": "time",
+      "values": {
+        "avg": 128.60517899999996,
+        "min": 118.260041,
+        "med": 128.464288,
+        "max": 222.935549,
+        "p(90)": 135.2093066,
+        "p(95)": 138.5312358
+      },
+      "thresholds": {
+        "p(95)<500": {
+          "ok": true
+        }
+      },
+      "type": "trend"
+    },
+    "http_req_duration{ep:dispatch_proposals}": {
+      "contains": "time",
+      "values": {
+        "min": 118.943783,
+        "med": 129.020201,
+        "max": 452.358173,
+        "p(90)": 135.958247,
+        "p(95)": 139.48739799999998,
+        "avg": 130.0851590573248
+      },
+      "thresholds": {
+        "p(95)<500": {
+          "ok": true
+        }
+      },
+      "type": "trend"
+    },
+    "http_req_blocked": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "max": 386.329453,
+        "p(90)": 0.0006069000000000006,
+        "p(95)": 0.0007408999999999996,
+        "avg": 5.410365915668655,
+        "min": 0.000121,
+        "med": 0.000428
+      }
+    },
+    "data_received": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 9486498,
+        "rate": 71941.61971988429
+      }
+    },
+    "vus_max": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "max": 120,
+        "value": 120,
+        "min": 120
+      }
+    },
+    "checks": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 0.999833582958895,
+        "passes": 6008,
+        "fails": 1
+      }
+    },
+    "http_req_duration{ep:crew_run_history}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "max": 175.133855,
+        "p(90)": 136.455193,
+        "p(95)": 138.82315279999997,
+        "avg": 129.5082182777778,
+        "min": 118.492802,
+        "med": 129.505721
+      },
+      "thresholds": {
+        "p(95)<500": {
+          "ok": true
+        }
+      }
+    },
+    "http_req_duration{ep:report_response_times}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(90)": 135.9584837,
+        "p(95)": 137.9004835,
+        "avg": 128.8946351139534,
+        "min": 118.31808,
+        "med": 128.991108,
+        "max": 223.485164
+      },
+      "thresholds": {
+        "p(95)<500": {
+          "ok": true
+        }
+      }
+    },
+    "http_req_duration{ep:login_setup}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 207.0577186666667,
+        "min": 201.728471,
+        "med": 204.797989,
+        "max": 214.646696,
+        "p(90)": 212.6769546,
+        "p(95)": 213.6618253
+      },
+      "thresholds": {
+        "max<5000": {
+          "ok": true
+        }
+      }
+    },
+    "http_req_waiting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 7.025076,
+        "med": 129.49491749999999,
+        "max": 574.594355,
+        "p(90)": 143.3320359,
+        "p(95)": 216.81991809999997,
+        "avg": 136.36281836310675
+      }
+    },
+    "data_sent": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 656939,
+        "rate": 4981.949684399982
+      }
+    },
+    "http_req_receiving": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 0.2629933166999328,
+        "min": 0,
+        "med": 0.08177899999999999,
+        "max": 131.353779,
+        "p(90)": 0.35477280000000083,
+        "p(95)": 1.1735875499999981
+      }
+    },
+    "http_req_failed": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "passes": 1,
+        "fails": 6011,
+        "rate": 0.00016633399866932801
+      },
+      "thresholds": {
+        "rate<0.05": {
+          "ok": true
+        }
+      }
+    },
+    "http_req_duration{ep:call_board_search}": {
+      "thresholds": {
+        "p(95)<500": {
+          "ok": true
+        }
+      },
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 138.9402764,
+        "avg": 128.8342110453608,
+        "min": 118.119313,
+        "med": 128.87138,
+        "max": 168.519963,
+        "p(90)": 136.56974979999998
+      }
+    },
+    "http_req_sending": {
+      "contains": "time",
+      "values": {
+        "max": 0.359812,
+        "p(90)": 0.10018,
+        "p(95)": 0.11337154999999999,
+        "avg": 0.06653020192947447,
+        "min": 0.013263,
+        "med": 0.062240500000000004
+      },
+      "type": "trend"
+    },
+    "http_req_duration{ep:crew_active_run}": {
+      "contains": "time",
+      "values": {
+        "med": 130.663726,
+        "max": 292.884462,
+        "p(90)": 138.7602632,
+        "p(95)": 143.06877765000002,
+        "avg": 131.19652808706468,
+        "min": 120.218948
+      },
+      "thresholds": {
+        "p(95)<500": {
+          "ok": true
+        }
+      },
+      "type": "trend"
+    },
+    "http_req_tls_handshaking": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 2.7763147902528282,
+        "min": 0,
+        "med": 0,
+        "max": 153.907035,
+        "p(90)": 0,
+        "p(95)": 0
+      }
+    },
+    "http_req_duration{ep:call_board}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 130.12426951827962,
+        "min": 7.096768,
+        "med": 130.785292,
+        "max": 160.846297,
+        "p(90)": 137.3837676,
+        "p(95)": 139.8193606
+      },
+      "thresholds": {
+        "p(95)<500": {
+          "ok": true
+        }
+      }
+    },
+    "http_req_duration{expected_response:true}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 136.71390161786758,
+        "min": 117.475196,
+        "med": 129.780348,
+        "max": 574.871769,
+        "p(90)": 143.986291,
+        "p(95)": 217.10175700000002
+      }
+    },
+    "http_req_duration{ep:call_board_waiting}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 141.3330179,
+        "avg": 131.35170504054062,
+        "min": 119.926265,
+        "med": 131.2982155,
+        "max": 196.031763,
+        "p(90)": 138.6522347
+      },
+      "thresholds": {
+        "p(95)<500": {
+          "ok": true
+        }
+      }
+    },
+    "http_req_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 217.1004054,
+        "avg": 136.69234188173687,
+        "min": 7.096768,
+        "med": 129.7788065,
+        "max": 574.871769,
+        "p(90)": 143.9845535
+      }
+    },
+    "http_req_duration{ep:fleet_map}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 129.49124459009016,
+        "min": 119.028958,
+        "med": 129.2734955,
+        "max": 173.401523,
+        "p(90)": 137.4789796,
+        "p(95)": 140.87351689999997
+      },
+      "thresholds": {
+        "p(95)<500": {
+          "ok": true
+        }
+      }
+    },
+    "http_req_duration{ep:patient_my_calls}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(90)": 135.7581032,
+        "p(95)": 138.19837669999998,
+        "avg": 128.26803586553322,
+        "min": 117.909778,
+        "med": 128.286094,
+        "max": 267.186969
+      },
+      "thresholds": {
+        "p(95)<500": {
+          "ok": true
+        }
+      }
+    },
+    "vus": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "value": 9,
+        "min": 9,
+        "max": 120
+      }
+    },
+    "http_req_connecting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 2.6296482777777777,
+        "min": 0,
+        "med": 0,
+        "max": 253.192589,
+        "p(90)": 0,
+        "p(95)": 0
+      }
+    },
+    "http_reqs": {
+      "values": {
+        "rate": 45.592484998778716,
+        "count": 6012
+      },
+      "type": "counter",
+      "contains": "default"
+    },
+    "http_req_duration{ep:ambulances_nearest}": {
+      "thresholds": {
+        "p(95)<500": {
+          "ok": true
+        }
+      },
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 221.25922855341878,
+        "min": 207.793251,
+        "med": 219.1794295,
+        "max": 574.871769,
+        "p(90)": 227.2275661,
+        "p(95)": 230.32910075
+      }
+    },
+    "http_req_duration{ep:report_fleet_utilisation}": {
+      "thresholds": {
+        "p(95)<500": {
+          "ok": true
+        }
+      },
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 128.763018,
+        "max": 294.22572,
+        "p(90)": 136.6586494,
+        "p(95)": 139.195036,
+        "avg": 129.55492870370358,
+        "min": 117.475196
+      }
+    }
+  }
+}

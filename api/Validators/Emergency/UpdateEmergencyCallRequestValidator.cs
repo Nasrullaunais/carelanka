@@ -1,3 +1,4 @@
+using CareLanka.Api.Data.Configurations.Emergency;
 using CareLanka.Api.DTOs.Emergency;
 using FluentValidation;
 
@@ -20,7 +21,7 @@ public sealed class UpdateEmergencyCallRequestValidator : AbstractValidator<Upda
             .Must(request => request.Latitude.HasValue == request.Longitude.HasValue)
             .WithMessage("Latitude and longitude must be supplied together.");
         RuleFor(request => request.LocationAccuracyMetres)
-            .GreaterThanOrEqualTo(0)
+            .InclusiveBetween(0, EmergencyCallConfiguration.MaxLocationAccuracyMetres)
             .When(request => request.LocationAccuracyMetres.HasValue);
         RuleFor(request => request)
             .Must(request => !request.LocationAccuracyMetres.HasValue || request.Latitude.HasValue)

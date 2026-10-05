@@ -1,3 +1,4 @@
+using CareLanka.Api.Data.Configurations.Emergency;
 using CareLanka.Api.DTOs.Emergency;
 using FluentValidation;
 
@@ -18,7 +19,9 @@ public sealed class CreateEmergencyCallRequestValidator : AbstractValidator<Crea
         RuleFor(request => request.CallerPhone).MaximumLength(20);
         RuleFor(request => request.Latitude).NotNull().InclusiveBetween(-90, 90);
         RuleFor(request => request.Longitude).NotNull().InclusiveBetween(-180, 180);
-        RuleFor(request => request.LocationAccuracyMetres).NotNull().GreaterThanOrEqualTo(0);
+        RuleFor(request => request.LocationAccuracyMetres)
+            .NotNull()
+            .InclusiveBetween(0, EmergencyCallConfiguration.MaxLocationAccuracyMetres);
         RuleFor(request => request.LocationCapturedAt).NotNull();
         RuleFor(request => request.IdempotencyKey).NotNull().NotEqual(Guid.Empty);
         RuleFor(request => request.Details).MaximumLength(1000);

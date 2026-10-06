@@ -262,7 +262,11 @@ public sealed class ShiftEndpointTests
         var updateShift = await client.PutAsJsonAsync($"/api/shifts/{shiftId}", new CreateShiftRequest
         {
             WardId = wardId,
-            Date = new DateOnly(2026, 10, 5),
+            // Deliberately computed from today, not a fixed date: CancelShiftAsync refuses to
+            // delete a shift once its start time has passed, so a hardcoded date eventually
+            // lands in the past and this test starts failing for a reason that has nothing to
+            // do with the code under test.
+            Date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
             StartTime = "22:00",
             EndTime = "06:00",
             RequiredRole = StaffRole.Doctor,

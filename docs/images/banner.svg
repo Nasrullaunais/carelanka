@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="260" viewBox="0 0 960 260" font-family="Liberation Sans, Arial, Helvetica, sans-serif" role="img" aria-labelledby="t d"><title id="t">CareLanka</title><desc id="d">CareLanka: one hospital, four busy areas, one connected system. AI suggests, a person always decides.</desc>
+<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0B2E4F"/><stop offset="1" stop-color="#0E6A74"/></linearGradient></defs>
+<rect width="960" height="260" rx="24" fill="url(#bg)"/>
+<circle cx="880" cy="40" r="170" fill="#fff" fill-opacity="0.04"/>
+<circle cx="930" cy="250" r="110" fill="#fff" fill-opacity="0.05"/>
+<rect x="48.0" y="40.0" width="84.0" height="84.0" rx="22" fill="#ffffff" fill-opacity="0.16" stroke="#ffffff" stroke-opacity="0.4" stroke-width="2"/>
+<rect x="79.0" y="58.0" width="22.0" height="48.0" rx="7" fill="#ffffff"/>
+<rect x="66.0" y="71.0" width="48.0" height="22.0" rx="7" fill="#ffffff"/>
+<text x="154.0" y="100.0" font-size="62" fill="#ffffff" font-weight="700">CareLanka</text>
+<text x="48.0" y="158.0" font-size="22" fill="#ffffff">One hospital. Four busy areas. One connected system.</text>
+<text x="48.0" y="188.0" font-size="17" fill="#ffffff" fill-opacity="0.78">AI suggests. A person always decides.</text>
+<path d="M560 84 H650 L668 84 L684 54 L708 112 L730 38 L756 84 H920" fill="none" stroke="#ffffff" stroke-opacity="0.55" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="48.0" y="208.0" width="125.2" height="32.0" rx="16" fill="#C8641E"/>
+<circle cx="66.0" cy="224.0" r="5" fill="#ffffff"/>
+<text x="79.0" y="229.5" font-size="15" fill="#ffffff" font-weight="700">Emergency</text>
+<rect x="185.2" y="208.0" width="77.6" height="32.0" rx="16" fill="#2271B3"/>
+<circle cx="203.2" cy="224.0" r="5" fill="#ffffff"/>
+<text x="216.2" y="229.5" font-size="15" fill="#ffffff" font-weight="700">Staff</text>
+<rect x="274.8" y="208.0" width="121.7" height="32.0" rx="16" fill="#2E8B57"/>
+<circle cx="292.8" cy="224.0" r="5" fill="#ffffff"/>
+<text x="305.8" y="229.5" font-size="15" fill="#ffffff" font-weight="700">Equipment</text>
+<rect x="408.4" y="208.0" width="94.2" height="32.0" rx="16" fill="#B83266"/>
+<circle cx="426.4" cy="224.0" r="5" fill="#ffffff"/>
+<text x="439.4" y="229.5" font-size="15" fill="#ffffff" font-weight="700">Patient</text>
+</svg>

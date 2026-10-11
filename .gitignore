@@ -28,6 +28,7 @@ RUN.md
 IMPORTANT.md
 PR_DRAFT.md
 OVERALL_EXPLANATION.md
+HOSTING_NOTES.md
 
 ## Graft (local code map) — each person runs `graft init` for their own
 graft/

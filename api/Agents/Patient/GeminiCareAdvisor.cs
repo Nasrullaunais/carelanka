@@ -195,7 +195,7 @@ public sealed class GeminiCareAdvisor : ICareAdvisor
             SourceNote = failure.ToReviewerText()
         };
     }
-
+    //facts
     private static string Facts(CareAdviceContext context)
         => JsonSerializer.Serialize(new
         {

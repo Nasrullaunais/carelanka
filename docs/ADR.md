@@ -20,7 +20,7 @@ component's decisions and the group ones below.
 | 5 | Enum storage strategy | **Accepted** | 2026-09-07 |
 | 6 | React state management | **Accepted** | 2026-09-07 |
 | 7 | Flutter state management | **Accepted** | 2026-09-07 |
-| 8 | Cloud deployment platform | **Open — needs a group call** | — |
+| 8 | Cloud deployment platform | **Accepted** | 2026-09-28 |
 | 9 | Notifications | **Accepted** | 2026-09-30 |
 
 ---
@@ -376,7 +376,7 @@ folder, which predates the codegen decision.
 
 ## ADR 8 — Cloud deployment platform
 
-**Status: OPEN — needs a group decision. This one is not settled.**
+**Status: Accepted, 2026-09-28**
 
 ### Context
 
@@ -385,35 +385,51 @@ PostgreSQL deployed with restricted credentials, React deployed and live, and a 
 Android APK. §15 requires all of it reachable by evaluators until 21 October 2026. §14 also
 requires that it all be achievable on no-cost services.
 
-`GET /health` is specified in `specs/common-spec.yaml`, so the health URL requirement has
-somewhere to point once a host exists.
-
-### Options on the table
+### Options considered
 
 | Option | Notes |
 | :--- | :--- |
-| **Azure for Students** | $100 credit with a student account. App Service plus Azure Database for PostgreSQL. Closest to the .NET stack and the least friction for an ASP.NET deploy |
-| **Render / Railway free tier + Neon or Supabase Postgres** | Free, straightforward Docker deploy, generous Postgres free tiers. Free instances sleep when idle, which is a live risk on demo day |
-| **Fly.io + Neon** | Free allowance, good for a container, region close to Sri Lanka |
+| **Azure App Service + Azure Database for PostgreSQL** | Managed services, closest to the .NET stack. Three separate paid resources to set up and keep within the student credit |
+| **Render / Railway free tier + Neon or Supabase Postgres** | Free, straightforward Docker deploy. Free instances sleep when idle, which is a live risk on demo day, and the API and database sit with different providers |
+| **Fly.io + Neon** | Free allowance, good for a container. Same split across two providers |
+| **One DigitalOcean server running Docker Compose** | The first setup written (2026-09-27). Simple, but paid by card, about $12 a month |
+| **One Azure virtual machine running Docker Compose** | The same one-server setup, paid from the Azure for Students credit |
 
-React can go to Vercel, Netlify or GitHub Pages under any of the three; it is a static
-build and is not the hard part. The database and the API are.
+### Decision
 
-### Why it is still open
+**One Azure virtual machine (Azure for Students credit) running the whole system with
+Docker Compose.** Ubuntu 24.04, 2 vCPU / 4 GB, region UAE North, public address
+`carelanka.uaenorth.cloudapp.azure.com`. Setup and day-to-day operation are in
+`deploy/README.md`; the services are in `deploy/compose.yaml`.
 
-Nobody has been assigned it and nobody has verified which free tiers are actually
-available to this group. It is the last of §14.2's five required decisions and the only
-one still unmade.
+Five containers: `db` (PostgreSQL 16, data in a named volume), `migrate` (applies EF
+migrations, then exits), `db-setup` (creates the API's limited login and loads the demo
+data the first time only, then exits), `api`, and `web` (Caddy serving the built React app).
+Caddy is the only container with open ports. It sends `/api` and `/swagger` to the API,
+everything else to the React app, and gets a free Let's Encrypt certificate for HTTPS.
 
-**Blocking on:** one person trying an actual deploy and reporting back. Until that
-happens, this section is a placeholder and the group cannot claim §14.
+The API connects as `carelanka_app`, which can read and write rows but cannot create,
+alter or drop tables (`deploy/db-setup/app-role.sql`). Only `migrate` and `db-setup` use
+the owner login. Secrets live in a `.env` file on the server and never in the repository.
 
-### Consequences of leaving it
+The server never builds anything. CI builds and tests, publishes the images to `ghcr.io`
+only when every check passes, and deploys over SSH on `main` only, then checks
+`/api/health`.
 
-The deployment evidence is worth marks under "Documentation and Deployment (10)", and
-"evaluator access is clear and setup is fully reproducible" is the difference between the
-top band and the one below. A deployment attempted in the final week usually discovers a
-connection-string or migration problem that takes a day.
+### Consequences
+
+- **No cost to the group**, and the server does not sleep when idle, so it is up on demo day.
+- **The API and the database sit on one machine**, so there is no network hop between them
+  and no second provider to configure. The flip side is a single point of failure: if the VM
+  stops, everything stops. Acceptable for an assignment demo, not for a real hospital.
+- **We run the database ourselves.** No managed backups or automatic patching. A fresh demo
+  database is one `docker volume rm` away; real data would need scheduled backups.
+- **The database has no public port.** Evaluators see the data through the app and the API;
+  looking at the tables directly means logging in to the server.
+- **Every image is labelled with its commit**, so going back to an earlier version is a
+  one-line change on the server. Rolling back does not undo a migration.
+- **The phone app is not hosted.** The APK is built with
+  `--dart-define=API_BASE_URL=https://<address>/api` and talks to the same server.
 
 
 ---

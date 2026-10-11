@@ -360,14 +360,125 @@ async function token(who) {
   }
 }
 
+const CONTEXT_NAME = 'QM-Patient';
+
+async function waitFor(label, read, done, { seconds = 5, limitMs = Infinity } = {}) {
+  const end = Date.now() + limitMs;
+  for (;;) {
+    const value = await read();
+    if (done(value) || Date.now() >= end) {
+      return value;
+    }
+    console.log(`  ${label}: ${value}`);
+    await new Promise((r) => setTimeout(r, seconds * 1000));
+  }
+}
+
+async function setUpContext() {
+  const host = escapeRegex(BASE);
+  const contexts = (await zapCall('context/view/contextList', {})).contextList ?? [];
+  if (contexts.includes(CONTEXT_NAME)) {
+    await zapCall('context/action/removeContext', { contextName: CONTEXT_NAME });
+  }
+  const { contextId } = await zapCall('context/action/newContext', { contextName: CONTEXT_NAME });
+  await zapCall('context/action/includeInContext', {
+    contextName: CONTEXT_NAME,
+    regex: `^${host}/api/(?:${SCOPE_PATTERN})(?:[/?].*)?$`,
+  });
+  for (const regex of [
+    `^${host}/api/auth/.*`,
+    `^${host}/api/me/care-queries.*`,
+    `^${host}/api/care-recommendations/[^/]+/redraft.*`,
+    `^${host}/api/admissions/pre-admit.*`,
+  ]) {
+    await zapCall('context/action/excludeFromContext', { contextName: CONTEXT_NAME, regex });
+  }
+  await zapCall('context/action/setContextInScope', { contextName: CONTEXT_NAME, booleanInScope: 'true' });
+  await zapCall('core/action/setMode', { mode: 'protect' });
+  console.log(`ZAP context ${CONTEXT_NAME} set, Protected mode on.`);
+  return contextId;
+}
+
+async function scan(who, minutes) {
+  if (who !== 'staff' && who !== 'patient') {
+    throw new Error('Use: scan staff or scan patient.');
+  }
+  const scanMinutes = Number(minutes) || 3;
+  const file = join(outDir, who === 'staff' ? 'staff-routes.openapi.json' : 'me-routes.openapi.json');
+  if (!existsSync(file)) {
+    throw new Error(`${file} is missing. Run prepare first.`);
+  }
+  const routes = JSON.parse(readFileSync(file, 'utf8'));
+  const target = Object.keys(routes.paths).every((p) => p.startsWith('/api/')) ? BASE : `${BASE}/api`;
+
+  const contextId = await setUpContext();
+  await token(who);
+  if (process.exitCode === 1) {
+    throw new Error('The token check through ZAP failed. No scan was started.');
+  }
+
+  console.log('');
+  console.log(`Passive scan: importing ${Object.keys(routes.paths).length} ${who} addresses into ZAP.`);
+  await zapCall('openapi/action/importFile', { file, target, contextId });
+  await waitFor(
+    'Requests ZAP still has to read',
+    async () => Number((await zapCall('pscan/view/recordsToScan', {})).recordsToScan),
+    (left) => left === 0,
+  );
+  console.log('Passive scan finished.');
+
+  const start = who === 'staff' ? `${BASE}/api/patients` : `${BASE}/api/me`;
+  await zapCall('ascan/action/setOptionThreadPerHost', { Integer: '2' });
+  await zapCall('ascan/action/setOptionDelayInMs', { Integer: '100' });
+  await zapCall('ascan/action/setOptionMaxScanDurationInMins', { Integer: String(scanMinutes) });
+  console.log('');
+  console.log(`Active scan: attacking ${start} for at most ${scanMinutes} minutes.`);
+  const { scan: scanId } = await zapCall('ascan/action/scan', { url: start, recurse: 'true', contextId });
+  await waitFor(
+    'Active scan progress %',
+    async () => Number((await zapCall('ascan/view/status', { scanId })).status),
+    (progress) => progress >= 100,
+    { seconds: 15, limitMs: (scanMinutes + 1) * 60000 },
+  );
+  await zapCall('ascan/action/stop', { scanId }, { allowMissing: true });
+  const sent = (await zapCall('ascan/view/messagesIds', { scanId })).messagesIds ?? [];
+  console.log(`Active scan stopped. Attack requests sent: ${sent.length}.`);
+
+  await token('clear');
+
+  const alerts = (await zapCall('alert/view/alerts', { baseurl: BASE })).alerts ?? [];
+  const byName = new Map();
+  for (const a of alerts) {
+    const key = `${a.risk}: ${a.alert}`;
+    byName.set(key, (byName.get(key) ?? 0) + 1);
+  }
+  console.log('');
+  console.log(`Alerts found: ${byName.size} kind(s)`);
+  for (const [key, pages] of byName) {
+    console.log(`  ${key} (on ${pages} page${pages === 1 ? '' : 's'})`);
+  }
+
+  const now = new Date();
+  const stamp = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+    .toISOString()
+    .replace(/[:T]/g, (c) => (c === 'T' ? '_' : '-'))
+    .slice(0, 19);
+  const report = join(outDir, `zap-report-${who}-${stamp}.html`);
+  const html = await fetch(`${ZAP_URL}/OTHER/core/other/htmlreport/`);
+  writeFileSync(report, await html.text());
+  console.log(`Report saved: ${report}`);
+}
+
 async function main() {
-  const [command, who] = process.argv.slice(2);
+  const [command, who, minutes] = process.argv.slice(2);
   if (command === 'prepare') {
     await prepare();
   } else if (command === 'token') {
     await token(who);
+  } else if (command === 'scan') {
+    await scan(who, minutes);
   } else {
-    throw new Error('Use: prepare, token staff, token patient or token clear.');
+    throw new Error('Use: prepare, token staff, token patient, token clear, scan staff or scan patient.');
   }
 }
 
